@@ -24,7 +24,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.LongAccumulator;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.function.FunctionRegistry;
-import org.apache.pinot.common.metrics.MetricsHelper;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -71,8 +70,6 @@ public class ServerInstance {
     PinotConfiguration metricsConfiguration = serverConf.getMetricsConfig();
     PinotMetricUtils.init(metricsConfiguration);
     PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
-    MetricsHelper.initializeMetrics(metricsConfiguration);
-    MetricsHelper.registerMetricsRegistry(metricsRegistry);
     _serverMetrics =
         new ServerMetrics(serverConf.getMetricsPrefix(), metricsRegistry, serverConf.emitTableLevelMetrics(),
             serverConf.getAllowedTablesForEmittingMetrics());

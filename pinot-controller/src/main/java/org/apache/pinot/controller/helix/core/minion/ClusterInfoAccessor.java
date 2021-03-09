@@ -33,7 +33,6 @@ import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -42,7 +41,7 @@ import org.apache.pinot.spi.data.Schema;
 
 /**
  * The class <code>ClusterInfoProvider</code> is an abstraction on top of {@link PinotHelixResourceManager} and
- * {@link PinotHelixTaskResourceManager} which provides cluster information for {@link PinotTaskGenerator}.
+ * {@link PinotHelixTaskResourceManager} which provides cluster information for PinotTaskGenerator.
  */
 public class ClusterInfoAccessor {
   private final PinotHelixResourceManager _pinotHelixResourceManager;

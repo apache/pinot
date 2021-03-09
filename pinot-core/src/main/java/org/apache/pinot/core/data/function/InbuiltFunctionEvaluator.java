@@ -31,21 +31,13 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
- * Evaluates a function expression.
- * <p>This is optimized for evaluating the an expression multiple times with different inputs.
- * <p>Overall idea
+ * Evaluates an expression.
+ * <p>This is optimized for evaluating an expression multiple times with different inputs.
+ * <p>Overall idea: parse the expression into an ExecutableNode, where an ExecutableNode can be:
  * <ul>
- *   <li>Parse the function expression into an expression tree</li>
- *   <li>Convert each node in the expression tree into and ExecutableNode</li>
- * </ul>
- * <p>An ExecutableNode can be a
- * <ul>
- *   <li>FunctionNode - executes another function</li>
+ *   <li>FunctionNode - executes a function</li>
  *   <li>ColumnNode - fetches the value of the column from the input GenericRow</li>
- *   <li>
- *     ConstantNode - returns the same value
- *     <p>Typically constant function arguments are represented using a ConstantNode
- *   </li>
+ *   <li>ConstantNode - returns the literal value</li>
  * </ul>
  */
 public class InbuiltFunctionEvaluator implements FunctionEvaluator {
@@ -56,42 +48,34 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
   public InbuiltFunctionEvaluator(String functionExpression) {
     _arguments = new ArrayList<>();
     ExpressionContext expression = QueryContextConverterUtils.getExpression(functionExpression);
-    Preconditions
-        .checkArgument(expression.getType() == ExpressionContext.Type.FUNCTION, "Invalid function expression: %s",
-            functionExpression);
-    _rootNode = planExecution(expression.getFunction());
+    _rootNode = planExecution(expression);
   }
 
-  private FunctionExecutionNode planExecution(FunctionContext function) {
-    List<ExpressionContext> arguments = function.getArguments();
-    int numArguments = arguments.size();
-    ExecutableNode[] childNodes = new ExecutableNode[numArguments];
-    for (int i = 0; i < numArguments; i++) {
-      ExpressionContext argument = arguments.get(i);
-      ExecutableNode childNode;
-      switch (argument.getType()) {
-        case FUNCTION:
-          childNode = planExecution(argument.getFunction());
-          break;
-        case IDENTIFIER:
-          String columnName = argument.getIdentifier();
-          childNode = new ColumnExecutionNode(columnName, _arguments.size());
-          _arguments.add(columnName);
-          break;
-        case LITERAL:
-          childNode = new ConstantExecutionNode(argument.getLiteral());
-          break;
-        default:
-          throw new IllegalStateException();
-      }
-      childNodes[i] = childNode;
-    }
-
-    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(function.getFunctionName(), numArguments);
-    Preconditions
-        .checkState(functionInfo != null, "Unsupported function: %s with %s parameters", function.getFunctionName(),
+  private ExecutableNode planExecution(ExpressionContext expression) {
+    switch (expression.getType()) {
+      case LITERAL:
+        return new ConstantExecutionNode(expression.getLiteral());
+      case IDENTIFIER:
+        String columnName = expression.getIdentifier();
+        ColumnExecutionNode columnExecutionNode = new ColumnExecutionNode(columnName, _arguments.size());
+        _arguments.add(columnName);
+        return columnExecutionNode;
+      case FUNCTION:
+        FunctionContext function = expression.getFunction();
+        List<ExpressionContext> arguments = function.getArguments();
+        int numArguments = arguments.size();
+        ExecutableNode[] childNodes = new ExecutableNode[numArguments];
+        for (int i = 0; i < numArguments; i++) {
+          childNodes[i] = planExecution(arguments.get(i));
+        }
+        String functionName = function.getFunctionName();
+        FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
+        Preconditions.checkState(functionInfo != null, "Unsupported function: %s with %s parameters", functionName,
             numArguments);
-    return new FunctionExecutionNode(functionInfo, childNodes);
+        return new FunctionExecutionNode(functionInfo, childNodes);
+      default:
+        throw new IllegalStateException();
+    }
   }
 
   @Override

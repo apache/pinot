@@ -1,6 +1,10 @@
 {
   "dimensionFieldSpecs": [
     {
+      "dataType": "INT",
+      "name": "generationNumber"
+    },
+    {
       "dataType": "STRING",
       "name": "stringDimSV1"
     },
@@ -78,12 +82,13 @@
       "name": "doubleMetric1"
     }
   ],
-  "timeFieldSpec" : {
-    "incomingGranularitySpec" : {
+  "dateTimeFieldSpecs" : [
+    {
       "name" : "HoursSinceEpoch",
       "dataType" : "INT",
-      "timeType" : "HOURS"
+      "format" : "1:HOURS:EPOCH",
+      "granularity": "1:HOURS"
     }
-  },
+  ],
   "schemaName": "FeatureTest1"
 }

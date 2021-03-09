@@ -19,7 +19,7 @@
 #
 
 # A script that does rolling upgrade of Pinot components
-# from one version to the other given 2 commit hashes. It first builds  
+# from one version to the other given 2 commit hashes. It first builds
 # Pinot in the 2 given directories and then upgrades in the following order:
 # Controller -> Broker -> Server
 #
@@ -34,17 +34,17 @@
 #  and run all the scripts in the directory in alpha order, one script at each
 #  "stage" of upgrade.
 #
-#  We may modify to choose a minimal run in which the same set of operatons are run 
+#  We may modify to choose a minimal run in which the same set of operatons are run
 #  between any two component upgrades/rollbacks -- this may consist of adding
 #  one more segment to table, adding some more rows to the stream topic, and
 #  running some queries with the new data.
 
-# get a temporary directory in case the workingDir is not provided by user   
+# get a temporary directory in case the workingDir is not provided by user
 TMP_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')
 
 COMPAT_TESTER_PATH="pinot-integration-tests/target/pinot-integration-tests-pkg/bin/pinot-compat-test-runner.sh"
 
-# get usage of the script 
+# get usage of the script
 function usage() {
   command=$1
   echo "Usage: $command olderCommit newerCommit [workingDir]"
@@ -62,7 +62,7 @@ function cleanup() {
 function checkoutAndBuild() {
   commitHash=$1
   targetDir=$2
-  
+
   pushd "$targetDir" || exit 1
   git init
   git remote add origin https://github.com/apache/incubator-pinot
@@ -72,7 +72,7 @@ function checkoutAndBuild() {
   popd || exit 1
 }
 
-# Given a component and directory, start that version of the specific component 
+# Given a component and directory, start that version of the specific component
 function startService() {
   serviceName=$1
   dirName=$2
@@ -80,7 +80,7 @@ function startService() {
   pushd "$dirName"/pinot-tools/target/pinot-tools-pkg/bin  || exit 1
   if [ "$serviceName" = "zookeeper" ]; then
     sh -c 'echo $$ > $0/zookeeper.pid; exec ./pinot-admin.sh StartZookeeper' "${dirName}" &
-  elif [ "$serviceName" = "controller" ]; then 
+  elif [ "$serviceName" = "controller" ]; then
     sh -c 'echo $$ > $0/controller.pid; exec ./pinot-admin.sh StartController' "${dirName}" &
   elif [ "$serviceName" = "broker" ]; then
     sh -c 'echo $$ > $0/broker.pid; exec ./pinot-admin.sh StartBroker' "${dirName}" &
@@ -96,7 +96,7 @@ function startService() {
 function stopService() {
   serviceName=$1
   dirName=$2
-  if [ -f "${dirName}/${serviceName}".pid ]; then 
+  if [ -f "${dirName}/${serviceName}".pid ]; then
     servicePid=$(<"${dirName}/${serviceName}".pid)
     rm "${dirName}/${serviceName}".pid
     if [ -n "$servicePid" ]; then
@@ -127,7 +127,7 @@ function stopServices() {
   stopService zookeeper "$dirName"
   stopService kafka "$dirName"
   echo "Cluster stopped."
-} 
+}
 
 # Setup the path and classpath prefix for compatibility tester executable
 function setupCompatTester() {
@@ -142,7 +142,7 @@ function setupCompatTester() {
 # Main
 #
 
-# cleanp the temporary directory when the bash script exits 
+# cleanp the temporary directory when the bash script exits
 trap cleanup EXIT
 
 setupCompatTester
@@ -158,6 +158,7 @@ setupCompatTester
 #   rm -rf /tmp/zkdir && ${PINOT_ADMIN_CMD} StartZookeeper -dataDir /tmp/zkdir
 #   ${PINOT_ADMIN_CMD} StartController
 #   ${PINOT_ADMIN_CMD} StartBroker
+#   ${PINOT_ADMIN_CMD} StartServer
 #   ${PINOT_ADMIN_CMD} StartKafka -zkAddress localhost:2181
 #
 # To compile the compat tester command alone, do the following:
@@ -165,8 +166,8 @@ setupCompatTester
 #   mvn clean install -DskipTests
 #   mvn -pl pinot-integration-tests  package -DskipTests
 #
-if [ $# -ne 1 ]; then echo "Usage: $0 <yaml-file-name> (Be sure to start all components)"; exit 1; fi
-${COMPAT_TESTER} $1; if [ $? -ne 0 ]; then echo "Command failed"; exit 1; fi
+if [ $# -ne 2 ]; then echo "Usage: $0 <yaml-file-name> <generation-number> (Be sure to start all components)"; exit 1; fi
+${COMPAT_TESTER} $1 $2; if [ $? -ne 0 ]; then echo "Command failed"; exit 1; fi
 exit 0
 # XXX END Temporary
 ##############################################################################
@@ -177,7 +178,7 @@ fi
 
 # get arguments
 olderCommit=$1
-newerCommit=$2 
+newerCommit=$2
 
 if [ -n "$3" ]; then
   workingDir=$3
@@ -210,7 +211,7 @@ echo "Building the new version ..."
 checkoutAndBuild "$newerCommit" "$newTargetDir"
 
 # check that the default ports are open
-if [ "$(lsof -t -i:8097 -s TCP:LISTEN)" ] || [ "$(lsof -t -i:8098 -sTCP:LISTEN)" ] || [ "$(lsof -t -i:8099 -sTCP:LISTEN)" ] || 
+if [ "$(lsof -t -i:8097 -s TCP:LISTEN)" ] || [ "$(lsof -t -i:8098 -sTCP:LISTEN)" ] || [ "$(lsof -t -i:8099 -sTCP:LISTEN)" ] ||
      [ "$(lsof -t -i:9000 -sTCP:LISTEN)" ] || [ "$(lsof -t -i:2181 -sTCP:LISTEN)" ]; then
   echo "Cannot start the components since the default ports are not open. Check any existing process that may be using the default ports."
   exit 1

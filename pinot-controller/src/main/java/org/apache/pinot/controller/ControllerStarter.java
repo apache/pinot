@@ -48,11 +48,9 @@ import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.model.Message;
 import org.apache.helix.task.TaskDriver;
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.metrics.MetricsHelper;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ValidationMetrics;
@@ -482,16 +480,9 @@ public class ControllerStarter implements ServiceStartable {
 
   private void initControllerMetrics() {
     PinotConfiguration metricsConfiguration = _config.subset(METRICS_REGISTRY_NAME);
-    try {
-      PinotMetricUtils.init(metricsConfiguration);
-      _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
-    } catch (InvalidConfigException e) {
-      throw new RuntimeException("Caught InvalidConfigException when initializing metricsRegistry", e);
-    }
+    PinotMetricUtils.init(metricsConfiguration);
+    _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
     _controllerMetrics = new ControllerMetrics(_config.getMetricsPrefix(), _metricsRegistry);
-
-    MetricsHelper.initializeMetrics(metricsConfiguration);
-    MetricsHelper.registerMetricsRegistry(_metricsRegistry);
     _controllerMetrics.initializeGlobalMeters();
   }
 

@@ -45,11 +45,11 @@ public class RecordFilterTest {
 
     recordFilterConfig =
         new RecordFilterConfig.Builder().setRecordFilterType(RecordFilterFactory.RecordFilterType.FILTER_FUNCTION)
-            .setFilterFunction("bad function").build();
+            .setFilterFunction("badFunction()").build();
     try {
       RecordFilterFactory.getRecordFilter(recordFilterConfig);
       fail("Should not pass for invalid filter function");
-    } catch (IllegalArgumentException e) {
+    } catch (IllegalStateException e) {
       // expected
     }
     recordFilterConfig =

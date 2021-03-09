@@ -54,7 +54,7 @@ public class ValidationMetrics {
 
     @Override
     public Object getGauge() {
-      return PinotMetricUtils.generatePinotGauge(avoid -> value()).getGauge();
+      return PinotMetricUtils.makePinotGauge(avoid -> value()).getGauge();
     }
 
     @Override
@@ -94,7 +94,7 @@ public class ValidationMetrics {
 
     @Override
     public Object getGauge() {
-      return PinotMetricUtils.generatePinotGauge(avoid -> value()).getGauge();
+      return PinotMetricUtils.makePinotGauge(avoid -> value()).getGauge();
     }
   }
 
@@ -205,14 +205,14 @@ public class ValidationMetrics {
   }
 
   private PinotMetricName makeMetricName(final String gaugeName) {
-    return PinotMetricUtils.generatePinotMetricName(ValidationMetrics.class, gaugeName);
+    return PinotMetricUtils.makePinotMetricName(ValidationMetrics.class, gaugeName);
   }
 
   private void makeGauge(final String gaugeName, final PinotMetricName metricName, final GaugeFactory<?> gaugeFactory,
       final long value) {
     if (!_gaugeValues.containsKey(gaugeName)) {
       _gaugeValues.put(gaugeName, value);
-      MetricsHelper.newGauge(_metricsRegistry, metricName, gaugeFactory.buildGauge(gaugeName));
+      PinotMetricUtils.makeGauge(_metricsRegistry, metricName, gaugeFactory.buildGauge(gaugeName));
       _metricNames.add(metricName);
     } else {
       _gaugeValues.put(gaugeName, value);
@@ -224,7 +224,7 @@ public class ValidationMetrics {
    */
   public void unregisterAllMetrics() {
     for (PinotMetricName metricName : _metricNames) {
-      MetricsHelper.removeMetric(_metricsRegistry, metricName);
+      PinotMetricUtils.removeMetric(_metricsRegistry, metricName);
     }
 
     _metricNames.clear();

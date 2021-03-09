@@ -22,7 +22,7 @@ import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 
 /**
- * Interface to implement operations that occur whenever a new MetricsRegistry is registered with the MetricsHelper.
+ * Interface to implement operations that occur whenever a new MetricsRegistry is registered with the PinotMetricUtils.
  *
  */
 public interface MetricsRegistryRegistrationListener {

@@ -60,19 +60,14 @@ public class PinotInstanceRestletResource {
   PinotHelixResourceManager pinotHelixResourceManager;
 
   public static class Instances {
-    List<String> instances;
+    List<String> _instances;
 
     public Instances(@JsonProperty("instances") List<String> instances) {
-      this.instances = instances;
+      _instances = instances;
     }
 
     public List<String> getInstances() {
-      return instances;
-    }
-
-    public Instances setInstances(List<String> instances) {
-      this.instances = instances;
-      return this;
+      return _instances;
     }
   }
 
@@ -114,25 +109,27 @@ public class PinotInstanceRestletResource {
   }
 
   private int getGrpcPort(InstanceConfig instanceConfig) {
-    int grpcPort;
-    try {
-      grpcPort = Integer.parseInt(instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.Instance.GRPC_PORT_KEY));
-    } catch (Exception e) {
-      LOGGER.warn("Grpc port is not set for instance: {}", instanceConfig.getInstanceName(), e);
-      grpcPort = Instance.NOT_SET_GRPC_PORT_VALUE;
+    String grpcPortStr = instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.Instance.GRPC_PORT_KEY);
+    if (grpcPortStr != null) {
+      try {
+        return Integer.parseInt(grpcPortStr);
+      } catch (Exception e) {
+        LOGGER.warn("Illegal gRPC port: {} for instance: {}", grpcPortStr, instanceConfig.getInstanceName());
+      }
     }
-    return grpcPort;
+    return Instance.NOT_SET_GRPC_PORT_VALUE;
   }
 
   private int getAdminPort(InstanceConfig instanceConfig) {
-    int adminPort;
-    try {
-      adminPort = Integer.parseInt(instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.Instance.ADMIN_PORT_KEY));
-    } catch (Exception e) {
-      LOGGER.warn("Admin port is not set for instance: {}", instanceConfig.getInstanceName(), e);
-      adminPort = Instance.NOT_SET_ADMIN_PORT_VALUE;
+    String adminPortStr = instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.Instance.ADMIN_PORT_KEY);
+    if (adminPortStr != null) {
+      try {
+        return Integer.parseInt(adminPortStr);
+      } catch (Exception e) {
+        LOGGER.warn("Illegal admin port: {} for instance: {}", adminPortStr, instanceConfig.getInstanceName());
+      }
     }
-    return adminPort;
+    return Instance.NOT_SET_ADMIN_PORT_VALUE;
   }
 
   @POST

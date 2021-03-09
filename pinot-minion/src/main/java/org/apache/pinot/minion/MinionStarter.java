@@ -30,7 +30,6 @@ import org.apache.helix.manager.zk.ZKHelixManager;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.task.TaskStateModelFactory;
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.metrics.MetricsHelper;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
@@ -155,9 +154,6 @@ public class MinionStarter implements ServiceStartable {
     PinotMetricUtils.init(metricsConfiguration);
     PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
 
-    MetricsHelper.initializeMetrics(_config);
-
-    MetricsHelper.registerMetricsRegistry(metricsRegistry);
     MinionMetrics minionMetrics = new MinionMetrics(_config
         .getProperty(CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX_KEY,
             CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX), metricsRegistry);

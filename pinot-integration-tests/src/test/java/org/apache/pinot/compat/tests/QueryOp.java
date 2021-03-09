@@ -24,6 +24,7 @@ import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import org.apache.pinot.integration.tests.ClusterTest;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,17 +73,17 @@ public class QueryOp extends BaseOp {
   }
 
   @Override
-  boolean runOp() {
+  boolean runOp(int generationNumber) {
     System.out.println("Verifying queries in " + _queryFileName + " against results in " + _expectedResultsFileName);
     try {
-      return verifyQueries();
+      return verifyQueries(generationNumber);
     } catch (Exception e) {
       LOGGER.error("FAILED to verify queries in {}: {}", _queryFileName, e);
       return false;
     }
   }
 
-  boolean verifyQueries()
+  boolean verifyQueries(int generationNumber)
       throws Exception {
     boolean testPassed = false;
 
@@ -101,7 +102,7 @@ public class QueryOp extends BaseOp {
         if (shouldIgnore(query)) {
           continue;
         }
-
+        query = query.replaceAll(GENERATION_NUMBER_PLACEHOLDER, String.valueOf(generationNumber));
         JsonNode expectedJson = null;
         try {
           String expectedResultLine = expectedResultReader.readLine();
@@ -117,7 +118,7 @@ public class QueryOp extends BaseOp {
         JsonNode actualJson = null;
         if (expectedJson != null) {
           try {
-            actualJson = QueryProcessor.postSqlQuery(query);
+            actualJson = ClusterTest.postSqlQuery(query, ClusterDescriptor.BROKER_URL);
           } catch (Exception e) {
             LOGGER.error("Comparison FAILED: Line: {} Exception caught while running query: '{}'", queryLineNum, query,
                 e);

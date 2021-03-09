@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.plugin.inputformat.csv;
 
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -32,6 +34,7 @@ import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
 /**
@@ -100,5 +103,38 @@ public class CSVRecordExtractorTest extends AbstractRecordExtractorTest {
         Assert.assertEquals(actualValue, expectedValue == null ? null : String.valueOf(expectedValue));
       }
     }
+  }
+
+  /**
+   * Check if we can parse a CSV file that has escaped comma characters within fields.
+   */
+  @Test
+  public void testEscapeCharacterInCSV()
+    throws Exception {
+    // Create CSV config with backslash as escape character.
+    CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
+    csvRecordReaderConfig.setEscapeCharacter('\\');
+
+    // Create a CSV file where records have two values and the second value contains an escaped comma.
+    File escapedFile = new File(_tempDir, "escape.csv");
+    BufferedWriter writer = new BufferedWriter(new FileWriter(escapedFile));
+    writer.write("first,second\n");
+    writer.write("string1, string2\\, string3");
+    writer.close();
+
+    // Try to parse CSV file with escaped comma.
+    CSVRecordReader csvRecordReader = new CSVRecordReader();
+    HashSet<String> fieldsToRead = new HashSet<>();
+    fieldsToRead.add("first");
+    fieldsToRead.add("second");
+    csvRecordReader.init(escapedFile, fieldsToRead, csvRecordReaderConfig);
+    GenericRow genericRow = new GenericRow();
+    csvRecordReader.rewind();
+
+    // check if parsing succeeded.
+    Assert.assertTrue(csvRecordReader.hasNext());
+    csvRecordReader.next(genericRow);
+    Assert.assertEquals(genericRow.getValue("first"), "string1");
+    Assert.assertEquals(genericRow.getValue("second"), " string2, string3");
   }
 }
