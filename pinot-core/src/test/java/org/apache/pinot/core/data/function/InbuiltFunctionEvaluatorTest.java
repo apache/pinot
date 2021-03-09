@@ -30,7 +30,31 @@ import static org.testng.Assert.assertTrue;
 public class InbuiltFunctionEvaluatorTest {
 
   @Test
-  public void testExpressionWithColumn() {
+  public void testColumnExpression() {
+    String expression = "testColumn";
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
+    assertEquals(evaluator.getArguments(), Collections.singletonList("testColumn"));
+    GenericRow row = new GenericRow();
+    for (int i = 0; i < 5; i++) {
+      String value = "testValue" + i;
+      row.putValue("testColumn", value);
+      assertEquals(evaluator.evaluate(row), value);
+    }
+  }
+
+  @Test
+  public void testLiteralExpression() {
+    String expression = "'testValue'";
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
+    assertTrue(evaluator.getArguments().isEmpty());
+    GenericRow row = new GenericRow();
+    for (int i = 0; i < 5; i++) {
+      assertEquals(evaluator.evaluate(row), "testValue");
+    }
+  }
+
+  @Test
+  public void testFunctionWithColumn() {
     String expression = "reverse(testColumn)";
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
     assertEquals(evaluator.getArguments(), Collections.singletonList("testColumn"));
@@ -43,7 +67,7 @@ public class InbuiltFunctionEvaluatorTest {
   }
 
   @Test
-  public void testExpressionWithConstant() {
+  public void testFunctionWithLiteral() {
     String expression = "reverse(12345)";
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
     assertTrue(evaluator.getArguments().isEmpty());
@@ -52,7 +76,7 @@ public class InbuiltFunctionEvaluatorTest {
   }
 
   @Test
-  public void testMultiFunctionExpression() {
+  public void testNestedFunction() {
     String expression = "reverse(reverse(testColumn))";
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
     assertEquals(evaluator.getArguments(), Collections.singletonList("testColumn"));

@@ -391,7 +391,7 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Queries the broker's sql query endpoint (/sql)
    */
-  static JsonNode postSqlQuery(String query, String brokerBaseApiUrl)
+  public static JsonNode postSqlQuery(String query, String brokerBaseApiUrl)
       throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("sql", query);

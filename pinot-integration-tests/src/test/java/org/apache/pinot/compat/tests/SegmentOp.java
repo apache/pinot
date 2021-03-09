@@ -37,6 +37,7 @@ import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.integration.tests.ClusterTest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
@@ -66,7 +67,6 @@ public class SegmentOp extends BaseOp {
   private static final FileFormat DEFAULT_FILE_FORMAT = FileFormat.CSV;
   private static final int DEFAULT_MAX_SLEEP_TIME_MS = 30000;
   private static final int DEFAULT_SLEEP_INTERVAL_MS = 200;
-  private static final String GEN_NUM_PLACE_HOLDER = "__GENERATION_NUMBER__";
 
   public enum Op {
     UPLOAD,
@@ -158,7 +158,7 @@ public class SegmentOp extends BaseOp {
       FileUtils.forceMkdir(localOutputTempDir);
       // replace the placeholder in the data file.
       File localReplacedInputDataFile = new File(localTempDir, "replaced");
-      Utils.replaceContent(new File(_inputDataFileName), localReplacedInputDataFile, GEN_NUM_PLACE_HOLDER,
+      Utils.replaceContent(new File(_inputDataFileName), localReplacedInputDataFile, GENERATION_NUMBER_PLACEHOLDER,
           String.valueOf(_generationNumber));
 
       File segmentTarFile = generateSegment(localOutputTempDir, localReplacedInputDataFile.getAbsolutePath());
@@ -260,7 +260,7 @@ public class SegmentOp extends BaseOp {
   private boolean verifyRoutingTableUpdated()
       throws Exception {
     String query = "SELECT count(*) FROM " + _tableName;
-    JsonNode result = QueryProcessor.postSqlQuery(query);
+    JsonNode result = ClusterTest.postSqlQuery(query, ClusterDescriptor.BROKER_URL);
     long startTime = System.currentTimeMillis();
     while (SqlResultComparator.isEmpty(result)) {
       if ((System.currentTimeMillis() - startTime) > DEFAULT_MAX_SLEEP_TIME_MS) {
@@ -271,7 +271,7 @@ public class SegmentOp extends BaseOp {
       }
       LOGGER.warn("Routing table has not been updated yet, will retry after {} ms.", DEFAULT_SLEEP_INTERVAL_MS);
       Thread.sleep(DEFAULT_SLEEP_INTERVAL_MS);
-      result = QueryProcessor.postSqlQuery(query);
+      result = ClusterTest.postSqlQuery(query, ClusterDescriptor.BROKER_URL);
     }
     LOGGER.info("Routing table has been updated.");
     return true;

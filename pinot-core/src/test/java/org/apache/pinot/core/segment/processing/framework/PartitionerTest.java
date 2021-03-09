@@ -158,11 +158,11 @@ public class PartitionerTest {
     }
     partitionerConfig =
         new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
-            .setTransformFunction("bad function").build();
+            .setTransformFunction("badFunction()").build();
     try {
       PartitionerFactory.getPartitioner(partitionerConfig);
       fail("Should not create TRANSFORM_FUNCTION Partitioner for invalid transform function");
-    } catch (IllegalArgumentException e) {
+    } catch (IllegalStateException e) {
       // expected
     }
 
