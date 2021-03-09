@@ -23,7 +23,10 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
@@ -162,8 +165,32 @@ public class Quickstart {
     com.google.common.base.Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, tableConfigFile);
 
+    Map<String, Object> properties = new HashMap<>();
+    properties.put("controller.admin.access.control.factory.class", "org.apache.pinot.controller.api.access.BasicAuthAccessControlFactory");
+    properties.put("controller.admin.access.control.principals", "admin, user");
+    properties.put("controller.admin.access.control.principals.admin.password", "verysecret");
+    properties.put("controller.admin.access.control.principals.user.password", "secret");
+    properties.put("controller.admin.access.control.principals.user.tables", "baseballStats");
+    properties.put("controller.admin.access.control.principals.user.permissions", "read");
+    properties.put("controller.segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
+
+    properties.put("pinot.broker.access.control.class", "org.apache.pinot.broker.broker.BasicAuthAccessControlFactory");
+    properties.put("pinot.broker.access.control.principals", "admin, user");
+    properties.put("pinot.broker.access.control.principals.admin.password", "verysecret");
+    properties.put("pinot.broker.access.control.principals.user.password", "secret");
+    properties.put("pinot.broker.access.control.principals.user.tables", "baseballStats");
+    properties.put("pinot.broker.access.control.principals.user.permissions", "read");
+
+    properties.put("pinot.server.segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
+    properties.put("pinot.server.segment.upload.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
+    properties.put("pinot.server.instance.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
+
+    properties.put("segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
+    properties.put("task.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
+
     QuickstartTableRequest request = new QuickstartTableRequest(baseDir.getAbsolutePath());
-    final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, dataDir);
+    final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 1, dataDir, true,
+        BasicAuthUtils.toBasicAuthToken("admin", "verysecret"), properties);
 
     printStatus(Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");
     runner.startAll();
@@ -196,13 +223,15 @@ public class Quickstart {
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q2)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q3 = "select playerName, sum(runs) from baseballStats where yearID=2000 group by playerName order by sum(runs) desc limit 5";
+    String q3 =
+        "select playerName, sum(runs) from baseballStats where yearID=2000 group by playerName order by sum(runs) desc limit 5";
     printStatus(Color.YELLOW, "Top 5 run scorers of the year 2000");
     printStatus(Color.CYAN, "Query : " + q3);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q3)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q4 = "select playerName, sum(runs) from baseballStats where yearID>=2000 group by playerName order by sum(runs) desc limit 10";
+    String q4 =
+        "select playerName, sum(runs) from baseballStats where yearID>=2000 group by playerName order by sum(runs) desc limit 10";
     printStatus(Color.YELLOW, "Top 10 run scorers after 2000");
     printStatus(Color.CYAN, "Query : " + q4);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q4)));

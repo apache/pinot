@@ -110,7 +110,7 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
     return this;
   }
 
-  public PostQueryCommand setauthToken(String authToken) {
+  public PostQueryCommand setAuthToken(String authToken) {
     _authToken = authToken;
     return this;
   }

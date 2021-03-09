@@ -70,13 +70,6 @@ public class PinotConfigUtils {
     properties.put(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS, 3600);
     properties.put(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS, 3600);
     properties.put(ControllerConf.CONTROLLER_MODE, controllerMode.toString());
-    properties.put("controller.admin.access.control.factory.class", "org.apache.pinot.controller.api.access.BasicAuthAccessControlFactory");
-    properties.put("controller.admin.access.control.principals", "admin, user");
-    properties.put("controller.admin.access.control.principals.admin.password", "verysecret");
-    properties.put("controller.admin.access.control.principals.user.password", "secret");
-    properties.put("controller.admin.access.control.principals.user.tables", "baseballStats");
-    properties.put("controller.admin.access.control.principals.user.permissions", "read");
-    properties.put("controller.segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
 
     return properties;
   }
@@ -150,12 +143,6 @@ public class PinotConfigUtils {
   public static Map<String, Object> generateBrokerConf(int brokerPort) {
     Map<String, Object> properties = new HashMap<>();
     properties.put(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, brokerPort != 0 ? brokerPort : getAvailablePort());
-    properties.put("pinot.broker.access.control.class", "org.apache.pinot.broker.broker.BasicAuthAccessControlFactory");
-    properties.put("pinot.broker.access.control.principals", "admin, user");
-    properties.put("pinot.broker.access.control.principals.admin.password", "verysecret");
-    properties.put("pinot.broker.access.control.principals.user.password", "secret");
-    properties.put("pinot.broker.access.control.principals.user.tables", "baseballStats");
-    properties.put("pinot.broker.access.control.principals.user.permissions", "read");
 
     return properties;
   }
@@ -183,9 +170,6 @@ public class PinotConfigUtils {
     properties.put(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT, serverAdminPort);
     properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR, serverDataDir);
     properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, serverSegmentDir);
-    properties.put("pinot.server.segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
-    properties.put("pinot.server.segment.upload.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
-    properties.put("pinot.server.instance.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
 
     return properties;
   }
@@ -198,8 +182,6 @@ public class PinotConfigUtils {
     Map<String, Object> properties = new HashMap<>();
     properties.put(CommonConstants.Helix.KEY_OF_MINION_HOST, minionHost);
     properties.put(CommonConstants.Helix.KEY_OF_MINION_PORT, minionPort != 0 ? minionPort : getAvailablePort());
-    properties.put("segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
-    properties.put("task.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
 
     return properties;
   }

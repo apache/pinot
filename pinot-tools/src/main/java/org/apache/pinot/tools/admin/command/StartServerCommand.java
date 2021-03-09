@@ -21,6 +21,7 @@ package org.apache.pinot.tools.admin.command;
 import java.io.File;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.commons.configuration.ConfigurationException;
@@ -57,6 +58,8 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
   private String _clusterName = "PinotCluster";
   @Option(name = "-configFileName", required = false, metaVar = "<Config File Name>", usage = "Server Starter Config file.", forbids = {"-serverHost", "-serverPort", "-dataDir", "-segmentDir",})
   private String _configFileName;
+
+  private Map<String, Object> _configOverrides = new HashMap<>();
 
   @Override
   public boolean getHelp() {
@@ -95,6 +98,11 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
 
   public StartServerCommand setConfigFileName(String configFileName) {
     _configFileName = configFileName;
+    return this;
+  }
+
+  public StartServerCommand setConfigOverrides(Map<String, Object> configs) {
+    _configOverrides = configs;
     return this;
   }
 
@@ -145,13 +153,17 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
     }
   }
 
-
   private Map<String, Object> getServerConf()
       throws ConfigurationException, SocketException, UnknownHostException {
+    Map<String, Object> properties = new HashMap<>();
     if (_configFileName != null) {
-      return PinotConfigUtils.readConfigFromFile(_configFileName);
+      properties.putAll(PinotConfigUtils.readConfigFromFile(_configFileName));
+    } else {
+      properties.putAll(PinotConfigUtils.generateServerConf(_serverHost, _serverPort, _serverAdminPort, _dataDir, _segmentDir));
     }
-    return PinotConfigUtils
-        .generateServerConf(_serverHost, _serverPort, _serverAdminPort, _dataDir, _segmentDir);
+    if (_configOverrides != null) {
+      properties.putAll(_configOverrides);
+    }
+    return properties;
   }
 }
