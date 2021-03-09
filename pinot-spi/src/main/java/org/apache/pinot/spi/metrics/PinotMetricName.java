@@ -39,4 +39,10 @@ public interface PinotMetricName {
    * Overrides the hashCode method. This method's contract is the same as equals() method.
    */
   int hashCode();
+
+  /**
+   * Overrides the toString method.
+   * This could be used to print out the actual metrics name instead of the memory address under this wrapper.
+   */
+  String toString();
 }
