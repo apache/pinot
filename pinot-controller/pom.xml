@@ -207,17 +207,9 @@
       <groupId>com.jcabi</groupId>
       <artifactId>jcabi-log</artifactId>
     </dependency>
-    <!-- test -->
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-math3</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-csv</artifactId>
-      <version>${project.version}</version>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.quartz-scheduler</groupId>
