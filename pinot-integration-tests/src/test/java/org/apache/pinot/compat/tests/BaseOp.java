@@ -43,6 +43,7 @@ public abstract class BaseOp {
   private String _name;
   private final OpType _opType;
   private String _description = "No description provided";
+  protected static final String GENERATION_NUMBER_PLACEHOLDER = "__GENERATION_NUMBER__";
 
   protected BaseOp(OpType opType) {
     _opType = opType;

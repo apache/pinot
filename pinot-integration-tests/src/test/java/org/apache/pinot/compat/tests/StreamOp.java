@@ -38,6 +38,7 @@ import org.apache.kafka.clients.admin.KafkaAdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.integration.tests.ClusterTest;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -89,7 +90,6 @@ public class StreamOp extends BaseOp {
   private static final String NUM_SERVERS_QUERIED = "numServersQueried";
   private static final String NUM_SERVERS_RESPONEDED = "numServersResponded";
   private static final String TOTAL_DOCS = "totalDocs";
-  private static final String GENERATION_NUMBER_PLACEHOLDER = "__GENERATION_NUMBER__";
   private static final short KAFKA_REPLICATION_FACTOR = 1;
 
   public StreamOp() {
@@ -264,7 +264,7 @@ public class StreamOp extends BaseOp {
   private long fetchExistingTotalDocs(String tableName)
       throws Exception {
     String query = "SELECT count(*) FROM " + tableName;
-    JsonNode response = QueryProcessor.postSqlQuery(query);
+    JsonNode response = ClusterTest.postSqlQuery(query, ClusterDescriptor.BROKER_URL);
     if (response == null) {
       String errorMsg = String.format("Failed to query Table: %s", tableName);
       LOGGER.error(errorMsg);
