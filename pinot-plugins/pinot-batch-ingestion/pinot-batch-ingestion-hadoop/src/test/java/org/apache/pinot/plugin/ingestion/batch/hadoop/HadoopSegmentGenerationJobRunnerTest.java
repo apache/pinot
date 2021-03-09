@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.ingestion.batch.hadoop;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Collections;
 import java.util.HashMap;
@@ -46,6 +47,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import com.google.common.collect.Lists;
+import com.google.gson.Gson;
 
 public class HadoopSegmentGenerationJobRunnerTest {
 

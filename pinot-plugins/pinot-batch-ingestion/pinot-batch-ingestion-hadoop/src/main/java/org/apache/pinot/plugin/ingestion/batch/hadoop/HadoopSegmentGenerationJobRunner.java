@@ -261,14 +261,6 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
       // that the mapper code is available. 
       addMapperJarToDistributedCache(job, outputDirFS, stagingDirURI);
 
-      // Our class is in the batch-ingestion-hadoop plugin, so we want to pick a class
-      // that's in the main jar (the pinot-all-${PINOT_VERSION}-jar-with-dependencies.jar)
-      job.setJarByClass(SegmentGenerationJobSpec.class);
-
-      // But we have to copy ourselves to HDFS, and add us to the distributed cache, so
-      // that the mapper code is available.
-      addMapperJarToDistributedCache(job, outputDirFS, stagingDirURI);
-
       org.apache.hadoop.conf.Configuration jobConf = job.getConfiguration();
       String hadoopTokenFileLocation = System.getenv("HADOOP_TOKEN_FILE_LOCATION");
       if (hadoopTokenFileLocation != null) {
