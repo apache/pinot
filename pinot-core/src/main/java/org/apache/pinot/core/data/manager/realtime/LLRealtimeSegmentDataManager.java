@@ -211,7 +211,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final String _resourceDataDir;
   private final IndexLoadingConfig _indexLoadingConfig;
   private final Schema _schema;
-  // Semaphore for each partitionGroupId only, which is to prevent two different Kafka consumers
+  // Semaphore for each partitionGroupId only, which is to prevent two different stream consumers
   // from consuming with the same partitionGroupId in parallel in the same host.
   // See the comments in {@link RealtimeTableDataManager}.
   private final Semaphore _partitionGroupConsumerSemaphore;
@@ -740,7 +740,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
-    closeKafkaConsumers();
+    closeStreamConsumers();
     try {
       final long startTimeMillis = now();
       if (_segBuildSemaphore != null) {
@@ -888,7 +888,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return true;
   }
 
-  private void closeKafkaConsumers() {
+  private void closeStreamConsumers() {
     closePartitionLevelConsumer();
     closeStreamMetadataProvider();
     if (_acquiredConsumerSemaphore.compareAndSet(true, false)) {
@@ -1033,7 +1033,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   protected void downloadSegmentAndReplace(LLCRealtimeSegmentZKMetadata metadata) {
-    closeKafkaConsumers();
+    closeStreamConsumers();
     _realtimeTableDataManager.downloadAndReplaceSegment(_segmentNameStr, metadata, _indexLoadingConfig, _tableConfig);
   }
 
@@ -1071,7 +1071,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       segmentLogger.error("Could not stop consumer thread");
     }
     _realtimeSegment.destroy();
-    closeKafkaConsumers();
+    closeStreamConsumers();
   }
 
   protected void start() {
@@ -1215,7 +1215,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // Create record transformer
     _recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
 
-    // Acquire semaphore to create Kafka consumers
+    // Acquire semaphore to create stream consumers
     try {
       _partitionGroupConsumerSemaphore.acquire();
       _acquiredConsumerSemaphore.set(true);
