@@ -157,6 +157,6 @@ public class RulesToExecute {
     VariedLengthDictionaryRule, // VariedLengthDictionaryRule must go after NoDictionaryOnHeapDictionaryJointRule  since we do not recommend dictionary on NoDictionary cols
     PinotTablePartitionRule, // PinotTablePartitionRule must go after KafkaPartitionRule to recommend realtime partitions, after NoDictionaryOnHeapDictionaryJointRule to correctly calculate record size
     BloomFilterRule,
-    RealtimeProvisioningRule
+    RealtimeProvisioningRule // this rule must be the last one because it needs the output of other rules as its input
   }
 }
