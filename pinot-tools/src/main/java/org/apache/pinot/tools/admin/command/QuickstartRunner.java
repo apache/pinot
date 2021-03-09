@@ -249,9 +249,10 @@ public class QuickstartRunner {
 
   public JsonNode runQuery(String query)
       throws Exception {
+    String token = BasicAuthUtils.toBasicAuthToken("admin", "verysecret");
     int brokerPort = _brokerPorts.get(RANDOM.nextInt(_brokerPorts.size()));
     return JsonUtils.stringToJsonNode(new PostQueryCommand().setBrokerPort(String.valueOf(brokerPort))
-        .setQueryType(CommonConstants.Broker.Request.SQL).setQuery(query).run());
+        .setQueryType(CommonConstants.Broker.Request.SQL).setauthToken(token).setQuery(query).run());
   }
 
   public static void registerDefaultPinotFS() {

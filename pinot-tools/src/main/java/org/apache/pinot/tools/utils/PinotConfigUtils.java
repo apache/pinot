@@ -150,6 +150,12 @@ public class PinotConfigUtils {
   public static Map<String, Object> generateBrokerConf(int brokerPort) {
     Map<String, Object> properties = new HashMap<>();
     properties.put(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, brokerPort != 0 ? brokerPort : getAvailablePort());
+    properties.put("pinot.broker.access.control.class", "org.apache.pinot.broker.broker.BasicAuthAccessControlFactory");
+    properties.put("pinot.broker.access.control.principals", "admin, user");
+    properties.put("pinot.broker.access.control.principals.admin.password", "verysecret");
+    properties.put("pinot.broker.access.control.principals.user.password", "secret");
+    properties.put("pinot.broker.access.control.principals.user.tables", "baseballStats");
+    properties.put("pinot.broker.access.control.principals.user.permissions", "read");
 
     return properties;
   }
