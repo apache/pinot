@@ -246,10 +246,13 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
 
     MemoryEstimator memoryEstimator;
     if (segmentProvided) {
+      // use the provided segment to estimate memory
       memoryEstimator =
           new MemoryEstimator(tableConfig, new File(_sampleCompletedSegmentDir), _ingestionRate, maxUsableHostMemBytes,
               tableRetentionHours);
     } else {
+      // no segments provided;
+      // generate a segment based on the provided characteristics and then use it to estimate memory
       if (_numRows == 0) {
         _numRows = DEFAULT_NUMBER_OF_ROWS;
       }

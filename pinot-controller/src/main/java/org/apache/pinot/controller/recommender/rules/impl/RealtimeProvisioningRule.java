@@ -45,8 +45,8 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 
 
 /**
- * This rule recommends gives some recommendations useful for provisioning real time tables. Specifically it provides
- * some recommendations for optimal segments size, total memory used per host, and consuming memory used per host based
+ * This rule gives some recommendations useful for provisioning real time tables. Specifically it provides some
+ * recommendations for optimal segments size, total memory used per host, and consuming memory used per host based
  * on the provided characteristics of the data.
  */
 public class RealtimeProvisioningRule extends AbstractRule {
