@@ -131,11 +131,15 @@ public class QueryContextConverterUtils {
         FunctionDefinitionRegistry.isAggFunc(functionName) ? FunctionContext.Type.AGGREGATION
             : FunctionContext.Type.TRANSFORM;
     List<Expression> operands = thriftFunction.getOperands();
-    List<ExpressionContext> arguments = new ArrayList<>(operands.size());
-    for (Expression operand : operands) {
-      arguments.add(getExpression(operand));
+    if (operands != null) {
+      List<ExpressionContext> arguments = new ArrayList<>(operands.size());
+      for (Expression operand : operands) {
+        arguments.add(getExpression(operand));
+      }
+      return new FunctionContext(functionType, functionName, arguments);
+    } else {
+      return new FunctionContext(functionType, functionName, Collections.emptyList());
     }
-    return new FunctionContext(functionType, functionName, arguments);
   }
 
   /**
@@ -152,11 +156,15 @@ public class QueryContextConverterUtils {
         FunctionDefinitionRegistry.isAggFunc(functionName) ? FunctionContext.Type.AGGREGATION
             : FunctionContext.Type.TRANSFORM;
     List<? extends AstNode> children = astNode.getChildren();
-    List<ExpressionContext> arguments = new ArrayList<>(children.size());
-    for (AstNode child : children) {
-      arguments.add(getExpression(child));
+    if (children != null) {
+      List<ExpressionContext> arguments = new ArrayList<>(children.size());
+      for (AstNode child : children) {
+        arguments.add(getExpression(child));
+      }
+      return new FunctionContext(functionType, functionName, arguments);
+    } else {
+      return new FunctionContext(functionType, functionName, Collections.emptyList());
     }
-    return new FunctionContext(functionType, functionName, arguments);
   }
 
   /**
@@ -232,8 +240,8 @@ public class QueryContextConverterUtils {
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new TextMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
       case JSON_MATCH:
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new JsonMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new JsonMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
       case IS_NULL:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new IsNullPredicate(getExpression(operands.get(0))));
