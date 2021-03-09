@@ -60,4 +60,9 @@ public class YammerMetricName implements PinotMetricName {
   public int hashCode() {
     return _metricName.hashCode();
   }
+
+  @Override
+  public String toString() {
+    return _metricName.toString();
+  }
 }
