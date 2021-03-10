@@ -136,7 +136,7 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
    * Helper method to assign instances for CONSUMING segment based on the segment partition id and instance partitions.
    */
   private List<String> assignConsumingSegment(String segmentName, InstancePartitions instancePartitions) {
-    int partitionId = new LLCSegmentName(segmentName).getPartitionId();
+    int partitionGroupId = new LLCSegmentName(segmentName).getPartitionGroupId();
 
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
     if (numReplicaGroups == 1) {
@@ -152,7 +152,7 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
       int numInstances = instances.size();
       List<String> instancesAssigned = new ArrayList<>(_replication);
       for (int replicaId = 0; replicaId < _replication; replicaId++) {
-        instancesAssigned.add(instances.get((partitionId * _replication + replicaId) % numInstances));
+        instancesAssigned.add(instances.get((partitionGroupId * _replication + replicaId) % numInstances));
       }
       return instancesAssigned;
     } else {
@@ -166,7 +166,7 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
       List<String> instancesAssigned = new ArrayList<>(numReplicaGroups);
       for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
         List<String> instances = instancePartitions.getInstances(0, replicaGroupId);
-        instancesAssigned.add(instances.get(partitionId % instances.size()));
+        instancesAssigned.add(instances.get(partitionGroupId % instances.size()));
       }
       return instancesAssigned;
     }
@@ -323,23 +323,23 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
       } else {
         // Replica-group based assignment
 
-        Map<Integer, List<String>> partitionIdToSegmentsMap = new HashMap<>();
+        Map<Integer, List<String>> partitionGroupIdToSegmentsMap = new HashMap<>();
         for (String segmentName : currentAssignment.keySet()) {
-          int partitionId = new LLCSegmentName(segmentName).getPartitionId();
-          partitionIdToSegmentsMap.computeIfAbsent(partitionId, k -> new ArrayList<>()).add(segmentName);
+          int partitionGroupId = new LLCSegmentName(segmentName).getPartitionGroupId();
+          partitionGroupIdToSegmentsMap.computeIfAbsent(partitionGroupId, k -> new ArrayList<>()).add(segmentName);
         }
 
         // NOTE: Shuffle the segments within the current assignment to avoid moving only new segments to the new added
         //       servers, which might cause hotspot servers because queries tend to hit the new segments. Use the table
         //       name hash as the random seed for the shuffle so that the result is deterministic.
         Random random = new Random(_realtimeTableName.hashCode());
-        for (List<String> segments : partitionIdToSegmentsMap.values()) {
+        for (List<String> segments : partitionGroupIdToSegmentsMap.values()) {
           Collections.shuffle(segments, random);
         }
 
         newAssignment = SegmentAssignmentUtils
             .rebalanceReplicaGroupBasedTable(currentAssignment, instancePartitions,
-                partitionIdToSegmentsMap);
+                partitionGroupIdToSegmentsMap);
       }
     }
     return newAssignment;
@@ -360,10 +360,11 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
       // Replica-group based assignment
 
       // Uniformly spray the segment partitions over the instance partitions
-      int segmentPartitionId = new LLCSegmentName(segmentName).getPartitionId();
+      int segmentPartitionId = new LLCSegmentName(segmentName).getPartitionGroupId();
       int numPartitions = instancePartitions.getNumPartitions();
-      int partitionId = segmentPartitionId % numPartitions;
-      return SegmentAssignmentUtils.assignSegmentWithReplicaGroup(currentAssignment, instancePartitions, partitionId);
+      int partitionGroupId = segmentPartitionId % numPartitions;
+      return SegmentAssignmentUtils
+          .assignSegmentWithReplicaGroup(currentAssignment, instancePartitions, partitionGroupId);
     }
   }
 }

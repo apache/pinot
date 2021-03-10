@@ -26,7 +26,7 @@ import org.joda.time.DateTimeZone;
 public class LLCSegmentName extends SegmentName implements Comparable {
   private final static String DATE_FORMAT = "yyyyMMdd'T'HHmm'Z'";
   private final String _tableName;
-  private final int _partitionId;
+  private final int _partitionGroupId;
   private final int _sequenceNumber;
   private final String _creationTime;
   private final String _segmentName;
@@ -39,22 +39,22 @@ public class LLCSegmentName extends SegmentName implements Comparable {
     _segmentName = segmentName;
     String[] parts = StringUtils.splitByWholeSeparator(segmentName, SEPARATOR);
     _tableName = parts[0];
-    _partitionId = Integer.parseInt(parts[1]);
+    _partitionGroupId = Integer.parseInt(parts[1]);
     _sequenceNumber = Integer.parseInt(parts[2]);
     _creationTime = parts[3];
   }
 
-  public LLCSegmentName(String tableName, int partitionId, int sequenceNumber, long msSinceEpoch) {
+  public LLCSegmentName(String tableName, int partitionGroupId, int sequenceNumber, long msSinceEpoch) {
     if (!isValidComponentName(tableName)) {
       throw new RuntimeException("Invalid table name " + tableName);
     }
     _tableName = tableName;
-    _partitionId = partitionId;
+    _partitionGroupId = partitionGroupId;
     _sequenceNumber = sequenceNumber;
     // ISO8601 date: 20160120T1234Z
     DateTime dateTime = new DateTime(msSinceEpoch, DateTimeZone.UTC);
     _creationTime = dateTime.toString(DATE_FORMAT);
-    _segmentName = tableName + SEPARATOR + partitionId + SEPARATOR + sequenceNumber + SEPARATOR + _creationTime;
+    _segmentName = tableName + SEPARATOR + partitionGroupId + SEPARATOR + sequenceNumber + SEPARATOR + _creationTime;
   }
 
   /**
@@ -75,13 +75,13 @@ public class LLCSegmentName extends SegmentName implements Comparable {
   }
 
   @Override
-  public int getPartitionId() {
-    return _partitionId;
+  public int getPartitionGroupId() {
+    return _partitionGroupId;
   }
 
   @Override
   public String getPartitionRange() {
-    return Integer.toString(getPartitionId());
+    return Integer.toString(getPartitionGroupId());
   }
 
   @Override
@@ -110,9 +110,9 @@ public class LLCSegmentName extends SegmentName implements Comparable {
       throw new RuntimeException(
           "Cannot compare segment names " + this.getSegmentName() + " and " + other.getSegmentName());
     }
-    if (this.getPartitionId() > other.getPartitionId()) {
+    if (this.getPartitionGroupId() > other.getPartitionGroupId()) {
       return 1;
-    } else if (this.getPartitionId() < other.getPartitionId()) {
+    } else if (this.getPartitionGroupId() < other.getPartitionGroupId()) {
       return -1;
     } else {
       if (this.getSequenceNumber() > other.getSequenceNumber()) {
@@ -141,7 +141,7 @@ public class LLCSegmentName extends SegmentName implements Comparable {
 
     LLCSegmentName segName = (LLCSegmentName) o;
 
-    if (_partitionId != segName._partitionId) {
+    if (_partitionGroupId != segName._partitionGroupId) {
       return false;
     }
     if (_sequenceNumber != segName._sequenceNumber) {
@@ -159,7 +159,7 @@ public class LLCSegmentName extends SegmentName implements Comparable {
   @Override
   public int hashCode() {
     int result = _tableName != null ? _tableName.hashCode() : 0;
-    result = 31 * result + _partitionId;
+    result = 31 * result + _partitionGroupId;
     result = 31 * result + _sequenceNumber;
     result = 31 * result + (_creationTime != null ? _creationTime.hashCode() : 0);
     result = 31 * result + (_segmentName != null ? _segmentName.hashCode() : 0);

@@ -165,9 +165,9 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       assertNotNull(columnPartitionMetadata);
       assertTrue(columnPartitionMetadata.getFunctionName().equalsIgnoreCase("murmur"));
       assertEquals(columnPartitionMetadata.getNumPartitions(), 2);
-      int streamPartitionId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionId();
-      assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(streamPartitionId));
-      numSegmentsForPartition[streamPartitionId]++;
+      int partitionGroupId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionGroupId();
+      assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(partitionGroupId));
+      numSegmentsForPartition[partitionGroupId]++;
     }
 
     // There should be 2 segments for partition 0, 2 segments for partition 1
@@ -236,18 +236,18 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       assertNotNull(columnPartitionMetadata);
       assertTrue(columnPartitionMetadata.getFunctionName().equalsIgnoreCase("murmur"));
       assertEquals(columnPartitionMetadata.getNumPartitions(), 2);
-      int streamPartitionId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionId();
-      numSegmentsForPartition[streamPartitionId]++;
+      int partitionGroupId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionGroupId();
+      numSegmentsForPartition[partitionGroupId]++;
 
       if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
         // For consuming segment, the partition metadata should only contain the stream partition
-        assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(streamPartitionId));
+        assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(partitionGroupId));
       } else {
         LLCSegmentName llcSegmentName = new LLCSegmentName(segmentZKMetadata.getSegmentName());
         int sequenceNumber = llcSegmentName.getSequenceNumber();
         if (sequenceNumber == 0) {
           // The partition metadata for the first completed segment should only contain the stream partition
-          assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(streamPartitionId));
+          assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(partitionGroupId));
         } else {
           // The partition metadata for the new completed segments should contain both partitions
           assertEquals(columnPartitionMetadata.getPartitions(), new HashSet<>(Arrays.asList(0, 1)));
@@ -313,19 +313,19 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       assertNotNull(columnPartitionMetadata);
       assertTrue(columnPartitionMetadata.getFunctionName().equalsIgnoreCase("murmur"));
       assertEquals(columnPartitionMetadata.getNumPartitions(), 2);
-      int streamPartitionId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionId();
-      numSegmentsForPartition[streamPartitionId]++;
+      int partitionGroupId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionGroupId();
+      numSegmentsForPartition[partitionGroupId]++;
 
       if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
         // For consuming segment, the partition metadata should only contain the stream partition
-        assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(streamPartitionId));
+        assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(partitionGroupId));
       } else {
         // The partition metadata for the new completed segments should only contain the stream partition
         LLCSegmentName llcSegmentName = new LLCSegmentName(segmentZKMetadata.getSegmentName());
         int sequenceNumber = llcSegmentName.getSequenceNumber();
         if (sequenceNumber == 0 || sequenceNumber >= 4) {
           // The partition metadata for the first and new completed segments should only contain the stream partition
-          assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(streamPartitionId));
+          assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(partitionGroupId));
         } else {
           // The partition metadata for the completed segments containing records from the second Avro file should
           // contain both partitions
