@@ -146,7 +146,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     this.config = config;
     recordReader = dataSource.getRecordReader();
     dataSchema = config.getSchema();
-    if (config.isFailOnEmptyRecord()) {
+    if (config.isFailOnEmptySegment()) {
       Preconditions.checkState(recordReader.hasNext(), "No record in data source");
     }
 

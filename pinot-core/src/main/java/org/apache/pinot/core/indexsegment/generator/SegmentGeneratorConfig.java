@@ -105,7 +105,7 @@ public class SegmentGeneratorConfig implements Serializable {
   private boolean _onHeap = false;
   private boolean _skipTimeValueCheck = false;
   private boolean _nullHandlingEnabled = false;
-  private boolean _failOnEmptyRecord = false;
+  private boolean _failOnEmptySegment = false;
 
   // constructed from FieldConfig
   private Map<String, Map<String, String>> _columnProperties = new HashMap<>();
@@ -672,11 +672,11 @@ public class SegmentGeneratorConfig implements Serializable {
     _nullHandlingEnabled = nullHandlingEnabled;
   }
 
-  public boolean isFailOnEmptyRecord() {
-    return _failOnEmptyRecord;
+  public boolean isFailOnEmptySegment() {
+    return _failOnEmptySegment;
   }
 
-  public void setFailOnEmptyRecord(boolean failOnEmptyRecord) {
-    _failOnEmptyRecord = failOnEmptyRecord;
+  public void setFailOnEmptySegment(boolean failOnEmptySegment) {
+    _failOnEmptySegment = failOnEmptySegment;
   }
 }

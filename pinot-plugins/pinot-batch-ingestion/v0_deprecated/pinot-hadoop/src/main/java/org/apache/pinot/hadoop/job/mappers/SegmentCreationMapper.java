@@ -257,7 +257,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     segmentGeneratorConfig.setOnHeap(true);
     // Enable failing the job when meeting empty record to early detect potential issue from upstream.
     // This is useful since releasing the constraint in offline job could allow unexpected issues appear without people's notice.
-    segmentGeneratorConfig.setFailOnEmptyRecord(true);
+    segmentGeneratorConfig.setFailOnEmptySegment(true);
 
     addAdditionalSegmentGeneratorConfigs(segmentGeneratorConfig, hdfsInputFile, sequenceId);
 
