@@ -51,6 +51,10 @@ const Layout = (props) => {
     setOpenSidebar(newSidebarState);
   };
 
+  const filterNavigationItems = () => {
+    return navigationItems.filter((item)=>{return item.name.toLowerCase() === 'query console'});
+  }
+
   return (
     <Grid container direction="column">
       <Header
@@ -63,7 +67,7 @@ const Layout = (props) => {
         <Grid container>
           <Grid item>
             <Sidebar
-              list={navigationItems}
+              list={props.configFile?.showOnlyQueryConsole ? filterNavigationItems() : navigationItems}
               showMenu={openSidebar}
               selectedId={selectedId}
               highlightSidebarLink={highlightSidebarLink}
