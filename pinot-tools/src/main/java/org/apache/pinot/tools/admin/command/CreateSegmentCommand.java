@@ -76,6 +76,9 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   @Option(name = "-retry", metaVar = "<int>", usage = "Number of retries if encountered any segment creation failure, default is 0.")
   private int _retry = 0;
 
+  @Option(name = "-failOnEmptySegment", usage = "Option to fail the segment creation if output is an empty segment.")
+  private boolean _failOnEmptySegment = false;
+
   @Option(name = "-postCreationVerification", usage = "Verify segment data file after segment creation. Please ensure you have enough local disk to hold data for verification")
   private boolean _postCreationVerification = false;
 
@@ -126,6 +129,11 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
     return this;
   }
 
+  public CreateSegmentCommand setFailOnEmptySegment(boolean failOnEmptySegment) {
+    _failOnEmptySegment = failOnEmptySegment;
+    return this;
+  }
+
   public CreateSegmentCommand setPostCreationVerification(boolean postCreationVerification) {
     _postCreationVerification = postCreationVerification;
     return this;
@@ -139,9 +147,9 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   @Override
   public String toString() {
     return String.format(
-        "CreateSegment -dataDir %s -format %s -outDir %s -overwrite %s -tableConfigFile %s -schemaFile %s -readerConfigFile %s -retry %d -postCreationVerification %s -numThreads %d",
+        "CreateSegment -dataDir %s -format %s -outDir %s -overwrite %s -tableConfigFile %s -schemaFile %s -readerConfigFile %s -retry %d -failOnEmptySegment %s -postCreationVerification %s -numThreads %d",
         _dataDir, _format, _outDir, _overwrite, _tableConfigFile, _schemaFile, _readerConfigFile, _retry,
-        _postCreationVerification, _numThreads);
+        _failOnEmptySegment, _postCreationVerification, _numThreads);
   }
 
   @Override
@@ -232,6 +240,7 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
         segmentGeneratorConfig.setReaderConfig(recordReaderConfig);
         segmentGeneratorConfig.setTableName(rawTableName);
         segmentGeneratorConfig.setSequenceId(sequenceId);
+        segmentGeneratorConfig.setFailOnEmptySegment(_failOnEmptySegment);
         for (int j = 0; j <= _retry; j++) {
           try {
             SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
@@ -252,7 +261,8 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
             if (j < _retry) {
               LOGGER.warn("Caught exception while creating/verifying segment, will retry", e);
             } else {
-              throw new RuntimeException("Caught exception while generating segment from file: " + dataFiles.get(sequenceId), e);
+              throw new RuntimeException(
+                  "Caught exception while generating segment from file: " + dataFiles.get(sequenceId), e);
             }
           }
         }

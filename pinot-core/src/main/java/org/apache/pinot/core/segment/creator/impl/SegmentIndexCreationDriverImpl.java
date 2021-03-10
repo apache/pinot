@@ -170,8 +170,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       indexDir.mkdirs();
     }
 
-    _ingestionSchemaValidator = SchemaValidatorFactory.getSchemaValidator(dataSchema, recordReader.getClass().getName(),
-        config.getInputFilePath());
+    _ingestionSchemaValidator = SchemaValidatorFactory
+        .getSchemaValidator(dataSchema, recordReader.getClass().getName(), config.getInputFilePath());
 
     // Create a temporary directory used in segment creation
     tempIndexDir = new File(indexDir, "tmp-" + UUID.randomUUID());
@@ -246,6 +246,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         segmentName = config.getSegmentNameGenerator()
             .generateSegmentName(sequenceId, timeColumnStatistics.getMinValue(), timeColumnStatistics.getMaxValue());
       } else {
+        // When totalDoc is 0, check whether 'failOnEmptySegment' option is true. If so, directly fail the segment creation.
+        Preconditions.checkArgument(!config.isFailOnEmptySegment(),
+            "Failing the empty segment creation as the option 'failOnEmptySegment' is set to: " + config
+                .isFailOnEmptySegment());
         // Generate a unique name for a segment with no rows
         long now = System.currentTimeMillis();
         segmentName = config.getSegmentNameGenerator().generateSegmentName(sequenceId, now, now);
