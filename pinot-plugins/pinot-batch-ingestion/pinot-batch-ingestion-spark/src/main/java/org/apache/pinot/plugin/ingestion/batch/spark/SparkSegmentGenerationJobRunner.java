@@ -305,6 +305,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
           taskSpec.setTableConfig(SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI()));
           taskSpec.setSequenceId(idx);
           taskSpec.setSegmentNameGeneratorSpec(_spec.getSegmentNameGeneratorSpec());
+          taskSpec.setFailOnEmptySegment(_spec.isFailOnEmptySegment());
           taskSpec.setCustomProperty(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, inputFileURI.toString());
 
           SegmentGenerationTaskRunner taskRunner = new SegmentGenerationTaskRunner(taskSpec);
