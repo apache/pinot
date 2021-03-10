@@ -70,31 +70,17 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
 
     @Override
     public boolean hasDataAccess(HttpHeaders httpHeaders, String tableName) {
-      // TODO remove debug
-      Optional<BasicAuthPrincipal> principal = getPrincipal(httpHeaders);
-      boolean response = getPrincipal(httpHeaders).filter(p -> p.hasTable(tableName)).isPresent();
-
       return getPrincipal(httpHeaders).filter(p -> p.hasTable(tableName)).isPresent();
     }
 
     @Override
     public boolean hasAccess(String tableName, AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
-      // TODO remove debug
-      Optional<BasicAuthPrincipal> principal = getPrincipal(httpHeaders);
-      boolean response =
-          getPrincipal(httpHeaders).filter(p -> p.hasTable(tableName) && p.hasPermission(Objects.toString(accessType)))
-              .isPresent();
-
       return getPrincipal(httpHeaders)
           .filter(p -> p.hasTable(tableName) && p.hasPermission(Objects.toString(accessType))).isPresent();
     }
 
     @Override
     public boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
-      // TODO remove debug
-      Optional<BasicAuthPrincipal> principal = getPrincipal(httpHeaders);
-      boolean response = getPrincipal(httpHeaders).isPresent();
-
       return getPrincipal(httpHeaders).isPresent();
     }
 

@@ -40,6 +40,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Deprecated. Does not support HTTPS or authentication
  */
+@Deprecated
 public class DefaultControllerRestApi implements ControllerRestApi {
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultControllerRestApi.class);
 

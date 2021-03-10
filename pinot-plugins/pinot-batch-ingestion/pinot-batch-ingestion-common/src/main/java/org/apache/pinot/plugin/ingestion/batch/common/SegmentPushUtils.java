@@ -253,9 +253,7 @@ public class SegmentPushUtils implements Serializable {
               headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI, segmentUriPath));
               headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
                   FileUploadDownloadClient.FileUploadType.METADATA.toString()));
-              if (StringUtils.isNotBlank(spec.getAuthToken())) {
-                headers.addAll(FileUploadDownloadClient.makeAuthHeader(spec.getAuthToken()));
-              }
+              headers.addAll(FileUploadDownloadClient.makeAuthHeader(spec.getAuthToken()));
 
               SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT
                   .uploadSegmentMetadata(FileUploadDownloadClient.getUploadSegmentURI(controllerURI), segmentName,

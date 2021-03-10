@@ -51,7 +51,7 @@ public class PinotControllerAuthResource {
   @Path("auth/verify")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Check whether authentication is enabled")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Verification result"), @ApiResponse(code = 500, message = "Verification error")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Verification result provided"), @ApiResponse(code = 500, message = "Verification error")})
   public boolean verify(@ApiParam(value = "Table name without type") @QueryParam("tableName") String tableName,
       @ApiParam(value = "API access type") @QueryParam("accessType") AccessType accessType,
       @ApiParam(value = "Endpoint URL") @QueryParam("endpointUrl") String endpointUrl) {
@@ -68,7 +68,7 @@ public class PinotControllerAuthResource {
   @Path("auth/info")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Retrieve auth workflow info")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Allowed")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Auth workflow info provided")})
   public AccessControl.AuthWorkflowInfo info() {
     return _accessControlFactory.create().getAuthWorkflowInfo();
   }
