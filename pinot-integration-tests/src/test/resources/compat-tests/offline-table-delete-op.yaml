@@ -17,9 +17,10 @@
 # under the License.
 #
 
-description: Yaml file for query ops
+description: Yaml file for deleting a offline table
 operations:
-  - type: queryOp
-    description: Run query on FeatureTest1 using SQL
-    queryFileName: pinot-integration-tests/src/test/resources/compat-tests/queries/feature-test-1-sql.queries
-    expectedResultsFileName: pinot-integration-tests/src/test/resources/compat-tests/query-results/feature-test-1-rest-sql.results
+  - type: tableOp
+    description: Delete table feature-test-1.json
+    op: DELETE
+    schemaFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/FeatureTest1-schema.json
+    tableConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/feature-test-1.json

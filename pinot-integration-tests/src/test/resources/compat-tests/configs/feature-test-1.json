@@ -21,7 +21,9 @@
     "retentionTimeValue": "",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "segmentPushFrequency": "daily",
-    "segmentPushType": "REFRESH"
+    "segmentPushType": "REFRESH",
+    "timeColumnName": "HoursSinceEpoch",
+    "timeType": "HOURS"
   },
   "tableIndexConfig": {
     "aggregateMetrics": false,

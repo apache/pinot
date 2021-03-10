@@ -17,9 +17,13 @@
 # under the License.
 #
 
-description: Yaml file for query ops
+# Operations to be done.
+description: Yaml file for uploading a segment
 operations:
-  - type: queryOp
-    description: Run query on FeatureTest1 using SQL
-    queryFileName: pinot-integration-tests/src/test/resources/compat-tests/queries/feature-test-1-sql.queries
-    expectedResultsFileName: pinot-integration-tests/src/test/resources/compat-tests/query-results/feature-test-1-rest-sql.results
+  - type: segmentOp
+    description: Build and upload segment using FeatureTest1-data-00.csv
+    op: UPLOAD
+    inputDataFileName: pinot-integration-tests/src/test/resources/compat-tests/data/FeatureTest1-data-00.csv
+    schemaFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/FeatureTest1-schema.json
+    tableConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/feature-test-1.json
+    recordReaderConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/data/recordReaderConfig.json

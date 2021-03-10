@@ -17,18 +17,8 @@
 # under the License.
 #
 
-# Operations to be done.
-description: tst file for stream op PRODUCE
+description: Yaml file for publishing rows to Kafka topic PinotRealtimeFeatureTest1Event
 operations:
-  - type: streamOp
-    description: create Kafka topic
-    op: CREATE
-    streamConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/feature-test-1-realtime-stream-config.json
-  - type: tableOp
-    description: Create table feature-test-1-realtime.json
-    op: CREATE
-    schemaFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/FeatureTest1-schema.json
-    tableConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/feature-test-1-realtime.json
   - type: streamOp
     description: publish rows to PinotRealtimeFeatureTest1Event
     op: PRODUCE

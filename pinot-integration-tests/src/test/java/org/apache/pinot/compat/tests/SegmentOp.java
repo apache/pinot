@@ -184,9 +184,9 @@ public class SegmentOp extends BaseOp {
       throws Exception {
     TableConfig tableConfig = JsonUtils.fileToObject(new File(_tableConfigFileName), TableConfig.class);
     _tableName = tableConfig.getTableName();
-    // if user does not specify segmentName, use tableName + generationNumber
+    // if user does not specify segmentName, use tableName_generationNumber
     if (_segmentName == null || _segmentName.isEmpty()) {
-      _segmentName = _tableName + _generationNumber;
+      _segmentName = _tableName + "_" + _generationNumber;
     }
 
     Schema schema = JsonUtils.fileToObject(new File(_schemaFileName), Schema.class);
@@ -285,9 +285,9 @@ public class SegmentOp extends BaseOp {
     try {
       TableConfig tableConfig = JsonUtils.fileToObject(new File(_tableConfigFileName), TableConfig.class);
       _tableName = tableConfig.getTableName();
-      // if user does not specify segmentName, use tableName + generationNumber
+      // if user does not specify segmentName, use tableName_generationNumber
       if (_segmentName == null || _segmentName.isEmpty()) {
-        _segmentName = _tableName + _generationNumber;
+        _segmentName = _tableName + "_" + _generationNumber;
       }
 
       ControllerTest.sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL)
