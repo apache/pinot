@@ -19,6 +19,10 @@
 package org.apache.pinot.spi.stream;
 
 import java.io.Closeable;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.TimeoutException;
 import javax.annotation.Nonnull;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
@@ -53,4 +57,33 @@ public interface StreamMetadataProvider extends Closeable {
     long offset = fetchPartitionOffset(offsetCriteria, timeoutMillis);
     return new LongMsgOffset(offset);
   }
+
+  /**
+   * Fetch the list of partition group info for the latest state of the stream
+   * @param currentPartitionGroupsMetadata In case of Kafka, each partition group contains a single partition.
+   */
+  default List<PartitionGroupInfo> getPartitionGroupInfoList(String clientId, StreamConfig streamConfig,
+      List<PartitionGroupMetadata> currentPartitionGroupsMetadata, int timeoutMillis)
+      throws TimeoutException, IOException {
+    int partitionCount = fetchPartitionCount(timeoutMillis);
+    List<PartitionGroupInfo> newPartitionGroupInfoList = new ArrayList<>(partitionCount);
+
+    // Add a PartitionGroupInfo into the list foreach partition already present in current.
+    for (PartitionGroupMetadata currentPartitionGroupMetadata : currentPartitionGroupsMetadata) {
+      newPartitionGroupInfoList.add(new PartitionGroupInfo(currentPartitionGroupMetadata.getPartitionGroupId(),
+          currentPartitionGroupMetadata.getEndOffset()));
+    }
+    // Add PartitionGroupInfo for new partitions
+    // Use offset criteria from stream config
+    StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
+    for (int i = currentPartitionGroupsMetadata.size(); i < partitionCount; i++) {
+      StreamMetadataProvider partitionMetadataProvider =
+          streamConsumerFactory.createPartitionMetadataProvider(clientId, i);
+      StreamPartitionMsgOffset streamPartitionMsgOffset =
+          partitionMetadataProvider.fetchStreamPartitionOffset(streamConfig.getOffsetCriteria(), timeoutMillis);
+      newPartitionGroupInfoList.add(new PartitionGroupInfo(i, streamPartitionMsgOffset));
+    }
+    return newPartitionGroupInfoList;
+  }
+
 }

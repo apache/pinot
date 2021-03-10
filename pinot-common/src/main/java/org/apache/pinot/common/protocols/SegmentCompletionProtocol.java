@@ -24,6 +24,9 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -135,6 +138,7 @@ public class SegmentCompletionProtocol {
 
   public static final String REASON_ROW_LIMIT = "rowLimit";  // Stop reason sent by server as max num rows reached
   public static final String REASON_TIME_LIMIT = "timeLimit";  // Stop reason sent by server as max time reached
+  public static final String REASON_END_OF_PARTITION_GROUP = "endOfPartitionGroup"; // Stop reason sent by server as end of partitionGroup reached
 
   // Canned responses
   public static final Response RESP_NOT_LEADER =
@@ -180,6 +184,16 @@ public class SegmentCompletionProtocol {
     }
 
     public String getUrl(String hostPort, String protocol) {
+      String streamPartitionMsgOffset;
+      try {
+        streamPartitionMsgOffset = _params.getStreamPartitionMsgOffset() == null ? null :
+            URLEncoder.encode(_params.getStreamPartitionMsgOffset(), StandardCharsets.UTF_8.toString());
+      } catch (UnsupportedEncodingException e) {
+        throw new IllegalStateException(
+            "Caught exception when encoding streamPartitionMsgOffset string: " + _params.getStreamPartitionMsgOffset(),
+            e);
+      }
+
       return protocol + "://" + hostPort + "/" + _msgType + "?" + PARAM_SEGMENT_NAME + "=" + _params.getSegmentName()
           + "&" + PARAM_OFFSET + "=" + _params.getOffset() + "&" + PARAM_INSTANCE_ID + "=" + _params.getInstanceId() + (
           _params.getReason() == null ? "" : ("&" + PARAM_REASON + "=" + _params.getReason())) + (
@@ -190,10 +204,10 @@ public class SegmentCompletionProtocol {
           + (_params.getSegmentSizeBytes() <= 0 ? ""
           : ("&" + PARAM_SEGMENT_SIZE_BYTES + "=" + _params.getSegmentSizeBytes())) + (_params.getNumRows() <= 0 ? ""
           : ("&" + PARAM_ROW_COUNT + "=" + _params.getNumRows())) + (_params.getSegmentLocation() == null ? ""
-          : ("&" + PARAM_SEGMENT_LOCATION + "=" + _params.getSegmentLocation()))
-          + (_params.getStreamPartitionMsgOffset() == null ? ""
-          : ("&" + PARAM_STREAM_PARTITION_MSG_OFFSET + "=" + _params.getStreamPartitionMsgOffset()))
-          ;
+          : ("&" + PARAM_SEGMENT_LOCATION + "=" + _params.getSegmentLocation())) + (
+          streamPartitionMsgOffset == null ? ""
+              : ("&" + PARAM_STREAM_PARTITION_MSG_OFFSET + "=" + streamPartitionMsgOffset));
+
     }
 
     public static class Params {

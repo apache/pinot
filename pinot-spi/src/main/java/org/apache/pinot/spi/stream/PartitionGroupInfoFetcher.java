@@ -18,54 +18,55 @@
  */
 package org.apache.pinot.spi.stream;
 
+import java.util.List;
 import java.util.concurrent.Callable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * Fetches the partition count of a stream using the {@link StreamMetadataProvider}
+ * Creates a list of PartitionGroupInfo for all partition groups of the stream using the {@link StreamMetadataProvider}
  */
-public class PartitionCountFetcher implements Callable<Boolean> {
+public class PartitionGroupInfoFetcher implements Callable<Boolean> {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(PartitionCountFetcher.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(PartitionGroupInfoFetcher.class);
 
-  private int _partitionCount = -1;
+  private List<PartitionGroupInfo> _partitionGroupInfoList;
   private final StreamConfig _streamConfig;
-  private StreamConsumerFactory _streamConsumerFactory;
+  private final List<PartitionGroupMetadata> _currentPartitionGroupMetadata;
+  private final StreamConsumerFactory _streamConsumerFactory;
   private Exception _exception;
   private final String _topicName;
 
-  public PartitionCountFetcher(StreamConfig streamConfig) {
-    _streamConfig = streamConfig;
-    _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
+  public PartitionGroupInfoFetcher(StreamConfig streamConfig, List<PartitionGroupMetadata> currentPartitionGroupMetadataList) {
+    _streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
     _topicName = streamConfig.getTopicName();
+    _streamConfig = streamConfig;
+    _currentPartitionGroupMetadata = currentPartitionGroupMetadataList;
   }
 
-  public int getPartitionCount() {
-    return _partitionCount;
+  public List<PartitionGroupInfo> getPartitionGroupInfoList() {
+    return _partitionGroupInfoList;
   }
+
 
   public Exception getException() {
     return _exception;
   }
 
   /**
-   * Callable to fetch the number of partitions of the stream given the stream metadata
-   * @return
-   * @throws Exception
+   * Callable to fetch the partition group info for the stream
    */
   @Override
   public Boolean call()
       throws Exception {
-
-    String clientId = PartitionCountFetcher.class.getSimpleName() + "-" + _topicName;
+    String clientId = PartitionGroupInfoFetcher.class.getSimpleName() + "-" + _topicName;
     try (
         StreamMetadataProvider streamMetadataProvider = _streamConsumerFactory.createStreamMetadataProvider(clientId)) {
-      _partitionCount = streamMetadataProvider.fetchPartitionCount(/*maxWaitTimeMs=*/5000L);
+      _partitionGroupInfoList = streamMetadataProvider.getPartitionGroupInfoList(clientId, _streamConfig, _currentPartitionGroupMetadata, /*maxWaitTimeMs=*/5000);
       if (_exception != null) {
         // We had at least one failure, but succeeded now. Log an info
-        LOGGER.info("Successfully retrieved partition count as {} for topic {}", _partitionCount, _topicName);
+        LOGGER.info("Successfully retrieved partition group info for topic {}", _topicName);
       }
       return Boolean.TRUE;
     } catch (TransientConsumerException e) {

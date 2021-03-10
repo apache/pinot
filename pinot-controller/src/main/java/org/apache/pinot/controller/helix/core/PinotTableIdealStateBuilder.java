@@ -32,7 +32,9 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.stream.PartitionCountFetcher;
+import org.apache.pinot.spi.stream.PartitionGroupInfo;
+import org.apache.pinot.spi.stream.PartitionGroupInfoFetcher;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -115,14 +117,22 @@ public class PinotTableIdealStateBuilder {
     pinotLLCRealtimeSegmentManager.setUpNewTable(realtimeTableConfig, idealState);
   }
 
-  public static int getPartitionCount(StreamConfig streamConfig) {
-    PartitionCountFetcher partitionCountFetcher = new PartitionCountFetcher(streamConfig);
+  /**
+   * Fetches the list of {@link PartitionGroupInfo} for the stream, with the help of the current partitionGroups metadata
+   * This call will only skip partitions which have reached end of life and all messages from that partition have been consumed.
+   * The current partition group metadata is used to determine the offsets that have been consumed for a partition.
+   * The current partition group metadata is also used to know about existing partition groupings which should not be disturbed
+   */
+  public static List<PartitionGroupInfo> getPartitionGroupInfoList(StreamConfig streamConfig,
+      List<PartitionGroupMetadata> currentPartitionGroupMetadataList) {
+    PartitionGroupInfoFetcher partitionGroupInfoFetcher =
+        new PartitionGroupInfoFetcher(streamConfig, currentPartitionGroupMetadataList);
     try {
-      RetryPolicies.noDelayRetryPolicy(3).attempt(partitionCountFetcher);
-      return partitionCountFetcher.getPartitionCount();
+      RetryPolicies.noDelayRetryPolicy(3).attempt(partitionGroupInfoFetcher);
+      return partitionGroupInfoFetcher.getPartitionGroupInfoList();
     } catch (Exception e) {
-      Exception fetcherException = partitionCountFetcher.getException();
-      LOGGER.error("Could not get partition count for {}", streamConfig.getTopicName(), fetcherException);
+      Exception fetcherException = partitionGroupInfoFetcher.getException();
+      LOGGER.error("Could not get partition group info for {}", streamConfig.getTopicName(), fetcherException);
       throw new RuntimeException(fetcherException);
     }
   }

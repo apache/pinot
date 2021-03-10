@@ -73,4 +73,13 @@ public abstract class StreamConsumerFactory {
   public StreamPartitionMsgOffsetFactory createStreamMsgOffsetFactory() {
     return new LongMsgOffsetFactory();
   }
+
+  /**
+   * Creates a partition group consumer, which can fetch messages from a partition group
+   */
+  public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
+      PartitionGroupMetadata partitionGroupMetadata) {
+    return createPartitionLevelConsumer(clientId, partitionGroupMetadata.getPartitionGroupId());
+  }
+
 }
