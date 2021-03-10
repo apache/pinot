@@ -21,39 +21,39 @@ package org.apache.pinot.spi.ingestion.segment.writer;
 import java.io.Closeable;
 import java.io.IOException;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
- * An interface to write records into Pinot.
- * This interface helps abstract out details regarding segment generation and push from the caller.
+ * An interface to collect records and create a Pinot segment.
+ * This interface helps abstract out details regarding segment generation from the caller.
  */
 public interface SegmentWriter extends Closeable {
 
   /**
-   * Initialize the {@link SegmentWriter} with details about the Pinot cluster and table
+   * Initializes the {@link SegmentWriter} with provided tableConfig and Pinot schema.
    */
-  void init(PinotConfiguration conf)
-    throws IOException;
+  void init(SegmentWriterConfig segmentWriterConfig)
+      throws Exception;
 
   /**
-   * Collect a single {@link GenericRow} into a buffer.
-   * This row is not available in Pinot until a <code>flush()</code> is invoked.
+   * Collects a single {@link GenericRow} into a buffer.
+   * This row is not available in the segment until a <code>flush()</code> is invoked.
    */
   void collect(GenericRow row)
       throws IOException;
 
   /**
-   * Collect a batch of {@link GenericRow}s into a buffer.
-   * These rows are not available in Pinot until a <code>flush()</code> is invoked.
+   * Collects a batch of {@link GenericRow}s into a buffer.
+   * These rows are not available in the segment until a <code>flush()</code> is invoked.
    */
   void collect(GenericRow[] rowBatch)
       throws IOException;
 
   /**
-   * Creates one Pinot segment using the {@link GenericRow}s collected in the buffer, and uploads the segment to Pinot.
+   * Creates one Pinot segment using the {@link GenericRow}s collected in the buffer,
+   * at the outputDirUri as specified in the batchConfigs.
    * Successful invocation of this method means that the {@link GenericRow}s collected so far,
-   * are now available in Pinot and not available in the buffer anymore.
+   * are now available in the Pinot segment and not available in the buffer anymore.
    */
   void flush();
 }
