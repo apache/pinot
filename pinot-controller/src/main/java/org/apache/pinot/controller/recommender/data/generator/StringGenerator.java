@@ -41,6 +41,7 @@ public class StringGenerator implements Generator {
   private final int lengthOfEachString;
 
   private List<String> vals;
+  private int counter = 0;
 
   public StringGenerator(Integer cardinality, Double numberOfValuesPerEntry, Integer lengthOfEachString) {
     this.cardinality = cardinality;
@@ -54,13 +55,13 @@ public class StringGenerator implements Generator {
 
   @Override
   public void init() {
-    final Set<String> uniqueStrings = new HashSet<String>();
+    final Set<String> uniqueStrings = new HashSet<>();
     for (int i = 0; i < cardinality; i++) {
       while (!uniqueStrings.add(RandomStringUtils.randomAlphabetic(lengthOfEachString))) {
         uniqueStrings.add(RandomStringUtils.randomAlphabetic(lengthOfEachString));
       }
     }
-    vals = new ArrayList<String>(uniqueStrings);
+    vals = new ArrayList<>(uniqueStrings);
   }
 
   @Override
@@ -72,7 +73,10 @@ public class StringGenerator implements Generator {
   }
 
   private String getNextString() {
-    return vals.get(rand.nextInt(cardinality));
+    if (counter == cardinality) {
+      counter = 0;
+    }
+    return vals.get(counter++);
   }
 
   public static void main(String[] args) {

@@ -101,7 +101,7 @@ public class MemoryEstimator {
   /**
    * Constructor used for processing the given completed segment
    */
-  public MemoryEstimator(TableConfig tableConfig, File sampleCompletedSegment, int ingestionRate,
+  public MemoryEstimator(TableConfig tableConfig, File sampleCompletedSegment, int ingestionRatePerPartition,
       long maxUsableHostMemory, int tableRetentionHours) {
     _maxUsableHostMemory = maxUsableHostMemory;
     _tableConfig = tableConfig;
@@ -116,7 +116,7 @@ public class MemoryEstimator {
       throw new RuntimeException("Caught exception when reading segment index dir", e);
     }
     _totalDocsInSampleSegment = _segmentMetadata.getTotalDocs();
-    _sampleSegmentConsumedSeconds = (int) (_totalDocsInSampleSegment / ingestionRate);
+    _sampleSegmentConsumedSeconds = (int) (_totalDocsInSampleSegment / ingestionRatePerPartition);
 
     if (CollectionUtils.isNotEmpty(_tableConfig.getIndexingConfig().getNoDictionaryColumns())) {
       _noDictionaryColumns.addAll(_tableConfig.getIndexingConfig().getNoDictionaryColumns());
@@ -142,10 +142,10 @@ public class MemoryEstimator {
    * Constructor used for processing the given data characteristics (instead of completed segment)
    */
   public MemoryEstimator(TableConfig tableConfig, Schema schema, SchemaWithMetaData schemaWithMetadata,
-      int numberOfRows, int ingestionRate, long maxUsableHostMemory, int tableRetentionHours) {
+      int numberOfRows, int ingestionRatePerPartition, long maxUsableHostMemory, int tableRetentionHours) {
     this(tableConfig,
         generateCompletedSegment(schemaWithMetadata, schema, tableConfig, numberOfRows),
-        ingestionRate,
+        ingestionRatePerPartition,
         maxUsableHostMemory,
         tableRetentionHours);
   }

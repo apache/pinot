@@ -74,14 +74,15 @@ public class RealtimeProvisioningRule extends AbstractRule {
     TableConfig tableConfig = createTableConfig(_output.getIndexConfig(), _input.getSchema());
     long maxUsableHostMemoryByte = DataSizeUtils.toBytes(_params.getMaxUsableHostMemory());
     int totalConsumingPartitions = _params.getNumPartitions() * _params.getNumReplicas();
-    int ingestionRate = (int) _input.getNumMessagesPerSecInKafkaTopic() / _params.getNumPartitions();
+    int ingestionRatePerPartition = (int) _input.getNumMessagesPerSecInKafkaTopic() / _params.getNumPartitions();
     int[] numHosts = _params.getNumHosts();
     int[] numHours = _params.getNumHours();
 
     // run memory estimator
     MemoryEstimator memoryEstimator =
         new MemoryEstimator(tableConfig, _input.getSchema(), _input.getSchemaWithMetadata(),
-            (int) _input.getNumRecordsPerPush(), ingestionRate, maxUsableHostMemoryByte,
+            (int) _input.getNumRecordsPerPush(), // TODO we may not want to use numRecordsPerPush as the numRows for the completed segment we are going to generate. A more fine-grained number is needed which we need to figure out how to capture.
+            ingestionRatePerPartition, maxUsableHostMemoryByte,
             _params.getRealtimeTableRetentionHours());
     File statsFile = memoryEstimator.initializeStatsHistory();
     runAndRethrowIOException(() -> memoryEstimator

@@ -5,26 +5,26 @@
       "dataType": "INT",
       "name": "colInt",
       "singleValueField": false,
-      "cardinality": 50,
+      "cardinality": 500,
       "numValuesPerEntry": 3
     },
     {
       "dataType": "FLOAT",
       "name": "colFloat",
       "singleValueField": false,
-      "cardinality": 60,
+      "cardinality": 600,
       "numValuesPerEntry": 1.7
     },
     {
       "dataType": "STRING",
       "name": "colString",
-      "cardinality": 70,
+      "cardinality": 700,
       "averageLength": 10
     },
     {
       "dataType": "BYTES",
       "name": "colBytes",
-      "cardinality": 80,
+      "cardinality": 800,
       "averageLength": 5
     }
   ],
@@ -32,7 +32,7 @@
     {
       "dataType": "DOUBLE",
       "name": "colMetric",
-      "cardinality": 90
+      "cardinality": 900
     }
   ],
   "dateTimeFieldSpecs": [
@@ -41,14 +41,14 @@
       "dataType": "INT",
       "format": "1:DAYS:EPOCH",
       "granularity": "1:DAYS",
-      "cardinality": 25
+      "cardinality": 250
     },
     {
       "name": "colTime2",
       "dataType": "LONG",
       "format": "1:MILLISECONDS:EPOCH",
       "granularity": "1:MILLISECONDS",
-      "cardinality": 75
+      "cardinality": 750
     }
   ]
 }

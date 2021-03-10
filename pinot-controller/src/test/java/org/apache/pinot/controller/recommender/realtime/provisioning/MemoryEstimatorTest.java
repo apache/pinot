@@ -43,20 +43,20 @@ public class MemoryEstimatorTest {
   public void testSegmentGenerator() throws Exception {
     runTest("memory_estimation/schema-with-metadata.json", metadata -> {
       assertEquals(extract(metadata, "segment.total.docs = (\\d+)"), "100000");
-      assertEquals(extract(metadata, "column.colInt.cardinality = (\\d+)"), "10");
-      assertEquals(extract(metadata, "column.colIntMV.cardinality = (\\d+)"), "15");
-      assertEquals(extract(metadata, "column.colFloat.cardinality = (\\d+)"), "20");
-      assertEquals(extract(metadata, "column.colFloatMV.cardinality = (\\d+)"), "25");
-      assertEquals(extract(metadata, "column.colString.cardinality = (\\d+)"), "30");
-      assertEquals(extract(metadata, "column.colStringMV.cardinality = (\\d+)"), "35");
-      assertEquals(extract(metadata, "column.colBytes.cardinality = (\\d+)"), "40");
-      assertEquals(extract(metadata, "column.colLong.cardinality = (\\d+)"), "50");
-      assertEquals(extract(metadata, "column.colLongMV.cardinality = (\\d+)"), "55");
-      assertEquals(extract(metadata, "column.colDouble.cardinality = (\\d+)"), "60");
-      assertEquals(extract(metadata, "column.colDoubleMV.cardinality = (\\d+)"), "65");
-      assertEquals(extract(metadata, "column.colDoubleMetric.cardinality = (\\d+)"), "70");
-      assertEquals(extract(metadata, "column.colFloatMetric.cardinality = (\\d+)"), "80");
-      assertEquals(extract(metadata, "column.colTime.cardinality = (\\d+)"), "90");
+      assertEquals(extract(metadata, "column.colInt.cardinality = (\\d+)"), "100");
+      assertEquals(extract(metadata, "column.colIntMV.cardinality = (\\d+)"), "150");
+      assertEquals(extract(metadata, "column.colFloat.cardinality = (\\d+)"), "200");
+      assertEquals(extract(metadata, "column.colFloatMV.cardinality = (\\d+)"), "250");
+      assertEquals(extract(metadata, "column.colString.cardinality = (\\d+)"), "300");
+      assertEquals(extract(metadata, "column.colStringMV.cardinality = (\\d+)"), "350");
+      assertEquals(extract(metadata, "column.colBytes.cardinality = (\\d+)"), "400");
+      assertEquals(extract(metadata, "column.colLong.cardinality = (\\d+)"), "500");
+      assertEquals(extract(metadata, "column.colLongMV.cardinality = (\\d+)"), "550");
+      assertEquals(extract(metadata, "column.colDouble.cardinality = (\\d+)"), "600");
+      assertEquals(extract(metadata, "column.colDoubleMV.cardinality = (\\d+)"), "650");
+      assertEquals(extract(metadata, "column.colDoubleMetric.cardinality = (\\d+)"), "700");
+      assertEquals(extract(metadata, "column.colFloatMetric.cardinality = (\\d+)"), "800");
+      assertEquals(extract(metadata, "column.colTime.cardinality = (\\d+)"), "900");
       assertEquals(extract(metadata, "column.colInt.maxNumberOfMultiValues = (\\d+)"), "0");
       assertEquals(extract(metadata, "column.colIntMV.maxNumberOfMultiValues = (\\d+)"), "3");
       assertEquals(extract(metadata, "column.colFloat.maxNumberOfMultiValues = (\\d+)"), "0");
@@ -78,13 +78,13 @@ public class MemoryEstimatorTest {
   public void testSegmentGenerator_withDateTimeFieldSpec() throws Exception {
     runTest("memory_estimation/schema-with-metadata__dateTimeFieldSpec.json", metadata -> {
       assertEquals(extract(metadata, "segment.total.docs = (\\d+)"), "100000");
-      assertEquals(extract(metadata, "column.colInt.cardinality = (\\d+)"), "50");
-      assertEquals(extract(metadata, "column.colFloat.cardinality = (\\d+)"), "60");
-      assertEquals(extract(metadata, "column.colString.cardinality = (\\d+)"), "70");
-      assertEquals(extract(metadata, "column.colBytes.cardinality = (\\d+)"), "80");
-      assertEquals(extract(metadata, "column.colMetric.cardinality = (\\d+)"), "90");
-      assertEquals(extract(metadata, "column.colTime.cardinality = (\\d+)"), "25");
-      assertEquals(extract(metadata, "column.colTime2.cardinality = (\\d+)"), "75");
+      assertEquals(extract(metadata, "column.colInt.cardinality = (\\d+)"), "500");
+      assertEquals(extract(metadata, "column.colFloat.cardinality = (\\d+)"), "600");
+      assertEquals(extract(metadata, "column.colString.cardinality = (\\d+)"), "700");
+      assertEquals(extract(metadata, "column.colBytes.cardinality = (\\d+)"), "800");
+      assertEquals(extract(metadata, "column.colMetric.cardinality = (\\d+)"), "900");
+      assertEquals(extract(metadata, "column.colTime.cardinality = (\\d+)"), "250");
+      assertEquals(extract(metadata, "column.colTime2.cardinality = (\\d+)"), "750");
       assertEquals(extract(metadata, "column.colInt.maxNumberOfMultiValues = (\\d+)"), "3");
       assertEquals(extract(metadata, "column.colFloat.maxNumberOfMultiValues = (\\d+)"), "2");
       assertEquals(extract(metadata, "column.colString.maxNumberOfMultiValues = (\\d+)"), "0");

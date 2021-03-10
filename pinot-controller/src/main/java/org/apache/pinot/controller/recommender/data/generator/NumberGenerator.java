@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.recommender.data.generator;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,79 +33,35 @@ import org.slf4j.LoggerFactory;
  */
 
 public class NumberGenerator implements Generator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(NumberGenerator.class);
   private static final double DEFAULT_NUMBER_OF_VALUES_PER_ENTRY = 1;
 
   private final int cardinality;
   private final DataType columnType;
   private final double numberOfValuesPerEntry;
 
-  private List<Integer> intValues;
-  private List<Double> doubleValues;
-  private List<Long> longValues;
-  private List<Float> floatValues;
-
+  private final int initialValue;
   private final Random random;
 
+  private int counter = 0;
+
   public NumberGenerator(Integer cardinality, DataType type, Double numberOfValuesPerEntry) {
+    this(cardinality, type, numberOfValuesPerEntry, new Random(System.currentTimeMillis()));
+  }
+
+  @VisibleForTesting
+  NumberGenerator(Integer cardinality, DataType type, Double numberOfValuesPerEntry, Random random) {
     this.cardinality = cardinality;
     this.numberOfValuesPerEntry =
         numberOfValuesPerEntry != null ? numberOfValuesPerEntry : DEFAULT_NUMBER_OF_VALUES_PER_ENTRY;
     Preconditions.checkState(this.numberOfValuesPerEntry >= 1,
         "Number of values per entry (should be >= 1): " + this.numberOfValuesPerEntry);
     columnType = type;
-    random = new Random(System.currentTimeMillis());
+    this.random = random;
+    initialValue = random.nextInt(100);
   }
 
   @Override
   public void init() {
-    final Random rand = new Random(System.currentTimeMillis());
-
-    switch (columnType) {
-      case INT:
-        intValues = new ArrayList<Integer>();
-        final int start = rand.nextInt(cardinality);
-        final int end = start + cardinality;
-        for (int i = start; i < end; i++) {
-          intValues.add(i);
-        }
-        break;
-      case LONG:
-        longValues = new ArrayList<Long>();
-        final long longStart = rand.nextInt(cardinality);
-        final long longEnd = longStart + cardinality;
-        for (long i = longStart; i < longEnd; i++) {
-          longValues.add(i);
-        }
-        break;
-      case FLOAT:
-        floatValues = new ArrayList<Float>();
-        final float floatStart = Math.round(rand.nextFloat()* 100.0f) / 100.0f; // round to two decimal places
-        int floatCounter = 1;
-        while (true) {
-          floatValues.add(floatStart + floatCounter);
-          if (floatCounter == cardinality) {
-            break;
-          }
-          floatCounter++;
-        }
-        break;
-      case DOUBLE:
-        doubleValues = new ArrayList<Double>();
-        final double doubleStart = Math.round(rand.nextDouble() * 100.0) / 100.0; // round to two decimal places
-        int doubleCounter = 1;
-        while (true) {
-          doubleValues.add(doubleStart + doubleCounter);
-          if (doubleCounter == cardinality) {
-            break;
-          }
-          doubleCounter++;
-        }
-        break;
-      default:
-        throw new RuntimeException("number generator can only accept a column of type number and this : " + columnType
-            + " is not a supported number type");
-    }
   }
 
   @Override
@@ -116,15 +73,20 @@ public class NumberGenerator implements Generator {
   }
 
   private Number getNextNumber() {
+    if (counter == cardinality) {
+      counter = 0;
+    }
+    int newValue = initialValue + counter;
+    counter++;
     switch (columnType) {
       case INT:
-        return intValues.get(random.nextInt(cardinality));
+        return newValue;
       case LONG:
-        return longValues.get(random.nextInt(cardinality));
+        return (long) newValue;
       case FLOAT:
-        return floatValues.get(random.nextInt(cardinality));
+        return newValue + 0.5f;
       case DOUBLE:
-        return doubleValues.get(random.nextInt(cardinality));
+        return newValue + 0.5;
       default:
         throw new RuntimeException("number generator can only accept a column of type number and this : " + columnType
             + " is not a supported number type");
