@@ -43,8 +43,9 @@ public class SqlResultComparator {
 
   private static final String FIELD_RESULT_TABLE = "resultTable";
   private static final String FIELD_DATA_SCHEMA = "dataSchema";
-  private static final String FIELD_ROWS = "rows";
+  private static final String FIELD_COLUMN_NAMES = "columnNames";
   private static final String FIELD_COLUMN_DATA_TYPES = "columnDataTypes";
+  private static final String FIELD_ROWS = "rows";
   private static final String FIELD_IS_SUPERSET = "isSuperset";
   private static final String FIELD_NUM_DOCS_SCANNED = "numDocsScanned";
   private static final String FIELD_EXCEPTIONS = "exceptions";
@@ -126,11 +127,12 @@ public class SqlResultComparator {
   }
 
   public static boolean areMetadataEqual(JsonNode actual, JsonNode expected) {
-    return areNumServersQueriedEqual(actual, expected) && areNumServersRespondedEqual(actual, expected)
-        && areNumSegmentsQueriedEqual(actual, expected) && areNumSegmentsProcessedEqual(actual, expected)
-        && areNumSegmentsMatchedEqual(actual, expected) && areNumConsumingSegmentsQueriedEqual(actual, expected)
-        && areNumDocsScannedEqual(actual, expected) && areNumEntriesScannedInFilterEqual(actual, expected)
-        && areNumEntriesScannedPostFilterEqual(actual, expected) && areNumGroupsLimitReachedEqual(actual, expected);
+    /*
+     * Since we add more and more several segments with different generations during compatibility test,
+     * metadata such as "numSegmentsQueried", "numDocsScanned" will be different, we only compare
+     * "numServersQueried" and "numServersResponded" here.
+     * */
+    return areNumServersQueriedEqual(actual, expected) && areNumServersRespondedEqual(actual, expected);
   }
 
   private static boolean areNumGroupsLimitReachedEqual(JsonNode actual, JsonNode expected) {
@@ -269,13 +271,20 @@ public class SqlResultComparator {
   }
 
   private static boolean areDataSchemaEqual(JsonNode actual, JsonNode expected) {
-    JsonNode actualDataSchema = actual.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA);
-    JsonNode expecteDataSchema = expected.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA);
+    /*
+    * Field "dataSchema" is an array, which contains "columnNames" and "columnDataTypes". However there is no orders
+    * between "columnNames" and "columnDataTypes", so we extract and append them when compare instead of compare
+    * "dataSchema" directly.
+    * */
+    JsonNode actualColumnNames = actual.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).get(FIELD_COLUMN_NAMES);
+    JsonNode expectedColumnNames = expected.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).get(FIELD_COLUMN_NAMES);
+    JsonNode actualColumnDataTypes = actual.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).get(FIELD_COLUMN_DATA_TYPES);
+    JsonNode expectedColumnDataTypes = expected.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).get(FIELD_COLUMN_DATA_TYPES);
 
-    String actualDataSchemaStr = actualDataSchema.toString();
-    String expecteDataSchemaStr = expecteDataSchema.toString();
-    if (!actualDataSchemaStr.equals(expecteDataSchemaStr)) {
-      LOGGER.error("The dataSchema don't match! Actual: {}, Expected: {}", actualDataSchema, expecteDataSchema);
+    String actualDataSchemaStr = actualColumnNames.toString() + actualColumnDataTypes.toString();
+    String expectedDataSchemaStr = expectedColumnNames.toString() + expectedColumnDataTypes.toString();
+    if (!actualDataSchemaStr.equals(expectedDataSchemaStr)) {
+      LOGGER.error("The dataSchema don't match! Actual: {}, Expected: {}", actualDataSchemaStr, expectedDataSchemaStr);
       return false;
     }
     return true;

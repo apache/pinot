@@ -1,5 +1,5 @@
 {
     "commentMarker" : "#",
     "header" :
-            "generationNumber,stringDimSV1,stringDimSV2,longDimSV1,longDimSV2,stringDimMV1,stringDimMV2,intDimMV1,intDimMV2,textDim1,bytesDimSV1,mapDim1__KEYS,mapDim1__VALUES,mapDim2json,intMetric1,longMetric1,floatMetric1,doubleMetric1"
+            "HoursSinceEpoch,generationNumber,stringDimSV1,stringDimSV2,longDimSV1,longDimSV2,stringDimMV1,stringDimMV2,intDimMV1,intDimMV2,textDim1,bytesDimSV1,mapDim1__KEYS,mapDim1__VALUES,mapDim2json,intMetric1,longMetric1,floatMetric1,doubleMetric1"
 }

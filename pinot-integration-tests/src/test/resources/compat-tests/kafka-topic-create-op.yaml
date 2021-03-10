@@ -17,9 +17,9 @@
 # under the License.
 #
 
-description: Yaml file for query ops
+description: Yaml file for creating Kafka topic PinotRealtimeFeatureTest1Event
 operations:
-  - type: queryOp
-    description: Run query on FeatureTest1 using SQL
-    queryFileName: pinot-integration-tests/src/test/resources/compat-tests/queries/feature-test-1-sql.queries
-    expectedResultsFileName: pinot-integration-tests/src/test/resources/compat-tests/query-results/feature-test-1-rest-sql.results
+  - type: streamOp
+    description: create Kafka topic PinotRealtimeFeatureTest1Event
+    op: CREATE
+    streamConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/feature-test-1-realtime-stream-config.json
