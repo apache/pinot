@@ -67,7 +67,7 @@ public class SegmentUploaderConfig {
 
   @Override
   public String toString() {
-    return "SegmentWriterConfig{" + "\n_tableConfig=" + _tableConfig + ", \nbatchConfigOverride=" + _batchConfigOverride
+    return "SegmentUploaderConfig{" + "\n_tableConfig=" + _tableConfig + ", \nbatchConfigOverride=" + _batchConfigOverride
         + "\n}";
   }
 }

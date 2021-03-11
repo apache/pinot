@@ -26,13 +26,14 @@ import java.net.URI;
  */
 public interface SegmentUploader {
 
-    /**
-     * Initializes the {@link SegmentUploader}
-     */
-    void init(SegmentUploaderConfig segmentUploaderConfig);
+  /**
+   * Initializes the {@link SegmentUploader}
+   */
+  void init(SegmentUploaderConfig segmentUploaderConfig);
 
-    /**
-     * Uploads the segments from the segmentDir to the cluster
-     */
-    void upload(URI segmentDir);
+  /**
+   * Uploads the segments from the segmentDir to the cluster
+   */
+  void upload(URI segmentDir)
+      throws Exception;
 }

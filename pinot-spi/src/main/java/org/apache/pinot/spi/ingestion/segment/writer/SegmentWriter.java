@@ -19,7 +19,6 @@
 package org.apache.pinot.spi.ingestion.segment.writer;
 
 import java.io.Closeable;
-import java.io.IOException;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -40,14 +39,14 @@ public interface SegmentWriter extends Closeable {
    * This row is not available in the segment until a <code>flush()</code> is invoked.
    */
   void collect(GenericRow row)
-      throws IOException;
+      throws Exception;
 
   /**
    * Collects a batch of {@link GenericRow}s into a buffer.
    * These rows are not available in the segment until a <code>flush()</code> is invoked.
    */
   void collect(GenericRow[] rowBatch)
-      throws IOException;
+      throws Exception;
 
   /**
    * Creates one Pinot segment using the {@link GenericRow}s collected in the buffer,
@@ -55,5 +54,6 @@ public interface SegmentWriter extends Closeable {
    * Successful invocation of this method means that the {@link GenericRow}s collected so far,
    * are now available in the Pinot segment and not available in the buffer anymore.
    */
-  void flush();
+  void flush()
+      throws Exception;
 }
