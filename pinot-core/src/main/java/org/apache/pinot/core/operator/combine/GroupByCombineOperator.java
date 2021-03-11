@@ -34,7 +34,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
@@ -42,7 +41,6 @@ import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmin
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.exception.EarlyTerminationException;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,7 +52,7 @@ import org.slf4j.LoggerFactory;
  *   - Try to extend BaseCombineOperator to reduce duplicate code
  */
 @SuppressWarnings("rawtypes")
-public class GroupByCombineOperator extends BaseOperator<IntermediateResultsBlock> {
+public class GroupByCombineOperator extends BaseCombineOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(GroupByCombineOperator.class);
   private static final String OPERATOR_NAME = "GroupByCombineOperator";
 
@@ -72,8 +70,26 @@ public class GroupByCombineOperator extends BaseOperator<IntermediateResultsBloc
   private final int _innerSegmentNumGroupsLimit;
   private final int _interSegmentNumGroupsLimit;
 
+  private final ConcurrentHashMap<String, Object[]> _resultsMap = new ConcurrentHashMap<>();
+  private final AtomicInteger _numGroups = new AtomicInteger();
+  private final ConcurrentLinkedQueue<ProcessingException> _mergedProcessingExceptions = new ConcurrentLinkedQueue<>();
+  private final AggregationFunction[] _aggregationFunctions;
+  private final int _numAggregationFunctions;
+  // We use a CountDownLatch to track if all Futures are finished by the query timeout, and cancel the unfinished
+  // _futures (try to interrupt the execution if it already started).
+  // Besides the CountDownLatch, we also use a Phaser to ensure all the Futures are done (not scheduled, finished or
+  // interrupted) before the main thread returns. We need to ensure no execution left before the main thread returning
+  // because the main thread holds the reference to the segments, and if the segments are deleted/refreshed, the
+  // segments can be released after the main thread returns, which would lead to undefined behavior (even JVM crash)
+  // when executing queries against them.
+  private final int _numOperators;
+  private final CountDownLatch _operatorLatch;
+  private final Phaser _phaser = new Phaser(1);
+  private final Future[] _futures;
+
   public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
       long endTimeMs, int innerSegmentNumGroupsLimit) {
+    super(operators, queryContext, executorService, endTimeMs);
     _operators = operators;
     _queryContext = queryContext;
     _executorService = executorService;
@@ -81,117 +97,79 @@ public class GroupByCombineOperator extends BaseOperator<IntermediateResultsBloc
     _innerSegmentNumGroupsLimit = innerSegmentNumGroupsLimit;
     _interSegmentNumGroupsLimit =
         (int) Math.min((long) innerSegmentNumGroupsLimit * INTER_SEGMENT_NUM_GROUPS_LIMIT_FACTOR, Integer.MAX_VALUE);
+
+    _aggregationFunctions = _queryContext.getAggregationFunctions();
+    assert _aggregationFunctions != null;
+    _numAggregationFunctions = _aggregationFunctions.length;
+    _numOperators = _operators.size();
+    _operatorLatch = new CountDownLatch(_numOperators);
+    _futures = new Future[_numOperators];
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * <p>Combines the group-by result blocks from underlying operators and returns a merged, sorted and trimmed group-by
-   * result block.
-   * <ul>
-   *   <li>
-   *     Concurrently merge group-by results form multiple result blocks into a map from group key to group results
-   *   </li>
-   *   <li>
-   *     Sort and trim the results map based on {@code TOP N} in the request
-   *     <p>Results map will be converted from {@code Map<String, Object[]>} to {@code List<Map<String, Object>>} which
-   *     is expected by the broker
-   *   </li>
-   *   <li>
-   *     Set all exceptions encountered during execution into the merged result block
-   *   </li>
-   * </ul>
-   */
   @Override
-  protected IntermediateResultsBlock getNextBlock() {
-    ConcurrentHashMap<String, Object[]> resultsMap = new ConcurrentHashMap<>();
-    AtomicInteger numGroups = new AtomicInteger();
-    ConcurrentLinkedQueue<ProcessingException> mergedProcessingExceptions = new ConcurrentLinkedQueue<>();
+  protected void processBlock(int threadIndex) {
+    try {
+      // Register the thread to the _phaser.
+      // If the _phaser is terminated (returning negative value) when trying to register the thread, that means the
+      // query execution has timed out, and the main thread has deregistered itself and returned the result.
+      // Directly return as no execution result will be taken.
+      if (_phaser.register() < 0) {
+        return;
+      }
 
-    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
-    assert aggregationFunctions != null;
-    int numAggregationFunctions = aggregationFunctions.length;
+      IntermediateResultsBlock intermediateResultsBlock =
+          (IntermediateResultsBlock) _operators.get(threadIndex).nextBlock();
 
-    // We use a CountDownLatch to track if all Futures are finished by the query timeout, and cancel the unfinished
-    // futures (try to interrupt the execution if it already started).
-    // Besides the CountDownLatch, we also use a Phaser to ensure all the Futures are done (not scheduled, finished or
-    // interrupted) before the main thread returns. We need to ensure no execution left before the main thread returning
-    // because the main thread holds the reference to the segments, and if the segments are deleted/refreshed, the
-    // segments can be released after the main thread returns, which would lead to undefined behavior (even JVM crash)
-    // when executing queries against them.
-    int numOperators = _operators.size();
-    CountDownLatch operatorLatch = new CountDownLatch(numOperators);
-    Phaser phaser = new Phaser(1);
+      // Merge processing exceptions.
+      List<ProcessingException> processingExceptionsToMerge = intermediateResultsBlock.getProcessingExceptions();
+      if (processingExceptionsToMerge != null) {
+        _mergedProcessingExceptions.addAll(processingExceptionsToMerge);
+      }
 
-    Future[] futures = new Future[numOperators];
-    for (int i = 0; i < numOperators; i++) {
-      int index = i;
-      futures[i] = _executorService.submit(new TraceRunnable() {
-        @SuppressWarnings("unchecked")
-        @Override
-        public void runJob() {
-          try {
-            // Register the thread to the phaser.
-            // If the phaser is terminated (returning negative value) when trying to register the thread, that means the
-            // query execution has timed out, and the main thread has deregistered itself and returned the result.
-            // Directly return as no execution result will be taken.
-            if (phaser.register() < 0) {
-              return;
-            }
-
-            IntermediateResultsBlock intermediateResultsBlock =
-                (IntermediateResultsBlock) _operators.get(index).nextBlock();
-
-            // Merge processing exceptions.
-            List<ProcessingException> processingExceptionsToMerge = intermediateResultsBlock.getProcessingExceptions();
-            if (processingExceptionsToMerge != null) {
-              mergedProcessingExceptions.addAll(processingExceptionsToMerge);
-            }
-
-            // Merge aggregation group-by result.
-            AggregationGroupByResult aggregationGroupByResult = intermediateResultsBlock.getAggregationGroupByResult();
-            if (aggregationGroupByResult != null) {
-              // Iterate over the group-by keys, for each key, update the group-by result in the resultsMap.
-              Iterator<GroupKeyGenerator.StringGroupKey> groupKeyIterator =
-                  aggregationGroupByResult.getStringGroupKeyIterator();
-              while (groupKeyIterator.hasNext()) {
-                GroupKeyGenerator.StringGroupKey groupKey = groupKeyIterator.next();
-                resultsMap.compute(groupKey._stringKey, (key, value) -> {
-                  if (value == null) {
-                    if (numGroups.getAndIncrement() < _interSegmentNumGroupsLimit) {
-                      value = new Object[numAggregationFunctions];
-                      for (int i = 0; i < numAggregationFunctions; i++) {
-                        value[i] = aggregationGroupByResult.getResultForKey(groupKey, i);
-                      }
-                    }
-                  } else {
-                    for (int i = 0; i < numAggregationFunctions; i++) {
-                      value[i] = aggregationFunctions[i]
-                          .merge(value[i], aggregationGroupByResult.getResultForKey(groupKey, i));
-                    }
-                  }
-                  return value;
-                });
+      // Merge aggregation group-by result.
+      AggregationGroupByResult aggregationGroupByResult = intermediateResultsBlock.getAggregationGroupByResult();
+      if (aggregationGroupByResult != null) {
+        // Iterate over the group-by keys, for each key, update the group-by result in the _resultsMap.
+        Iterator<GroupKeyGenerator.StringGroupKey> groupKeyIterator =
+            aggregationGroupByResult.getStringGroupKeyIterator();
+        while (groupKeyIterator.hasNext()) {
+          GroupKeyGenerator.StringGroupKey groupKey = groupKeyIterator.next();
+          _resultsMap.compute(groupKey._stringKey, (key, value) -> {
+            if (value == null) {
+              if (_numGroups.getAndIncrement() < _interSegmentNumGroupsLimit) {
+                value = new Object[_numAggregationFunctions];
+                for (int i = 0; i < _numAggregationFunctions; i++) {
+                  value[i] = aggregationGroupByResult.getResultForKey(groupKey, i);
+                }
+              }
+            } else {
+              for (int i = 0; i < _numAggregationFunctions; i++) {
+                value[i] =
+                    _aggregationFunctions[i].merge(value[i], aggregationGroupByResult.getResultForKey(groupKey, i));
               }
             }
-          } catch (EarlyTerminationException e) {
-            // Early-terminated because query times out or is already satisfied
-          } catch (Exception e) {
-            LOGGER.error(
-                "Caught exception while processing and combining group-by for index: {}, operator: {}, queryContext: {}",
-                index, _operators.get(index).getClass().getName(), _queryContext, e);
-            mergedProcessingExceptions.add(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
-          } finally {
-            operatorLatch.countDown();
-            phaser.arriveAndDeregister();
-          }
+            return value;
+          });
         }
-      });
+      }
+    } catch (EarlyTerminationException e) {
+      // Early-terminated because query times out or is already satisfied
+    } catch (Exception e) {
+      LOGGER.error(
+          "Caught exception while processing and combining group-by for index: {}, operator: {}, queryContext: {}",
+          threadIndex, _operators.get(threadIndex).getClass().getName(), _queryContext, e);
+      _mergedProcessingExceptions.add(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
+    } finally {
+      _operatorLatch.countDown();
+      _phaser.arriveAndDeregister();
     }
+  }
 
+  @Override
+  protected IntermediateResultsBlock mergeBlock() {
     try {
       long timeoutMs = _endTimeMs - System.currentTimeMillis();
-      boolean opCompleted = operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
+      boolean opCompleted = _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
       if (!opCompleted) {
         // If this happens, the broker side should already timed out, just log the error and return
         String errorMessage = String
@@ -205,20 +183,16 @@ public class GroupByCombineOperator extends BaseOperator<IntermediateResultsBloc
       AggregationGroupByTrimmingService aggregationGroupByTrimmingService =
           new AggregationGroupByTrimmingService(_queryContext);
       List<Map<String, Object>> trimmedResults =
-          aggregationGroupByTrimmingService.trimIntermediateResultsMap(resultsMap);
-      IntermediateResultsBlock mergedBlock = new IntermediateResultsBlock(aggregationFunctions, trimmedResults, true);
+          aggregationGroupByTrimmingService.trimIntermediateResultsMap(_resultsMap);
+      IntermediateResultsBlock mergedBlock = new IntermediateResultsBlock(_aggregationFunctions, trimmedResults, true);
 
       // Set the processing exceptions.
-      if (!mergedProcessingExceptions.isEmpty()) {
-        mergedBlock.setProcessingExceptions(new ArrayList<>(mergedProcessingExceptions));
+      if (!_mergedProcessingExceptions.isEmpty()) {
+        mergedBlock.setProcessingExceptions(new ArrayList<>(_mergedProcessingExceptions));
       }
-
-      // Set the execution statistics.
-      CombineOperatorUtils.setExecutionStatistics(mergedBlock, _operators);
-
       // TODO: this value should be set in the inner-segment operators. Setting it here might cause false positive as we
       //       are comparing number of groups across segments with the groups limit for each segment.
-      if (resultsMap.size() >= _innerSegmentNumGroupsLimit) {
+      if (_resultsMap.size() >= _innerSegmentNumGroupsLimit) {
         mergedBlock.setNumGroupsLimitReached(true);
       }
 
@@ -227,14 +201,34 @@ public class GroupByCombineOperator extends BaseOperator<IntermediateResultsBloc
       return new IntermediateResultsBlock(e);
     } finally {
       // Cancel all ongoing jobs
-      for (Future future : futures) {
+      for (Future future : _futures) {
         if (!future.isDone()) {
           future.cancel(true);
         }
       }
       // Deregister the main thread and wait for all threads done
-      phaser.awaitAdvance(phaser.arriveAndDeregister());
+      _phaser.awaitAdvance(_phaser.arriveAndDeregister());
     }
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Combines the group-by result blocks from underlying operators and returns a merged, sorted and trimmed group-by
+   * result block.
+   * <ul>
+   *   <li>
+   *     Sort and trim the results map based on {@code TOP N} in the request
+   *     <p>Results map will be converted from {@code Map<String, Object[]>} to {@code List<Map<String, Object>>} which
+   *     is expected by the broker
+   *   </li>
+   *   <li>
+   *     Set all exceptions encountered during execution into the merged result block
+   *   </li>
+   * </ul>
+   */
+  @Override
+  protected void mergeResultsBlocks(IntermediateResultsBlock mergedBlock, IntermediateResultsBlock blockToMerge) {
   }
 
   @Override
