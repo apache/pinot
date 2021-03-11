@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.ingestion.segment.writer;
 
 import java.io.Closeable;
+import java.net.URI;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -50,10 +51,12 @@ public interface SegmentWriter extends Closeable {
 
   /**
    * Creates one Pinot segment using the {@link GenericRow}s collected in the buffer,
-   * at the outputDirUri as specified in the batchConfigs.
+   * at the outputDirUri as specified in the tableConfig->batchConfigs or the batchConfigOverride.
    * Successful invocation of this method means that the {@link GenericRow}s collected so far,
    * are now available in the Pinot segment and not available in the buffer anymore.
+   *
+   * @return URI of the generated segment
    */
-  void flush()
+  URI flush()
       throws Exception;
 }

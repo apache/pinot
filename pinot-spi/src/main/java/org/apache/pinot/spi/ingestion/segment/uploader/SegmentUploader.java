@@ -29,10 +29,12 @@ public interface SegmentUploader {
   /**
    * Initializes the {@link SegmentUploader}
    */
-  void init(SegmentUploaderConfig segmentUploaderConfig);
+  void init(SegmentUploaderConfig segmentUploaderConfig)
+      throws Exception;
 
   /**
    * Uploads the segments from the segmentDir to the cluster
+   * @param segmentDir URI of segment tar file or URI of directory containing segment tar files
    */
   void upload(URI segmentDir)
       throws Exception;
