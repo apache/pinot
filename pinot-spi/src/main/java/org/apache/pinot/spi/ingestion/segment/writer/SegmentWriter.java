@@ -51,7 +51,7 @@ public interface SegmentWriter extends Closeable {
 
   /**
    * Creates one Pinot segment using the {@link GenericRow}s collected in the buffer,
-   * at the outputDirUri as specified in the tableConfig->batchConfigs or the batchConfigOverride.
+   * at the outputDirUri as specified in the tableConfig->batchConfigs.
    * Successful invocation of this method means that the {@link GenericRow}s collected so far,
    * are now available in the Pinot segment and not available in the buffer anymore.
    *

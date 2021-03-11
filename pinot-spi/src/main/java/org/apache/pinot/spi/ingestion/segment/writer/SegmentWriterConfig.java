@@ -19,10 +19,8 @@
 package org.apache.pinot.spi.ingestion.segment.writer;
 
 import com.google.common.base.Preconditions;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 
 
 /**
@@ -31,12 +29,10 @@ import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 public class SegmentWriterConfig {
   private final TableConfig _tableConfig;
   private final Schema _schema;
-  private final BatchConfig _batchConfigOverride;
 
-  private SegmentWriterConfig(TableConfig tableConfig, Schema schema, @Nullable BatchConfig batchConfigOverride) {
+  private SegmentWriterConfig(TableConfig tableConfig, Schema schema) {
     this._tableConfig = tableConfig;
     this._schema = schema;
-    this._batchConfigOverride = batchConfigOverride;
   }
 
   public TableConfig getTableConfig() {
@@ -47,15 +43,9 @@ public class SegmentWriterConfig {
     return _schema;
   }
 
-  @Nullable
-  public BatchConfig getBatchConfigOverride() {
-    return _batchConfigOverride;
-  }
-
   public static class Builder {
     private TableConfig _tableConfig;
     private Schema _schema;
-    private BatchConfig _batchConfigOverride;
 
     public Builder setTableConfig(TableConfig tableConfig) {
       _tableConfig = tableConfig;
@@ -67,21 +57,16 @@ public class SegmentWriterConfig {
       return this;
     }
 
-    public Builder setBatchConfigOverride(@Nullable BatchConfig batchConfigOverride) {
-      _batchConfigOverride = batchConfigOverride;
-      return this;
-    }
-
     public SegmentWriterConfig build() {
       Preconditions.checkNotNull(_tableConfig);
       Preconditions.checkNotNull(_schema);
-      return new SegmentWriterConfig(_tableConfig, _schema, _batchConfigOverride);
+      return new SegmentWriterConfig(_tableConfig, _schema);
     }
   }
 
   @Override
   public String toString() {
     return "SegmentWriterConfig{" + "\n_tableConfig=" + _tableConfig + ", \n_schema=" + _schema.toSingleLineJsonString()
-        + ", \nbatchConfigOverride=" + _batchConfigOverride + "\n}";
+        + "\n}";
   }
 }

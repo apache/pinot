@@ -19,9 +19,7 @@
 package org.apache.pinot.spi.ingestion.segment.uploader;
 
 import com.google.common.base.Preconditions;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 
 
 /**
@@ -29,45 +27,31 @@ import org.apache.pinot.spi.ingestion.batch.BatchConfig;
  */
 public class SegmentUploaderConfig {
   private final TableConfig _tableConfig;
-  private final BatchConfig _batchConfigOverride;
 
-  private SegmentUploaderConfig(TableConfig tableConfig, @Nullable BatchConfig batchConfigOverride) {
+  private SegmentUploaderConfig(TableConfig tableConfig) {
     this._tableConfig = tableConfig;
-    this._batchConfigOverride = batchConfigOverride;
   }
 
   public TableConfig getTableConfig() {
     return _tableConfig;
   }
 
-  @Nullable
-  public BatchConfig getBatchConfigOverride() {
-    return _batchConfigOverride;
-  }
-
   public static class Builder {
     private TableConfig _tableConfig;
-    private BatchConfig _batchConfigOverride;
 
     public Builder setTableConfig(TableConfig tableConfig) {
       _tableConfig = tableConfig;
       return this;
     }
 
-    public Builder setBatchConfigOverride(@Nullable BatchConfig batchConfigOverride) {
-      _batchConfigOverride = batchConfigOverride;
-      return this;
-    }
-
     public SegmentUploaderConfig build() {
       Preconditions.checkNotNull(_tableConfig);
-      return new SegmentUploaderConfig(_tableConfig, _batchConfigOverride);
+      return new SegmentUploaderConfig(_tableConfig);
     }
   }
 
   @Override
   public String toString() {
-    return "SegmentUploaderConfig{" + "\n_tableConfig=" + _tableConfig + ", \nbatchConfigOverride=" + _batchConfigOverride
-        + "\n}";
+    return "SegmentUploaderConfig{" + "\n_tableConfig=" + _tableConfig + "\n}";
   }
 }
