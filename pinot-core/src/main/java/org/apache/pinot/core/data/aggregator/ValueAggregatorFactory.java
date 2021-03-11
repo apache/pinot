@@ -46,6 +46,8 @@ public class ValueAggregatorFactory {
         return new MaxValueAggregator();
       case SUM:
         return new SumValueAggregator();
+      case SUMPRECISION:
+        return new SumPrecisionValueAggregator();
       case AVG:
         return new AvgValueAggregator();
       case MINMAXRANGE:
@@ -80,6 +82,8 @@ public class ValueAggregatorFactory {
         return MaxValueAggregator.AGGREGATED_VALUE_TYPE;
       case SUM:
         return SumValueAggregator.AGGREGATED_VALUE_TYPE;
+      case SUMPRECISION:
+        return SumPrecisionValueAggregator.AGGREGATED_VALUE_TYPE;
       case AVG:
         return AvgValueAggregator.AGGREGATED_VALUE_TYPE;
       case MINMAXRANGE:
