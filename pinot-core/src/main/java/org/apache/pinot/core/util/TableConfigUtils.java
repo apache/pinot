@@ -20,7 +20,6 @@ package org.apache.pinot.core.util;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +29,6 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
-import org.apache.commons.collections.MultiMap;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.config.TagNameUtils;
