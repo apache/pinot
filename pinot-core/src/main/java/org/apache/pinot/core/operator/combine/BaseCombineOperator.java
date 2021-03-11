@@ -82,17 +82,20 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
       _futures[i] = _executorService.submit(new TraceRunnable() {
         @Override
         public void runJob() {
-          processBlock(threadIndex);
+          processSegments(threadIndex);
         }
       });
     }
 
-    IntermediateResultsBlock mergedBlock = mergeBlock();
+    IntermediateResultsBlock mergedBlock = mergeResultsFromSegments();
     CombineOperatorUtils.setExecutionStatistics(mergedBlock, _operators);
     return mergedBlock;
   }
 
-  protected void processBlock(int threadIndex) {
+  /**
+   * processSegments will execute query on one or more segments in a single thread.
+   */
+  protected void processSegments(int threadIndex) {
     try {
       // Register the thread to the phaser
       // NOTE: If the phaser is terminated (returning negative value) when trying to register the thread, that
@@ -129,7 +132,10 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
     }
   }
 
-  protected IntermediateResultsBlock mergeBlock() {
+  /**
+   * mergeResultsFromSegments will merge multiple intermediate result blocks into a result block.
+   */
+  protected IntermediateResultsBlock mergeResultsFromSegments() {
     IntermediateResultsBlock mergedBlock = null;
     try {
       int numBlocksMerged = 0;

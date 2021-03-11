@@ -39,7 +39,6 @@ import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
-import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
@@ -47,16 +46,14 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.exception.EarlyTerminationException;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GroupByUtils;
-import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
  * Combine operator for aggregation group-by queries with SQL semantic.
- * TODO:
- *   - Use CombineOperatorUtils.getNumThreadsForQuery() to get the parallelism of the query instead of using all threads
- *   - Try to extend BaseCombineOperator to reduce duplicate code
+ * TODO: Use CombineOperatorUtils.getNumThreadsForQuery() to get the parallelism of the query instead of using
+ *   all threads
  */
 @SuppressWarnings("rawtypes")
 public class GroupByOrderByCombineOperator extends BaseCombineOperator {
@@ -70,9 +67,6 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
   private final int _trimSize;
   private final int _trimThreshold;
   private final Lock _initLock;
-  private DataSchema _dataSchema;
-  private ConcurrentIndexedTable _indexedTable;
-
   private final AggregationFunction[] _aggregationFunctions;
   private final int _numAggregationFunctions;
   private final int _numGroupByExpressions;
@@ -89,6 +83,8 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
   private final CountDownLatch _operatorLatch;
   private final Phaser _phaser = new Phaser(1);
   private final Future[] _futures;
+  private DataSchema _dataSchema;
+  private ConcurrentIndexedTable _indexedTable;
 
   public GroupByOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService, long endTimeMs, int trimThreshold) {
@@ -112,8 +108,14 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
     _futures = new Future[_numOperators];
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p> Execute query on one or more segments in a single thread, and store multiple intermediate result blocks
+   * into {@link org.apache.pinot.core.data.table.IndexedTable}
+   */
   @Override
-  protected void processBlock(int threadIndex) {
+  protected void processSegments(int threadIndex) {
     try {
       // Register the thread to the _phaser.
       // If the _phaser is terminated (returning negative value) when trying to register the thread, that means the
@@ -179,8 +181,21 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
     }
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Combines intermediate selection result blocks from underlying operators and returns a merged one.
+   * <ul>
+   *   <li>
+   *     Merges multiple intermediate selection result blocks as a merged one.
+   *   </li>
+   *   <li>
+   *     Set all exceptions encountered during execution into the merged result block
+   *   </li>
+   * </ul>
+   */
   @Override
-  protected IntermediateResultsBlock mergeBlock() {
+  protected IntermediateResultsBlock mergeResultsFromSegments() {
     try {
       long timeoutMs = _endTimeMs - System.currentTimeMillis();
       boolean opCompleted = _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);

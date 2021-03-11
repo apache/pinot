@@ -47,9 +47,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Combine operator for aggregation group-by queries with PQL semantic.
- * TODO:
- *   - Use CombineOperatorUtils.getNumThreadsForQuery() to get the parallelism of the query instead of using all threads
- *   - Try to extend BaseCombineOperator to reduce duplicate code
+ * TODO: Use CombineOperatorUtils.getNumThreadsForQuery() to get the parallelism of the query instead of using
+ *   all threads
  */
 @SuppressWarnings("rawtypes")
 public class GroupByCombineOperator extends BaseCombineOperator {
@@ -106,8 +105,14 @@ public class GroupByCombineOperator extends BaseCombineOperator {
     _futures = new Future[_numOperators];
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p> Execute query on one or more segments in a single thread, and store multiple intermediate result blocks into a
+   * map
+   */
   @Override
-  protected void processBlock(int threadIndex) {
+  protected void processSegments(int threadIndex) {
     try {
       // Register the thread to the _phaser.
       // If the _phaser is terminated (returning negative value) when trying to register the thread, that means the
@@ -165,8 +170,27 @@ public class GroupByCombineOperator extends BaseCombineOperator {
     }
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Combines the group-by result blocks from underlying operators and returns a merged, sorted and trimmed group-by
+   * result block.
+   * <ul>
+   *   <li>
+   *     Merge group-by results form multiple result blocks into a map from group key to group results
+   *   </li>
+   *   <li>
+   *     Sort and trim the results map based on {@code TOP N} in the request
+   *     <p>Results map will be converted from {@code Map<String, Object[]>} to {@code List<Map<String, Object>>} which
+   *     is expected by the broker
+   *   </li>
+   *   <li>
+   *     Set all exceptions encountered during execution into the merged result block
+   *   </li>
+   * </ul>
+   */
   @Override
-  protected IntermediateResultsBlock mergeBlock() {
+  protected IntermediateResultsBlock mergeResultsFromSegments() {
     try {
       long timeoutMs = _endTimeMs - System.currentTimeMillis();
       boolean opCompleted = _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
@@ -211,22 +235,6 @@ public class GroupByCombineOperator extends BaseCombineOperator {
     }
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * <p>Combines the group-by result blocks from underlying operators and returns a merged, sorted and trimmed group-by
-   * result block.
-   * <ul>
-   *   <li>
-   *     Sort and trim the results map based on {@code TOP N} in the request
-   *     <p>Results map will be converted from {@code Map<String, Object[]>} to {@code List<Map<String, Object>>} which
-   *     is expected by the broker
-   *   </li>
-   *   <li>
-   *     Set all exceptions encountered during execution into the merged result block
-   *   </li>
-   * </ul>
-   */
   @Override
   protected void mergeResultsBlocks(IntermediateResultsBlock mergedBlock, IntermediateResultsBlock blockToMerge) {
   }
