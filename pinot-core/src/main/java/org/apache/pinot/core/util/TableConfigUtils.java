@@ -19,6 +19,7 @@
 package org.apache.pinot.core.util;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ArrayListMultimap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -29,6 +30,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections.MultiMap;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.config.TagNameUtils;
@@ -369,7 +371,7 @@ public final class TableConfigUtils {
     if (indexingConfig == null || schema == null) {
       return;
     }
-    Map<String, String> columnNameToConfigMap = new HashMap<>();
+    ArrayListMultimap<String, String> columnNameToConfigMap = ArrayListMultimap.create();
     Set<String> noDictionaryColumnsSet = new HashSet<>();
     String STAR_TREE_CONFIG_NAME = "StarTreeIndex Config";
 
@@ -465,7 +467,7 @@ public final class TableConfigUtils {
       }
     }
 
-    for (Map.Entry<String, String> entry : columnNameToConfigMap.entrySet()) {
+    for (Map.Entry<String, String> entry : columnNameToConfigMap.entries()) {
       String columnName = entry.getKey();
       String configName = entry.getValue();
       FieldSpec columnFieldSpec = schema.getFieldSpecFor(columnName);
