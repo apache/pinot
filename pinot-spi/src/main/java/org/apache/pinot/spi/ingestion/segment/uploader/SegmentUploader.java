@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.ingestion.segment.uploader;
 
 import java.net.URI;
+import org.apache.pinot.spi.config.table.TableConfig;
 
 
 /**
@@ -28,8 +29,9 @@ public interface SegmentUploader {
 
   /**
    * Initializes the {@link SegmentUploader}
+   * @param tableConfig The table config for the segment upload
    */
-  void init(SegmentUploaderConfig segmentUploaderConfig)
+  void init(TableConfig tableConfig)
       throws Exception;
 
   /**

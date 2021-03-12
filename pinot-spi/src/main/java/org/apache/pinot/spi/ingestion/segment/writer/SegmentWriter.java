@@ -20,6 +20,8 @@ package org.apache.pinot.spi.ingestion.segment.writer;
 
 import java.io.Closeable;
 import java.net.URI;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -31,8 +33,10 @@ public interface SegmentWriter extends Closeable {
 
   /**
    * Initializes the {@link SegmentWriter} with provided tableConfig and Pinot schema.
+   * @param tableConfig The table config for the segment
+   * @param schema The Pinot schema for the table
    */
-  void init(SegmentWriterConfig segmentWriterConfig)
+  void init(TableConfig tableConfig, Schema schema)
       throws Exception;
 
   /**
@@ -46,8 +50,12 @@ public interface SegmentWriter extends Closeable {
    * Collects a batch of {@link GenericRow}s into a buffer.
    * These rows are not available in the segment until a <code>flush()</code> is invoked.
    */
-  void collect(GenericRow[] rowBatch)
-      throws Exception;
+  default void collect(GenericRow[] rowBatch)
+      throws Exception {
+    for (GenericRow row : rowBatch) {
+      collect(row);
+    }
+  }
 
   /**
    * Creates one Pinot segment using the {@link GenericRow}s collected in the buffer,
