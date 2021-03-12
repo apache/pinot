@@ -59,7 +59,7 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
   // deleted/refreshed, the segment will be released after the main thread returns, which would lead to undefined
   // behavior (even JVM crash) when processing queries against it.
   protected final Phaser _phaser = new Phaser(1);
-  protected final Future[] _futures;
+  protected Future[] _futures;
   // Use a _blockingQueue to store the per-segment result
   private final BlockingQueue<IntermediateResultsBlock> _blockingQueue;
 
@@ -79,6 +79,7 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
       long endTimeMs, int numThreads) {
     this(operators, queryContext, executorService, endTimeMs);
     _numThreads = numThreads;
+    _futures = new Future[_numThreads];
   }
 
   @Override
