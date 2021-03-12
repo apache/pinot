@@ -78,7 +78,11 @@ public interface AccessControl {
   }
 
   /**
-   * Container for authentication workflow info. May be extended by implementations.
+   * Container for authentication workflow info for the Pinot UI. May be extended by implementations.
+   *
+   * Auth workflow info hold any configuration necessary to execute a UI workflow. We currently foresee supporting NONE
+   * (auth disabled), BASIC (basic auth with username and password), and OAUTH2 (token-based workflow via external
+   * issuer)
    */
   class AuthWorkflowInfo {
     String workflow;

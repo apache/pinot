@@ -74,6 +74,11 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
     }
 
     @Override
+    public boolean hasAccess(RequesterIdentity requesterIdentity) {
+      return hasAccess(requesterIdentity, null);
+    }
+
+    @Override
     public boolean hasAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
       Preconditions.checkArgument(requesterIdentity instanceof HttpRequesterIdentity, "HttpRequesterIdentity required");
       HttpRequesterIdentity identity = (HttpRequesterIdentity) requesterIdentity;

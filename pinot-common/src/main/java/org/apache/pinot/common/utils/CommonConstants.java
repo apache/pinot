@@ -236,6 +236,10 @@ public class CommonConstants {
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.server.storage.factory";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.server.crypter";
 
+    /**
+     * Service token for accessing protected controller APIs.
+     * E.g. null (auth disabled), "Basic abcdef..." (basic auth), "Bearer 123def..." (oauth2)
+     */
     public static final String CONFIG_OF_AUTH_TOKEN = "auth.token";
 
     // Configuration to consider the server ServiceStatus as being STARTED if the percent of resources (tables) that
@@ -307,6 +311,11 @@ public class CommonConstants {
       public static final String CONFIG_OF_CONTROLLER_HTTPS_ENABLED = "enabled";
       public static final String CONFIG_OF_CONTROLLER_HTTPS_PORT = "controller.port";
       public static final String CONFIG_OF_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = "upload.request.timeout.ms";
+
+      /**
+       * Service token for accessing protected controller APIs.
+       * E.g. null (auth disabled), "Basic abcdef..." (basic auth), "Bearer 123def..." (oauth2)
+       */
       public static final String CONFIG_OF_SEGMENT_UPLOAD_AUTH_TOKEN = "upload.auth.token";
 
       public static final int DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = 300_000;
@@ -362,6 +371,10 @@ public class CommonConstants {
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "segment.uploader";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "crypter";
 
+    /**
+     * Service token for accessing protected controller APIs.
+     * E.g. null (auth disabled), "Basic abcdef..." (basic auth), "Bearer 123def..." (oauth2)
+     */
     public static final String CONFIG_OF_TASK_AUTH_TOKEN = "task.auth.token";
   }
 

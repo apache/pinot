@@ -182,7 +182,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     // first-stage access control to prevent unauthenticated requests from using up resources
     // secondary table-level check comes later
-    boolean hasAccess = _accessControlFactory.create().hasAccess(requesterIdentity, null);
+    boolean hasAccess = _accessControlFactory.create().hasAccess(requesterIdentity);
     if (!hasAccess) {
       _brokerMetrics.addMeteredTableValue(null, BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
       LOGGER.info("Access denied for requestId {}", requestId);

@@ -107,7 +107,8 @@ public class BasicAuthClusterIntegrationTest extends ClusterTest {
       throws Exception {
     JsonNode response =
         JsonUtils.stringToJsonNode(sendPostRequest("http://localhost:18099/query/sql", "{\"sql\":\"SELECT now()\"}"));
-    Assert.assertEquals(response.get("exceptions").get(0).get("errorCode").asInt(), 180, "must return error code");
+    Assert.assertFalse(response.has("resultTable"), "must not return result table");
+    Assert.assertTrue(response.get("exceptions").get(0).get("errorCode").asInt() != 0, "must return error code");
   }
 
   @Test
@@ -116,7 +117,7 @@ public class BasicAuthClusterIntegrationTest extends ClusterTest {
     JsonNode response = JsonUtils.stringToJsonNode(
         sendPostRequest("http://localhost:18099/query/sql", "{\"sql\":\"SELECT now()\"}", AUTH_HEADER));
     Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "LONG",
-        "must return LONG value");
+        "must return result with LONG value");
     Assert.assertTrue(response.get("exceptions").isEmpty(), "must not return exception");
   }
 

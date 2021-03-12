@@ -47,6 +47,15 @@ public class PinotControllerAuthResource {
   @Context
   HttpHeaders _httpHeaders;
 
+  /**
+   * Verify a token is both authenticated and authorized to perform an operation.
+   *
+   * @param tableName table name (optional)
+   * @param accessType access type (optional)
+   * @param endpointUrl endpoint url (optional)
+   *
+   * @return {@code true} if authenticated and authorized, {@code false} otherwise
+   */
   @GET
   @Path("auth/verify")
   @Produces(MediaType.APPLICATION_JSON)
@@ -64,6 +73,12 @@ public class PinotControllerAuthResource {
     return accessControl.hasAccess(tableName, accessType, _httpHeaders, endpointUrl);
   }
 
+  /**
+   * Provide the auth workflow configuration for the Pinot UI to perform user authentication. Currently supports NONE
+   * (no auth), BASIC (basic auth with username and password), and OAUTH2 (token-based via external issuer)
+   *
+   * @return auth workflow info/configuration
+   */
   @GET
   @Path("auth/info")
   @Produces(MediaType.APPLICATION_JSON)

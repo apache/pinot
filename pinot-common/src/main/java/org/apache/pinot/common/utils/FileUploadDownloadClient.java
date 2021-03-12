@@ -46,6 +46,7 @@ import org.apache.http.StatusLine;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.methods.RequestBuilder;
 import org.apache.http.entity.ContentType;
@@ -139,12 +140,18 @@ public class FileUploadDownloadClient implements Closeable {
     return new URI(protocol, null, host, port, path, null, null);
   }
 
+  /**
+   * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
+   */
   @Deprecated
   public static URI getRetrieveTableConfigHttpURI(String host, int port, String rawTableName)
       throws URISyntaxException {
     return getURI(HTTP, host, port, TABLES_PATH + "/" + rawTableName);
   }
 
+  /**
+   * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
+   */
   @Deprecated
   public static URI getDeleteSegmentHttpUri(String host, int port, String rawTableName, String segmentName,
       String tableType)
@@ -153,6 +160,9 @@ public class FileUploadDownloadClient implements Closeable {
         rawTableName + "/" + URIUtils.encode(segmentName) + TYPE_DELIMITER + tableType));
   }
 
+  /**
+   * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
+   */
   @Deprecated
   public static URI getRetrieveAllSegmentWithTableTypeHttpUri(String host, int port, String rawTableName,
       String tableType)
@@ -161,6 +171,9 @@ public class FileUploadDownloadClient implements Closeable {
         rawTableName + TYPE_DELIMITER + tableType));
   }
 
+  /**
+   * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
+   */
   @Deprecated
   public static URI getRetrieveSchemaHttpURI(String host, int port, String schemaName)
       throws URISyntaxException {
@@ -170,6 +183,24 @@ public class FileUploadDownloadClient implements Closeable {
   public static URI getRetrieveSchemaURI(String protocol, String host, int port, String schemaName)
       throws URISyntaxException {
     return getURI(protocol, host, port, SCHEMA_PATH + "/" + schemaName);
+  }
+
+  /**
+   * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
+   */
+  @Deprecated
+  public static URI getUploadSchemaHttpURI(String host, int port)
+      throws URISyntaxException {
+    return getURI(HTTP, host, port, SCHEMA_PATH);
+  }
+
+  /**
+   * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
+   */
+  @Deprecated
+  public static URI getUploadSchemaHttpsURI(String host, int port)
+      throws URISyntaxException {
+    return getURI(HTTPS, host, port, SCHEMA_PATH);
   }
 
   public static URI getUploadSchemaURI(String protocol, String host, int port)
@@ -182,10 +213,46 @@ public class FileUploadDownloadClient implements Closeable {
     return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(), SCHEMA_PATH);
   }
 
+  /**
+   * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
+   *
+   * This method calls the old segment upload endpoint. We will deprecate this behavior soon. Please call
+   * getUploadSegmentHttpURI to construct your request.
+   */
+  @Deprecated
+  public static URI getOldUploadSegmentHttpURI(String host, int port)
+      throws URISyntaxException {
+    return getURI(HTTP, host, port, OLD_SEGMENT_PATH);
+  }
+
+  /**
+   * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
+   *
+   * This method calls the old segment upload endpoint. We will deprecate this behavior soon. Please call
+   * getUploadSegmentHttpsURI to construct your request.
+   */
+  @Deprecated
+  public static URI getOldUploadSegmentHttpsURI(String host, int port)
+      throws URISyntaxException {
+    return getURI(HTTPS, host, port, OLD_SEGMENT_PATH);
+  }
+
+  /**
+   * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
+   */
   @Deprecated
   public static URI getUploadSegmentHttpURI(String host, int port)
       throws URISyntaxException {
     return getURI(HTTP, host, port, SEGMENT_PATH);
+  }
+
+  /**
+   * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
+   */
+  @Deprecated
+  public static URI getUploadSegmentHttpsURI(String host, int port)
+      throws URISyntaxException {
+    return getURI(HTTPS, host, port, SEGMENT_PATH);
   }
 
   public static URI getUploadSegmentURI(String protocol, String host, int port)
@@ -223,20 +290,6 @@ public class FileUploadDownloadClient implements Closeable {
         RequestBuilder.create(method).setVersion(HttpVersion.HTTP_1_1).setUri(uri).setEntity(entity);
     addHeadersAndParameters(requestBuilder, headers, parameters);
     setTimeout(requestBuilder, socketTimeoutMs);
-    return requestBuilder.build();
-  }
-
-  @Deprecated
-  private static HttpUriRequest constructGetRequest(URI uri) {
-    RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
-    setTimeout(requestBuilder, GET_REQUEST_SOCKET_TIMEOUT_MS);
-    return requestBuilder.build();
-  }
-
-  @Deprecated
-  private static HttpUriRequest constructDeleteRequest(URI uri) {
-    RequestBuilder requestBuilder = RequestBuilder.delete(uri).setVersion(HttpVersion.HTTP_1_1);
-    setTimeout(requestBuilder, DELETE_REQUEST_SOCKET_TIMEOUT_MS);
     return requestBuilder.build();
   }
 
@@ -395,16 +448,44 @@ public class FileUploadDownloadClient implements Closeable {
     return errorMessage;
   }
 
+  /**
+   * Deprecated due to lack of auth header support. May break for deployments with auth enabled
+   */
   @Deprecated
   public SimpleHttpResponse sendGetRequest(URI uri)
       throws IOException, HttpErrorStatusException {
-    return sendRequest(constructGetRequest(uri));
+    RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
+    setTimeout(requestBuilder, GET_REQUEST_SOCKET_TIMEOUT_MS);
+    return sendRequest(requestBuilder.build());
   }
 
+  /**
+   * Deprecated due to lack of auth header support. May break for deployments with auth enabled
+   */
   @Deprecated
   public SimpleHttpResponse sendDeleteRequest(URI uri)
       throws IOException, HttpErrorStatusException {
-    return sendRequest(constructDeleteRequest(uri));
+    RequestBuilder requestBuilder = RequestBuilder.delete(uri).setVersion(HttpVersion.HTTP_1_1);
+    setTimeout(requestBuilder, DELETE_REQUEST_SOCKET_TIMEOUT_MS);
+    return sendRequest(requestBuilder.build());
+  }
+
+  /**
+   * Deprecated due to lack of auth header support. May break for deployments with auth enabled
+   *
+   * Add schema.
+   *
+   * @param uri URI
+   * @param schemaName Schema name
+   * @param schemaFile Schema file
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  @Deprecated
+  public SimpleHttpResponse addSchema(URI uri, String schemaName, File schemaFile)
+      throws IOException, HttpErrorStatusException {
+    return addSchema(uri, schemaName, schemaFile, Collections.emptyList(), Collections.emptyList());
   }
 
   /**
@@ -426,6 +507,26 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   /**
+   * Deprecated due to lack of auth header support. May break for deployments with auth enabled
+   *
+   * Update schema.
+   *
+   * @param uri URI
+   * @param schemaName Schema name
+   * @param schemaFile Schema file
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  @Deprecated
+  public SimpleHttpResponse updateSchema(URI uri, String schemaName, File schemaFile)
+      throws IOException, HttpErrorStatusException {
+    return sendRequest(
+        getUploadFileRequest(HttpPut.METHOD_NAME, uri, getContentBody(schemaName, schemaFile), null, null,
+            DEFAULT_SOCKET_TIMEOUT_MS));
+  }
+
+  /**
    * Upload segment by sending a zip of creation.meta and metadata.properties.
    *
    * @param uri URI
@@ -443,6 +544,18 @@ public class FileUploadDownloadClient implements Closeable {
       throws IOException, HttpErrorStatusException {
     return sendRequest(
         getUploadSegmentMetadataRequest(uri, segmentName, segmentMetadataFile, headers, parameters, socketTimeoutMs));
+  }
+
+  /**
+   * Deprecated due to lack of auth header support. May break for deployments with auth enabled
+   */
+  @Deprecated
+  // Upload a set of segment metadata files (e.g., meta.properties and creation.meta) to controllers.
+  public SimpleHttpResponse uploadSegmentMetadataFiles(URI uri, Map<String, File> metadataFiles,
+      int segmentUploadRequestTimeoutMs)
+      throws IOException, HttpErrorStatusException {
+    return uploadSegmentMetadataFiles(uri, metadataFiles, Collections.emptyList(), Collections.emptyList(),
+        segmentUploadRequestTimeoutMs);
   }
 
   // Upload a set of segment metadata files (e.g., meta.properties and creation.meta) to controllers.
@@ -478,9 +591,9 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   /**
-   * Upload segment with segment file using default settings. Include table name as a request parameter.
+   * Deprecated due to lack of auth header support. May break for deployments with auth enabled
    *
-   * NOTE: does not support auth tokens
+   * Upload segment with segment file using default settings. Include table name as a request parameter.
    *
    * @param uri URI
    * @param segmentName Segment name
@@ -521,6 +634,25 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   /**
+   * Upload segment with segment file input stream using default settings. Include table name as a request parameter.
+   *
+   * @param uri URI
+   * @param segmentName Segment name
+   * @param inputStream Segment file input stream
+   * @param rawTableName Raw table name
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public SimpleHttpResponse uploadSegment(URI uri, String segmentName, InputStream inputStream, String rawTableName)
+      throws IOException, HttpErrorStatusException {
+    // Add table name as a request parameter
+    NameValuePair tableNameValuePair = new BasicNameValuePair(QueryParameters.TABLE_NAME, rawTableName);
+    List<NameValuePair> parameters = Arrays.asList(tableNameValuePair);
+    return uploadSegment(uri, segmentName, inputStream, null, parameters, DEFAULT_SOCKET_TIMEOUT_MS);
+  }
+
+  /**
    * Send segment uri.
    *
    * Note: table name has to be set as a parameter.
@@ -541,6 +673,8 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   /**
+   * Deprecated due to lack of auth header support. May break for deployments with auth enabled
+   *
    * Send segment uri using default settings. Include table name as a request parameter.
    *
    * @param uri URI
@@ -578,6 +712,8 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   /**
+   * Deprecated due to lack of auth header support. May break for deployments with auth enabled
+   *
    * Send segment json using default settings.
    *
    * @param uri URI
@@ -593,9 +729,28 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   /**
+   * Deprecated due to lack of auth header support. May break for deployments with auth enabled
+   *
    * Send segment completion protocol request.
    *
    * @param uri URI
+   * @param socketTimeoutMs Socket timeout in milliseconds
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  @Deprecated
+  public SimpleHttpResponse sendSegmentCompletionProtocolRequest(URI uri, int socketTimeoutMs)
+      throws IOException, HttpErrorStatusException {
+    return sendSegmentCompletionProtocolRequest(uri, Collections.emptyList(), Collections.emptyList(), socketTimeoutMs);
+  }
+
+  /**
+   * Send segment completion protocol request.
+   *
+   * @param uri URI
+   * @param headers Optional http headers
+   * @param parameters Optional query parameters
    * @param socketTimeoutMs Socket timeout in milliseconds
    * @return Response
    * @throws IOException
@@ -608,12 +763,30 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   /**
+   * Deprecated due to lack of auth header support. May break for deployments with auth enabled
+   *
    * Download a file using default settings, with an optional auth token
    *
    * @param uri URI
    * @param socketTimeoutMs Socket timeout in milliseconds
    * @param dest File destination
-   * @param authToken optional auth token, or null
+   * @return Response status code
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  @Deprecated
+  public int downloadFile(URI uri, int socketTimeoutMs, File dest)
+      throws IOException, HttpErrorStatusException {
+    return downloadFile(uri, socketTimeoutMs, dest, null);
+  }
+
+  /**
+   * Download a file using default settings, with an optional auth token
+   *
+   * @param uri URI
+   * @param socketTimeoutMs Socket timeout in milliseconds
+   * @param dest File destination
+   * @param authToken auth token
    * @return Response status code
    * @throws IOException
    * @throws HttpErrorStatusException
@@ -648,11 +821,28 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   /**
-   * Download a file, with an optional auth token.
+   * Deprecated due to lack of auth header support. May break for deployments with auth enabled
+   *
+   * Download a file.
    *
    * @param uri URI
    * @param dest File destination
-   * @param authToken optional auth token, or null
+   * @return Response status code
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  @Deprecated
+  public int downloadFile(URI uri, File dest)
+      throws IOException, HttpErrorStatusException {
+    return downloadFile(uri, dest, null);
+  }
+
+  /**
+   * Download a file.
+   *
+   * @param uri URI
+   * @param dest File destination
+   * @param authToken auth token
    * @return Response status code
    * @throws IOException
    * @throws HttpErrorStatusException
