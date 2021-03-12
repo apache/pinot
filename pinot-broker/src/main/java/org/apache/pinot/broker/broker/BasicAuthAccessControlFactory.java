@@ -67,10 +67,10 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
    * Access Control using header-based basic http authentication
    */
   private static class BasicAuthAccessControl implements AccessControl {
-    private final Map<String, BasicAuthPrincipal> _principals;
+    private final Map<String, BasicAuthPrincipal> _token2principal;
 
     public BasicAuthAccessControl(Collection<BasicAuthPrincipal> principals) {
-      _principals = principals.stream().collect(Collectors.toMap(BasicAuthPrincipal::getToken, p -> p));
+      _token2principal = principals.stream().collect(Collectors.toMap(BasicAuthPrincipal::getToken, p -> p));
     }
 
     @Override
@@ -80,7 +80,7 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
 
       Collection<String> tokens = identity.getHttpHeaders().get(HEADER_AUTHORIZATION);
       Optional<BasicAuthPrincipal> principalOpt =
-          tokens.stream().map(BasicAuthUtils::normalizeBase64Token).map(_principals::get).filter(Objects::nonNull)
+          tokens.stream().map(BasicAuthUtils::normalizeBase64Token).map(_token2principal::get).filter(Objects::nonNull)
               .findFirst();
 
       if (!principalOpt.isPresent()) {
@@ -89,7 +89,8 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       }
 
       BasicAuthPrincipal principal = principalOpt.get();
-      if (!brokerRequest.isSetQuerySource() || !brokerRequest.getQuerySource().isSetTableName()) {
+      if (brokerRequest == null || !brokerRequest.isSetQuerySource() || !brokerRequest.getQuerySource()
+          .isSetTableName()) {
         // no table restrictions? accept
         return true;
       }

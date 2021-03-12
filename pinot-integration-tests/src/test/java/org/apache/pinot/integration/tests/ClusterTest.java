@@ -91,6 +91,10 @@ public abstract class ClusterTest extends ControllerTest {
   private List<HelixServerStarter> _serverStarters;
   private MinionStarter _minionStarter;
 
+  protected PinotConfiguration getDefaultBrokerConfiguration() {
+    return new PinotConfiguration();
+  }
+
   protected void startBroker()
       throws Exception {
     startBrokers(1);
@@ -111,7 +115,7 @@ public abstract class ClusterTest extends ControllerTest {
     _brokerBaseApiUrl = "http://localhost:" + basePort;
     _brokerStarters = new ArrayList<>(numBrokers);
     for (int i = 0; i < numBrokers; i++) {
-      Map<String, Object> properties = new HashMap<>();
+      Map<String, Object> properties = getDefaultBrokerConfiguration().toMap();
       properties.put(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
       properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, basePort + i);
       properties.put(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
@@ -125,7 +129,7 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  public static PinotConfiguration getDefaultServerConfiguration() {
+  protected PinotConfiguration getDefaultServerConfiguration() {
     PinotConfiguration configuration = DefaultHelixStarterServerConfig.loadDefaultServerConf();
 
     configuration.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, LOCAL_HOST);
@@ -177,13 +181,17 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
+  protected PinotConfiguration getDefaultMinionConfiguration() {
+    return new PinotConfiguration();
+  }
+
   // NOTE: We don't allow multiple Minion instances in the same JVM because Minion uses singleton class MinionContext
   //       to manage the instance level configs
   protected void startMinion(@Nullable List<PinotTaskExecutorFactory> taskExecutorFactories,
       @Nullable List<MinionEventObserverFactory> eventObserverFactories) {
     FileUtils.deleteQuietly(new File(Minion.DEFAULT_INSTANCE_BASE_DIR));
     try {
-      _minionStarter = new MinionStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, new PinotConfiguration());
+      _minionStarter = new MinionStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, getDefaultMinionConfiguration());
       // Register task executor factories
       if (taskExecutorFactories != null) {
         for (PinotTaskExecutorFactory taskExecutorFactory : taskExecutorFactories) {

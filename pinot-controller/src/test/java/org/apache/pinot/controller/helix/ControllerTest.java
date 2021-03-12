@@ -584,6 +584,18 @@ public abstract class ControllerTest {
     return constructResponse(new URL(urlString).openStream());
   }
 
+  public static String sendGetRequest(String urlString, Map<String, String> headers) throws IOException {
+    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
+    httpConnection.setRequestMethod("GET");
+    if (headers != null) {
+      for (String key : headers.keySet()) {
+        httpConnection.setRequestProperty(key, headers.get(key));
+      }
+    }
+
+    return constructResponse(httpConnection.getInputStream());
+  }
+
   public static String sendGetRequestRaw(String urlString) throws IOException {
     return IOUtils.toString(new URL(urlString).openStream());
   }

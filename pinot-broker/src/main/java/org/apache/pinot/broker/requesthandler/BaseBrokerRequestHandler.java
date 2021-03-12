@@ -180,6 +180,16 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     requestStatistics.setRequestId(requestId);
     requestStatistics.setRequestArrivalTimeMillis(System.currentTimeMillis());
 
+    // first-stage access control to prevent unauthenticated requests from using up resources
+    // secondary table-level check comes later
+    boolean hasAccess = _accessControlFactory.create().hasAccess(requesterIdentity, null);
+    if (!hasAccess) {
+      _brokerMetrics.addMeteredTableValue(null, BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
+      LOGGER.info("Access denied for requestId {}", requestId);
+      requestStatistics.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
+      return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
+    }
+
     PinotQueryRequest pinotQueryRequest = getPinotQueryRequest(request);
     String query = pinotQueryRequest.getQuery();
     LOGGER.debug("Query string for request {}: {}", requestId, pinotQueryRequest.getQuery());
@@ -245,9 +255,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         compilationEndTimeNs - compilationStartTimeNs);
     _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERIES, 1);
 
-    // Check table access
-    boolean hasAccess = _accessControlFactory.create().hasAccess(requesterIdentity, brokerRequest);
-    if (!hasAccess) {
+    // second-stage table-level access control
+    boolean hasTableAccess = _accessControlFactory.create().hasAccess(requesterIdentity, brokerRequest);
+    if (!hasTableAccess) {
       _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
       LOGGER.info("Access denied for requestId {}, table {}", requestId, tableName);
       requestStatistics.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);

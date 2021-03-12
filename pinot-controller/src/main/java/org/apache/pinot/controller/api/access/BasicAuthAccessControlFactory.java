@@ -62,10 +62,10 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
    * Access Control using header-based basic http authentication
    */
   private static class BasicAuthAccessControl implements AccessControl {
-    private final Map<String, BasicAuthPrincipal> _principals;
+    private final Map<String, BasicAuthPrincipal> _token2principal;
 
     public BasicAuthAccessControl(Collection<BasicAuthPrincipal> principals) {
-      this._principals = principals.stream().collect(Collectors.toMap(BasicAuthPrincipal::getToken, p -> p));
+      this._token2principal = principals.stream().collect(Collectors.toMap(BasicAuthPrincipal::getToken, p -> p));
     }
 
     @Override
@@ -94,7 +94,7 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
         return Optional.empty();
       }
 
-      return authHeaders.stream().map(BasicAuthUtils::normalizeBase64Token).map(_principals::get)
+      return authHeaders.stream().map(BasicAuthUtils::normalizeBase64Token).map(_token2principal::get)
           .filter(Objects::nonNull).findFirst();
     }
 
