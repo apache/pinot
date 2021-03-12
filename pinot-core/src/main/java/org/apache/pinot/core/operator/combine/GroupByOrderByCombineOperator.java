@@ -26,7 +26,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
@@ -60,14 +59,9 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
   public static final int MAX_TRIM_THRESHOLD = 1_000_000_000;
   private static final Logger LOGGER = LoggerFactory.getLogger(GroupByOrderByCombineOperator.class);
   private static final String OPERATOR_NAME = "GroupByOrderByCombineOperator";
-  private final List<Operator> _operators;
-  private final QueryContext _queryContext;
-  private final ExecutorService _executorService;
-  private final long _endTimeMs;
   private final int _trimSize;
   private final int _trimThreshold;
   private final Lock _initLock;
-  private final AggregationFunction[] _aggregationFunctions;
   private final int _numAggregationFunctions;
   private final int _numGroupByExpressions;
   private final int _numColumns;
@@ -79,33 +73,25 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
   // because the main thread holds the reference to the segments, and if the segments are deleted/refreshed, the
   // segments can be released after the main thread returns, which would lead to undefined behavior (even JVM crash)
   // when executing queries against them.
-  private final int _numOperators;
   private final CountDownLatch _operatorLatch;
-  private final Phaser _phaser = new Phaser(1);
-  private final Future[] _futures;
   private DataSchema _dataSchema;
   private ConcurrentIndexedTable _indexedTable;
 
   public GroupByOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService, long endTimeMs, int trimThreshold) {
     super(operators, queryContext, executorService, endTimeMs);
-    _operators = operators;
-    _queryContext = queryContext;
-    _executorService = executorService;
-    _endTimeMs = endTimeMs;
     _initLock = new ReentrantLock();
     _trimSize = GroupByUtils.getTableCapacity(_queryContext);
     _trimThreshold = trimThreshold;
 
-    _aggregationFunctions = _queryContext.getAggregationFunctions();
-    assert _aggregationFunctions != null;
-    _numAggregationFunctions = _aggregationFunctions.length;
+    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
+    assert aggregationFunctions != null;
+    _numAggregationFunctions = aggregationFunctions.length;
     assert _queryContext.getGroupByExpressions() != null;
     _numGroupByExpressions = _queryContext.getGroupByExpressions().size();
     _numColumns = _numGroupByExpressions + _numAggregationFunctions;
-    _numOperators = _operators.size();
-    _operatorLatch = new CountDownLatch(_numOperators);
-    _futures = new Future[_numOperators];
+    int numOperators = _operators.size();
+    _operatorLatch = new CountDownLatch(numOperators);
   }
 
   /**

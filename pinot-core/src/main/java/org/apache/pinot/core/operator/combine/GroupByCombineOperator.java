@@ -27,7 +27,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -60,11 +59,6 @@ public class GroupByCombineOperator extends BaseCombineOperator {
   // in each segment. We still put a limit across segments to protect cases where data is very skewed across different
   // segments.
   private static final int INTER_SEGMENT_NUM_GROUPS_LIMIT_FACTOR = 2;
-
-  private final List<Operator> _operators;
-  private final QueryContext _queryContext;
-  private final ExecutorService _executorService;
-  private final long _endTimeMs;
   // Limit on number of groups stored, beyond which no new group will be created
   private final int _innerSegmentNumGroupsLimit;
   private final int _interSegmentNumGroupsLimit;
@@ -81,18 +75,11 @@ public class GroupByCombineOperator extends BaseCombineOperator {
   // because the main thread holds the reference to the segments, and if the segments are deleted/refreshed, the
   // segments can be released after the main thread returns, which would lead to undefined behavior (even JVM crash)
   // when executing queries against them.
-  private final int _numOperators;
   private final CountDownLatch _operatorLatch;
-  private final Phaser _phaser = new Phaser(1);
-  private final Future[] _futures;
 
   public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
       long endTimeMs, int innerSegmentNumGroupsLimit) {
     super(operators, queryContext, executorService, endTimeMs);
-    _operators = operators;
-    _queryContext = queryContext;
-    _executorService = executorService;
-    _endTimeMs = endTimeMs;
     _innerSegmentNumGroupsLimit = innerSegmentNumGroupsLimit;
     _interSegmentNumGroupsLimit =
         (int) Math.min((long) innerSegmentNumGroupsLimit * INTER_SEGMENT_NUM_GROUPS_LIMIT_FACTOR, Integer.MAX_VALUE);
@@ -100,9 +87,8 @@ public class GroupByCombineOperator extends BaseCombineOperator {
     _aggregationFunctions = _queryContext.getAggregationFunctions();
     assert _aggregationFunctions != null;
     _numAggregationFunctions = _aggregationFunctions.length;
-    _numOperators = _operators.size();
-    _operatorLatch = new CountDownLatch(_numOperators);
-    _futures = new Future[_numOperators];
+    int numOperators = _operators.size();
+    _operatorLatch = new CountDownLatch(numOperators);
   }
 
   /**

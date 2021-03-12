@@ -52,16 +52,16 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
   protected final ExecutorService _executorService;
   protected final long _endTimeMs;
 
-  private final int _numOperators;
-  private final int _numThreads;
-  // Use a _blockingQueue to store the per-segment result
-  private final BlockingQueue<IntermediateResultsBlock> _blockingQueue;
+  protected final int _numOperators;
+  protected final int _numThreads;
   // Use a Phaser to ensure all the Futures are done (not scheduled, finished or interrupted) before the main thread
   // returns. We need to ensure this because the main thread holds the reference to the segments. If a segment is
   // deleted/refreshed, the segment will be released after the main thread returns, which would lead to undefined
   // behavior (even JVM crash) when processing queries against it.
-  private final Phaser _phaser = new Phaser(1);
-  private final Future[] _futures;
+  protected final Phaser _phaser = new Phaser(1);
+  protected final Future[] _futures;
+  // Use a _blockingQueue to store the per-segment result
+  private final BlockingQueue<IntermediateResultsBlock> _blockingQueue;
 
   public BaseCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
       long endTimeMs) {
