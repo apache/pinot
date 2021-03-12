@@ -20,10 +20,10 @@ package org.apache.pinot.core.startree.v2;
 
 import com.tdunning.math.stats.TDigest;
 import java.util.Random;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.data.aggregator.PercentileTDigestValueAggregator;
 import org.apache.pinot.core.data.aggregator.ValueAggregator;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 import static org.testng.Assert.assertEquals;
 
@@ -31,6 +31,7 @@ import static org.testng.Assert.assertEquals;
 public class PreAggregatedPercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<Object, TDigest> {
   // Use non-default compression
   private static final double COMPRESSION = 50;
+  private static final int MAX_VALUE = 10000;
 
   @Override
   ValueAggregator<Object, TDigest> getValueAggregator() {
@@ -45,15 +46,16 @@ public class PreAggregatedPercentileTDigestStarTreeV2Test extends BaseStarTreeV2
   @Override
   Object getRandomRawValue(Random random) {
     TDigest tDigest = TDigest.createMergingDigest(COMPRESSION);
-    tDigest.add(random.nextLong());
-    tDigest.add(random.nextLong());
+    tDigest.add(random.nextInt(MAX_VALUE));
+    tDigest.add(random.nextInt(MAX_VALUE));
     return ObjectSerDeUtils.TDIGEST_SER_DE.serialize(tDigest);
   }
 
   @Override
   void assertAggregatedValue(TDigest starTreeResult, TDigest nonStarTreeResult) {
+    double delta = MAX_VALUE * 0.05;
     for (int i = 0; i <= 100; i++) {
-      assertEquals(starTreeResult.quantile(i / 100), nonStarTreeResult.quantile(i / 100));
+      assertEquals(starTreeResult.quantile(i / 100.0), nonStarTreeResult.quantile(i / 100.0), delta);
     }
   }
 }
