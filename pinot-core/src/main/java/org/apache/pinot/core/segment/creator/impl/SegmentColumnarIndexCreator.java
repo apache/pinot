@@ -366,15 +366,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private boolean createDictionaryForColumn(ColumnIndexCreationInfo info, SegmentGeneratorConfig config,
       FieldSpec spec) {
     String column = spec.getName();
-
     if (config.getRawIndexCreationColumns().contains(column) || config.getRawIndexCompressionType()
         .containsKey(column)) {
       if (!spec.isSingleValueField()) {
         throw new RuntimeException(
             "Creation of indices without dictionaries is supported for single valued columns only.");
       }
-      return false;
-    } else if (spec.getDataType().equals(DataType.BYTES) && !info.isFixedLength()) {
       return false;
     }
     return info.isCreateDictionary();

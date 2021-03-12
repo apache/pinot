@@ -205,7 +205,7 @@ public class SegmentGenerationWithBytesTypeTest {
     SegmentMetadata metadata = segment.getSegmentMetadata();
 
     Assert.assertTrue(metadata.hasDictionary(FIXED_BYTES_UNSORTED_COLUMN));
-    Assert.assertFalse(metadata.hasDictionary(VARIABLE_BYTES_COLUMN));
+    Assert.assertTrue(metadata.hasDictionary(VARIABLE_BYTES_COLUMN));
 
     PinotSegmentRecordReader reader = new PinotSegmentRecordReader(new File(AVRO_DIR_NAME, SEGMENT_NAME));
     GenericRow row = new GenericRow();

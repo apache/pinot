@@ -50,7 +50,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.Sketch;
-import org.apache.pinot.common.function.scalar.DataTypeConversionFunctions;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.geospatial.serde.GeometrySerializer;
 import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
@@ -59,6 +58,7 @@ import org.apache.pinot.core.query.aggregation.function.customobject.QuantileDig
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.StringUtils;
 import org.locationtech.jts.geom.Geometry;
@@ -858,19 +858,19 @@ public class ObjectSerDeUtils {
 
     @Override
     public byte[] serialize(BigDecimal value) {
-      return DataTypeConversionFunctions.bigDecimalToBytes(value.toString());
+      return BigDecimalUtils.serialize(value);
     }
 
     @Override
     public BigDecimal deserialize(byte[] bytes) {
-      return new BigDecimal(DataTypeConversionFunctions.bytesToBigDecimal(bytes));
+      return BigDecimalUtils.deserialize(bytes);
     }
 
     @Override
     public BigDecimal deserialize(ByteBuffer byteBuffer) {
       byte[] bytes = new byte[byteBuffer.remaining()];
       byteBuffer.get(bytes);
-      return deserialize(bytes);
+      return BigDecimalUtils.deserialize(bytes);
     }
   };
 

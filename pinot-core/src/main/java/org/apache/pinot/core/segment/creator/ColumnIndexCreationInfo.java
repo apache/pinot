@@ -108,8 +108,4 @@ public class ColumnIndexCreationInfo implements Serializable {
   public int getNumPartitions() {
     return columnStatistics.getNumPartitions();
   }
-
-  public boolean isFixedLength() {
-    return columnStatistics.getLengthOfShortestElement() == columnStatistics.getLengthOfLargestElement();
-  }
 }
