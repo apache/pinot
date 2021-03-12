@@ -121,6 +121,11 @@ public class SegmentGenerationJobSpec implements Serializable {
    */
   private TlsSpec _tlsSpec;
 
+  /**
+   * Should fail segment generation if it's an empty segment.
+   */
+  private boolean _failOnEmptySegment = false;
+
   public ExecutionFrameworkSpec getExecutionFrameworkSpec() {
     return _executionFrameworkSpec;
   }
@@ -272,6 +277,14 @@ public class SegmentGenerationJobSpec implements Serializable {
 
   public void setTlsSpec(TlsSpec tlsSpec) {
     _tlsSpec = tlsSpec;
+  }
+
+  public boolean isFailOnEmptySegment() {
+    return _failOnEmptySegment;
+  }
+
+  public void setFailOnEmptySegment(boolean failOnEmptySegment) {
+    _failOnEmptySegment = failOnEmptySegment;
   }
 }
 

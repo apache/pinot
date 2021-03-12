@@ -96,7 +96,7 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
     } else {
       LOGGER.warn("Cannot find local Pinot plugins directory at [{}]", localPluginsTarFile.getAbsolutePath());
     }
-    
+
     // Register file systems
     List<PinotFSSpec> pinotFSSpecs = _spec.getPinotFSSpecs();
     for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
@@ -150,6 +150,7 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
       taskSpec.setTableConfig(SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI()));
       taskSpec.setSequenceId(idx);
       taskSpec.setSegmentNameGeneratorSpec(_spec.getSegmentNameGeneratorSpec());
+      taskSpec.setFailOnEmptySegment(_spec.isFailOnEmptySegment());
       taskSpec.setCustomProperty(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, inputFileURI.toString());
 
       // Start a thread that reports progress every minute during segment generation to prevent job getting killed
@@ -186,7 +187,7 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
           .resolve(segmentTarFileName);
       LOGGER.info("Copying segment tar file from [{}] to [{}]", localSegmentTarFile, outputSegmentTarURI);
       outputDirFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
-      
+
       FileUtils.deleteQuietly(localSegmentDir);
       FileUtils.deleteQuietly(localSegmentTarFile);
       FileUtils.deleteQuietly(localInputDataFile);

@@ -64,7 +64,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
   public static final String DEPRECATED_USE_LOCAL_DIRECTORY_SEQUENCE_ID = "local.directory.sequence.id";
   public static final String USE_GLOBAL_DIRECTORY_SEQUENCE_ID = "use.global.directory.sequence.id";
 
-  private SegmentGenerationTaskSpec _taskSpec;
+  private final SegmentGenerationTaskSpec _taskSpec;
 
   public SegmentGenerationTaskRunner(SegmentGenerationTaskSpec taskSpec) {
     _taskSpec = taskSpec;
@@ -103,6 +103,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
     segmentGeneratorConfig.setRecordReaderPath(_taskSpec.getRecordReaderSpec().getClassName());
     segmentGeneratorConfig.setInputFilePath(_taskSpec.getInputFilePath());
     segmentGeneratorConfig.setCustomProperties(_taskSpec.getCustomProperties());
+    segmentGeneratorConfig.setFailOnEmptySegment(_taskSpec.isFailOnEmptySegment());
 
     //build segment
     SegmentIndexCreationDriverImpl segmentIndexCreationDriver = new SegmentIndexCreationDriverImpl();

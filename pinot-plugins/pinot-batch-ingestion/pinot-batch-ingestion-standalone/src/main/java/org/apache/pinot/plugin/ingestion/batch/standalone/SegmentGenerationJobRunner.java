@@ -248,6 +248,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     taskSpec.setSegmentNameGeneratorSpec(_spec.getSegmentNameGeneratorSpec());
     taskSpec.setInputFilePath(localInputDataFile.getAbsolutePath());
     taskSpec.setSequenceId(seqId);
+    taskSpec.setFailOnEmptySegment(_spec.isFailOnEmptySegment());
     taskSpec.setCustomProperty(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, inputFileURI.toString());
 
     LOGGER.info("Submitting one Segment Generation Task for {}", inputFileURI);

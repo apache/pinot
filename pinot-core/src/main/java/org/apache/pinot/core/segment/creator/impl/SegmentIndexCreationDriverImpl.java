@@ -146,6 +146,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     this.config = config;
     recordReader = dataSource.getRecordReader();
     dataSchema = config.getSchema();
+    if (config.isFailOnEmptySegment()) {
+      Preconditions.checkState(recordReader.hasNext(), "No record in data source");
+    }
 
     _recordTransformer = recordTransformer;
 
@@ -243,6 +246,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         segmentName = config.getSegmentNameGenerator()
             .generateSegmentName(sequenceId, timeColumnStatistics.getMinValue(), timeColumnStatistics.getMaxValue());
       } else {
+        // When totalDoc is 0, check whether 'failOnEmptySegment' option is true. If so, directly fail the segment creation.
+        Preconditions.checkArgument(!config.isFailOnEmptySegment(),
+            "Failing the empty segment creation as the option 'failOnEmptySegment' is set to: " + config
+                .isFailOnEmptySegment());
         // Generate a unique name for a segment with no rows
         long now = System.currentTimeMillis();
         segmentName = config.getSegmentNameGenerator().generateSegmentName(sequenceId, now, now);

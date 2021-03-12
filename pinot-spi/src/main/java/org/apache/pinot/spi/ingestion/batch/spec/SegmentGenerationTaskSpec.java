@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.spi.ingestion.batch.spec;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
@@ -68,6 +67,8 @@ public class SegmentGenerationTaskSpec implements Serializable {
    * sequence id
    */
   private int _sequenceId;
+
+  private boolean _failOnEmptySegment = false;
 
   /**
    * Custom properties set into segment metadata
@@ -128,6 +129,14 @@ public class SegmentGenerationTaskSpec implements Serializable {
 
   public void setSequenceId(int sequenceId) {
     _sequenceId = sequenceId;
+  }
+
+  public boolean isFailOnEmptySegment() {
+    return _failOnEmptySegment;
+  }
+
+  public void setFailOnEmptySegment(boolean failOnEmptySegment) {
+    _failOnEmptySegment = failOnEmptySegment;
   }
 
   public void setCustomProperty(String key, String value) {
