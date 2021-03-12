@@ -26,11 +26,13 @@ import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.controller.recommender.io.metadata.SchemaWithMetaData;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.Command;
-import org.apache.pinot.tools.realtime.provisioning.MemoryEstimator;
+import org.apache.pinot.controller.recommender.realtime.provisioning.MemoryEstimator;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -242,13 +244,25 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
 
     long maxUsableHostMemBytes = DataSizeUtils.toBytes(_maxUsableHostMemory);
 
-    if (_numRows == 0) {
-      _numRows = DEFAULT_NUMBER_OF_ROWS;
+    MemoryEstimator memoryEstimator;
+    if (segmentProvided) {
+      // use the provided segment to estimate memory
+      memoryEstimator =
+          new MemoryEstimator(tableConfig, new File(_sampleCompletedSegmentDir), _ingestionRate, maxUsableHostMemBytes,
+              tableRetentionHours);
+    } else {
+      // no segments provided;
+      // generate a segment based on the provided characteristics and then use it to estimate memory
+      if (_numRows == 0) {
+        _numRows = DEFAULT_NUMBER_OF_ROWS;
+      }
+      File file = new File(_schemaWithMetadataFile);
+      Schema schema = deserialize(file, Schema.class);
+      SchemaWithMetaData schemaWithMetaData = deserialize(file, SchemaWithMetaData.class);
+      memoryEstimator =
+          new MemoryEstimator(tableConfig, schema, schemaWithMetaData, _numRows, _ingestionRate, maxUsableHostMemBytes,
+              tableRetentionHours);
     }
-
-    MemoryEstimator memoryEstimator = segmentProvided
-        ? new MemoryEstimator(tableConfig, new File(_sampleCompletedSegmentDir), _ingestionRate, maxUsableHostMemBytes, tableRetentionHours)
-        : new MemoryEstimator(tableConfig, new File(_schemaWithMetadataFile), _numRows, _ingestionRate, maxUsableHostMemBytes, tableRetentionHours);
     File sampleStatsHistory = memoryEstimator.initializeStatsHistory();
     memoryEstimator
         .estimateMemoryUsed(sampleStatsHistory, numHosts, numHours, totalConsumingPartitions, _retentionHours);
@@ -303,5 +317,14 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
   private String getStringForDisplay(String memoryStr) {
     int numSpacesToPad = MEMORY_STR_LEN - memoryStr.length();
     return memoryStr + StringUtils.repeat(" ", numSpacesToPad);
+  }
+
+  private <T> T deserialize(File file, Class<T> clazz) {
+    try {
+      return JsonUtils.fileToObject(file, clazz);
+    } catch (Exception e) {
+      throw new RuntimeException(
+          String.format("Cannot read schema file '%s' to '%s' object.", file, clazz.getSimpleName()), e);
+    }
   }
 }

@@ -20,6 +20,8 @@ package org.apache.pinot.controller.recommender.io;
 
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.controller.recommender.rules.io.FlaggedQueries;
 import org.apache.pinot.controller.recommender.rules.io.configs.IndexConfig;
 import org.apache.pinot.controller.recommender.rules.io.configs.PartitionConfig;
@@ -38,6 +40,7 @@ public class ConfigManager {
   IndexConfig _indexConfig = new IndexConfig();
   PartitionConfig _partitionConfig = new PartitionConfig();
   FlaggedQueries _flaggedQueries = new FlaggedQueries();
+  Map<String, Map<String, String>> _realtimeProvisioningRecommendations = new HashMap<>();
 
   @JsonSetter(nulls = Nulls.SKIP)
   public void setIndexConfig(IndexConfig indexConfig) {
@@ -47,6 +50,17 @@ public class ConfigManager {
   @JsonSetter(nulls = Nulls.SKIP)
   public void setPartitionConfig(PartitionConfig partitionConfig) {
     _partitionConfig = partitionConfig;
+  }
+
+  @JsonSetter(nulls = Nulls.SKIP)
+  public void setFlaggedQueries(FlaggedQueries flaggedQueries) {
+    _flaggedQueries = flaggedQueries;
+  }
+
+  @JsonSetter(nulls = Nulls.SKIP)
+  public void setRealtimeProvisioningRecommendations(
+      Map<String, Map<String, String>> realtimeProvisioningRecommendation) {
+    _realtimeProvisioningRecommendations = realtimeProvisioningRecommendation;
   }
 
   public IndexConfig getIndexConfig() {
@@ -59,5 +73,9 @@ public class ConfigManager {
 
   public FlaggedQueries getFlaggedQueries() {
     return _flaggedQueries;
+  }
+
+  public Map<String, Map<String, String>> getRealtimeProvisioningRecommendations() {
+    return _realtimeProvisioningRecommendations;
   }
 }
