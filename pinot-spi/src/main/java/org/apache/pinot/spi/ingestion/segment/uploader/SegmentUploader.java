@@ -19,12 +19,14 @@
 package org.apache.pinot.spi.ingestion.segment.uploader;
 
 import java.net.URI;
+import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.config.table.TableConfig;
 
 
 /**
  * Interface for uploading segments to Pinot
  */
+@InterfaceStability.Evolving
 public interface SegmentUploader {
 
   /**
@@ -35,9 +37,16 @@ public interface SegmentUploader {
       throws Exception;
 
   /**
-   * Uploads the segments from the segmentDir to the cluster
-   * @param segmentDir URI of segment tar file or URI of directory containing segment tar files
+   * Uploads the segment tar file to the cluster
+   * @param segmentTarFile URI of segment tar file
    */
-  void upload(URI segmentDir)
+  void uploadSegment(URI segmentTarFile)
+      throws Exception;
+
+  /**
+   * Uploads the segments from the segmentDir to the cluster
+   * @param segmentDir URI of directory containing segment tar files
+   */
+  void uploadSegments(URI segmentDir)
       throws Exception;
 }
