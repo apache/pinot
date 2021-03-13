@@ -383,7 +383,7 @@ public class CommonConstants {
   public static class Segment {
     public static class Realtime {
       public enum Status {
-        IN_PROGRESS, DONE
+        IN_PROGRESS, DONE, UPLOAD
       }
 
       /**

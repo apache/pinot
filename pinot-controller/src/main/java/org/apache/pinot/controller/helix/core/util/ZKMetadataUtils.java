@@ -20,10 +20,8 @@ package org.apache.pinot.controller.helix.core.util;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
-import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
+
+import org.apache.pinot.common.metadata.segment.*;
 import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
@@ -35,24 +33,24 @@ public class ZKMetadataUtils {
   private ZKMetadataUtils() {
   }
 
-  public static void updateSegmentMetadata(OfflineSegmentZKMetadata offlineSegmentZKMetadata,
-      SegmentMetadata segmentMetadata) {
-    offlineSegmentZKMetadata.setSegmentName(segmentMetadata.getName());
-    offlineSegmentZKMetadata.setTableName(segmentMetadata.getTableName());
-    offlineSegmentZKMetadata.setIndexVersion(segmentMetadata.getVersion());
-    offlineSegmentZKMetadata.setSegmentType(SegmentType.OFFLINE);
+  public static void updateSegmentMetadata(SegmentZKMetadata segmentZKMetadata,
+                                           SegmentMetadata segmentMetadata, SegmentType segmentType) {
+    segmentZKMetadata.setSegmentName(segmentMetadata.getName());
+    segmentZKMetadata.setTableName(segmentMetadata.getTableName());
+    segmentZKMetadata.setIndexVersion(segmentMetadata.getVersion());
+    segmentZKMetadata.setSegmentType(segmentType);
     if (segmentMetadata.getTimeInterval() != null) {
-      offlineSegmentZKMetadata.setStartTime(segmentMetadata.getStartTime());
-      offlineSegmentZKMetadata.setEndTime(segmentMetadata.getEndTime());
-      offlineSegmentZKMetadata.setTimeUnit(segmentMetadata.getTimeUnit());
+      segmentZKMetadata.setStartTime(segmentMetadata.getStartTime());
+      segmentZKMetadata.setEndTime(segmentMetadata.getEndTime());
+      segmentZKMetadata.setTimeUnit(segmentMetadata.getTimeUnit());
     }
-    offlineSegmentZKMetadata.setTotalDocs(segmentMetadata.getTotalDocs());
-    offlineSegmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
-    offlineSegmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
+    segmentZKMetadata.setTotalDocs(segmentMetadata.getTotalDocs());
+    segmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
+    segmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
     SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier =
         new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE,
-            offlineSegmentZKMetadata.getCustomMap());
-    offlineSegmentZKMetadata.setCustomMap(segmentZKMetadataCustomMapModifier.modifyMap(segmentMetadata.getCustomMap()));
+            segmentZKMetadata.getCustomMap());
+    segmentZKMetadata.setCustomMap(segmentZKMetadataCustomMapModifier.modifyMap(segmentMetadata.getCustomMap()));
 
     // Extract column partition metadata (if any), and set it into segment ZK metadata.
     Map<String, ColumnPartitionMetadata> columnPartitionMap = new HashMap<>();
@@ -73,7 +71,7 @@ public class ZKMetadataUtils {
     }
 
     if (!columnPartitionMap.isEmpty()) {
-      offlineSegmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(columnPartitionMap));
+      segmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(columnPartitionMap));
     }
   }
 }

@@ -24,15 +24,16 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.collections.map.HashedMap;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
+import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -46,6 +47,7 @@ public class PinotResourceManagerTest {
   private static final String OFFLINE_TABLE_NAME = "offlineResourceManagerTestTable";
   private static final String REALTIME_TABLE_NAME = "realtimeResourceManagerTestTable";
   private static final String NUM_REPLICAS_STRING = "2";
+  private static final String PARTITION_COLUMN = "Partition_Column";
 
   @BeforeClass
   public void setUp() throws Exception {
@@ -55,13 +57,16 @@ public class PinotResourceManagerTest {
     TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(OFFLINE_TABLE_NAME).build();
     ControllerTestUtils.getHelixResourceManager().addTable(offlineTableConfig);
 
-    // Adding a realtime table which consumes from a stream with 2 partitions
+    // Adding an upsert enabled realtime table which consumes from a stream with 2 partitions
     Schema dummySchema = ControllerTestUtils.createDummySchema(REALTIME_TABLE_NAME);
     ControllerTestUtils.addSchema(dummySchema);
     Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
     TableConfig realtimeTableConfig = new TableConfigBuilder(TableType.REALTIME).setStreamConfigs(streamConfigs).
         setTableName(REALTIME_TABLE_NAME).setSchemaName(dummySchema.getSchemaName()).build();
     realtimeTableConfig.getValidationConfig().setReplicasPerPartition(NUM_REPLICAS_STRING);
+    realtimeTableConfig.getValidationConfig()
+        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(PARTITION_COLUMN, 1));
+    realtimeTableConfig.setUpsertConfig(new UpsertConfig((UpsertConfig.Mode.FULL)));
     ControllerTestUtils.getHelixResourceManager().addTable(realtimeTableConfig);
   }
 
@@ -157,33 +162,44 @@ public class PinotResourceManagerTest {
   }
 
   @Test
-  public void testAddingRealtimeTableSegments() {
+  public void testAddingRealtimeTableSegmentsWithPartitionIdInZkMetadata() {
     // Add three segments: two from partition 0 and 1 from partition 1;
-    String partition0Segment0 =  "realtimeResourceManagerTestTable__0__0__aa";
-    String partition0Segment1 =  "realtimeResourceManagerTestTable__0__0__bb";
-    String partition1Segment1 =  "realtimeResourceManagerTestTable__1__0__cc";
-    ControllerTestUtils.getHelixResourceManager().addNewSegment(
-        REALTIME_TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(REALTIME_TABLE_NAME, partition0Segment0),
+    String partition0Segment0 = "realtimeResourceManagerTestTable__aa";
+    String partition0Segment1 = "realtimeResourceManagerTestTable__bb";
+    String partition1Segment1 = "realtimeResourceManagerTestTable__cc";
+    ControllerTestUtils.getHelixResourceManager().addNewSegment(REALTIME_TABLE_NAME, SegmentMetadataMockUtils
+            .mockSegmentMetadataWithPartitionInfo(REALTIME_TABLE_NAME, partition0Segment0, PARTITION_COLUMN, 0),
         "downloadUrl");
-    ControllerTestUtils.getHelixResourceManager().addNewSegment(
-        REALTIME_TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(REALTIME_TABLE_NAME, partition0Segment1),
+    ControllerTestUtils.getHelixResourceManager().addNewSegment(REALTIME_TABLE_NAME, SegmentMetadataMockUtils
+            .mockSegmentMetadataWithPartitionInfo(REALTIME_TABLE_NAME, partition0Segment1, PARTITION_COLUMN, 0),
         "downloadUrl");
-    ControllerTestUtils.getHelixResourceManager().addNewSegment(
-          REALTIME_TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(REALTIME_TABLE_NAME, partition1Segment1),
-          "downloadUrl");
+    ControllerTestUtils.getHelixResourceManager().addNewSegment(REALTIME_TABLE_NAME, SegmentMetadataMockUtils
+            .mockSegmentMetadataWithPartitionInfo(REALTIME_TABLE_NAME, partition1Segment1, PARTITION_COLUMN, 1),
+        "downloadUrl");
+    Map<String, Integer> segment2PartitionId = new HashMap<>();
+    segment2PartitionId.put(partition0Segment0, 0);
+    segment2PartitionId.put(partition0Segment1, 0);
+    segment2PartitionId.put(partition1Segment1, 1);
 
-    IdealState idealState = ControllerTestUtils
-        .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(), TableNameBuilder.REALTIME.tableNameWithType(REALTIME_TABLE_NAME));
+    IdealState idealState = ControllerTestUtils.getHelixAdmin()
+        .getResourceIdealState(ControllerTestUtils.getHelixClusterName(),
+            TableNameBuilder.REALTIME.tableNameWithType(REALTIME_TABLE_NAME));
     Set<String> segments = idealState.getPartitionSet();
     Assert.assertEquals(segments.size(), 5);
     Assert.assertTrue(segments.contains(partition0Segment0));
     Assert.assertTrue(segments.contains(partition0Segment1));
     Assert.assertTrue(segments.contains(partition1Segment1));
+
     // Check the segments of the same partition is assigned to the same set of servers.
     Map<Integer, Set<String>> segmentAssignment = new HashMap<>();
     for (String segment : segments) {
-      Assert.assertTrue(LLCSegmentName.isLowLevelConsumerSegmentName(segment));
-      Integer partitionId = new LLCSegmentName(segment).getPartitionId();
+      Integer partitionId;
+      if (LLCSegmentName.isLowLevelConsumerSegmentName(segment)) {
+        partitionId = new LLCSegmentName(segment).getPartitionGroupId();
+      } else {
+        partitionId = segment2PartitionId.get(segment);
+      }
+      Assert.assertNotNull(partitionId);
       Set<String> instances = idealState.getInstanceSet(segment);
       if (segmentAssignment.containsKey(partitionId)) {
         Assert.assertEquals(instances, segmentAssignment.get(partitionId));

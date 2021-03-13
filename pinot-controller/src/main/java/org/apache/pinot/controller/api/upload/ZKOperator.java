@@ -64,7 +64,7 @@ public class ZKOperator {
     String tableNameWithType;
     String segmentName = segmentMetadata.getName();
 
-    if (_pinotHelixResourceManager.isRealtimeOnlyTable(rawTableName)) {
+    if (_pinotHelixResourceManager.isUpsertTable(rawTableName)) {
       tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
     } else {
       tableNameWithType= TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);

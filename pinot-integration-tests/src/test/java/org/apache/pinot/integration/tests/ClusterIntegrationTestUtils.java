@@ -288,7 +288,7 @@ public class ClusterIntegrationTestUtils {
     segmentGeneratorConfig.setOutDir(segmentDir.getPath());
     segmentGeneratorConfig.setTableName(tableConfig.getTableName());
     // Test segment with space and special character in the file name
-    segmentGeneratorConfig.setSegmentNamePostfix(segmentIndex + " %");
+    segmentGeneratorConfig.setSegmentNamePostfix(Integer.toString(segmentIndex));
 
     // Build the segment
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();

@@ -1,0 +1,33 @@
+{
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "INT",
+      "singleValueField": true,
+      "name": "clientId"
+    },
+    {
+      "dataType": "STRING",
+      "singleValueField": true,
+      "name": "city"
+    },
+    {
+      "dataType": "STRING",
+      "singleValueField": true,
+      "name": "description"
+    },
+    {
+      "dataType": "INT",
+      "singleValueField": true,
+      "name": "salary"
+    }
+  ],
+  "timeFieldSpec": {
+    "incomingGranularitySpec": {
+      "timeType": "DAYS",
+      "dataType": "INT",
+      "name": "DaysSinceEpoch"
+    }
+  },
+  "primaryKeyColumns": ["clientId"],
+  "schemaName": "upsertSchema"
+}

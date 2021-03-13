@@ -19,22 +19,29 @@
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import com.google.common.base.Preconditions;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
+import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
+import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.slf4j.Logger;
@@ -85,15 +92,19 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
   private HelixManager _helixManager;
   private String _realtimeTableName;
   private int _replication;
+  private String _partitionColumn;
 
   @Override
   public void init(HelixManager helixManager, TableConfig tableConfig) {
     _helixManager = helixManager;
     _realtimeTableName = tableConfig.getTableName();
     _replication = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
+    ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
+            tableConfig.getValidationConfig().getReplicaGroupStrategyConfig();
+    _partitionColumn = replicaGroupStrategyConfig != null ? replicaGroupStrategyConfig.getPartitionColumn() : null;
 
-    LOGGER.info("Initialized RealtimeSegmentAssignment with replication: {} for table: {}", _replication,
-        _realtimeTableName);
+    LOGGER.info("Initialized RealtimeSegmentAssignment with replication: {} partitionColumn: {} for table: {}",
+        _replication, _partitionColumn, _realtimeTableName);
   }
 
   @Override
@@ -136,7 +147,7 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
    * Helper method to assign instances for CONSUMING segment based on the segment partition id and instance partitions.
    */
   private List<String> assignConsumingSegment(String segmentName, InstancePartitions instancePartitions) {
-    int partitionGroupId = new LLCSegmentName(segmentName).getPartitionGroupId();
+    int partitionGroupId = getSegmentPartitionId(segmentName);
 
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
     if (numReplicaGroups == 1) {
@@ -170,6 +181,39 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
       }
       return instancesAssigned;
     }
+  }
+
+  private int getSegmentPartitionId(String segmentName) {
+    // A fast path if the segmentName is a LLC segment name and we can get the partition id from the name directly.
+    if (LLCSegmentName.isLowLevelConsumerSegmentName(segmentName)) {
+      return new LLCSegmentName(segmentName).getPartitionGroupId();
+    }
+    // Otherwise, retrieve the partition id from the segment zk metadata. Currently only realtime segments from upsert
+    // enabled tables have partition ids in their segment metadata.
+    RealtimeSegmentZKMetadata segmentZKMetadata = ZKMetadataProvider
+        .getRealtimeSegmentZKMetadata(_helixManager.getHelixPropertyStore(), _realtimeTableName, segmentName);
+    Preconditions
+        .checkState(segmentZKMetadata != null, "Failed to find segment ZK metadata for segment: %s of table: %s",
+            segmentName, _realtimeTableName);
+    return getSegmentPartitionIdFromZkMetaData(segmentZKMetadata);
+  }
+
+  private int getSegmentPartitionIdFromZkMetaData(RealtimeSegmentZKMetadata segmentZKMetadata) {
+    String segmentName = segmentZKMetadata.getSegmentName();
+    Preconditions.checkState(segmentZKMetadata.getPartitionMetadata() != null,
+        "Segment ZK metadata for segment: %s of table: %s does not contain partition metadata", segmentName,
+        _realtimeTableName);
+
+    ColumnPartitionMetadata partitionMetadata =
+        segmentZKMetadata.getPartitionMetadata().getColumnPartitionMap().get(_partitionColumn);
+    Preconditions.checkState(partitionMetadata != null,
+        "Segment ZK metadata for segment: %s of table: %s does not contain partition metadata for column: %s",
+        segmentName, _realtimeTableName, _partitionColumn);
+    Set<Integer> partitions = partitionMetadata.getPartitions();
+    Preconditions.checkState(partitions.size() == 1,
+        "Segment ZK metadata for segment: %s of table: %s contains multiple partitions for column: %s", segmentName,
+        _realtimeTableName, _partitionColumn);
+    return partitions.iterator().next();
   }
 
   @Override
@@ -325,7 +369,7 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
 
         Map<Integer, List<String>> partitionGroupIdToSegmentsMap = new HashMap<>();
         for (String segmentName : currentAssignment.keySet()) {
-          int partitionGroupId = new LLCSegmentName(segmentName).getPartitionGroupId();
+          int partitionGroupId = getSegmentPartitionId(segmentName);
           partitionGroupIdToSegmentsMap.computeIfAbsent(partitionGroupId, k -> new ArrayList<>()).add(segmentName);
         }
 
@@ -360,7 +404,7 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
       // Replica-group based assignment
 
       // Uniformly spray the segment partitions over the instance partitions
-      int segmentPartitionId = new LLCSegmentName(segmentName).getPartitionGroupId();
+      int segmentPartitionId =getSegmentPartitionId(segmentName);
       int numPartitions = instancePartitions.getNumPartitions();
       int partitionGroupId = segmentPartitionId % numPartitions;
       return SegmentAssignmentUtils

@@ -19,9 +19,13 @@
 package org.apache.pinot.controller.utils;
 
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.core.data.partition.MurmurPartitionFunction;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
@@ -75,6 +79,7 @@ public class SegmentMetadataMockUtils {
     ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
     Set<Integer> partitions = Collections.singleton(partitionNumber);
     when(columnMetadata.getPartitions()).thenReturn(partitions);
+    when(columnMetadata.getPartitionFunction()).thenReturn(new MurmurPartitionFunction(5));
 
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     if (columnName != null) {
@@ -83,6 +88,10 @@ public class SegmentMetadataMockUtils {
     when(segmentMetadata.getTableName()).thenReturn(tableName);
     when(segmentMetadata.getName()).thenReturn(segmentName);
     when(segmentMetadata.getCrc()).thenReturn("0");
+
+    Map<String, ColumnMetadata> columnMetadataMap = new HashMap<>();
+    columnMetadataMap.put(columnName, columnMetadata);
+    when(segmentMetadata.getColumnMetadataMap()).thenReturn(columnMetadataMap);
     return segmentMetadata;
   }
 

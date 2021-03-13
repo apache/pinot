@@ -25,10 +25,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+
+import java.util.UUID;
+import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.spi.crypt.PinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,6 +47,7 @@ public class SegmentFetcherFactory {
   private static final String PROTOCOLS_KEY = "protocols";
   private static final String AUTH_TOKEN_KEY = CommonConstants.KEY_OF_AUTH_TOKEN;
   private static final String ENCODED_SUFFIX = ".enc";
+  private static final String TAR_GZ_SUFFIX = ".tar.gz";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentFetcherFactory.class);
 
@@ -144,6 +152,47 @@ public class SegmentFetcherFactory {
   private void fetchSegmentToLocalInternal(URI uri, File dest)
       throws Exception {
     getSegmentFetcher(uri.getScheme()).fetchSegmentToLocal(uri, dest);
+  }
+
+  /**
+   * Fetches a segment from a given URI and untar the segment file to the dest dir (i.e., tableDataDir + segmentName).
+   */
+  public static void fetchAndUtarSegmentToLocal(String uri, File tableDataDir, String segmentName)
+      throws Exception {
+    File tempDir = new File(tableDataDir, "tmp-" + segmentName + "-" + UUID.randomUUID());
+    FileUtils.forceMkdir(tempDir);
+    File tempTarFile = new File(tempDir, segmentName + TAR_GZ_SUFFIX);
+    File tempSegmentDir = new File(tempDir, segmentName);
+    try {
+      try {
+        SegmentFetcherFactory.fetchSegmentToLocal(uri, tempTarFile);
+        LOGGER.info("Downloaded tarred segment: {} from: {} to: {}, file length: {}", segmentName, uri, tempTarFile,
+            tempTarFile.length());
+      } catch (AttemptsExceededException e) {
+        LOGGER.error("Attempts exceeded when downloading segment: {} : {} from: {} to: {}", segmentName, uri,
+            tempTarFile);
+        Utils.rethrowException(e);
+      }
+
+      try {
+        // If an exception is thrown when untarring, it means the tar file is broken OR not found after the retry.
+        // Thus, there's no need to retry again.
+        File tempIndexDir = TarGzCompressionUtils.untar(tempTarFile, tempSegmentDir).get(0);
+        File segmentDir = new File(tableDataDir, segmentName);
+        if (segmentDir.exists()) {
+          LOGGER.info("Deleting existing index directory for segment: {}", segmentName);
+          FileUtils.deleteDirectory(segmentDir);
+        }
+        FileUtils.moveDirectory(tempIndexDir, segmentDir);
+        LOGGER.info("Successfully downloaded segment: {} to: {}", segmentName, segmentDir);
+      } catch (Exception e) {
+        LOGGER
+            .error("Exception when untarring segment: {} for from {} to {}", segmentName, tempTarFile, tempSegmentDir);
+        Utils.rethrowException(e);
+      }
+    } finally {
+      FileUtils.deleteQuietly(tempDir);
+    }
   }
 
   /**
