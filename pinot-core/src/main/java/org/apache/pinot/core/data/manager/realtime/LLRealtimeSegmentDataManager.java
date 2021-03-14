@@ -1115,7 +1115,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _serverMetrics = serverMetrics;
     _segmentVersion = indexLoadingConfig.getSegmentVersion();
     _instanceId = _realtimeTableDataManager.getServerInstance();
-    _leaseExtender = SegmentBuildTimeLeaseExtender.getLeaseExtender(_instanceId);
+    _leaseExtender = SegmentBuildTimeLeaseExtender.getLeaseExtender(_tableNameWithType);
     _protocolHandler = new ServerSegmentCompletionProtocolHandler(_serverMetrics, _tableNameWithType);
 
     String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();

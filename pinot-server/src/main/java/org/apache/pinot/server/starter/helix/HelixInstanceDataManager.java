@@ -41,6 +41,7 @@ import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
+import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
@@ -91,9 +92,12 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       Preconditions.checkState(instanceSegmentTarDir.mkdirs());
     }
 
+    // Initialize segment build time lease extender executor
+    SegmentBuildTimeLeaseExtender.initExecutor();
+    LOGGER.info("Initialized segment build time lease extender executor");
+
     // Initialize the table data manager provider
     TableDataManagerProvider.init(_instanceDataManagerConfig);
-
     LOGGER.info("Initialized Helix instance data manager");
   }
 
@@ -108,6 +112,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     for (TableDataManager tableDataManager : _tableDataManagerMap.values()) {
       tableDataManager.shutDown();
     }
+    SegmentBuildTimeLeaseExtender.shutdownExecutor();
+    LOGGER.info("Segment build time lease extender executor shut down");
     LOGGER.info("Helix instance data manager shut down");
   }
 

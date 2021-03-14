@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.Uninterruptibles;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
@@ -45,42 +45,63 @@ public class SegmentBuildTimeLeaseExtender {
   private static final int EXTRA_TIME_SECONDS = 120;
   // Retransmit lease request 10% before lease expires.
   private static final int REPEAT_REQUEST_PERIOD_SEC = (EXTRA_TIME_SECONDS * 9 / 10);
-  private static Logger LOGGER = LoggerFactory.getLogger(SegmentBuildTimeLeaseExtender.class);
-  private static final Map<String, SegmentBuildTimeLeaseExtender> INSTANCE_TO_LEASE_EXTENDER = new HashMap<>(1);
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentBuildTimeLeaseExtender.class);
+  private static final Map<String, SegmentBuildTimeLeaseExtender> TABLE_TO_LEASE_EXTENDER = new ConcurrentHashMap<>();
+  private static ScheduledExecutorService _executor;
 
-  private ScheduledExecutorService _executor;
   private final Map<String, Future> _segmentToFutureMap = new ConcurrentHashMap<>();
   private final String _instanceId;
+  private final String _tableNameWithType;
   private final ServerSegmentCompletionProtocolHandler _protocolHandler;
 
-  public static SegmentBuildTimeLeaseExtender getLeaseExtender(final String instanceId) {
-    return INSTANCE_TO_LEASE_EXTENDER.get(instanceId);
-  }
-
-  public static synchronized SegmentBuildTimeLeaseExtender create(final String instanceId,
-      ServerMetrics serverMetrics, String tableNameWithType) {
-    SegmentBuildTimeLeaseExtender leaseExtender = INSTANCE_TO_LEASE_EXTENDER.get(instanceId);
-    if (leaseExtender != null) {
-      LOGGER.warn("Instance already exists");
-    } else {
-      leaseExtender = new SegmentBuildTimeLeaseExtender(instanceId, serverMetrics, tableNameWithType);
-      INSTANCE_TO_LEASE_EXTENDER.put(instanceId, leaseExtender);
-    }
-    return leaseExtender;
-  }
-
-  private SegmentBuildTimeLeaseExtender(String instanceId, ServerMetrics serverMetrics, String tableNameWithType) {
-    _instanceId = instanceId;
-    _protocolHandler = new ServerSegmentCompletionProtocolHandler(serverMetrics, tableNameWithType);
+  public static void initExecutor() {
     _executor = new ScheduledThreadPoolExecutor(1);
   }
 
-  public void shutDown() {
+  public static void shutdownExecutor() {
     if (_executor != null) {
       _executor.shutdownNow();
       _executor = null;
     }
+  }
+
+  @VisibleForTesting
+  public static boolean isExecutorShutdown() {
+    return _executor == null;
+  }
+
+  public static SegmentBuildTimeLeaseExtender getLeaseExtender(final String tableNameWithType) {
+    return TABLE_TO_LEASE_EXTENDER.get(tableNameWithType);
+  }
+
+  public static SegmentBuildTimeLeaseExtender getOrCreate(final String instanceId,
+      ServerMetrics serverMetrics, String tableNameWithType) {
+    return TABLE_TO_LEASE_EXTENDER.compute(tableNameWithType, (k, v) -> {
+      if (v == null) {
+        return new SegmentBuildTimeLeaseExtender(instanceId, serverMetrics, tableNameWithType);
+      } else {
+        LOGGER.warn("Lease extender for Table: {} already exists", tableNameWithType);
+        return v;
+      }
+    });
+  }
+
+  private SegmentBuildTimeLeaseExtender(String instanceId, ServerMetrics serverMetrics, String tableNameWithType) {
+    _instanceId = instanceId;
+    _tableNameWithType = tableNameWithType;
+    _protocolHandler = new ServerSegmentCompletionProtocolHandler(serverMetrics, tableNameWithType);
+  }
+
+  public void shutDown() {
+    for (Map.Entry<String, Future> entry : _segmentToFutureMap.entrySet()) {
+      Future future = entry.getValue();
+      boolean cancelled = future.cancel(true);
+      if (!cancelled) {
+        LOGGER.warn("Task could not be cancelled for {}" + entry.getKey());
+      }
+    }
     _segmentToFutureMap.clear();
+    TABLE_TO_LEASE_EXTENDER.remove(_tableNameWithType);
   }
 
   /**
