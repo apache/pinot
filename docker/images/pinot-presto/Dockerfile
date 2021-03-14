@@ -30,9 +30,10 @@ ENV PRESTO_BUILD_DIR=/home/presto/build
 # extra dependency for running launcher
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    vim wget curl git && \
+    build-essential vim wget curl git \
+    gcc libpq-dev python-dev python-pip python3-dev python3-pip python3-venv python3-wheel && \
+    pip3 install --upgrade pip setuptools wheel && \
     rm -rf /var/lib/apt/lists/*
-
 RUN groupadd -g 999 presto && \
     useradd -r -u 999 -g presto --create-home --shell /bin/bash presto
 USER presto
