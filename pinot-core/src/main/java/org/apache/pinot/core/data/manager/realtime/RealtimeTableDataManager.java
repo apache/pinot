@@ -61,8 +61,6 @@ import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
-import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
-import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.loader.V3RemoveIndexException;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
@@ -296,20 +294,21 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
             throw e;
           }
         }
-      }  else if (realtimeSegmentZKMetadata.getStatus() == Status.UPLOAD) {
-        // The segment is uploaded to an upsert enabled realtime table. Download the segment and load.
-        Preconditions.checkArgument(realtimeSegmentZKMetadata instanceof LLCRealtimeSegmentZKMetadata,
-            "Upload segment is not LLC segment");
-        String downURL = ((LLCRealtimeSegmentZKMetadata)realtimeSegmentZKMetadata).getDownloadUrl();
-        Preconditions.checkNotNull(downURL, "Upload segment metadata has no download url");
-        SegmentFetcherFactory.fetchAndUtarSegmentToLocal(downURL, _indexDir, segmentName);
-        _logger.info("Downloaded and untarred segment {} of table {} from {}", segmentName, tableConfig.getTableName(),
-            downURL);
-        addSegment(ImmutableSegmentLoader.load(segmentDir, indexLoadingConfig, schema));
       } else {
         // Metadata has not been committed, delete the local segment
         FileUtils.deleteQuietly(segmentDir);
       }
+    } else if (realtimeSegmentZKMetadata.getStatus() == Status.UPLOAD) {
+      // The segment is uploaded to an upsert enabled realtime table. Download the segment and load.
+      Preconditions.checkArgument(realtimeSegmentZKMetadata instanceof LLCRealtimeSegmentZKMetadata,
+          "Upload segment is not LLC segment");
+      String downURL = ((LLCRealtimeSegmentZKMetadata)realtimeSegmentZKMetadata).getDownloadUrl();
+      Preconditions.checkNotNull(downURL, "Upload segment metadata has no download url");
+      SegmentFetcherFactory.fetchAndUtarSegmentToLocal(downURL, _indexDir, segmentName);
+      _logger.info("Downloaded and untarred segment {} of table {} from {}", segmentName, tableConfig.getTableName(),
+          downURL);
+      addSegment(ImmutableSegmentLoader.load(segmentDir, indexLoadingConfig, schema));
+      return;
     }
 
     // Start a new consuming segment or download the segment from the controller
