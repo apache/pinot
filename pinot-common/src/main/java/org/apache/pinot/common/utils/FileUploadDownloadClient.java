@@ -28,6 +28,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -142,6 +143,8 @@ public class FileUploadDownloadClient implements Closeable {
 
   /**
    * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
+   *
+   * @see FileUploadDownloadClient#getRetrieveTableConfigURI(String, String, int, String)
    */
   @Deprecated
   public static URI getRetrieveTableConfigHttpURI(String host, int port, String rawTableName)
@@ -149,8 +152,15 @@ public class FileUploadDownloadClient implements Closeable {
     return getURI(HTTP, host, port, TABLES_PATH + "/" + rawTableName);
   }
 
+  public static URI getRetrieveTableConfigURI(String protocol, String host, int port, String rawTableName)
+      throws URISyntaxException {
+    return getURI(protocol, host, port, TABLES_PATH + "/" + rawTableName);
+  }
+
   /**
    * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
+   *
+   * This method calls the old segment endpoint. We will deprecate this behavior soon.
    */
   @Deprecated
   public static URI getDeleteSegmentHttpUri(String host, int port, String rawTableName, String segmentName,
@@ -162,6 +172,8 @@ public class FileUploadDownloadClient implements Closeable {
 
   /**
    * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
+   *
+   * This method calls the old segment endpoint. We will deprecate this behavior soon.
    */
   @Deprecated
   public static URI getRetrieveAllSegmentWithTableTypeHttpUri(String host, int port, String rawTableName,
@@ -173,6 +185,8 @@ public class FileUploadDownloadClient implements Closeable {
 
   /**
    * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
+   *
+   * @see FileUploadDownloadClient#getRetrieveSchemaURI(String, String, int, String)
    */
   @Deprecated
   public static URI getRetrieveSchemaHttpURI(String host, int port, String schemaName)
@@ -187,6 +201,8 @@ public class FileUploadDownloadClient implements Closeable {
 
   /**
    * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
+   *
+   * @see FileUploadDownloadClient#getUploadSchemaURI(String, String, int)
    */
   @Deprecated
   public static URI getUploadSchemaHttpURI(String host, int port)
@@ -196,6 +212,8 @@ public class FileUploadDownloadClient implements Closeable {
 
   /**
    * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
+   *
+   * @see FileUploadDownloadClient#getUploadSchemaURI(String, String, int)
    */
   @Deprecated
   public static URI getUploadSchemaHttpsURI(String host, int port)
@@ -216,6 +234,8 @@ public class FileUploadDownloadClient implements Closeable {
   /**
    * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
    *
+   * @see FileUploadDownloadClient#getUploadSegmentURI(String, String, int)
+   *
    * This method calls the old segment upload endpoint. We will deprecate this behavior soon. Please call
    * getUploadSegmentHttpURI to construct your request.
    */
@@ -228,6 +248,8 @@ public class FileUploadDownloadClient implements Closeable {
   /**
    * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
    *
+   * @see FileUploadDownloadClient#getUploadSegmentURI(String, String, int)
+   *
    * This method calls the old segment upload endpoint. We will deprecate this behavior soon. Please call
    * getUploadSegmentHttpsURI to construct your request.
    */
@@ -239,6 +261,8 @@ public class FileUploadDownloadClient implements Closeable {
 
   /**
    * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
+   *
+   * @see FileUploadDownloadClient#getUploadSegmentURI(String, String, int)
    */
   @Deprecated
   public static URI getUploadSegmentHttpURI(String host, int port)
@@ -248,6 +272,8 @@ public class FileUploadDownloadClient implements Closeable {
 
   /**
    * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
+   *
+   * @see FileUploadDownloadClient#getUploadSegmentURI(String, String, int)
    */
   @Deprecated
   public static URI getUploadSegmentHttpsURI(String host, int port)
@@ -450,6 +476,8 @@ public class FileUploadDownloadClient implements Closeable {
 
   /**
    * Deprecated due to lack of auth header support. May break for deployments with auth enabled
+   *
+   * @see FileUploadDownloadClient#sendGetRequest(URI, String)
    */
   @Deprecated
   public SimpleHttpResponse sendGetRequest(URI uri)
@@ -459,8 +487,18 @@ public class FileUploadDownloadClient implements Closeable {
     return sendRequest(requestBuilder.build());
   }
 
+  public SimpleHttpResponse sendGetRequest(URI uri, String authToken)
+      throws IOException, HttpErrorStatusException {
+    RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
+    requestBuilder.addHeader("Authorization", authToken);
+    setTimeout(requestBuilder, GET_REQUEST_SOCKET_TIMEOUT_MS);
+    return sendRequest(requestBuilder.build());
+  }
+
   /**
    * Deprecated due to lack of auth header support. May break for deployments with auth enabled
+   *
+   * @see FileUploadDownloadClient#sendDeleteRequest(URI, String)
    */
   @Deprecated
   public SimpleHttpResponse sendDeleteRequest(URI uri)
@@ -470,10 +508,20 @@ public class FileUploadDownloadClient implements Closeable {
     return sendRequest(requestBuilder.build());
   }
 
+  public SimpleHttpResponse sendDeleteRequest(URI uri, String authToken)
+      throws IOException, HttpErrorStatusException {
+    RequestBuilder requestBuilder = RequestBuilder.delete(uri).setVersion(HttpVersion.HTTP_1_1);
+    requestBuilder.addHeader("Authorization", authToken);
+    setTimeout(requestBuilder, DELETE_REQUEST_SOCKET_TIMEOUT_MS);
+    return sendRequest(requestBuilder.build());
+  }
+
   /**
    * Deprecated due to lack of auth header support. May break for deployments with auth enabled
    *
    * Add schema.
+   *
+   * @see FileUploadDownloadClient#addSchema(URI, String, File, List, List)
    *
    * @param uri URI
    * @param schemaName Schema name
@@ -511,6 +559,8 @@ public class FileUploadDownloadClient implements Closeable {
    *
    * Update schema.
    *
+   * @see FileUploadDownloadClient#updateSchema(URI, String, File, List, List)
+   *
    * @param uri URI
    * @param schemaName Schema name
    * @param schemaFile Schema file
@@ -523,6 +573,26 @@ public class FileUploadDownloadClient implements Closeable {
       throws IOException, HttpErrorStatusException {
     return sendRequest(
         getUploadFileRequest(HttpPut.METHOD_NAME, uri, getContentBody(schemaName, schemaFile), null, null,
+            DEFAULT_SOCKET_TIMEOUT_MS));
+  }
+
+  /**
+   * Update schema.
+   *
+   * @param uri URI
+   * @param schemaName Schema name
+   * @param schemaFile Schema file
+   * @param headers HTTP headers
+   * @param parameters HTTP parameters
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public SimpleHttpResponse updateSchema(URI uri, String schemaName, File schemaFile, @Nullable List<Header> headers,
+      @Nullable List<NameValuePair> parameters)
+      throws IOException, HttpErrorStatusException {
+    return sendRequest(
+        getUploadFileRequest(HttpPut.METHOD_NAME, uri, getContentBody(schemaName, schemaFile), headers, parameters,
             DEFAULT_SOCKET_TIMEOUT_MS));
   }
 
@@ -548,6 +618,8 @@ public class FileUploadDownloadClient implements Closeable {
 
   /**
    * Deprecated due to lack of auth header support. May break for deployments with auth enabled
+   *
+   * @see FileUploadDownloadClient#uploadSegment(URI, String, InputStream, List, List, int)
    */
   @Deprecated
   // Upload a set of segment metadata files (e.g., meta.properties and creation.meta) to controllers.
@@ -594,6 +666,8 @@ public class FileUploadDownloadClient implements Closeable {
    * Deprecated due to lack of auth header support. May break for deployments with auth enabled
    *
    * Upload segment with segment file using default settings. Include table name as a request parameter.
+   *
+   * @see FileUploadDownloadClient#uploadSegment(URI, String, InputStream, List, List, int)
    *
    * @param uri URI
    * @param segmentName Segment name
@@ -677,6 +751,8 @@ public class FileUploadDownloadClient implements Closeable {
    *
    * Send segment uri using default settings. Include table name as a request parameter.
    *
+   * @see FileUploadDownloadClient#sendSegmentUri(URI, String, List, List, int)
+   *
    * @param uri URI
    * @param downloadUri Segment download uri
    * @param rawTableName Raw table name
@@ -716,6 +792,8 @@ public class FileUploadDownloadClient implements Closeable {
    *
    * Send segment json using default settings.
    *
+   * @see FileUploadDownloadClient#sendSegmentJson(URI, String, List, List, int)
+   *
    * @param uri URI
    * @param jsonString Segment json string
    * @return Response
@@ -732,6 +810,8 @@ public class FileUploadDownloadClient implements Closeable {
    * Deprecated due to lack of auth header support. May break for deployments with auth enabled
    *
    * Send segment completion protocol request.
+   *
+   * @see FileUploadDownloadClient#sendSegmentCompletionProtocolRequest(URI, List, List, int)
    *
    * @param uri URI
    * @param socketTimeoutMs Socket timeout in milliseconds
@@ -766,6 +846,8 @@ public class FileUploadDownloadClient implements Closeable {
    * Deprecated due to lack of auth header support. May break for deployments with auth enabled
    *
    * Download a file using default settings, with an optional auth token
+   *
+   * @see FileUploadDownloadClient#downloadFile(URI, int, File, String)
    *
    * @param uri URI
    * @param socketTimeoutMs Socket timeout in milliseconds
@@ -824,6 +906,8 @@ public class FileUploadDownloadClient implements Closeable {
    * Deprecated due to lack of auth header support. May break for deployments with auth enabled
    *
    * Download a file.
+   *
+   * @see FileUploadDownloadClient#downloadFile(URI, File, String)
    *
    * @param uri URI
    * @param dest File destination

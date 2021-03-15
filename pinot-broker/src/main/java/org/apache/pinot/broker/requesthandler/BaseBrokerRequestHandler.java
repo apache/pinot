@@ -184,7 +184,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // secondary table-level check comes later
     boolean hasAccess = _accessControlFactory.create().hasAccess(requesterIdentity);
     if (!hasAccess) {
-      _brokerMetrics.addMeteredTableValue(null, BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
       LOGGER.info("Access denied for requestId {}", requestId);
       requestStatistics.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
       return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);

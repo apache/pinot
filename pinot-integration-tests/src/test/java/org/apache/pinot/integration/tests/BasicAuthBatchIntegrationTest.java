@@ -37,24 +37,21 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER;
+import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER_USER;
+import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_TOKEN;
+
 
 /**
  * Integration test that provides example of {@link PinotTaskGenerator} and {@link PinotTaskExecutor} and tests simple
  * minion functionality.
  */
-public class BasicAuthClusterIntegrationTest extends ClusterTest {
+public class BasicAuthBatchIntegrationTest extends ClusterTest {
   private static final String BOOTSTRAP_DATA_DIR = "/examples/batch/baseballStats";
   private static final String SCHEMA_FILE = "baseballStats_schema.json";
   private static final String CONFIG_FILE = "baseballStats_offline_table_config.json";
   private static final String DATA_FILE = "baseballStats_data.csv";
   private static final String JOB_FILE = "ingestionJobSpec.yaml";
-
-  private static final String AUTH_TOKEN = "Basic YWRtaW46dmVyeXNlY3JldA=====";
-  private static final String AUTH_TOKEN_USER = "Basic dXNlcjpzZWNyZXQ==";
-
-  private static final Map<String, String> AUTH_HEADER = Collections.singletonMap("Authorization", AUTH_TOKEN);
-  private static final Map<String, String> AUTH_HEADER_USER =
-      Collections.singletonMap("Authorization", AUTH_TOKEN_USER);
 
   @BeforeClass
   public void setUp()
@@ -78,45 +75,22 @@ public class BasicAuthClusterIntegrationTest extends ClusterTest {
 
   @Override
   public Map<String, Object> getDefaultControllerConfiguration() {
-    Map<String, Object> properties = super.getDefaultControllerConfiguration();
-    properties.put("controller.segment.fetcher.auth.token", AUTH_TOKEN);
-    properties.put("controller.admin.access.control.factory.class",
-        "org.apache.pinot.controller.api.access.BasicAuthAccessControlFactory");
-    properties.put("controller.admin.access.control.principals", "admin, user");
-    properties.put("controller.admin.access.control.principals.admin.password", "verysecret");
-    properties.put("controller.admin.access.control.principals.user.password", "secret");
-    properties.put("controller.admin.access.control.principals.user.tables", "userTableOnly");
-    properties.put("controller.admin.access.control.principals.user.permissions", "read");
-    return properties;
+    return BasicAuthTestUtils.addControllerConfiguration(super.getDefaultControllerConfiguration());
   }
 
   @Override
   protected PinotConfiguration getDefaultBrokerConfiguration() {
-    Map<String, Object> properties = super.getDefaultBrokerConfiguration().toMap();
-    properties.put("pinot.broker.access.control.class", "org.apache.pinot.broker.broker.BasicAuthAccessControlFactory");
-    properties.put("pinot.broker.access.control.principals", "admin, user");
-    properties.put("pinot.broker.access.control.principals.admin.password", "verysecret");
-    properties.put("pinot.broker.access.control.principals.user.password", "secret");
-    properties.put("pinot.broker.access.control.principals.user.tables", "userTableOnly");
-    properties.put("pinot.broker.access.control.principals.user.permissions", "read");
-    return new PinotConfiguration(properties);
+    return BasicAuthTestUtils.addBrokerConfiguration(super.getDefaultBrokerConfiguration().toMap());
   }
 
   @Override
   protected PinotConfiguration getDefaultServerConfiguration() {
-    Map<String, Object> properties = super.getDefaultServerConfiguration().toMap();
-    properties.put("pinot.server.segment.fetcher.auth.token", AUTH_TOKEN);
-    properties.put("pinot.server.segment.upload.auth.token", AUTH_TOKEN);
-    properties.put("pinot.server.instance.auth.token", AUTH_TOKEN);
-    return new PinotConfiguration(properties);
+    return BasicAuthTestUtils.addServerConfiguration(super.getDefaultServerConfiguration().toMap());
   }
 
   @Override
   protected PinotConfiguration getDefaultMinionConfiguration() {
-    Map<String, Object> properties = super.getDefaultMinionConfiguration().toMap();
-    properties.put("segment.fetcher.auth.token", AUTH_TOKEN);
-    properties.put("task.auth.token", AUTH_TOKEN);
-    return new PinotConfiguration(properties);
+    return BasicAuthTestUtils.addMinionConfiguration(super.getDefaultMinionConfiguration().toMap());
   }
 
   @Test
