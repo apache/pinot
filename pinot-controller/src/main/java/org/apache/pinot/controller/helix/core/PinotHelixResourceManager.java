@@ -1644,21 +1644,19 @@ public class PinotHelixResourceManager {
     return instanceSet;
   }
 
-  public void addNewSegment(String tableName, SegmentMetadata segmentMetadata, String downloadUrl) {
-    addNewSegment(tableName, segmentMetadata, downloadUrl, null);
+  public void addNewSegment(String tableNameWithType, SegmentMetadata segmentMetadata, String downloadUrl) {
+    addNewSegment(tableNameWithType, segmentMetadata, downloadUrl, null);
   }
 
-  public void addNewSegment(String tableName, SegmentMetadata segmentMetadata, String downloadUrl,
+  public void addNewSegment(String tableNameWithType, SegmentMetadata segmentMetadata, String downloadUrl,
       @Nullable String crypter) {
     String segmentName = segmentMetadata.getName();
-    String tableNameWithType;
     InstancePartitionsType instancePartitionsType;
     // NOTE: must first set the segment ZK metadata before assigning segment to instances because segment assignment
     // might need them to determine the partition of the segment, and server will need them to download the segment
     ZNRecord znRecord;
 
-    if (isUpsertTable(tableName)) {
-      tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    if (isUpsertTable(tableNameWithType)) {
       instancePartitionsType = InstancePartitionsType.CONSUMING;
       // Build the realtime segment zk metadata with necessary fields.
       LLCRealtimeSegmentZKMetadata segmentZKMetadata = new LLCRealtimeSegmentZKMetadata();
@@ -1669,7 +1667,6 @@ public class PinotHelixResourceManager {
       segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.UPLOAD);
       znRecord = segmentZKMetadata.toZNRecord();
     } else {
-      tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
       instancePartitionsType = InstancePartitionsType.OFFLINE;
       // Build the offline segment zk metadata with necessary fields.
       OfflineSegmentZKMetadata segmentZKMetadata = new OfflineSegmentZKMetadata();

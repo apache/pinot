@@ -304,7 +304,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           "Upload segment is not LLC segment");
       String downURL = ((LLCRealtimeSegmentZKMetadata)realtimeSegmentZKMetadata).getDownloadUrl();
       Preconditions.checkNotNull(downURL, "Upload segment metadata has no download url");
-      SegmentFetcherFactory.fetchAndUtarSegmentToLocal(downURL, _indexDir, segmentName);
+      SegmentFetcherFactory.fetchAndUntarSegmentToLocal(downURL, _indexDir, segmentName);
       _logger.info("Downloaded and untarred segment {} of table {} from {}", segmentName, tableConfig.getTableName(),
           downURL);
       addSegment(ImmutableSegmentLoader.load(segmentDir, indexLoadingConfig, schema));

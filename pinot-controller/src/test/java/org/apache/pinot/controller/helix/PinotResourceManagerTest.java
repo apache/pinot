@@ -44,8 +44,8 @@ import org.testng.annotations.Test;
 
 
 public class PinotResourceManagerTest {
-  private static final String OFFLINE_TABLE_NAME = "offlineResourceManagerTestTable";
-  private static final String REALTIME_TABLE_NAME = "realtimeResourceManagerTestTable";
+  private static final String OFFLINE_TABLE_NAME = "offlineResourceManagerTestTable_OFFLINE";
+  private static final String REALTIME_TABLE_NAME = "realtimeResourceManagerTestTable_REALTIME";
   private static final String NUM_REPLICAS_STRING = "2";
   private static final String PARTITION_COLUMN = "Partition_Column";
 

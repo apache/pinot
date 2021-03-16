@@ -157,7 +157,7 @@ public class SegmentFetcherFactory {
   /**
    * Fetches a segment from a given URI and untar the segment file to the dest dir (i.e., tableDataDir + segmentName).
    */
-  public static void fetchAndUtarSegmentToLocal(String uri, File tableDataDir, String segmentName)
+  public static void fetchAndUntarSegmentToLocal(String uri, File tableDataDir, String segmentName)
       throws Exception {
     File tempDir = new File(tableDataDir, "tmp-" + segmentName + "-" + UUID.randomUUID());
     FileUtils.forceMkdir(tempDir);
@@ -169,8 +169,8 @@ public class SegmentFetcherFactory {
         LOGGER.info("Downloaded tarred segment: {} from: {} to: {}, file length: {}", segmentName, uri, tempTarFile,
             tempTarFile.length());
       } catch (AttemptsExceededException e) {
-        LOGGER.error("Attempts exceeded when downloading segment: {} : {} from: {} to: {}", segmentName, uri,
-            tempTarFile);
+        LOGGER.error("Attempts exceeded when downloading segment: {} from: {} to: {}", segmentName, uri,
+            tempTarFile, e);
         Utils.rethrowException(e);
       }
 
@@ -186,8 +186,8 @@ public class SegmentFetcherFactory {
         FileUtils.moveDirectory(tempIndexDir, segmentDir);
         LOGGER.info("Successfully downloaded segment: {} to: {}", segmentName, segmentDir);
       } catch (Exception e) {
-        LOGGER
-            .error("Exception when untarring segment: {} for from {} to {}", segmentName, tempTarFile, tempSegmentDir);
+        LOGGER.error("Exception when untarring segment: {} for from {} to {}", segmentName, tempTarFile, tempSegmentDir,
+            e);
         Utils.rethrowException(e);
       }
     } finally {

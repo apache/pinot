@@ -271,7 +271,7 @@ public class PinotSegmentUploadDownloadRestletResource {
           _pinotHelixResourceManager.getCrypterClassNameFromTableConfig(tableNameWithType);
       Pair<String, File> encryptionInfo =
           encryptSegmentIfNeeded(tempDecryptedFile, tempEncryptedFile, uploadedSegmentIsEncrypted,
-              crypterClassNameInHeader, crypterClassNameInTableConfig, segmentName, tableName);
+              crypterClassNameInHeader, crypterClassNameInTableConfig, segmentName, tableNameWithType);
 
       String crypterClassName = encryptionInfo.getLeft();
       File finalSegmentFile = encryptionInfo.getRight();
@@ -290,7 +290,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       }
 
       // Zk operations
-      completeZkOperations(enableParallelPushProtection, headers, finalSegmentFile, rawTableName, segmentMetadata,
+      completeZkOperations(enableParallelPushProtection, headers, finalSegmentFile, tableNameWithType, segmentMetadata,
           segmentName, zkDownloadUri, moveSegmentToFinalLocation, crypterClassName);
 
       return new SuccessResponse("Successfully uploaded segment: " + segmentName + " of table: " + rawTableName);
@@ -318,7 +318,7 @@ public class PinotSegmentUploadDownloadRestletResource {
 
   Pair<String, File> encryptSegmentIfNeeded(File tempDecryptedFile, File tempEncryptedFile,
       boolean isUploadedSegmentEncrypted, String crypterUsedInUploadedSegment, String crypterClassNameInTableConfig,
-      String segmentName, String tableName) {
+      String segmentName, String tableNameWithType) {
 
     boolean segmentNeedsEncryption = !Strings.isNullOrEmpty(crypterClassNameInTableConfig);
 
@@ -337,13 +337,13 @@ public class PinotSegmentUploadDownloadRestletResource {
       throw new ControllerApplicationException(LOGGER, String.format(
           "Uploaded segment is encrypted with '%s' while table config requires '%s' as crypter "
               + "(segment name = '%s', table name = '%s').", crypterUsedInUploadedSegment,
-          crypterClassNameInTableConfig, segmentName, tableName), Response.Status.INTERNAL_SERVER_ERROR);
+          crypterClassNameInTableConfig, segmentName, tableNameWithType), Response.Status.INTERNAL_SERVER_ERROR);
     }
 
     // encrypt segment
     PinotCrypter pinotCrypter = PinotCrypterFactory.create(crypterClassNameInTableConfig);
     LOGGER.info("Using crypter class '{}' for encrypting '{}' to '{}' (segment name = '{}', table name = '{}').",
-        crypterClassNameInTableConfig, tempDecryptedFile, tempEncryptedFile, segmentName, tableName);
+        crypterClassNameInTableConfig, tempDecryptedFile, tempEncryptedFile, segmentName, tableNameWithType);
     pinotCrypter.encrypt(tempDecryptedFile, tempEncryptedFile);
 
     return out;
@@ -380,14 +380,14 @@ public class PinotSegmentUploadDownloadRestletResource {
   }
 
   private void completeZkOperations(boolean enableParallelPushProtection, HttpHeaders headers, File uploadedSegmentFile,
-      String rawTableName, SegmentMetadata segmentMetadata, String segmentName, String zkDownloadURI,
+      String tableNameWithType, SegmentMetadata segmentMetadata, String segmentName, String zkDownloadURI,
       boolean moveSegmentToFinalLocation, String crypter)
       throws Exception {
     URI finalSegmentLocationURI = URIUtils
-        .getUri(ControllerFilePathProvider.getInstance().getDataDirURI().toString(), rawTableName,
+        .getUri(ControllerFilePathProvider.getInstance().getDataDirURI().toString(), tableNameWithType,
             URIUtils.encode(segmentName));
     ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
-    zkOperator.completeSegmentOperations(rawTableName, segmentMetadata, finalSegmentLocationURI, uploadedSegmentFile,
+    zkOperator.completeSegmentOperations(tableNameWithType, segmentMetadata, finalSegmentLocationURI, uploadedSegmentFile,
         enableParallelPushProtection, headers, zkDownloadURI, moveSegmentToFinalLocation, crypter);
   }
 
