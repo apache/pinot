@@ -376,7 +376,15 @@ public abstract class ClusterTest extends ControllerTest {
    */
   public static JsonNode postQuery(PinotQueryRequest r, String brokerBaseApiUrl)
       throws Exception {
-    return postQuery(r.getQuery(), brokerBaseApiUrl, false, r.getQueryFormat());
+    return postQuery(r.getQuery(), brokerBaseApiUrl, false, r.getQueryFormat(), null);
+  }
+
+  /**
+   * Queries the broker's pql query endpoint (/query)
+   */
+  public static JsonNode postQuery(PinotQueryRequest r, String brokerBaseApiUrl, Map<String, String> headers)
+      throws Exception {
+    return postQuery(r.getQuery(), brokerBaseApiUrl, false, r.getQueryFormat(), headers);
   }
 
   /**
@@ -384,11 +392,19 @@ public abstract class ClusterTest extends ControllerTest {
    */
   public static JsonNode postQuery(String query, String brokerBaseApiUrl, boolean enableTrace, String queryType)
       throws Exception {
+    return postQuery(query, brokerBaseApiUrl, enableTrace, queryType, null);
+  }
+
+  /**
+   * Queries the broker's pql query endpoint (/query)
+   */
+  public static JsonNode postQuery(String query, String brokerBaseApiUrl, boolean enableTrace, String queryType, Map<String, String> headers)
+      throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put(queryType, query);
     payload.put("trace", enableTrace);
 
-    return JsonUtils.stringToJsonNode(sendPostRequest(brokerBaseApiUrl + "/query", payload.toString()));
+    return JsonUtils.stringToJsonNode(sendPostRequest(brokerBaseApiUrl + "/query", payload.toString(), headers));
   }
 
   /**
@@ -404,10 +420,18 @@ public abstract class ClusterTest extends ControllerTest {
    */
   public static JsonNode postSqlQuery(String query, String brokerBaseApiUrl)
       throws Exception {
+    return postSqlQuery(query, brokerBaseApiUrl, null);
+  }
+
+  /**
+   * Queries the broker's sql query endpoint (/sql)
+   */
+  public static JsonNode postSqlQuery(String query, String brokerBaseApiUrl, Map<String, String> headers)
+      throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("sql", query);
     payload.put("queryOptions", "groupByMode=sql;responseFormat=sql");
 
-    return JsonUtils.stringToJsonNode(sendPostRequest(brokerBaseApiUrl + "/query/sql", payload.toString()));
+    return JsonUtils.stringToJsonNode(sendPostRequest(brokerBaseApiUrl + "/query/sql", payload.toString(), headers));
   }
 }
