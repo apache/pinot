@@ -254,7 +254,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     // committing segment's partitionGroupId no longer in the newPartitionGroupInfoList
     List<PartitionGroupInfo> partitionGroupInfoListWithout0 =
-        segmentManager.getPartitionGroupInfoList(segmentManager._streamConfig, Collections.emptyList());
+        segmentManager.getNewPartitionGroupInfoList(segmentManager._streamConfig, Collections.emptyList());
     partitionGroupInfoListWithout0.remove(0);
     segmentManager._partitionGroupInfoList = partitionGroupInfoListWithout0;
 
@@ -565,7 +565,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
      */
     // 1 reached end of shard.
     List<PartitionGroupInfo> partitionGroupInfoListWithout1 =
-        segmentManager.getPartitionGroupInfoList(segmentManager._streamConfig, Collections.emptyList());
+        segmentManager.getNewPartitionGroupInfoList(segmentManager._streamConfig, Collections.emptyList());
     partitionGroupInfoListWithout1.remove(1);
     segmentManager._partitionGroupInfoList = partitionGroupInfoListWithout1;
     // noop
@@ -962,7 +962,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     public void ensureAllPartitionsConsuming() {
       ensureAllPartitionsConsuming(_tableConfig, _streamConfig, _idealState,
-          getPartitionGroupInfoList(_streamConfig, Collections.emptyList()));
+          getNewPartitionGroupInfoList(_streamConfig, Collections.emptyList()));
     }
 
     @Override
@@ -1028,7 +1028,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    List<PartitionGroupInfo> getPartitionGroupInfoList(StreamConfig streamConfig,
+    List<PartitionGroupInfo> getNewPartitionGroupInfoList(StreamConfig streamConfig,
         List<PartitionGroupMetadata> currentPartitionGroupMetadataList) {
       if (_partitionGroupInfoList != null) {
         return _partitionGroupInfoList;

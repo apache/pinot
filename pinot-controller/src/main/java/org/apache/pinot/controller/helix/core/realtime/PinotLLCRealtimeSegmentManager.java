@@ -257,7 +257,7 @@ public class PinotLLCRealtimeSegmentManager {
     PartitionLevelStreamConfig streamConfig =
         new PartitionLevelStreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
-    List<PartitionGroupInfo> newPartitionGroupInfoList = getPartitionGroupInfoList(streamConfig, Collections.emptyList());
+    List<PartitionGroupInfo> newPartitionGroupInfoList = getNewPartitionGroupInfoList(streamConfig, Collections.emptyList());
     int numPartitionGroups = newPartitionGroupInfoList.size();
     int numReplicas = getNumReplicas(tableConfig, instancePartitions);
 
@@ -501,11 +501,8 @@ public class PinotLLCRealtimeSegmentManager {
         getCurrentPartitionGroupMetadataList(idealState, streamConfig);
 
     // Fetches new partition groups, given current partition groups metadata.
-    // Assume stream has partitions A, B, C, all still consuming. Result will be A, B, C
-    // Assume A was split into D, E, but messages of A are yet to be consumed, result will be A, B, C
-    // Assume A was split into D, E and all messages of A are consumed, result will be B, C, D, E.
     List<PartitionGroupInfo> newPartitionGroupInfoList =
-        getPartitionGroupInfoList(streamConfig, currentPartitionGroupMetadataList);
+        getNewPartitionGroupInfoList(streamConfig, currentPartitionGroupMetadataList);
     Set<Integer> newPartitionGroupSet =
         newPartitionGroupInfoList.stream().map(PartitionGroupInfo::getPartitionGroupId).collect(Collectors.toSet());
     int numPartitions = newPartitionGroupInfoList.size();
@@ -707,7 +704,7 @@ public class PinotLLCRealtimeSegmentManager {
    * it will be skipped from the result
    */
   @VisibleForTesting
-  List<PartitionGroupInfo> getPartitionGroupInfoList(StreamConfig streamConfig,
+  List<PartitionGroupInfo> getNewPartitionGroupInfoList(StreamConfig streamConfig,
       List<PartitionGroupMetadata> currentPartitionGroupMetadataList) {
     return PinotTableIdealStateBuilder.getPartitionGroupInfoList(streamConfig, currentPartitionGroupMetadataList);
   }
@@ -815,7 +812,7 @@ public class PinotLLCRealtimeSegmentManager {
         List<PartitionGroupMetadata> currentPartitionGroupMetadataList =
             getCurrentPartitionGroupMetadataList(idealState, streamConfig);
         List<PartitionGroupInfo> newPartitionGroupInfoList =
-            getPartitionGroupInfoList(streamConfig, currentPartitionGroupMetadataList);
+            getNewPartitionGroupInfoList(streamConfig, currentPartitionGroupMetadataList);
         return ensureAllPartitionsConsuming(tableConfig, streamConfig, idealState, newPartitionGroupInfoList);
 
       } else {
@@ -1135,7 +1132,7 @@ public class PinotLLCRealtimeSegmentManager {
     StreamConfig smallestOffsetCriteriaStreamConfig =
         new StreamConfig(streamConfig.getTableNameWithType(), streamConfigMapWithSmallestOffsetCriteria);
     List<PartitionGroupInfo> smallestOffsetCriteriaPartitionGroupInfo =
-        getPartitionGroupInfoList(smallestOffsetCriteriaStreamConfig, Collections.emptyList());
+        getNewPartitionGroupInfoList(smallestOffsetCriteriaStreamConfig, Collections.emptyList());
     StreamPartitionMsgOffset partitionStartOffset = null;
     for (PartitionGroupInfo info : smallestOffsetCriteriaPartitionGroupInfo) {
       if (info.getPartitionGroupId() == partitionGroupId) {
