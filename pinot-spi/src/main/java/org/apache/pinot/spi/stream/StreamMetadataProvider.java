@@ -59,8 +59,9 @@ public interface StreamMetadataProvider extends Closeable {
   }
 
   /**
-   * Fetch the list of partition group info for the latest state of the stream
-   * @param currentPartitionGroupsMetadata In case of Kafka, each partition group contains a single partition.
+   * Fetch the list of partition group info for the latest state of the stream.
+   * Default behavior is the one for the Kafka stream, where each partition group contains only one partition
+   * @param currentPartitionGroupsMetadata The list of metadata for the current partition groups
    */
   default List<PartitionGroupInfo> getPartitionGroupInfoList(String clientId, StreamConfig streamConfig,
       List<PartitionGroupMetadata> currentPartitionGroupsMetadata, int timeoutMillis)

@@ -19,7 +19,17 @@
 package org.apache.pinot.spi.stream;
 
 /**
- * A wrapper around all the information of a current Partition Group 
+ * A PartitionGroup is a group of partitions/shards that the same consumer should consume from.
+ * This class contains metadata about the latest state of a partition group,
+ * derived by looking at the segment zk metadata of the latest segment of each partition group.
+ * It consists of:
+ * 1. partitionGroupId - A unique ID for the partitionGroup
+ * 2. sequenceNumber - The sequenceNumber this partitionGroup is currently at
+ * 3. startOffset - The start offset that the latest segment started consuming from
+ * 4. endOffset - The endOffset (if segment consuming from this partition group has finished consuming the segment and recorded the end offset)
+ * 5. status - IN_PROGRESS/DONE
+ *
+ * This information is useful when coming up with the new partition groups for the stream.
  */
 public class PartitionGroupMetadata {
 

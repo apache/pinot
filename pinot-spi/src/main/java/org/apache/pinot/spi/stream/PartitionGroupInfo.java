@@ -20,7 +20,8 @@ package org.apache.pinot.spi.stream;
 
 /**
  * A PartitionGroup is a group of partitions/shards that the same consumer should consume from.
- * This class is a container for the metadata of a partition group. It consists of
+ * This class is a container for the info regarding a partition group that is needed by a consumer to start consumption.
+ * It consists of
  * 1. A unique partition group id for this partition group
  * 2. The start offset to begin consumption for this partition group
  */

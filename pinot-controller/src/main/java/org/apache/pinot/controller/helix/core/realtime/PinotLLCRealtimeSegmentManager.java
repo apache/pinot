@@ -494,8 +494,7 @@ public class PinotLLCRealtimeSegmentManager {
     // Refresh the Broker routing to reflect the changes in the segment ZK metadata
     _helixResourceManager.sendSegmentRefreshMessage(realtimeTableName, committingSegmentName, false, true);
 
-    // Get current partition groups - this gives current state of latest segments for each partition
-    // E.g. [A - DONE], [B - IN_PROGRESS], [C - IN_PROGRESS]
+    // Using the latest segment of each partition group, creates a list of {@link PartitionGroupMetadata}
     PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig.getTableName(),
         IngestionConfigUtils.getStreamConfigMap(tableConfig));
     List<PartitionGroupMetadata> currentPartitionGroupMetadataList =
