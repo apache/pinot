@@ -24,7 +24,6 @@
         "module": "commonjs",
         "target": "es6",
         "esModuleInterop": true,
-        "jsx": "react",
-        "resolveJsonModule": true
+        "jsx": "react"
     }
 }

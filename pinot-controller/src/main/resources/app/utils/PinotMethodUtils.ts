@@ -167,6 +167,15 @@ const getClusterConfigData = () => {
   });
 };
 
+// This method is used to fetch cluster congifuration
+// API: /cluster/configs
+// Expected Output: {key: value}
+const getClusterConfigJSON = () => {
+  return getClusterConfig().then(({ data }) => {
+    return data;
+  });
+};
+
 // This method is used to display table listing on query page
 // API: /tables
 // Expected Output: {columns: [], records: []}
@@ -741,6 +750,7 @@ export default {
   getAllInstances,
   getInstanceData,
   getClusterConfigData,
+  getClusterConfigJSON,
   getQueryTablesList,
   getTableSchemaData,
   getQueryResults,
