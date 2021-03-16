@@ -30,13 +30,19 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.HelixManager;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
+import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
+import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory;
@@ -58,6 +64,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -128,9 +136,9 @@ public class LLRealtimeSegmentDataManagerTest {
     return JsonUtils.stringToObject(_tableConfigJson, TableConfig.class);
   }
 
-  private RealtimeTableDataManager createTableDataManager() {
+  private RealtimeTableDataManager createTableDataManager(TableConfig tableConfig) {
     final String instanceId = "server-1";
-    SegmentBuildTimeLeaseExtender.create(instanceId, new ServerMetrics(new MetricsRegistry()), _tableName);
+    SegmentBuildTimeLeaseExtender.getOrCreate(instanceId, new ServerMetrics(new MetricsRegistry()), _tableName);
     RealtimeTableDataManager tableDataManager = mock(RealtimeTableDataManager.class);
     when(tableDataManager.getServerInstance()).thenReturn(instanceId);
     RealtimeSegmentStatsHistory statsHistory = mock(RealtimeSegmentStatsHistory.class);
@@ -154,7 +162,7 @@ public class LLRealtimeSegmentDataManagerTest {
     LLCRealtimeSegmentZKMetadata segmentZKMetadata = createZkMetadata();
     TableConfig tableConfig = createTableConfig();
     InstanceZKMetadata instanceZKMetadata = new InstanceZKMetadata();
-    RealtimeTableDataManager tableDataManager = createTableDataManager();
+    RealtimeTableDataManager tableDataManager = createTableDataManager(tableConfig);
     String resourceDir = _segmentDir;
     LLCSegmentName llcSegmentName = new LLCSegmentName(_segmentNameStr);
     _partitionIdToSemaphoreMap.putIfAbsent(_partitionId, new Semaphore(1));
@@ -169,11 +177,13 @@ public class LLRealtimeSegmentDataManagerTest {
   @BeforeClass
   public void setUp() {
     _segmentDirFile.deleteOnExit();
+    SegmentBuildTimeLeaseExtender.initExecutor();
   }
 
   @AfterClass
   public void tearDown() {
     FileUtils.deleteQuietly(_segmentDirFile);
+    SegmentBuildTimeLeaseExtender.shutdownExecutor();
   }
 
   @Test
@@ -763,6 +773,27 @@ public class LLRealtimeSegmentDataManagerTest {
     // The permit finally gets released in the Semaphore.
     secondSegmentDataManager.get().destroy();
     Assert.assertEquals(secondSegmentDataManager.get().getPartitionConsumerSemaphore().availablePermits(), 1);
+  }
+
+  @Test
+  public void testShutdownTableDataManagerWillNotShutdownLeaseExtenderExecutor()
+      throws Exception {
+    TableConfig tableConfig = createTableConfig();
+    tableConfig.setUpsertConfig(null);
+    ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
+    when(propertyStore.get(anyString(), any(), anyInt())).thenReturn(TableConfigUtils.toZNRecord(tableConfig));
+
+    TableDataManagerConfig tableDataManagerConfig = mock(TableDataManagerConfig.class);
+    when(tableDataManagerConfig.getTableDataManagerType()).thenReturn("REALTIME");
+    when(tableDataManagerConfig.getTableName()).thenReturn(tableConfig.getTableName());
+    when(tableDataManagerConfig.getDataDir()).thenReturn(FileUtils.getTempDirectoryPath());
+
+    TableDataManager tableDataManager = TableDataManagerProvider
+        .getTableDataManager(tableDataManagerConfig, "testInstance", propertyStore, mock(ServerMetrics.class),
+            mock(HelixManager.class));
+    tableDataManager.start();
+    tableDataManager.shutDown();
+    Assert.assertFalse(SegmentBuildTimeLeaseExtender.isExecutorShutdown());
   }
 
   public static class FakeLLRealtimeSegmentDataManager extends LLRealtimeSegmentDataManager {
