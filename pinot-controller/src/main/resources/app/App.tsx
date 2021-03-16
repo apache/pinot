@@ -42,6 +42,7 @@ const useStyles = makeStyles(() =>
 const App = () => {
   const [clusterName, setClusterName] = React.useState('');
   const [loading, setLoading] = React.useState(true);
+  const [isAuthenticated, setIsAuthenticated] = React.useState(null);
 
   const fetchClusterName = async () => {
     const clusterNameResponse = await PinotMethodUtils.getClusterName();
@@ -55,11 +56,6 @@ const App = () => {
     setLoading(false);
   };
 
-  React.useEffect(()=>{
-    fetchClusterConfig();
-    fetchClusterName();
-  }, []);
-
   const getRouterData = () => {
     if(app_state.queryConsoleOnlyView){
       return RouterData.filter((routeObj)=>{return routeObj.path === '/query'});
@@ -67,7 +63,46 @@ const App = () => {
     return RouterData;
   };
 
+  const getAuthInfo = async () => {
+    const authInfoResponse = await PinotMethodUtils.getAuthInfo()
+    // If authInfoResponse has workflow set to anything but BASIC,
+    // it doesn't require authentication.
+    if(authInfoResponse?.workflow !== 'BASIC'){
+      setIsAuthenticated(true);
+    }
+  }
+
+  React.useEffect(()=>{
+    getAuthInfo();
+  }, []);
+
+  React.useEffect(()=>{
+    if(isAuthenticated){
+      fetchClusterConfig();
+      fetchClusterName();
+    }
+  }, [isAuthenticated]);
+
+  const loginRender = (Component, props) => {
+    return (
+      <div className="p-8">
+        <Component {...props} setIsAuthenticated={setIsAuthenticated}/>
+      </div>
+    )
+  };
+
+  const componentRender = (Component, props) => {
+    return (
+      <div className="p-8">
+        <Layout clusterName={clusterName} {...props}>
+          <Component {...props} />
+        </Layout>
+      </div>
+    )
+  };
+
   const classes = useStyles();
+
   return (
     <MuiThemeProvider theme={theme}>
       <NotificationContextProvider>
@@ -84,13 +119,16 @@ const App = () => {
                   path={path}
                   key={key}
                   render={props => {
-                    return (
-                      <div className="p-8">
-                        <Layout clusterName={clusterName} {...props}>
-                          <Component {...props} />
-                        </Layout>
-                      </div>
-                    );
+                    if(path === '/login'){
+                      return loginRender(Component, props);
+                    } else if(isAuthenticated){
+                      // default render
+                      return componentRender(Component, props);
+                    } else {
+                      return (
+                        <Redirect to="/login"/>
+                      );
+                    }
                   }}
                 />
               ))}
