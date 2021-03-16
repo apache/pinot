@@ -58,7 +58,7 @@ public final class BasicAuthTestUtils {
 
   public static PinotConfiguration addServerConfiguration(Map<String, Object> properties) {
     properties.put("pinot.server.segment.fetcher.auth.token", AUTH_TOKEN);
-    properties.put("pinot.server.segment.upload.auth.token", AUTH_TOKEN);
+    properties.put("pinot.server.segment.uploader.auth.token", AUTH_TOKEN);
     properties.put("pinot.server.instance.auth.token", AUTH_TOKEN);
     return new PinotConfiguration(properties);
   }

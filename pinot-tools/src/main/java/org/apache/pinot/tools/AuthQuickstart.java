@@ -54,7 +54,7 @@ public class AuthQuickstart extends Quickstart {
 
     // server
     properties.put("pinot.server.segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
-    properties.put("pinot.server.segment.upload.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
+    properties.put("pinot.server.segment.uploader.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
     properties.put("pinot.server.instance.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
 
     // minion

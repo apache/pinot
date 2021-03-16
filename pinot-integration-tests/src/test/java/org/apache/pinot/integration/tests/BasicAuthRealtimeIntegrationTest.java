@@ -18,42 +18,74 @@
  */
 package org.apache.pinot.integration.tests;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import groovy.lang.IntRange;
+import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.commons.httpclient.methods.PostMethod;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ConnectionFactory;
+import org.apache.pinot.client.Request;
+import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
-import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER;
 
 
-public class BasicAuthRealtimeIntegrationTest extends RealtimeClusterIntegrationTest {
+public class BasicAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    super.setUp();
+    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
+
+    startZk();
+    startKafka();
+    startController();
+    startBroker();
+    startServer();
     startMinion(null, null);
+
+    // Unpack the Avro files
+    List<File> avroFiles = unpackAvroData(_tempDir);
+
+    // Create and upload the schema and table config
+    addSchema(createSchema());
+    addTableConfig(createRealtimeTableConfig(avroFiles.get(0)));
+    addTableConfig(createOfflineTableConfig());
+
+    // Push data into Kafka
+    pushAvroIntoKafka(avroFiles);
+    waitForAllDocsLoaded(600_000L);
   }
 
   @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
+    dropRealtimeTable(getTableName());
     stopMinion();
-    super.tearDown();
+    stopServer();
+    stopBroker();
+    stopController();
+    stopKafka();
+    stopZk();
+    FileUtils.deleteDirectory(_tempDir);
   }
 
   @Override
@@ -77,12 +109,14 @@ public class BasicAuthRealtimeIntegrationTest extends RealtimeClusterIntegration
   }
 
   @Override
-  protected IngestionConfig getIngestionConfig() {
-    return null;
-//    // TODO build valid ingestion (and table) config for segment flush
-//    return new IngestionConfig(null, new StreamIngestionConfig(Collections
-//        .singletonList(Collections.singletonMap(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, "10000"))), null,
-//        null);
+  protected TableTaskConfig getTaskConfig() {
+    return new TableTaskConfig(
+        Collections.singletonMap(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, new HashMap<>()));
+  }
+
+  @Override
+  protected boolean useLlc() {
+    return true;
   }
 
   @Override
@@ -110,20 +144,6 @@ public class BasicAuthRealtimeIntegrationTest extends RealtimeClusterIntegration
   }
 
   @Override
-  protected void testQuery(String pqlQuery, @Nullable List<String> sqlQueries)
-      throws Exception {
-    ClusterIntegrationTestUtils
-        .testPqlQuery(pqlQuery, _brokerBaseApiUrl, getPinotConnection(), sqlQueries, getH2Connection(), AUTH_HEADER);
-  }
-
-  @Override
-  protected void testSqlQuery(String pinotQuery, @Nullable List<String> sqlQueries)
-      throws Exception {
-    ClusterIntegrationTestUtils
-        .testSqlQuery(pinotQuery, _brokerBaseApiUrl, getPinotConnection(), sqlQueries, getH2Connection(), AUTH_HEADER);
-  }
-
-  @Override
   protected void dropRealtimeTable(String tableName)
       throws IOException {
     sendDeleteRequest(
@@ -131,5 +151,36 @@ public class BasicAuthRealtimeIntegrationTest extends RealtimeClusterIntegration
         AUTH_HEADER);
   }
 
-  // TODO end-to-end test involving segment upload and download sequence with auth
+  @Test
+  public void testSegmentUploadDownload()
+      throws Exception {
+    final Request query = new Request("sql", "SELECT count(*) FROM " + getTableName());
+
+    ResultSetGroup resultBeforeOffline = getPinotConnection().execute(query);
+
+    // schedule offline segment generation
+    Assert.assertNotNull(_controllerStarter.getTaskManager().scheduleTasks());
+    Thread.sleep(5000);
+
+    ResultSetGroup resultAfterOffline = getPinotConnection().execute(query);
+
+    // Verify constant row count
+    Assert.assertEquals(resultBeforeOffline.getResultSet(0).getLong(0), resultAfterOffline.getResultSet(0).getLong(0));
+
+    // list offline segments
+    JsonNode segmentSets = JsonUtils
+        .stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(getTableName()), AUTH_HEADER));
+    JsonNode offlineSegments =
+        new IntRange(0, segmentSets.size()).stream().map(segmentSets::get).filter(s -> s.has("OFFLINE"))
+            .map(s -> s.get("OFFLINE")).findFirst().get();
+    Assert.assertFalse(offlineSegments.isEmpty());
+
+    // download and sanity-check size of offline segment(s)
+    for (int i = 0; i < offlineSegments.size(); i++) {
+      String segment = offlineSegments.get(i).asText();
+      Assert.assertTrue(
+          sendGetRequest(_controllerRequestURLBuilder.forSegmentDownload(getTableName(), segment), AUTH_HEADER).length()
+              > 10000); // download segment
+    }
+  }
 }

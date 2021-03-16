@@ -74,7 +74,7 @@ public class ServerSegmentCompletionProtocolHandler {
     }
     _segmentUploadRequestTimeoutMs = uploaderConfig
         .getProperty(CONFIG_OF_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS, DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS);
-    _authToken = uploaderConfig.getProperty(CONFIG_OF_SEGMENT_UPLOAD_AUTH_TOKEN);
+    _authToken = uploaderConfig.getProperty(CONFIG_OF_SEGMENT_UPLOADER_AUTH_TOKEN);
   }
 
   public ServerSegmentCompletionProtocolHandler(ServerMetrics serverMetrics, String tableNameWithType) {

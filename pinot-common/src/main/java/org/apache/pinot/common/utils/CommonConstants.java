@@ -316,7 +316,7 @@ public class CommonConstants {
        * Service token for accessing protected controller APIs.
        * E.g. null (auth disabled), "Basic abcdef..." (basic auth), "Bearer 123def..." (oauth2)
        */
-      public static final String CONFIG_OF_SEGMENT_UPLOAD_AUTH_TOKEN = "upload.auth.token";
+      public static final String CONFIG_OF_SEGMENT_UPLOADER_AUTH_TOKEN = "auth.token";
 
       public static final int DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = 300_000;
       public static final int DEFAULT_OTHER_REQUESTS_TIMEOUT = 10_000;
