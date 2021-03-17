@@ -75,7 +75,7 @@ public class PinotControllerAuthResource {
 
   /**
    * Provide the auth workflow configuration for the Pinot UI to perform user authentication. Currently supports NONE
-   * (no auth), BASIC (basic auth with username and password), and OAUTH2 (token-based via external issuer)
+   * (no auth) and BASIC (basic auth with username and password)
    *
    * @return auth workflow info/configuration
    */

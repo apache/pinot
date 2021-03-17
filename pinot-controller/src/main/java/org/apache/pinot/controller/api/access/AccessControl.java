@@ -28,7 +28,6 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 public interface AccessControl {
   String WORKFLOW_NONE = "NONE";
   String WORKFLOW_BASIC = "BASIC";
-  String WORKFLOW_OAUTH2 = "OAUTH2";
 
   /**
    * Return whether the client has data access to the given table.
@@ -81,8 +80,7 @@ public interface AccessControl {
    * Container for authentication workflow info for the Pinot UI. May be extended by implementations.
    *
    * Auth workflow info hold any configuration necessary to execute a UI workflow. We currently foresee supporting NONE
-   * (auth disabled), BASIC (basic auth with username and password), and OAUTH2 (token-based workflow via external
-   * issuer)
+   * (auth disabled) and BASIC (basic auth with username and password)
    */
   class AuthWorkflowInfo {
     String workflow;
