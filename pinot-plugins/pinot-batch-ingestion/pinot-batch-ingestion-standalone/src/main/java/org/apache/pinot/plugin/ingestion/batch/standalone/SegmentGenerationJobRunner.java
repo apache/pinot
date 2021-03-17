@@ -133,7 +133,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
           .generateSchemaURI(pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
       _spec.getTableSpec().setSchemaURI(schemaURI);
     }
-    _schema = SegmentGenerationUtils.getSchema(_spec.getTableSpec().getSchemaURI());
+    _schema = SegmentGenerationUtils.getSchema(_spec.getTableSpec().getSchemaURI(), _spec.getAuthToken());
 
     // Read Table config
     if (_spec.getTableSpec().getTableConfigURI() == null) {

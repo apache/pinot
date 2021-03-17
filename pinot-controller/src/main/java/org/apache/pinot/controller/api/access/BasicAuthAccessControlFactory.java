@@ -69,6 +69,11 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
     }
 
     @Override
+    public boolean protectAnnotatedOnly() {
+      return false;
+    }
+
+    @Override
     public boolean hasDataAccess(HttpHeaders httpHeaders, String tableName) {
       return getPrincipal(httpHeaders).filter(p -> p.hasTable(tableName)).isPresent();
     }

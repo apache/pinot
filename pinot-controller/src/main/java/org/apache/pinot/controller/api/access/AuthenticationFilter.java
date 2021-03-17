@@ -25,6 +25,9 @@ import java.lang.reflect.Method;
 import java.util.Optional;
 import javax.inject.Inject;
 import javax.inject.Provider;
+import javax.ws.rs.DELETE;
+import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
 import javax.ws.rs.container.ResourceInfo;
@@ -57,24 +60,43 @@ public class AuthenticationFilter implements ContainerRequestFilter {
   @Override
   public void filter(ContainerRequestContext requestContext)
       throws IOException {
-    // check if authentication is required
     Method endpointMethod = _resourceInfo.getResourceMethod();
-    if (endpointMethod.isAnnotationPresent(Authenticate.class)) {
-      // Perform authentication:
-      // Note that table name is extracted from "path parameters" or "query parameters" if it's defined as one of the
-      // followings:
-      //     - "tableName",
-      //     - "tableNameWithType", or
-      //     - "schemaName"
-      // If table name is not available, it means the endpoint is not a table-level endpoint.
-      AccessControlUtils accessControlUtils = new AccessControlUtils();
-      AccessType accessType = endpointMethod.getAnnotation(Authenticate.class).value();
-      String endpointUrl = _requestProvider.get().getRequestURL().toString();
-      UriInfo uriInfo = requestContext.getUriInfo();
-      Optional<String> tableName = extractTableName(uriInfo.getPathParameters(), uriInfo.getQueryParameters());
-      accessControlUtils
-          .validatePermission(tableName, accessType, _httpHeaders, endpointUrl, _accessControlFactory.create());
+    AccessControl accessControl = _accessControlFactory.create();
+
+    // check if authentication is required
+    if (accessControl.protectAnnotatedOnly() && !endpointMethod.isAnnotationPresent(Authenticate.class)) {
+      return;
     }
+
+    String endpointUrl = _requestProvider.get().getRequestURL().toString();
+    UriInfo uriInfo = requestContext.getUriInfo();
+
+    // Note that table name is extracted from "path parameters" or "query parameters" if it's defined as one of the
+    // followings:
+    //     - "tableName",
+    //     - "tableNameWithType", or
+    //     - "schemaName"
+    // If table name is not available, it means the endpoint is not a table-level endpoint.
+    Optional<String> tableName = extractTableName(uriInfo.getPathParameters(), uriInfo.getQueryParameters());
+
+    // default access type
+    AccessType accessType = AccessType.READ;
+
+    if (endpointMethod.isAnnotationPresent(Authenticate.class)) {
+      accessType = endpointMethod.getAnnotation(Authenticate.class).value();
+
+    } else if (accessControl.protectAnnotatedOnly()) {
+      // heuristically infer access type via javax.ws.rs annotations
+      if (endpointMethod.getAnnotation(POST.class) != null) {
+        accessType = AccessType.CREATE;
+      } else if (endpointMethod.getAnnotation(PUT.class) != null) {
+        accessType = AccessType.UPDATE;
+      } else if (endpointMethod.getAnnotation(DELETE.class) != null) {
+        accessType = AccessType.DELETE;
+      }
+    }
+
+    new AccessControlUtils().validatePermission(tableName, accessType, _httpHeaders, endpointUrl, accessControl);
   }
 
   @VisibleForTesting

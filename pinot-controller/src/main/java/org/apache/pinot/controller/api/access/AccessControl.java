@@ -68,6 +68,15 @@ public interface AccessControl {
   }
 
   /**
+   * Determine whether authentication is required for annotated (controller) endpoints only
+   *
+   * @return {@code true} if annotated methods are protected only, {@code false} otherwise
+   */
+  default boolean protectAnnotatedOnly() {
+    return true;
+  }
+
+  /**
    * Return workflow info for authenticating users. Not all workflows may be supported by the pinot UI implementation.
    *
    * @return workflow info for user authentication

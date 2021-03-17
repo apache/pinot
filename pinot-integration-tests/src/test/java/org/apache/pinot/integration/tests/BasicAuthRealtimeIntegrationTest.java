@@ -157,6 +157,7 @@ public class BasicAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest
     final Request query = new Request("sql", "SELECT count(*) FROM " + getTableName());
 
     ResultSetGroup resultBeforeOffline = getPinotConnection().execute(query);
+    Assert.assertTrue(resultBeforeOffline.getResultSet(0).getLong(0) > 0);
 
     // schedule offline segment generation
     Assert.assertNotNull(_controllerStarter.getTaskManager().scheduleTasks());
