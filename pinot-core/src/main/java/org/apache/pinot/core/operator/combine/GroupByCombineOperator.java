@@ -81,6 +81,7 @@ public class GroupByCombineOperator extends BaseCombineOperator {
       long endTimeMs, int innerSegmentNumGroupsLimit) {
     super(operators, queryContext, executorService, endTimeMs);
     _numThreads = operators.size(); // GroupByCombineOperator use numOperators as numThreads
+    _futures = new Future[_numThreads];
     _innerSegmentNumGroupsLimit = innerSegmentNumGroupsLimit;
     _interSegmentNumGroupsLimit =
         (int) Math.min((long) innerSegmentNumGroupsLimit * INTER_SEGMENT_NUM_GROUPS_LIMIT_FACTOR, Integer.MAX_VALUE);
