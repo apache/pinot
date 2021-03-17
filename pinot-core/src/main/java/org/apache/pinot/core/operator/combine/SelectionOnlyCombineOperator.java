@@ -27,6 +27,8 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -37,6 +39,7 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
  */
 @SuppressWarnings("rawtypes")
 public class SelectionOnlyCombineOperator extends BaseCombineOperator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SelectionOnlyCombineOperator.class);
   private static final String OPERATOR_NAME = "SelectionOnlyCombineOperator";
 
   private final int _numRowsToKeep;

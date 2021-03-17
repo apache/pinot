@@ -79,7 +79,8 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
 
   public GroupByOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService, long endTimeMs, int trimThreshold) {
-    super(operators, queryContext, executorService, endTimeMs, operators.size());
+    super(operators, queryContext, executorService, endTimeMs);
+    _numThreads = operators.size(); // GroupByOrderByCombineOperator use numOperators as numThreads
     _initLock = new ReentrantLock();
     _trimSize = GroupByUtils.getTableCapacity(_queryContext);
     _trimThreshold = trimThreshold;

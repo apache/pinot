@@ -22,11 +22,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.PriorityQueue;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -40,6 +37,8 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -54,18 +53,14 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombineOperator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MinMaxValueBasedSelectionOrderByCombineOperator.class);
   private static final String OPERATOR_NAME = "MinMaxValueBasedSelectionOrderByCombineOperator";
-
   // For min/max value based combine, when a thread detects that no more segments need to be processed, it inserts this
   // special IntermediateResultsBlock into the BlockingQueue to awake the main thread
   private static final IntermediateResultsBlock LAST_RESULTS_BLOCK =
       new IntermediateResultsBlock(new DataSchema(new String[0], new DataSchema.ColumnDataType[0]),
           Collections.emptyList());
 
-  private final int _numOperators;
-  private final int numThreads;
-  // Use a BlockingQueue to store the per-segment result
-  private final BlockingQueue<IntermediateResultsBlock> _blockingQueue;
   // Use an AtomicInteger to track the number of operators skipped (no result inserted into the BlockingQueue)
   private final AtomicInteger _numOperatorsSkipped = new AtomicInteger();
   private final AtomicReference<Comparable> _globalBoundaryValue = new AtomicReference<>();
@@ -76,9 +71,6 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
       ExecutorService executorService, long endTimeMs, List<MinMaxValueContext> minMaxValueContexts) {
     super(operators, queryContext, executorService, endTimeMs);
     _minMaxValueContexts = minMaxValueContexts;
-    _numOperators = _operators.size();
-    numThreads = CombineOperatorUtils.getNumThreadsForQuery(_numOperators);
-    _blockingQueue = new ArrayBlockingQueue<>(_numOperators);
     _numRowsToKeep = queryContext.getLimit() + queryContext.getOffset();
   }
 
@@ -118,7 +110,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
       //       segment result is merged.
       Comparable threadBoundaryValue = null;
 
-      for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += numThreads) {
+      for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numThreads) {
         // Calculate the boundary value from global boundary and thread boundary
         Comparable boundaryValue = _globalBoundaryValue.get();
         if (boundaryValue == null) {
@@ -146,7 +138,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
             if (minMaxValueContext._minValue != null) {
               int result = minMaxValueContext._minValue.compareTo(boundaryValue);
               if (result > 0 || (result == 0 && numOrderByExpressions == 1)) {
-                _numOperatorsSkipped.getAndAdd((_numOperators - operatorIndex - 1) / numThreads);
+                _numOperatorsSkipped.getAndAdd((_numOperators - operatorIndex - 1) / _numThreads);
                 _blockingQueue.offer(LAST_RESULTS_BLOCK);
                 return;
               }
@@ -157,7 +149,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
             if (minMaxValueContext._maxValue != null) {
               int result = minMaxValueContext._maxValue.compareTo(boundaryValue);
               if (result < 0 || (result == 0 && numOrderByExpressions == 1)) {
-                _numOperatorsSkipped.getAndAdd((_numOperators - operatorIndex - 1) / numThreads);
+                _numOperatorsSkipped.getAndAdd((_numOperators - operatorIndex - 1) / _numThreads);
                 _blockingQueue.offer(LAST_RESULTS_BLOCK);
                 return;
               }
