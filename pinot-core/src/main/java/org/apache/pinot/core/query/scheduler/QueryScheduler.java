@@ -28,6 +28,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
@@ -203,7 +204,7 @@ public abstract class QueryScheduler {
       serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_RESIZES, numResizes);
     }
     if (resizeTimeMs > 0) {
-      serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.RESIZE_TIME_MS, resizeTimeMs);
+      serverMetrics.addValueToTableGauge(tableNameWithType, ServerGauge.RESIZE_TIME_MS, resizeTimeMs);
     }
 
     TimerContext timerContext = queryRequest.getTimerContext();
