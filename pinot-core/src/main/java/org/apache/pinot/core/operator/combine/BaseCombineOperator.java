@@ -45,7 +45,7 @@ import org.slf4j.LoggerFactory;
  */
 @SuppressWarnings("rawtypes")
 public abstract class BaseCombineOperator extends BaseOperator<IntermediateResultsBlock> {
-  protected static final Logger LOGGER = LoggerFactory.getLogger(BaseCombineOperator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseCombineOperator.class);
 
   protected final List<Operator> _operators;
   protected final QueryContext _queryContext;
@@ -71,6 +71,13 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
     _numOperators = _operators.size();
     _numThreads = CombineOperatorUtils.getNumThreadsForQuery(_numOperators);
     _blockingQueue = new ArrayBlockingQueue<>(_numOperators);
+    _futures = new Future[_numThreads];
+  }
+
+  public BaseCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
+      long endTimeMs, int numThreads) {
+    this(operators, queryContext, executorService, endTimeMs);
+    _numThreads = numThreads;
     _futures = new Future[_numThreads];
   }
 
