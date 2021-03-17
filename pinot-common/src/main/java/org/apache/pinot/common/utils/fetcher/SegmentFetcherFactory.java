@@ -38,7 +38,7 @@ public class SegmentFetcherFactory {
 
   static final String SEGMENT_FETCHER_CLASS_KEY_SUFFIX = ".class";
   private static final String PROTOCOLS_KEY = "protocols";
-  private static final String AUTH_TOKEN_KEY = "auth.token";
+  private static final String AUTH_TOKEN_KEY = CommonConstants.KEY_OF_AUTH_TOKEN;
   private static final String ENCODED_SUFFIX = ".enc";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentFetcherFactory.class);
