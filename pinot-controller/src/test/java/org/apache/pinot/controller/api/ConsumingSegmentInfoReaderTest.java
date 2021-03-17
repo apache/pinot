@@ -22,11 +22,7 @@ import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.net.InetSocketAddress;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -43,6 +39,9 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager.ConsumerState;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.glassfish.grizzly.http.server.HttpHandler;
+import org.glassfish.grizzly.http.server.Request;
+import org.glassfish.grizzly.http.server.Response;
 import org.mockito.ArgumentMatchers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -119,25 +118,29 @@ public class ConsumingSegmentInfoReaderTest {
   @AfterClass
   public void tearDown() {
     for (Map.Entry<String, FakeConsumingInfoServer> fakeServerEntry : serverMap.entrySet()) {
-      fakeServerEntry.getValue().httpServer.stop(0);
+      fakeServerEntry.getValue().httpServer.stop();
     }
   }
 
   private HttpHandler createHandler(final int status, final List<SegmentConsumerInfo> consumerInfos,
       final int sleepTimeMs) {
-    return httpExchange -> {
-      if (sleepTimeMs > 0) {
-        try {
-          Thread.sleep(sleepTimeMs);
-        } catch (InterruptedException e) {
-          LOGGER.info("Handler interrupted during sleep");
+    return new HttpHandler() {
+      @Override
+      public void service(Request request, Response response)
+          throws Exception {
+        if (sleepTimeMs > 0) {
+          try {
+            Thread.sleep(sleepTimeMs);
+          } catch (InterruptedException e) {
+            LOGGER.info("Handler interrupted during sleep");
+          }
         }
+        String json = JsonUtils.objectToString(consumerInfos);
+        response.setStatus(status);
+        response.setContentType("text/plain");
+        response.setContentLength(json.length());
+        response.getWriter().write(json);
       }
-      String json = JsonUtils.objectToString(consumerInfos);
-      httpExchange.sendResponseHeaders(status, json.length());
-      OutputStream responseBody = httpExchange.getResponseBody();
-      responseBody.write(json.getBytes());
-      responseBody.close();
     };
   }
 
@@ -145,10 +148,8 @@ public class ConsumingSegmentInfoReaderTest {
    * Server to return fake consuming segment info
    */
   private static class FakeConsumingInfoServer {
-    String endpoint;
-    InetSocketAddress socket = new InetSocketAddress(0);
     List<SegmentConsumerInfo> consumerInfos;
-    HttpServer httpServer;
+    TestHttpServerMock httpServer;
 
     FakeConsumingInfoServer(List<SegmentConsumerInfo> consumerInfos) {
       this.consumerInfos = consumerInfos;
@@ -156,10 +157,8 @@ public class ConsumingSegmentInfoReaderTest {
 
     private void start(String path, HttpHandler handler)
         throws IOException {
-      httpServer = HttpServer.create(socket, 0);
-      httpServer.createContext(path, handler);
-      new Thread(() -> httpServer.start()).start();
-      endpoint = "http://localhost:" + httpServer.getAddress().getPort();
+      httpServer = new TestHttpServerMock();
+      httpServer.start(path, handler);
     }
   }
 
@@ -175,7 +174,7 @@ public class ConsumingSegmentInfoReaderTest {
   private BiMap<String, String> serverEndpoints(String... servers) {
     BiMap<String, String> endpoints = HashBiMap.create(servers.length);
     for (String server : servers) {
-      endpoints.put(server, serverMap.get(server).endpoint);
+      endpoints.put(server, serverMap.get(server).httpServer.getEndpoint());
     }
     return endpoints;
   }

@@ -22,11 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
-import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -39,6 +35,9 @@ import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.glassfish.grizzly.http.server.HttpHandler;
+import org.glassfish.grizzly.http.server.Request;
+import org.glassfish.grizzly.http.server.Response;
 import org.mockito.stubbing.Answer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,7 +62,7 @@ public class PinotSegmentsMetadataTest {
   private BiMap<String, String> serverEndpoints(List<String> servers) {
     BiMap<String, String> endpoints = HashBiMap.create(servers.size());
     for (String server : servers) {
-      endpoints.put(server, serverMap.get(server).endpoint);
+      endpoints.put(server, serverMap.get(server).httpServer.getEndpoint());
     }
     return endpoints;
   }
@@ -112,25 +111,29 @@ public class PinotSegmentsMetadataTest {
   @AfterClass
   public void tearDown() {
     for (Map.Entry<String, SegmentsServerMock> fakeServerEntry : serverMap.entrySet()) {
-      fakeServerEntry.getValue().httpServer.stop(0);
+      fakeServerEntry.getValue().httpServer.stop();
     }
   }
 
   private HttpHandler createSegmentMetadataHandler(final int status, final String segmentMetadata, final int sleepTimeMs) {
-    return httpExchange -> {
-      if (sleepTimeMs > 0) {
-        try {
-          Thread.sleep(sleepTimeMs);
-        } catch (InterruptedException e) {
-          LOGGER.info("Handler interrupted during sleep");
+    return new HttpHandler() {
+      @Override
+      public void service(Request request, Response response)
+          throws Exception {
+        if (sleepTimeMs > 0) {
+          try {
+            Thread.sleep(sleepTimeMs);
+          } catch (InterruptedException e) {
+            LOGGER.info("Handler interrupted during sleep");
+          }
         }
-      }
 
-      String json = JsonUtils.objectToString(segmentMetadata);
-      httpExchange.sendResponseHeaders(status, json.length());
-      OutputStream responseBody = httpExchange.getResponseBody();
-      responseBody.write(json.getBytes());
-      responseBody.close();
+        String json = JsonUtils.objectToString(segmentMetadata);
+        response.setStatus(status);
+        response.setContentType("text/plain");
+        response.setContentLength(json.length());
+        response.getWriter().write(json);
+      }
     };
   }
 
@@ -178,10 +181,8 @@ public class PinotSegmentsMetadataTest {
 
   public static class SegmentsServerMock {
     String segment;
-    String endpoint;
-    InetSocketAddress socket = new InetSocketAddress(0);
     String segmentMetadata;
-    HttpServer httpServer;
+    TestHttpServerMock httpServer;
 
     public SegmentsServerMock(String segment) {
       this.segment = segment;
@@ -196,10 +197,8 @@ public class PinotSegmentsMetadataTest {
 
     private void start(String path, HttpHandler handler)
             throws IOException {
-      httpServer = HttpServer.create(socket, 0);
-      httpServer.createContext(path, handler);
-      new Thread(() -> httpServer.start()).start();
-      endpoint = "http://localhost:" + httpServer.getAddress().getPort();
+      httpServer = new TestHttpServerMock();
+      httpServer.start(path, handler);
     }
   }
 

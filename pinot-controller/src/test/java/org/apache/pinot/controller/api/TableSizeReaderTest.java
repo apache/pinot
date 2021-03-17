@@ -20,12 +20,7 @@ package org.apache.pinot.controller.api;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -45,6 +40,9 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.glassfish.grizzly.http.server.HttpHandler;
+import org.glassfish.grizzly.http.server.Request;
+import org.glassfish.grizzly.http.server.Response;
 import org.mockito.ArgumentMatchers;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -134,14 +132,14 @@ public class TableSizeReaderTest {
   @AfterClass
   public void tearDown() {
     for (Map.Entry<String, FakeSizeServer> fakeServerEntry : serverMap.entrySet()) {
-      fakeServerEntry.getValue().httpServer.stop(0);
+      fakeServerEntry.getValue().httpServer.stop();
     }
   }
 
   private HttpHandler createHandler(final int status, final List<SegmentSizeInfo> segmentSizes, final int sleepTimeMs) {
     return new HttpHandler() {
       @Override
-      public void handle(HttpExchange httpExchange)
+      public void service(Request request, Response response)
           throws IOException {
         if (sleepTimeMs > 0) {
           try {
@@ -158,10 +156,10 @@ public class TableSizeReaderTest {
         }
 
         String json = JsonUtils.objectToString(tableInfo);
-        httpExchange.sendResponseHeaders(status, json.length());
-        OutputStream responseBody = httpExchange.getResponseBody();
-        responseBody.write(json.getBytes());
-        responseBody.close();
+        response.setStatus(status);
+        response.setContentType("text/plain");
+        response.setContentLength(json.length());
+        response.getWriter().write(json);
       }
     };
   }
@@ -172,10 +170,8 @@ public class TableSizeReaderTest {
 
   private static class FakeSizeServer {
     List<String> segments;
-    String endpoint;
-    InetSocketAddress socket = new InetSocketAddress(0);
     List<SegmentSizeInfo> sizes = new ArrayList<>();
-    HttpServer httpServer;
+    TestHttpServerMock httpServer;
 
     FakeSizeServer(List<String> segments) {
       this.segments = segments;
@@ -196,15 +192,8 @@ public class TableSizeReaderTest {
 
     private void start(String path, HttpHandler handler)
         throws IOException {
-      httpServer = HttpServer.create(socket, 0);
-      httpServer.createContext(path, handler);
-      new Thread(new Runnable() {
-        @Override
-        public void run() {
-          httpServer.start();
-        }
-      }).start();
-      endpoint = "http://localhost:" + httpServer.getAddress().getPort();
+      httpServer = new TestHttpServerMock();
+      httpServer.start(path, handler);
     }
   }
 
@@ -219,7 +208,7 @@ public class TableSizeReaderTest {
   private BiMap<String, String> serverEndpoints(String... servers) {
     BiMap<String, String> endpoints = HashBiMap.create(servers.length);
     for (String server : servers) {
-      endpoints.put(server, serverMap.get(server).endpoint);
+      endpoints.put(server, serverMap.get(server).httpServer.getEndpoint());
     }
     return endpoints;
   }

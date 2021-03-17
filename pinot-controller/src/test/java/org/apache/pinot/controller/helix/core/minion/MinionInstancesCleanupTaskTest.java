@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.minion;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.testng.Assert;

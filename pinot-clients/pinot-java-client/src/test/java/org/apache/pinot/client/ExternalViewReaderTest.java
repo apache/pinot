@@ -74,8 +74,7 @@ public class ExternalViewReaderTest {
   public void testGetLiveBrokersExceptionState() throws IOException {
     // Setup
     final List<String> expectedResult = Arrays.asList();
-    when(mockZkClient.readData(Mockito.anyString(), Mockito.anyBoolean())).thenThrow(
-        IOException.class);
+    when(mockZkClient.readData(Mockito.anyString(), Mockito.anyBoolean())).thenThrow(RuntimeException.class);
 
     // Run the test
     final List<String> result = externalViewReaderUnderTest.getLiveBrokers();
@@ -103,8 +102,7 @@ public class ExternalViewReaderTest {
   public void testGetTableToBrokersMapExceptionState() {
     // Setup
     final Map<String, List<String>> expectedResult = new HashMap<>();
-    when(mockZkClient.readData(Mockito.anyString(), Mockito.anyBoolean())).thenThrow(
-        IOException.class);
+    when(mockZkClient.readData(Mockito.anyString(), Mockito.anyBoolean())).thenThrow(RuntimeException.class);
 
     // Run the test
     final Map<String, List<String>> result = externalViewReaderUnderTest.getTableToBrokersMap();

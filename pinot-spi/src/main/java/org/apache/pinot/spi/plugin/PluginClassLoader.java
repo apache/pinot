@@ -36,18 +36,9 @@ public class PluginClassLoader extends URLClassLoader {
   public PluginClassLoader(URL[] urls, ClassLoader parent) {
     super(urls, parent);
     classLoader = PluginClassLoader.class.getClassLoader();
-    Method method = null;
-    try {
-      method = URLClassLoader.class.getDeclaredMethod("addURL", URL.class);
-
-    } catch (NoSuchMethodException e) {
-      //this should never happen
-      ExceptionUtils.rethrow(e);
-    }
-    method.setAccessible(true);
     for (URL url : urls) {
       try {
-        method.invoke(classLoader, url);
+        super.addURL(url);
       } catch (Exception e) {
         ExceptionUtils.rethrow(e);
       }

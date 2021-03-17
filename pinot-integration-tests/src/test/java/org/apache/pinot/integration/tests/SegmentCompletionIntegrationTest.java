@@ -19,8 +19,10 @@
 package org.apache.pinot.integration.tests;
 
 import com.google.common.base.Function;
+import java.io.IOException;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
@@ -73,14 +75,16 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
   @BeforeClass
   public void setUp()
       throws Exception {
+    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
     // Start the Pinot cluster
     startZk();
-    startController();
-    startBroker();
-    startFakeServer();
 
     // Start Kafka
     startKafka();
+
+    startController();
+    startBroker();
+    startFakeServer();
 
     // Create and upload the schema and table config
     addSchema(createSchema());
@@ -193,12 +197,17 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
   }
 
   @AfterClass
-  public void tearDown() {
+  public void tearDown() throws IOException {
+    dropRealtimeTable(getTableName());
+    dropOfflineTable(getTableName());
+    // Stop the Pinot cluster
     stopFakeServer();
     stopBroker();
     stopController();
+    // Stop Kafka
     stopKafka();
     stopZk();
+    FileUtils.deleteDirectory(_tempDir);
   }
 
   private void stopFakeServer() {

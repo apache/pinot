@@ -478,7 +478,7 @@ public final class Schema implements Serializable {
   }
 
   public static class SchemaBuilder {
-    private Schema _schema;
+    private final Schema _schema;
 
     public SchemaBuilder() {
       _schema = new Schema();
@@ -640,6 +640,8 @@ public final class Schema implements Serializable {
         .isEqualIgnoreOrder(_metricFieldSpecs, that._metricFieldSpecs) && EqualityUtils
         .isEqual(_timeFieldSpec, that._timeFieldSpec) && EqualityUtils
         .isEqualIgnoreOrder(_dateTimeFieldSpecs, that._dateTimeFieldSpecs) && EqualityUtils
+        .isEqualIgnoreOrder(_complexFieldSpecs, that._complexFieldSpecs) && EqualityUtils
+        .isEqualMap(_fieldSpecMap, that._fieldSpecMap) && EqualityUtils
         .isEqual(_primaryKeyColumns, that._primaryKeyColumns);
   }
 
@@ -672,6 +674,8 @@ public final class Schema implements Serializable {
     result = EqualityUtils.hashCodeOf(result, _metricFieldSpecs);
     result = EqualityUtils.hashCodeOf(result, _timeFieldSpec);
     result = EqualityUtils.hashCodeOf(result, _dateTimeFieldSpecs);
+    result = EqualityUtils.hashCodeOf(result, _complexFieldSpecs);
+    result = EqualityUtils.hashCodeOf(result, _fieldSpecMap);
     result = EqualityUtils.hashCodeOf(result, _primaryKeyColumns);
     return result;
   }

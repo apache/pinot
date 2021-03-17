@@ -20,16 +20,12 @@ package org.apache.pinot.controller.api;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.httpclient.HttpConnectionManager;
@@ -38,6 +34,9 @@ import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
 import org.apache.pinot.controller.api.resources.ServerTableSizeReader;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.glassfish.grizzly.http.server.HttpHandler;
+import org.glassfish.grizzly.http.server.Request;
+import org.glassfish.grizzly.http.server.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -51,9 +50,8 @@ public class ServerTableSizeReaderTest {
 
   private final ExecutorService executor = Executors.newFixedThreadPool(3);
   private final HttpConnectionManager httpConnectionManager = new MultiThreadedHttpConnectionManager();
-  private final int serverPortStart = 10000;
   private final String URI_PATH = "/table/";
-  private final List<HttpServer> servers = new ArrayList<>();
+  private final List<TestHttpServerMock> servers = new ArrayList<>();
   final int timeoutMsec = 5000;
   final String tableName = "myTable";
   final int serverCount = 6;
@@ -70,7 +68,6 @@ public class ServerTableSizeReaderTest {
       throws IOException {
     for (int i = 0; i < serverCount; i++) {
       serverList.add("server_" + i);
-      endpointList.add("http://localhost:" + (serverPortStart + i));
     }
 
     server1Segments = Arrays.asList(1, 3, 5);
@@ -78,19 +75,25 @@ public class ServerTableSizeReaderTest {
 
     tableInfo1 = createTableSizeInfo(tableName, server1Segments);
     tableInfo2 = createTableSizeInfo(tableName, server2Segments);
-    tableInfo3 = createTableSizeInfo(tableName, new ArrayList<Integer>());
-    servers.add(startServer(serverPortStart, createHandler(200, tableInfo1, 0)));
-    servers.add(startServer(serverPortStart + 1, createHandler(200, tableInfo2, 0)));
-    servers.add(startServer(serverPortStart + 3, createHandler(500, null, 0)));
-    servers.add(startServer(serverPortStart + 4, createHandler(200, null, timeoutMsec * 20)));
-    servers.add(startServer(serverPortStart + 5, createHandler(200, tableInfo3, 0)));
+    tableInfo3 = createTableSizeInfo(tableName, new ArrayList<>());
+    servers.add(startServer(createHandler(200, tableInfo1, 0)));
+    servers.add(startServer(createHandler(200, tableInfo2, 0)));
+    servers.add(startServer(createHandler(500, null, 0)));
+    servers.add(startServer(createHandler(200, null, timeoutMsec * 20)));
+    servers.add(startServer(createHandler(200, tableInfo3, 0)));
+    endpointList.add(servers.get(0).getEndpoint());
+    endpointList.add(servers.get(1).getEndpoint());
+    endpointList.add("http://localhost:" + (new Random().nextInt(10000) + 10000));
+    endpointList.add(servers.get(2).getEndpoint());
+    endpointList.add(servers.get(3).getEndpoint());
+    endpointList.add(servers.get(4).getEndpoint());
   }
 
   @AfterClass
   public void tearDown() {
-    for (HttpServer server : servers) {
+    for (TestHttpServerMock server : servers) {
       if (server != null) {
-        server.stop(0);
+        server.stop();
       }
     }
   }
@@ -115,8 +118,8 @@ public class ServerTableSizeReaderTest {
   private HttpHandler createHandler(final int status, final TableSizeInfo tableSize, final int sleepTimeMs) {
     return new HttpHandler() {
       @Override
-      public void handle(HttpExchange httpExchange)
-          throws IOException {
+      public void service(Request request, Response response)
+          throws Exception {
         if (sleepTimeMs > 0) {
           try {
             Thread.sleep(sleepTimeMs);
@@ -125,24 +128,18 @@ public class ServerTableSizeReaderTest {
           }
         }
         String json = JsonUtils.objectToString(tableSize);
-        httpExchange.sendResponseHeaders(status, json.length());
-        OutputStream responseBody = httpExchange.getResponseBody();
-        responseBody.write(json.getBytes());
-        responseBody.close();
+        response.setStatus(status);
+        response.setContentType("text/plain");
+        response.setContentLength(json.length());
+        response.getWriter().write(json);
       }
     };
   }
 
-  private HttpServer startServer(int port, HttpHandler handler)
+  private TestHttpServerMock startServer(HttpHandler handler)
       throws IOException {
-    final HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
-    server.createContext(URI_PATH, handler);
-    new Thread(new Runnable() {
-      @Override
-      public void run() {
-        server.start();
-      }
-    }).start();
+    TestHttpServerMock server = new TestHttpServerMock();
+    server.start(URI_PATH, handler);
     return server;
   }
 
