@@ -37,7 +37,7 @@ import org.testng.annotations.Test;
 public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 2;
-  private static final int NUM_SEGMENTS = 12;
+  public static final String UPLOADED_SEGMENT_NAME = "mytable_10027_19736_0 %";
 
   @BeforeClass
   public void setUp()
@@ -112,7 +112,7 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
     Set<String> segments = idealState.getPartitionSet();
     Assert.assertEquals(segments.size(), 3);
     Map<String, Integer> segment2PartitionId = new HashMap<>();
-    segment2PartitionId.put("mytable_10027_19736_0", 0);
+    segment2PartitionId.put(UPLOADED_SEGMENT_NAME, 0);
 
     // Verify that all segments of the same partition are mapped to the same single server.
     Map<Integer, Set<String>> segmentAssignment = new HashMap<>();

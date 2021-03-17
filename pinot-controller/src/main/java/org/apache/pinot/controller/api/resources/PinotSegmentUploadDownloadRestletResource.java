@@ -286,14 +286,14 @@ public class PinotSegmentUploadDownloadRestletResource {
                 tableNameWithType);
         zkDownloadUri = downloadUri;
       } else {
-        zkDownloadUri = getZkDownloadURIForSegmentUpload(rawTableName, segmentName);
+        zkDownloadUri = getZkDownloadURIForSegmentUpload(tableNameWithType, segmentName);
       }
 
       // Zk operations
       completeZkOperations(enableParallelPushProtection, headers, finalSegmentFile, tableNameWithType, segmentMetadata,
           segmentName, zkDownloadUri, moveSegmentToFinalLocation, crypterClassName);
 
-      return new SuccessResponse("Successfully uploaded segment: " + segmentName + " of table: " + rawTableName);
+      return new SuccessResponse("Successfully uploaded segment: " + segmentName + " of table: " + tableNameWithType);
     } catch (WebApplicationException e) {
       throw e;
     } catch (Exception e) {
