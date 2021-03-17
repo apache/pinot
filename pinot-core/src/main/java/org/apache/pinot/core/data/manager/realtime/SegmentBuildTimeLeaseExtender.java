@@ -56,6 +56,7 @@ public class SegmentBuildTimeLeaseExtender {
 
   public static void initExecutor() {
     _executor = new ScheduledThreadPoolExecutor(1);
+    LOGGER.info("Initialized segment build time lease extender executor");
   }
 
   public static void shutdownExecutor() {
@@ -63,6 +64,7 @@ public class SegmentBuildTimeLeaseExtender {
       _executor.shutdownNow();
       _executor = null;
     }
+    LOGGER.info("Shut down segment build time lease extender executor");
   }
 
   @VisibleForTesting
@@ -78,9 +80,11 @@ public class SegmentBuildTimeLeaseExtender {
       ServerMetrics serverMetrics, String tableNameWithType) {
     return TABLE_TO_LEASE_EXTENDER.compute(tableNameWithType, (k, v) -> {
       if (v == null) {
-        return new SegmentBuildTimeLeaseExtender(instanceId, serverMetrics, tableNameWithType);
+        SegmentBuildTimeLeaseExtender leaseExtender = new SegmentBuildTimeLeaseExtender(instanceId, serverMetrics, tableNameWithType);
+        LOGGER.info("Created lease extender for table: {}", tableNameWithType);
+        return leaseExtender;
       } else {
-        LOGGER.warn("Lease extender for Table: {} already exists", tableNameWithType);
+        LOGGER.warn("Lease extender for table: {} already exists", tableNameWithType);
         return v;
       }
     });

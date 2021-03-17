@@ -94,7 +94,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
     // Initialize segment build time lease extender executor
     SegmentBuildTimeLeaseExtender.initExecutor();
-    LOGGER.info("Initialized segment build time lease extender executor");
 
     // Initialize the table data manager provider
     TableDataManagerProvider.init(_instanceDataManagerConfig);
@@ -113,7 +112,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       tableDataManager.shutDown();
     }
     SegmentBuildTimeLeaseExtender.shutdownExecutor();
-    LOGGER.info("Segment build time lease extender executor shut down");
     LOGGER.info("Helix instance data manager shut down");
   }
 
