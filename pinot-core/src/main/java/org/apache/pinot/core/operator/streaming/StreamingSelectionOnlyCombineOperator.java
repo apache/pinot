@@ -22,11 +22,8 @@ import io.grpc.stub.StreamObserver;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.exception.QueryException;
@@ -34,23 +31,21 @@ import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.operator.combine.CombineOperatorUtils;
 import org.apache.pinot.core.query.exception.EarlyTerminationException;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
-import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
  * Combine operator for selection only streaming queries.
- * TODO: extend StreamingSelectionOnlyCombineOperator from BaseCombineOperator.
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class StreamingSelectionOnlyCombineOperator extends BaseOperator<IntermediateResultsBlock> {
+public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamingSelectionOnlyCombineOperator.class);
   private static final String OPERATOR_NAME = "StreamingSelectionOnlyCombineOperator";
 
@@ -58,20 +53,12 @@ public class StreamingSelectionOnlyCombineOperator extends BaseOperator<Intermed
   private static final IntermediateResultsBlock LAST_RESULTS_BLOCK =
       new IntermediateResultsBlock(new DataSchema(new String[0], new DataSchema.ColumnDataType[0]),
           Collections.emptyList());
-
-  private final List<Operator> _operators;
-  private final QueryContext _queryContext;
-  private final ExecutorService _executorService;
-  private final long _endTimeMs;
   private final StreamObserver<Server.ServerResponse> _streamObserver;
   private final int _limit;
 
   public StreamingSelectionOnlyCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService, long endTimeMs, StreamObserver<Server.ServerResponse> streamObserver) {
-    _operators = operators;
-    _queryContext = queryContext;
-    _executorService = executorService;
-    _endTimeMs = endTimeMs;
+    super(operators, queryContext, executorService, endTimeMs);
     _streamObserver = streamObserver;
     _limit = queryContext.getLimit();
   }
@@ -81,73 +68,77 @@ public class StreamingSelectionOnlyCombineOperator extends BaseOperator<Intermed
     return OPERATOR_NAME;
   }
 
-  @Override
-  protected IntermediateResultsBlock getNextBlock() {
-    int numOperators = _operators.size();
-    int numThreads = CombineOperatorUtils.getNumThreadsForQuery(numOperators);
+  /**
+   * {@inheritDoc}
+   *
+   * <p> Execute query on one or more segments in a single thread, and store multiple intermediate result blocks
+   * into BlockingQueue, skip processing the more segments if there are enough documents to fulfill the LIMIT and
+   * OFFSET requirement.
+   */
+  protected void processSegments(int threadIndex) {
 
-    // Use a BlockingQueue to store all the results blocks
-    BlockingQueue<IntermediateResultsBlock> blockingQueue = new LinkedBlockingQueue<>();
-    // Use a Phaser to ensure all the Futures are done (not scheduled, finished or interrupted) before the main thread
-    // returns. We need to ensure this because the main thread holds the reference to the segments. If a segment is
-    // deleted/refreshed, the segment will be released after the main thread returns, which would lead to undefined
-    // behavior (even JVM crash) when processing queries against it.
-    Phaser phaser = new Phaser(1);
+    try {
+      // Register the thread to the phaser
+      // NOTE: If the phaser is terminated (returning negative value) when trying to register the thread, that
+      //       means the query execution has finished, and the main thread has deregistered itself and returned
+      //       the result. Directly return as no execution result will be taken.
+      if (_phaser.register() < 0) {
+        return;
+      }
 
-    Future[] futures = new Future[numThreads];
-    for (int i = 0; i < numThreads; i++) {
-      int threadIndex = i;
-      futures[i] = _executorService.submit(new TraceRunnable() {
-        @Override
-        public void runJob() {
-          try {
-            // Register the thread to the phaser
-            // NOTE: If the phaser is terminated (returning negative value) when trying to register the thread, that
-            //       means the query execution has finished, and the main thread has deregistered itself and returned
-            //       the result. Directly return as no execution result will be taken.
-            if (phaser.register() < 0) {
+      int numRowsCollected = 0;
+      for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numThreads) {
+        Operator<IntermediateResultsBlock> operator = _operators.get(operatorIndex);
+        try {
+          IntermediateResultsBlock resultsBlock;
+          while ((resultsBlock = operator.nextBlock()) != null) {
+            Collection<Object[]> rows = resultsBlock.getSelectionResult();
+            assert rows != null;
+            numRowsCollected += rows.size();
+            _blockingQueue.offer(resultsBlock);
+            if (numRowsCollected >= _limit) {
               return;
             }
-
-            int numRowsCollected = 0;
-            for (int operatorIndex = threadIndex; operatorIndex < numOperators; operatorIndex += numThreads) {
-              Operator<IntermediateResultsBlock> operator = _operators.get(operatorIndex);
-              try {
-                IntermediateResultsBlock resultsBlock;
-                while ((resultsBlock = operator.nextBlock()) != null) {
-                  Collection<Object[]> rows = resultsBlock.getSelectionResult();
-                  assert rows != null;
-                  numRowsCollected += rows.size();
-                  blockingQueue.offer(resultsBlock);
-                  if (numRowsCollected >= _limit) {
-                    return;
-                  }
-                }
-                blockingQueue.offer(LAST_RESULTS_BLOCK);
-              } catch (EarlyTerminationException e) {
-                // Early-terminated by interruption (canceled by the main thread)
-                return;
-              } catch (Exception e) {
-                // Caught exception, skip processing the remaining operators
-                LOGGER.error("Caught exception while executing operator of index: {} (query: {})", operatorIndex,
-                    _queryContext, e);
-                blockingQueue.offer(new IntermediateResultsBlock(e));
-                return;
-              }
-            }
-          } finally {
-            phaser.arriveAndDeregister();
           }
+          _blockingQueue.offer(LAST_RESULTS_BLOCK);
+        } catch (EarlyTerminationException e) {
+          // Early-terminated by interruption (canceled by the main thread)
+          return;
+        } catch (Exception e) {
+          // Caught exception, skip processing the remaining operators
+          LOGGER
+              .error("Caught exception while executing operator of index: {} (query: {})", operatorIndex, _queryContext,
+                  e);
+          _blockingQueue.offer(new IntermediateResultsBlock(e));
+          return;
         }
-      });
+      }
+    } finally {
+      _phaser.arriveAndDeregister();
     }
+  }
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Combines intermediate selection result blocks from underlying operators and returns a merged one.
+   * <ul>
+   *   <li>
+   *     Merges multiple intermediate selection result blocks as a merged one.
+   *   </li>
+   *   <li>
+   *     Set all exceptions encountered during execution into the merged result block
+   *   </li>
+   * </ul>
+   */
+  @Override
+  protected IntermediateResultsBlock mergeResultsFromSegments() {
     try {
       int numRowsCollected = 0;
       int numOperatorsFinished = 0;
-      while (numRowsCollected < _limit && numOperatorsFinished < numOperators) {
+      while (numRowsCollected < _limit && numOperatorsFinished < _numOperators) {
         IntermediateResultsBlock resultsBlock =
-            blockingQueue.poll(_endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+            _blockingQueue.poll(_endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
         if (resultsBlock == null) {
           // Query times out, skip streaming the remaining results blocks
           LOGGER.error("Timed out while polling results block (query: {})", _queryContext);
@@ -178,13 +169,18 @@ public class StreamingSelectionOnlyCombineOperator extends BaseOperator<Intermed
       return new IntermediateResultsBlock(QueryException.INTERNAL_ERROR, e);
     } finally {
       // Cancel all ongoing jobs
-      for (Future future : futures) {
+      for (Future future : _futures) {
         if (!future.isDone()) {
           future.cancel(true);
         }
       }
       // Deregister the main thread and wait for all threads done
-      phaser.awaitAdvance(phaser.arriveAndDeregister());
+      _phaser.awaitAdvance(_phaser.arriveAndDeregister());
     }
+  }
+
+  @Override
+  protected void mergeResultsBlocks(IntermediateResultsBlock mergedBlock, IntermediateResultsBlock blockToMerge) {
+
   }
 }
