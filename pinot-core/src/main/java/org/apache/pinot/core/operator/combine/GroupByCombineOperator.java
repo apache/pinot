@@ -79,6 +79,7 @@ public class GroupByCombineOperator extends BaseCombineOperator {
 
   public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
       long endTimeMs, int innerSegmentNumGroupsLimit) {
+    // GroupByCombineOperator use numOperators as numThreads
     super(operators, queryContext, executorService, endTimeMs, operators.size());
     _innerSegmentNumGroupsLimit = innerSegmentNumGroupsLimit;
     _interSegmentNumGroupsLimit =

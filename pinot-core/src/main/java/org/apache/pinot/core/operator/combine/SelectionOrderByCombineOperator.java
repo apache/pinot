@@ -32,6 +32,8 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -43,6 +45,7 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class SelectionOrderByCombineOperator extends BaseCombineOperator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SelectionOrderByCombineOperator.class);
   private static final String OPERATOR_NAME = "SelectionOrderByCombineOperator";
 
   private final List<Operator> _operators;
