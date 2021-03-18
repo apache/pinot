@@ -26,12 +26,14 @@ import java.util.concurrent.Future;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.exception.EarlyTerminationException;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,6 +61,7 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
   protected final Phaser _phaser = new Phaser(1);
   // Use a _blockingQueue to store the per-segment result
   protected final BlockingQueue<IntermediateResultsBlock> _blockingQueue;
+  private final AtomicLong totalWorkerThreadCpuTimeNs = new AtomicLong(0);
   protected int _numThreads;
   protected Future[] _futures;
 
@@ -88,12 +91,21 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
       _futures[i] = _executorService.submit(new TraceRunnable() {
         @Override
         public void runJob() {
+          ThreadTimer executionThreadTimer = new ThreadTimer();
+          executionThreadTimer.start();
+
           processSegments(threadIndex);
+
+          totalWorkerThreadCpuTimeNs.addAndGet(executionThreadTimer.stopAndGetThreadTimeNs());
         }
       });
     }
-
     IntermediateResultsBlock mergedBlock = mergeResultsFromSegments();
+    /*
+     * TODO: setThreadTime logic can be put into CombineOperatorUtils.setExecutionStatistics(),
+     *   after we extends StreamingSelectionOnlyCombineOperator from BaseCombineOperator.
+     */
+    mergedBlock.setThreadCpuTimeNs(totalWorkerThreadCpuTimeNs.get());
     CombineOperatorUtils.setExecutionStatistics(mergedBlock, _operators);
     return mergedBlock;
   }

@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.core.operator;
 
+import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.query.request.context.ThreadTimer;
 
 
 public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock> {
@@ -34,7 +36,18 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
 
   @Override
   protected InstanceResponseBlock getNextBlock() {
-    return new InstanceResponseBlock((IntermediateResultsBlock) _operator.nextBlock());
+    ThreadTimer mainThreadTimer = new ThreadTimer();
+    mainThreadTimer.start();
+
+    IntermediateResultsBlock intermediateResultsBlock = (IntermediateResultsBlock) _operator.nextBlock();
+    InstanceResponseBlock instanceResponseBlock = new InstanceResponseBlock(intermediateResultsBlock);
+    DataTable dataTable = instanceResponseBlock.getInstanceResponseDataTable();
+
+    mainThreadTimer.stop();
+    long totalThreadCpuTimeNs = intermediateResultsBlock.getThreadCpuTimeNs() + mainThreadTimer.getThreadTimeNs();
+    dataTable.getMetadata().put(DataTable.EXECUTION_THREAD_CPU_TIME_NS_METADATA_KEY, String.valueOf(totalThreadCpuTimeNs));
+
+    return instanceResponseBlock;
   }
 
   @Override

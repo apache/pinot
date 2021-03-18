@@ -60,6 +60,7 @@ import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.transport.ListenerConfig;
@@ -140,6 +141,11 @@ public class HelixServerStarter implements ServiceStartable {
     _instanceConfigScope =
         new HelixConfigScopeBuilder(ConfigScopeProperty.PARTICIPANT, _helixClusterName).forParticipant(_instanceId)
             .build();
+
+    // Enable/disable thread CPU time measurement through instance config.
+    ThreadTimer.setThreadCpuTimeMeasurementEnabled(_serverConf
+        .getProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
+            Server.DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT));
   }
 
   /**

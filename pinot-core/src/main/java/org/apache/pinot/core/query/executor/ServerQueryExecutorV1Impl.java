@@ -77,6 +77,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private PlanMaker _planMaker;
   private long _defaultTimeOutMs = CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS;
   private ServerMetrics _serverMetrics;
+  boolean _enableThreadCpuTimeInstrument;
 
   @Override
   public synchronized void init(PinotConfiguration config, InstanceDataManager instanceDataManager,
