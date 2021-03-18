@@ -203,7 +203,7 @@ public abstract class QueryScheduler {
       serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_RESIZES, numResizes);
     }
     if (resizeTimeMs > 0) {
-      serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.RESIZE_TIME_MS, resizeTimeMs);
+      serverMetrics.addValueToTableGauge(tableNameWithType, ServerGauge.RESIZE_TIME_MS, resizeTimeMs);
     }
     if (executionThreadCpuTimeNs > 0) {
       serverMetrics.addValueToTableGauge(tableNameWithType, ServerGauge.EXECUTION_THREAD_CPU_TIME_NS, executionThreadCpuTimeNs);
