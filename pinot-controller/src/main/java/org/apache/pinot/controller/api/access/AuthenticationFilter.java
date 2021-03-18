@@ -62,14 +62,18 @@ public class AuthenticationFilter implements ContainerRequestFilter {
       throws IOException {
     Method endpointMethod = _resourceInfo.getResourceMethod();
     AccessControl accessControl = _accessControlFactory.create();
+    String endpointUrl = _requestProvider.get().getRequestURL().toString();
+    UriInfo uriInfo = requestContext.getUriInfo();
+
+    // exclude "/auth" endpoints
+    if (endpointUrl.endsWith("/auth/info") || endpointUrl.endsWith("/auth/verify")) {
+      return;
+    }
 
     // check if authentication is required
     if (accessControl.protectAnnotatedOnly() && !endpointMethod.isAnnotationPresent(Authenticate.class)) {
       return;
     }
-
-    String endpointUrl = _requestProvider.get().getRequestURL().toString();
-    UriInfo uriInfo = requestContext.getUriInfo();
 
     // Note that table name is extracted from "path parameters" or "query parameters" if it's defined as one of the
     // followings:
