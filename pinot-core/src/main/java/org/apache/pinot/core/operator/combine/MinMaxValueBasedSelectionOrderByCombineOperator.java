@@ -18,20 +18,22 @@
  */
 package org.apache.pinot.core.operator.combine;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.PriorityQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.query.SelectionOrderByOperator;
 import org.apache.pinot.core.query.exception.EarlyTerminationException;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
@@ -67,11 +69,48 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
   private final int _numRowsToKeep;
   private final List<MinMaxValueContext> _minMaxValueContexts;
 
-  public MinMaxValueBasedSelectionOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
-      ExecutorService executorService, long endTimeMs, List<MinMaxValueContext> minMaxValueContexts) {
+  MinMaxValueBasedSelectionOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
+      ExecutorService executorService, long endTimeMs) {
     super(operators, queryContext, executorService, endTimeMs);
-    _minMaxValueContexts = minMaxValueContexts;
     _numRowsToKeep = queryContext.getLimit() + queryContext.getOffset();
+
+    List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
+    assert orderByExpressions != null;
+    int numOrderByExpressions = orderByExpressions.size();
+    assert numOrderByExpressions > 0;
+    OrderByExpressionContext firstOrderByExpression = orderByExpressions.get(0);
+    assert firstOrderByExpression.getExpression().getType() == ExpressionContext.Type.IDENTIFIER;
+    String firstOrderByColumn = firstOrderByExpression.getExpression().getIdentifier();
+
+    _minMaxValueContexts = new ArrayList<>(_numOperators);
+    for (Operator operator : _operators) {
+      _minMaxValueContexts.add(new MinMaxValueContext((SelectionOrderByOperator) operator, firstOrderByColumn));
+    }
+    if (firstOrderByExpression.isAsc()) {
+      // For ascending order, sort on column min value in ascending order
+      _minMaxValueContexts.sort((o1, o2) -> {
+        // Put segments without column min value in the front because we always need to process them
+        if (o1._minValue == null) {
+          return o2._minValue == null ? 0 : -1;
+        }
+        if (o2._minValue == null) {
+          return 1;
+        }
+        return o1._minValue.compareTo(o2._minValue);
+      });
+    } else {
+      // For descending order, sort on column max value in descending order
+      _minMaxValueContexts.sort((o1, o2) -> {
+        // Put segments without column max value in the front because we always need to process them
+        if (o1._maxValue == null) {
+          return o2._maxValue == null ? 0 : -1;
+        }
+        if (o2._maxValue == null) {
+          return 1;
+        }
+        return o2._maxValue.compareTo(o1._maxValue);
+      });
+    }
   }
 
   @Override
@@ -95,106 +134,93 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
     assert firstOrderByExpression.getExpression().getType() == ExpressionContext.Type.IDENTIFIER;
     boolean asc = firstOrderByExpression.isAsc();
 
-    try {
-      // Register the thread to the _phaser
-      // NOTE: If the _phaser is terminated (returning negative value) when trying to register the thread, that
-      //       means the query execution has finished, and the main thread has deregistered itself and returned
-      //       the result. Directly return as no execution result will be taken.
-      if (_phaser.register() < 0) {
-        return;
-      }
+    // Keep a boundary value for the thread
+    // NOTE: The thread boundary value can be different from the global boundary value because thread boundary
+    //       value is updated after processing the segment, while global boundary value is updated after the
+    //       segment result is merged.
+    Comparable threadBoundaryValue = null;
 
-      // Keep a boundary value for the thread
-      // NOTE: The thread boundary value can be different from the global boundary value because thread boundary
-      //       value is updated after processing the segment, while global boundary value is updated after the
-      //       segment result is merged.
-      Comparable threadBoundaryValue = null;
-
-      for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numThreads) {
-        // Calculate the boundary value from global boundary and thread boundary
-        Comparable boundaryValue = _globalBoundaryValue.get();
-        if (boundaryValue == null) {
-          boundaryValue = threadBoundaryValue;
-        } else {
-          if (threadBoundaryValue != null) {
-            if (asc) {
-              if (threadBoundaryValue.compareTo(boundaryValue) < 0) {
-                boundaryValue = threadBoundaryValue;
-              }
-            } else {
-              if (threadBoundaryValue.compareTo(boundaryValue) > 0) {
-                boundaryValue = threadBoundaryValue;
-              }
-            }
-          }
-        }
-
-        // Check if the segment can be skipped
-        MinMaxValueContext minMaxValueContext = _minMaxValueContexts.get(operatorIndex);
-        if (boundaryValue != null) {
+    for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numThreads) {
+      // Calculate the boundary value from global boundary and thread boundary
+      Comparable boundaryValue = _globalBoundaryValue.get();
+      if (boundaryValue == null) {
+        boundaryValue = threadBoundaryValue;
+      } else {
+        if (threadBoundaryValue != null) {
           if (asc) {
-            // For ascending order, no need to process more segments if the column min value is larger than the
-            // boundary value, or is equal to the boundary value and the there is only one order-by expression
-            if (minMaxValueContext._minValue != null) {
-              int result = minMaxValueContext._minValue.compareTo(boundaryValue);
-              if (result > 0 || (result == 0 && numOrderByExpressions == 1)) {
-                _numOperatorsSkipped.getAndAdd((_numOperators - operatorIndex - 1) / _numThreads);
-                _blockingQueue.offer(LAST_RESULTS_BLOCK);
-                return;
-              }
+            if (threadBoundaryValue.compareTo(boundaryValue) < 0) {
+              boundaryValue = threadBoundaryValue;
             }
           } else {
-            // For descending order, no need to process more segments if the column max value is smaller than the
-            // boundary value, or is equal to the boundary value and the there is only one order-by expression
-            if (minMaxValueContext._maxValue != null) {
-              int result = minMaxValueContext._maxValue.compareTo(boundaryValue);
-              if (result < 0 || (result == 0 && numOrderByExpressions == 1)) {
-                _numOperatorsSkipped.getAndAdd((_numOperators - operatorIndex - 1) / _numThreads);
-                _blockingQueue.offer(LAST_RESULTS_BLOCK);
-                return;
-              }
+            if (threadBoundaryValue.compareTo(boundaryValue) > 0) {
+              boundaryValue = threadBoundaryValue;
             }
           }
-        }
-
-        // Process the segment
-        try {
-          IntermediateResultsBlock resultsBlock = minMaxValueContext._operator.nextBlock();
-          PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
-          if (selectionResult != null && selectionResult.size() == _numRowsToKeep) {
-            // Segment result has enough rows, update the boundary value
-            assert selectionResult.peek() != null;
-            Comparable segmentBoundaryValue = (Comparable) selectionResult.peek()[0];
-            if (boundaryValue == null) {
-              boundaryValue = segmentBoundaryValue;
-            } else {
-              if (asc) {
-                if (segmentBoundaryValue.compareTo(boundaryValue) < 0) {
-                  boundaryValue = segmentBoundaryValue;
-                }
-              } else {
-                if (segmentBoundaryValue.compareTo(boundaryValue) > 0) {
-                  boundaryValue = segmentBoundaryValue;
-                }
-              }
-            }
-          }
-          threadBoundaryValue = boundaryValue;
-          _blockingQueue.offer(resultsBlock);
-        } catch (EarlyTerminationException e) {
-          // Early-terminated by interruption (canceled by the main thread)
-          return;
-        } catch (Exception e) {
-          // Caught exception, skip processing the remaining operators
-          LOGGER
-              .error("Caught exception while executing operator of index: {} (query: {})", operatorIndex, _queryContext,
-                  e);
-          _blockingQueue.offer(new IntermediateResultsBlock(e));
-          return;
         }
       }
-    } finally {
-      _phaser.arriveAndDeregister();
+
+      // Check if the segment can be skipped
+      MinMaxValueContext minMaxValueContext = _minMaxValueContexts.get(operatorIndex);
+      if (boundaryValue != null) {
+        if (asc) {
+          // For ascending order, no need to process more segments if the column min value is larger than the
+          // boundary value, or is equal to the boundary value and the there is only one order-by expression
+          if (minMaxValueContext._minValue != null) {
+            int result = minMaxValueContext._minValue.compareTo(boundaryValue);
+            if (result > 0 || (result == 0 && numOrderByExpressions == 1)) {
+              _numOperatorsSkipped.getAndAdd((_numOperators - operatorIndex - 1) / _numThreads);
+              _blockingQueue.offer(LAST_RESULTS_BLOCK);
+              return;
+            }
+          }
+        } else {
+          // For descending order, no need to process more segments if the column max value is smaller than the
+          // boundary value, or is equal to the boundary value and the there is only one order-by expression
+          if (minMaxValueContext._maxValue != null) {
+            int result = minMaxValueContext._maxValue.compareTo(boundaryValue);
+            if (result < 0 || (result == 0 && numOrderByExpressions == 1)) {
+              _numOperatorsSkipped.getAndAdd((_numOperators - operatorIndex - 1) / _numThreads);
+              _blockingQueue.offer(LAST_RESULTS_BLOCK);
+              return;
+            }
+          }
+        }
+      }
+
+      // Process the segment
+      try {
+        IntermediateResultsBlock resultsBlock = minMaxValueContext._operator.nextBlock();
+        PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
+        if (selectionResult != null && selectionResult.size() == _numRowsToKeep) {
+          // Segment result has enough rows, update the boundary value
+          assert selectionResult.peek() != null;
+          Comparable segmentBoundaryValue = (Comparable) selectionResult.peek()[0];
+          if (boundaryValue == null) {
+            boundaryValue = segmentBoundaryValue;
+          } else {
+            if (asc) {
+              if (segmentBoundaryValue.compareTo(boundaryValue) < 0) {
+                boundaryValue = segmentBoundaryValue;
+              }
+            } else {
+              if (segmentBoundaryValue.compareTo(boundaryValue) > 0) {
+                boundaryValue = segmentBoundaryValue;
+              }
+            }
+          }
+        }
+        threadBoundaryValue = boundaryValue;
+        _blockingQueue.offer(resultsBlock);
+      } catch (EarlyTerminationException e) {
+        // Early-terminated by interruption (canceled by the main thread)
+        return;
+      } catch (Exception e) {
+        // Caught exception, skip processing the remaining operators
+        LOGGER.error("Caught exception while executing operator of index: {} (query: {})", operatorIndex, _queryContext,
+            e);
+        _blockingQueue.offer(new IntermediateResultsBlock(e));
+        return;
+      }
     }
   }
 
@@ -212,55 +238,42 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
    * </ul>
    */
   @Override
-  protected IntermediateResultsBlock mergeResultsFromSegments() {
+  protected IntermediateResultsBlock mergeResults()
+      throws Exception {
     IntermediateResultsBlock mergedBlock = null;
-    try {
-      int numBlocksMerged = 0;
-      while (numBlocksMerged + _numOperatorsSkipped.get() < _numOperators) {
-        IntermediateResultsBlock blockToMerge =
-            _blockingQueue.poll(_endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
-        if (blockToMerge == null) {
-          // Query times out, skip merging the remaining results blocks
-          LOGGER.error("Timed out while polling results block, numBlocksMerged: {} (query: {})", numBlocksMerged,
-              _queryContext);
-          mergedBlock = new IntermediateResultsBlock(QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR,
-              new TimeoutException("Timed out while polling results block")));
-          break;
+    int numBlocksMerged = 0;
+    while (numBlocksMerged + _numOperatorsSkipped.get() < _numOperators) {
+      IntermediateResultsBlock blockToMerge =
+          _blockingQueue.poll(_endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+      if (blockToMerge == null) {
+        // Query times out, skip merging the remaining results blocks
+        LOGGER.error("Timed out while polling results block, numBlocksMerged: {} (query: {})", numBlocksMerged,
+            _queryContext);
+        mergedBlock = new IntermediateResultsBlock(QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR,
+            new TimeoutException("Timed out while polling results block")));
+        break;
+      }
+      if (blockToMerge.getProcessingExceptions() != null) {
+        // Caught exception while processing segment, skip merging the remaining results blocks and directly return
+        // the exception
+        mergedBlock = blockToMerge;
+        break;
+      }
+      if (mergedBlock == null) {
+        mergedBlock = blockToMerge;
+      } else {
+        if (blockToMerge != LAST_RESULTS_BLOCK) {
+          mergeResultsBlocks(mergedBlock, blockToMerge);
         }
-        if (blockToMerge.getProcessingExceptions() != null) {
-          // Caught exception while processing segment, skip merging the remaining results blocks and directly return
-          // the exception
-          mergedBlock = blockToMerge;
-          break;
-        }
-        if (mergedBlock == null) {
-          mergedBlock = blockToMerge;
-        } else {
-          if (blockToMerge != LAST_RESULTS_BLOCK) {
-            mergeResultsBlocks(mergedBlock, blockToMerge);
-          }
-        }
-        numBlocksMerged++;
+      }
+      numBlocksMerged++;
 
-        // Update the boundary value if enough rows are collected
-        PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) mergedBlock.getSelectionResult();
-        if (selectionResult != null && selectionResult.size() == _numRowsToKeep) {
-          assert selectionResult.peek() != null;
-          _globalBoundaryValue.set((Comparable) selectionResult.peek()[0]);
-        }
+      // Update the boundary value if enough rows are collected
+      PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) mergedBlock.getSelectionResult();
+      if (selectionResult != null && selectionResult.size() == _numRowsToKeep) {
+        assert selectionResult.peek() != null;
+        _globalBoundaryValue.set((Comparable) selectionResult.peek()[0]);
       }
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while merging results blocks (query: {})", _queryContext, e);
-      mergedBlock = new IntermediateResultsBlock(QueryException.getException(QueryException.INTERNAL_ERROR, e));
-    } finally {
-      // Cancel all ongoing jobs
-      for (Future future : _futures) {
-        if (!future.isDone()) {
-          future.cancel(true);
-        }
-      }
-      // Deregister the main thread and wait for all threads done
-      _phaser.awaitAdvance(_phaser.arriveAndDeregister());
     }
     return mergedBlock;
   }
@@ -285,5 +298,18 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
     Collection<Object[]> rowsToMerge = blockToMerge.getSelectionResult();
     assert mergedRows != null && rowsToMerge != null;
     SelectionOperatorUtils.mergeWithOrdering(mergedRows, rowsToMerge, _numRowsToKeep);
+  }
+
+  private static class MinMaxValueContext {
+    final SelectionOrderByOperator _operator;
+    final Comparable _minValue;
+    final Comparable _maxValue;
+
+    MinMaxValueContext(SelectionOrderByOperator operator, String column) {
+      _operator = operator;
+      DataSourceMetadata dataSourceMetadata = operator.getIndexSegment().getDataSource(column).getDataSourceMetadata();
+      _minValue = dataSourceMetadata.getMinValue();
+      _maxValue = dataSourceMetadata.getMaxValue();
+    }
   }
 }

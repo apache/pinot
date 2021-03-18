@@ -19,10 +19,10 @@
 package org.apache.pinot.core.operator.combine;
 
 import java.util.List;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -50,42 +50,41 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseCombineOperator.class);
 
   protected final List<Operator> _operators;
+  protected final int _numOperators;
   protected final QueryContext _queryContext;
   protected final ExecutorService _executorService;
   protected final long _endTimeMs;
-  protected final int _numOperators;
-  // Use a Phaser to ensure all the Futures are done (not scheduled, finished or interrupted) before the main thread
-  // returns. We need to ensure this because the main thread holds the reference to the segments. If a segment is
-  // deleted/refreshed, the segment will be released after the main thread returns, which would lead to undefined
-  // behavior (even JVM crash) when processing queries against it.
-  protected final Phaser _phaser = new Phaser(1);
-  // Use a _blockingQueue to store the per-segment result
-  protected final BlockingQueue<IntermediateResultsBlock> _blockingQueue;
-  private final AtomicLong totalWorkerThreadCpuTimeNs = new AtomicLong(0);
-  protected int _numThreads;
-  protected Future[] _futures;
+  protected final int _numThreads;
+  protected final Future[] _futures;
+  // Use a _blockingQueue to store the intermediate results blocks
+  protected final BlockingQueue<IntermediateResultsBlock> _blockingQueue = new LinkedBlockingQueue<>();
+  protected final AtomicLong totalWorkerThreadCpuTimeNs = new AtomicLong(0);
 
-  public BaseCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
-      long endTimeMs) {
+  protected BaseCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
+      long endTimeMs, int numThreads) {
     _operators = operators;
+    _numOperators = _operators.size();
     _queryContext = queryContext;
     _executorService = executorService;
     _endTimeMs = endTimeMs;
-    _numOperators = _operators.size();
-    _numThreads = CombineOperatorUtils.getNumThreadsForQuery(_numOperators);
-    _blockingQueue = new ArrayBlockingQueue<>(_numOperators);
-    _futures = new Future[_numThreads];
-  }
-
-  public BaseCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
-      long endTimeMs, int numThreads) {
-    this(operators, queryContext, executorService, endTimeMs);
     _numThreads = numThreads;
     _futures = new Future[_numThreads];
   }
 
+  protected BaseCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
+      long endTimeMs) {
+    this(operators, queryContext, executorService, endTimeMs,
+        CombineOperatorUtils.getNumThreadsForQuery(operators.size()));
+  }
+
   @Override
   protected IntermediateResultsBlock getNextBlock() {
+    // Use a Phaser to ensure all the Futures are done (not scheduled, finished or interrupted) before the main thread
+    // returns. We need to ensure this because the main thread holds the reference to the segments. If a segment is
+    // deleted/refreshed, the segment will be released after the main thread returns, which would lead to undefined
+    // behavior (even JVM crash) when processing queries against it.
+    Phaser phaser = new Phaser(1);
+
     for (int i = 0; i < _numThreads; i++) {
       int threadIndex = i;
       _futures[i] = _executorService.submit(new TraceRunnable() {
@@ -94,97 +93,27 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
           ThreadTimer executionThreadTimer = new ThreadTimer();
           executionThreadTimer.start();
 
-          processSegments(threadIndex);
+          // Register the thread to the phaser
+          // NOTE: If the phaser is terminated (returning negative value) when trying to register the thread, that
+          //       means the query execution has finished, and the main thread has deregistered itself and returned
+          //       the result. Directly return as no execution result will be taken.
+          if (phaser.register() < 0) {
+            return;
+          }
+          try {
+            processSegments(threadIndex);
+          } finally {
+            phaser.arriveAndDeregister();
+          }
 
-          totalWorkerThreadCpuTimeNs.addAndGet(executionThreadTimer.stopAndGetThreadTimeNs());
+          totalWorkerThreadCpuTimeNs.getAndAdd(executionThreadTimer.stopAndGetThreadTimeNs());
         }
       });
     }
-    IntermediateResultsBlock mergedBlock = mergeResultsFromSegments();
-    /*
-     * TODO: setThreadTime logic can be put into CombineOperatorUtils.setExecutionStatistics(),
-     *   after we extends StreamingSelectionOnlyCombineOperator from BaseCombineOperator.
-     */
-    mergedBlock.setThreadCpuTimeNs(totalWorkerThreadCpuTimeNs.get());
-    CombineOperatorUtils.setExecutionStatistics(mergedBlock, _operators);
-    return mergedBlock;
-  }
 
-  /**
-   * processSegments will execute query on one or more segments in a single thread.
-   */
-  protected void processSegments(int threadIndex) {
+    IntermediateResultsBlock mergedBlock;
     try {
-      // Register the thread to the phaser
-      // NOTE: If the phaser is terminated (returning negative value) when trying to register the thread, that
-      //       means the query execution has finished, and the main thread has deregistered itself and returned
-      //       the result. Directly return as no execution result will be taken.
-      if (_phaser.register() < 0) {
-        return;
-      }
-
-      for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numThreads) {
-        try {
-          IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) _operators.get(operatorIndex).nextBlock();
-          if (isQuerySatisfied(resultsBlock)) {
-            // Query is satisfied, skip processing the remaining segments
-            _blockingQueue.offer(resultsBlock);
-            return;
-          } else {
-            _blockingQueue.offer(resultsBlock);
-          }
-        } catch (EarlyTerminationException e) {
-          // Early-terminated by interruption (canceled by the main thread)
-          return;
-        } catch (Exception e) {
-          // Caught exception, skip processing the remaining operators
-          LOGGER
-              .error("Caught exception while executing operator of index: {} (query: {})", operatorIndex, _queryContext,
-                  e);
-          _blockingQueue.offer(new IntermediateResultsBlock(e));
-          return;
-        }
-      }
-    } finally {
-      _phaser.arriveAndDeregister();
-    }
-  }
-
-  /**
-   * mergeResultsFromSegments will merge multiple intermediate result blocks into a result block.
-   */
-  protected IntermediateResultsBlock mergeResultsFromSegments() {
-    IntermediateResultsBlock mergedBlock = null;
-    try {
-      int numBlocksMerged = 0;
-      while (numBlocksMerged < _numOperators) {
-        IntermediateResultsBlock blockToMerge =
-            _blockingQueue.poll(_endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
-        if (blockToMerge == null) {
-          // Query times out, skip merging the remaining results blocks
-          LOGGER.error("Timed out while polling results block, numBlocksMerged: {} (query: {})", numBlocksMerged,
-              _queryContext);
-          mergedBlock = new IntermediateResultsBlock(QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR,
-              new TimeoutException("Timed out while polling results block")));
-          break;
-        }
-        if (blockToMerge.getProcessingExceptions() != null) {
-          // Caught exception while processing segment, skip merging the remaining results blocks and directly return
-          // the exception
-          mergedBlock = blockToMerge;
-          break;
-        }
-        if (mergedBlock == null) {
-          mergedBlock = blockToMerge;
-        } else {
-          mergeResultsBlocks(mergedBlock, blockToMerge);
-        }
-        numBlocksMerged++;
-        if (isQuerySatisfied(mergedBlock)) {
-          // Query is satisfied, skip merging the remaining results blocks
-          break;
-        }
-      }
+      mergedBlock = mergeResults();
     } catch (Exception e) {
       LOGGER.error("Caught exception while merging results blocks (query: {})", _queryContext, e);
       mergedBlock = new IntermediateResultsBlock(QueryException.getException(QueryException.INTERNAL_ERROR, e));
@@ -196,7 +125,77 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
         }
       }
       // Deregister the main thread and wait for all threads done
-      _phaser.awaitAdvance(_phaser.arriveAndDeregister());
+      phaser.awaitAdvance(phaser.arriveAndDeregister());
+    }
+
+    /*
+     * TODO: setThreadTime logic can be put into CombineOperatorUtils.setExecutionStatistics(),
+     *   after we extends StreamingSelectionOnlyCombineOperator from BaseCombineOperator.
+     */
+    mergedBlock.setThreadCpuTimeNs(totalWorkerThreadCpuTimeNs.get());
+    CombineOperatorUtils.setExecutionStatistics(mergedBlock, _operators);
+    return mergedBlock;
+  }
+
+  /**
+   * Executes query on one or more segments in a worker thread.
+   */
+  protected void processSegments(int threadIndex) {
+    for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numThreads) {
+      try {
+        IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) _operators.get(operatorIndex).nextBlock();
+        if (isQuerySatisfied(resultsBlock)) {
+          // Query is satisfied, skip processing the remaining segments
+          _blockingQueue.offer(resultsBlock);
+          return;
+        } else {
+          _blockingQueue.offer(resultsBlock);
+        }
+      } catch (EarlyTerminationException e) {
+        // Early-terminated by interruption (canceled by the main thread)
+        return;
+      } catch (Exception e) {
+        // Caught exception, skip processing the remaining operators
+        LOGGER.error("Caught exception while executing operator of index: {} (query: {})", operatorIndex, _queryContext,
+            e);
+        _blockingQueue.offer(new IntermediateResultsBlock(e));
+        return;
+      }
+    }
+  }
+
+  /**
+   * Merges the results from the worker threads into a results block.
+   */
+  protected IntermediateResultsBlock mergeResults()
+      throws Exception {
+    IntermediateResultsBlock mergedBlock = null;
+    int numBlocksMerged = 0;
+    while (numBlocksMerged < _numOperators) {
+      IntermediateResultsBlock blockToMerge =
+          _blockingQueue.poll(_endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+      if (blockToMerge == null) {
+        // Query times out, skip merging the remaining results blocks
+        LOGGER.error("Timed out while polling results block, numBlocksMerged: {} (query: {})", numBlocksMerged,
+            _queryContext);
+        return new IntermediateResultsBlock(QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR,
+            new TimeoutException("Timed out while polling results block")));
+      }
+      if (blockToMerge.getProcessingExceptions() != null) {
+        // Caught exception while processing segment, skip merging the remaining results blocks and directly return the
+        // exception
+        return blockToMerge;
+      }
+      if (mergedBlock == null) {
+        mergedBlock = blockToMerge;
+      } else {
+        mergeResultsBlocks(mergedBlock, blockToMerge);
+      }
+      numBlocksMerged++;
+      if (isQuerySatisfied(mergedBlock)) {
+        // Query is satisfied, skip merging the remaining results blocks
+        return mergedBlock;
+      }
     }
     return mergedBlock;
   }
