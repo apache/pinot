@@ -1656,6 +1656,11 @@ public class PinotHelixResourceManager {
     // might need them to determine the partition of the segment, and server will need them to download the segment
     ZNRecord znRecord;
 
+    if (hasRealtimeTable(tableNameWithType)) {
+      Preconditions.checkState(isUpsertTable(tableNameWithType),
+          "Upload segment " + segmentName + " for non upsert enabled realtime table " + tableNameWithType
+              + "is not supported");
+    } ;
     if (isUpsertTable(tableNameWithType)) {
       instancePartitionsType = InstancePartitionsType.CONSUMING;
       // Build the realtime segment zk metadata with necessary fields.

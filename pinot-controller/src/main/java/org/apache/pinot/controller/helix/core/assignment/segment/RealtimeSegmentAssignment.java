@@ -103,7 +103,7 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
             tableConfig.getValidationConfig().getReplicaGroupStrategyConfig();
     _partitionColumn = replicaGroupStrategyConfig != null ? replicaGroupStrategyConfig.getPartitionColumn() : null;
 
-    LOGGER.info("Initialized RealtimeSegmentAssignment with replication: {} partitionColumn: {} for table: {}",
+    LOGGER.info("Initialized RealtimeSegmentAssignment with replication: {}, partitionColumn: {} for table: {}",
         _replication, _partitionColumn, _realtimeTableName);
   }
 

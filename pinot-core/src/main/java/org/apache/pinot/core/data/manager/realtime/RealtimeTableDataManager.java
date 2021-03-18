@@ -589,8 +589,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         segmentName, tableName, _primaryKeyColumns.get(0));
     Set<Integer> partitions = partitionMetadata.getPartitions();
     Preconditions.checkState(partitions.size() == 1,
-        "Segment ZK metadata for segment: %s of table: %s contains multiple partitions for column: %s", segmentName,
-        tableName, _primaryKeyColumns.get(0));
+        "Segment ZK metadata for segment: %s of table: %s contains multiple partitions for column: %s %s", segmentName,
+        tableName, _primaryKeyColumns.get(0), partitions);
     return partitions.iterator().next();
   }
 }
