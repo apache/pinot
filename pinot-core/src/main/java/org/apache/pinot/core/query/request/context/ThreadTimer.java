@@ -55,7 +55,7 @@ public class ThreadTimer {
   }
 
   public long getThreadTimeNs() {
-    if (_startTimeNs == -1 || _endTimeNs == -1) {
+    if (!IS_THREAD_CPU_TIME_MEASUREMENT_ENABLED) {
       return 0;
     }
     return _endTimeNs - _startTimeNs;
