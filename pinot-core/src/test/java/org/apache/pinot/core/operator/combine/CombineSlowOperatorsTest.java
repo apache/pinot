@@ -65,7 +65,8 @@ public class CombineSlowOperatorsTest {
   public void testSelectionOnlyCombineOperator() {
     List<Operator> operators = getOperators();
     SelectionOnlyCombineOperator combineOperator = new SelectionOnlyCombineOperator(operators,
-        QueryContextConverterUtils.getQueryContextFromPQL("SELECT * FROM table"), _executorService, TIMEOUT_MS);
+        QueryContextConverterUtils.getQueryContextFromPQL("SELECT * FROM table"),
+        _executorService, TIMEOUT_MS);
     testCombineOperator(operators, combineOperator);
   }
 
@@ -76,7 +77,8 @@ public class CombineSlowOperatorsTest {
   public void testAggregationOnlyCombineOperator() {
     List<Operator> operators = getOperators();
     AggregationOnlyCombineOperator combineOperator = new AggregationOnlyCombineOperator(operators,
-        QueryContextConverterUtils.getQueryContextFromPQL("SELECT COUNT(*) FROM table"), _executorService, TIMEOUT_MS);
+        QueryContextConverterUtils.getQueryContextFromPQL("SELECT COUNT(*) FROM table"), _executorService,
+        TIMEOUT_MS);
     testCombineOperator(operators, combineOperator);
   }
 

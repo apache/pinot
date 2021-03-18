@@ -69,6 +69,7 @@ public class IntermediateResultsBlock implements Block {
   private boolean _numGroupsLimitReached;
   private int _numResizes;
   private long _resizeTimeMs;
+  private long _threadCpuTimeNs;
 
   private Table _table;
 
@@ -229,6 +230,14 @@ public class IntermediateResultsBlock implements Block {
 
   public void setResizeTimeMs(long resizeTimeMs) {
     _resizeTimeMs = resizeTimeMs;
+  }
+
+  public void setThreadCpuTimeNs(long threadCpuTimeNanos) {
+    _threadCpuTimeNs = threadCpuTimeNanos;
+  }
+
+  public long getThreadCpuTimeNs() {
+    return _threadCpuTimeNs;
   }
 
   @VisibleForTesting

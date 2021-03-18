@@ -168,8 +168,6 @@ public abstract class QueryScheduler {
     Map<String, String> dataTableMetadata = dataTable.getMetadata();
     dataTableMetadata.put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(requestId));
 
-    byte[] responseData = serializeDataTable(queryRequest, dataTable);
-
     // Log the statistics
     String tableNameWithType = queryRequest.getTableNameWithType();
     long numDocsScanned =
@@ -188,6 +186,7 @@ public abstract class QueryScheduler {
         Long.parseLong(dataTableMetadata.getOrDefault(DataTable.MIN_CONSUMING_FRESHNESS_TIME_MS, INVALID_FRESHNESS_MS));
     int numResizes = Integer.parseInt(dataTableMetadata.getOrDefault(DataTable.NUM_RESIZES_METADATA_KEY, INVALID_NUM_RESIZES));
     long resizeTimeMs = Long.parseLong(dataTableMetadata.getOrDefault(DataTable.RESIZE_TIME_MS_METADATA_KEY, INVALID_RESIZE_TIME_MS));
+    long executionThreadCpuTimeNs = Long.parseLong(dataTableMetadata.getOrDefault(DataTable.EXECUTION_THREAD_CPU_TIME_NS_METADATA_KEY, "0"));
 
     if (numDocsScanned > 0) {
       serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_DOCS_SCANNED, numDocsScanned);
@@ -206,6 +205,9 @@ public abstract class QueryScheduler {
     if (resizeTimeMs > 0) {
       serverMetrics.addValueToTableGauge(tableNameWithType, ServerGauge.RESIZE_TIME_MS, resizeTimeMs);
     }
+    if (executionThreadCpuTimeNs > 0) {
+      serverMetrics.addValueToTableGauge(tableNameWithType, ServerGauge.EXECUTION_THREAD_CPU_TIME_NS, executionThreadCpuTimeNs);
+    }
 
     TimerContext timerContext = queryRequest.getTimerContext();
     int numSegmentsQueried = queryRequest.getSegmentsToQuery().size();
@@ -216,13 +218,14 @@ public abstract class QueryScheduler {
     if (queryLogRateLimiter.tryAcquire() || forceLog(schedulerWaitMs, numDocsScanned)) {
       LOGGER.info("Processed requestId={},table={},segments(queried/processed/matched/consuming)={}/{}/{}/{},"
               + "schedulerWaitMs={},reqDeserMs={},totalExecMs={},resSerMs={},totalTimeMs={},minConsumingFreshnessMs={},broker={},"
-              + "numDocsScanned={},scanInFilter={},scanPostFilter={},sched={}", requestId, tableNameWithType,
+              + "numDocsScanned={},scanInFilter={},scanPostFilter={},sched={},executionThreadCpuTimeNs={}", requestId, tableNameWithType,
           numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched, numSegmentsConsuming, schedulerWaitMs,
           timerContext.getPhaseDurationMs(ServerQueryPhase.REQUEST_DESERIALIZATION),
           timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
           timerContext.getPhaseDurationMs(ServerQueryPhase.RESPONSE_SERIALIZATION),
           timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME), minConsumingFreshnessMs,
-          queryRequest.getBrokerId(), numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, name());
+          queryRequest.getBrokerId(), numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, name(),
+          executionThreadCpuTimeNs);
 
       // Limit the dropping log message at most once per second.
       if (numDroppedLogRateLimiter.tryAcquire()) {
@@ -247,6 +250,12 @@ public abstract class QueryScheduler {
     serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_PROCESSED, numSegmentsProcessed);
     serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_MATCHED, numSegmentsMatched);
 
+    /**
+     * TODO: Currently not send "executionThreadCpuTimeNs" as part of metadata to broker. Revisit this when follow-up
+     *   work of data table serialization cost measurement is done.
+     */
+    dataTableMetadata.remove(DataTable.EXECUTION_THREAD_CPU_TIME_NS_METADATA_KEY);
+    byte[] responseData = serializeDataTable(queryRequest, dataTable);
     return responseData;
   }
 
