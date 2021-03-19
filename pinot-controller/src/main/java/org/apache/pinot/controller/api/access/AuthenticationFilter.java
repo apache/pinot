@@ -22,7 +22,10 @@ package org.apache.pinot.controller.api.access;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.ws.rs.DELETE;
@@ -44,6 +47,8 @@ import org.glassfish.grizzly.http.server.Request;
  */
 @javax.ws.rs.ext.Provider
 public class AuthenticationFilter implements ContainerRequestFilter {
+  private static final Set<String> UNPROTECTED_PATHS =
+      new HashSet<>(Arrays.asList("", "help", "auth/info", "auth/verify"));
 
   @Inject
   Provider<Request> _requestProvider;
@@ -65,12 +70,12 @@ public class AuthenticationFilter implements ContainerRequestFilter {
     String endpointUrl = _requestProvider.get().getRequestURL().toString();
     UriInfo uriInfo = requestContext.getUriInfo();
 
-    // exclude "/auth" endpoints
-    if (endpointUrl.endsWith("/auth/info") || endpointUrl.endsWith("/auth/verify")) {
+    // exclude public/unprotected paths
+    if (isBaseFile(uriInfo.getPath()) || UNPROTECTED_PATHS.contains(uriInfo.getPath())) {
       return;
     }
 
-    // check if authentication is required
+    // check if authentication is required implicitly
     if (accessControl.protectAnnotatedOnly() && !endpointMethod.isAnnotationPresent(Authenticate.class)) {
       return;
     }
@@ -88,7 +93,6 @@ public class AuthenticationFilter implements ContainerRequestFilter {
 
     if (endpointMethod.isAnnotationPresent(Authenticate.class)) {
       accessType = endpointMethod.getAnnotation(Authenticate.class).value();
-
     } else if (accessControl.protectAnnotatedOnly()) {
       // heuristically infer access type via javax.ws.rs annotations
       if (endpointMethod.getAnnotation(POST.class) != null) {
@@ -122,5 +126,9 @@ public class AuthenticationFilter implements ContainerRequestFilter {
       }
     }
     return Optional.ofNullable(tableName);
+  }
+
+  private static boolean isBaseFile(String path) {
+    return !path.contains("/") && path.contains(".");
   }
 }
