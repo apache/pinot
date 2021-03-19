@@ -69,6 +69,8 @@ const App = () => {
     // it doesn't require authentication.
     if(authInfoResponse?.workflow !== 'BASIC'){
       setIsAuthenticated(true);
+    } else {
+      setLoading(false);
     }
   }
 
