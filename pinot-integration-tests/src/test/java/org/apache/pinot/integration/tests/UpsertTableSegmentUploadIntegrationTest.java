@@ -19,25 +19,39 @@
 package org.apache.pinot.integration.tests;
 
 import java.io.File;
+import java.net.URI;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.apache.helix.model.IdealState;
+import org.apache.http.HttpStatus;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
+
 
 public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 2;
   public static final String UPLOADED_SEGMENT_NAME = "mytable_10027_19736_0 %";
+  public static final String PRIMARY_KEY_COL = "clientId";
+  public static final String TABLE_NAME_WITH_TYPE = "mytable_REALTIME";
 
   @BeforeClass
   public void setUp()
@@ -60,12 +74,12 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
     // Unpack the Avro files
     List<File> avroFiles = unpackAvroData(_tempDir);
     // Create and upload the table config
-    TableConfig upsertTableConfig = createUpsertTableConfig(avroFiles.get(0), "clientId");
+    TableConfig upsertTableConfig = createUpsertTableConfig(avroFiles.get(0), PRIMARY_KEY_COL);
     addTableConfig(upsertTableConfig);
 
     // Create and upload segments
     ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, upsertTableConfig, schema, 0, _segmentDir, _tarDir);
-    uploadSegments(getTableName(), _tarDir);
+    uploadSegments(getTableName(), TableType.REALTIME, _tarDir);
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
@@ -106,7 +120,7 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
   public void testSegmentAssignment()
       throws Exception {
     Assert.assertEquals(getCurrentCountStarResult(), 1);
-    IdealState idealState = HelixHelper.getTableIdealState(_helixManager, "mytable_REALTIME");
+    IdealState idealState = HelixHelper.getTableIdealState(_helixManager, TABLE_NAME_WITH_TYPE);
 
     // Verify various ideal state properties
     Set<String> segments = idealState.getPartitionSet();
@@ -130,6 +144,39 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
         Assert.assertEquals(instances, segmentAssignment.get(partitionId));
       } else {
         segmentAssignment.put(partitionId, instances);
+      }
+    }
+  }
+
+  private void uploadSegments(String tableName, TableType tableType, File tarDir)
+      throws Exception {
+    File[] segmentTarFiles = tarDir.listFiles();
+    assertNotNull(segmentTarFiles);
+    int numSegments = segmentTarFiles.length;
+    assertTrue(numSegments > 0);
+
+    URI uploadSegmentHttpURI = FileUploadDownloadClient.getUploadSegmentHttpURI(LOCAL_HOST, _controllerPort);
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      if (numSegments == 1) {
+        File segmentTarFile = segmentTarFiles[0];
+        assertEquals(fileUploadDownloadClient
+            .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, tableName, tableType)
+            .getStatusCode(), HttpStatus.SC_OK);
+      } else {
+        // Upload all segments in parallel
+        ExecutorService executorService = Executors.newFixedThreadPool(numSegments);
+        List<Future<Integer>> futures = new ArrayList<>(numSegments);
+        for (File segmentTarFile : segmentTarFiles) {
+          futures.add(executorService.submit(() -> {
+            return fileUploadDownloadClient
+                .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, tableName, tableType)
+                .getStatusCode();
+          }));
+        }
+        executorService.shutdown();
+        for (Future<Integer> future : futures) {
+          assertEquals((int) future.get(), HttpStatus.SC_OK);
+        }
       }
     }
   }

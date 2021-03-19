@@ -1655,13 +1655,10 @@ public class PinotHelixResourceManager {
     // NOTE: must first set the segment ZK metadata before assigning segment to instances because segment assignment
     // might need them to determine the partition of the segment, and server will need them to download the segment
     ZNRecord znRecord;
-
-    if (hasRealtimeTable(tableNameWithType)) {
+    if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
       Preconditions.checkState(isUpsertTable(tableNameWithType),
           "Upload segment " + segmentName + " for non upsert enabled realtime table " + tableNameWithType
-              + "is not supported");
-    } ;
-    if (isUpsertTable(tableNameWithType)) {
+              + " is not supported");
       instancePartitionsType = InstancePartitionsType.CONSUMING;
       // Build the realtime segment zk metadata with necessary fields.
       LLCRealtimeSegmentZKMetadata segmentZKMetadata = new LLCRealtimeSegmentZKMetadata();
@@ -1669,7 +1666,7 @@ public class PinotHelixResourceManager {
           .updateSegmentMetadata(segmentZKMetadata, segmentMetadata, CommonConstants.Segment.SegmentType.REALTIME);
       segmentZKMetadata.setDownloadUrl(downloadUrl);
       segmentZKMetadata.setCrypterName(crypter);
-      segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.UPLOAD);
+      segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.UPLOADED);
       znRecord = segmentZKMetadata.toZNRecord();
     } else {
       instancePartitionsType = InstancePartitionsType.OFFLINE;

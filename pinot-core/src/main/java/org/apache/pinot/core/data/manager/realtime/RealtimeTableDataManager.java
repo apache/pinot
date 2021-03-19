@@ -298,7 +298,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         // Metadata has not been committed, delete the local segment
         FileUtils.deleteQuietly(segmentDir);
       }
-    } else if (realtimeSegmentZKMetadata.getStatus() == Status.UPLOAD) {
+    } else if (realtimeSegmentZKMetadata.getStatus() == Status.UPLOADED) {
       // The segment is uploaded to an upsert enabled realtime table. Download the segment and load.
       Preconditions.checkArgument(realtimeSegmentZKMetadata instanceof LLCRealtimeSegmentZKMetadata,
           "Upload segment is not LLC segment");
