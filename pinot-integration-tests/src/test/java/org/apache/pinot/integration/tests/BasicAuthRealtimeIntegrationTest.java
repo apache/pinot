@@ -110,8 +110,11 @@ public class BasicAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest
 
   @Override
   protected TableTaskConfig getTaskConfig() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("bucketTimePeriod", "30d");
+
     return new TableTaskConfig(
-        Collections.singletonMap(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, new HashMap<>()));
+        Collections.singletonMap(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, properties));
   }
 
   @Override
@@ -181,7 +184,7 @@ public class BasicAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest
       String segment = offlineSegments.get(i).asText();
       Assert.assertTrue(
           sendGetRequest(_controllerRequestURLBuilder.forSegmentDownload(getTableName(), segment), AUTH_HEADER).length()
-              > 10000); // download segment
+              > 200000); // download segment
     }
   }
 }
