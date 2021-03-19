@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -120,6 +121,18 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
   }
 
   @Test
+  public void testControllerGetTablesNoAuth()
+      throws Exception {
+    try {
+      // NOTE: the endpoint is protected implicitly (without annotation) by BasicAuthAccessControlFactory
+      sendGetRequest("http://localhost:18998/tables");
+    } catch (IOException e) {
+      Assert.assertTrue(e.getMessage().contains("HTTP"));
+      Assert.assertTrue(e.getMessage().contains("403"));
+    }
+  }
+
+  @Test
   public void testIngestionBatch()
       throws Exception {
     File quickstartTmpDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
@@ -138,7 +151,7 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
     FileUtils.copyURLToFile(getClass().getResource(BOOTSTRAP_DATA_DIR + "/rawdata/" + DATA_FILE), dataFile);
     FileUtils.copyURLToFile(getClass().getResource(BOOTSTRAP_DATA_DIR + "/" + JOB_FILE), jobFile);
 
-    // patch ingestion job
+    // patch ingestion job file
     String jobFileContents = IOUtils.toString(new FileInputStream(jobFile));
     IOUtils.write(jobFileContents.replaceAll("9000", String.valueOf(DEFAULT_CONTROLLER_PORT)),
         new FileOutputStream(jobFile));
@@ -167,11 +180,4 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
     Assert.assertFalse(responseUser.has("resultTable"), "must not return result table");
     Assert.assertTrue(responseUser.get("exceptions").get(0).get("errorCode").asInt() != 0, "must return error code");
   }
-
-//  // TODO this endpoint should be protected once UI supports auth
-//  @Test
-//  public void testControllerGetTablesNoAuth()
-//      throws Exception {
-//    System.out.println(sendGetRequest("http://localhost:18998/tables"));
-//  }
 }
