@@ -27,7 +27,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -40,7 +39,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
-import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -69,6 +67,7 @@ import org.apache.pinot.core.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.core.util.SchemaUtils;
+import org.apache.pinot.core.util.SegmentUtils;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -364,7 +363,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     columnToReaderMap.put(_timeColumnName, new PinotSegmentColumnReader(immutableSegment, _timeColumnName));
     int numTotalDocs = immutableSegment.getSegmentMetadata().getTotalDocs();
     String segmentName = immutableSegment.getSegmentName();
-    int partitionGroupId = getSegmentPartitionId(segmentName, this.getTableName());
+    int partitionGroupId = SegmentUtils
+        .getRealtimeSegmentPartitionId(segmentName, this.getTableName(), _helixManager, _primaryKeyColumns.get(0));
     PartitionUpsertMetadataManager partitionUpsertMetadataManager =
         _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionGroupId);
     int numPrimaryKeyColumns = _primaryKeyColumns.size();
@@ -555,42 +555,5 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       isValid = false;
     }
     return isValid;
-  }
-
-  private int getSegmentPartitionId(String segmentName, String tableName) {
-    // A fast path if the segmentName is a LLC segment name and we can get the partition id from the name directly.
-    if (LLCSegmentName.isLowLevelConsumerSegmentName(segmentName)) {
-      return new LLCSegmentName(segmentName).getPartitionGroupId();
-    }
-    // Otherwise, retrieve the partition id from the segment zk metadata. Currently only realtime segments from upsert
-    // enabled tables have partition ids in their segment metadata.
-    RealtimeSegmentZKMetadata segmentZKMetadata =
-        ZKMetadataProvider.getRealtimeSegmentZKMetadata(_helixManager.getHelixPropertyStore(), tableName, segmentName);
-    Preconditions.checkState(isUpsertEnabled(),
-        "Only upsert enabled table has partition ids in its segment metadata: seg %s of table %s", segmentName,
-        tableName);
-    Preconditions
-        .checkState(segmentZKMetadata != null, "Failed to find segment ZK metadata for segment: %s of table: %s",
-            segmentName, tableName);
-    return getSegmentPartitionIdFromZkMetaData(segmentZKMetadata, tableName);
-  }
-
-  private int getSegmentPartitionIdFromZkMetaData(RealtimeSegmentZKMetadata segmentZKMetadata, String tableName) {
-    String segmentName = segmentZKMetadata.getSegmentName();
-    Preconditions.checkState(segmentZKMetadata.getPartitionMetadata() != null,
-        "Segment ZK metadata for segment: %s of table: %s does not contain partition metadata", segmentName,
-        tableName);
-
-    // Use any primary key column to fetch the partition metadata
-    ColumnPartitionMetadata partitionMetadata =
-        segmentZKMetadata.getPartitionMetadata().getColumnPartitionMap().get(_primaryKeyColumns.get(0));
-    Preconditions.checkState(partitionMetadata != null,
-        "Segment ZK metadata for segment: %s of table: %s does not contain partition metadata for column: %s",
-        segmentName, tableName, _primaryKeyColumns.get(0));
-    Set<Integer> partitions = partitionMetadata.getPartitions();
-    Preconditions.checkState(partitions.size() == 1,
-        "Segment ZK metadata for segment: %s of table: %s contains multiple partitions for column: %s %s", segmentName,
-        tableName, _primaryKeyColumns.get(0), partitions);
-    return partitions.iterator().next();
   }
 }

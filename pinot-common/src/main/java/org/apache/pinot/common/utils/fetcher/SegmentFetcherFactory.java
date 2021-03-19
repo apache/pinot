@@ -186,7 +186,7 @@ public class SegmentFetcherFactory {
         FileUtils.moveDirectory(tempIndexDir, segmentDir);
         LOGGER.info("Successfully downloaded segment: {} to: {}", segmentName, segmentDir);
       } catch (Exception e) {
-        LOGGER.error("Exception when untarring segment: {} for from {} to {}", segmentName, tempTarFile, tempSegmentDir,
+        LOGGER.error("Exception when untarring segment: {} from {} to {}", segmentName, tempTarFile, tempSegmentDir,
             e);
         Utils.rethrowException(e);
       }
