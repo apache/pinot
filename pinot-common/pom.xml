@@ -301,6 +301,10 @@
                 <configuration>
                   <relocations>
                     <relocation>
+                      <pattern>com.google.common.base</pattern>
+                      <shadedPattern>shaded.com.google.common.base</shadedPattern>
+                    </relocation>
+                    <relocation>
                       <pattern>org.apache.http</pattern>
                       <shadedPattern>shaded.org.apache.http</shadedPattern>
                     </relocation>
