@@ -216,20 +216,20 @@ public class TablesResourceTest extends BaseResourceTest {
     setUpSegment(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), LLC_SEGMENT_NAME, null, _realtimeIndexSegments);
 
     // Verify segment uploading succeed.
-    Response response = _webTarget.path(String.format("/segments/%s/%s", TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), LLC_SEGMENT_NAME)).request().post(null);
+    Response response = _webTarget.path(String.format("/segments/%s/%s/upload", TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), LLC_SEGMENT_NAME)).request().post(null);
     Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
     Assert.assertEquals(response.readEntity(String.class), SEGMENT_DOWNLOAD_URL);
 
     // Verify bad request: table type is offline
-    response = _webTarget.path(String.format("/segments/%s/%s", TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME), _offlineIndexSegments.get(0).getSegmentName())).request().post(null);
+    response = _webTarget.path(String.format("/segments/%s/%s/upload", TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME), _offlineIndexSegments.get(0).getSegmentName())).request().post(null);
     Assert.assertEquals(response.getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
 
     // Verify bad request: segment is not low level consumer segment
-    response = _webTarget.path(String.format("/segments/%s/%s", TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), _realtimeIndexSegments.get(0).getSegmentName())).request().post(null);
+    response = _webTarget.path(String.format("/segments/%s/%s/upload", TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), _realtimeIndexSegments.get(0).getSegmentName())).request().post(null);
     Assert.assertEquals(response.getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
 
     // Verify non-existent segment uploading fail with NOT_FOUND status.
-    response = _webTarget.path(String.format("/segments/%s/%s_dummy", TABLE_NAME, LLC_SEGMENT_NAME)).request().post(null);
+    response = _webTarget.path(String.format("/segments/%s/%s_dummy/upload", TABLE_NAME, LLC_SEGMENT_NAME)).request().post(null);
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }
 

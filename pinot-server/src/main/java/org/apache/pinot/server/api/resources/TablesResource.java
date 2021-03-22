@@ -245,7 +245,7 @@ public class TablesResource {
 
   // Upload a low level consumer segment to segment store and return the segment download url
   @POST
-  @Path("/segments/{realtimeTableName}/{segmentName}")
+  @Path("/segments/{realtimeTableName}/{segmentName}/upload")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Upload a low level consumer segment to segment store and return the segment download url", notes = "Upload a low level consumer segment to segment store and return the segment download url")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class), @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class), @ApiResponse(code = 400, message = "Bad request", response = ErrorInfo.class)})
