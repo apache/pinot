@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.combine;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.PriorityQueue;
@@ -27,7 +26,6 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.operator.query.SelectionOrderByOperator;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -43,24 +41,16 @@ import org.slf4j.LoggerFactory;
  * skip processing some segments based on the column min/max value. Otherwise fall back to the default combine
  * (process all segments).
  */
-@SuppressWarnings({"rawtypes", "unchecked"})
+@SuppressWarnings("rawtypes")
 public class SelectionOrderByCombineOperator extends BaseCombineOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SelectionOrderByCombineOperator.class);
   private static final String OPERATOR_NAME = "SelectionOrderByCombineOperator";
 
-  private final List<Operator> _operators;
-  private final QueryContext _queryContext;
-  private final ExecutorService _executorService;
-  private final long _endTimeMs;
   private final int _numRowsToKeep;
 
   public SelectionOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService, long endTimeMs) {
     super(operators, queryContext, executorService, endTimeMs);
-    _operators = operators;
-    _queryContext = queryContext;
-    _executorService = executorService;
-    _endTimeMs = endTimeMs;
     _numRowsToKeep = queryContext.getLimit() + queryContext.getOffset();
   }
 
@@ -83,62 +73,14 @@ public class SelectionOrderByCombineOperator extends BaseCombineOperator {
     List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
     assert orderByExpressions != null;
     if (orderByExpressions.get(0).getExpression().getType() == ExpressionContext.Type.IDENTIFIER) {
-      return tryMinMaxValueBasedCombine(orderByExpressions);
-    } else {
-      // Fall back to the default combine (process all segments) when segments have different data types for the first
-      // order-by column
-      return super.getNextBlock();
-    }
-  }
-
-  private IntermediateResultsBlock tryMinMaxValueBasedCombine(List<OrderByExpressionContext> orderByExpressions) {
-    int numOrderByExpressions = orderByExpressions.size();
-    assert numOrderByExpressions > 0;
-    OrderByExpressionContext firstOrderByExpression = orderByExpressions.get(0);
-    assert firstOrderByExpression.getExpression().getType() == ExpressionContext.Type.IDENTIFIER;
-    String firstOrderByColumn = firstOrderByExpression.getExpression().getIdentifier();
-    boolean asc = firstOrderByExpression.isAsc();
-
-    int numOperators = _operators.size();
-    List<MinMaxValueContext> minMaxValueContexts = new ArrayList<>(numOperators);
-    for (Operator operator : _operators) {
-      minMaxValueContexts.add(new MinMaxValueContext((SelectionOrderByOperator) operator, firstOrderByColumn));
-    }
-    try {
-      if (asc) {
-        // For ascending order, sort on column min value in ascending order
-        minMaxValueContexts.sort((o1, o2) -> {
-          // Put segments without column min value in the front because we always need to process them
-          if (o1._minValue == null) {
-            return o2._minValue == null ? 0 : -1;
-          }
-          if (o2._minValue == null) {
-            return 1;
-          }
-          return o1._minValue.compareTo(o2._minValue);
-        });
-      } else {
-        // For descending order, sort on column max value in descending order
-        minMaxValueContexts.sort((o1, o2) -> {
-          // Put segments without column max value in the front because we always need to process them
-          if (o1._maxValue == null) {
-            return o2._maxValue == null ? 0 : -1;
-          }
-          if (o2._maxValue == null) {
-            return 1;
-          }
-          return o2._maxValue.compareTo(o1._maxValue);
-        });
+      try {
+        return new MinMaxValueBasedSelectionOrderByCombineOperator(_operators, _queryContext, _executorService,
+            _endTimeMs).getNextBlock();
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception while using min/max value based combine, using the default combine", e);
       }
-    } catch (Exception e) {
-      // Fall back to the default combine (process all segments) if there are any exceptions.
-      LOGGER.warn("Segments have different data types for the first order-by column: {}, using the default combine",
-          firstOrderByColumn);
-      return super.getNextBlock();
     }
-
-    return new MinMaxValueBasedSelectionOrderByCombineOperator(_operators, _queryContext, _executorService, _endTimeMs,
-        minMaxValueContexts).getNextBlock();
+    return super.getNextBlock();
   }
 
   @Override

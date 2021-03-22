@@ -26,7 +26,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -49,7 +48,7 @@ import org.slf4j.LoggerFactory;
  * TODO: Use CombineOperatorUtils.getNumThreadsForQuery() to get the parallelism of the query instead of using
  *   all threads
  */
-@SuppressWarnings("rawtypes")
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class GroupByCombineOperator extends BaseCombineOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(GroupByCombineOperator.class);
   private static final String OPERATOR_NAME = "GroupByCombineOperator";
@@ -70,11 +69,6 @@ public class GroupByCombineOperator extends BaseCombineOperator {
   private final int _numAggregationFunctions;
   // We use a CountDownLatch to track if all Futures are finished by the query timeout, and cancel the unfinished
   // _futures (try to interrupt the execution if it already started).
-  // Besides the CountDownLatch, we also use a Phaser to ensure all the Futures are done (not scheduled, finished or
-  // interrupted) before the main thread returns. We need to ensure no execution left before the main thread returning
-  // because the main thread holds the reference to the segments, and if the segments are deleted/refreshed, the
-  // segments can be released after the main thread returns, which would lead to undefined behavior (even JVM crash)
-  // when executing queries against them.
   private final CountDownLatch _operatorLatch;
 
   public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
@@ -88,27 +82,20 @@ public class GroupByCombineOperator extends BaseCombineOperator {
     _aggregationFunctions = _queryContext.getAggregationFunctions();
     assert _aggregationFunctions != null;
     _numAggregationFunctions = _aggregationFunctions.length;
-    int numOperators = _operators.size();
-    _operatorLatch = new CountDownLatch(numOperators);
+    _operatorLatch = new CountDownLatch(_numOperators);
+  }
+
+  @Override
+  public String getOperatorName() {
+    return OPERATOR_NAME;
   }
 
   /**
-   * {@inheritDoc}
-   *
-   * <p> Execute query on one or more segments in a single thread, and store multiple intermediate result blocks into a
-   * map
+   * Executes query on one segment in a worker thread and merges the results into the results map.
    */
   @Override
   protected void processSegments(int threadIndex) {
     try {
-      // Register the thread to the _phaser.
-      // If the _phaser is terminated (returning negative value) when trying to register the thread, that means the
-      // query execution has timed out, and the main thread has deregistered itself and returned the result.
-      // Directly return as no execution result will be taken.
-      if (_phaser.register() < 0) {
-        return;
-      }
-
       IntermediateResultsBlock intermediateResultsBlock =
           (IntermediateResultsBlock) _operators.get(threadIndex).nextBlock();
 
@@ -153,7 +140,6 @@ public class GroupByCombineOperator extends BaseCombineOperator {
       _mergedProcessingExceptions.add(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
     } finally {
       _operatorLatch.countDown();
-      _phaser.arriveAndDeregister();
     }
   }
 
@@ -177,57 +163,39 @@ public class GroupByCombineOperator extends BaseCombineOperator {
    * </ul>
    */
   @Override
-  protected IntermediateResultsBlock mergeResultsFromSegments() {
-    try {
-      long timeoutMs = _endTimeMs - System.currentTimeMillis();
-      boolean opCompleted = _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
-      if (!opCompleted) {
-        // If this happens, the broker side should already timed out, just log the error and return
-        String errorMessage = String
-            .format("Timed out while combining group-by results after %dms, queryContext = %s", timeoutMs,
-                _queryContext);
-        LOGGER.error(errorMessage);
-        return new IntermediateResultsBlock(new TimeoutException(errorMessage));
-      }
-
-      // Trim the results map.
-      AggregationGroupByTrimmingService aggregationGroupByTrimmingService =
-          new AggregationGroupByTrimmingService(_queryContext);
-      List<Map<String, Object>> trimmedResults =
-          aggregationGroupByTrimmingService.trimIntermediateResultsMap(_resultsMap);
-      IntermediateResultsBlock mergedBlock = new IntermediateResultsBlock(_aggregationFunctions, trimmedResults, true);
-
-      // Set the processing exceptions.
-      if (!_mergedProcessingExceptions.isEmpty()) {
-        mergedBlock.setProcessingExceptions(new ArrayList<>(_mergedProcessingExceptions));
-      }
-      // TODO: this value should be set in the inner-segment operators. Setting it here might cause false positive as we
-      //       are comparing number of groups across segments with the groups limit for each segment.
-      if (_resultsMap.size() >= _innerSegmentNumGroupsLimit) {
-        mergedBlock.setNumGroupsLimitReached(true);
-      }
-
-      return mergedBlock;
-    } catch (Exception e) {
-      return new IntermediateResultsBlock(e);
-    } finally {
-      // Cancel all ongoing jobs
-      for (Future future : _futures) {
-        if (!future.isDone()) {
-          future.cancel(true);
-        }
-      }
-      // Deregister the main thread and wait for all threads done
-      _phaser.awaitAdvance(_phaser.arriveAndDeregister());
+  protected IntermediateResultsBlock mergeResults()
+      throws Exception {
+    long timeoutMs = _endTimeMs - System.currentTimeMillis();
+    boolean opCompleted = _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
+    if (!opCompleted) {
+      // If this happens, the broker side should already timed out, just log the error and return
+      String errorMessage = String
+          .format("Timed out while combining group-by results after %dms, queryContext = %s", timeoutMs, _queryContext);
+      LOGGER.error(errorMessage);
+      return new IntermediateResultsBlock(new TimeoutException(errorMessage));
     }
+
+    // Trim the results map.
+    AggregationGroupByTrimmingService aggregationGroupByTrimmingService =
+        new AggregationGroupByTrimmingService(_queryContext);
+    List<Map<String, Object>> trimmedResults =
+        aggregationGroupByTrimmingService.trimIntermediateResultsMap(_resultsMap);
+    IntermediateResultsBlock mergedBlock = new IntermediateResultsBlock(_aggregationFunctions, trimmedResults, true);
+
+    // Set the processing exceptions.
+    if (!_mergedProcessingExceptions.isEmpty()) {
+      mergedBlock.setProcessingExceptions(new ArrayList<>(_mergedProcessingExceptions));
+    }
+    // TODO: this value should be set in the inner-segment operators. Setting it here might cause false positive as we
+    //       are comparing number of groups across segments with the groups limit for each segment.
+    if (_resultsMap.size() >= _innerSegmentNumGroupsLimit) {
+      mergedBlock.setNumGroupsLimitReached(true);
+    }
+
+    return mergedBlock;
   }
 
   @Override
   protected void mergeResultsBlocks(IntermediateResultsBlock mergedBlock, IntermediateResultsBlock blockToMerge) {
-  }
-
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
   }
 }
