@@ -443,7 +443,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       LOGGER.info("requestId={},table={},timeMs={},docs={}/{},entries={}/{},"
               + "segments(queried/processed/matched/consuming/unavailable):{}/{}/{}/{}/{},consumingFreshnessTimeMs={},"
               + "servers={}/{},groupLimitReached={},brokerReduceTimeMs={},exceptions={},serverStats={},query={},"
-              + "offlineThreadCpuTimeNs={},realtimeThreadCpuTimeNs={}", requestId,
+              + "offlineThreadCpuTimeNs={},realtimeThreadCpuTimeNs={},invalidColumnsInQuery={}", requestId,
           brokerRequest.getQuerySource().getTableName(), totalTimeMs, brokerResponse.getNumDocsScanned(),
           brokerResponse.getTotalDocs(), brokerResponse.getNumEntriesScannedInFilter(),
           brokerResponse.getNumEntriesScannedPostFilter(), brokerResponse.getNumSegmentsQueried(),
@@ -453,7 +453,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           brokerResponse.getNumServersQueried(), brokerResponse.isNumGroupsLimitReached(),
           requestStatistics.getReduceTimeMillis(), brokerResponse.getExceptionsSize(), serverStats.getServerStats(),
           StringUtils.substring(query, 0, _queryLogLength), brokerResponse.getOfflineThreadCpuTimeNs(),
-          brokerResponse.getRealtimeThreadCpuTimeNs());
+          brokerResponse.getRealtimeThreadCpuTimeNs(), brokerResponse.getInvalidColumnsInQuery());
 
       // Limit the dropping log message at most once per second.
       if (_numDroppedLogRateLimiter.tryAcquire()) {

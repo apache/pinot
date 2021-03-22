@@ -63,6 +63,7 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _timeUsedMs = 0L;
   private long _offlineThreadCpuTimeNs = 0L;
   private long _realtimeThreadCpuTimeNs = 0L;
+  private String _invalidColumnsInQuery = null;
 
   private SelectionResults _selectionResults;
   private List<AggregationResult> _aggregationResults;
@@ -291,7 +292,6 @@ public class BrokerResponseNative implements BrokerResponse {
     _offlineThreadCpuTimeNs = timeUsedMs;
   }
 
-
   @JsonProperty("realtimeThreadCpuTimeNs")
   @Override
   public long getRealtimeThreadCpuTimeNs() {
@@ -302,6 +302,18 @@ public class BrokerResponseNative implements BrokerResponse {
   @Override
   public void setRealtimeThreadCpuTimeNs(long timeUsedMs) {
     _realtimeThreadCpuTimeNs = timeUsedMs;
+  }
+
+  @JsonProperty("invalidColumnsInQuery")
+  @Override
+  public void setInvalidColumnsInQuery(String invalidColumnsInQuery) {
+    _invalidColumnsInQuery = invalidColumnsInQuery;
+  }
+
+  @JsonProperty("invalidColumnsInQuery")
+  @Override
+  public String getInvalidColumnsInQuery() {
+    return _invalidColumnsInQuery;
   }
 
   @JsonProperty("segmentStatistics")

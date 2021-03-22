@@ -35,7 +35,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
-import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.proto.Server;
@@ -1548,29 +1547,15 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     List<String> segments = _helixResourceManager.getSegmentsFor("mytable_OFFLINE");
 
     GrpcRequestBuilder requestBuilder = new GrpcRequestBuilder().setSegments(segments);
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        return testNonStreamingRequest(queryClient.submit(requestBuilder.setSql(sql).build()))
-            && testNonStreamingRequest(queryClient.submit(requestBuilder.setBrokerRequest(brokerRequest).build()));
-      } catch (Exception e) {
-        Utils.rethrowException(e);
-        return false;
-      }
-    }, 60_000L, "Failed to test non-streaming request");
+    testNonStreamingRequest(queryClient.submit(requestBuilder.setSql(sql).build()));
+    testNonStreamingRequest(queryClient.submit(requestBuilder.setBrokerRequest(brokerRequest).build()));
 
     requestBuilder.setEnableStreaming(true);
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        return testStreamingRequest(queryClient.submit(requestBuilder.setSql(sql).build()))
-            && testStreamingRequest(queryClient.submit(requestBuilder.setBrokerRequest(brokerRequest).build()));
-      } catch (Exception e) {
-        Utils.rethrowException(e);
-        return false;
-      }
-    }, 60_000L, "Failed to test streaming request");
+    testStreamingRequest(queryClient.submit(requestBuilder.setSql(sql).build()));
+    testStreamingRequest(queryClient.submit(requestBuilder.setBrokerRequest(brokerRequest).build()));
   }
 
-  private boolean testNonStreamingRequest(Iterator<Server.ServerResponse> nonStreamingResponses)
+  private void testNonStreamingRequest(Iterator<Server.ServerResponse> nonStreamingResponses)
       throws Exception {
     int expectedNumDocs = (int) getCountStarResult();
     assertTrue(nonStreamingResponses.hasNext());
@@ -1579,14 +1564,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         CommonConstants.Query.Response.ResponseType.NON_STREAMING);
     DataTable dataTable = DataTableFactory.getDataTable(nonStreamingResponse.getPayload().asReadOnlyByteBuffer());
     assertNotNull(dataTable.getDataSchema());
-    if (dataTable.getNumberOfRows() != expectedNumDocs) {
-      return false;
-    }
+    assertEquals(dataTable.getNumberOfRows(), expectedNumDocs);
     Map<String, String> metadata = dataTable.getMetadata();
-    return Integer.toString(expectedNumDocs).equals(metadata.get(DataTable.NUM_DOCS_SCANNED_METADATA_KEY));
+    assertEquals(metadata.get(MetadataKey.NUM_DOCS_SCANNED.getName()), Integer.toString(expectedNumDocs));
   }
 
-  private boolean testStreamingRequest(Iterator<Server.ServerResponse> streamingResponses)
+  private void testStreamingRequest(Iterator<Server.ServerResponse> streamingResponses)
       throws Exception {
     int expectedNumDocs = (int) getCountStarResult();
     int numTotalDocs = 0;
@@ -1603,20 +1586,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         numTotalDocs += dataTable.getNumberOfRows();
       } else {
         assertEquals(responseType, CommonConstants.Query.Response.ResponseType.METADATA);
-        if (!CommonConstants.Query.Response.ResponseType.METADATA.equals(responseType)) {
-          return false;
-        }
         assertFalse(streamingResponses.hasNext());
         assertEquals(numTotalDocs, expectedNumDocs);
         assertNull(dataTable.getDataSchema());
         assertEquals(dataTable.getNumberOfRows(), 0);
         Map<String, String> metadata = dataTable.getMetadata();
-        if (!Integer.toString(expectedNumDocs).equals(metadata.get(DataTable.NUM_DOCS_SCANNED_METADATA_KEY))) {
-          return false;
-        }
+        assertEquals(metadata.get(MetadataKey.NUM_DOCS_SCANNED.getName()), Integer.toString(expectedNumDocs));
       }
     }
-    return true;
   }
 
   @Test

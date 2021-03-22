@@ -209,9 +209,9 @@ public class BrokerReduceService {
       }
       numGroupsLimitReached |= Boolean.parseBoolean(metadata.get(MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName()));
 
-      String invalidColumnNamesString = metadata.get(DataTable.INVALID_COLUMN_IN_QUERY_KEY);
-      if (invalidColumnNamesString != null) {
-        invalidColumnNames = invalidColumnNames == null ? invalidColumnNamesString : invalidColumnNames;
+      String invalidColumnNamesString = metadata.get(MetadataKey.INVALID_COLUMNS_IN_QUERY.getName());
+      if (invalidColumnNames == null && invalidColumnNamesString != null) {
+        invalidColumnNames =  invalidColumnNamesString;
       }
 
       // After processing the metadata, remove data tables without data rows inside.
@@ -265,7 +265,8 @@ public class BrokerReduceService {
       }
 
       if (invalidColumnNames != null) {
-        brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.INVALID_COLUMN_NAME_IN_QUERY, 1L);
+        brokerResponseNative.setInvalidColumnsInQuery(invalidColumnNames);
+        brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.INVALID_COLUMN_NAMES_IN_QUERY, 1L);
       }
     }
 

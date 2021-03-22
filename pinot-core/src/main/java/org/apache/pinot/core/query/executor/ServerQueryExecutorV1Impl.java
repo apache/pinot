@@ -261,18 +261,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       ExecutorService executorService, @Nullable StreamObserver<Server.ServerResponse> responseObserver, long endTimeMs,
       boolean enableStreaming)
       throws Exception {
-
-    // Validate whether column names in the query are valid
-    Set<String> columnNamesFromSchema = _instanceDataManager.getColumnNamesByTable(queryContext.getTableName());
-    Set<String> columnNamesFromQuery = queryContext.getColumns();
-    if (!columnNamesFromSchema.isEmpty() && !columnNamesFromSchema.containsAll(columnNamesFromQuery)) {
-      columnNamesFromQuery.removeAll(columnNamesFromSchema);
-      DataTable dataTable = enableStreaming ? new DataTableImplV2() : DataTableUtils.buildEmptyDataTable(queryContext);
-      setDefaultValuesForEmptyDataTable(dataTable, 0L);
-      dataTable.getMetadata().put(DataTable.INVALID_COLUMN_IN_QUERY_KEY, columnNamesFromQuery.toString());
-      return dataTable;
-    }
-
     handleSubquery(queryContext, indexSegments, timerContext, executorService, endTimeMs);
 
     // Compute total docs for the table before pruning the segments
@@ -288,8 +276,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     LOGGER.debug("Matched {} segments after pruning", numSelectedSegments);
     if (numSelectedSegments == 0) {
       // Only return metadata for streaming query
-      DataTable dataTable = enableStreaming ? DataTableBuilder.getEmptyDataTable() : DataTableUtils.buildEmptyDataTable(queryContext);
+      DataTable dataTable =
+          enableStreaming ? DataTableBuilder.getEmptyDataTable() : DataTableUtils.buildEmptyDataTable(queryContext);
       setDefaultValuesForEmptyDataTable(dataTable, numTotalDocs);
+      detectInvalidColumnIfExists(queryContext, dataTable);
       return dataTable;
     } else {
       TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
@@ -306,6 +296,21 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       dataTable.getMetadata().put(MetadataKey.TOTAL_DOCS.getName(), Long.toString(numTotalDocs));
 
       return dataTable;
+    }
+  }
+
+  /**
+   * If all the segments are pruned, check whether it's caused by invalid column name in the query.
+   * This is to keep the behavior consistent when new columns are added and not all the segments have the new columns in their metadata;
+   * old segments may contain stale schema until the table is reloaded.
+   */
+  private void detectInvalidColumnIfExists(QueryContext queryContext, DataTable dataTable) {
+    Set<String> columnNamesFromSchema = _instanceDataManager.getColumnNamesByTable(queryContext.getTableName());
+    Set<String> columnNamesFromQuery = queryContext.getColumns();
+    // Validate whether column names in the query are valid
+    if (!columnNamesFromSchema.isEmpty() && !columnNamesFromSchema.containsAll(columnNamesFromQuery)) {
+      columnNamesFromQuery.removeAll(columnNamesFromSchema);
+      dataTable.getMetadata().put(MetadataKey.INVALID_COLUMNS_IN_QUERY.getName(), columnNamesFromQuery.toString());
     }
   }
 

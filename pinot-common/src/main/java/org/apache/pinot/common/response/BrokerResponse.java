@@ -62,6 +62,11 @@ public interface BrokerResponse {
   void setOfflineThreadCpuTimeNs(long offlineThreadCpuTimeNs);
 
   /**
+   * Set invalid columns in query.
+   */
+  void setInvalidColumnsInQuery(String invalidColumnsInQuery);
+
+  /**
    * Convert the broker response to JSON String.
    */
   String toJsonString()
@@ -146,4 +151,9 @@ public interface BrokerResponse {
    * Get the total thread cpu time used against offline table in request handling, into the broker response.
    */
   long getOfflineThreadCpuTimeNs();
+
+  /**
+   * Get invalid columns in query.
+   */
+  String getInvalidColumnsInQuery();
 }
