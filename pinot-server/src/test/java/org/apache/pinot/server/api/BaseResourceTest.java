@@ -31,7 +31,6 @@ import javax.ws.rs.client.WebTarget;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.http.util.NetUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.CommonConstants;
@@ -69,7 +68,8 @@ public abstract class BaseResourceTest {
   private static final String AVRO_DATA_PATH = "data/test_data-mv.avro";
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "BaseResourceTest");
   protected static final String TABLE_NAME = "testTable";
-  protected static final String LLC_SEGMENT_NAME = new LLCSegmentName(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), 1, 0, System.currentTimeMillis()).getSegmentName();
+  protected static final String LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS = new LLCSegmentName(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), 1, 0, System.currentTimeMillis()).getSegmentName();
+  protected static final String LLC_SEGMENT_NAME_FOR_UPLOAD_FAILURE = new LLCSegmentName(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), 2, 0, System.currentTimeMillis()).getSegmentName();
   protected static final String SEGMENT_DOWNLOAD_URL = "testSegmentDownloadUrl";
 
   private final Map<String, TableDataManager> _tableDataManagerMap = new HashMap<>();
@@ -103,7 +103,8 @@ public abstract class BaseResourceTest {
 
     // Mock the segment uploader
     SegmentUploader segmentUploader = mock(SegmentUploader.class);
-    when(segmentUploader.uploadSegment(any(File.class), eq(new LLCSegmentName(LLC_SEGMENT_NAME)))).thenReturn(new URI(SEGMENT_DOWNLOAD_URL));
+    when(segmentUploader.uploadSegment(any(File.class), eq(new LLCSegmentName(LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS)))).thenReturn(new URI(SEGMENT_DOWNLOAD_URL));
+    when(segmentUploader.uploadSegment(any(File.class), eq(new LLCSegmentName(LLC_SEGMENT_NAME_FOR_UPLOAD_FAILURE)))).thenReturn(null);
     when(instanceDataManager.getSegmentUploader()).thenReturn(segmentUploader);
 
     // Add the default tables and segments.

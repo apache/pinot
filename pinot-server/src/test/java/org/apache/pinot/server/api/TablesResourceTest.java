@@ -213,10 +213,12 @@ public class TablesResourceTest extends BaseResourceTest {
 
   @Test
   public void testUploadSegments() throws Exception {
-    setUpSegment(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), LLC_SEGMENT_NAME, null, _realtimeIndexSegments);
+    setUpSegment(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS, null, _realtimeIndexSegments);
+    setUpSegment(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), LLC_SEGMENT_NAME_FOR_UPLOAD_FAILURE, null, _realtimeIndexSegments);
 
     // Verify segment uploading succeed.
-    Response response = _webTarget.path(String.format("/segments/%s/%s/upload", TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), LLC_SEGMENT_NAME)).request().post(null);
+    Response response = _webTarget.path(String.format("/segments/%s/%s/upload", TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
+        LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS)).request().post(null);
     Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
     Assert.assertEquals(response.readEntity(String.class), SEGMENT_DOWNLOAD_URL);
 
@@ -229,8 +231,14 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(response.getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
 
     // Verify non-existent segment uploading fail with NOT_FOUND status.
-    response = _webTarget.path(String.format("/segments/%s/%s_dummy/upload", TABLE_NAME, LLC_SEGMENT_NAME)).request().post(null);
+    response = _webTarget.path(String.format("/segments/%s/%s_dummy/upload", TABLE_NAME,
+        LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS)).request().post(null);
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+
+    // Verify fail to upload segment to segment store with internal server error.
+    response = _webTarget.path(String.format("/segments/%s/%s/upload", TABLE_NAME,
+        LLC_SEGMENT_NAME_FOR_UPLOAD_FAILURE)).request().post(null);
+    Assert.assertEquals(response.getStatus(), Response.Status.INTERNAL_SERVER_ERROR.getStatusCode());
   }
 
   @Test

@@ -46,8 +46,6 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
-
-import joptsimple.internal.Strings;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
@@ -251,7 +249,11 @@ public class TablesResource {
     }
   }
 
-  // Upload a low level consumer segment to segment store and return the segment download url
+  /**
+   * Upload a low level consumer segment to segment store and return the segment download url. This endpoint is used when segment store copy is unavailable for committed low level consumer segments.
+   * Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment to upload it.
+   * @see <a href="https://cwiki.apache.org/confluence/display/PINOT/By-passing+deep-store+requirement+for+Realtime+segment+completion#BypassingdeepstorerequirementforRealtimesegmentcompletion-Failurecasesandhandling">By-passing deep-store requirement for Realtime segment completion:Failure cases and handling</a>
+   */
   @POST
   @Path("/segments/{realtimeTableName}/{segmentName}/upload")
   @Produces(MediaType.APPLICATION_JSON)
@@ -300,7 +302,12 @@ public class TablesResource {
       // Use segment uploader to upload the segment tar file to segment store and return the segment download url.
       SegmentUploader segmentUploader = _serverInstance.getInstanceDataManager().getSegmentUploader();
       URI segmentDownloadUrl = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName));
-      return segmentDownloadUrl == null ? Strings.EMPTY : segmentDownloadUrl.getPath();
+      if (segmentDownloadUrl == null) {
+        throw new WebApplicationException(
+            String.format("Failed to upload table %s segment %s to segment store", realtimeTableName, segmentName),
+            Response.Status.INTERNAL_SERVER_ERROR);
+      }
+      return segmentDownloadUrl.getPath();
     } finally {
       FileUtils.deleteQuietly(segmentTarFile);
       tableDataManager.releaseSegment(segmentDataManager);
