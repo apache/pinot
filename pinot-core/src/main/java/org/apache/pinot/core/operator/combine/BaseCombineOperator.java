@@ -127,13 +127,7 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
       // Deregister the main thread and wait for all threads done
       phaser.awaitAdvance(phaser.arriveAndDeregister());
     }
-
-    /*
-     * TODO: setThreadTime logic can be put into CombineOperatorUtils.setExecutionStatistics(),
-     *   after we extends StreamingSelectionOnlyCombineOperator from BaseCombineOperator.
-     */
-    mergedBlock.setThreadCpuTimeNs(totalWorkerThreadCpuTimeNs.get());
-    CombineOperatorUtils.setExecutionStatistics(mergedBlock, _operators);
+    CombineOperatorUtils.setExecutionStatistics(mergedBlock, _operators, totalWorkerThreadCpuTimeNs.get());
     return mergedBlock;
   }
 
