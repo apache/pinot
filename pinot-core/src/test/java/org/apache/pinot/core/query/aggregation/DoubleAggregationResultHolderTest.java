@@ -16,11 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.aggregation;
+package org.apache.pinot.core.query.aggregation;
 
 import java.util.Random;
-import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.DoubleAggregationResultHolder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
