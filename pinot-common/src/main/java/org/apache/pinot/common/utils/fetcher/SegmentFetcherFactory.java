@@ -155,47 +155,6 @@ public class SegmentFetcherFactory {
   }
 
   /**
-   * Fetches a segment from a given URI and untar the segment file to the dest dir (i.e., tableDataDir + segmentName).
-   */
-  public static void fetchAndUntarSegmentToLocal(String uri, File tableDataDir, String segmentName)
-      throws Exception {
-    File tempDir = new File(tableDataDir, "tmp-" + segmentName + "-" + UUID.randomUUID());
-    FileUtils.forceMkdir(tempDir);
-    File tempTarFile = new File(tempDir, segmentName + TAR_GZ_SUFFIX);
-    File tempSegmentDir = new File(tempDir, segmentName);
-    try {
-      try {
-        SegmentFetcherFactory.fetchSegmentToLocal(uri, tempTarFile);
-        LOGGER.info("Downloaded tarred segment: {} from: {} to: {}, file length: {}", segmentName, uri, tempTarFile,
-            tempTarFile.length());
-      } catch (AttemptsExceededException e) {
-        LOGGER.error("Attempts exceeded when downloading segment: {} from: {} to: {}", segmentName, uri,
-            tempTarFile, e);
-        Utils.rethrowException(e);
-      }
-
-      try {
-        // If an exception is thrown when untarring, it means the tar file is broken OR not found after the retry.
-        // Thus, there's no need to retry again.
-        File tempIndexDir = TarGzCompressionUtils.untar(tempTarFile, tempSegmentDir).get(0);
-        File segmentDir = new File(tableDataDir, segmentName);
-        if (segmentDir.exists()) {
-          LOGGER.info("Deleting existing index directory for segment: {}", segmentName);
-          FileUtils.deleteDirectory(segmentDir);
-        }
-        FileUtils.moveDirectory(tempIndexDir, segmentDir);
-        LOGGER.info("Successfully downloaded segment: {} to: {}", segmentName, segmentDir);
-      } catch (Exception e) {
-        LOGGER.error("Exception when untarring segment: {} from {} to {}", segmentName, tempTarFile, tempSegmentDir,
-            e);
-        Utils.rethrowException(e);
-      }
-    } finally {
-      FileUtils.deleteQuietly(tempDir);
-    }
-  }
-
-  /**
    * Fetches a segment from a URI location to a local file and decrypts it if needed
    * @param uri remote segment location
    * @param dest local file

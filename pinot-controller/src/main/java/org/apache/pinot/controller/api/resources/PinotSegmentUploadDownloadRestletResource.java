@@ -32,6 +32,7 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.nio.file.Files;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executor;
@@ -419,8 +420,8 @@ public class PinotSegmentUploadDownloadRestletResource {
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(
-          uploadSegment(tableName, "OFFLINE".equalsIgnoreCase(tableType) ? TableType.OFFLINE : TableType.REALTIME, null,
-              enableParallelPushProtection, headers, request, false));
+          uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), null, enableParallelPushProtection,
+              headers, request, false));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -441,8 +442,8 @@ public class PinotSegmentUploadDownloadRestletResource {
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(
-          uploadSegment(tableName, "OFFLINE".equalsIgnoreCase(tableType) ? TableType.OFFLINE : TableType.REALTIME,
-              multiPart, enableParallelPushProtection, headers, request, true));
+          uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), multiPart, enableParallelPushProtection,
+              headers, request, true));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -465,8 +466,8 @@ public class PinotSegmentUploadDownloadRestletResource {
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(
-          uploadSegment(tableName, "OFFLINE".equalsIgnoreCase(tableType) ? TableType.OFFLINE : TableType.REALTIME, null,
-              enableParallelPushProtection, headers, request, true));
+          uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), null, enableParallelPushProtection,
+              headers, request, true));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -487,8 +488,8 @@ public class PinotSegmentUploadDownloadRestletResource {
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(
-          uploadSegment(tableName, "OFFLINE".equalsIgnoreCase(tableType) ? TableType.OFFLINE : TableType.REALTIME,
-              multiPart, enableParallelPushProtection, headers, request, true));
+          uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), multiPart, enableParallelPushProtection,
+              headers, request, true));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
