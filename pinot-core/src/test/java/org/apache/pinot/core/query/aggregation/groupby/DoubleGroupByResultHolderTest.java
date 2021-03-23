@@ -16,11 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.aggregation.groupby;
+package org.apache.pinot.core.query.aggregation.groupby;
 
 import java.util.Random;
-import org.apache.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder;
-import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.testng.Assert;
 import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;

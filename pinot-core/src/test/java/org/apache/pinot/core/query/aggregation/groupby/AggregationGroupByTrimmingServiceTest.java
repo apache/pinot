@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.aggregation.groupby;
+package org.apache.pinot.core.query.aggregation.groupby;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.util.ArrayList;
@@ -28,8 +28,6 @@ import java.util.Random;
 import java.util.Set;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.common.response.broker.GroupByResult;
-import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
-import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.testng.Assert;

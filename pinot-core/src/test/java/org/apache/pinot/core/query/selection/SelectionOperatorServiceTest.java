@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.selection;
+package org.apache.pinot.core.query.selection;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -33,8 +33,6 @@ import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
-import org.apache.pinot.core.query.selection.SelectionOperatorService;
-import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
