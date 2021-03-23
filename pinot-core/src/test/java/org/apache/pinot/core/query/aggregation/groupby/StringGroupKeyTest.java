@@ -16,9 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.aggregation.groupby;
+package org.apache.pinot.core.query.aggregation.groupby;
 
-import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

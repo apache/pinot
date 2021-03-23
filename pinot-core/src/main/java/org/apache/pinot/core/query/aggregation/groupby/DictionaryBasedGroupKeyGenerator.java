@@ -64,11 +64,20 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   private static final int INITIAL_MAP_SIZE = (int) ((1 << 9) * 0.75f);
   private static final int MAX_CACHING_MAP_SIZE = (int) ((1 << 20) * 0.75f);
 
-  private static final ThreadLocal<IntGroupIdMap> THREAD_LOCAL_INT_MAP = ThreadLocal.withInitial(IntGroupIdMap::new);
-  private static final ThreadLocal<Long2IntOpenHashMap> THREAD_LOCAL_LONG_MAP =
-      ThreadLocal.withInitial(() -> new Long2IntOpenHashMap(INITIAL_MAP_SIZE));
-  private static final ThreadLocal<Object2IntOpenHashMap<IntArray>> THREAD_LOCAL_INT_ARRAY_MAP =
-      ThreadLocal.withInitial(() -> new Object2IntOpenHashMap<>(INITIAL_MAP_SIZE));
+  @VisibleForTesting
+  static final ThreadLocal<IntGroupIdMap> THREAD_LOCAL_INT_MAP = ThreadLocal.withInitial(IntGroupIdMap::new);
+  @VisibleForTesting
+  static final ThreadLocal<Long2IntOpenHashMap> THREAD_LOCAL_LONG_MAP = ThreadLocal.withInitial(() -> {
+    Long2IntOpenHashMap map = new Long2IntOpenHashMap(INITIAL_MAP_SIZE);
+    map.defaultReturnValue(INVALID_ID);
+    return map;
+  });
+  @VisibleForTesting
+  static final ThreadLocal<Object2IntOpenHashMap<IntArray>> THREAD_LOCAL_INT_ARRAY_MAP = ThreadLocal.withInitial(() -> {
+    Object2IntOpenHashMap<IntArray> map = new Object2IntOpenHashMap<>(INITIAL_MAP_SIZE);
+    map.defaultReturnValue(INVALID_ID);
+    return map;
+  });
 
   private final ExpressionContext[] _groupByExpressions;
   private final int _numGroupByExpressions;
@@ -1085,8 +1094,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   /**
    * Drop un-necessary checks for highest performance.
    */
+  @VisibleForTesting
   @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
-  private static class IntArray {
+  static class IntArray {
     public int[] _elements;
 
     public IntArray(int[] elements) {

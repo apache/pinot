@@ -16,8 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.aggregation.groupby;
+package org.apache.pinot.core.query.aggregation.groupby;
 
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -40,8 +42,6 @@ import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.plan.TransformPlanNode;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
-import org.apache.pinot.core.query.aggregation.groupby.DictionaryBasedGroupKeyGenerator;
-import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
@@ -421,6 +421,17 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     assertEquals(count, numUniqueKeys, _errorMessage);
     assertEquals(idSet.size(), numUniqueKeys, _errorMessage);
     assertEquals(groupKeySet.size(), numUniqueKeys, _errorMessage);
+  }
+
+  @Test
+  public void testMapDefaultValue() {
+    Long2IntOpenHashMap longMap = DictionaryBasedGroupKeyGenerator.THREAD_LOCAL_LONG_MAP.get();
+    assertEquals(longMap.get(0L), GroupKeyGenerator.INVALID_ID);
+
+    Object2IntOpenHashMap<DictionaryBasedGroupKeyGenerator.IntArray> intArrayMap =
+        DictionaryBasedGroupKeyGenerator.THREAD_LOCAL_INT_ARRAY_MAP.get();
+    assertEquals(intArrayMap.getInt(new DictionaryBasedGroupKeyGenerator.IntArray(new int[0])),
+        GroupKeyGenerator.INVALID_ID);
   }
 
   @AfterClass
