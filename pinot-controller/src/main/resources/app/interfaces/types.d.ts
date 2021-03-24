@@ -76,6 +76,8 @@ declare module 'Models' {
   export type IdealState = {
     OFFLINE: Object | null;
     REALTIME: Object | null;
+    code?: number;
+    error?: string;
   };
 
   export type QueryTables = {
