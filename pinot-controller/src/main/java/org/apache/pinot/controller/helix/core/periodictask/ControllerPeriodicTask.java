@@ -94,7 +94,7 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
       try {
         processTable(tableNameWithType, context);
       } catch (Exception e) {
-        LOGGER.error("Caught exception while processing table: {} in task: {}", tableNamesWithType, _taskName, e);
+        LOGGER.error("Caught exception while processing table: {} in task: {}", tableNameWithType, _taskName, e);
       }
       numTablesProcessed++;
     }
