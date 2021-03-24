@@ -71,6 +71,6 @@ public class CombineOperatorUtils {
     resultsBlock.setNumEntriesScannedInFilter(numEntriesScannedInFilter);
     resultsBlock.setNumEntriesScannedPostFilter(numEntriesScannedPostFilter);
     resultsBlock.setNumTotalDocs(numTotalDocs);
-    resultsBlock.setThreadCpuTimeNs(threadCpuTimeNs);
+    resultsBlock.setExecutionThreadCpuTimeNs(threadCpuTimeNs);
   }
 }
