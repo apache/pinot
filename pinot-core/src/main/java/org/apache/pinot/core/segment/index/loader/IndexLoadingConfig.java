@@ -212,6 +212,9 @@ public class IndexLoadingConfig {
   }
 
   private void extractFromInstanceConfig(InstanceDataManagerConfig instanceDataManagerConfig) {
+    if (instanceDataManagerConfig == null) {
+      return;
+    }
     ReadMode instanceReadMode = instanceDataManagerConfig.getReadMode();
     if (instanceReadMode != null) {
       _readMode = instanceReadMode;

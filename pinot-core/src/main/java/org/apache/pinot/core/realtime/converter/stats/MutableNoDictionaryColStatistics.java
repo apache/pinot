@@ -28,11 +28,11 @@ import org.apache.pinot.core.segment.creator.ColumnStatistics;
 import static org.apache.pinot.core.common.Constants.UNKNOWN_CARDINALITY;
 
 
-public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
+public class MutableNoDictionaryColStatistics implements ColumnStatistics {
   private final DataSourceMetadata _dataSourceMetadata;
   private final MutableForwardIndex _forwardIndex;
 
-  public RealtimeNoDictionaryColStatistics(DataSource dataSource) {
+  public MutableNoDictionaryColStatistics(DataSource dataSource) {
     _dataSourceMetadata = dataSource.getDataSourceMetadata();
     _forwardIndex = (MutableForwardIndex) dataSource.getForwardIndex();
   }

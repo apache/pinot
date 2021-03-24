@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.data.readers.IntermediateSegmentRecordReader;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
@@ -39,6 +40,7 @@ import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.core.segment.creator.ColumnStatistics;
+import org.apache.pinot.core.segment.creator.IntermediateSegmentSegmentCreationDataSource;
 import org.apache.pinot.core.segment.creator.RecordReaderSegmentCreationDataSource;
 import org.apache.pinot.core.segment.creator.SegmentCreationDataSource;
 import org.apache.pinot.core.segment.creator.SegmentCreator;
@@ -136,8 +138,15 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   public void init(SegmentGeneratorConfig config, RecordReader recordReader)
       throws Exception {
-    init(config, new RecordReaderSegmentCreationDataSource(recordReader),
-        CompositeTransformer.getDefaultTransformer(config.getTableConfig(), config.getSchema()));
+    SegmentCreationDataSource dataSource;
+    if (recordReader instanceof IntermediateSegmentRecordReader) {
+      LOGGER.info("IntermediateSegmentRecordReader is used");
+      dataSource = new IntermediateSegmentSegmentCreationDataSource((IntermediateSegmentRecordReader) recordReader);
+    } else {
+      LOGGER.info("RecordReaderSegmentCreationDataSource is used");
+      dataSource = new RecordReaderSegmentCreationDataSource(recordReader);
+    }
+    init(config, dataSource, CompositeTransformer.getDefaultTransformer(config.getTableConfig(), config.getSchema()));
   }
 
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource,

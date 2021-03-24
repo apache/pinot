@@ -33,7 +33,7 @@ import org.apache.pinot.spi.data.FieldSpec;
  *
  * TODO: Gather more info on the fly to avoid scanning the segment
  */
-public class RealtimeColumnStatistics implements ColumnStatistics {
+public class MutableColumnStatistics implements ColumnStatistics {
   private final DataSource _dataSource;
   private final int[] _sortedDocIdIterationOrder;
 
@@ -41,7 +41,7 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
   //       dictionary.
   private final Dictionary _dictionary;
 
-  public RealtimeColumnStatistics(DataSource dataSource, int[] sortedDocIdIterationOrder) {
+  public MutableColumnStatistics(DataSource dataSource, int[] sortedDocIdIterationOrder) {
     _dataSource = dataSource;
     _sortedDocIdIterationOrder = sortedDocIdIterationOrder;
     _dictionary = dataSource.getDictionary();
