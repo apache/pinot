@@ -20,7 +20,7 @@ package org.apache.pinot.common.utils.fetcher;
 
 import java.io.File;
 import java.net.URI;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
 
 
 public class SegmentFetcherFactory {
-  private final static SegmentFetcherFactory instance = new SegmentFetcherFactory();
+  private final static SegmentFetcherFactory INSTANCE = new SegmentFetcherFactory();
 
   static final String SEGMENT_FETCHER_CLASS_KEY_SUFFIX = ".class";
   private static final String PROTOCOLS_KEY = "protocols";
@@ -52,7 +52,7 @@ public class SegmentFetcherFactory {
   }
 
   public static SegmentFetcherFactory getInstance() {
-    return instance;
+    return INSTANCE;
   }
 
   /**
@@ -68,7 +68,7 @@ public class SegmentFetcherFactory {
     _httpSegmentFetcher.init(config); // directly, without sub-namespace
     _pinotFSSegmentFetcher.init(config); // directly, without sub-namespace
 
-    List<String> protocols = config.getProperty(PROTOCOLS_KEY, Arrays.asList());
+    List<String> protocols = config.getProperty(PROTOCOLS_KEY, Collections.emptyList());
     for (String protocol : protocols) {
       String segmentFetcherClassName = config.getProperty(protocol + SEGMENT_FETCHER_CLASS_KEY_SUFFIX);
       SegmentFetcher segmentFetcher;
