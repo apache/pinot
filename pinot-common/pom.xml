@@ -33,7 +33,6 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
-    <audienceannotations.version>0.11.0</audienceannotations.version>
   </properties>
   <build>
     <!-- Antlr stuff -->
@@ -285,7 +284,6 @@
     <dependency>
       <groupId>org.apache.yetus</groupId>
       <artifactId>audience-annotations</artifactId>
-      <version>${audienceannotations.version}</version>
     </dependency>
   </dependencies>
   <profiles>

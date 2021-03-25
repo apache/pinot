@@ -147,6 +147,7 @@
     <jts.version>1.16.1</jts.version>
     <h3.version>3.0.3</h3.version>
     <jmh.version>1.26</jmh.version>
+    <audienceannotations.version>0.11.0</audienceannotations.version>
 
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g</argLine>
@@ -487,6 +488,11 @@
         <artifactId>netty-transport-native-epoll</artifactId>
         <version>${netty.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.apache.yetus</groupId>
+        <artifactId>audience-annotations</artifactId>
+        <version>${audienceannotations.version}</version>
+      </dependency>
 
       <dependency>
         <groupId>it.unimi.dsi</groupId>
@@ -813,6 +819,12 @@
             <artifactId>protobuf-java</artifactId>
           </exclusion>
         </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-mapreduce-client-core</artifactId>
+        <version>${hadoop.version}</version>
+        <scope>provided</scope>
       </dependency>
 
       <!-- Spark -->
