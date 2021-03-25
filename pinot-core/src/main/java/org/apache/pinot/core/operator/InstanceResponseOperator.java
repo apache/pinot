@@ -44,7 +44,7 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
     DataTable dataTable = instanceResponseBlock.getInstanceResponseDataTable();
 
     mainThreadTimer.stop();
-    long totalThreadCpuTimeNs = intermediateResultsBlock.getThreadCpuTimeNs() + mainThreadTimer.getThreadTimeNs();
+    long totalThreadCpuTimeNs = intermediateResultsBlock.getExecutionThreadCpuTimeNs() + mainThreadTimer.getThreadTimeNs();
     dataTable.getMetadata().put(DataTable.EXECUTION_THREAD_CPU_TIME_NS_METADATA_KEY, String.valueOf(totalThreadCpuTimeNs));
 
     return instanceResponseBlock;
