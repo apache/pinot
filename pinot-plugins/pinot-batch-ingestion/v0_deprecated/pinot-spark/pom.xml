@@ -368,6 +368,10 @@
           <groupId>org.apache.derby</groupId>
           <artifactId>derby</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>commons-pool</groupId>
+          <artifactId>commons-pool</artifactId>
+        </exclusion>
       </exclusions>
       <scope>test</scope>
     </dependency>

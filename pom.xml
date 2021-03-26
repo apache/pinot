@@ -113,8 +113,8 @@
       See also: the surefire plugin section and the profiles section.-->
     <SKIP_INTEGRATION_TESTS>true</SKIP_INTEGRATION_TESTS>
     <!-- Configuration for unit/integration tests section 1 of 3 (properties) ENDS HERE.-->
-    <avro.version>1.7.6</avro.version>
-    <parquet.version>1.8.0</parquet.version>
+    <avro.version>1.9.2</avro.version>
+    <parquet.version>1.11.1</parquet.version>
     <helix.version>0.9.8</helix.version>
     <zkclient.version>0.7</zkclient.version>
     <jackson.version>2.10.0</jackson.version>
@@ -147,6 +147,7 @@
     <jts.version>1.16.1</jts.version>
     <h3.version>3.0.3</h3.version>
     <jmh.version>1.26</jmh.version>
+    <audienceannotations.version>0.11.0</audienceannotations.version>
 
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g</argLine>
@@ -487,6 +488,11 @@
         <artifactId>netty-transport-native-epoll</artifactId>
         <version>${netty.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.apache.yetus</groupId>
+        <artifactId>audience-annotations</artifactId>
+        <version>${audienceannotations.version}</version>
+      </dependency>
 
       <dependency>
         <groupId>it.unimi.dsi</groupId>
@@ -648,6 +654,10 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>org.apache.yetus</groupId>
+            <artifactId>audience-annotations</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -744,6 +754,10 @@
             <groupId>com.google.protobuf</groupId>
             <artifactId>protobuf-java</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>org.apache.yetus</groupId>
+            <artifactId>audience-annotations</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -805,6 +819,12 @@
             <artifactId>protobuf-java</artifactId>
           </exclusion>
         </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-mapreduce-client-core</artifactId>
+        <version>${hadoop.version}</version>
+        <scope>provided</scope>
       </dependency>
 
       <!-- Spark -->
