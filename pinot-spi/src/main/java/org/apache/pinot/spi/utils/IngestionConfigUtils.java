@@ -107,12 +107,36 @@ public final class IngestionConfigUtils {
     return getConfigMapWithPrefix(batchConfigMap, BatchConfigProperties.RECORD_READER_PROP_PREFIX + DOT_SEPARATOR);
   }
 
+  /**
+   * Fetch the properties which belong to segment name generator, by removing the identifier prefix
+   */
+  public static Map<String, String> getSegmentNameGeneratorProps(Map<String, String> batchConfigMap) {
+    return getConfigMapWithPrefix(batchConfigMap,
+        BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX + DOT_SEPARATOR);
+  }
+
   public static PinotConfiguration getInputFsProps(Map<String, String> batchConfigMap) {
-    return new PinotConfiguration(getPropsWithPrefix(batchConfigMap, BatchConfigProperties.INPUT_FS_PROP_PREFIX + DOT_SEPARATOR));
+    return new PinotConfiguration(
+        getPropsWithPrefix(batchConfigMap, BatchConfigProperties.INPUT_FS_PROP_PREFIX + DOT_SEPARATOR));
   }
 
   public static PinotConfiguration getOutputFsProps(Map<String, String> batchConfigMap) {
-    return new PinotConfiguration(getPropsWithPrefix(batchConfigMap, BatchConfigProperties.OUTPUT_FS_PROP_PREFIX + DOT_SEPARATOR));
+    return new PinotConfiguration(
+        getPropsWithPrefix(batchConfigMap, BatchConfigProperties.OUTPUT_FS_PROP_PREFIX + DOT_SEPARATOR));
+  }
+
+  /**
+   * Extracts entries where keys start with given prefix
+   */
+  public static Map<String, String> extractPropsMatchingPrefix(Map<String, String> batchConfigMap, String prefix) {
+    Map<String, String> propsMatchingPrefix = new HashMap<>();
+    for (Map.Entry<String, String> entry : batchConfigMap.entrySet()) {
+      String key = entry.getKey();
+      if (key.startsWith(prefix)) {
+        propsMatchingPrefix.put(key, entry.getValue());
+      }
+    }
+    return propsMatchingPrefix;
   }
 
   public static Map<String, Object> getPropsWithPrefix(Map<String, String> batchConfigMap, String prefix) {

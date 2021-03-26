@@ -16,23 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.processing.utils;
+package org.apache.pinot.core.util;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Set;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.generic.GenericData;
+import org.apache.pinot.core.segment.processing.framework.SegmentProcessorFramework;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
 
 
 /**
- * Helper util methods for SegmentProcessorFramework
+ * Helper methods for avro related conversions needed, when using AVRO as intermediate format in segment processing.
+ * AVRO is used as intermediate processing format in {@link SegmentProcessorFramework} and file-based impl of {@link SegmentWriter}
  */
-public final class SegmentProcessorUtils {
+public final class SegmentProcessorAvroUtils {
 
-  private SegmentProcessorUtils() {
+  private SegmentProcessorAvroUtils() {
   }
 
   /**
@@ -40,7 +44,15 @@ public final class SegmentProcessorUtils {
    */
   public static GenericData.Record convertGenericRowToAvroRecord(GenericRow genericRow,
       GenericData.Record reusableRecord) {
-    for (String field : genericRow.getFieldToValueMap().keySet()) {
+    return convertGenericRowToAvroRecord(genericRow, reusableRecord, genericRow.getFieldToValueMap().keySet());
+  }
+
+  /**
+   * Convert a GenericRow to an avro GenericRecord
+   */
+  public static GenericData.Record convertGenericRowToAvroRecord(GenericRow genericRow,
+      GenericData.Record reusableRecord, Set<String> fields) {
+    for (String field : fields) {
       Object value = genericRow.getValue(field);
       if (value instanceof Object[]) {
         reusableRecord.put(field, Arrays.asList((Object[]) value));
