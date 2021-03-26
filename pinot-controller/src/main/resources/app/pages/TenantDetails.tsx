@@ -192,10 +192,15 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
 
   const fetchTableJSON = async () => {
     const result = await PinotMethodUtils.getTableDetails(tableName);
-    const tableObj:any = result.OFFLINE || result.REALTIME;
-    setTableType(tableObj.tableType);
-    setTableConfig(JSON.stringify(result, null, 2));
-    fetchTableState(tableObj.tableType);
+    if(result.error){
+      setFetching(false);
+      dispatch({type: 'error', message: result.error, show: true});
+    } else {
+      const tableObj:any = result.OFFLINE || result.REALTIME;
+      setTableType(tableObj.tableType);
+      setTableConfig(JSON.stringify(result, null, 2));
+      fetchTableState(tableObj.tableType);
+    }
   };
 
   const fetchTableState = async (type) => {
@@ -219,7 +224,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
 
   const toggleTableState = async () => {
     const result = await PinotMethodUtils.toggleTableState(tableName, state.enabled ? 'disable' : 'enable', tableType.toLowerCase());
-    if(result[0].state){
+    if(!result.error && result[0].state){
       if(result[0].state.successful){
         dispatch({type: 'success', message: result[0].state.message, show: true});
         setState({ enabled: !state.enabled });

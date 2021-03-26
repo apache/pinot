@@ -20,6 +20,7 @@
 /* eslint-disable no-console */
 
 import axios from 'axios';
+import app_state from '../app_state';
 
 const isDev = process.env.NODE_ENV !== 'production';
 
@@ -38,6 +39,9 @@ const handleResponse = (response: any) => {
 };
 
 const handleConfig = (config: any) => {
+  if(app_state.authToken){
+    Object.assign(config.headers, {"Authorization": app_state.authToken});
+  }
   if (isDev) {
     console.log(config);
   }

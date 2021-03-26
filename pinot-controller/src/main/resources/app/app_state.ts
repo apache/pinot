@@ -17,6 +17,7 @@
  * under the License.
  */
 class app_state {
-  queryConsoleOnlyView: boolean
+  queryConsoleOnlyView: boolean;
+  authToken: string | null;
 }
 export default new app_state();

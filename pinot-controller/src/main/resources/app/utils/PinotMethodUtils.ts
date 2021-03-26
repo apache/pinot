@@ -64,7 +64,9 @@ import {
   saveTable,
   getSchema,
   getSchemaList,
-  getState
+  getState,
+  getInfo,
+  authenticateUser
 } from '../requests';
 import Utils from './Utils';
 
@@ -745,6 +747,18 @@ const getTableState = (tableName, tableType) => {
   });
 };
 
+const getAuthInfo = () => {
+  return getInfo().then((response)=>{
+    return response.data;
+  });
+};
+
+const verifyAuth = (authToken) => {
+  return authenticateUser(authToken).then((response)=>{
+    return response.data;
+  });
+};
+
 export default {
   getTenantsData,
   getAllInstances,
@@ -792,5 +806,7 @@ export default {
   saveTableAction,
   getSchemaData,
   getAllSchemaDetails,
-  getTableState
+  getTableState,
+  getAuthInfo,
+  verifyAuth
 };

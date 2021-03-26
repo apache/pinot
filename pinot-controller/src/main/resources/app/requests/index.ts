@@ -164,3 +164,9 @@ export const saveTable = (tableObject: string): Promise<AxiosResponse<OperationR
 
 export const getState = (tableName: string, tableType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tables/${tableName}/state?type=${tableType}`);
+
+export const getInfo = (): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/auth/info`);
+
+export const authenticateUser = (authToken): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/auth/verify`, {headers:{"Authorization": authToken}});
