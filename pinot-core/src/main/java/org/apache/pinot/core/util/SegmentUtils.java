@@ -60,8 +60,8 @@ public class SegmentUtils {
         segmentName, realtimeTableName, partitionColumn);
     Set<Integer> partitions = partitionMetadata.getPartitions();
     Preconditions.checkState(partitions.size() == 1,
-        "Segment ZK metadata for segment: %s of table: %s contains multiple partitions for column: %s", segmentName,
-        realtimeTableName, partitionColumn);
+        "Segment ZK metadata for segment: %s of table: %s contains multiple partitions for column: %s with %s", segmentName,
+        realtimeTableName, partitionColumn, partitions);
     return partitions.iterator().next();
   }
 }

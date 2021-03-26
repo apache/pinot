@@ -49,9 +49,14 @@ import static org.testng.Assert.assertTrue;
 public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 2;
-  public static final String UPLOADED_SEGMENT_NAME = "mytable_10027_19736_0 %";
-  public static final String PRIMARY_KEY_COL = "clientId";
-  public static final String TABLE_NAME_WITH_TYPE = "mytable_REALTIME";
+  // Segment 1 contains records of pk value 100000
+  private static final String UPLOADED_SEGMENT_1 = "mytable_10027_19736_0 %";
+  // Segment 2 contains records of pk value 100001
+  private static final String UPLOADED_SEGMENT_2 = "mytable_10072_19919_1 %";
+  // Segment 3 contains records of pk value 100000
+  private static final String UPLOADED_SEGMENT_3 = "mytable_10158_19938_2 %";
+  private static final String PRIMARY_KEY_COL = "clientId";
+  private static final String TABLE_NAME_WITH_TYPE = "mytable_REALTIME";
 
   @BeforeClass
   public void setUp()
@@ -73,8 +78,11 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
 
     // Unpack the Avro files
     List<File> avroFiles = unpackAvroData(_tempDir);
+
+    // Push data to Kafka
+    pushAvroIntoKafka(avroFiles);
     // Create and upload the table config
-    TableConfig upsertTableConfig = createUpsertTableConfig(avroFiles.get(0), PRIMARY_KEY_COL);
+    TableConfig upsertTableConfig = createUpsertTableConfig(avroFiles.get(0), PRIMARY_KEY_COL, getNumKafkaPartitions());
     addTableConfig(upsertTableConfig);
 
     // Create and upload segments
@@ -111,22 +119,28 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
 
   @Override
   protected long getCountStarResult() {
-    // Only 1 result is expected as the table is an upsert table and all records of the same primary key are versions of
-    // the same record.
-    return 1;
+    // Three distinct records are expected with pk values of 100000, 100001, 100002
+    return 3;
+  }
+
+  @Override
+  protected String getPartitionColumn() {
+    return PRIMARY_KEY_COL;
   }
 
   @Test
   public void testSegmentAssignment()
       throws Exception {
-    Assert.assertEquals(getCurrentCountStarResult(), 1);
     IdealState idealState = HelixHelper.getTableIdealState(_helixManager, TABLE_NAME_WITH_TYPE);
+    Assert.assertEquals(getCurrentCountStarResult(), getCountStarResult());
 
     // Verify various ideal state properties
     Set<String> segments = idealState.getPartitionSet();
-    Assert.assertEquals(segments.size(), 3);
+    Assert.assertEquals(segments.size(), 5);
     Map<String, Integer> segment2PartitionId = new HashMap<>();
-    segment2PartitionId.put(UPLOADED_SEGMENT_NAME, 0);
+    segment2PartitionId.put(UPLOADED_SEGMENT_1, 0);
+    segment2PartitionId.put(UPLOADED_SEGMENT_2, 1);
+    segment2PartitionId.put(UPLOADED_SEGMENT_3, 1);
 
     // Verify that all segments of the same partition are mapped to the same single server.
     Map<Integer, Set<String>> segmentAssignment = new HashMap<>();

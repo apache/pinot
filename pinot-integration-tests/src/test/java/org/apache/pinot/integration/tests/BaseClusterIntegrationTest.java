@@ -367,10 +367,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   /**
    * Creates a new Upsert enabled table config.
    */
-  protected TableConfig createUpsertTableConfig(File sampleAvroFile, String primaryKeyColumn) {
+  protected TableConfig createUpsertTableConfig(File sampleAvroFile, String primaryKeyColumn, int numPartitions) {
     AvroFileSchemaKafkaAvroMessageDecoder.avroFile = sampleAvroFile;
     Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
-    columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Modulo", 5));
+    columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Murmur", numPartitions));
 
     return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName()).setSchemaName(getSchemaName())
         .setTimeColumnName(getTimeColumnName())
@@ -520,6 +520,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected long getCurrentCountStarResult()
       throws Exception {
+    System.out.println(getPinotConnection().execute(new Request("pql", "SELECT * FROM " + getTableName())));
     return getPinotConnection().execute(new Request("pql", "SELECT COUNT(*) FROM " + getTableName())).getResultSet(0)
         .getLong(0);
   }
