@@ -135,7 +135,7 @@ public interface InstanceDataManager {
   ZkHelixPropertyStore<ZNRecord> getPropertyStore();
 
   /**
-   * Returns the segment uploader.
+   * Returns the segment uploader, which uploads a llc segment to the destination place and returns the url of uploaded segment file. Servers utilize segment uploader to upload llc segment to segment store.
    */
   SegmentUploader getSegmentUploader();
 }
