@@ -91,6 +91,8 @@ public class FileBasedSegmentWriter implements SegmentWriter {
         "Must provide ingestionConfig->batchIngestionConfig->batchConfigMaps in tableConfig for table: %s",
         _tableNameWithType);
     _batchIngestionConfig = _tableConfig.getIngestionConfig().getBatchIngestionConfig();
+    Preconditions.checkState(_batchIngestionConfig.getBatchConfigMaps().size() == 1,
+        "batchConfigMaps must contain only 1 BatchConfig for table: %s", _tableNameWithType);
     _batchConfig = new BatchConfig(_tableNameWithType, _batchIngestionConfig.getBatchConfigMaps().get(0));
 
     Preconditions.checkState(StringUtils.isNotBlank(_batchConfig.getOutputDirURI()),

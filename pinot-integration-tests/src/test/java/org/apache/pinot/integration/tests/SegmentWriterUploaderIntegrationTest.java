@@ -162,4 +162,3 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
     FileUtils.deleteDirectory(_tempDir);
   }
 }
-
