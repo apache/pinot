@@ -63,7 +63,8 @@ public class SegmentCommitterFactory {
 
     segmentUploader = new Server2ControllerSegmentUploader(LOGGER, _protocolHandler.getFileUploadDownloadClient(),
         _protocolHandler.getSegmentCommitUploadURL(params, controllerVipUrl), params.getSegmentName(),
-        ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), _serverMetrics);
+        ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), _serverMetrics,
+        _protocolHandler.getAuthToken());
     return new SplitSegmentCommitter(LOGGER, _protocolHandler, params, segmentUploader);
   }
 }

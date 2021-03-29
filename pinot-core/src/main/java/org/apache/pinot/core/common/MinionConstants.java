@@ -29,6 +29,7 @@ public class MinionConstants {
   public static final String DOWNLOAD_URL_KEY = "downloadURL";
   public static final String UPLOAD_URL_KEY = "uploadURL";
   public static final String URL_SEPARATOR = ",";
+  public static final String AUTH_TOKEN = "authToken";
 
   /**
    * When minion downloads a segment to do work on, we will save that CRC. We will send that to the controller in an

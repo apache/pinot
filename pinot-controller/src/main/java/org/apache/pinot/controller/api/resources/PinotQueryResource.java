@@ -209,15 +209,16 @@ public class PinotQueryResource {
     String protocol = _controllerConf.getControllerBrokerProtocol();
     int port = _controllerConf.getControllerBrokerPortOverride() > 0 ? _controllerConf.getControllerBrokerPortOverride()
         : Integer.parseInt(instanceConfig.getPort());
-    String url = getQueryURL(protocol, hostNameWithPrefix.substring(hostNameWithPrefix.indexOf("_") + 1),
-        String.valueOf(port), querySyntax);
+    String url =
+        getQueryURL(protocol, hostNameWithPrefix.substring(hostNameWithPrefix.indexOf("_") + 1), String.valueOf(port),
+            querySyntax);
     ObjectNode requestJson = getRequestJson(query, traceEnabled, queryOptions, querySyntax);
 
     // forward client-supplied headers
-    Map<String, String> headers = httpHeaders.getRequestHeaders().entrySet().stream()
-        .filter(entry -> !entry.getValue().isEmpty())
-        .map(entry -> Pair.of(entry.getKey(), entry.getValue().get(0)))
-        .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+    Map<String, String> headers =
+        httpHeaders.getRequestHeaders().entrySet().stream().filter(entry -> !entry.getValue().isEmpty())
+            .map(entry -> Pair.of(entry.getKey(), entry.getValue().get(0)))
+            .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
 
     return sendRequestRaw(url, query, requestJson, headers);
   }

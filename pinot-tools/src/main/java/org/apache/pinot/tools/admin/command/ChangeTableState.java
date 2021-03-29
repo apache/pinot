@@ -23,6 +23,7 @@ import java.net.URL;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpURL;
 import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
@@ -50,6 +51,15 @@ public class ChangeTableState extends AbstractBaseAdminCommand implements Comman
   @Option(name = "-state", required = true, metaVar = "<String>", usage = "Change Table State(enable|disable|drop)")
   private String _state;
 
+  @Option(name = "-user", required = false, metaVar = "<String>", usage = "Username for basic auth.")
+  private String _user;
+
+  @Option(name = "-password", required = false, metaVar = "<String>", usage = "Password for basic auth.")
+  private String _password;
+
+  @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
+  private String _authToken;
+
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
@@ -69,7 +79,12 @@ public class ChangeTableState extends AbstractBaseAdminCommand implements Comman
     URI uri = new URI(_controllerProtocol, null, _controllerHost, Integer.parseInt(_controllerPort),
         URI_TABLES_PATH + _tableName, "state=" + stateValue, null);
 
+    String token = makeAuthToken(_authToken, _user, _password);
+
     GetMethod httpGet = new GetMethod(uri.toString());
+    if (StringUtils.isNotBlank(token)) {
+      httpGet.setRequestHeader("Authorization", token);
+    }
     int status = httpClient.executeMethod(httpGet);
     if (status != 200) {
       throw new RuntimeException("Failed to change table state, error: " + httpGet.getResponseBodyAsString());
@@ -94,7 +109,8 @@ public class ChangeTableState extends AbstractBaseAdminCommand implements Comman
   @Override
   public String toString() {
     return ("ChangeTableState -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
-        + " -controllerPort " + _controllerPort + " -tableName" + _tableName + " -state" + _state);
+        + " -controllerPort " + _controllerPort + " -tableName" + _tableName + " -state" + _state + " -user " + _user
+        + " -password " + "[hidden]");
   }
 
   @Override

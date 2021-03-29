@@ -584,12 +584,24 @@ public abstract class ControllerTest {
     return constructResponse(new URL(urlString).openStream());
   }
 
+  public static String sendGetRequest(String urlString, Map<String, String> headers) throws IOException {
+    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
+    httpConnection.setRequestMethod("GET");
+    if (headers != null) {
+      for (String key : headers.keySet()) {
+        httpConnection.setRequestProperty(key, headers.get(key));
+      }
+    }
+
+    return constructResponse(httpConnection.getInputStream());
+  }
+
   public static String sendGetRequestRaw(String urlString) throws IOException {
     return IOUtils.toString(new URL(urlString).openStream());
   }
 
   public static String sendPostRequest(String urlString, String payload) throws IOException {
-    return sendPostRequest(urlString, payload, Collections.EMPTY_MAP);
+    return sendPostRequest(urlString, payload, Collections.emptyMap());
   }
 
   public static String sendPostRequest(String urlString, String payload, Map<String, String> headers)
@@ -615,9 +627,18 @@ public abstract class ControllerTest {
   }
 
   public static String sendPutRequest(String urlString, String payload) throws IOException {
+    return sendPutRequest(urlString, payload, Collections.emptyMap());
+  }
+
+  public static String sendPutRequest(String urlString, String payload, Map<String, String> headers) throws IOException {
     HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
     httpConnection.setDoOutput(true);
     httpConnection.setRequestMethod("PUT");
+    if (headers != null) {
+      for (String key : headers.keySet()) {
+        httpConnection.setRequestProperty(key, headers.get(key));
+      }
+    }
 
     try (BufferedWriter writer = new BufferedWriter(
         new OutputStreamWriter(httpConnection.getOutputStream(), StandardCharsets.UTF_8))) {
@@ -628,6 +649,7 @@ public abstract class ControllerTest {
     return constructResponse(httpConnection.getInputStream());
   }
 
+  // NOTE: does not support headers
   public static String sendPutRequest(String urlString) throws IOException {
     HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
     httpConnection.setDoOutput(true);
@@ -636,10 +658,18 @@ public abstract class ControllerTest {
   }
 
   public static String sendDeleteRequest(String urlString) throws IOException {
+    return sendDeleteRequest(urlString, Collections.emptyMap());
+  }
+
+  public static String sendDeleteRequest(String urlString, Map<String, String> headers) throws IOException {
     HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
     httpConnection.setRequestMethod("DELETE");
+    if (headers != null) {
+      for (String key : headers.keySet()) {
+        httpConnection.setRequestProperty(key, headers.get(key));
+      }
+    }
     httpConnection.connect();
-
     return constructResponse(httpConnection.getInputStream());
   }
 
@@ -655,21 +685,39 @@ public abstract class ControllerTest {
   }
 
   public static PostMethod sendMultipartPostRequest(String url, String body) throws IOException {
+    return sendMultipartPostRequest(url, body, Collections.emptyMap());
+  }
+
+  public static PostMethod sendMultipartPostRequest(String url, String body, Map<String, String> headers) throws IOException {
     HttpClient httpClient = new HttpClient();
     PostMethod postMethod = new PostMethod(url);
     // our handlers ignore key...so we can put anything here
     Part[] parts = {new StringPart("body", body)};
     postMethod.setRequestEntity(new MultipartRequestEntity(parts, postMethod.getParams()));
+    if (headers != null) {
+      for (String key : headers.keySet()) {
+        postMethod.addRequestHeader(key, headers.get(key));
+      }
+    }
     httpClient.executeMethod(postMethod);
     return postMethod;
   }
 
   public static PutMethod sendMultipartPutRequest(String url, String body) throws IOException {
+    return sendMultipartPutRequest(url, body, Collections.emptyMap());
+  }
+
+  public static PutMethod sendMultipartPutRequest(String url, String body, Map<String, String> headers) throws IOException {
     HttpClient httpClient = new HttpClient();
     PutMethod putMethod = new PutMethod(url);
     // our handlers ignore key...so we can put anything here
     Part[] parts = {new StringPart("body", body)};
     putMethod.setRequestEntity(new MultipartRequestEntity(parts, putMethod.getParams()));
+    if (headers != null) {
+      for (String key : headers.keySet()) {
+        putMethod.addRequestHeader(key, headers.get(key));
+      }
+    }
     httpClient.executeMethod(putMethod);
     return putMethod;
   }

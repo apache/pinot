@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -75,6 +76,8 @@ public class QuickstartRunner {
   private final int _numMinions;
   private final File _tempDir;
   private final boolean _enableTenantIsolation;
+  private final String _authToken;
+  private final Map<String, Object> _configOverrides;
 
   private final List<Integer> _brokerPorts = new ArrayList<>();
   private final List<Integer> _controllerPorts = new ArrayList<>();
@@ -84,11 +87,11 @@ public class QuickstartRunner {
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numServers, int numBrokers,
       int numControllers, File tempDir, boolean enableIsolation)
       throws Exception {
-    this(tableRequests, numServers, numBrokers, numControllers, 1, tempDir, enableIsolation);
+    this(tableRequests, numServers, numBrokers, numControllers, 1, tempDir, enableIsolation, null, null);
   }
 
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numServers, int numBrokers,
-      int numControllers, int numMinions, File tempDir, boolean enableIsolation)
+      int numControllers, int numMinions, File tempDir, boolean enableIsolation, String authToken, Map<String, Object> configOverrides)
       throws Exception {
     _tableRequests = tableRequests;
     _numServers = numServers;
@@ -97,13 +100,15 @@ public class QuickstartRunner {
     _numMinions = numMinions;
     _tempDir = tempDir;
     _enableTenantIsolation = enableIsolation;
+    _authToken = authToken;
+    _configOverrides = configOverrides;
     clean();
   }
 
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numServers, int numBrokers,
       int numControllers, File tempDir)
       throws Exception {
-    this(tableRequests, numServers, numBrokers, numControllers, tempDir, true);
+    this(tableRequests, numServers, numBrokers, numControllers, 1, tempDir, true, null, null);
   }
 
   private void startZookeeper()
@@ -120,7 +125,7 @@ public class QuickstartRunner {
       StartControllerCommand controllerStarter = new StartControllerCommand();
       controllerStarter.setControllerPort(String.valueOf(DEFAULT_CONTROLLER_PORT + i)).setZkAddress(ZK_ADDRESS)
           .setClusterName(CLUSTER_NAME).setTenantIsolation(_enableTenantIsolation)
-          .setDataDir(new File(_tempDir, DEFAULT_CONTROLLER_DIR + i).getAbsolutePath());
+          .setDataDir(new File(_tempDir, DEFAULT_CONTROLLER_DIR + i).getAbsolutePath()).setConfigOverrides(_configOverrides);
       controllerStarter.execute();
       _controllerPorts.add(DEFAULT_CONTROLLER_PORT + i);
     }
@@ -130,7 +135,7 @@ public class QuickstartRunner {
       throws Exception {
     for (int i = 0; i < _numBrokers; i++) {
       StartBrokerCommand brokerStarter = new StartBrokerCommand();
-      brokerStarter.setPort(DEFAULT_BROKER_PORT + i).setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME);
+      brokerStarter.setPort(DEFAULT_BROKER_PORT + i).setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME).setConfigOverrides(_configOverrides);
       brokerStarter.execute();
       _brokerPorts.add(DEFAULT_BROKER_PORT + i);
     }
@@ -143,7 +148,7 @@ public class QuickstartRunner {
       serverStarter.setPort(DEFAULT_SERVER_NETTY_PORT + i).setAdminPort(DEFAULT_SERVER_ADMIN_API_PORT + i)
           .setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME)
           .setDataDir(new File(_tempDir, DEFAULT_SERVER_DATA_DIR + i).getAbsolutePath())
-          .setSegmentDir(new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath());
+          .setSegmentDir(new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath()).setConfigOverrides(_configOverrides);
       serverStarter.execute();
     }
   }
@@ -153,7 +158,7 @@ public class QuickstartRunner {
     for (int i = 0; i < _numMinions; i++) {
       StartMinionCommand minionStarter = new StartMinionCommand();
       minionStarter.setMinionPort(DEFAULT_MINION_PORT + i)
-          .setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME);
+          .setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME).setConfigOverrides(_configOverrides);
       minionStarter.execute();
     }
   }
@@ -203,8 +208,8 @@ public class QuickstartRunner {
   public void bootstrapTable()
       throws Exception {
     for (QuickstartTableRequest request : _tableRequests) {
-      if (!new BootstrapTableTool(InetAddress.getLocalHost().getHostName(), _controllerPorts.get(0), request.getBootstrapTableDir())
-          .execute()) {
+      if (!new BootstrapTableTool("http", InetAddress.getLocalHost().getHostName(), _controllerPorts.get(0),
+          request.getBootstrapTableDir(), _authToken).execute()) {
         throw new RuntimeException("Failed to bootstrap table with request - " + request);
       }
     }
@@ -249,7 +254,7 @@ public class QuickstartRunner {
       throws Exception {
     int brokerPort = _brokerPorts.get(RANDOM.nextInt(_brokerPorts.size()));
     return JsonUtils.stringToJsonNode(new PostQueryCommand().setBrokerPort(String.valueOf(brokerPort))
-        .setQueryType(CommonConstants.Broker.Request.SQL).setQuery(query).run());
+        .setQueryType(CommonConstants.Broker.Request.SQL).setAuthToken(_authToken).setQuery(query).run());
   }
 
   public static void registerDefaultPinotFS() {

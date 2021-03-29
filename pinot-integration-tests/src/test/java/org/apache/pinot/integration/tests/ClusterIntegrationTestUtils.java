@@ -536,9 +536,32 @@ public class ClusterIntegrationTestUtils {
       org.apache.pinot.client.Connection pinotConnection, @Nullable List<String> sqlQueries,
       @Nullable Connection h2Connection)
       throws Exception {
+    testPqlQuery(pinotQuery, brokerUrl, pinotConnection, sqlQueries, h2Connection, null);
+  }
+
+  /**
+   * Run equivalent Pinot and H2 query and compare the results.
+   * <p>LIMITATIONS:
+   * <ul>
+   *   <li>Skip comparison for selection and aggregation group-by when H2 results are too large to exhaust.</li>
+   *   <li>Do not examine the order of result records.</li>
+   * </ul>
+   *
+   * @param pinotQuery Pinot query
+   * @param brokerUrl Pinot broker URL
+   * @param pinotConnection Pinot connection
+   * @param sqlQueries H2 SQL queries
+   * @param h2Connection H2 connection
+   * @param headers headers
+   * @throws Exception
+   */
+  public static void testPqlQuery(String pinotQuery, String brokerUrl,
+      org.apache.pinot.client.Connection pinotConnection, @Nullable List<String> sqlQueries,
+      @Nullable Connection h2Connection, @Nullable Map<String, String> headers)
+      throws Exception {
     // Use broker response for metadata check, connection response for value check
     PinotQueryRequest pinotBrokerQueryRequest = new PinotQueryRequest(CommonConstants.Broker.Request.PQL, pinotQuery);
-    JsonNode pinotResponse = ClusterTest.postQuery(pinotBrokerQueryRequest, brokerUrl);
+    JsonNode pinotResponse = ClusterTest.postQuery(pinotBrokerQueryRequest, brokerUrl, headers);
     Request pinotClientRequest = new Request(CommonConstants.Broker.Request.PQL, pinotQuery);
     ResultSetGroup pinotResultSetGroup = pinotConnection.execute(pinotClientRequest);
 
@@ -757,6 +780,23 @@ public class ClusterIntegrationTestUtils {
   static void testSqlQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
       @Nullable List<String> sqlQueries, @Nullable Connection h2Connection)
       throws Exception {
+    testSqlQuery(pinotQuery, brokerUrl, pinotConnection, sqlQueries, h2Connection, null);
+  }
+
+  /**
+   * Run equivalent Pinot SQL and H2 query and compare the results.
+   *
+   * @param pinotQuery Pinot sql query
+   * @param brokerUrl Pinot broker URL
+   * @param pinotConnection Pinot connection
+   * @param sqlQueries H2 SQL query
+   * @param h2Connection H2 connection
+   * @param headers headers
+   * @throws Exception
+   */
+  static void testSqlQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
+      @Nullable List<String> sqlQueries, @Nullable Connection h2Connection, @Nullable Map<String, String> headers)
+      throws Exception {
     if (pinotQuery == null || sqlQueries == null) {
       return;
     }
@@ -771,7 +811,7 @@ public class ClusterIntegrationTestUtils {
     }
 
     // broker response
-    JsonNode pinotResponse = ClusterTest.postSqlQuery(pinotQuery, brokerUrl);
+    JsonNode pinotResponse = ClusterTest.postSqlQuery(pinotQuery, brokerUrl, headers);
     if (pinotResponse.get("exceptions").size() > 0) {
       throw new RuntimeException("Got Exceptions from Query Response: " + pinotResponse);
     }
