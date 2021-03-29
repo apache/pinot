@@ -28,6 +28,7 @@ import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
@@ -57,6 +58,7 @@ import org.slf4j.LoggerFactory;
  * A {@link SegmentWriter} implementation that uses a local file as a buffer to collect {@link GenericRow}.
  * The {@link GenericRow} are written to the buffer as AVRO records.
  */
+@NotThreadSafe
 public class FileBasedSegmentWriter implements SegmentWriter {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FileBasedSegmentWriter.class);

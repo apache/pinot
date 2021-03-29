@@ -134,6 +134,12 @@
       <destName>plugins/pinot-metrics/pinot-yammer/pinot-yammer-${project.version}-shaded.jar</destName>
     </file>
     <!-- End Include Pinot Metrics Plugins-->
+    <!-- Start Include Pinot Segment Writer Plugins-->
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-segment-writer/pinot-segment-writer-file-based/target/pinot-segment-writer-file-based-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-segment-writer/pinot-segment-writer-file-based/pinot-segment-writer-file-based-${project.version}-shaded.jar</destName>
+    </file>
+    <!-- End Include Pinot Segment Writer Plugins-->
     <!-- End Include Pinot Plugins-->
   </files>
   <fileSets>
