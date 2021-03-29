@@ -110,14 +110,14 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
-    // Start the Pinot cluster
+    // Start Zookeeper
     startZk();
+    // Start Kafka
+    startKafka();
+    // Start the Pinot cluster
     startController();
     startBroker();
     startServer();
-
-    // Start Kafka
-    startKafka();
 
     // Create the Avro file
     File avroFile = createAvroFile();

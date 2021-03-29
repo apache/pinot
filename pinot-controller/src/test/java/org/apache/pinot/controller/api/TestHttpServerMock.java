@@ -37,6 +37,7 @@ class TestHttpServerMock {
   private static final Logger LOGGER = LoggerFactory.getLogger(TestHttpServerMock.class);
 
   private HttpServer _httpServer;
+  private Thread _httpServerThread;
   private String _endpoint;
 
   public void start(String path, HttpHandler handler)
@@ -44,19 +45,25 @@ class TestHttpServerMock {
     int port = findRandomOpenPort();
     _httpServer = HttpServer.createSimpleServer(null, port);
     _httpServer.getServerConfiguration().addHttpHandler(handler, path);
-    new Thread(() -> {
+    _httpServerThread = new Thread(() -> {
       try {
         _httpServer.start();
       } catch (IOException e) {
         LOGGER.error("Got error starting http server", e);
         throw new RuntimeException(e);
       }
-    }).start();
+    });
+    _httpServerThread.setDaemon(true);
+    _httpServerThread.start();
     _endpoint = "http://localhost:" + port;
   }
 
   public void stop() {
     _httpServer.shutdownNow();
+    _httpServer = null;
+    if (_httpServerThread.isAlive()) {
+      _httpServerThread.interrupt();
+    }
   }
 
   private int findRandomOpenPort()

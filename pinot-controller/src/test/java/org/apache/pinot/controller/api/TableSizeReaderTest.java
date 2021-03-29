@@ -72,6 +72,7 @@ public class TableSizeReaderTest {
   @BeforeClass
   public void setUp()
       throws IOException {
+    ((MultiThreadedHttpConnectionManager) connectionManager).setMaxConnectionsPerHost(20);
     helix = mock(PinotHelixResourceManager.class);
     when(helix.hasOfflineTable(anyString())).thenAnswer(new Answer() {
       @Override
@@ -362,7 +363,7 @@ public class TableSizeReaderTest {
     Assert.assertNull(tableSizeDetails.offlineSegments);
     TableSizeReader.TableSubTypeSizeDetails realtimeSegments = tableSizeDetails.realtimeSegments;
     Assert.assertEquals(realtimeSegments.segments.size(), 2);
-    Assert.assertTrue(realtimeSegments.reportedSizeInBytes == realtimeSegments.estimatedSizeInBytes);
+    Assert.assertEquals(realtimeSegments.reportedSizeInBytes, realtimeSegments.estimatedSizeInBytes);
     validateTableSubTypeSize(servers, realtimeSegments);
   }
 }

@@ -65,8 +65,9 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
-    // Start the Pinot cluster
+    // Start Zookeeper
     startZk();
+    // Start the Pinot cluster
     startController();
     startBroker();
     startServer();

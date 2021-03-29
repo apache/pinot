@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.ServiceLoader;
+import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
@@ -29,8 +30,6 @@ import org.apache.pinot.spi.stream.StreamDataServerStartable;
 
 public class KafkaStarterUtils {
   public static final int DEFAULT_BROKER_ID = 0;
-  public static final int DEFAULT_ZK_TEST_PORT = 2191;
-  public static final String DEFAULT_ZK_STR = "localhost:" + DEFAULT_ZK_TEST_PORT + "/kafka";
   public static int DEFAULT_KAFKA_PORT = 19092;
   public static final String DEFAULT_KAFKA_BROKER = "localhost:" + DEFAULT_KAFKA_PORT;
 
@@ -69,7 +68,7 @@ public class KafkaStarterUtils {
     configureOffsetsTopicReplicationFactor(configuration, (short) 1);
     configuration.put(PORT, DEFAULT_KAFKA_PORT);
     configuration.put(BROKER_ID, DEFAULT_BROKER_ID);
-    configuration.put(ZOOKEEPER_CONNECT, DEFAULT_ZK_STR);
+    configuration.put(ZOOKEEPER_CONNECT, getDefaultKafkaZKAddress());
     configuration.put(LOG_DIRS, "/tmp/kafka-" + Double.toHexString(Math.random()));
 
     return configuration;
@@ -89,6 +88,10 @@ public class KafkaStarterUtils {
 
   public static void configureHostName(Properties configuration, String hostName) {
     configuration.put("host.name", hostName);
+  }
+
+  public static String getDefaultKafkaZKAddress() {
+    return ZkStarter.getDefaultZkStr() + "/kafka";
   }
 
   public static Properties getTopicCreationProps(int numKafkaPartitions) {

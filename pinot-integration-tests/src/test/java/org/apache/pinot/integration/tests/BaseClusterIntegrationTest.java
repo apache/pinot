@@ -30,6 +30,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ConnectionFactory;
@@ -159,7 +160,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected String getKafkaZKAddress() {
-    return KafkaStarterUtils.DEFAULT_ZK_STR;
+    return KafkaStarterUtils.getDefaultKafkaZKAddress();
   }
 
   protected int getNumKafkaPartitions() {
@@ -328,7 +329,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
               StreamConfig.ConsumerType.HIGHLEVEL.toString());
       streamConfigMap.put(KafkaStreamConfigProperties
               .constructStreamProperty(KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_ZK_CONNECTION_STRING),
-          KafkaStarterUtils.DEFAULT_ZK_STR);
+          getKafkaZKAddress());
       streamConfigMap.put(KafkaStreamConfigProperties
               .constructStreamProperty(KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_BOOTSTRAP_SERVER),
           KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
@@ -398,7 +399,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected org.apache.pinot.client.Connection getPinotConnection() {
     if (_pinotConnection == null) {
-      _pinotConnection = ConnectionFactory.fromZookeeper(ZkStarter.DEFAULT_ZK_STR + "/" + getHelixClusterName());
+      _pinotConnection = ConnectionFactory.fromZookeeper(ZkStarter.getDefaultZkStr() + "/" + getHelixClusterName());
     }
     return _pinotConnection;
   }
@@ -500,8 +501,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected void startKafka() {
+    Properties kafkaConfig = KafkaStarterUtils.getDefaultKafkaConfiguration();
+    kafkaConfig.put(KafkaStarterUtils.ZOOKEEPER_CONNECT, getKafkaZKAddress());
     _kafkaStarters = KafkaStarterUtils.startServers(getNumKafkaBrokers(), getBaseKafkaPort(), getKafkaZKAddress(),
-        KafkaStarterUtils.getDefaultKafkaConfiguration());
+        kafkaConfig);
     _kafkaStarters.get(0)
         .createTopic(getKafkaTopic(), KafkaStarterUtils.getTopicCreationProps(getNumKafkaPartitions()));
   }

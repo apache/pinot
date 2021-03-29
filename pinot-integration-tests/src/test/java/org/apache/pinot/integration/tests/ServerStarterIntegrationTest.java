@@ -56,7 +56,7 @@ public class ServerStarterIntegrationTest extends ControllerTest {
       int expectedPort)
       throws Exception {
     HelixServerStarter helixServerStarter =
-        new HelixServerStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, serverConf);
+        new HelixServerStarter(getHelixClusterName(), ZkStarter.getDefaultZkStr(), serverConf);
     helixServerStarter.start();
     helixServerStarter.stop();
 

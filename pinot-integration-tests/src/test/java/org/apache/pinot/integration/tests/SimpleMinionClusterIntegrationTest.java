@@ -80,7 +80,9 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   @BeforeClass
   public void setUp()
       throws Exception {
+    // Start Zookeeper
     startZk();
+    // Start the Pinot cluster
     startController();
     startBroker();
     startServer();

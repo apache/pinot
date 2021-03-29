@@ -99,8 +99,9 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir, defaultTableSegmentDir, defaultTableTarDir,
         starTreeTableSegmentDir, starTreeTableTarDir);
 
-    // Start the Pinot cluster
+    // Start Zookeeper
     startZk();
+    // Start the Pinot cluster
     startController();
     startBroker();
     startServers(2);

@@ -143,8 +143,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
-    // Start the Pinot cluster
+    // Start Zookeeper
     startZk();
+    // Start the Pinot cluster
     startController();
     startBrokers(getNumBrokers());
     startServers();

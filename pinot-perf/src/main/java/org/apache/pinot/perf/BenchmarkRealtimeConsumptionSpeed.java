@@ -50,12 +50,14 @@ public class BenchmarkRealtimeConsumptionSpeed extends BaseClusterIntegrationTes
 
     // Start the Pinot cluster
     startZk();
+
+    // Start Kafka
+    startKafka();
+
     startController();
     startBroker();
     startServer();
 
-    // Start Kafka
-    startKafka();
 
     // Unpack the Avro files
     File avroFile = unpackAvroData(_tempDir).get(0);

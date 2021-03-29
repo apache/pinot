@@ -106,7 +106,7 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void startBrokers(int numBrokers)
       throws Exception {
-    startBrokers(numBrokers, DEFAULT_BROKER_PORT, ZkStarter.DEFAULT_ZK_STR);
+    startBrokers(numBrokers, DEFAULT_BROKER_PORT, ZkStarter.getDefaultZkStr());
   }
 
   protected void startBrokers(int numBrokers, int basePort, String zkStr)
@@ -144,12 +144,12 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void startServer(PinotConfiguration configuration) {
     startServers(1, configuration, Server.DEFAULT_ADMIN_API_PORT, Helix.DEFAULT_SERVER_NETTY_PORT,
-        ZkStarter.DEFAULT_ZK_STR);
+        ZkStarter.getDefaultZkStr());
   }
 
   protected void startServers(int numServers) {
     startServers(numServers, getDefaultServerConfiguration(), Server.DEFAULT_ADMIN_API_PORT,
-        Helix.DEFAULT_SERVER_NETTY_PORT, ZkStarter.DEFAULT_ZK_STR);
+        Helix.DEFAULT_SERVER_NETTY_PORT, ZkStarter.getDefaultZkStr());
   }
 
   protected void startServers(int numServers, int baseAdminApiPort, int baseNettyPort, String zkStr) {
@@ -190,7 +190,7 @@ public abstract class ClusterTest extends ControllerTest {
       @Nullable List<MinionEventObserverFactory> eventObserverFactories) {
     FileUtils.deleteQuietly(new File(Minion.DEFAULT_INSTANCE_BASE_DIR));
     try {
-      _minionStarter = new MinionStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, getDefaultMinionConfiguration());
+      _minionStarter = new MinionStarter(getHelixClusterName(), ZkStarter.getDefaultZkStr(), getDefaultMinionConfiguration());
       // Register task executor factories
       if (taskExecutorFactories != null) {
         for (PinotTaskExecutorFactory taskExecutorFactory : taskExecutorFactories) {

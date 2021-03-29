@@ -57,7 +57,9 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
   @BeforeClass
   public void setUp()
       throws Exception {
+    // Start Zookeeper
     startZk();
+    // Start the Pinot cluster
     startController();
     startBroker();
     startServer();
@@ -116,7 +118,7 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
   @Test
   public void testControllerGetTables()
       throws Exception {
-    JsonNode response = JsonUtils.stringToJsonNode(sendGetRequest("http://localhost:18998/tables", AUTH_HEADER));
+    JsonNode response = JsonUtils.stringToJsonNode(sendGetRequest("http://localhost:" + getControllerPort() + "/tables", AUTH_HEADER));
     Assert.assertTrue(response.get("tables").isArray(), "must return table array");
   }
 
@@ -125,7 +127,7 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
       throws Exception {
     try {
       // NOTE: the endpoint is protected implicitly (without annotation) by BasicAuthAccessControlFactory
-      sendGetRequest("http://localhost:18998/tables");
+      sendGetRequest("http://localhost:" + getControllerPort() + "/tables");
     } catch (IOException e) {
       Assert.assertTrue(e.getMessage().contains("HTTP"));
       Assert.assertTrue(e.getMessage().contains("403"));
@@ -153,10 +155,10 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
 
     // patch ingestion job file
     String jobFileContents = IOUtils.toString(new FileInputStream(jobFile));
-    IOUtils.write(jobFileContents.replaceAll("9000", String.valueOf(DEFAULT_CONTROLLER_PORT)),
+    IOUtils.write(jobFileContents.replaceAll("9000", String.valueOf(getControllerPort())),
         new FileOutputStream(jobFile));
 
-    new BootstrapTableTool("http", "localhost", DEFAULT_CONTROLLER_PORT, baseDir.getAbsolutePath(), AUTH_TOKEN)
+    new BootstrapTableTool("http", "localhost", getControllerPort(), baseDir.getAbsolutePath(), AUTH_TOKEN)
         .execute();
 
     Thread.sleep(5000);

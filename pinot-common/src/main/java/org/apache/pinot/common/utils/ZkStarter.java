@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.util.concurrent.TimeUnit;
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.zookeeper.server.ServerConfig;
@@ -34,8 +35,8 @@ import org.slf4j.LoggerFactory;
 public class ZkStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(ZkStarter.class);
   public static final int DEFAULT_ZK_TEST_PORT = 2191;
-  public static final String DEFAULT_ZK_STR = "localhost:" + DEFAULT_ZK_TEST_PORT;
   private static final int DEFAULT_ZK_CLIENT_RETRIES = 10;
+  private static int ZK_TEST_PORT = 2191;
 
   public static class ZookeeperInstance {
     private PublicZooKeeperServerMain _serverMain;
@@ -130,7 +131,20 @@ public class ZkStarter {
    * Starts an empty local Zk instance on the default port
    */
   public static ZookeeperInstance startLocalZkServer() {
-    return startLocalZkServer(DEFAULT_ZK_TEST_PORT);
+    ZK_TEST_PORT = findRandomOpenPort();
+    return startLocalZkServer(ZK_TEST_PORT);
+  }
+
+  public static String getDefaultZkStr() {
+    return "localhost:" + ZK_TEST_PORT;
+  }
+
+  private static int findRandomOpenPort() {
+    try (ServerSocket socket = new ServerSocket(0)) {
+      return socket.getLocalPort();
+    } catch (IOException e) {
+      return DEFAULT_ZK_TEST_PORT;
+    }
   }
 
   /**

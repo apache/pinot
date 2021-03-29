@@ -103,7 +103,9 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
+    // Start Zookeeper
     startZk();
+    // Start Kafka
     startKafka();
 
     Map<String, Object> properties = getDefaultControllerConfiguration();

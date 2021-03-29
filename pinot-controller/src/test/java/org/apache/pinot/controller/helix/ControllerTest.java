@@ -27,6 +27,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
+import java.net.ServerSocket;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -34,6 +35,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.PutMethod;
@@ -41,7 +45,6 @@ import org.apache.commons.httpclient.methods.multipart.MultipartRequestEntity;
 import org.apache.commons.httpclient.methods.multipart.Part;
 import org.apache.commons.httpclient.methods.multipart.StringPart;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
@@ -60,6 +63,7 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.http.HttpResponse;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -136,12 +140,20 @@ public abstract class ControllerTest {
     Map<String, Object> properties = new HashMap<>();
 
     properties.put(ControllerConf.CONTROLLER_HOST, LOCAL_HOST);
-    properties.put(ControllerConf.CONTROLLER_PORT, DEFAULT_CONTROLLER_PORT);
+    properties.put(ControllerConf.CONTROLLER_PORT, findRandomOpenPort());
     properties.put(ControllerConf.DATA_DIR, DEFAULT_DATA_DIR);
-    properties.put(ControllerConf.ZK_STR, ZkStarter.DEFAULT_ZK_STR);
+    properties.put(ControllerConf.ZK_STR, ZkStarter.getDefaultZkStr());
     properties.put(ControllerConf.HELIX_CLUSTER_NAME, getHelixClusterName());
 
     return properties;
+  }
+
+  private int findRandomOpenPort() {
+    try (ServerSocket socket = new ServerSocket(0)) {
+      return socket.getLocalPort();
+    } catch (IOException e) {
+      return DEFAULT_CONTROLLER_PORT;
+    }
   }
 
   protected void startController() {
@@ -193,8 +205,19 @@ public abstract class ControllerTest {
     return new ControllerStarter(config);
   }
 
+  protected int getControllerPort() {
+    return _controllerPort;
+  }
+
   protected void stopController() {
-    _controllerStarter.stop();
+    try {
+      ExecutorService executor = Executors.newCachedThreadPool();
+      executor.submit(() -> _controllerStarter.stop());
+      executor.shutdown();
+      executor.awaitTermination(30, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      // Controller stop timed out, continue.
+    }
     _controllerStarter = null;
     FileUtils.deleteQuietly(new File(_controllerDataDir));
   }
@@ -210,7 +233,7 @@ public abstract class ControllerTest {
       throws Exception {
     HelixManager helixManager =
         HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
-            ZkStarter.DEFAULT_ZK_STR);
+            ZkStarter.getDefaultZkStr());
     helixManager.getStateMachineEngine()
         .registerStateModelFactory(FakeBrokerResourceOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
             FakeBrokerResourceOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
@@ -295,7 +318,7 @@ public abstract class ControllerTest {
       throws Exception {
     HelixManager helixManager =
         HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
-            ZkStarter.DEFAULT_ZK_STR);
+            ZkStarter.getDefaultZkStr());
     helixManager.getStateMachineEngine()
         .registerStateModelFactory(FakeSegmentOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
             FakeSegmentOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
@@ -309,7 +332,7 @@ public abstract class ControllerTest {
     }
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT,
         getHelixClusterName()).forParticipant(instanceId).build();
-    helixAdmin.setConfig(configScope, Collections.singletonMap(ADMIN_PORT_KEY, Integer.toString(adminPort)));
+    helixAdmin.setConfig(configScope, Collections.singletonMap(Instance.ADMIN_PORT_KEY, Integer.toString(adminPort)));
     _fakeInstanceHelixManagers.add(helixManager);
   }
 
@@ -394,7 +417,7 @@ public abstract class ControllerTest {
       throws Exception {
     HelixManager helixManager =
         HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
-            ZkStarter.DEFAULT_ZK_STR);
+            ZkStarter.getDefaultZkStr());
     helixManager.getStateMachineEngine()
         .registerStateModelFactory(FakeMinionResourceOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
             FakeMinionResourceOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
@@ -587,7 +610,7 @@ public abstract class ControllerTest {
   }
 
   public static String sendGetRequest(String urlString) throws IOException {
-    return constructResponse(new URL(urlString).openStream());
+    return sendGetRequest(urlString, Collections.emptyMap());
   }
 
   public static String sendGetRequest(String urlString, Map<String, String> headers) throws IOException {
@@ -598,12 +621,7 @@ public abstract class ControllerTest {
         httpConnection.setRequestProperty(key, headers.get(key));
       }
     }
-
     return constructResponse(httpConnection.getInputStream());
-  }
-
-  public static String sendGetRequestRaw(String urlString) throws IOException {
-    return IOUtils.toString(new URL(urlString).openStream());
   }
 
   public static String sendPostRequest(String urlString, String payload) throws IOException {
@@ -619,7 +637,6 @@ public abstract class ControllerTest {
         httpConnection.setRequestProperty(key, headers.get(key));
       }
     }
-
     if (payload != null && !payload.isEmpty()) {
       httpConnection.setDoOutput(true);
       try (BufferedWriter writer = new BufferedWriter(
@@ -628,7 +645,6 @@ public abstract class ControllerTest {
         writer.flush();
       }
     }
-
     return constructResponse(httpConnection.getInputStream());
   }
 
@@ -652,14 +668,6 @@ public abstract class ControllerTest {
       writer.flush();
     }
 
-    return constructResponse(httpConnection.getInputStream());
-  }
-
-  // NOTE: does not support headers
-  public static String sendPutRequest(String urlString) throws IOException {
-    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
-    httpConnection.setDoOutput(true);
-    httpConnection.setRequestMethod("PUT");
     return constructResponse(httpConnection.getInputStream());
   }
 
@@ -688,6 +696,10 @@ public abstract class ControllerTest {
       }
       return responseBuilder.toString();
     }
+  }
+
+  private static String constructResponse(HttpResponse response) throws IOException {
+    return constructResponse(response.getEntity().getContent());
   }
 
   public static PostMethod sendMultipartPostRequest(String url, String body) throws IOException {

@@ -22,7 +22,9 @@ import java.io.File;
 import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.util.TestUtils;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -38,14 +40,14 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
-    // Start the Pinot cluster
+    // Start Zookeeper
     startZk();
+    // Start Kafka
+    startKafka();
+    // Start the Pinot cluster
     startController();
     startBroker();
     startServer();
-
-    // Start Kafka
-    startKafka();
 
     // Unpack the Avro files
     List<File> avroFiles = unpackAvroData(_tempDir);
@@ -71,7 +73,6 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
   public void tearDown()
       throws Exception {
     dropRealtimeTable(getTableName());
-    dropOfflineTable(getTableName());
 
     // Stop the Pinot cluster
     stopServer();
@@ -79,6 +80,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     stopController();
     // Stop Kafka
     stopKafka();
+    // Stop Zookeeper
     stopZk();
     FileUtils.deleteDirectory(_tempDir);
   }

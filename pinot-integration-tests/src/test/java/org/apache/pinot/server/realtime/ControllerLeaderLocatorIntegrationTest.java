@@ -66,7 +66,6 @@ public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
     validateResultSet(controllerLeaderLocator, resultSet, 1, "Failed to get only one pair of controller");
 
     Map<String, Object> properties = getDefaultControllerConfiguration();
-    properties.put(ControllerConf.CONTROLLER_PORT, DEFAULT_CONTROLLER_PORT + 1);
     ControllerStarter secondControllerStarter = new ControllerStarter(new ControllerConf(properties));
     secondControllerStarter.start();
 
@@ -93,7 +92,7 @@ public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
         _partitionToTableMap.get(new Random().nextInt(Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE)));
 
     Assert.assertEquals(pair.getFirst(), ControllerTest.LOCAL_HOST);
-    Assert.assertEquals((int) pair.getSecond(), ControllerTest.DEFAULT_CONTROLLER_PORT);
+    Assert.assertEquals((int) pair.getSecond(), getControllerPort());
 
     // Stop the second controller.
     secondControllerStarter.stop();

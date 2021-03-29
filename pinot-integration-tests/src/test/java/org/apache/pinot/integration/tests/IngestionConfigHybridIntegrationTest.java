@@ -115,10 +115,10 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
   public void setUp()
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
-    // Start Zk and Kafka
+    // Start Zookeeper
     startZk();
+    // Start Kafka
     startKafka();
-
     // Start the Pinot cluster
     startController();
     startBroker();

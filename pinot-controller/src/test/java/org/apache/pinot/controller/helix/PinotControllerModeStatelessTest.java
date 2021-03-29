@@ -114,7 +114,6 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
     // Start the second dual-mode controller
     properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.DUAL);
-    properties.put(ControllerConf.CONTROLLER_PORT, DEFAULT_CONTROLLER_PORT + 1);
     ControllerStarter secondDualModeController = getControllerStarter(new ControllerConf(properties));
     secondDualModeController.start();
     TestUtils
@@ -153,7 +152,7 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
       return result;
     }, TIMEOUT_IN_MS, "No one should be the partition leader for tables");
 
-    ZkClient zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR);
+    ZkClient zkClient = new ZkClient(ZkStarter.getDefaultZkStr());
     TestUtils
         .waitForCondition(aVoid -> !zkClient.exists("/" + getHelixClusterName() + "/CONTROLLER/LEADER"), TIMEOUT_IN_MS,
             "No cluster leader should be shown in Helix cluster");
@@ -161,7 +160,6 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
 
     properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.DUAL);
-    properties.put(ControllerConf.CONTROLLER_PORT, DEFAULT_CONTROLLER_PORT + 2);
 
     ControllerStarter thirdDualModeController = getControllerStarter(new ControllerConf(properties));
     thirdDualModeController.start();
@@ -215,7 +213,6 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
     // Start a Helix-only controller
     properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.HELIX_ONLY);
-    properties.put(ControllerConf.CONTROLLER_PORT, DEFAULT_CONTROLLER_PORT + 1);
 
     ControllerStarter helixOnlyController = new ControllerStarter(new ControllerConf(properties));
     helixOnlyController.start();
@@ -235,7 +232,6 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
     // Start the second Pinot-only controller
     properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.PINOT_ONLY);
-    properties.put(ControllerConf.CONTROLLER_PORT, DEFAULT_CONTROLLER_PORT + 2);
 
     ControllerStarter secondPinotOnlyController = getControllerStarter(new ControllerConf(properties));
     secondPinotOnlyController.start();
@@ -291,7 +287,7 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
 
   @AfterMethod
   public void cleanUpCluster() {
-    ZkClient zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR);
+    ZkClient zkClient = new ZkClient(ZkStarter.getDefaultZkStr());
     if (zkClient.exists("/" + getHelixClusterName())) {
       zkClient.deleteRecursive("/" + getHelixClusterName());
     }

@@ -41,7 +41,9 @@ public class AdminConsoleIntegrationTest extends BaseClusterIntegrationTest {
   public void setUp() throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
     // Start an empty Pinot cluster
+    // Start Zookeeper
     startZk();
+    // Start the Pinot cluster
     startController();
     startBroker();
     startServer();

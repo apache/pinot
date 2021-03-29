@@ -103,16 +103,17 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
   protected void startHybridCluster()
       throws Exception {
-    // Start Zk and Kafka
+    // Start Zookeeper
     startZk();
+    // Start Kafka
     startKafka();
 
     // Start the Pinot cluster
     Map<String, Object> properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
 
+    // Start the Pinot cluster
     startController(properties);
-
     startBroker();
     startServers(2);
 
