@@ -24,10 +24,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.AggregationInfo;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.core.query.utils.Pair;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
 
 public class Aggregation {

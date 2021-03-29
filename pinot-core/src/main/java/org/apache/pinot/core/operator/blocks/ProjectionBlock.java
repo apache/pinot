@@ -25,8 +25,8 @@ import org.apache.pinot.core.common.BlockDocIdValueSet;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.DataBlockCache;
-import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.docvalsets.ProjectionBlockValSet;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
 /**

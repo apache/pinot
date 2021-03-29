@@ -34,7 +34,7 @@ import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.core.data.function.FunctionEvaluator;
 import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
-import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;

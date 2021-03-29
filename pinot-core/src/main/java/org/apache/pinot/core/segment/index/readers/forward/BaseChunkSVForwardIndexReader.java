@@ -22,12 +22,13 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
-import org.apache.pinot.core.io.compression.ChunkDecompressor;
 import org.apache.pinot.core.io.writer.impl.BaseChunkSVForwardIndexWriter;
-import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
-import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.util.CleanerUtil;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,16 +76,16 @@ public abstract class BaseChunkSVForwardIndexReader implements ForwardIndexReade
       _dataBuffer.getInt(headerOffset); // Total docs
       headerOffset += Integer.BYTES;
 
-      ChunkCompressorFactory.CompressionType compressionType =
-          ChunkCompressorFactory.CompressionType.values()[_dataBuffer.getInt(headerOffset)];
+      ChunkCompressionType compressionType =
+          ChunkCompressionType.values()[_dataBuffer.getInt(headerOffset)];
       _chunkDecompressor = ChunkCompressorFactory.getDecompressor(compressionType);
-      _isCompressed = !compressionType.equals(ChunkCompressorFactory.CompressionType.PASS_THROUGH);
+      _isCompressed = !compressionType.equals(ChunkCompressionType.PASS_THROUGH);
 
       headerOffset += Integer.BYTES;
       dataHeaderStart = _dataBuffer.getInt(headerOffset);
     } else {
       _isCompressed = true;
-      _chunkDecompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressorFactory.CompressionType.SNAPPY);
+      _chunkDecompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressionType.SNAPPY);
     }
 
     _headerEntryChunkOffsetSize = BaseChunkSVForwardIndexWriter.getHeaderEntryChunkOffsetSize(version);

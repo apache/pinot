@@ -32,7 +32,7 @@ import java.util.Set;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.query.request.context.predicate.NotInPredicate;
 import org.apache.pinot.core.query.request.context.predicate.Predicate;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;

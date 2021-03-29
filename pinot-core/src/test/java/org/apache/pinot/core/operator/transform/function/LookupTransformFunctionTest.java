@@ -19,8 +19,8 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.util.Arrays;
-import org.apache.commons.lang3.ArrayUtils;
-import org.apache.pinot.common.utils.PrimitiveArrayUtils;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.core.data.manager.offline.DimensionTableDataManager;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
@@ -33,10 +33,10 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.testng.Assert;
 import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
-import java.util.HashMap;
-import java.util.Map;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 public class LookupTransformFunctionTest extends BaseTransformFunctionTest {

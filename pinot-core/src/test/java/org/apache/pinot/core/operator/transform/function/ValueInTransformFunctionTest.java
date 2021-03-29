@@ -23,7 +23,7 @@ import it.unimi.dsi.fastutil.ints.IntList;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;

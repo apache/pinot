@@ -20,9 +20,11 @@ package org.apache.pinot.core.segment.creator;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.indexsegment.mutable.IntermediateSegment;
 import org.apache.pinot.core.realtime.converter.stats.MutableColumnStatistics;
+import org.apache.pinot.segment.spi.creator.ColumnStatistics;
+import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsContainer;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
 public class IntermediateSegmentStatsContainer implements SegmentPreIndexStatsContainer {

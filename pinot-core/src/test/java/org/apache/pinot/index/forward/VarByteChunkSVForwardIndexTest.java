@@ -25,7 +25,7 @@ import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.core.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.core.io.writer.impl.VarByteChunkSVForwardIndexWriter;
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
@@ -51,13 +51,13 @@ public class VarByteChunkSVForwardIndexTest {
   @Test
   public void testWithCompression()
       throws Exception {
-    test(ChunkCompressorFactory.CompressionType.SNAPPY);
+    test(ChunkCompressionType.SNAPPY);
   }
 
   @Test
   public void testWithoutCompression()
       throws Exception {
-    test(ChunkCompressorFactory.CompressionType.PASS_THROUGH);
+    test(ChunkCompressionType.PASS_THROUGH);
   }
 
   /**
@@ -70,7 +70,7 @@ public class VarByteChunkSVForwardIndexTest {
    * @param compressionType Compression type
    * @throws Exception
    */
-  public void test(ChunkCompressorFactory.CompressionType compressionType)
+  public void test(ChunkCompressionType compressionType)
       throws Exception {
     String[] expected = new String[NUM_ENTRIES];
     Random random = new Random();
@@ -159,29 +159,29 @@ public class VarByteChunkSVForwardIndexTest {
   @Test
   public void testVarCharWithDifferentSizes()
       throws Exception {
-    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.SNAPPY, 10, 1000);
-    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.PASS_THROUGH, 10, 1000);
+    testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 10, 1000);
+    testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 10, 1000);
 
-    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.SNAPPY, 100, 1000);
-    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.PASS_THROUGH, 100, 1000);
+    testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 100, 1000);
+    testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 100, 1000);
 
-    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.SNAPPY, 1000, 1000);
-    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.PASS_THROUGH, 1000, 1000);
+    testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 1000, 1000);
+    testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 1000, 1000);
 
-    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.SNAPPY, 10000, 100);
-    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.PASS_THROUGH, 10000, 100);
+    testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 10000, 100);
+    testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 10000, 100);
 
-    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.SNAPPY, 100000, 10);
-    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.PASS_THROUGH, 100000, 10);
+    testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 100000, 10);
+    testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 100000, 10);
 
-    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.SNAPPY, 1000000, 10);
-    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.PASS_THROUGH, 1000000, 10);
+    testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 1000000, 10);
+    testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 1000000, 10);
 
-    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.SNAPPY, 2000000, 10);
-    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.PASS_THROUGH, 2000000, 10);
+    testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 2000000, 10);
+    testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 2000000, 10);
   }
 
-  private void testLargeVarcharHelper(ChunkCompressorFactory.CompressionType compressionType, int numChars, int numDocs)
+  private void testLargeVarcharHelper(ChunkCompressionType compressionType, int numChars, int numDocs)
       throws Exception {
     String[] expected = new String[numDocs];
     Random random = new Random();

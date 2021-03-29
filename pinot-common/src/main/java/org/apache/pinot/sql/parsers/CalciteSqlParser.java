@@ -48,7 +48,6 @@ import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.parser.babel.SqlBabelParserImpl;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.function.FunctionDefinitionRegistry;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
@@ -61,6 +60,7 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

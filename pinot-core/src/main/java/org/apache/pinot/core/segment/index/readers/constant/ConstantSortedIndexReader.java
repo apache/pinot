@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.segment.index.readers.constant;
 
-import org.apache.pinot.common.utils.Pairs;
-import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
-import org.apache.pinot.core.segment.index.readers.SortedIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
+import org.apache.pinot.spi.utils.Pairs;
 
 
 /**

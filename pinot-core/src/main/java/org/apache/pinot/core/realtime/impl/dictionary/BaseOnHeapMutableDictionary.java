@@ -21,7 +21,7 @@ package org.apache.pinot.core.realtime.impl.dictionary;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import org.apache.pinot.core.segment.index.readers.MutableDictionary;
+import org.apache.pinot.segment.spi.index.reader.MutableDictionary;
 
 
 /**

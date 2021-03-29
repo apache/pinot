@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.segment.index.readers.constant;
 
-import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
-import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 

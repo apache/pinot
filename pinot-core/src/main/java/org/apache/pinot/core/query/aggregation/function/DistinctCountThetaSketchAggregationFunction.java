@@ -35,7 +35,6 @@ import org.apache.datasketches.theta.Sketch;
 import org.apache.datasketches.theta.Union;
 import org.apache.datasketches.theta.UpdateSketch;
 import org.apache.datasketches.theta.UpdateSketchBuilder;
-import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -49,6 +48,7 @@ import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.FunctionContext;
 import org.apache.pinot.core.query.request.context.predicate.Predicate;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 

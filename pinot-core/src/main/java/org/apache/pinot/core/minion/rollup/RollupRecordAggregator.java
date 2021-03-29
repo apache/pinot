@@ -22,13 +22,13 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.core.minion.segment.RecordAggregator;
+import org.apache.pinot.core.segment.processing.collector.ValueAggregator;
+import org.apache.pinot.core.segment.processing.collector.ValueAggregatorFactory;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.core.segment.processing.collector.ValueAggregator;
-import org.apache.pinot.core.segment.processing.collector.ValueAggregatorFactory;
-import org.apache.pinot.core.minion.segment.RecordAggregator;
 
 
 /**

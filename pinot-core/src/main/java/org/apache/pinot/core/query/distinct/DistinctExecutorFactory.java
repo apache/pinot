@@ -41,7 +41,7 @@ import org.apache.pinot.core.query.distinct.raw.RawStringSingleColumnDistinctOnl
 import org.apache.pinot.core.query.distinct.raw.RawStringSingleColumnDistinctOrderByExecutor;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 

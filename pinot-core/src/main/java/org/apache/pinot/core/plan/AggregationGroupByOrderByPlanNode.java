@@ -21,7 +21,6 @@ package org.apache.pinot.core.plan;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -30,8 +29,9 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.plan.StarTreeTransformPlanNode;
-import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
-import org.apache.pinot.core.startree.v2.StarTreeV2;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
 
 /**

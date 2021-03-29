@@ -19,12 +19,12 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.util.ArrayCopyUtils;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**

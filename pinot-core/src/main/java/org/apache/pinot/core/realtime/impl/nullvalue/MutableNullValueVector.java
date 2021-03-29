@@ -19,7 +19,7 @@
 package org.apache.pinot.core.realtime.impl.nullvalue;
 
 import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
-import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 

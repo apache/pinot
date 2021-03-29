@@ -20,7 +20,7 @@ package org.apache.pinot.core.operator.filter;
 
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
-import org.apache.pinot.core.segment.index.readers.TextIndexReader;
+import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 
 
 /**

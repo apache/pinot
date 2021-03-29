@@ -19,8 +19,6 @@
 package org.apache.pinot.core.data.table;
 
 import com.google.common.base.Preconditions;
-import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;

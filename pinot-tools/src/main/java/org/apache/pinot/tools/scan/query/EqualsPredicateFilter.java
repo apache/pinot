@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.tools.scan.query;
 
-import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
 
 public class EqualsPredicateFilter implements PredicateFilter {

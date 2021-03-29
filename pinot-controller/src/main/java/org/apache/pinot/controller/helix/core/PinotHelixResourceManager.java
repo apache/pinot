@@ -112,7 +112,7 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
-import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.ConfigUtils;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.table.IndexingConfig;

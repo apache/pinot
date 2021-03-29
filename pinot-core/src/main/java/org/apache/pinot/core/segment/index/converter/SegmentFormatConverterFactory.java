@@ -18,7 +18,8 @@
  */
 package org.apache.pinot.core.segment.index.converter;
 
-import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
+import org.apache.pinot.segment.spi.creator.SegmentVersion;
 
 
 public class SegmentFormatConverterFactory {

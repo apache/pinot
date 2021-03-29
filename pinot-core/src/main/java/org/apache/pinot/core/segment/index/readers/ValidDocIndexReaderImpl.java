@@ -19,6 +19,7 @@
 package org.apache.pinot.core.segment.index.readers;
 
 import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.segment.spi.index.reader.ValidDocIndexReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 

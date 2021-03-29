@@ -25,7 +25,7 @@ import java.io.File;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.core.realtime.converter.RealtimeSegmentConverter;

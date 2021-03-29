@@ -27,7 +27,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 
 
 /**

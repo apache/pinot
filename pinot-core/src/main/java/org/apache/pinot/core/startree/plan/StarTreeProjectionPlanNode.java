@@ -23,11 +23,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.plan.PlanNode;
-import org.apache.pinot.core.startree.v2.StarTreeV2;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
 
 public class StarTreeProjectionPlanNode implements PlanNode {

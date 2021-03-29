@@ -19,6 +19,10 @@
 package org.apache.pinot.controller.recommender.rules.impl;
 
 import com.google.common.util.concurrent.AtomicDouble;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.controller.recommender.exceptions.InvalidInputException;
 import org.apache.pinot.controller.recommender.io.ConfigManager;
 import org.apache.pinot.controller.recommender.io.InputManager;
@@ -32,11 +36,6 @@ import org.apache.pinot.core.query.request.context.predicate.Predicate;
 import org.apache.pinot.core.requesthandler.BrokerRequestOptimizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
 
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.REALTIME;
 

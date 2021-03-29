@@ -21,10 +21,10 @@ package org.apache.pinot.core.data.manager.realtime;
 import java.util.Map;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
-import org.apache.pinot.core.indexsegment.mutable.MutableSegment;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.core.io.writer.impl.MmapMemoryManager;
+import org.apache.pinot.segment.spi.MutableSegment;
 
 
 public abstract class RealtimeSegmentDataManager extends SegmentDataManager {
