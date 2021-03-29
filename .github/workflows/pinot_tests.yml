@@ -20,8 +20,18 @@
 name: Pinot Tests
 
 on:
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - "docs/**"
+      - "licenses/**"
+      - "licenses-binary/**"
+      - "website/**"
+      - "**.md"
   pull_request:
-    branches: [ master ]
+    branches:
+      - master
     paths-ignore:
       - "docs/**"
       - "licenses/**"
