@@ -1734,13 +1734,11 @@ public class PinotHelixResourceManager {
   }
 
   public boolean isUpsertTable(String tableName) {
-    if (hasOfflineTable(tableName))
+    TableConfig realtimeTableConfig = getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+    if (realtimeTableConfig == null) {
       return false;
-    if (!hasRealtimeTable(tableName))
-      return false;
-
-    UpsertConfig upsertConfig =
-        getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(tableName)).getUpsertConfig();
+    }
+    UpsertConfig upsertConfig = realtimeTableConfig.getUpsertConfig();
     return ((upsertConfig != null) && upsertConfig.getMode() != UpsertConfig.Mode.NONE);
   }
 

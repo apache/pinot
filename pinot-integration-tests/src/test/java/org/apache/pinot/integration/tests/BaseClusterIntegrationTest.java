@@ -520,7 +520,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected long getCurrentCountStarResult()
       throws Exception {
-    System.out.println(getPinotConnection().execute(new Request("pql", "SELECT * FROM " + getTableName())));
     return getPinotConnection().execute(new Request("pql", "SELECT COUNT(*) FROM " + getTableName())).getResultSet(0)
         .getLong(0);
   }

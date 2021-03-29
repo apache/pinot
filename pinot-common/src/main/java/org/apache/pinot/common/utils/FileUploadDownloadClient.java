@@ -707,9 +707,7 @@ public class FileUploadDownloadClient implements Closeable {
     // Add table name and type request parameters
     NameValuePair tableNameValuePair = new BasicNameValuePair(QueryParameters.TABLE_NAME, tableName);
     NameValuePair tableTypeValuePair = new BasicNameValuePair(QueryParameters.TABLE_TYPE, tableType.name());
-    List<NameValuePair> parameters = new ArrayList<>();
-    parameters.add(tableNameValuePair);
-    parameters.add(tableTypeValuePair);
+    List<NameValuePair> parameters = Arrays.asList(tableNameValuePair, tableTypeValuePair);
     return uploadSegment(uri, segmentName, segmentFile, null, parameters, DEFAULT_SOCKET_TIMEOUT_MS);
   }
 

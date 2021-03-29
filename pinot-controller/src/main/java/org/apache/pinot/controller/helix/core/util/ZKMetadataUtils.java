@@ -33,8 +33,8 @@ public class ZKMetadataUtils {
   private ZKMetadataUtils() {
   }
 
-  public static void updateSegmentMetadata(SegmentZKMetadata segmentZKMetadata,
-                                           SegmentMetadata segmentMetadata, SegmentType segmentType) {
+  public static void updateSegmentMetadata(SegmentZKMetadata segmentZKMetadata, SegmentMetadata segmentMetadata,
+      SegmentType segmentType) {
     segmentZKMetadata.setSegmentName(segmentMetadata.getName());
     segmentZKMetadata.setTableName(segmentMetadata.getTableName());
     segmentZKMetadata.setIndexVersion(segmentMetadata.getVersion());

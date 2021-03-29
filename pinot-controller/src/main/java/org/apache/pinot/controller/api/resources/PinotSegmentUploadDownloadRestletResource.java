@@ -263,8 +263,8 @@ public class PinotSegmentUploadDownloadRestletResource {
       LOGGER.info("Processing upload request for segment: {} of table: {} from client: {}, ingestion descriptor: {}",
           segmentName, tableNameWithType, clientAddress, ingestionDescriptor);
 
-      // Skip segment validation if upload only segment metadata or it is a realtime table segment.
-      if (uploadType != FileUploadDownloadClient.FileUploadType.METADATA && TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
+      // Skip segment validation if upload is to an offline table and only segment metadata.
+      if (tableType == TableType.OFFLINE && uploadType != FileUploadDownloadClient.FileUploadType.METADATA) {
         // Validate segment
         new SegmentValidator(_pinotHelixResourceManager, _controllerConf, _executor, _connectionManager,
             _controllerMetrics, _leadControllerManager.isLeaderForTable(tableNameWithType))
