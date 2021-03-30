@@ -61,6 +61,10 @@ public interface ColumnStatistics extends Serializable {
    */
   int getLengthOfLargestElement();
 
+  default boolean isFixedLength() {
+    return getLengthOfShortestElement() == getLengthOfLargestElement();
+  }
+
   /**
    * Whether or not the data in this column is in ascending order.
    * @return true if the data is in ascending order.

@@ -72,6 +72,11 @@ public class ConstantValueBytesDictionary extends BaseImmutableDictionary {
   }
 
   @Override
+  public Object getInternal(int dictId) {
+    return new ByteArray(_value);
+  }
+
+  @Override
   public int getIntValue(int dictId) {
     throw new UnsupportedOperationException();
   }

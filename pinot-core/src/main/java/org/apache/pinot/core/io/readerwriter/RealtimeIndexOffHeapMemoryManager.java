@@ -79,7 +79,9 @@ public abstract class RealtimeIndexOffHeapMemoryManager implements PinotDataBuff
     PinotDataBuffer buffer = allocateInternal(size, allocationContext);
     _totalAllocatedBytes += size;
     _buffers.add(buffer);
-    _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.REALTIME_OFFHEAP_MEMORY_USED, size);
+    if (_serverMetrics != null) {
+      _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.REALTIME_OFFHEAP_MEMORY_USED, size);
+    }
     return buffer;
   }
 
@@ -104,7 +106,9 @@ public abstract class RealtimeIndexOffHeapMemoryManager implements PinotDataBuff
     for (PinotDataBuffer buffer : _buffers) {
       buffer.close();
     }
-    _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.REALTIME_OFFHEAP_MEMORY_USED, -_totalAllocatedBytes);
+    if (_serverMetrics != null) {
+      _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.REALTIME_OFFHEAP_MEMORY_USED, -_totalAllocatedBytes);
+    }
     doClose();
     _buffers.clear();
     _totalAllocatedBytes = 0;

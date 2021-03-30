@@ -37,6 +37,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Deprecated. Does not support HTTPS or authentication
+ */
+@Deprecated
 public class DefaultControllerRestApi implements ControllerRestApi {
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultControllerRestApi.class);
 
@@ -114,7 +118,8 @@ public class DefaultControllerRestApi implements ControllerRestApi {
           try (InputStream inputStream = fileSystem.open(tarFilePath)) {
             SimpleHttpResponse response = _fileUploadDownloadClient.uploadSegment(
                 FileUploadDownloadClient.getUploadSegmentHttpURI(pushLocation.getHost(), pushLocation.getPort()),
-                segmentName, inputStream, _rawTableName);
+                segmentName, inputStream, null, FileUploadDownloadClient.makeTableParam(_rawTableName),
+                FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
             LOGGER.info("Response {}: {}", response.getStatusCode(), response.getResponse());
             break;
           } catch (Exception e) {

@@ -163,7 +163,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   }
 
   @Override
-  public Iterator<GroupKey> getUniqueGroupKeys() {
+  public Iterator<GroupKey> getGroupKeys() {
     switch (_dataType) {
       case INT:
         return new IntGroupKeyIterator((Int2IntOpenHashMap) _groupKeyMap);
@@ -176,6 +176,25 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
       case STRING:
       case BYTES:
         return new ObjectGroupKeyIterator((Object2IntOpenHashMap) _groupKeyMap);
+      default:
+        throw new IllegalStateException();
+    }
+  }
+
+  @Override
+  public Iterator<StringGroupKey> getStringGroupKeys() {
+    switch (_dataType) {
+      case INT:
+        return new IntStringGroupKeyIterator((Int2IntOpenHashMap) _groupKeyMap);
+      case LONG:
+        return new LongStringGroupKeyIterator((Long2IntOpenHashMap) _groupKeyMap);
+      case FLOAT:
+        return new FloatStringGroupKeyIterator((Float2IntOpenHashMap) _groupKeyMap);
+      case DOUBLE:
+        return new DoubleStringGroupKeyIterator((Double2IntOpenHashMap) _groupKeyMap);
+      case STRING:
+      case BYTES:
+        return new ObjectStringGroupKeyIterator((Object2IntOpenHashMap) _groupKeyMap);
       default:
         throw new IllegalStateException();
     }
@@ -259,7 +278,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     public GroupKey next() {
       Int2IntMap.Entry entry = _iterator.next();
       _groupKey._groupId = entry.getIntValue();
-      _groupKey._stringKey = Integer.toString(entry.getIntKey());
+      _groupKey._keys = new Object[]{entry.getIntKey()};
       return _groupKey;
     }
 
@@ -287,7 +306,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     public GroupKey next() {
       Long2IntMap.Entry entry = _iterator.next();
       _groupKey._groupId = entry.getIntValue();
-      _groupKey._stringKey = Long.toString(entry.getLongKey());
+      _groupKey._keys = new Object[]{entry.getLongKey()};
       return _groupKey;
     }
 
@@ -315,7 +334,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     public GroupKey next() {
       Float2IntMap.Entry entry = _iterator.next();
       _groupKey._groupId = entry.getIntValue();
-      _groupKey._stringKey = Float.toString(entry.getFloatKey());
+      _groupKey._keys = new Object[]{entry.getFloatKey()};
       return _groupKey;
     }
 
@@ -343,7 +362,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     public GroupKey next() {
       Double2IntMap.Entry entry = _iterator.next();
       _groupKey._groupId = entry.getIntValue();
-      _groupKey._stringKey = Double.toString(entry.getDoubleKey());
+      _groupKey._keys = new Object[]{entry.getDoubleKey()};
       return _groupKey;
     }
 
@@ -369,6 +388,146 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
 
     @Override
     public GroupKey next() {
+      Object2IntMap.Entry entry = _iterator.next();
+      _groupKey._groupId = entry.getIntValue();
+      _groupKey._keys = new Object[]{entry.getKey()};
+      return _groupKey;
+    }
+
+    @Override
+    public void remove() {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  private static class IntStringGroupKeyIterator implements Iterator<StringGroupKey> {
+    final Iterator<Int2IntMap.Entry> _iterator;
+    final StringGroupKey _groupKey;
+
+    IntStringGroupKeyIterator(Int2IntOpenHashMap intMap) {
+      _iterator = intMap.int2IntEntrySet().fastIterator();
+      _groupKey = new StringGroupKey();
+    }
+
+    @Override
+    public boolean hasNext() {
+      return _iterator.hasNext();
+    }
+
+    @Override
+    public StringGroupKey next() {
+      Int2IntMap.Entry entry = _iterator.next();
+      _groupKey._groupId = entry.getIntValue();
+      _groupKey._stringKey = Integer.toString(entry.getIntKey());
+      return _groupKey;
+    }
+
+    @Override
+    public void remove() {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  private static class LongStringGroupKeyIterator implements Iterator<StringGroupKey> {
+    final Iterator<Long2IntMap.Entry> _iterator;
+    final StringGroupKey _groupKey;
+
+    LongStringGroupKeyIterator(Long2IntOpenHashMap longMap) {
+      _iterator = longMap.long2IntEntrySet().fastIterator();
+      _groupKey = new StringGroupKey();
+    }
+
+    @Override
+    public boolean hasNext() {
+      return _iterator.hasNext();
+    }
+
+    @Override
+    public StringGroupKey next() {
+      Long2IntMap.Entry entry = _iterator.next();
+      _groupKey._groupId = entry.getIntValue();
+      _groupKey._stringKey = Long.toString(entry.getLongKey());
+      return _groupKey;
+    }
+
+    @Override
+    public void remove() {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  private static class FloatStringGroupKeyIterator implements Iterator<StringGroupKey> {
+    final Iterator<Float2IntMap.Entry> _iterator;
+    final StringGroupKey _groupKey;
+
+    FloatStringGroupKeyIterator(Float2IntOpenHashMap floatMap) {
+      _iterator = floatMap.float2IntEntrySet().fastIterator();
+      _groupKey = new StringGroupKey();
+    }
+
+    @Override
+    public boolean hasNext() {
+      return _iterator.hasNext();
+    }
+
+    @Override
+    public StringGroupKey next() {
+      Float2IntMap.Entry entry = _iterator.next();
+      _groupKey._groupId = entry.getIntValue();
+      _groupKey._stringKey = Float.toString(entry.getFloatKey());
+      return _groupKey;
+    }
+
+    @Override
+    public void remove() {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  private static class DoubleStringGroupKeyIterator implements Iterator<StringGroupKey> {
+    final Iterator<Double2IntMap.Entry> _iterator;
+    final StringGroupKey _groupKey;
+
+    DoubleStringGroupKeyIterator(Double2IntOpenHashMap doubleMap) {
+      _iterator = doubleMap.double2IntEntrySet().fastIterator();
+      _groupKey = new StringGroupKey();
+    }
+
+    @Override
+    public boolean hasNext() {
+      return _iterator.hasNext();
+    }
+
+    @Override
+    public StringGroupKey next() {
+      Double2IntMap.Entry entry = _iterator.next();
+      _groupKey._groupId = entry.getIntValue();
+      _groupKey._stringKey = Double.toString(entry.getDoubleKey());
+      return _groupKey;
+    }
+
+    @Override
+    public void remove() {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  private static class ObjectStringGroupKeyIterator implements Iterator<StringGroupKey> {
+    final ObjectIterator<Object2IntMap.Entry> _iterator;
+    final StringGroupKey _groupKey;
+
+    ObjectStringGroupKeyIterator(Object2IntOpenHashMap objectMap) {
+      _iterator = objectMap.object2IntEntrySet().fastIterator();
+      _groupKey = new StringGroupKey();
+    }
+
+    @Override
+    public boolean hasNext() {
+      return _iterator.hasNext();
+    }
+
+    @Override
+    public StringGroupKey next() {
       Object2IntMap.Entry entry = _iterator.next();
       _groupKey._groupId = entry.getIntValue();
       _groupKey._stringKey = entry.getKey().toString();

@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.data.readers.IntermediateSegmentRecordReader;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
@@ -39,6 +40,7 @@ import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.core.segment.creator.ColumnStatistics;
+import org.apache.pinot.core.segment.creator.IntermediateSegmentSegmentCreationDataSource;
 import org.apache.pinot.core.segment.creator.RecordReaderSegmentCreationDataSource;
 import org.apache.pinot.core.segment.creator.SegmentCreationDataSource;
 import org.apache.pinot.core.segment.creator.SegmentCreator;
@@ -136,8 +138,15 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   public void init(SegmentGeneratorConfig config, RecordReader recordReader)
       throws Exception {
-    init(config, new RecordReaderSegmentCreationDataSource(recordReader),
-        CompositeTransformer.getDefaultTransformer(config.getTableConfig(), config.getSchema()));
+    SegmentCreationDataSource dataSource;
+    if (recordReader instanceof IntermediateSegmentRecordReader) {
+      LOGGER.info("IntermediateSegmentRecordReader is used");
+      dataSource = new IntermediateSegmentSegmentCreationDataSource((IntermediateSegmentRecordReader) recordReader);
+    } else {
+      LOGGER.info("RecordReaderSegmentCreationDataSource is used");
+      dataSource = new RecordReaderSegmentCreationDataSource(recordReader);
+    }
+    init(config, dataSource, CompositeTransformer.getDefaultTransformer(config.getTableConfig(), config.getSchema()));
   }
 
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource,
@@ -145,8 +154,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       throws Exception {
     this.config = config;
     recordReader = dataSource.getRecordReader();
-    Preconditions.checkState(recordReader.hasNext(), "No record in data source");
     dataSchema = config.getSchema();
+    if (config.isFailOnEmptySegment()) {
+      Preconditions.checkState(recordReader.hasNext(), "No record in data source");
+    }
 
     _recordTransformer = recordTransformer;
 
@@ -168,8 +179,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       indexDir.mkdirs();
     }
 
-    _ingestionSchemaValidator = SchemaValidatorFactory.getSchemaValidator(dataSchema, recordReader.getClass().getName(),
-        config.getInputFilePath());
+    _ingestionSchemaValidator = SchemaValidatorFactory
+        .getSchemaValidator(dataSchema, recordReader.getClass().getName(), config.getInputFilePath());
 
     // Create a temporary directory used in segment creation
     tempIndexDir = new File(indexDir, "tmp-" + UUID.randomUUID());
@@ -240,8 +251,18 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     ColumnStatistics timeColumnStatistics = segmentStats.getColumnProfileFor(config.getTimeColumnName());
     int sequenceId = config.getSequenceId();
     if (timeColumnStatistics != null) {
-      segmentName = config.getSegmentNameGenerator()
-          .generateSegmentName(sequenceId, timeColumnStatistics.getMinValue(), timeColumnStatistics.getMaxValue());
+      if (totalDocs > 0) {
+        segmentName = config.getSegmentNameGenerator()
+            .generateSegmentName(sequenceId, timeColumnStatistics.getMinValue(), timeColumnStatistics.getMaxValue());
+      } else {
+        // When totalDoc is 0, check whether 'failOnEmptySegment' option is true. If so, directly fail the segment creation.
+        Preconditions.checkArgument(!config.isFailOnEmptySegment(),
+            "Failing the empty segment creation as the option 'failOnEmptySegment' is set to: " + config
+                .isFailOnEmptySegment());
+        // Generate a unique name for a segment with no rows
+        long now = System.currentTimeMillis();
+        segmentName = config.getSegmentNameGenerator().generateSegmentName(sequenceId, now, now);
+      }
     } else {
       segmentName = config.getSegmentNameGenerator().generateSegmentName(sequenceId, null, null);
     }
@@ -272,7 +293,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     convertFormatIfNecessary(segmentOutputDir);
 
     // Build star-tree V2 if necessary
-    buildStarTreeV2IfNecessary(segmentOutputDir);
+    if (totalDocs > 0) {
+      buildStarTreeV2IfNecessary(segmentOutputDir);
+    }
 
     // Compute CRC and creation time
     long crc = CrcUtils.forAllFilesInFolder(segmentOutputDir).computeCrc();
@@ -366,12 +389,17 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
       String columnName = fieldSpec.getName();
       ColumnStatistics columnProfile = segmentStats.getColumnProfileFor(columnName);
+      boolean useVarLengthDictionary = varLengthDictionaryColumns.contains(columnName);
       Object defaultNullValue = fieldSpec.getDefaultNullValue();
       if (fieldSpec.getDataType() == FieldSpec.DataType.BYTES) {
+        if (!columnProfile.isFixedLength()) {
+          useVarLengthDictionary = true;
+        }
         defaultNullValue = new ByteArray((byte[]) defaultNullValue);
       }
-      indexCreationInfoMap.put(columnName, new ColumnIndexCreationInfo(columnProfile, true/*createDictionary*/,
-          varLengthDictionaryColumns.contains(columnName), false/*isAutoGenerated*/, defaultNullValue));
+      indexCreationInfoMap.put(columnName,
+          new ColumnIndexCreationInfo(columnProfile, true/*createDictionary*/, useVarLengthDictionary,
+              false/*isAutoGenerated*/, defaultNullValue));
     }
     segmentIndexCreationInfo.setTotalDocs(totalDocs);
   }

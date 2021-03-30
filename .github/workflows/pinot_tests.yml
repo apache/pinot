@@ -20,8 +20,18 @@
 name: Pinot Tests
 
 on:
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - "docs/**"
+      - "licenses/**"
+      - "licenses-binary/**"
+      - "website/**"
+      - "**.md"
   pull_request:
-    branches: [ master ]
+    branches:
+      - master
     paths-ignore:
       - "docs/**"
       - "licenses/**"
@@ -66,7 +76,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: [ 1.8, 10, 11, 12, 13, 14, 15-ea ]
+        java: [ 1.8, 10, 11, 12, 13, 14, 15 ]
     name: Pinot Quickstart on JDK ${{ matrix.java }}
     steps:
       - uses: actions/checkout@v2

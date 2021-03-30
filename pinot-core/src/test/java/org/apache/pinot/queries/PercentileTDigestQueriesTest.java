@@ -174,7 +174,7 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
     assertTDigest((TDigest) aggregationResult.get(1), doubleList0);
     assertTDigest((TDigest) aggregationResult.get(2), doubleList0);
 
-    DoubleList doubleList3 = (DoubleList)aggregationResult.get(3);
+    DoubleList doubleList3 = (DoubleList) aggregationResult.get(3);
     Collections.sort(doubleList3);
     Assert.assertEquals(doubleList3, doubleList0);
     assertTDigest((TDigest) aggregationResult.get(4), doubleList0);
@@ -211,17 +211,17 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
     Assert.assertNotNull(groupByResult);
     Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupByResult.getGroupKeyIterator();
     while (groupKeyIterator.hasNext()) {
-      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-      DoubleList doubleList0 = (DoubleList) groupByResult.getResultForKey(groupKey, 0);
+      int groupId = groupKeyIterator.next()._groupId;
+      DoubleList doubleList0 = (DoubleList) groupByResult.getResultForGroupId(0, groupId);
       Collections.sort(doubleList0);
-      assertTDigest((TDigest) groupByResult.getResultForKey(groupKey, 1), doubleList0);
-      assertTDigest((TDigest) groupByResult.getResultForKey(groupKey, 2), doubleList0);
+      assertTDigest((TDigest) groupByResult.getResultForGroupId(1, groupId), doubleList0);
+      assertTDigest((TDigest) groupByResult.getResultForGroupId(2, groupId), doubleList0);
 
-      DoubleList doubleList3 = (DoubleList) groupByResult.getResultForKey(groupKey, 3);
+      DoubleList doubleList3 = (DoubleList) groupByResult.getResultForGroupId(3, groupId);
       Collections.sort(doubleList3);
       Assert.assertEquals(doubleList3, doubleList0);
-      assertTDigest((TDigest) groupByResult.getResultForKey(groupKey, 4), doubleList0);
-      assertTDigest((TDigest) groupByResult.getResultForKey(groupKey, 5), doubleList0);
+      assertTDigest((TDigest) groupByResult.getResultForGroupId(4, groupId), doubleList0);
+      assertTDigest((TDigest) groupByResult.getResultForGroupId(5, groupId), doubleList0);
     }
   }
 

@@ -23,13 +23,14 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
 
 public class Quickstart {
-
   private static final String TAB = "\t\t";
   private static final String NEW_LINE = "\n";
 
@@ -45,6 +46,14 @@ public class Quickstart {
 
   public String getBootstrapDataDir() {
     return "examples/batch/baseballStats";
+  }
+
+  public String getAuthToken() {
+    return null;
+  }
+
+  public Map<String, Object> getConfigOverrides() {
+    return new HashMap<>();
   }
 
   public static void printStatus(Color color, String message) {
@@ -163,7 +172,9 @@ public class Quickstart {
     FileUtils.copyURLToFile(resource, tableConfigFile);
 
     QuickstartTableRequest request = new QuickstartTableRequest(baseDir.getAbsolutePath());
-    final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, dataDir);
+    final QuickstartRunner runner =
+        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 1, dataDir, true, getAuthToken(),
+            getConfigOverrides());
 
     printStatus(Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");
     runner.startAll();
@@ -196,13 +207,15 @@ public class Quickstart {
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q2)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q3 = "select playerName, sum(runs) from baseballStats where yearID=2000 group by playerName order by sum(runs) desc limit 5";
+    String q3 =
+        "select playerName, sum(runs) from baseballStats where yearID=2000 group by playerName order by sum(runs) desc limit 5";
     printStatus(Color.YELLOW, "Top 5 run scorers of the year 2000");
     printStatus(Color.CYAN, "Query : " + q3);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q3)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q4 = "select playerName, sum(runs) from baseballStats where yearID>=2000 group by playerName order by sum(runs) desc limit 10";
+    String q4 =
+        "select playerName, sum(runs) from baseballStats where yearID>=2000 group by playerName order by sum(runs) desc limit 10";
     printStatus(Color.YELLOW, "Top 10 run scorers after 2000");
     printStatus(Color.CYAN, "Query : " + q4);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q4)));

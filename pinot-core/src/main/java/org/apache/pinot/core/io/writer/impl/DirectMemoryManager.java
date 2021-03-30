@@ -19,7 +19,7 @@
 package org.apache.pinot.core.io.writer.impl;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.yammer.metrics.core.MetricsRegistry;
+import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
@@ -37,7 +37,7 @@ public class DirectMemoryManager extends RealtimeIndexOffHeapMemoryManager {
 
   @VisibleForTesting
   public DirectMemoryManager(final String segmentName) {
-    this(segmentName, new ServerMetrics(new MetricsRegistry()));
+    this(segmentName, new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
   }
 
   /**

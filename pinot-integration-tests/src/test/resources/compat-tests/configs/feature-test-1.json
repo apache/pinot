@@ -1,4 +1,15 @@
 {
+  "fieldConfigList": [
+    {
+      "encodingType": "RAW",
+      "indexType": "TEXT",
+      "name": "textDim1",
+      "properties": {
+        "deriveNumDocsPerChunkForRawIndex": "true",
+        "rawIndexWriterVersion": "3"
+      }
+    }
+  ],
   "metadata": {
     "customConfigs": {
       "d2Name": ""
@@ -10,7 +21,9 @@
     "retentionTimeValue": "",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "segmentPushFrequency": "daily",
-    "segmentPushType": "REFRESH"
+    "segmentPushType": "REFRESH",
+    "timeColumnName": "HoursSinceEpoch",
+    "timeType": "HOURS"
   },
   "tableIndexConfig": {
     "aggregateMetrics": false,
@@ -19,6 +32,7 @@
     "enableDefaultStarTree": false,
     "enableDynamicStarTreeCreation": false,
     "loadMode": "MMAP",
+    "noDictionaryColumns": [],
     "nullHandlingEnabled": false,
     "sortedColumn": [],
     "streamConfigs": {}

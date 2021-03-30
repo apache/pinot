@@ -45,6 +45,7 @@ public class MinionContext {
 
   // For segment upload
   private SSLContext _sslContext;
+  private String _taskAuthToken;
 
   // For PurgeTask
   private SegmentPurger.RecordPurgerFactory _recordPurgerFactory;
@@ -96,5 +97,13 @@ public class MinionContext {
 
   public void setRecordModifierFactory(SegmentPurger.RecordModifierFactory recordModifierFactory) {
     _recordModifierFactory = recordModifierFactory;
+  }
+
+  public String getTaskAuthToken() {
+    return _taskAuthToken;
+  }
+
+  public void setTaskAuthToken(String taskAuthToken) {
+    _taskAuthToken = taskAuthToken;
   }
 }

@@ -266,6 +266,11 @@
             </exclusions>
         </dependency>
         <dependency>
+            <groupId>org.apache.pinot</groupId>
+            <artifactId>pinot-yammer</artifactId>
+            <version>${project.parent.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpclient</artifactId>
         </dependency>

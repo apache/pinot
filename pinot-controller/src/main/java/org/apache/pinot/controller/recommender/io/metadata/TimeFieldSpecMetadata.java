@@ -21,36 +21,41 @@ package org.apache.pinot.controller.recommender.io.metadata;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 
+import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.DEFAULT_CARDINALITY;
+import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.DEFAULT_DATA_LENGTH;
+
 
 public class TimeFieldSpecMetadata extends FieldMetadata {
 
-  private FieldMetadata _incomingGranularitySpec;
-  private FieldMetadata _outgoingGranularitySpec;
+  private TimeGranularitySpecMetadata _incomingGranularitySpec;
+  private TimeGranularitySpecMetadata _outgoingGranularitySpec;
 
-  public FieldMetadata getIncomingGranularitySpec() {
+  public TimeGranularitySpecMetadata getIncomingGranularitySpec() {
     return _incomingGranularitySpec;
   }
 
-  public void setIncomingGranularitySpec(FieldMetadata incomingGranularitySpec) {
+  public void setIncomingGranularitySpec(TimeGranularitySpecMetadata incomingGranularitySpec) {
     _incomingGranularitySpec = incomingGranularitySpec;
     if (_outgoingGranularitySpec == null) {
-      super.setNumValuesPerEntry(incomingGranularitySpec.getNumValuesPerEntry());
-      super.setAverageLength(incomingGranularitySpec.getAverageLength());
+      super.setNumValuesPerEntry(DEFAULT_CARDINALITY);
+      super.setAverageLength(DEFAULT_DATA_LENGTH);
       super.setCardinality(incomingGranularitySpec.getCardinality());
       super.setName(incomingGranularitySpec.getName());
+      super.setDataType(incomingGranularitySpec.getDataType());
     }
   }
 
-  public FieldMetadata getOutgoingGranularitySpec() {
+  public TimeGranularitySpecMetadata getOutgoingGranularitySpec() {
     return _outgoingGranularitySpec;
   }
 
-  public void setOutgoingGranularitySpec(FieldMetadata outgoingGranularitySpec) {
+  public void setOutgoingGranularitySpec(TimeGranularitySpecMetadata outgoingGranularitySpec) {
     _outgoingGranularitySpec = outgoingGranularitySpec;
-    super.setNumValuesPerEntry(outgoingGranularitySpec.getNumValuesPerEntry());
-    super.setAverageLength(outgoingGranularitySpec.getAverageLength());
+    super.setNumValuesPerEntry(DEFAULT_CARDINALITY);
+    super.setAverageLength(DEFAULT_DATA_LENGTH);
     super.setCardinality(outgoingGranularitySpec.getCardinality());
     super.setName(outgoingGranularitySpec.getName());
+    super.setDataType(outgoingGranularitySpec.getDataType());
   }
 
   @Override
@@ -67,7 +72,7 @@ public class TimeFieldSpecMetadata extends FieldMetadata {
 
   @Override
   @JsonSetter(nulls = Nulls.SKIP)
-  public void setCardinality(double cardinality) {
+  public void setCardinality(int cardinality) {
     ;
   }
 

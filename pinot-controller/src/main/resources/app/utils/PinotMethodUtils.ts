@@ -64,7 +64,9 @@ import {
   saveTable,
   getSchema,
   getSchemaList,
-  getState
+  getState,
+  getInfo,
+  authenticateUser
 } from '../requests';
 import Utils from './Utils';
 
@@ -164,6 +166,15 @@ const getClusterConfigData = () => {
       columns: ['Property', 'Value'],
       records: [...Object.keys(data).map((key) => [key, data[key]])],
     };
+  });
+};
+
+// This method is used to fetch cluster congifuration
+// API: /cluster/configs
+// Expected Output: {key: value}
+const getClusterConfigJSON = () => {
+  return getClusterConfig().then(({ data }) => {
+    return data;
   });
 };
 
@@ -736,11 +747,24 @@ const getTableState = (tableName, tableType) => {
   });
 };
 
+const getAuthInfo = () => {
+  return getInfo().then((response)=>{
+    return response.data;
+  });
+};
+
+const verifyAuth = (authToken) => {
+  return authenticateUser(authToken).then((response)=>{
+    return response.data;
+  });
+};
+
 export default {
   getTenantsData,
   getAllInstances,
   getInstanceData,
   getClusterConfigData,
+  getClusterConfigJSON,
   getQueryTablesList,
   getTableSchemaData,
   getQueryResults,
@@ -782,5 +806,7 @@ export default {
   saveTableAction,
   getSchemaData,
   getAllSchemaDetails,
-  getTableState
+  getTableState,
+  getAuthInfo,
+  verifyAuth
 };

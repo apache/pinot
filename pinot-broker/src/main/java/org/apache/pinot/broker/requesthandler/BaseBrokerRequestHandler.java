@@ -52,6 +52,7 @@ import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.function.TransformFunctionType;
+import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
@@ -179,6 +180,16 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     requestStatistics.setRequestId(requestId);
     requestStatistics.setRequestArrivalTimeMillis(System.currentTimeMillis());
 
+    // first-stage access control to prevent unauthenticated requests from using up resources
+    // secondary table-level check comes later
+    boolean hasAccess = _accessControlFactory.create().hasAccess(requesterIdentity);
+    if (!hasAccess) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
+      LOGGER.info("Access denied for requestId {}", requestId);
+      requestStatistics.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
+      return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
+    }
+
     PinotQueryRequest pinotQueryRequest = getPinotQueryRequest(request);
     String query = pinotQueryRequest.getQuery();
     LOGGER.debug("Query string for request {}: {}", requestId, pinotQueryRequest.getQuery());
@@ -244,9 +255,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         compilationEndTimeNs - compilationStartTimeNs);
     _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERIES, 1);
 
-    // Check table access
-    boolean hasAccess = _accessControlFactory.create().hasAccess(requesterIdentity, brokerRequest);
-    if (!hasAccess) {
+    // second-stage table-level access control
+    boolean hasTableAccess = _accessControlFactory.create().hasAccess(requesterIdentity, brokerRequest);
+    if (!hasTableAccess) {
       _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
       LOGGER.info("Access denied for requestId {}, table {}", requestId, tableName);
       requestStatistics.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
@@ -307,6 +318,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e));
     }
+
+    _brokerMetrics.addValueToTableGauge(rawTableName, BrokerGauge.REQUEST_SIZE, query.length());
 
     // Prepare offline and real-time requests
     BrokerRequest offlineBrokerRequest = null;

@@ -45,6 +45,7 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
  */
 public class Instance extends BaseJsonConfig {
   public static int NOT_SET_GRPC_PORT_VALUE = -1;
+  public static int NOT_SET_ADMIN_PORT_VALUE = -1;
 
   private final String _host;
   private final int _port;
@@ -52,13 +53,17 @@ public class Instance extends BaseJsonConfig {
   private final List<String> _tags;
   private final Map<String, Integer> _pools;
   private final int _grpcPort;
+  private final int _adminPort;
+  private final boolean _queriesDisabled;
 
   @JsonCreator
   public Instance(@JsonProperty(value = "host", required = true) String host,
       @JsonProperty(value = "port", required = true) int port,
       @JsonProperty(value = "type", required = true) InstanceType type,
       @JsonProperty("tags") @Nullable List<String> tags, @JsonProperty("pools") @Nullable Map<String, Integer> pools,
-      @JsonProperty("grpcPort") int grpcPort) {
+      @JsonProperty("grpcPort") int grpcPort,
+      @JsonProperty("adminPort") int adminPort,
+      @JsonProperty("queriesDisabled") boolean queriesDisabled) {
     Preconditions.checkArgument(host != null, "'host' must be configured");
     Preconditions.checkArgument(type != null, "'type' must be configured");
     _host = host;
@@ -71,6 +76,12 @@ public class Instance extends BaseJsonConfig {
     } else {
       _grpcPort = grpcPort;
     }
+    if (adminPort == 0) {
+      _adminPort = NOT_SET_ADMIN_PORT_VALUE;
+    } else {
+      _adminPort = adminPort;
+    }
+    _queriesDisabled = queriesDisabled;
   }
 
   public String getHost() {
@@ -97,5 +108,13 @@ public class Instance extends BaseJsonConfig {
 
   public int getGrpcPort() {
     return _grpcPort;
+  }
+
+  public int getAdminPort() {
+    return _adminPort;
+  }
+
+  public boolean isQueriesDisabled() {
+    return _queriesDisabled;
   }
 }

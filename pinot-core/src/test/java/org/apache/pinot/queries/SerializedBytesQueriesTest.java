@@ -391,9 +391,9 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
     AggregationGroupByResult groupByResult = resultsBlock.getAggregationGroupByResult();
     assertNotNull(groupByResult);
 
-    Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupByResult.getGroupKeyIterator();
+    Iterator<GroupKeyGenerator.StringGroupKey> groupKeyIterator = groupByResult.getStringGroupKeyIterator();
     while (groupKeyIterator.hasNext()) {
-      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
+      GroupKeyGenerator.StringGroupKey groupKey = groupKeyIterator.next();
       int groupId = Integer.parseInt(groupKey._stringKey.substring(1));
 
       // Avg
@@ -627,9 +627,9 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       expectedTDigest.add(_tDigests[i]);
     }
 
-    Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupByResult.getGroupKeyIterator();
+    Iterator<GroupKeyGenerator.StringGroupKey> groupKeyIterator = groupByResult.getStringGroupKeyIterator();
     while (groupKeyIterator.hasNext()) {
-      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
+      GroupKeyGenerator.StringGroupKey groupKey = groupKeyIterator.next();
 
       // Avg
       AvgPair avgPair = (AvgPair) groupByResult.getResultForKey(groupKey, 0);

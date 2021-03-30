@@ -49,6 +49,8 @@ public class BatchConfigProperties {
   public static final String PUSH_CONTROLLER_URI = "push.controllerUri";
   public static final String PUSH_SEGMENT_URI_PREFIX = "push.segmentUriPrefix";
   public static final String PUSH_SEGMENT_URI_SUFFIX = "push.segmentUriSuffix";
+  public static final String FAIL_ON_EMPTY_SEGMENT = "fail.on.empty.segment";
+  public static final String AUTH_TOKEN = "authToken";
 
   public static final String OUTPUT_SEGMENT_DIR_URI = "output.segment.dir.uri";
 

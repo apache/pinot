@@ -41,7 +41,7 @@ import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
-import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
+import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
@@ -71,6 +71,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private HelixManager _helixManager;
   private ServerMetrics _serverMetrics;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  private String _authToken;
 
   @Override
   public synchronized void init(PinotConfiguration config, HelixManager helixManager, ServerMetrics serverMetrics)
@@ -82,6 +83,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     _instanceId = _instanceDataManagerConfig.getInstanceId();
     _helixManager = helixManager;
     _serverMetrics = serverMetrics;
+    _authToken = config.getProperty(CommonConstants.Server.CONFIG_OF_AUTH_TOKEN);
 
     File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
     if (!instanceDataDir.exists()) {
@@ -92,9 +94,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       Preconditions.checkState(instanceSegmentTarDir.mkdirs());
     }
 
+    // Initialize segment build time lease extender executor
+    SegmentBuildTimeLeaseExtender.initExecutor();
+
     // Initialize the table data manager provider
     TableDataManagerProvider.init(_instanceDataManagerConfig);
-
     LOGGER.info("Initialized Helix instance data manager");
   }
 
@@ -109,6 +113,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     for (TableDataManager tableDataManager : _tableDataManagerMap.values()) {
       tableDataManager.shutDown();
     }
+    SegmentBuildTimeLeaseExtender.shutdownExecutor();
     LOGGER.info("Helix instance data manager shut down");
   }
 
@@ -138,7 +143,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     LOGGER.info("Creating table data manager for table: {}", tableNameWithType);
     TableDataManagerConfig tableDataManagerConfig =
         TableDataManagerConfig.getDefaultHelixTableDataManagerConfig(_instanceDataManagerConfig, tableNameWithType);
-    tableDataManagerConfig.overrideConfigs(tableConfig);
+    tableDataManagerConfig.overrideConfigs(tableConfig, _authToken);
     TableDataManager tableDataManager = TableDataManagerProvider
         .getTableDataManager(tableDataManagerConfig, _instanceId, _propertyStore, _serverMetrics, _helixManager);
     tableDataManager.start();
@@ -149,11 +154,16 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public void removeSegment(String tableNameWithType, String segmentName) {
     LOGGER.info("Removing segment: {} from table: {}", segmentName, tableNameWithType);
-    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
-    if (tableDataManager != null) {
-      tableDataManager.removeSegment(segmentName);
-      LOGGER.info("Removed segment: {} from table: {}", segmentName, tableNameWithType);
-    }
+    _tableDataManagerMap.computeIfPresent(tableNameWithType, (k, v) -> {
+      v.removeSegment(segmentName);
+      LOGGER.info("Removed segment: {} from table: {}", segmentName, k);
+      if (v.getNumSegments() == 0) {
+        v.shutDown();
+        return null;
+      } else {
+        return v;
+      }
+    });
   }
 
   @Override

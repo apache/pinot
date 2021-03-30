@@ -1,5 +1,0 @@
-databaseConfiguration:
-  url: jdbc:hsqldb:mem:thirdeye
-  user: SA
-  password:
-  driver: org.hsqldb.jdbcDriver

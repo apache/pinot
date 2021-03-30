@@ -80,39 +80,43 @@ public class DataTypeTransformer implements RecordTransformer {
   public GenericRow transform(GenericRow record) {
     for (Map.Entry<String, PinotDataType> entry : _dataTypes.entrySet()) {
       String column = entry.getKey();
-      Object value = record.getValue(column);
-      if (value == null) {
-        continue;
-      }
-      PinotDataType dest = entry.getValue();
-      value = standardize(column, value, dest.isSingleValue());
-      // NOTE: The standardized value could be null for empty Collection/Map/Object[].
-      if (value == null) {
-        record.putValue(column, null);
-        continue;
-      }
-
-      // Convert data type if necessary
-      PinotDataType source;
-      if (value instanceof Object[]) {
-        // Multi-value column
-        Object[] values = (Object[]) value;
-        source = MULTI_VALUE_TYPE_MAP.get(values[0].getClass());
-        if (source == null) {
-          source = PinotDataType.OBJECT_ARRAY;
+      try {
+        Object value = record.getValue(column);
+        if (value == null) {
+          continue;
         }
-      } else {
-        // Single-value column
-        source = SINGLE_VALUE_TYPE_MAP.get(value.getClass());
-        if (source == null) {
-          source = PinotDataType.OBJECT;
+        PinotDataType dest = entry.getValue();
+        value = standardize(column, value, dest.isSingleValue());
+        // NOTE: The standardized value could be null for empty Collection/Map/Object[].
+        if (value == null) {
+          record.putValue(column, null);
+          continue;
         }
-      }
-      if (source != dest) {
-        value = dest.convert(value, source);
-      }
 
-      record.putValue(column, value);
+        // Convert data type if necessary
+        PinotDataType source;
+        if (value instanceof Object[]) {
+          // Multi-value column
+          Object[] values = (Object[]) value;
+          source = MULTI_VALUE_TYPE_MAP.get(values[0].getClass());
+          if (source == null) {
+            source = PinotDataType.OBJECT_ARRAY;
+          }
+        } else {
+          // Single-value column
+          source = SINGLE_VALUE_TYPE_MAP.get(value.getClass());
+          if (source == null) {
+            source = PinotDataType.OBJECT;
+          }
+        }
+        if (source != dest) {
+          value = dest.convert(value, source);
+        }
+
+        record.putValue(column, value);
+      } catch (Exception e) {
+        throw new RuntimeException("Caught exception while transforming data type for column: " + column, e);
+      }
     }
     return record;
   }

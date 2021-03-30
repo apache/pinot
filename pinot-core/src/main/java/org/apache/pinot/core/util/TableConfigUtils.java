@@ -19,7 +19,7 @@
 package org.apache.pinot.core.util;
 
 import com.google.common.base.Preconditions;
-import java.util.HashMap;
+import com.google.common.collect.ArrayListMultimap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +48,7 @@ import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -62,7 +63,6 @@ import org.apache.pinot.spi.utils.TimeUtils;
 public final class TableConfigUtils {
 
   private TableConfigUtils() {
-
   }
 
   /**
@@ -213,7 +213,7 @@ public final class TableConfigUtils {
               "Dimension tables must have segment ingestion type REFRESH");
         }
       }
-      if (tableConfig.isDimTable()){
+      if (tableConfig.isDimTable()) {
         Preconditions.checkState(ingestionConfig.getBatchIngestionConfig() != null,
             "Dimension tables must have batch ingestion configuration");
       }
@@ -254,8 +254,7 @@ public final class TableConfigUtils {
           String columnName = transformConfig.getColumnName();
           if (schema != null) {
             Preconditions.checkState(schema.getFieldSpecFor(columnName) != null,
-                "The destination column '" + columnName
-                    + "' of the transform function must be present in the schema");
+                "The destination column '" + columnName + "' of the transform function must be present in the schema");
           }
           String transformFunction = transformConfig.getTransformFunction();
           if (columnName == null || transformFunction == null) {
@@ -370,8 +369,9 @@ public final class TableConfigUtils {
     if (indexingConfig == null || schema == null) {
       return;
     }
-    Map<String, String> columnNameToConfigMap = new HashMap<>();
+    ArrayListMultimap<String, String> columnNameToConfigMap = ArrayListMultimap.create();
     Set<String> noDictionaryColumnsSet = new HashSet<>();
+    String STAR_TREE_CONFIG_NAME = "StarTreeIndex Config";
 
     if (indexingConfig.getNoDictionaryColumns() != null) {
       for (String columnName : indexingConfig.getNoDictionaryColumns()) {
@@ -429,13 +429,18 @@ public final class TableConfigUtils {
         columnNameToConfigMap.put(columnName, "Segment Partition Config");
       }
     }
+    if (indexingConfig.getJsonIndexColumns() != null) {
+      for (String columnName : indexingConfig.getJsonIndexColumns()) {
+        columnNameToConfigMap.put(columnName, "Json Index Config");
+      }
+    }
 
     List<StarTreeIndexConfig> starTreeIndexConfigList = indexingConfig.getStarTreeIndexConfigs();
     if (starTreeIndexConfigList != null) {
       for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigList) {
         // Dimension split order cannot be null
         for (String columnName : starTreeIndexConfig.getDimensionsSplitOrder()) {
-          columnNameToConfigMap.put(columnName, "StarTreeIndex Config");
+          columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
         }
         // Function column pairs cannot be null
         for (String functionColumnPair : starTreeIndexConfig.getFunctionColumnPairs()) {
@@ -448,29 +453,71 @@ public final class TableConfigUtils {
           }
           String columnName = columnPair.getColumn();
           if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
-            columnNameToConfigMap.put(columnName, "StarTreeIndex Config");
+            columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
           }
         }
         List<String> skipDimensionList = starTreeIndexConfig.getSkipStarNodeCreationForDimensions();
         if (skipDimensionList != null) {
           for (String columnName : skipDimensionList) {
-            columnNameToConfigMap.put(columnName, "StarTreeIndex Config");
+            columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
           }
         }
       }
     }
 
-    for (Map.Entry<String, String> entry : columnNameToConfigMap.entrySet()) {
+    for (Map.Entry<String, String> entry : columnNameToConfigMap.entries()) {
       String columnName = entry.getKey();
       String configName = entry.getValue();
-      Preconditions.checkState(schema.getFieldSpecFor(columnName) != null,
+      FieldSpec columnFieldSpec = schema.getFieldSpecFor(columnName);
+      Preconditions.checkState(columnFieldSpec != null,
           "Column Name " + columnName + " defined in " + configName + " must be a valid column defined in the schema");
+      if (configName.equals(STAR_TREE_CONFIG_NAME)) {
+        Preconditions.checkState(columnFieldSpec.isSingleValueField(),
+            "Column Name " + columnName + " defined in " + configName + " must be a single value column");
+      }
+    }
+
+    // Range index semantic validation
+    // Range index can be defined on numeric columns and any column with a dictionary
+    if (indexingConfig.getRangeIndexColumns() != null) {
+      for (String rangeIndexCol : indexingConfig.getRangeIndexColumns()) {
+        Preconditions.checkState(
+            schema.getFieldSpecFor(rangeIndexCol).getDataType().isNumeric() || !noDictionaryColumnsSet
+                .contains(rangeIndexCol),
+            "Cannot create a range index on non-numeric/no-dictionary column " + rangeIndexCol);
+      }
+    }
+
+    // Var length dictionary semantic validation
+    if (indexingConfig.getVarLengthDictionaryColumns() != null) {
+      for (String varLenDictCol : indexingConfig.getVarLengthDictionaryColumns()) {
+        FieldSpec varLenDictFieldSpec = schema.getFieldSpecFor(varLenDictCol);
+        switch (varLenDictFieldSpec.getDataType()) {
+          case STRING:
+          case BYTES:
+            continue;
+          default:
+            throw new IllegalStateException(
+                "var length dictionary can only be created for columns of type STRING and BYTES. Invalid for column "
+                    + varLenDictCol);
+        }
+      }
+    }
+
+    if (indexingConfig.getJsonIndexColumns() != null) {
+      for (String jsonIndexCol : indexingConfig.getJsonIndexColumns()) {
+        Preconditions.checkState(
+            schema.getFieldSpecFor(jsonIndexCol).isSingleValueField() && schema.getFieldSpecFor(jsonIndexCol)
+                .getDataType().equals(FieldSpec.DataType.STRING),
+            "Json index can only be created for single value String column. Invalid for column: " + jsonIndexCol);
+      }
     }
   }
 
   /**
    * Validates the Field Config List in the given TableConfig
    * Ensures that every referred column name exists in the corresponding schema
+   * Additional checks for TEXT and FST index types
    */
   private static void validateFieldConfigList(@Nullable List<FieldConfig> fieldConfigList,
       @Nullable IndexingConfig indexingConfigs, @Nullable Schema schema) {
@@ -480,18 +527,31 @@ public final class TableConfigUtils {
 
     for (FieldConfig fieldConfig : fieldConfigList) {
       String columnName = fieldConfig.getName();
-      Preconditions.checkState(schema.getFieldSpecFor(columnName) != null,
+      FieldSpec fieldConfigColSpec = schema.getFieldSpecFor(columnName);
+      Preconditions.checkState(fieldConfigColSpec != null,
           "Column Name " + columnName + " defined in field config list must be a valid column defined in the schema");
 
-      if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY &&
-          indexingConfigs.getNoDictionaryColumns() != null) {
-        Preconditions.checkArgument(!indexingConfigs.getNoDictionaryColumns().contains(columnName),
-            "FieldConfig encoding type is different from indexingConfig for column: " + columnName);
+      List<String> noDictionaryColumns = indexingConfigs.getNoDictionaryColumns();
+      switch (fieldConfig.getEncodingType()) {
+        case DICTIONARY:
+          if (noDictionaryColumns != null) {
+            Preconditions.checkArgument(!noDictionaryColumns.contains(columnName),
+                "FieldConfig encoding type is different from indexingConfig for column: " + columnName);
+          }
       }
-      // FST Index is only available on dictionary encoded columns.
-      if (fieldConfig.getIndexType() == FieldConfig.IndexType.FST) {
-        Preconditions.checkArgument(fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY,
-            "FST Index is only enabled on dictionary encoded columns");
+
+      switch (fieldConfig.getIndexType()) {
+        case FST:
+          Preconditions.checkArgument(fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY,
+              "FST Index is only enabled on dictionary encoded columns");
+          Preconditions.checkState(
+              fieldConfigColSpec.isSingleValueField() && fieldConfigColSpec.getDataType() == FieldSpec.DataType.STRING,
+              "FST Index is only supported for single value string columns");
+          break;
+        case TEXT:
+          Preconditions.checkState(
+              fieldConfigColSpec.isSingleValueField() && fieldConfigColSpec.getDataType() == FieldSpec.DataType.STRING,
+              "TEXT Index is only supported for single value string columns");
       }
     }
   }

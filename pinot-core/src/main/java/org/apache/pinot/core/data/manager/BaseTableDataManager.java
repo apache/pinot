@@ -55,6 +55,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected File _indexDir;
   protected Logger _logger;
   protected HelixManager _helixManager;
+  protected String _authToken;
 
   @Override
   public void init(TableDataManagerConfig tableDataManagerConfig, String instanceId,
@@ -66,6 +67,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _propertyStore = propertyStore;
     _serverMetrics = serverMetrics;
     _helixManager = helixManager;
+    _authToken = tableDataManagerConfig.getAuthToken();
 
     _tableNameWithType = tableDataManagerConfig.getTableName();
     _tableDataDir = tableDataManagerConfig.getDataDir();
@@ -208,6 +210,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
         -segmentDataManager.getSegment().getSegmentMetadata().getTotalDocs());
     segmentDataManager.destroy();
     _logger.info("Closed segment: {} of table: {}", segmentName, _tableNameWithType);
+  }
+
+  @Override
+  public int getNumSegments() {
+    return _segmentDataManagerMap.size();
   }
 
   @Override

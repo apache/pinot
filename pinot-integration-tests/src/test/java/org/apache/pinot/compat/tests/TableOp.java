@@ -84,7 +84,7 @@ public class TableOp extends BaseOp {
   }
 
   @Override
-  boolean runOp() {
+  boolean runOp(int generationNumber) {
     switch (_op) {
       case CREATE:
         createSchema();

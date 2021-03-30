@@ -70,7 +70,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private final File _indexDir;
   private final Map<String, ColumnMetadata> _columnMetadataMap;
   private String _segmentName;
-  private final Set<String> _allColumns;
   private final Schema _schema;
   private long _crc = Long.MIN_VALUE;
   private long _creationTime = Long.MIN_VALUE;
@@ -106,7 +105,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _indexDir = indexDir;
     PropertiesConfiguration segmentMetadataPropertiesConfiguration = getPropertiesConfiguration(indexDir);
     _columnMetadataMap = new HashMap<>();
-    _allColumns = new HashSet<>();
     _schema = new Schema();
     _customMap = new HashMap<>();
 
@@ -149,7 +147,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _columnMetadataMap = null;
     _rawTableName = segmentMetadata.getTableName();
     _segmentName = segmentMetadata.getSegmentName();
-    _allColumns = schema.getColumnNames();
     _schema = schema;
     _totalDocs = segmentMetadataPropertiesConfiguration.getInt(SEGMENT_TOTAL_DOCS);
     _customMap = new HashMap<>();
@@ -206,7 +203,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   public Set<String> getAllColumns() {
-    return _allColumns;
+    return _schema.getColumnNames();
   }
 
   private void init(PropertiesConfiguration segmentMetadataPropertiesConfiguration) {
@@ -227,10 +224,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     // NOTE: getList() will always return an non-null List with trimmed strings:
     // - If key does not exist, it will return an empty list
     // - If key exists but value is missing, it will return a singleton list with an empty string
-    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(DIMENSIONS), _allColumns);
-    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(METRICS), _allColumns);
-    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(TIME_COLUMN_NAME), _allColumns);
-    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(DATETIME_COLUMNS), _allColumns);
+    Set<String> physicalColumns = new HashSet<>();
+    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(DIMENSIONS), physicalColumns);
+    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(METRICS), physicalColumns);
+    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(TIME_COLUMN_NAME), physicalColumns);
+    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(DATETIME_COLUMNS), physicalColumns);
 
     // Set the table name (for backward compatibility)
     String tableName = segmentMetadataPropertiesConfiguration.getString(TABLE_NAME);
@@ -241,8 +239,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     // Set segment name.
     _segmentName = segmentMetadataPropertiesConfiguration.getString(SEGMENT_NAME);
 
-    // Build column metadata map, schema and hll derived column map.
-    for (String column : _allColumns) {
+    // Build column metadata map and schema.
+    for (String column : physicalColumns) {
       ColumnMetadata columnMetadata =
           ColumnMetadata.fromPropertiesConfiguration(column, segmentMetadataPropertiesConfiguration);
       _columnMetadataMap.put(column, columnMetadata);
@@ -293,6 +291,15 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   public Map<String, ColumnMetadata> getColumnMetadataMap() {
     return _columnMetadataMap;
+  }
+
+  /**
+   * Removes a column from the segment metadata.
+   */
+  public void removeColumn(String column) {
+    Preconditions.checkState(!column.equals(_timeColumn), "Cannot remove time column: %s", _timeColumn);
+    _columnMetadataMap.remove(column);
+    _schema.removeField(column);
   }
 
   @Override
@@ -552,14 +559,15 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
     segmentMetadata.set("custom", customConfigs);
 
-    ArrayNode columnsMetadata = JsonUtils.newArrayNode();
-    for (String column : _allColumns) {
-      if (columnFilter != null && !columnFilter.contains(column)) {
-        continue;
+    if (_columnMetadataMap != null) {
+      ArrayNode columnsMetadata = JsonUtils.newArrayNode();
+      for (Map.Entry<String, ColumnMetadata> entry : _columnMetadataMap.entrySet()) {
+        if (columnFilter == null || columnFilter.contains(entry.getKey())) {
+          columnsMetadata.add(JsonUtils.objectToJsonNode(entry.getValue()));
+        }
       }
-      columnsMetadata.add(JsonUtils.objectToJsonNode(_columnMetadataMap.get(column)));
+      segmentMetadata.set("columns", columnsMetadata);
     }
-    segmentMetadata.set("columns", columnsMetadata);
 
     return segmentMetadata;
   }

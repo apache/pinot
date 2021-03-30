@@ -178,8 +178,8 @@ public class TableConfigUtilsTest {
     // dimension table with REALTIME type (should be OFFLINE)
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(TIME_COLUMN, FieldSpec.DataType.STRING).build();
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
-        .setTableName(TABLE_NAME).setIsDimTable(true).setTimeColumnName(TIME_COLUMN).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setIsDimTable(true)
+        .setTimeColumnName(TIME_COLUMN).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail with a Dimension table of type REALTIME");
@@ -188,8 +188,8 @@ public class TableConfigUtilsTest {
     }
 
     // dimension table without a schema
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(TABLE_NAME).setIsDimTable(true).setTimeColumnName(TIME_COLUMN).build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIsDimTable(true)
+        .setTimeColumnName(TIME_COLUMN).build();
     try {
       TableConfigUtils.validate(tableConfig, null);
       Assert.fail("Should fail with a Dimension table without a schema");
@@ -200,8 +200,8 @@ public class TableConfigUtilsTest {
     // dimension table without a Primary Key
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(TIME_COLUMN, FieldSpec.DataType.STRING).build();
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(TABLE_NAME).setIsDimTable(true).setTimeColumnName(TIME_COLUMN).build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIsDimTable(true)
+        .setTimeColumnName(TIME_COLUMN).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail with a Dimension without a primary key");
@@ -210,10 +210,10 @@ public class TableConfigUtilsTest {
     }
 
     // valid dimension table
-    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-        .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(TABLE_NAME).setIsDimTable(true).build();
+    schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIsDimTable(true).build();
     TableConfigUtils.validate(tableConfig, schema);
   }
 
@@ -451,17 +451,14 @@ public class TableConfigUtilsTest {
 
     // valid dimension table ingestion config
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIsDimTable(true)
-        .setIngestionConfig(
-            new IngestionConfig(new BatchIngestionConfig(Lists.newArrayList(batchConfigMap, batchConfigMap), "REFRESH",
-                null), null, null, null)
-        ).build();
+        .setIngestionConfig(new IngestionConfig(
+            new BatchIngestionConfig(Lists.newArrayList(batchConfigMap, batchConfigMap), "REFRESH", null), null, null,
+            null)).build();
     TableConfigUtils.validateIngestionConfig(tableConfig, null);
 
     // dimension tables should have batch ingestion config
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIsDimTable(true)
-        .setIngestionConfig(
-            new IngestionConfig(null, null, null, null)
-        ).build();
+        .setIngestionConfig(new IngestionConfig(null, null, null, null)).build();
     try {
       TableConfigUtils.validateIngestionConfig(tableConfig, null);
       Assert.fail("Should fail for Dimension table without batch ingestion config");
@@ -471,10 +468,9 @@ public class TableConfigUtilsTest {
 
     // dimension tables should have batch ingestion config of type REFRESH
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIsDimTable(true)
-        .setIngestionConfig(
-            new IngestionConfig(new BatchIngestionConfig(Lists.newArrayList(batchConfigMap, batchConfigMap), "APPEND",
-                null), null, null, null)
-        ).build();
+        .setIngestionConfig(new IngestionConfig(
+            new BatchIngestionConfig(Lists.newArrayList(batchConfigMap, batchConfigMap), "APPEND", null), null, null,
+            null)).build();
     try {
       TableConfigUtils.validateIngestionConfig(tableConfig, null);
       Assert.fail("Should fail for Dimension table with ingestion type APPEND (should be REFRESH)");
@@ -643,7 +639,9 @@ public class TableConfigUtilsTest {
   @Test
   public void testValidateFieldConfig() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension("myCol1", FieldSpec.DataType.STRING).build();
+        .addSingleValueDimension("myCol1", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("myCol2", FieldSpec.DataType.INT)
+        .addSingleValueDimension("intCol", FieldSpec.DataType.INT).build();
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(Arrays.asList("myCol1")).build();
 
@@ -670,6 +668,52 @@ public class TableConfigUtilsTest {
       Assert.assertEquals(e.getMessage(), "FST Index is only enabled on dictionary encoded columns");
     }
 
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    try {
+      FieldConfig fieldConfig =
+          new FieldConfig("myCol2", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail since FST index is enabled on multi value column");
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(), "FST Index is only supported for single value string columns");
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    try {
+      FieldConfig fieldConfig =
+          new FieldConfig("intCol", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail since FST index is enabled on non String column");
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(), "FST Index is only supported for single value string columns");
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNoDictionaryColumns(Arrays.asList("myCol2", "intCol")).build();
+    try {
+      FieldConfig fieldConfig =
+          new FieldConfig("myCol2", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail since TEXT index is enabled on multi value column");
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(), "TEXT Index is only supported for single value string columns");
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNoDictionaryColumns(Arrays.asList("myCol2", "intCol")).build();
+    try {
+      FieldConfig fieldConfig =
+          new FieldConfig("intCol", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail since TEXT index is enabled on non String column");
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(), "TEXT Index is only supported for single value string columns");
+    }
+
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(Arrays.asList("myCol1")).build();
     try {
@@ -677,7 +721,7 @@ public class TableConfigUtilsTest {
           new FieldConfig("myCol21", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.FST, null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
-      Assert.fail("Should fail since field name is not persent in schema");
+      Assert.fail("Should fail since field name is not present in schema");
     } catch (Exception e) {
       Assert.assertEquals(e.getMessage(),
           "Column Name myCol21 defined in field config list must be a valid column defined in the schema");
@@ -688,7 +732,9 @@ public class TableConfigUtilsTest {
   public void testValidateIndexingConfig() {
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-            .build();
+            .addSingleValueDimension("bytesCol", FieldSpec.DataType.BYTES)
+            .addSingleValueDimension("intCol", FieldSpec.DataType.INT)
+            .addMultiValueDimension("multiValCol", FieldSpec.DataType.STRING).build();
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setBloomFilterColumns(Arrays.asList("myCol2")).build();
     try {
@@ -837,6 +883,17 @@ public class TableConfigUtilsTest {
       // expected
     }
 
+    starTreeIndexConfig =
+        new StarTreeIndexConfig(Arrays.asList("multiValCol"), Arrays.asList("multiValCol"), Arrays.asList("SUM__multiValCol"), 1);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setStarTreeIndexConfigs(Arrays.asList(starTreeIndexConfig)).build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for multi-value column name in StarTreeIndex config");
+    } catch (Exception e) {
+      // expected
+    }
+
     FieldConfig fieldConfig = new FieldConfig("myCol2", null, null, null);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setFieldConfigList(Arrays.asList(fieldConfig)).build();
@@ -862,6 +919,69 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for valid column name in both no dictionary and bloom filter column config");
+    } catch (Exception e) {
+      // expected
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setJsonIndexColumns(Arrays.asList("non-existent-column")).build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for non existent column in Json index config");
+    } catch (Exception e) {
+      // expected
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setJsonIndexColumns(Arrays.asList("intCol")).build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for Json index defined on non string column");
+    } catch (Exception e) {
+      // expected
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setJsonIndexColumns(Arrays.asList("multiValCol")).build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for Json index defined on multi-value column");
+    } catch (Exception e) {
+      // expected
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setRangeIndexColumns(columnList).
+        build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (Exception e) {
+      Assert.fail("Should work for range index defined on dictionary encoded string column");
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setRangeIndexColumns(columnList)
+        .setNoDictionaryColumns(columnList).
+            build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for range index defined on non numeric/no-dictionary column");
+    } catch (Exception e) {
+      // Expected
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setVarLengthDictionaryColumns(Arrays.asList("intCol")).
+        build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for Var length dictionary defined for non string/bytes column");
+    } catch (Exception e) {
+      // expected
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setJsonIndexColumns(Arrays.asList("multiValCol")).
+        build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for Json Index defined on a multi value column");
     } catch (Exception e) {
       // expected
     }

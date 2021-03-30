@@ -144,8 +144,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertEquals(instanceStatesMap.size(), numPartitions);
     assertEquals(segmentManager.getAllSegments(REALTIME_TABLE_NAME).size(), numPartitions);
 
-    for (int partitionId = 0; partitionId < numPartitions; partitionId++) {
-      LLCSegmentName llcSegmentName = new LLCSegmentName(RAW_TABLE_NAME, partitionId, 0, CURRENT_TIME_MS);
+    for (int partitionGroupId = 0; partitionGroupId < numPartitions; partitionGroupId++) {
+      LLCSegmentName llcSegmentName = new LLCSegmentName(RAW_TABLE_NAME, partitionGroupId, 0, CURRENT_TIME_MS);
       String segmentName = llcSegmentName.getSegmentName();
 
       Map<String, String> instanceStateMap = instanceStatesMap.get(segmentName);
@@ -180,7 +180,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     setUpNewTable(segmentManager, 2, 5, 4);
     Map<String, Map<String, String>> instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
 
-    // Commit a segment for partition 0
+    // Commit a segment for partition group 0
     String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
     CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(committingSegment,
         new LongMsgOffset(PARTITION_OFFSET.getOffset() + NUM_DOCS).toString(), 0L);
@@ -270,8 +270,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     testSetUpNewPartitions(segmentManager, false);
 
     // 2 partitions commit segment
-    for (int partitionId = 0; partitionId < 2; partitionId++) {
-      String segmentName = new LLCSegmentName(RAW_TABLE_NAME, partitionId, 0, CURRENT_TIME_MS).getSegmentName();
+    for (int partitionGroupId = 0; partitionGroupId < 2; partitionGroupId++) {
+      String segmentName = new LLCSegmentName(RAW_TABLE_NAME, partitionGroupId, 0, CURRENT_TIME_MS).getSegmentName();
       CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(segmentName,
           new LongMsgOffset(PARTITION_OFFSET.getOffset() + NUM_DOCS).toString(), 0L);
       committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
@@ -333,19 +333,20 @@ public class PinotLLCRealtimeSegmentManagerTest {
       assertTrue(oldSegmentZKMetadataMap.containsKey(segmentName));
       assertTrue(segmentZKMetadataMap.containsKey(segmentName));
       assertEquals(segmentZKMetadataMap.get(segmentName), oldSegmentZKMetadataMap.get(segmentName));
-      oldNumPartitions = Math.max(oldNumPartitions, new LLCSegmentName(segmentName).getPartitionId() + 1);
+      oldNumPartitions = Math.max(oldNumPartitions, new LLCSegmentName(segmentName).getPartitionGroupId() + 1);
     }
 
-    // Check that for new partitions, each partition should have exactly 1 new segment in CONSUMING state, and metadata
+    // Check that for new partition groups, each partition group should have exactly 1 new segment in CONSUMING state, and metadata
     // in IN_PROGRESS state
-    Map<Integer, List<String>> partitionIdToSegmentsMap = new HashMap<>();
+    Map<Integer, List<String>> partitionGroupIdToSegmentsMap = new HashMap<>();
     for (Map.Entry<String, Map<String, String>> entry : instanceStatesMap.entrySet()) {
       String segmentName = entry.getKey();
-      int partitionId = new LLCSegmentName(segmentName).getPartitionId();
-      partitionIdToSegmentsMap.computeIfAbsent(partitionId, k -> new ArrayList<>()).add(segmentName);
+      int partitionGroupId = new LLCSegmentName(segmentName).getPartitionGroupId();
+      partitionGroupIdToSegmentsMap.computeIfAbsent(partitionGroupId, k -> new ArrayList<>()).add(segmentName);
     }
-    for (int partitionId = oldNumPartitions; partitionId < segmentManager._numPartitions; partitionId++) {
-      List<String> segments = partitionIdToSegmentsMap.get(partitionId);
+    for (int partitionGroupId = oldNumPartitions; partitionGroupId < segmentManager._numPartitions;
+        partitionGroupId++) {
+      List<String> segments = partitionGroupIdToSegmentsMap.get(partitionGroupId);
       assertEquals(segments.size(), 1);
       String segmentName = segments.get(0);
       assertFalse(oldInstanceStatesMap.containsKey(segmentName));
@@ -415,32 +416,32 @@ public class PinotLLCRealtimeSegmentManagerTest {
     setUpNewTable(segmentManager, 2, 5, 4);
     Map<String, Map<String, String>> instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
 
-    // Remove the CONSUMING segment from the ideal state for partition 0 (step 3 failed)
+    // Remove the CONSUMING segment from the ideal state for partition group 0 (step 3 failed)
     String consumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
     removeNewConsumingSegment(instanceStatesMap, consumingSegment, null);
     testRepairs(segmentManager);
 
-    // Remove the CONSUMING segment from the ideal state and segment ZK metadata map for partition 0 (step 2 failed)
+    // Remove the CONSUMING segment from the ideal state and segment ZK metadata map for partition group 0 (step 2 failed)
     removeNewConsumingSegment(instanceStatesMap, consumingSegment, null);
     assertNotNull(segmentManager._segmentZKMetadataMap.remove(consumingSegment));
     testRepairs(segmentManager);
 
     // 2 partitions commit segment
-    for (int partitionId = 0; partitionId < 2; partitionId++) {
-      String segmentName = new LLCSegmentName(RAW_TABLE_NAME, partitionId, 0, CURRENT_TIME_MS).getSegmentName();
+    for (int partitionGroupId = 0; partitionGroupId < 2; partitionGroupId++) {
+      String segmentName = new LLCSegmentName(RAW_TABLE_NAME, partitionGroupId, 0, CURRENT_TIME_MS).getSegmentName();
       CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(segmentName,
           new LongMsgOffset(PARTITION_OFFSET.getOffset() + NUM_DOCS).toString(), 0L);
       committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
       segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
     }
 
-    // Remove the CONSUMING segment from the ideal state for partition 0 (step 3 failed)
+    // Remove the CONSUMING segment from the ideal state for partition group 0 (step 3 failed)
     consumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
     String latestCommittedSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
     removeNewConsumingSegment(instanceStatesMap, consumingSegment, latestCommittedSegment);
     testRepairs(segmentManager);
 
-    // Remove the CONSUMING segment from the ideal state and segment ZK metadata map for partition 0 (step 2 failed)
+    // Remove the CONSUMING segment from the ideal state and segment ZK metadata map for partition group 0 (step 2 failed)
     removeNewConsumingSegment(instanceStatesMap, consumingSegment, latestCommittedSegment);
     assertNotNull(segmentManager._segmentZKMetadataMap.remove(consumingSegment));
     testRepairs(segmentManager);
@@ -454,45 +455,45 @@ public class PinotLLCRealtimeSegmentManagerTest {
     setUpNewTable(segmentManager, 2, 5, 4);
     instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
 
-    // Turn all the replicas for the CONSUMING segment to OFFLINE for partition 0
+    // Turn all the replicas for the CONSUMING segment to OFFLINE for partition group 0
     consumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
     turnNewConsumingSegmentOffline(instanceStatesMap, consumingSegment);
     testRepairs(segmentManager);
 
-    // Turn all the replicas for the CONSUMING segment to OFFLINE for partition 0 again
+    // Turn all the replicas for the CONSUMING segment to OFFLINE for partition group 0 again
     consumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
     turnNewConsumingSegmentOffline(instanceStatesMap, consumingSegment);
     testRepairs(segmentManager);
 
     // 2 partitions commit segment
-    for (int partitionId = 0; partitionId < 2; partitionId++) {
-      // Sequence number is 2 for partition 0 because segment 0 and 1 are OFFLINE
-      int sequenceNumber = partitionId == 0 ? 2 : 0;
+    for (int partitionGroupId = 0; partitionGroupId < 2; partitionGroupId++) {
+      // Sequence number is 2 for partition group 0 because segment 0 and 1 are OFFLINE
+      int sequenceNumber = partitionGroupId == 0 ? 2 : 0;
       String segmentName =
-          new LLCSegmentName(RAW_TABLE_NAME, partitionId, sequenceNumber, CURRENT_TIME_MS).getSegmentName();
+          new LLCSegmentName(RAW_TABLE_NAME, partitionGroupId, sequenceNumber, CURRENT_TIME_MS).getSegmentName();
       CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(segmentName,
           new LongMsgOffset(PARTITION_OFFSET.getOffset() + NUM_DOCS).toString(), 0L);
       committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
       segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
     }
 
-    // Remove the CONSUMING segment from the ideal state for partition 0 (step 3 failed)
+    // Remove the CONSUMING segment from the ideal state for partition group 0 (step 3 failed)
     consumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 3, CURRENT_TIME_MS).getSegmentName();
     latestCommittedSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 2, CURRENT_TIME_MS).getSegmentName();
     removeNewConsumingSegment(instanceStatesMap, consumingSegment, latestCommittedSegment);
     testRepairs(segmentManager);
 
-    // Remove the CONSUMING segment from the ideal state and segment ZK metadata map for partition 0 (step 2 failed)
+    // Remove the CONSUMING segment from the ideal state and segment ZK metadata map for partition group 0 (step 2 failed)
     removeNewConsumingSegment(instanceStatesMap, consumingSegment, latestCommittedSegment);
     assertNotNull(segmentManager._segmentZKMetadataMap.remove(consumingSegment));
     testRepairs(segmentManager);
 
-    // Turn all the replicas for the CONSUMING segment to OFFLINE for partition 0
+    // Turn all the replicas for the CONSUMING segment to OFFLINE for partition group 0
     consumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 3, CURRENT_TIME_MS).getSegmentName();
     turnNewConsumingSegmentOffline(instanceStatesMap, consumingSegment);
     testRepairs(segmentManager);
 
-    // Turn all the replicas for the CONSUMING segment to OFFLINE for partition 0 again
+    // Turn all the replicas for the CONSUMING segment to OFFLINE for partition group 0 again
     consumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 4, CURRENT_TIME_MS).getSegmentName();
     turnNewConsumingSegmentOffline(instanceStatesMap, consumingSegment);
     testRepairs(segmentManager);
@@ -566,10 +567,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // Segments are the same for ideal state and ZK metadata
     assertEquals(instanceStatesMap.keySet(), segmentManager._segmentZKMetadataMap.keySet());
 
-    // Gather the ONLINE/CONSUMING segments for each partition ordered by sequence number
-    List<Map<Integer, String>> partitionIdToSegmentsMap = new ArrayList<>(segmentManager._numPartitions);
-    for (int partitionId = 0; partitionId < segmentManager._numPartitions; partitionId++) {
-      partitionIdToSegmentsMap.add(new TreeMap<>());
+    // Gather the ONLINE/CONSUMING segments for each partition group ordered by sequence number
+    List<Map<Integer, String>> partitionGroupIdToSegmentsMap = new ArrayList<>(segmentManager._numPartitions);
+    for (int partitionGroupId = 0; partitionGroupId < segmentManager._numPartitions; partitionGroupId++) {
+      partitionGroupIdToSegmentsMap.add(new TreeMap<>());
     }
     for (Map.Entry<String, Map<String, String>> entry : instanceStatesMap.entrySet()) {
       String segmentName = entry.getKey();
@@ -579,16 +580,16 @@ public class PinotLLCRealtimeSegmentManagerTest {
       if (instanceStateMap.containsValue(SegmentStateModel.ONLINE) || instanceStateMap.containsValue(
           SegmentStateModel.CONSUMING)) {
         LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-        int partitionsId = llcSegmentName.getPartitionId();
-        Map<Integer, String> sequenceNumberToSegmentMap = partitionIdToSegmentsMap.get(partitionsId);
+        int partitionsId = llcSegmentName.getPartitionGroupId();
+        Map<Integer, String> sequenceNumberToSegmentMap = partitionGroupIdToSegmentsMap.get(partitionsId);
         int sequenceNumber = llcSegmentName.getSequenceNumber();
         assertFalse(sequenceNumberToSegmentMap.containsKey(sequenceNumber));
         sequenceNumberToSegmentMap.put(sequenceNumber, segmentName);
       }
     }
 
-    for (int partitionId = 0; partitionId < segmentManager._numPartitions; partitionId++) {
-      List<String> segments = new ArrayList<>(partitionIdToSegmentsMap.get(partitionId).values());
+    for (int partitionGroupId = 0; partitionGroupId < segmentManager._numPartitions; partitionGroupId++) {
+      List<String> segments = new ArrayList<>(partitionGroupIdToSegmentsMap.get(partitionGroupId).values());
       assertFalse(segments.isEmpty());
       int numSegments = segments.size();
 
@@ -646,7 +647,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
         new FakePinotLLCRealtimeSegmentManagerII(FakePinotLLCRealtimeSegmentManagerII.Scenario.METADATA_STATUS_CHANGED);
     setUpNewTable(segmentManager2, 2, 5, 4);
 
-    // Commit a segment for partition 0
+    // Commit a segment for partition group 0
     String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
     CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(committingSegment,
         new LongMsgOffset(PARTITION_OFFSET.getOffset() + NUM_DOCS).toString(), 0L);
@@ -770,7 +771,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     setUpNewTable(segmentManager, 2, 5, 4);
 
     // Test case 1: segment location with vip format.
-    // Commit a segment for partition 0
+    // Commit a segment for partition group 0
     String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
     String segmentLocationVIP = "http://control_vip/segments/segment1";
     CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(committingSegment,
@@ -915,7 +916,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    LongMsgOffset getPartitionOffset(StreamConfig streamConfig, OffsetCriteria offsetCriteria, int partitionId) {
+    LongMsgOffset getPartitionOffset(StreamConfig streamConfig, OffsetCriteria offsetCriteria, int partitionGroupId) {
       // The criteria for this test should always be SMALLEST (for default streaming config and new added partitions)
       assertTrue(offsetCriteria.isSmallest());
       return PARTITION_OFFSET;

@@ -1,8 +1,0 @@
-<label class="te-label te-label--small {{if record.startDuration.showLink "te-anomaly-table__link" "te-label--disable-click"}}">
-    <span class="start-time" onclick={{action "drilldownAnomaly" record.anomalyId}}>{{record.startDuration.startTime}}</span>
-    {{#tooltip-on-element}}
-      Start: {{record.startDuration.startTime}}<br />
-      End: {{record.startDuration.endTime}}
-    {{/tooltip-on-element}}
-</label>
-<p class="te-anomaly-table__duration">{{record.startDuration.duration}}</p>

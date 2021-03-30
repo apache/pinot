@@ -282,6 +282,37 @@ public class JsonMatchPredicateTest extends BaseQueriesTest {
     Assert.assertEquals(iterator.next()[0], "goofy");
   }
 
+  /** Evaluate json_extract_scalar over string column that does not contain valid json data. */
+  @Test
+  public void testJsonExtractScalarAgainstInvalidJson() {
+    // json_extract_scalar throws exception since we are trying to parse a non-JSON string.
+    Operator operator1 = getOperatorForSqlQuery(
+        "select count(*) FROM testTable WHERE json_extract_scalar(stringColumn, '$.name.first', 'INT') = 0");
+    try {
+      IntermediateResultsBlock block1 = (IntermediateResultsBlock) operator1.nextBlock();
+      Assert.fail("Expected query to fail with Exception.");
+    } catch (RuntimeException re) {
+      // JSON parsing exception expected.
+    }
+
+    // JSON data is stored in columns of type STRING, so there is nothing preventing the column from storing bad json
+    // string. Bad JSON string in columns will cause json_extract_scalar to throw an exception which would terminate
+    // query processing. However, when json_extract_scalar is used within the WHERE clause, we should return the
+    // default value instead of throwing exception. This will allow the predicate to be evaluated to either true or
+    // false and hence allow the query to complete successfully. Returning default value from json_extract_scalar is
+    // an undocumented feature. Ideally, json_extract_scalar should return NULL when it encounters bad JSON. However,
+    // NULL support is currently pending, so this is the best we can do.
+    Operator operator2 = getOperatorForSqlQuery(
+        "select count(*) FROM testTable WHERE json_extract_scalar(stringColumn, '$.name.first', 'INT', 0) = 0");
+
+    IntermediateResultsBlock block2 = (IntermediateResultsBlock) operator2.nextBlock();
+    Collection<Object[]> rows = block2.getSelectionResult();
+
+    // None of the values in stringColumn are valid JSON. Hence, json_extract_scalar should default to '0' for all rows
+    // and count returned by the query should be 9 (same as number of rows in the table).
+    Assert.assertEquals(block2.getAggregationResult().get(0), 9L);
+  }
+
   @AfterClass
   public void tearDown()
       throws IOException {

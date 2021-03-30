@@ -19,14 +19,12 @@
 package org.apache.pinot.broker.broker.helix;
 
 import com.google.common.collect.ImmutableList;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixConstants.ChangeType;
@@ -53,7 +51,8 @@ import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.metrics.MetricsHelper;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Broker;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
@@ -92,7 +91,7 @@ public class HelixBrokerStarter implements ServiceStartable {
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private HelixDataAccessor _helixDataAccessor;
 
-  private MetricsRegistry _metricsRegistry;
+  private PinotMetricsRegistry _metricsRegistry;
   private BrokerMetrics _brokerMetrics;
   private RoutingManager _routingManager;
   private AccessControlFactory _accessControlFactory;
@@ -226,9 +225,9 @@ public class HelixBrokerStarter implements ServiceStartable {
 
     LOGGER.info("Setting up broker request handler");
     // Set up metric registry and broker metrics
-    _metricsRegistry = new MetricsRegistry();
-    MetricsHelper.initializeMetrics(_brokerConf.subset(Broker.METRICS_CONFIG_PREFIX));
-    MetricsHelper.registerMetricsRegistry(_metricsRegistry);
+    PinotConfiguration metricsConfiguration = _brokerConf.subset(Broker.METRICS_CONFIG_PREFIX);
+    PinotMetricUtils.init(metricsConfiguration);
+    _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
     _brokerMetrics = new BrokerMetrics(
         _brokerConf.getProperty(Broker.CONFIG_OF_METRICS_NAME_PREFIX, Broker.DEFAULT_METRICS_NAME_PREFIX),
         _metricsRegistry,
@@ -394,7 +393,7 @@ public class HelixBrokerStarter implements ServiceStartable {
     return _spectatorHelixManager;
   }
 
-  public MetricsRegistry getMetricsRegistry() {
+  public PinotMetricsRegistry getMetricsRegistry() {
     return _metricsRegistry;
   }
 

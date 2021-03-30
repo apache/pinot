@@ -47,26 +47,30 @@ public class SegmentPrunerFactory {
   public static List<SegmentPruner> getSegmentPruners(TableConfig tableConfig,
       ZkHelixPropertyStore<ZNRecord> propertyStore) {
     RoutingConfig routingConfig = tableConfig.getRoutingConfig();
+    List<SegmentPruner> segmentPruners = new ArrayList<>();
+    // Always prune out empty segments first
+    segmentPruners.add(new EmptySegmentPruner(tableConfig, propertyStore));
+
     if (routingConfig != null) {
       List<String> segmentPrunerTypes = routingConfig.getSegmentPrunerTypes();
       if (segmentPrunerTypes != null) {
-        List<SegmentPruner> segmentPruners = new ArrayList<>(segmentPrunerTypes.size());
+        List<SegmentPruner> configuredSegmentPruners = new ArrayList<>(segmentPrunerTypes.size());
         for (String segmentPrunerType : segmentPrunerTypes) {
           if (RoutingConfig.PARTITION_SEGMENT_PRUNER_TYPE.equalsIgnoreCase(segmentPrunerType)) {
             PartitionSegmentPruner partitionSegmentPruner = getPartitionSegmentPruner(tableConfig, propertyStore);
             if (partitionSegmentPruner != null) {
-              segmentPruners.add(partitionSegmentPruner);
+              configuredSegmentPruners.add(partitionSegmentPruner);
             }
           }
 
           if (RoutingConfig.TIME_SEGMENT_PRUNER_TYPE.equalsIgnoreCase(segmentPrunerType)) {
             TimeSegmentPruner timeSegmentPruner = getTimeSegmentPruner(tableConfig, propertyStore);
             if (timeSegmentPruner != null) {
-              segmentPruners.add(timeSegmentPruner);
+              configuredSegmentPruners.add(timeSegmentPruner);
             }
           }
         }
-        return sortSegmentPruners(segmentPruners);
+        segmentPruners.addAll(sortSegmentPruners(configuredSegmentPruners));
       } else {
         // Handle legacy configs for backward-compatibility
         TableType tableType = tableConfig.getTableType();
@@ -76,12 +80,12 @@ public class SegmentPrunerFactory {
             && LEGACY_PARTITION_AWARE_REALTIME_ROUTING.equalsIgnoreCase(routingTableBuilderName))) {
           PartitionSegmentPruner partitionSegmentPruner = getPartitionSegmentPruner(tableConfig, propertyStore);
           if (partitionSegmentPruner != null) {
-            return Collections.singletonList(getPartitionSegmentPruner(tableConfig, propertyStore));
+            segmentPruners.add(getPartitionSegmentPruner(tableConfig, propertyStore));
           }
         }
       }
     }
-    return Collections.emptyList();
+    return segmentPruners;
   }
 
   @Nullable

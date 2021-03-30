@@ -43,6 +43,7 @@ public abstract class BaseOp {
   private String _name;
   private final OpType _opType;
   private String _description = "No description provided";
+  protected static final String GENERATION_NUMBER_PLACEHOLDER = "__GENERATION_NUMBER__";
 
   protected BaseOp(OpType opType) {
     _opType = opType;
@@ -64,10 +65,10 @@ public abstract class BaseOp {
     return _description;
   }
 
-  public  boolean run() {
+  public  boolean run(int generationNumber) {
     System.out.println("Running OpType " + _opType.toString() + ": " + getDescription());
-    return runOp();
+    return runOp(generationNumber);
   }
 
-  abstract boolean runOp();
+  abstract boolean runOp(int generationNumber);
 }

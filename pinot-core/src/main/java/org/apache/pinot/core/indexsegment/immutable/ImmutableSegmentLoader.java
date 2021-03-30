@@ -21,7 +21,9 @@ package org.apache.pinot.core.indexsegment.immutable;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
@@ -101,13 +103,29 @@ public class ImmutableSegmentLoader {
 
     // Load the metadata again since converter and pre-processor may have changed it
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+    if (segmentMetadata.getTotalDocs() == 0) {
+      return new EmptyIndexSegment(segmentMetadata);
+    }
+
+    // Remove columns not in schema from the metadata
+    Map<String, ColumnMetadata> columnMetadataMap = segmentMetadata.getColumnMetadataMap();
+    if (schema != null) {
+      Set<String> columnsInMetadata = new HashSet<>(columnMetadataMap.keySet());
+      columnsInMetadata.removeIf(schema::hasColumn);
+      if (!columnsInMetadata.isEmpty()) {
+        LOGGER.info("Skip loading columns only exist in metadata but not in schema: {}", columnsInMetadata);
+        for (String column : columnsInMetadata) {
+          segmentMetadata.removeColumn(column);
+        }
+      }
+    }
 
     // Load the segment
     ReadMode readMode = indexLoadingConfig.getReadMode();
     SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(indexDir, segmentMetadata, readMode);
     SegmentDirectory.Reader segmentReader = segmentDirectory.createReader();
     Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<>();
-    for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
+    for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {
       indexContainerMap.put(entry.getKey(),
           new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig, indexDir));
     }
@@ -121,7 +139,7 @@ public class ImmutableSegmentLoader {
         VirtualColumnContext context = new VirtualColumnContext(fieldSpec, segmentMetadata.getTotalDocs());
         VirtualColumnProvider provider = VirtualColumnProviderFactory.buildProvider(context);
         indexContainerMap.put(columnName, provider.buildColumnIndexContainer(context));
-        segmentMetadata.getColumnMetadataMap().put(columnName, provider.buildMetadata(context));
+        columnMetadataMap.put(columnName, provider.buildMetadata(context));
       }
     }
 

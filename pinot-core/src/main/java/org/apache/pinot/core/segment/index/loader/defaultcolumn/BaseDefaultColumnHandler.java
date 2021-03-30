@@ -603,8 +603,13 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             statsCollector.collect(value);
           }
           statsCollector.seal();
-          indexCreationInfo = new ColumnIndexCreationInfo(statsCollector, true,
-              _indexLoadingConfig.getVarLengthDictionaryColumns().contains(column), true,
+          boolean useVarLengthDictionary;
+          if (!statsCollector.isFixedLength()) {
+            useVarLengthDictionary = true;
+          } else {
+            useVarLengthDictionary = _indexLoadingConfig.getVarLengthDictionaryColumns().contains(column);
+          }
+          indexCreationInfo = new ColumnIndexCreationInfo(statsCollector, true, useVarLengthDictionary, true,
               new ByteArray((byte[]) fieldSpec.getDefaultNullValue()));
           break;
         }

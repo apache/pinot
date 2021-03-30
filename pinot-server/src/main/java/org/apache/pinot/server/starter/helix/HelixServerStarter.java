@@ -60,6 +60,7 @@ import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.transport.ListenerConfig;
@@ -69,6 +70,7 @@ import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.server.starter.ServerQueriesDisabledTracker;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.plugin.PluginManager;
@@ -113,6 +115,7 @@ public class HelixServerStarter implements ServiceStartable {
   private HelixAdmin _helixAdmin;
   private ServerInstance _serverInstance;
   private AdminApiApplication _adminApiApplication;
+  private ServerQueriesDisabledTracker _serverQueriesDisabledTracker;
   private RealtimeLuceneIndexRefreshState _realtimeLuceneIndexRefreshState;
 
   public HelixServerStarter(String helixClusterName, String zkAddress, PinotConfiguration serverConf)
@@ -138,6 +141,11 @@ public class HelixServerStarter implements ServiceStartable {
     _instanceConfigScope =
         new HelixConfigScopeBuilder(ConfigScopeProperty.PARTICIPANT, _helixClusterName).forParticipant(_instanceId)
             .build();
+
+    // Enable/disable thread CPU time measurement through instance config.
+    ThreadTimer.setThreadCpuTimeMeasurementEnabled(_serverConf
+        .getProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
+            Server.DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT));
   }
 
   /**
@@ -418,6 +426,10 @@ public class HelixServerStarter implements ServiceStartable {
     serverMetrics.addCallbackGauge("memory.mmapBufferUsage", PinotDataBuffer::getMmapBufferUsage);
     serverMetrics.addCallbackGauge("memory.allocationFailureCount", PinotDataBuffer::getAllocationFailureCount);
 
+    // Track metric for queries disabled
+    _serverQueriesDisabledTracker = new ServerQueriesDisabledTracker(_helixClusterName, _instanceId, _helixManager, serverMetrics);
+    _serverQueriesDisabledTracker.start();
+
     _realtimeLuceneIndexRefreshState = RealtimeLuceneIndexRefreshState.getInstance();
     _realtimeLuceneIndexRefreshState.start();
   }
@@ -449,6 +461,7 @@ public class HelixServerStarter implements ServiceStartable {
         .getProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_RESOURCE_CHECK, Server.DEFAULT_SHUTDOWN_ENABLE_RESOURCE_CHECK)) {
       shutdownResourceCheck(endTimeMs);
     }
+    _serverQueriesDisabledTracker.stop();
     _realtimeLuceneIndexRefreshState.stop();
     LOGGER.info("Deregistering service status handler");
     ServiceStatus.removeServiceStatusCallback(_instanceId);

@@ -50,18 +50,18 @@ public class FileIngestionHelper {
   private final TableConfig _tableConfig;
   private final Schema _schema;
   private final BatchConfig _batchConfig;
-  private final String _controllerHost;
-  private final int _controllerPort;
+  private final URI _controllerUri;
   private final File _uploadDir;
+  private final String _authToken;
 
-  public FileIngestionHelper(TableConfig tableConfig, Schema schema, BatchConfig batchConfig, String controllerHost,
-      int controllerPort, File uploadDir) {
+  public FileIngestionHelper(TableConfig tableConfig, Schema schema, BatchConfig batchConfig, URI controllerUri,
+      File uploadDir, String authToken) {
     _tableConfig = tableConfig;
     _schema = schema;
     _batchConfig = batchConfig;
-    _controllerHost = controllerHost;
-    _controllerPort = controllerPort;
+    _controllerUri = controllerUri;
     _uploadDir = uploadDir;
+    _authToken = authToken;
   }
 
   /**
@@ -106,8 +106,8 @@ public class FileIngestionHelper {
           new File(segmentTarDir, segmentName + org.apache.pinot.spi.ingestion.batch.spec.Constants.TAR_GZ_FILE_EXT);
       TarGzCompressionUtils.createTarGzFile(new File(outputDir, segmentName), segmentTarFile);
       FileIngestionUtils
-          .uploadSegment(tableNameWithType, Lists.newArrayList(segmentTarFile), _controllerHost, _controllerPort);
-      LOGGER.info("Uploaded tar: {} to {}:{}", segmentTarFile.getAbsolutePath(), _controllerHost, _controllerPort);
+          .uploadSegment(tableNameWithType, Lists.newArrayList(segmentTarFile), _controllerUri, _authToken);
+      LOGGER.info("Uploaded tar: {} to {}", segmentTarFile.getAbsolutePath(), _controllerUri);
 
       return new SuccessResponse(
           "Successfully ingested file into table: " + tableNameWithType + " as segment: " + segmentName);

@@ -18,8 +18,7 @@
  */
 package org.apache.pinot.common.metrics;
 
-import com.yammer.metrics.core.MetricsRegistry;
-import com.yammer.metrics.reporting.JmxReporter;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,9 +31,9 @@ public class JmxReporterMetricsRegistryRegistrationListener implements MetricsRe
   private static final Logger LOGGER = LoggerFactory.getLogger(JmxReporterMetricsRegistryRegistrationListener.class);
 
   @Override
-  public void onMetricsRegistryRegistered(MetricsRegistry metricsRegistry) {
+  public void onMetricsRegistryRegistered(PinotMetricsRegistry metricsRegistry) {
     LOGGER.info("Registering JmxReporterMetricsRegistryRegistrationListener");
-    new JmxReporter(metricsRegistry).start();
+    PinotMetricUtils.makePinotJmxReporter(metricsRegistry).start();
     LOGGER.info("Number of metrics in metricsRegistry: {}", metricsRegistry.allMetrics().size());
   }
 }

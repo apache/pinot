@@ -212,9 +212,10 @@ public class SegmentPartitionedDistinctCountQueriesTest extends BaseQueriesTest 
     while (groupKeyIterator.hasNext()) {
       numGroups++;
       GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-      assertTrue(_values.contains(Integer.parseInt(groupKey._stringKey)));
+      Integer key = (Integer) groupKey._keys[0];
+      assertTrue(_values.contains(key));
       for (int i = 0; i < 6; i++) {
-        assertEquals((long) aggregationGroupByResult.getResultForKey(groupKey, i), 1);
+        assertEquals((long) aggregationGroupByResult.getResultForGroupId(i, groupKey._groupId), 1);
       }
     }
     assertEquals(numGroups, _values.size());

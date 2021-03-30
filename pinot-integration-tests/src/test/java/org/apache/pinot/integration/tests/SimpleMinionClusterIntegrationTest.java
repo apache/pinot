@@ -36,10 +36,10 @@ import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObserverFactory;
 import org.apache.pinot.minion.exception.TaskCancelledException;
-import org.apache.pinot.minion.executor.BaseTaskExecutor;
 import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
 import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
+import org.apache.pinot.plugin.minion.tasks.BaseTaskExecutor;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -69,6 +69,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   private static final String TABLE_NAME_3 = "testTable3";
   private static final long STATE_TRANSITION_TIMEOUT_MS = 60_000L;  // 1 minute
   private static final int NUM_TASKS = 2;
+  private static final int NUM_CONFIGS = 3;
 
   private static final AtomicBoolean HOLD = new AtomicBoolean();
   private static final AtomicBoolean TASK_START_NOTIFIED = new AtomicBoolean();
@@ -284,7 +285,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
 
           assertEquals(pinotTaskConfig.getTaskType(), TASK_TYPE);
           Map<String, String> configs = pinotTaskConfig.getConfigs();
-          assertEquals(configs.size(), NUM_TASKS);
+          assertEquals(configs.size(), NUM_CONFIGS);
           String offlineTableName = configs.get("tableName");
           assertEquals(TableNameBuilder.getTableTypeFromTableName(offlineTableName), TableType.OFFLINE);
           String rawTableName = TableNameBuilder.extractRawTableName(offlineTableName);

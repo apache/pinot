@@ -125,15 +125,18 @@ public class TimeBoundaryManager {
       LOGGER.warn("Failed to find segment ZK metadata for segment: {}, table: {}", segment, _offlineTableName);
       return INVALID_END_TIME_MS;
     }
-
-    long endTime = znRecord.getLongField(CommonConstants.Segment.END_TIME, -1);
-    if (endTime > 0) {
-      TimeUnit timeUnit = znRecord.getEnumField(CommonConstants.Segment.TIME_UNIT, TimeUnit.class, TimeUnit.DAYS);
-      return timeUnit.toMillis(endTime);
-    } else {
-      LOGGER.warn("Failed to find valid end time for segment: {}, table: {}", segment, _offlineTableName);
-      return INVALID_END_TIME_MS;
+    long totalDocs = znRecord.getLongField(CommonConstants.Segment.TOTAL_DOCS, -1);
+    long endTimeMs = INVALID_END_TIME_MS;
+    if (totalDocs != 0) {
+      long endTime = znRecord.getLongField(CommonConstants.Segment.END_TIME, -1);
+      if (endTime > 0) {
+        TimeUnit timeUnit = znRecord.getEnumField(CommonConstants.Segment.TIME_UNIT, TimeUnit.class, TimeUnit.DAYS);
+        endTimeMs = timeUnit.toMillis(endTime);
+      } else {
+        LOGGER.warn("Failed to find valid end time for segment: {}, table: {}", segment, _offlineTableName);
+      }
     }
+    return endTimeMs;
   }
 
   private void updateTimeBoundaryInfo(long maxEndTimeMs) {

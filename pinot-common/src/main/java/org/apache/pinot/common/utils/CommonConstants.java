@@ -27,6 +27,8 @@ public class CommonConstants {
   public static final String HTTP_PROTOCOL = "http";
   public static final String HTTPS_PROTOCOL = "https";
 
+  public static final String KEY_OF_AUTH_TOKEN = "auth.token";
+
   public static class Table {
     public static final String PUSH_FREQUENCY_HOURLY = "hourly";
     public static final String PUSH_FREQUENCY_DAILY = "daily";
@@ -235,6 +237,13 @@ public class CommonConstants {
         "pinot.server.instance.realtime.alloc.offheap.direct";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.server.storage.factory";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.server.crypter";
+
+    /**
+     * Service token for accessing protected controller APIs.
+     * E.g. null (auth disabled), "Basic abcdef..." (basic auth), "Bearer 123def..." (oauth2)
+     */
+    public static final String CONFIG_OF_AUTH_TOKEN = KEY_OF_AUTH_TOKEN;
+
     // Configuration to consider the server ServiceStatus as being STARTED if the percent of resources (tables) that
     // are ONLINE for this this server has crossed the threshold percentage of the total number of tables
     // that it is expected to serve.
@@ -305,6 +314,12 @@ public class CommonConstants {
       public static final String CONFIG_OF_CONTROLLER_HTTPS_PORT = "controller.port";
       public static final String CONFIG_OF_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = "upload.request.timeout.ms";
 
+      /**
+       * Service token for accessing protected controller APIs.
+       * E.g. null (auth disabled), "Basic abcdef..." (basic auth), "Bearer 123def..." (oauth2)
+       */
+      public static final String CONFIG_OF_SEGMENT_UPLOADER_AUTH_TOKEN = KEY_OF_AUTH_TOKEN;
+
       public static final int DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = 300_000;
       public static final int DEFAULT_OTHER_REQUESTS_TIMEOUT = 10_000;
     }
@@ -317,6 +332,10 @@ public class CommonConstants {
     public static final String ACCESS_CONTROL_FACTORY_CLASS = "pinot.server.admin.access.control.factory.class";
     public static final String DEFAULT_ACCESS_CONTROL_FACTORY_CLASS =
         "org.apache.pinot.server.api.access.AllowAllAccessFactory";
+
+    public static final String CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT =
+        "pinot.server.instance.enableThreadCpuTimeMeasurement";
+    public static final boolean DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT = false;
   }
 
   public static class Controller {
@@ -353,6 +372,12 @@ public class CommonConstants {
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "segment.fetcher";
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "segment.uploader";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "crypter";
+
+    /**
+     * Service token for accessing protected controller APIs.
+     * E.g. null (auth disabled), "Basic abcdef..." (basic auth), "Bearer 123def..." (oauth2)
+     */
+    public static final String CONFIG_OF_TASK_AUTH_TOKEN = "task.auth.token";
   }
 
   public static class Segment {

@@ -50,7 +50,7 @@ public class StreamConfig {
   public static final int DEFAULT_FLUSH_AUTOTUNE_INITIAL_ROWS = 100_000;
 
   public static final String DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING =
-      "org.apache.pinot.plugin.stream.kafka09.KafkaConsumerFactory";
+      "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory";
 
   public static final long DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS = 30_000;
   public static final int DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS = 5_000;

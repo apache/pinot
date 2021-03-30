@@ -39,7 +39,7 @@ import org.testng.collections.Lists;
 
 public abstract class AbstractRecordReaderTest {
   private final static Random RANDOM = new Random(System.currentTimeMillis());
-  private final static int SAMPLE_RECORDS_SIZE = 10000;
+  protected final static int SAMPLE_RECORDS_SIZE = 10000;
 
   protected final File _tempDir = new File(FileUtils.getTempDirectory(), "RecordReaderTest");
   protected List<Map<String, Object>> _records;
@@ -155,6 +155,9 @@ public abstract class AbstractRecordReaderTest {
   @BeforeClass
   public void setUp()
       throws Exception {
+    if (_tempDir.exists()) {
+      FileUtils.cleanDirectory(_tempDir);
+    }
     FileUtils.forceMkdir(_tempDir);
     // Generate Pinot schema
     _pinotSchema = getPinotSchema();

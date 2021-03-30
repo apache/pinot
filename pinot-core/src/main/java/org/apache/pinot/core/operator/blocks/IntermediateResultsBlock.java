@@ -40,13 +40,10 @@ import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableImplV2;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.Table;
-import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -69,6 +66,7 @@ public class IntermediateResultsBlock implements Block {
   private boolean _numGroupsLimitReached;
   private int _numResizes;
   private long _resizeTimeMs;
+  private long _executionThreadCpuTimeNs;
 
   private Table _table;
 
@@ -229,6 +227,14 @@ public class IntermediateResultsBlock implements Block {
 
   public void setResizeTimeMs(long resizeTimeMs) {
     _resizeTimeMs = resizeTimeMs;
+  }
+
+  public void setExecutionThreadCpuTimeNs(long executionThreadCpuTimeNs) {
+    _executionThreadCpuTimeNs = executionThreadCpuTimeNs;
+  }
+
+  public long getExecutionThreadCpuTimeNs() {
+    return _executionThreadCpuTimeNs;
   }
 
   @VisibleForTesting

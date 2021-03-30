@@ -88,9 +88,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected final File _tarDir = new File(_tempDir, "tarDir");
   protected List<StreamDataServerStartable> _kafkaStarters;
 
-  private org.apache.pinot.client.Connection _pinotConnection;
-  private Connection _h2Connection;
-  private QueryGenerator _queryGenerator;
+  protected org.apache.pinot.client.Connection _pinotConnection;
+  protected Connection _h2Connection;
+  protected QueryGenerator _queryGenerator;
 
   /**
    * The following getters can be overridden to change default settings.

@@ -42,10 +42,10 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
     for (String columnName : realtimeSegment.getPhysicalColumnNames()) {
       DataSource dataSource = realtimeSegment.getDataSource(columnName);
       if (dataSource.getDictionary() != null) {
-        _columnStatisticsMap.put(columnName, new RealtimeColumnStatistics(realtimeSegment.getDataSource(columnName),
+        _columnStatisticsMap.put(columnName, new MutableColumnStatistics(realtimeSegment.getDataSource(columnName),
             realtimeSegmentRecordReader.getSortedDocIdIterationOrder()));
       } else {
-        _columnStatisticsMap.put(columnName, new RealtimeNoDictionaryColStatistics(dataSource));
+        _columnStatisticsMap.put(columnName, new MutableNoDictionaryColStatistics(dataSource));
       }
     }
   }

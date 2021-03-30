@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableSet;
 import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.Option;
+import com.jayway.jsonpath.ParseContext;
 import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.json.JsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
@@ -55,8 +56,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   public static final String FUNCTION_NAME = "jsonExtractScalar";
-  private static final Configuration LIST_RESPONSE_CONFIG =
-      Configuration.defaultConfiguration().addOptions(Option.SUPPRESS_EXCEPTIONS);
+  private static final ParseContext JSON_PARSER_CONTEXT =
+      JsonPath.using(Configuration.defaultConfiguration().addOptions(Option.SUPPRESS_EXCEPTIONS));
   private TransformFunction _jsonFieldTransformFunction;
   private String _jsonPath;
   private String _resultsType;
@@ -131,7 +132,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     final String[] stringValuesSV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     final int[] results = new int[projectionBlock.getNumDocs()];
     for (int i = 0; i < results.length; i++) {
-      Object read = JsonPath.read(stringValuesSV[i], _jsonPath);
+      Object read = JSON_PARSER_CONTEXT.parse(stringValuesSV[i]).read(_jsonPath);
       if (read == null) {
         if (_defaultValue != null) {
           results[i] = (int) _defaultValue;
@@ -154,7 +155,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     final String[] stringValuesSV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     final long[] results = new long[projectionBlock.getNumDocs()];
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      Object read = JsonPath.read(stringValuesSV[i], _jsonPath);
+      Object read = JSON_PARSER_CONTEXT.parse(stringValuesSV[i]).read(_jsonPath);
       if (read == null) {
         if (_defaultValue != null) {
           results[i] = (long) _defaultValue;
@@ -178,7 +179,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     final String[] stringValuesSV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     final float[] results = new float[projectionBlock.getNumDocs()];
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      Object read = JsonPath.read(stringValuesSV[i], _jsonPath);
+      Object read = JSON_PARSER_CONTEXT.parse(stringValuesSV[i]).read(_jsonPath);
       if (read == null) {
         if (_defaultValue != null) {
           results[i] = (float) _defaultValue;
@@ -201,7 +202,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     final String[] stringValuesSV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     final double[] results = new double[projectionBlock.getNumDocs()];
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      Object read = JsonPath.read(stringValuesSV[i], _jsonPath);
+      Object read = JSON_PARSER_CONTEXT.parse(stringValuesSV[i]).read(_jsonPath);
       if (read == null) {
         if (_defaultValue != null) {
           results[i] = (double) _defaultValue;
@@ -226,7 +227,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     final String[] stringValuesSV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     final String[] results = new String[projectionBlock.getNumDocs()];
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      Object read = JsonPath.read(stringValuesSV[i], _jsonPath);
+      Object read = JSON_PARSER_CONTEXT.parse(stringValuesSV[i]).read(_jsonPath);
       if (read == null) {
         if (_defaultValue != null) {
           results[i] = (String) _defaultValue;
@@ -249,7 +250,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     final String[] stringValuesMV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     final int[][] results = new int[projectionBlock.getNumDocs()][];
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      final List<Integer> intVals = JsonPath.using(LIST_RESPONSE_CONFIG).parse(stringValuesMV[i]).read(_jsonPath);
+      final List<Integer> intVals = JSON_PARSER_CONTEXT.parse(stringValuesMV[i]).read(_jsonPath);
       if (intVals == null) {
         results[i] = new int[0];
         continue;
@@ -267,7 +268,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     final String[] stringValuesMV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     final long[][] results = new long[projectionBlock.getNumDocs()][];
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      final List<Long> longVals = JsonPath.using(LIST_RESPONSE_CONFIG).parse(stringValuesMV[i]).read(_jsonPath);
+      final List<Long> longVals = JSON_PARSER_CONTEXT.parse(stringValuesMV[i]).read(_jsonPath);
       if (longVals == null) {
         results[i] = new long[0];
         continue;
@@ -285,7 +286,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     final String[] stringValuesMV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     final float[][] results = new float[projectionBlock.getNumDocs()][];
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      final List<Float> floatVals = JsonPath.using(LIST_RESPONSE_CONFIG).parse(stringValuesMV[i]).read(_jsonPath);
+      final List<Float> floatVals = JSON_PARSER_CONTEXT.parse(stringValuesMV[i]).read(_jsonPath);
       if (floatVals == null) {
         results[i] = new float[0];
         continue;
@@ -303,7 +304,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     final String[] stringValuesMV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     final double[][] results = new double[projectionBlock.getNumDocs()][];
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      final List<Double> doubleVals = JsonPath.using(LIST_RESPONSE_CONFIG).parse(stringValuesMV[i]).read(_jsonPath);
+      final List<Double> doubleVals = JSON_PARSER_CONTEXT.parse(stringValuesMV[i]).read(_jsonPath);
       if (doubleVals == null) {
         results[i] = new double[0];
         continue;
@@ -321,7 +322,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     final String[] stringValuesMV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     final String[][] results = new String[projectionBlock.getNumDocs()][];
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      final List<String> stringVals = JsonPath.using(LIST_RESPONSE_CONFIG).parse(stringValuesMV[i]).read(_jsonPath);
+      final List<String> stringVals = JSON_PARSER_CONTEXT.parse(stringValuesMV[i]).read(_jsonPath);
       if (stringVals == null) {
         results[i] = new String[0];
         continue;

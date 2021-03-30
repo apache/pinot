@@ -70,7 +70,10 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   CRON_SCHEDULER_JOB_SCHEDULED("cronSchedulerJobScheduled", false),
 
   // Number of Tasks Status
-  TASK_STATUS("taskStatus", false);
+  TASK_STATUS("taskStatus", false),
+
+  // Number of dropped minion instances
+  DROPPED_MINION_INSTANCES("droppedMinionInstances", true);
 
   private final String gaugeName;
   private final String unit;

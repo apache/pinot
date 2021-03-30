@@ -31,7 +31,7 @@ import java.util.List;
 public class SchemaWithMetaData {
   private List<FieldMetadata> _dimensionFieldSpecs = new ArrayList<>();
   private List<FieldMetadata> _metricFieldSpecs = new ArrayList<>();
-  private List<FieldMetadata> _dateTimeFieldSpecs = new ArrayList<>();
+  private List<DateTimeFieldSpecMetadata> _dateTimeFieldSpecs = new ArrayList<>();
   private TimeFieldSpecMetadata _timeFieldSpec;
 
 
@@ -51,15 +51,15 @@ public class SchemaWithMetaData {
     _metricFieldSpecs = metricFieldSpecs;
   }
 
-  public List<FieldMetadata> getDateTimeFieldSpecs() {
+  public List<DateTimeFieldSpecMetadata> getDateTimeFieldSpecs() {
     return _dateTimeFieldSpecs;
   }
 
-  public void setDateTimeFieldSpecs(List<FieldMetadata> dateTimeFieldSpecs) {
+  public void setDateTimeFieldSpecs(List<DateTimeFieldSpecMetadata> dateTimeFieldSpecs) {
     _dateTimeFieldSpecs = dateTimeFieldSpecs;
   }
 
-  public FieldMetadata getTimeFieldSpec() {
+  public TimeFieldSpecMetadata getTimeFieldSpec() {
     return _timeFieldSpec;
   }
 

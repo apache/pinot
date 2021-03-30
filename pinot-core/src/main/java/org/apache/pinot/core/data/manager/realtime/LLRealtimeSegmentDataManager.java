@@ -21,7 +21,6 @@ package org.apache.pinot.core.data.manager.realtime;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.yammer.metrics.core.Meter;
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -41,6 +40,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -211,13 +211,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final String _resourceDataDir;
   private final IndexLoadingConfig _indexLoadingConfig;
   private final Schema _schema;
-  // Semaphore for each partitionId only, which is to prevent two different Kafka consumers
-  // from consuming with the same partitionId in parallel in the same host.
+  // Semaphore for each partitionGroupId only, which is to prevent two different stream consumers
+  // from consuming with the same partitionGroupId in parallel in the same host.
   // See the comments in {@link RealtimeTableDataManager}.
-  private final Semaphore _partitionConsumerSemaphore;
+  private final Semaphore _partitionGroupConsumerSemaphore;
   // A boolean flag to check whether the current thread has acquired the semaphore.
   // This boolean is needed because the semaphore is shared by threads; every thread holding this semaphore can
-  // modify the permit. This boolean make sure the semaphore gets released only once when the partition stops consuming.
+  // modify the permit. This boolean make sure the semaphore gets released only once when the partition group stops consuming.
   private final AtomicBoolean _acquiredConsumerSemaphore;
   private final String _metricKeyName;
   private final ServerMetrics _serverMetrics;
@@ -247,7 +247,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   private Thread _consumerThread;
   private final String _streamTopic;
-  private final int _streamPartitionId;
+  private final int _partitionGroupId;
   final String _clientId;
   private final LLCSegmentName _llcSegmentName;
   private final RecordTransformer _recordTransformer;
@@ -428,8 +428,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   private void processStreamEvents(MessageBatch messagesAndOffsets, long idlePipeSleepTimeMillis) {
-    Meter realtimeRowsConsumedMeter = null;
-    Meter realtimeRowsDroppedMeter = null;
+    PinotMeter realtimeRowsConsumedMeter = null;
+    PinotMeter realtimeRowsDroppedMeter = null;
 
     int indexedMessageCount = 0;
     int streamMessageCount = 0;
@@ -705,7 +705,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   @Override
   public Map<String, String> getPartitionToCurrentOffset() {
     Map<String, String> partitionToCurrentOffset = new HashMap<>();
-    partitionToCurrentOffset.put(String.valueOf(_streamPartitionId), _currentOffset.toString());
+    partitionToCurrentOffset.put(String.valueOf(_partitionGroupId), _currentOffset.toString());
     return partitionToCurrentOffset;
   }
 
@@ -730,8 +730,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   @VisibleForTesting
-  protected Semaphore getPartitionConsumerSemaphore() {
-    return _partitionConsumerSemaphore;
+  protected Semaphore getPartitionGroupConsumerSemaphore() {
+    return _partitionGroupConsumerSemaphore;
   }
 
   @VisibleForTesting
@@ -740,7 +740,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
-    closeKafkaConsumers();
+    closeStreamConsumers();
     try {
       final long startTimeMillis = now();
       if (_segBuildSemaphore != null) {
@@ -888,11 +888,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return true;
   }
 
-  private void closeKafkaConsumers() {
+  private void closeStreamConsumers() {
     closePartitionLevelConsumer();
     closeStreamMetadataProvider();
     if (_acquiredConsumerSemaphore.compareAndSet(true, false)) {
-      _partitionConsumerSemaphore.release();
+      _partitionGroupConsumerSemaphore.release();
     }
   }
 
@@ -1033,7 +1033,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   protected void downloadSegmentAndReplace(LLCRealtimeSegmentZKMetadata metadata) {
-    closeKafkaConsumers();
+    closeStreamConsumers();
     _realtimeTableDataManager.downloadAndReplaceSegment(_segmentNameStr, metadata, _indexLoadingConfig, _tableConfig);
   }
 
@@ -1071,7 +1071,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       segmentLogger.error("Could not stop consumer thread");
     }
     _realtimeSegment.destroy();
-    closeKafkaConsumers();
+    closeStreamConsumers();
   }
 
   protected void start() {
@@ -1102,7 +1102,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   // If the transition is OFFLINE to ONLINE, the caller should have downloaded the segment and we don't reach here.
   public LLRealtimeSegmentDataManager(RealtimeSegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
       RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, IndexLoadingConfig indexLoadingConfig,
-      Schema schema, LLCSegmentName llcSegmentName, Semaphore partitionConsumerSemaphore, ServerMetrics serverMetrics,
+      Schema schema, LLCSegmentName llcSegmentName, Semaphore partitionGroupConsumerSemaphore, ServerMetrics serverMetrics,
       @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
     _segBuildSemaphore = realtimeTableDataManager.getSegmentBuildSemaphore();
     _segmentZKMetadata = (LLCRealtimeSegmentZKMetadata) segmentZKMetadata;
@@ -1115,7 +1115,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _serverMetrics = serverMetrics;
     _segmentVersion = indexLoadingConfig.getSegmentVersion();
     _instanceId = _realtimeTableDataManager.getServerInstance();
-    _leaseExtender = SegmentBuildTimeLeaseExtender.getLeaseExtender(_instanceId);
+    _leaseExtender = SegmentBuildTimeLeaseExtender.getLeaseExtender(_tableNameWithType);
     _protocolHandler = new ServerSegmentCompletionProtocolHandler(_serverMetrics, _tableNameWithType);
 
     String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
@@ -1129,10 +1129,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _streamTopic = _partitionLevelStreamConfig.getTopicName();
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _llcSegmentName = llcSegmentName;
-    _streamPartitionId = _llcSegmentName.getPartitionId();
-    _partitionConsumerSemaphore = partitionConsumerSemaphore;
+    _partitionGroupId = _llcSegmentName.getPartitionGroupId();
+    _partitionGroupConsumerSemaphore = partitionGroupConsumerSemaphore;
     _acquiredConsumerSemaphore = new AtomicBoolean(false);
-    _metricKeyName = _tableNameWithType + "-" + _streamTopic + "-" + _streamPartitionId;
+    _metricKeyName = _tableNameWithType + "-" + _streamTopic + "-" + _partitionGroupId;
     segmentLogger = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
     _tableStreamName = _tableNameWithType + "_" + _streamTopic;
     _memoryManager = getMemoryManager(realtimeTableDataManager.getConsumerDir(), _segmentNameStr,
@@ -1210,14 +1210,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig.getIngestionConfig(), _schema);
     _messageDecoder = StreamDecoderProvider.create(_partitionLevelStreamConfig, fieldsToRead);
-    _clientId = _streamTopic + "-" + _streamPartitionId;
+    _clientId = _streamTopic + "-" + _partitionGroupId;
 
     // Create record transformer
     _recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
 
-    // Acquire semaphore to create Kafka consumers
+    // Acquire semaphore to create stream consumers
     try {
-      _partitionConsumerSemaphore.acquire();
+      _partitionGroupConsumerSemaphore.acquire();
       _acquiredConsumerSemaphore.set(true);
     } catch (InterruptedException e) {
       String errorMsg = "InterruptedException when acquiring the partitionConsumerSemaphore";
@@ -1261,7 +1261,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         realtimeSegmentConfigBuilder.setPartitionColumn(partitionColumn);
         realtimeSegmentConfigBuilder
             .setPartitionFunction(PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions));
-        realtimeSegmentConfigBuilder.setPartitionId(_streamPartitionId);
+        realtimeSegmentConfigBuilder.setPartitionId(_partitionGroupId);
       } else {
         segmentLogger.warn("Cannot partition on multiple columns: {}", columnPartitionMap.keySet());
       }
@@ -1313,7 +1313,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       closePartitionLevelConsumer();
     }
     segmentLogger.info("Creating new stream consumer, reason: {}", reason);
-    _partitionLevelConsumer = _streamConsumerFactory.createPartitionLevelConsumer(_clientId, _streamPartitionId);
+    _partitionLevelConsumer = _streamConsumerFactory.createPartitionLevelConsumer(_clientId, _partitionGroupId);
   }
 
   /**
@@ -1325,7 +1325,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       closeStreamMetadataProvider();
     }
     segmentLogger.info("Creating new stream metadata provider, reason: {}", reason);
-    _streamMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _streamPartitionId);
+    _streamMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _partitionGroupId);
   }
 
   // This should be done during commit? We may not always commit when we build a segment....

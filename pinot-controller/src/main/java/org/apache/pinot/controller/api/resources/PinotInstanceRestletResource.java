@@ -39,6 +39,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
@@ -59,19 +60,14 @@ public class PinotInstanceRestletResource {
   PinotHelixResourceManager pinotHelixResourceManager;
 
   public static class Instances {
-    List<String> instances;
+    List<String> _instances;
 
     public Instances(@JsonProperty("instances") List<String> instances) {
-      this.instances = instances;
+      _instances = instances;
     }
 
     public List<String> getInstances() {
-      return instances;
-    }
-
-    public Instances setInstances(List<String> instances) {
-      this.instances = instances;
-      return this;
+      return _instances;
     }
   }
 
@@ -104,17 +100,36 @@ public class PinotInstanceRestletResource {
     response.set("tags", JsonUtils.objectToJsonNode(instanceConfig.getTags()));
     response.set("pools", JsonUtils.objectToJsonNode(instanceConfig.getRecord().getMapField(InstanceUtils.POOL_KEY)));
     response.put("grpcPort", getGrpcPort(instanceConfig));
+    response.put("adminPort", getAdminPort(instanceConfig));
+    String queriesDisabled = instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.QUERIES_DISABLED);
+    if ("true".equalsIgnoreCase(queriesDisabled)) {
+      response.put(CommonConstants.Helix.QUERIES_DISABLED, "true");
+    }
     return response.toString();
   }
 
   private int getGrpcPort(InstanceConfig instanceConfig) {
-    int grpcPort;
-    try {
-      grpcPort = Integer.parseInt(instanceConfig.getRecord().getSimpleField(InstanceUtils.GRPC_PORT_KEY));
-    } catch (Exception e) {
-      grpcPort = Instance.NOT_SET_GRPC_PORT_VALUE;
+    String grpcPortStr = instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.Instance.GRPC_PORT_KEY);
+    if (grpcPortStr != null) {
+      try {
+        return Integer.parseInt(grpcPortStr);
+      } catch (Exception e) {
+        LOGGER.warn("Illegal gRPC port: {} for instance: {}", grpcPortStr, instanceConfig.getInstanceName());
+      }
     }
-    return grpcPort;
+    return Instance.NOT_SET_GRPC_PORT_VALUE;
+  }
+
+  private int getAdminPort(InstanceConfig instanceConfig) {
+    String adminPortStr = instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.Instance.ADMIN_PORT_KEY);
+    if (adminPortStr != null) {
+      try {
+        return Integer.parseInt(adminPortStr);
+      } catch (Exception e) {
+        LOGGER.warn("Illegal admin port: {} for instance: {}", adminPortStr, instanceConfig.getInstanceName());
+      }
+    }
+    return Instance.NOT_SET_ADMIN_PORT_VALUE;
   }
 
   @POST
