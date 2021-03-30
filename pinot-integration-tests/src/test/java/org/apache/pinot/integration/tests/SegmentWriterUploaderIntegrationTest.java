@@ -41,6 +41,8 @@ import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -51,6 +53,8 @@ import org.testng.annotations.Test;
  * Tests creating segments via the {@link SegmentWriter} implementations
  */
 public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegrationTest {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentWriterUploaderIntegrationTest.class);
 
   private Schema _schema;
   private String _tableNameWithType;
@@ -129,6 +133,7 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
         try {
           return getTotalDocsFromQuery() == expectedDocs;
         } catch (Exception e) {
+          LOGGER.error("Caught exception when getting totalDocs from query: {}", e.getMessage());
           return null;
         }
       }

@@ -51,11 +51,11 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
+import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
@@ -187,14 +187,13 @@ public final class IngestionUtils {
   /**
    * Uploads the segment tar files to the provided controller
    */
-  public static void uploadSegment(String tableNameWithType, List<File> tarFiles, URI controllerUri, String authToken)
+  public static void uploadSegment(String tableNameWithType, List<File> tarFiles, URI controllerUri,
+      final String authToken)
       throws RetriableOperationException, AttemptsExceededException {
     for (File tarFile : tarFiles) {
       String fileName = tarFile.getName();
-      Preconditions
-          .checkArgument(fileName.endsWith(org.apache.pinot.spi.ingestion.batch.spec.Constants.TAR_GZ_FILE_EXT));
-      String segmentName = fileName.substring(0,
-          fileName.length() - org.apache.pinot.spi.ingestion.batch.spec.Constants.TAR_GZ_FILE_EXT.length());
+      Preconditions.checkArgument(fileName.endsWith(Constants.TAR_GZ_FILE_EXT));
+      String segmentName = fileName.substring(0, fileName.length() - Constants.TAR_GZ_FILE_EXT.length());
 
       RetryPolicies.exponentialBackoffRetryPolicy(DEFAULT_ATTEMPTS, DEFAULT_RETRY_WAIT_MS, 5).attempt(() -> {
         try (InputStream inputStream = new FileInputStream(tarFile)) {
@@ -213,9 +212,6 @@ public final class IngestionUtils {
                 segmentName, e);
             return false;
           } else {
-            LOGGER
-                .error("Caught permanent exception while pushing table: {} segment: {}, won't retry", tableNameWithType,
-                    segmentName, e);
             throw e;
           }
         }
