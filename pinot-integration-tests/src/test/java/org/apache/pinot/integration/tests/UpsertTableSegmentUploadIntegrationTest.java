@@ -33,6 +33,7 @@ import org.apache.http.HttpStatus;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
@@ -65,6 +66,7 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
 
     // Start the Pinot cluster
     startZk();
+    // Start a customized controller with more frequent realtime segment validation
     startController();
     startBrokers(getNumBrokers());
     startServers(NUM_SERVERS);
@@ -128,12 +130,32 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
     return PRIMARY_KEY_COL;
   }
 
+  @Override
+  protected void startController() {
+    Map<String, Object> controllerConfig = getDefaultControllerConfiguration();
+    // Perform realtime segment validation every second with 1 second initial delay.
+    controllerConfig
+        .put(ControllerConf.ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS, 1);
+    controllerConfig.put(ControllerConf.ControllerPeriodicTasksConf.SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS, 1);
+    controllerConfig
+        .put(ControllerConf.ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_INITIAL_DELAY_IN_SECONDS, 1);
+    startController(controllerConfig);
+  }
+
   @Test
   public void testSegmentAssignment()
       throws Exception {
     IdealState idealState = HelixHelper.getTableIdealState(_helixManager, TABLE_NAME_WITH_TYPE);
     Assert.assertEquals(getCurrentCountStarResult(), getCountStarResult());
+    verifyTableIdealStates(idealState);
+    // Wait 3 seconds to let the realtime validation thread to run.
+    Thread.sleep(3000);
+    // Verify the result again.
+    Assert.assertEquals(getCurrentCountStarResult(), getCountStarResult());
+    verifyTableIdealStates(idealState);
+  }
 
+  private void verifyTableIdealStates(IdealState idealState) {
     // Verify various ideal state properties
     Set<String> segments = idealState.getPartitionSet();
     Assert.assertEquals(segments.size(), 5);
