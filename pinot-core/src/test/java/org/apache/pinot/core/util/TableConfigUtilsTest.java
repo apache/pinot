@@ -430,13 +430,6 @@ public class TableConfigUtilsTest {
         new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable_OFFLINE").setIngestionConfig(ingestionConfig)
             .build();
     TableConfigUtils.validateIngestionConfig(tableConfig, null);
-    batchConfigMap.remove(BatchConfigProperties.INPUT_FORMAT);
-    try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, null);
-      Assert.fail("Should fail for invalid batch config map");
-    } catch (IllegalStateException e) {
-      // expected
-    }
   }
 
   @Test
