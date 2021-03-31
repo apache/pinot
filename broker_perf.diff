@@ -1,0 +1,305 @@
+diff --git a/pinot-broker/src/main/java/org/apache/pinot/broker/routing/segmentpruner/PartitionSegmentPruner.java b/pinot-broker/src/main/java/org/apache/pinot/broker/routing/segmentpruner/PartitionSegmentPruner.java
+index 52f1412fe..ab09e7130 100644
+--- a/pinot-broker/src/main/java/org/apache/pinot/broker/routing/segmentpruner/PartitionSegmentPruner.java
++++ b/pinot-broker/src/main/java/org/apache/pinot/broker/routing/segmentpruner/PartitionSegmentPruner.java
+@@ -19,12 +19,17 @@
+ package org.apache.pinot.broker.routing.segmentpruner;
+ 
+ import java.util.ArrayList;
++import java.util.HashMap;
+ import java.util.HashSet;
+ import java.util.List;
+ import java.util.Map;
++import java.util.Objects;
+ import java.util.Set;
+ import java.util.concurrent.ConcurrentHashMap;
++import java.util.concurrent.ConcurrentSkipListSet;
+ import javax.annotation.Nullable;
++import javax.annotation.concurrent.ThreadSafe;
++
+ import org.apache.helix.AccessOption;
+ import org.apache.helix.ZNRecord;
+ import org.apache.helix.model.ExternalView;
+@@ -55,8 +60,27 @@ public class PartitionSegmentPruner implements SegmentPruner {
+   private final String _partitionColumn;
+   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
+   private final String _segmentZKMetadataPathPrefix;
++  /**
++   * The map will contain INVALID_PARTITION_INFO as values, to indicate that the segment has no info.
++   * The key set of this map will have all the segments available
++   */
+   private final Map<String, PartitionInfo> _partitionInfoMap = new ConcurrentHashMap<>();
+ 
++  /**
++   * This map is used as a HashSet, values are meaningless.
++   * It is the index of all segments without any partition information on it.
++   * The Pruner will consider those segments "MATCH" for all queries to be scanned to be correct.
++   * We use this set for performance optimization
++   */
++  private final Map<String, Boolean> _segmentsWithoutPartitionInfo = new ConcurrentHashMap<>();
++  /**
++   * This map is used as a reverse index of _partitionInfoMap. For each specific partition info,
++   * we will have a Set of all the segments in it.
++   * When we have something like 40k segments, a quick retainAll() will help improve the pruner a lot.
++   */
++  private final Map<PartitionInfo, Set<String>> _partitionInfoSegments = new ConcurrentHashMap<>();
++  private final PartitionNumberCache partitionNumberCache = new PartitionNumberCache();
++
+   public PartitionSegmentPruner(String tableNameWithType, String partitionColumn,
+       ZkHelixPropertyStore<ZNRecord> propertyStore) {
+     _tableNameWithType = tableNameWithType;
+@@ -79,12 +103,18 @@ public class PartitionSegmentPruner implements SegmentPruner {
+     for (int i = 0; i < numSegments; i++) {
+       String segment = segments.get(i);
+       PartitionInfo partitionInfo = extractPartitionInfoFromSegmentZKMetadataZNRecord(segment, znRecords.get(i));
+-      if (partitionInfo != null) {
+-        _partitionInfoMap.put(segment, partitionInfo);
+-      }
++      safePutPartitionInfo(segment, partitionInfo);
+     }
++    rebuildReverseMap();
+   }
++  private void safePutPartitionInfo(String segment, PartitionInfo partitionInfo) {
++    if (partitionInfo == null) {
++      _partitionInfoMap.put(segment, INVALID_PARTITION_INFO);
++    } else {
++      _partitionInfoMap.put(segment, partitionInfo);
++    }
+ 
++  }
+   /**
+    * NOTE: Returns {@code null} when the ZNRecord is missing (could be transient Helix issue). Returns
+    *       {@link #INVALID_PARTITION_INFO} when the segment does not have valid partition metadata in its ZK metadata,
+@@ -135,17 +165,15 @@ public class PartitionSegmentPruner implements SegmentPruner {
+           _propertyStore.get(_segmentZKMetadataPathPrefix + k, null, AccessOption.PERSISTENT)));
+     }
+     _partitionInfoMap.keySet().retainAll(onlineSegments);
++    rebuildReverseMap();
+   }
+ 
+   @Override
+   public synchronized void refreshSegment(String segment) {
+     PartitionInfo partitionInfo = extractPartitionInfoFromSegmentZKMetadataZNRecord(segment,
+         _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT));
+-    if (partitionInfo != null) {
+-      _partitionInfoMap.put(segment, partitionInfo);
+-    } else {
+-      _partitionInfoMap.remove(segment);
+-    }
++    safePutPartitionInfo(segment, partitionInfo);
++    rebuildReverseMap();
+   }
+ 
+   @Override
+@@ -154,18 +182,39 @@ public class PartitionSegmentPruner implements SegmentPruner {
+     if (filterQueryTree == null) {
+       return segments;
+     }
+-    Set<String> selectedSegments = new HashSet<>();
+-    for (String segment : segments) {
+-      PartitionInfo partitionInfo = _partitionInfoMap.get(segment);
+-      if (partitionInfo == null || partitionInfo == INVALID_PARTITION_INFO || isPartitionMatch(filterQueryTree,
+-          partitionInfo)) {
+-        selectedSegments.add(segment);
++    Set<String> selectedSegments = new HashSet<>(_segmentsWithoutPartitionInfo.keySet());
++    for (PartitionInfo partitionInfo : _partitionInfoSegments.keySet()) {
++      if (isPartitionMatch(filterQueryTree, partitionInfo)) {
++        selectedSegments.addAll(_partitionInfoSegments.get(partitionInfo));
+       }
+     }
++    selectedSegments.retainAll(segments);
+     return selectedSegments;
+   }
+ 
++  /**
++   * Builds the index for performance optimization.
++   * In the case of Prune() call, if there are 40k segments, looping through them one by one is going to be slow.
++   * We have build the partition info, and then do a retainAll to avoid the o(n) on 40k segments.
++   */
++  private void rebuildReverseMap() {
++    _partitionInfoSegments.clear();
++    _segmentsWithoutPartitionInfo.clear();
++    _partitionInfoMap.forEach(
++        (segmentName, partitionInfo) -> {
++          if (partitionInfo == null || partitionInfo == INVALID_PARTITION_INFO) {
++            _segmentsWithoutPartitionInfo.put(segmentName, true);
++          } else {
++            Set<String> segments =
++                _partitionInfoSegments.computeIfAbsent(partitionInfo, (info) -> new HashSet<>());
++            segments.add(segmentName);
++          }
++        });
++  }
+   private boolean isPartitionMatch(FilterQueryTree filterQueryTree, PartitionInfo partitionInfo) {
++    if (partitionInfo == INVALID_PARTITION_INFO) {
++      return true;
++    }
+     switch (filterQueryTree.getOperator()) {
+       case AND:
+         for (FilterQueryTree child : filterQueryTree.getChildren()) {
+@@ -185,7 +234,7 @@ public class PartitionSegmentPruner implements SegmentPruner {
+       case IN:
+         if (filterQueryTree.getColumn().equals(_partitionColumn)) {
+           for (String value : filterQueryTree.getValue()) {
+-            if (partitionInfo._partitions.contains(partitionInfo._partitionFunction.getPartition(value))) {
++            if (partitionInfo._partitions.contains(partitionNumberCache.getPartition(partitionInfo._partitionFunction, value))) {
+               return true;
+             }
+           }
+@@ -196,7 +245,7 @@ public class PartitionSegmentPruner implements SegmentPruner {
+     }
+   }
+ 
+-  private static class PartitionInfo {
++  static class PartitionInfo {
+     final PartitionFunction _partitionFunction;
+     final Set<Integer> _partitions;
+ 
+@@ -204,5 +253,42 @@ public class PartitionSegmentPruner implements SegmentPruner {
+       _partitionFunction = partitionFunction;
+       _partitions = partitions;
+     }
++
++    @Override
++    public boolean equals(Object o) {
++      if (this == o) return true;
++      if (o == null || getClass() != o.getClass()) return false;
++      PartitionInfo that = (PartitionInfo) o;
++      return Objects.equals(_partitionFunction.toString(), that._partitionFunction.toString()) &&
++              Objects.equals(_partitionFunction.getNumPartitions(), that._partitionFunction.getNumPartitions()) &&
++              Objects.equals(_partitions, that._partitions);
++    }
++
++    @Override
++    public int hashCode() {
++      return Objects.hash(_partitionFunction.toString(), _partitionFunction.getNumPartitions(), _partitions);
++    }
++  }
++
++  /**
++   * This cache is to avoid computing partition hash repeatedly.
++   * It caches the PartitionFunction results of a string so it can be quickly looked up instead computed.
++   * It will help the performance when we are in high QPS situation.
++   */
++  @ThreadSafe
++  static class PartitionNumberCache {
++    final Map<PartitionFunction, Map<String, Integer>> cache = new ConcurrentHashMap<>();
++    public int getPartition(PartitionFunction func, String value) {
++      if (func == null) {
++        throw new RuntimeException("Hash func is null!");
++      }
++      // if two threads runs the below code at the same time, one of the thread will win
++      // the one that have lost will end up computing one extra (not caching) but no harm is done for next run
++      // the dangling hashmap will be GC'ed
++      Map<String, Integer> valueToPartition = cache.computeIfAbsent(func, (f) -> new ConcurrentHashMap<>());
++      // same goes here for two threads running at the same time. One will win,
++      // the other thread will waste one computation but no harm is done.
++      return valueToPartition.computeIfAbsent(value, (v) -> func.getPartition(value));
++    }
+   }
+ }
+diff --git a/pinot-broker/src/main/java/org/apache/pinot/broker/routing/segmentselector/OfflineSegmentSelector.java b/pinot-broker/src/main/java/org/apache/pinot/broker/routing/segmentselector/OfflineSegmentSelector.java
+index c236a569e..79d11970c 100644
+--- a/pinot-broker/src/main/java/org/apache/pinot/broker/routing/segmentselector/OfflineSegmentSelector.java
++++ b/pinot-broker/src/main/java/org/apache/pinot/broker/routing/segmentselector/OfflineSegmentSelector.java
+@@ -19,6 +19,7 @@
+ package org.apache.pinot.broker.routing.segmentselector;
+ 
+ import java.util.Collections;
++import java.util.HashSet;
+ import java.util.Set;
+ import org.apache.helix.model.ExternalView;
+ import org.apache.helix.model.IdealState;
+@@ -41,7 +42,7 @@ public class OfflineSegmentSelector implements SegmentSelector {
+     // TODO: for new added segments, before all replicas are up, consider not selecting them to avoid causing
+     //       hotspot servers
+ 
+-    _segments = Collections.unmodifiableSet(onlineSegments);
++    _segments = Collections.unmodifiableSet(new HashSet<>(onlineSegments));
+   }
+ 
+   @Override
+diff --git a/pinot-broker/src/test/java/org/apache/pinot/broker/routing/segmentpruner/SegmentPrunerTest.java b/pinot-broker/src/test/java/org/apache/pinot/broker/routing/segmentpruner/SegmentPrunerTest.java
+index a639709e4..4cc9d874a 100644
+--- a/pinot-broker/src/test/java/org/apache/pinot/broker/routing/segmentpruner/SegmentPrunerTest.java
++++ b/pinot-broker/src/test/java/org/apache/pinot/broker/routing/segmentpruner/SegmentPrunerTest.java
+@@ -26,6 +26,9 @@ import java.util.List;
+ import java.util.Map;
+ import java.util.Set;
+ import java.util.concurrent.TimeUnit;
++
++import com.google.common.collect.ImmutableSet;
++import com.google.common.collect.Sets;
+ import org.apache.helix.ZNRecord;
+ import org.apache.helix.manager.zk.ZNRecordSerializer;
+ import org.apache.helix.manager.zk.ZkBaseDataAccessor;
+@@ -41,6 +44,9 @@ import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
+ import org.apache.pinot.common.request.BrokerRequest;
+ import org.apache.pinot.common.utils.CommonConstants;
+ import org.apache.pinot.common.utils.ZkStarter;
++import org.apache.pinot.core.data.partition.ModuloPartitionFunction;
++import org.apache.pinot.core.data.partition.MurmurPartitionFunction;
++import org.apache.pinot.core.data.partition.PartitionFunction;
+ import org.apache.pinot.pql.parsers.Pql2Compiler;
+ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+ import org.apache.pinot.spi.config.table.IndexingConfig;
+@@ -62,6 +68,8 @@ import org.testng.annotations.Test;
+ import static org.mockito.Mockito.mock;
+ import static org.mockito.Mockito.when;
+ import static org.testng.Assert.assertEquals;
++import static org.testng.Assert.assertFalse;
++import static org.testng.Assert.assertNotEquals;
+ import static org.testng.Assert.assertTrue;
+ 
+ 
+@@ -237,6 +245,8 @@ public class SegmentPrunerTest {
+ 
+     // Segments without metadata (not updated yet) should not be pruned
+     String newSegment = "newSegment";
++    // by protocol this segment has to be online to be in the list, so we call refresh without ZK for it.
++    segmentPruner.refreshSegment(newSegment);
+     assertEquals(segmentPruner.prune(brokerRequest1, new HashSet<>(Collections.singletonList(newSegment))),
+         Collections.singletonList(newSegment));
+     assertEquals(segmentPruner.prune(brokerRequest2, new HashSet<>(Collections.singletonList(newSegment))),
+@@ -433,7 +443,41 @@ public class SegmentPrunerTest {
+     assertEquals(new HashSet(segmentPruner.prune(brokerRequest7, new HashSet<>(Arrays.asList(segment0, segment1, segment2)))),
+         Collections.emptySet());
+   }
++  @Test
++  public void testPartitionSegmentPrunerPartitionCache() {
++    PartitionSegmentPruner.PartitionNumberCache cache = new PartitionSegmentPruner.PartitionNumberCache();
++    PartitionFunction func = new MurmurPartitionFunction(40);
++    int partition1 = cache.getPartition(func, "bla1");
++    assertEquals(func.getPartition("bla1"), partition1);
++    // run again
++    partition1 = cache.getPartition(func, "bla1");
++    assertEquals(func.getPartition("bla1"), partition1);
++    int partition2 = cache.getPartition(func, "bla2");
++    assertEquals(func.getPartition("bla2"), partition2);
++  }
+ 
++  @Test
++  public void testPartitionSegmentPrunerPartitionInfo() {
++    PartitionSegmentPruner.PartitionInfo info1 = new PartitionSegmentPruner.PartitionInfo(new MurmurPartitionFunction(20), ImmutableSet.of(1, 2));
++    PartitionSegmentPruner.PartitionInfo info2 = new PartitionSegmentPruner.PartitionInfo(new MurmurPartitionFunction(20), ImmutableSet.of(1, 2));
++    assertEquals(info1, info2);
++    assertEquals(info1.hashCode(), info2.hashCode());
++    PartitionSegmentPruner.PartitionInfo info3 = new PartitionSegmentPruner.PartitionInfo(new MurmurPartitionFunction(21), ImmutableSet.of(1, 2));
++    assertNotEquals(info1, info3);
++    assertNotEquals(info2, info3);
++    assertNotEquals(info1.hashCode(), info3.hashCode());
++
++    Set<PartitionSegmentPruner.PartitionInfo> s = new HashSet<>();
++    s.add(info1);
++    s.add(info2);
++    assertEquals(1, s.size());
++    s.add(info3);
++    assertEquals(2, s.size());
++    PartitionSegmentPruner.PartitionInfo info4 = new PartitionSegmentPruner.PartitionInfo(new MurmurPartitionFunction(20), ImmutableSet.of(1, 2));
++    assertTrue(s.contains(info4));
++    PartitionSegmentPruner.PartitionInfo info5 = new PartitionSegmentPruner.PartitionInfo(new ModuloPartitionFunction(20), ImmutableSet.of(1, 2));
++    assertFalse(s.contains(info5));
++  }
+   @Test
+   public void testTimeSegmentPrunerSimpleDateFormat() {
+     CalciteSqlCompiler sqlCompiler = new CalciteSqlCompiler();
