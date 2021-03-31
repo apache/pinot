@@ -70,6 +70,8 @@ public interface StreamMetadataProvider extends Closeable {
     List<PartitionGroupInfo> newPartitionGroupInfoList = new ArrayList<>(partitionCount);
 
     // Add a PartitionGroupInfo into the list foreach partition already present in current.
+    // Setting endOffset (exclusive) as the startOffset for new partition group.
+    // If partition group is still in progress, this value will be null
     for (PartitionGroupMetadata currentPartitionGroupMetadata : currentPartitionGroupsMetadata) {
       newPartitionGroupInfoList.add(new PartitionGroupInfo(currentPartitionGroupMetadata.getPartitionGroupId(),
           currentPartitionGroupMetadata.getEndOffset()));
