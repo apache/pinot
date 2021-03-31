@@ -440,6 +440,13 @@ public enum PinotDataType {
 
   SHORT_ARRAY,
 
+  /*
+    NOTE:
+      Primitive array is used in query execution, query response, scalar function arguments and return values.
+      Object array is used in GenericRow for data ingestion.
+      We need to keep them separately because they cannot automatically cast to the other type.
+   */
+
   PRIMITIVE_INT_ARRAY {
     @Override
     public int[] convert(Object value, PinotDataType sourceType) {
@@ -510,27 +517,27 @@ public enum PinotDataType {
    */
 
   public int toInt(Object value) {
-    return getSingleValueType().toInt(((Object[]) value)[0]);
+    return getSingleValueType().toInt(toObjectArray(value)[0]);
   }
 
   public long toLong(Object value) {
-    return getSingleValueType().toLong(((Object[]) value)[0]);
+    return getSingleValueType().toLong(toObjectArray(value)[0]);
   }
 
   public float toFloat(Object value) {
-    return getSingleValueType().toFloat(((Object[]) value)[0]);
+    return getSingleValueType().toFloat(toObjectArray(value)[0]);
   }
 
   public double toDouble(Object value) {
-    return getSingleValueType().toDouble(((Object[]) value)[0]);
+    return getSingleValueType().toDouble(toObjectArray(value)[0]);
   }
 
   public String toString(Object value) {
-    return getSingleValueType().toString(((Object[]) value)[0]);
+    return getSingleValueType().toString(toObjectArray(value)[0]);
   }
 
   public byte[] toBytes(Object value) {
-    return getSingleValueType().toBytes(((Object[]) value)[0]);
+    return getSingleValueType().toBytes(toObjectArray(value)[0]);
   }
 
   public int[] toPrimitiveIntArray(Object value) {
@@ -753,7 +760,11 @@ public enum PinotDataType {
     }
   }
 
-  public static PinotDataType getPinotDataType(FieldSpec fieldSpec) {
+  /**
+   * Returns the {@link PinotDataType} for the given {@link FieldSpec} for data ingestion purpose. Returns object array
+   * type for multi-valued types.
+   */
+  public static PinotDataType getPinotDataTypeForIngestion(FieldSpec fieldSpec) {
     DataType dataType = fieldSpec.getDataType();
     switch (dataType) {
       case INT:
@@ -778,7 +789,11 @@ public enum PinotDataType {
     }
   }
 
-  public static PinotDataType getPinotDataType(ColumnDataType columnDataType) {
+  /**
+   * Returns the {@link PinotDataType} for the given {@link ColumnDataType} for query execution purpose. Returns
+   * primitive array type for multi-valued types.
+   */
+  public static PinotDataType getPinotDataTypeForExecution(ColumnDataType columnDataType) {
     switch (columnDataType) {
       case INT:
         return INTEGER;

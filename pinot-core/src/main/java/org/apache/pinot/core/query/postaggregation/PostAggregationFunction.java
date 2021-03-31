@@ -53,7 +53,7 @@ public class PostAggregationFunction {
     }
     _argumentTypes = new PinotDataType[numArguments];
     for (int i = 0; i < numArguments; i++) {
-      _argumentTypes[i] = PinotDataType.getPinotDataType(argumentTypes[i]);
+      _argumentTypes[i] = PinotDataType.getPinotDataTypeForExecution(argumentTypes[i]);
     }
     ColumnDataType resultType = FunctionUtils.getColumnDataType(_functionInvoker.getResultClass());
     // Handle unrecognized result class with STRING

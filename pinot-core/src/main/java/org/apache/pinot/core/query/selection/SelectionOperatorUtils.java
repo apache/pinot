@@ -492,6 +492,7 @@ public class SelectionOperatorUtils {
   }
 
   /**
+   * Deprecated because this method is only used to construct the PQL response, and PQL is already deprecated.
    * Formats a value into a {@code String} (single-value column) or {@code String[]} (multi-value column) based on the
    * data type. (Broker side)
    * <p>Actual value type can be different with data type passed in, but they must be type compatible.
