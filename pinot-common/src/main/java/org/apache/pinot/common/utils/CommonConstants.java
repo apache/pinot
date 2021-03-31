@@ -307,6 +307,9 @@ public class CommonConstants {
     public static final String SERVER_TLS_PREFIX = "pinot.server.tls";
     public static final String SERVER_NETTYTLS_PREFIX = "pinot.server.nettytls";
 
+    // The complete config key is pinot.server.instance.segment.store.uri
+    public static final String CONFIG_OF_SEGMENT_STORE_URI = "segment.store.uri";
+
     public static class SegmentCompletionProtocol {
       public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";
 
