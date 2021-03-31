@@ -27,10 +27,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
@@ -47,6 +49,7 @@ import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.util.Objects.requireNonNull;
 
 public class SegmentDeletionManager {
 
@@ -67,14 +70,10 @@ public class SegmentDeletionManager {
     _helixAdmin = helixAdmin;
     _helixClusterName = helixClusterName;
     _propertyStore = propertyStore;
-
-    _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
-      @Override
-      public Thread newThread(Runnable runnable) {
-        Thread thread = new Thread(runnable);
-        thread.setName("PinotHelixResourceManagerExecutorService");
-        return thread;
-      }
+    _executorService = Executors.newSingleThreadScheduledExecutor(runnable -> {
+      Thread thread = new Thread(runnable);
+      thread.setName("PinotHelixResourceManagerExecutorService");
+      return thread;
     });
   }
 
@@ -88,12 +87,7 @@ public class SegmentDeletionManager {
 
   protected void deleteSegmentsWithDelay(final String tableName, final Collection<String> segmentIds,
       final long deletionDelaySeconds) {
-    _executorService.schedule(new Runnable() {
-      @Override
-      public void run() {
-        deleteSegmentFromPropertyStoreAndLocal(tableName, segmentIds, deletionDelaySeconds);
-      }
-    }, deletionDelaySeconds, TimeUnit.SECONDS);
+    _executorService.schedule(() -> deleteSegmentFromPropertyStoreAndLocal(tableName, segmentIds, deletionDelaySeconds), deletionDelaySeconds, TimeUnit.SECONDS);
   }
 
   protected synchronized void deleteSegmentFromPropertyStoreAndLocal(String tableName, Collection<String> segmentIds,
@@ -159,60 +153,81 @@ public class SegmentDeletionManager {
       long effectiveDeletionDelay = Math.min(deletionDelay * 2, MAX_DELETION_DELAY_SECONDS);
       LOGGER.info("Postponing deletion of {} segments from table {}", segmentsToRetryLater.size(), tableName);
       deleteSegmentsWithDelay(tableName, segmentsToRetryLater, effectiveDeletionDelay);
-      return;
     }
   }
 
-  public void removeSegmentsFromStore(String tableNameWithType, List<String> segments) {
+  @SuppressWarnings("unchecked")
+  public <T extends PinotFS> void removeSegmentsFromStore(String tableNameWithType, List<String> segments) {
+    URI deletedSegmentBaseUri = URIUtils.getUri(_dataDir, DELETED_SEGMENTS);
+    T pinotFS = (T) PinotFSFactory.create(deletedSegmentBaseUri.getScheme());
+    PinotFS.ParallelOperationsBuilder<T> operationsBuilder = pinotFS.getParallelOperationsBuilder();
+
     for (String segment : segments) {
-      removeSegmentFromStore(tableNameWithType, segment);
+        removeSegmentFromStore(tableNameWithType, segment, operationsBuilder);
+    }
+
+    try {
+      operationsBuilder.execute();
+    } catch (InterruptedException | ExecutionException e) {
+      LOGGER.warn("Failed to delete segments for table '{}': {}", tableNameWithType, segments);
     }
   }
 
-  protected void removeSegmentFromStore(String tableNameWithType, String segmentId) {
+  protected <T extends PinotFS> void removeSegmentFromStore(String tableNameWithType, String segmentId, PinotFS.ParallelOperationsBuilder<T> operationsBuilder) {
     // Ignore HLC segments as they are not stored in Pinot FS
     if (SegmentName.isHighLevelConsumerSegmentName(segmentId)) {
       return;
     }
     if (_dataDir != null) {
-      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-      URI fileToMoveURI = URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
-      URI deletedSegmentDestURI = URIUtils.getUri(_dataDir, DELETED_SEGMENTS, rawTableName, URIUtils.encode(segmentId));
-      PinotFS pinotFS = PinotFSFactory.create(fileToMoveURI.getScheme());
+      operationsBuilder.add(removeSegmentFromStoreOperation(tableNameWithType, segmentId));
+    } else {
+      LOGGER.info("dataDir is not configured, won't delete segment {} from disk", segmentId);
+    }
+  }
 
+  <T extends PinotFS> PinotFS.FileOperation<T> removeSegmentFromStoreOperation(String tableNameWithType, String segmentId) {
+    requireNonNull(_dataDir, "data directory is null");
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    URI fileToMoveURI = URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
+    URI deletedSegmentDestURI = URIUtils.getUri(_dataDir, DELETED_SEGMENTS, rawTableName, URIUtils.encode(segmentId));
+    return  pinotFS -> {
       try {
         if (pinotFS.exists(fileToMoveURI)) {
           // Overwrites the file if it already exists in the target directory.
           if (pinotFS.move(fileToMoveURI, deletedSegmentDestURI, true)) {
             // Updates last modified.
             // Touch is needed here so that removeAgedDeletedSegments() works correctly.
-            pinotFS.touch(deletedSegmentDestURI);
+            boolean result = pinotFS.touch(deletedSegmentDestURI);
             LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToMoveURI.toString(),
-                deletedSegmentDestURI.toString());
-          } else {
-            LOGGER.warn("Failed to move segment {} from {} to {}", segmentId, fileToMoveURI.toString(),
-                deletedSegmentDestURI.toString());
+                    deletedSegmentDestURI.toString());
+            return result;
           }
-        } else {
+          else {
+            LOGGER.warn("Failed to move segment {} from {} to {}", segmentId, fileToMoveURI.toString(),
+                    deletedSegmentDestURI.toString());
+          }
+        }
+        else {
           LOGGER.warn("Failed to find local segment file for segment {}", fileToMoveURI.toString());
         }
-      } catch (IOException e) {
-        LOGGER.warn("Could not move segment {} from {} to {}", segmentId, fileToMoveURI.toString(),
-            deletedSegmentDestURI.toString(), e);
       }
-    } else {
-      LOGGER.info("dataDir is not configured, won't delete segment {} from disk", segmentId);
-    }
+      catch (IOException e) {
+        LOGGER.warn("Could not move segment {} from {} to {}", segmentId, fileToMoveURI.toString(),
+                deletedSegmentDestURI.toString(), e);
+      }
+      return false;
+    };
   }
 
   /**
    * Removes aged deleted segments from the deleted directory
    * @param retentionInDays: retention for deleted segments in days
    */
-  public void removeAgedDeletedSegments(int retentionInDays) {
+  @SuppressWarnings("unchecked")
+  public <T extends PinotFS> void removeAgedDeletedSegments(int retentionInDays) {
     if (_dataDir != null) {
       URI deletedDirURI = URIUtils.getUri(_dataDir, DELETED_SEGMENTS);
-      PinotFS pinotFS = PinotFSFactory.create(deletedDirURI.getScheme());
+      T pinotFS = (T) PinotFSFactory.create(deletedDirURI.getScheme());
 
       try {
         // Check that the directory for deleted segments exists.
@@ -227,31 +242,51 @@ public class SegmentDeletionManager {
           return;
         }
 
+        PinotFS.ParallelOperationsBuilder<T> directoryOperationsBuilder = pinotFS.getParallelOperationsBuilder();
         for (String tableNameDir : tableNameDirs) {
           URI tableNameURI = URIUtils.getUri(tableNameDir);
           // Get files that are aged
           final String[] targetFiles = pinotFS.listFiles(tableNameURI, false);
-          int numFilesDeleted = 0;
+          AtomicInteger numFilesDeleted = new AtomicInteger();
+
+          PinotFS.ParallelOperationsBuilder<T> operationsBuilder = pinotFS.getParallelOperationsBuilder();
           for (String targetFile : targetFiles) {
-            URI targetURI = URIUtils.getUri(targetFile);
-            Date dateToDelete = DateTime.now().minusDays(retentionInDays).toDate();
-            if (pinotFS.lastModified(targetURI) < dateToDelete.getTime()) {
-              if (!pinotFS.delete(targetURI, true)) {
-                LOGGER.warn("Cannot remove file {} from deleted directory.", targetURI.toString());
+            operationsBuilder.add(fs -> {
+              URI targetURI = URIUtils.getUri(targetFile);
+              Date dateToDelete = DateTime.now().minusDays(retentionInDays).toDate();
+              if (pinotFS.lastModified(targetURI) < dateToDelete.getTime()) {
+                boolean result = fs.delete(targetURI, true);
+                if (!result) {
+                  LOGGER.warn("Cannot remove file {} from deleted directory.", targetURI.toString());
+                }
+                else {
+                  numFilesDeleted.incrementAndGet();
+                }
+                return result;
               } else {
-                numFilesDeleted++;
+                return true;
               }
-            }
+            });
           }
 
-          if (numFilesDeleted == targetFiles.length) {
-            // Delete directory if it's empty
-            if (!pinotFS.delete(tableNameURI, false)) {
-              LOGGER.warn("The directory {} cannot be removed.", tableNameDir);
+          directoryOperationsBuilder.add(fs -> {
+            try {
+              operationsBuilder.execute();
+
+              if (numFilesDeleted.get() == targetFiles.length) {
+                // Delete directory if it's empty
+                if (!fs.delete(tableNameURI, false)) {
+                  LOGGER.warn("The directory {} cannot be removed.", tableNameDir);
+                }
+              }
+            } catch (ExecutionException | InterruptedException e) {
+              LOGGER.error("Had trouble deleting directories: {}", deletedDirURI.toString(), e);
             }
-          }
+            return true;
+          });
         }
-      } catch (IOException e) {
+        directoryOperationsBuilder.execute();
+      } catch (InterruptedException | ExecutionException | IOException e) {
         LOGGER.error("Had trouble deleting directories: {}", deletedDirURI.toString(), e);
       }
     } else {

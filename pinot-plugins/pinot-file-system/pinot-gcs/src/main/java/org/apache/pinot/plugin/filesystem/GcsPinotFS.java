@@ -19,7 +19,9 @@
 package org.apache.pinot.plugin.filesystem;
 
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static java.util.Objects.requireNonNull;
+import static java.util.concurrent.Executors.newFixedThreadPool;
 import static joptsimple.internal.Strings.isNullOrEmpty;
 import static org.glassfish.jersey.internal.guava.Preconditions.checkArgument;
 
@@ -36,6 +38,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import com.google.common.util.concurrent.ListeningExecutorService;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -54,14 +57,28 @@ import com.google.cloud.storage.StorageOptions;
 import com.google.common.collect.ImmutableList;
 
 public class GcsPinotFS  extends PinotFS {
+  private class GcsParallelOperationsBuilder
+          extends ParallelOperationsBuilder<GcsPinotFS>
+  {
+    public void addCopyFile(URI src, URI dst) {
+      operationBuilder.add(pinotFS -> copyFile(src, dst));
+    }
+
+    public void addDeleteBlob(Blob blob) {
+      operationBuilder.add(ignored -> blob.delete());
+    }
+  }
+
   public static final String PROJECT_ID = "projectId";
   public static final String GCP_KEY = "gcpKey";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(GcsPinotFS.class);
   private static final String SCHEME = "gs";
   private static final String DELIMITER = "/";
+  private static final int DEFAULT_CONCURRENCY = 20;
   private static final int BUFFER_SIZE = 128 * 1024;
   private Storage storage;
+  private ListeningExecutorService _fileOperationExecutorService;
 
   @Override
   public void init(PinotConfiguration config) {
@@ -82,6 +99,12 @@ public class GcsPinotFS  extends PinotFS {
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
+    _fileOperationExecutorService =  listeningDecorator(newFixedThreadPool(DEFAULT_CONCURRENCY, runnable -> {
+      Thread thread = new Thread(runnable);
+      thread.setDaemon(true);
+      thread.setName("PinotGcsFileOperationExecutorService");
+      return thread;
+    }));
   }
 
   private Bucket getBucket(URI uri) {
@@ -165,9 +188,7 @@ public class GcsPinotFS  extends PinotFS {
       page = getBucket(uri).list(Storage.BlobListOption.prefix(prefix));
     }
     for (Blob blob : page.iterateAll()) {
-      if (blob.getName().equals(prefix)) {
-        continue;
-      } else {
+      if (!blob.getName().equals(prefix)) {
         isEmpty = false;
         break;
       }
@@ -181,6 +202,11 @@ public class GcsPinotFS  extends PinotFS {
     CopyWriter copyWriter = blob.copyTo(newBlob.getBlobId());
     copyWriter.getResult();
     return copyWriter.isDone();
+  }
+
+  @Override
+  protected ListeningExecutorService getFileOperationExecutorService() {
+    return _fileOperationExecutorService;
   }
 
   @Override
@@ -218,11 +244,11 @@ public class GcsPinotFS  extends PinotFS {
         } else {
           page = getBucket(segmentUri).list(Storage.BlobListOption.prefix(prefix));
         }
-        boolean deleteSucceeded = true;
+        GcsParallelOperationsBuilder operationsBuilder = new GcsParallelOperationsBuilder();
         for (Blob blob : page.iterateAll()) {
-          deleteSucceeded &= blob.delete();
+          operationsBuilder.addDeleteBlob(blob);
         }
-        return deleteSucceeded;
+        return operationsBuilder.executeDirect();
       } else {
         Blob blob = getBlob(segmentUri);
         return blob != null && blob.delete();
@@ -247,7 +273,7 @@ public class GcsPinotFS  extends PinotFS {
    * @param srcUri URI of the original file
    * @param dstUri URI of the final file location
    * @return {@code true} if copy succeeded otherwise return {@code false}
-   * @throws IOException
+   * @throws IOException on any IO error - missing file, not a file etc
    */
   @Override
   public boolean copy(URI srcUri, URI dstUri) throws IOException {
@@ -261,18 +287,18 @@ public class GcsPinotFS  extends PinotFS {
       return copyFile(srcUri, dstUri);
     }
     dstUri = normalizeToDirectoryUri(dstUri);
-    ImmutableList.Builder<URI> builder = ImmutableList.builder();
     Path srcPath = Paths.get(srcUri.getPath());
     try {
-      boolean copySucceeded = true;
+      GcsParallelOperationsBuilder operationsBuilder = new GcsParallelOperationsBuilder();
+
       for (String directoryEntry : listFiles(srcUri, true)) {
         URI src = new URI(srcUri.getScheme(), srcUri.getHost(), directoryEntry, null);
         String relativeSrcPath = srcPath.relativize(Paths.get(directoryEntry)).toString();
         String dstPath = dstUri.resolve(relativeSrcPath).getPath();
         URI dst = new URI(dstUri.getScheme(), dstUri.getHost(), dstPath, null);
-        copySucceeded &= copyFile(src, dst);
+        operationsBuilder.addCopyFile(src, dst);
       }
-      return copySucceeded;
+      return operationsBuilder.executeDirect();
     } catch (URISyntaxException e) {
       throw new IOException(e);
     }
