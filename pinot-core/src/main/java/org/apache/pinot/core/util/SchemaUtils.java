@@ -82,7 +82,7 @@ public class SchemaUtils {
       if (!fieldSpec.isVirtualColumn()) {
         String column = fieldSpec.getName();
         Preconditions.checkState(!StringUtils.containsWhitespace(column),
-            "The column name \"%s\" should not" + " contain blank space.", column);
+            "The column name \"%s\" should not contain blank space.", column);
         primaryKeyColumnCandidates.add(column);
         String transformFunction = fieldSpec.getTransformFunction();
         if (transformFunction != null) {

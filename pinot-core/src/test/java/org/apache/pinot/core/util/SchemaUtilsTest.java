@@ -315,21 +315,39 @@ public class SchemaUtilsTest {
     SchemaUtils.validate(pinotSchema);
   }
 
+  /**
+   * Testcases for testing column name validation logic.
+   * Currently column name validation only checks no blank space in column names. Should we add more validation on column
+   * names later on, we can corresponding tests here.
+   */
   @Test
   public void testColumnNameValidation()
       throws IOException {
     Schema pinotSchema;
+    // A schema all column names does not contains blank space should pass the validation.
     pinotSchema = Schema.fromString(
         "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
             + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd\",\"granularity\":\"1:DAYS\"}]}");
     SchemaUtils.validate(pinotSchema);
+    // Validation will fail if dimensionFieldSpecs column name contain blank space.
     pinotSchema = Schema.fromString(
         "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim 1\",\"dataType\":\"STRING\"}],"
             + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd\",\"granularity\":\"1:DAYS\"}]}");
     checkValidationFails(pinotSchema);
+    // Validation will fail if dateTimeFieldSpecs column name contain blank space.
     pinotSchema = Schema.fromString(
         "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
             + "\"dateTimeFieldSpecs\":[{\"name\":\"dt 1\",\"dataType\":\"INT\",\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd\",\"granularity\":\"1:DAYS\"}]}");
+    checkValidationFails(pinotSchema);
+    // Test case for column name has leading blank space.
+    pinotSchema = Schema.fromString(
+        "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\" dim1\",\"dataType\":\"STRING\"}],"
+            + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd\",\"granularity\":\"1:DAYS\"}]}");
+    checkValidationFails(pinotSchema);
+    // Test case for column name has trailing blank space.
+    pinotSchema = Schema.fromString(
+        "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
+            + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1  \",\"dataType\":\"INT\",\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd\",\"granularity\":\"1:DAYS\"}]}");
     checkValidationFails(pinotSchema);
   }
 
