@@ -100,8 +100,8 @@ public class MultiGetRequest {
     CompletionService<GetMethod> completionService = new ExecutorCompletionService<>(_executor);
     for (String url : urls) {
       completionService.submit(() -> {
+        GetMethod getMethod = new GetMethod(url);
         try {
-          GetMethod getMethod = new GetMethod(url);
           getMethod.getParams().setSoTimeout(timeoutMs);
           client.executeMethod(getMethod);
           return getMethod;
@@ -109,6 +109,8 @@ public class MultiGetRequest {
           // Log only exception type and message instead of the whole stack trace
           LOGGER.warn("Caught '{}' while executing GET on URL: {}", e.toString(), url);
           throw e;
+        } finally {
+          getMethod.releaseConnection();
         }
       });
     }
