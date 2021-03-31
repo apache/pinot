@@ -143,7 +143,7 @@ public class NotEqualsPredicateEvaluatorFactory {
 
     IntRawValueBasedNeqPredicateEvaluator(NotEqPredicate nEqPredicate) {
       _precomputed = nEqPredicate.getPrecomputedResult();
-      _nonMatchingValue = Integer.parseInt(nEqPredicate.getValue());
+      _nonMatchingValue = _precomputed == null ? Integer.parseInt(nEqPredicate.getValue()) : 0;
     }
 
     @Override
@@ -167,7 +167,7 @@ public class NotEqualsPredicateEvaluatorFactory {
 
     LongRawValueBasedNeqPredicateEvaluator(NotEqPredicate nEqPredicate) {
       _precomputed = nEqPredicate.getPrecomputedResult();
-      _nonMatchingValue = Long.parseLong(nEqPredicate.getValue());
+      _nonMatchingValue = _precomputed == null ? Long.parseLong(nEqPredicate.getValue()) : 0;
     }
 
     @Override
@@ -191,7 +191,7 @@ public class NotEqualsPredicateEvaluatorFactory {
 
     FloatRawValueBasedNeqPredicateEvaluator(NotEqPredicate nEqPredicate) {
       _precomputed = nEqPredicate.getPrecomputedResult();
-      _nonMatchingValue = Float.parseFloat(nEqPredicate.getValue());
+      _nonMatchingValue = _precomputed == null ? Float.parseFloat(nEqPredicate.getValue()) : 0f;
     }
 
     @Override
@@ -215,7 +215,7 @@ public class NotEqualsPredicateEvaluatorFactory {
 
     DoubleRawValueBasedNeqPredicateEvaluator(NotEqPredicate nEqPredicate) {
       _precomputed = nEqPredicate.getPrecomputedResult();
-      _nonMatchingValue = Double.parseDouble(nEqPredicate.getValue());
+      _nonMatchingValue = _precomputed == null ? Double.parseDouble(nEqPredicate.getValue()) : 0d;
     }
 
     @Override
@@ -239,7 +239,7 @@ public class NotEqualsPredicateEvaluatorFactory {
 
     StringRawValueBasedNeqPredicateEvaluator(NotEqPredicate nEqPredicate) {
       _precomputed = nEqPredicate.getPrecomputedResult();
-      _nonMatchingValue = nEqPredicate.getValue();
+      _nonMatchingValue = _precomputed == null ? nEqPredicate.getValue() : null;
     }
 
     @Override
@@ -263,7 +263,7 @@ public class NotEqualsPredicateEvaluatorFactory {
 
     BytesRawValueBasedNeqPredicateEvaluator(NotEqPredicate nEqPredicate) {
       _precomputed = nEqPredicate.getPrecomputedResult();
-      _nonMatchingValue = BytesUtils.toBytes(nEqPredicate.getValue());
+      _nonMatchingValue = _precomputed == null ? BytesUtils.toBytes(nEqPredicate.getValue()) : null;
     }
 
     @Override

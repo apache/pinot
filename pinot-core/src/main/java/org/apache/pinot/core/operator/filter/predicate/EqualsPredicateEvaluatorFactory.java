@@ -141,7 +141,7 @@ public class EqualsPredicateEvaluatorFactory {
 
     LongRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
       _precomputed = eqPredicate.getPrecomputedResult();
-      _matchingValue = Long.parseLong(eqPredicate.getValue());
+      _matchingValue = _precomputed == null ? Long.parseLong(eqPredicate.getValue()) : 0l;
     }
 
     @Override
@@ -165,7 +165,7 @@ public class EqualsPredicateEvaluatorFactory {
 
     FloatRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
       _precomputed = eqPredicate.getPrecomputedResult();
-      _matchingValue = Float.parseFloat(eqPredicate.getValue());
+      _matchingValue = _precomputed == null ? Float.parseFloat(eqPredicate.getValue()) : 0f;
     }
 
     @Override
@@ -189,7 +189,7 @@ public class EqualsPredicateEvaluatorFactory {
 
     DoubleRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
       _precomputed = eqPredicate.getPrecomputedResult();
-      _matchingValue = Double.parseDouble(eqPredicate.getValue());
+      _matchingValue = _precomputed == null ? Double.parseDouble(eqPredicate.getValue()) : 0d;
     }
 
     @Override
@@ -213,7 +213,7 @@ public class EqualsPredicateEvaluatorFactory {
 
     StringRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
       _precomputed = eqPredicate.getPrecomputedResult();
-      _matchingValue = eqPredicate.getValue();
+      _matchingValue = _precomputed == null ? eqPredicate.getValue() : null;
     }
 
     @Override
@@ -237,7 +237,7 @@ public class EqualsPredicateEvaluatorFactory {
 
     BytesRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
       _precomputed = eqPredicate.getPrecomputedResult();
-      _matchingValue = BytesUtils.toBytes(eqPredicate.getValue());
+      _matchingValue = _precomputed == null ? BytesUtils.toBytes(eqPredicate.getValue()) : null;
     }
 
     @Override

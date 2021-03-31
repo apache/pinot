@@ -51,8 +51,8 @@ import org.testng.annotations.Test;
 /**
  * Test cases verifying evaluation of predicate can can be precomputed at compile time.
  */
-public class NumericalPrecomputedPredicateTest extends BaseQueriesTest {
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "NumericalPredicateTest");
+public class WhereClausePrecomputedPredicateTest extends BaseQueriesTest {
+  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "NumericalPrecomputedPredicateTest");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
   private static final int NUM_RECORDS = 10;

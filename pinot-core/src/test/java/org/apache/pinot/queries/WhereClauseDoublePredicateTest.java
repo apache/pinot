@@ -48,8 +48,8 @@ import org.testng.annotations.Test;
 /**
  * Test cases verifying evaluation of predicate with expressions that contain numerical values of different types.
  */
-public class NumericalDoublePredicateTest extends BaseQueriesTest {
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "NumericalPredicateTest");
+public class WhereClauseDoublePredicateTest extends BaseQueriesTest {
+  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "NumericalDoublePredicateTest");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
   private static final int NUM_RECORDS = 10;
