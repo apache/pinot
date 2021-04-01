@@ -361,8 +361,17 @@ public class TestConfigEngine {
   }
 
   @Test
-  void testRealtimeProvisioningRule() throws Exception {
-    String input = readInputToStr("recommenderInput/RealtimeProvisioningInput.json");
+  void testRealtimeProvisioningRule_withTimeColumn() throws Exception {
+    testRealtimeProvisioningRule("recommenderInput/RealtimeProvisioningInput_timeColumn.json");
+  }
+
+  @Test
+  void testRealtimeProvisioningRule_withDateTimeColumn() throws Exception {
+    testRealtimeProvisioningRule("recommenderInput/RealtimeProvisioningInput_dateTimeColumn.json");
+  }
+
+  private void testRealtimeProvisioningRule(String fileName) throws Exception {
+    String input = readInputToStr(fileName);
     String output = RecommenderDriver.run(input);
     ConfigManager configManager = objectMapper.readValue(output, ConfigManager.class);
     Map<String, Map<String, String>> recommendations = configManager.getRealtimeProvisioningRecommendations();
