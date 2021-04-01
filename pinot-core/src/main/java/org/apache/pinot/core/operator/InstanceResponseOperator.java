@@ -24,6 +24,8 @@ import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 
+import static org.apache.pinot.common.utils.DataTable.MetadataKey.THREAD_CPU_TIME_NS;
+
 
 public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock> {
   private static final String OPERATOR_NAME = "InstanceResponseOperator";
@@ -45,7 +47,7 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
 
     mainThreadTimer.stop();
     long totalThreadCpuTimeNs = intermediateResultsBlock.getExecutionThreadCpuTimeNs() + mainThreadTimer.getThreadTimeNs();
-    dataTable.getMetadata().put(DataTable.EXECUTION_THREAD_CPU_TIME_NS_METADATA_KEY, String.valueOf(totalThreadCpuTimeNs));
+    dataTable.getMetadata().put(THREAD_CPU_TIME_NS.getName(), String.valueOf(totalThreadCpuTimeNs));
 
     return instanceResponseBlock;
   }

@@ -27,19 +27,15 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
-import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.BytesUtils;
+
+import static org.apache.pinot.core.common.datatable.DataTableBuilder.VERSION_2;
+import static org.apache.pinot.core.common.datatable.DataTableUtils.decodeString;
 
 
-public class DataTableImplV2 implements DataTable {
-  private static final int VERSION = 2;
-
+public class DataTableImplV2 extends BaseDataTable {
   // VERSION
   // NUM_ROWS
   // NUM_COLUMNS
@@ -50,51 +46,18 @@ public class DataTableImplV2 implements DataTable {
   // VARIABLE_SIZE_DATA (START|SIZE)
   private static final int HEADER_SIZE = Integer.BYTES * 13;
 
-  private final int _numRows;
-  private final int _numColumns;
-  private final DataSchema _dataSchema;
-  private final int[] _columnOffsets;
-  private final int _rowSizeInBytes;
-  private final Map<String, Map<Integer, String>> _dictionaryMap;
-  private final byte[] _fixedSizeDataBytes;
-  private final ByteBuffer _fixedSizeData;
-  private final byte[] _variableSizeDataBytes;
-  private final ByteBuffer _variableSizeData;
-  private final Map<String, String> _metadata;
-
   /**
    * Construct data table with results. (Server side)
    */
   public DataTableImplV2(int numRows, DataSchema dataSchema, Map<String, Map<Integer, String>> dictionaryMap,
       byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
-    _numRows = numRows;
-    _numColumns = dataSchema.size();
-    _dataSchema = dataSchema;
-    _columnOffsets = new int[_numColumns];
-    _rowSizeInBytes = DataTableUtils.computeColumnOffsets(dataSchema, _columnOffsets);
-    _dictionaryMap = dictionaryMap;
-    _fixedSizeDataBytes = fixedSizeDataBytes;
-    _fixedSizeData = ByteBuffer.wrap(fixedSizeDataBytes);
-    _variableSizeDataBytes = variableSizeDataBytes;
-    _variableSizeData = ByteBuffer.wrap(variableSizeDataBytes);
-    _metadata = new HashMap<>();
+    super(numRows, dataSchema, dictionaryMap, fixedSizeDataBytes, variableSizeDataBytes);
   }
 
   /**
    * Construct empty data table. (Server side)
    */
   public DataTableImplV2() {
-    _numRows = 0;
-    _numColumns = 0;
-    _dataSchema = null;
-    _columnOffsets = null;
-    _rowSizeInBytes = 0;
-    _dictionaryMap = null;
-    _fixedSizeDataBytes = null;
-    _fixedSizeData = null;
-    _variableSizeDataBytes = null;
-    _variableSizeData = null;
-    _metadata = new HashMap<>();
   }
 
   /**
@@ -169,29 +132,6 @@ public class DataTableImplV2 implements DataTable {
     }
   }
 
-  private Map<String, Map<Integer, String>> deserializeDictionaryMap(byte[] bytes)
-      throws IOException {
-    try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
-        DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream)) {
-      int numDictionaries = dataInputStream.readInt();
-      Map<String, Map<Integer, String>> dictionaryMap = new HashMap<>(numDictionaries);
-
-      for (int i = 0; i < numDictionaries; i++) {
-        String column = decodeString(dataInputStream);
-        int dictionarySize = dataInputStream.readInt();
-        Map<Integer, String> dictionary = new HashMap<>(dictionarySize);
-        for (int j = 0; j < dictionarySize; j++) {
-          int key = dataInputStream.readInt();
-          String value = decodeString(dataInputStream);
-          dictionary.put(key, value);
-        }
-        dictionaryMap.put(column, dictionary);
-      }
-
-      return dictionaryMap;
-    }
-  }
-
   private Map<String, String> deserializeMetadata(byte[] bytes)
       throws IOException {
     try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
@@ -209,22 +149,23 @@ public class DataTableImplV2 implements DataTable {
     }
   }
 
-  private static String decodeString(DataInputStream dataInputStream)
-      throws IOException {
-    int length = dataInputStream.readInt();
-    if (length == 0) {
-      return StringUtils.EMPTY;
-    } else {
-      byte[] buffer = new byte[length];
-      int numBytesRead = dataInputStream.read(buffer);
-      assert numBytesRead == length;
-      return StringUtil.decodeUtf8(buffer);
-    }
-  }
-
   @Override
   public void addException(ProcessingException processingException) {
     _metadata.put(EXCEPTION_METADATA_KEY + processingException.getErrorCode(), processingException.getMessage());
+  }
+
+  // getExceptions return a map of errorCode->errMessage of the datatable.
+  @Override
+  public Map<Integer, String> getExceptions() {
+    Map<Integer, String> exceptions = new HashMap<>();
+    for (String key : _metadata.keySet()) {
+      if (key.startsWith(EXCEPTION_METADATA_KEY)) {
+        // In V2, all exceptions are added into metadata, using "Exception"+errCode as key,
+        // Integer.parseInt(key.substring(9)) can extract the error code from the key.
+        exceptions.put(Integer.parseInt(key.substring(9)), _metadata.get(key));
+      }
+    }
+    return exceptions;
   }
 
   @Override
@@ -232,7 +173,7 @@ public class DataTableImplV2 implements DataTable {
       throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
-    dataOutputStream.writeInt(VERSION);
+    dataOutputStream.writeInt(VERSION_2);
     dataOutputStream.writeInt(_numRows);
     dataOutputStream.writeInt(_numColumns);
     int dataOffset = HEADER_SIZE;
@@ -300,31 +241,6 @@ public class DataTableImplV2 implements DataTable {
     return byteArrayOutputStream.toByteArray();
   }
 
-  private byte[] serializeDictionaryMap()
-      throws IOException {
-    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-    DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
-
-    dataOutputStream.writeInt(_dictionaryMap.size());
-    for (Entry<String, Map<Integer, String>> dictionaryMapEntry : _dictionaryMap.entrySet()) {
-      String columnName = dictionaryMapEntry.getKey();
-      Map<Integer, String> dictionary = dictionaryMapEntry.getValue();
-      byte[] bytes = StringUtil.encodeUtf8(columnName);
-      dataOutputStream.writeInt(bytes.length);
-      dataOutputStream.write(bytes);
-      dataOutputStream.writeInt(dictionary.size());
-
-      for (Entry<Integer, String> dictionaryEntry : dictionary.entrySet()) {
-        dataOutputStream.writeInt(dictionaryEntry.getKey());
-        byte[] valueBytes = StringUtil.encodeUtf8(dictionaryEntry.getValue());
-        dataOutputStream.writeInt(valueBytes.length);
-        dataOutputStream.write(valueBytes);
-      }
-    }
-
-    return byteArrayOutputStream.toByteArray();
-  }
-
   private byte[] serializeMetadata()
       throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
@@ -342,164 +258,5 @@ public class DataTableImplV2 implements DataTable {
     }
 
     return byteArrayOutputStream.toByteArray();
-  }
-
-  @Override
-  public Map<String, String> getMetadata() {
-    return _metadata;
-  }
-
-  @Override
-  public DataSchema getDataSchema() {
-    return _dataSchema;
-  }
-
-  @Override
-  public int getNumberOfRows() {
-    return _numRows;
-  }
-
-  @Override
-  public int getInt(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    return _fixedSizeData.getInt();
-  }
-
-  @Override
-  public long getLong(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    return _fixedSizeData.getLong();
-  }
-
-  @Override
-  public float getFloat(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    return _fixedSizeData.getFloat();
-  }
-
-  @Override
-  public double getDouble(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    return _fixedSizeData.getDouble();
-  }
-
-  @Override
-  public String getString(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    int dictId = _fixedSizeData.getInt();
-    return _dictionaryMap.get(_dataSchema.getColumnName(colId)).get(dictId);
-  }
-
-  @Override
-  public ByteArray getBytes(int rowId, int colId) {
-    // NOTE: DataTable V2 uses String to store BYTES value
-    return BytesUtils.toByteArray(getString(rowId, colId));
-  }
-
-  @Override
-  public <T> T getObject(int rowId, int colId) {
-    int size = positionCursorInVariableBuffer(rowId, colId);
-    int objectTypeValue = _variableSizeData.getInt();
-    ByteBuffer byteBuffer = _variableSizeData.slice();
-    byteBuffer.limit(size);
-    return ObjectSerDeUtils.deserialize(byteBuffer, objectTypeValue);
-  }
-
-  @Override
-  public int[] getIntArray(int rowId, int colId) {
-    int length = positionCursorInVariableBuffer(rowId, colId);
-    int[] ints = new int[length];
-    for (int i = 0; i < length; i++) {
-      ints[i] = _variableSizeData.getInt();
-    }
-    return ints;
-  }
-
-  @Override
-  public long[] getLongArray(int rowId, int colId) {
-    int length = positionCursorInVariableBuffer(rowId, colId);
-    long[] longs = new long[length];
-    for (int i = 0; i < length; i++) {
-      longs[i] = _variableSizeData.getLong();
-    }
-    return longs;
-  }
-
-  @Override
-  public float[] getFloatArray(int rowId, int colId) {
-    int length = positionCursorInVariableBuffer(rowId, colId);
-    float[] floats = new float[length];
-    for (int i = 0; i < length; i++) {
-      floats[i] = _variableSizeData.getFloat();
-    }
-    return floats;
-  }
-
-  @Override
-  public double[] getDoubleArray(int rowId, int colId) {
-    int length = positionCursorInVariableBuffer(rowId, colId);
-    double[] doubles = new double[length];
-    for (int i = 0; i < length; i++) {
-      doubles[i] = _variableSizeData.getDouble();
-    }
-    return doubles;
-  }
-
-  @Override
-  public String[] getStringArray(int rowId, int colId) {
-    int length = positionCursorInVariableBuffer(rowId, colId);
-    String[] strings = new String[length];
-    Map<Integer, String> dictionary = _dictionaryMap.get(_dataSchema.getColumnName(colId));
-    for (int i = 0; i < length; i++) {
-      strings[i] = dictionary.get(_variableSizeData.getInt());
-    }
-    return strings;
-  }
-
-  private int positionCursorInVariableBuffer(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    _variableSizeData.position(_fixedSizeData.getInt());
-    return _fixedSizeData.getInt();
-  }
-
-  @Override
-  public String toString() {
-    if (_dataSchema == null) {
-      return _metadata.toString();
-    }
-
-    StringBuilder stringBuilder = new StringBuilder();
-    stringBuilder.append(_dataSchema.toString()).append('\n');
-    stringBuilder.append("numRows: ").append(_numRows).append('\n');
-
-    _fixedSizeData.position(0);
-    for (int rowId = 0; rowId < _numRows; rowId++) {
-      for (int colId = 0; colId < _numColumns; colId++) {
-        switch (_dataSchema.getColumnDataType(colId)) {
-          case INT:
-            stringBuilder.append(_fixedSizeData.getInt());
-            break;
-          case LONG:
-            stringBuilder.append(_fixedSizeData.getLong());
-            break;
-          case FLOAT:
-            stringBuilder.append(_fixedSizeData.getFloat());
-            break;
-          case DOUBLE:
-            stringBuilder.append(_fixedSizeData.getDouble());
-            break;
-          case STRING:
-            stringBuilder.append(_fixedSizeData.getInt());
-            break;
-          // Object and array.
-          default:
-            stringBuilder.append(String.format("(%s:%s)", _fixedSizeData.getInt(), _fixedSizeData.getInt()));
-            break;
-        }
-        stringBuilder.append("\t");
-      }
-      stringBuilder.append("\n");
-    }
-    return stringBuilder.toString();
   }
 }
