@@ -23,9 +23,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -90,7 +90,8 @@ public class SchemaUtilsTest {
     // schema doesn't have destination columns from transformConfigs
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
-        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("colA", "round(colB, 1000)")))).build();
+        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("colA", "round(colB, 1000)"))))
+        .build();
     try {
       SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
       Assert.fail("Should fail schema validation, as colA is not present in schema");
@@ -138,7 +139,8 @@ public class SchemaUtilsTest {
         .addDateTime(TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS").build();
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
         .setIngestionConfig(
-            new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("colA", "round(colB, 1000)")))).build();
+            new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("colA", "round(colB, 1000)"))))
+        .build();
     try {
       SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
       Assert.fail("Should fail schema validation, as colA is not present in schema");
@@ -227,15 +229,15 @@ public class SchemaUtilsTest {
     // non-existing column used as primary key
     pinotSchema = new Schema.SchemaBuilder()
         .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
-            new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "outgoing")).addSingleValueDimension("col", DataType.INT)
-        .setPrimaryKeyColumns(Lists.newArrayList("test")).build();
+            new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "outgoing"))
+        .addSingleValueDimension("col", DataType.INT).setPrimaryKeyColumns(Lists.newArrayList("test")).build();
     checkValidationFails(pinotSchema);
 
     // valid primary key
     pinotSchema = new Schema.SchemaBuilder()
         .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
-            new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "outgoing")).addSingleValueDimension("col", DataType.INT)
-        .setPrimaryKeyColumns(Lists.newArrayList("col")).build();
+            new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "outgoing"))
+        .addSingleValueDimension("col", DataType.INT).setPrimaryKeyColumns(Lists.newArrayList("col")).build();
     SchemaUtils.validate(pinotSchema);
   }
 
@@ -311,6 +313,42 @@ public class SchemaUtilsTest {
         "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
             + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd\",\"granularity\":\"1:DAYS\"}]}");
     SchemaUtils.validate(pinotSchema);
+  }
+
+  /**
+   * Testcases for testing column name validation logic.
+   * Currently column name validation only checks no blank space in column names. Should we add more validation on column
+   * names later on, we can corresponding tests here.
+   */
+  @Test
+  public void testColumnNameValidation()
+      throws IOException {
+    Schema pinotSchema;
+    // A schema all column names does not contains blank space should pass the validation.
+    pinotSchema = Schema.fromString(
+        "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
+            + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd\",\"granularity\":\"1:DAYS\"}]}");
+    SchemaUtils.validate(pinotSchema);
+    // Validation will fail if dimensionFieldSpecs column name contain blank space.
+    pinotSchema = Schema.fromString(
+        "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim 1\",\"dataType\":\"STRING\"}],"
+            + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd\",\"granularity\":\"1:DAYS\"}]}");
+    checkValidationFails(pinotSchema);
+    // Validation will fail if dateTimeFieldSpecs column name contain blank space.
+    pinotSchema = Schema.fromString(
+        "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
+            + "\"dateTimeFieldSpecs\":[{\"name\":\"dt 1\",\"dataType\":\"INT\",\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd\",\"granularity\":\"1:DAYS\"}]}");
+    checkValidationFails(pinotSchema);
+    // Test case for column name has leading blank space.
+    pinotSchema = Schema.fromString(
+        "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\" dim1\",\"dataType\":\"STRING\"}],"
+            + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd\",\"granularity\":\"1:DAYS\"}]}");
+    checkValidationFails(pinotSchema);
+    // Test case for column name has trailing blank space.
+    pinotSchema = Schema.fromString(
+        "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
+            + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1  \",\"dataType\":\"INT\",\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd\",\"granularity\":\"1:DAYS\"}]}");
+    checkValidationFails(pinotSchema);
   }
 
   private void checkValidationFails(Schema pinotSchema) {
