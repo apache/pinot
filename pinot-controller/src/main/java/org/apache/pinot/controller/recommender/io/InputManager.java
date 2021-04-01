@@ -183,7 +183,7 @@ public class InputManager {
   }
 
   // create a map from col name to data type
-  public void registerColNameFieldType() {
+  private void registerColNameFieldType() {
     for (DimensionFieldSpec dimensionFieldSpec : _schema.getDimensionFieldSpecs()) {
       _colNameFieldTypeMap.put(dimensionFieldSpec.getName(), dimensionFieldSpec.getDataType());
     }
