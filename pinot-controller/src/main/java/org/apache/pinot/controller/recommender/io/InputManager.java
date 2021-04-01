@@ -182,7 +182,8 @@ public class InputManager {
     invalidQueries.forEach(_queryWeightMap::remove);
   }
 
-  public void registerColNameFieldType() { // create a map from col name to data type
+  // create a map from col name to data type
+  public void registerColNameFieldType() {
     for (DimensionFieldSpec dimensionFieldSpec : _schema.getDimensionFieldSpecs()) {
       _colNameFieldTypeMap.put(dimensionFieldSpec.getName(), dimensionFieldSpec.getDataType());
     }
