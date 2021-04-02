@@ -30,9 +30,9 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.core.util.SegmentPushUtils;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
-import org.apache.pinot.plugin.ingestion.batch.common.SegmentPushUtils;
 import org.apache.pinot.plugin.minion.tasks.BaseTaskExecutor;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -118,6 +118,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
 
       resultBuilder.setSegmentName(segmentName);
       // Segment push task
+      // TODO: Make this use SegmentUploader
       pushSegment(taskSpec.getTableConfig().getTableName(), taskConfigs, outputSegmentTarURI);
       resultBuilder.setSucceed(true);
     } catch (Exception e) {

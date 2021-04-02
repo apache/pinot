@@ -44,7 +44,7 @@ public interface SegmentUploader {
       throws Exception;
 
   /**
-   * Uploads the segments from the segmentDir to the cluster
+   * Uploads the segments from the segmentDir to the cluster. Looks for segmentTar files recursively, with suffix .tar.gz
    * @param segmentDir URI of directory containing segment tar files
    */
   void uploadSegments(URI segmentDir)

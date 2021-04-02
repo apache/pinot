@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.pinot.plugin.ingestion.batch.common;
+package org.apache.pinot.core.util;
 
 import java.net.URI;
 import org.testng.Assert;

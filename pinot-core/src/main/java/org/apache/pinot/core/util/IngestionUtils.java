@@ -19,21 +19,17 @@
 package org.apache.pinot.core.util;
 
 import com.google.common.base.Preconditions;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.exception.HttpErrorStatusException;
-import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.core.data.function.FunctionEvaluator;
 import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -53,16 +49,20 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.filesystem.LocalPinotFS;
+import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
-import org.apache.pinot.spi.ingestion.batch.spec.Constants;
+import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
+import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
+import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
+import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
-import org.apache.pinot.spi.utils.retry.RetryPolicies;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -70,13 +70,7 @@ import org.slf4j.LoggerFactory;
  */
 public final class IngestionUtils {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(IngestionUtils.class);
-
-  private static final String DEFAULT_SEGMENT_NAME_GENERATOR_TYPE =
-      BatchConfigProperties.SegmentNameGeneratorType.SIMPLE;
-  private static final long DEFAULT_RETRY_WAIT_MS = 1000L;
-  private static final int DEFAULT_ATTEMPTS = 3;
-  private static final FileUploadDownloadClient FILE_UPLOAD_DOWNLOAD_CLIENT = new FileUploadDownloadClient();
+  private static final PinotFS LOCAL_PINOT_FS = new LocalPinotFS();
 
   private IngestionUtils() {
   }
@@ -143,9 +137,6 @@ public final class IngestionUtils {
 
     String rawTableName = TableNameBuilder.extractRawTableName(batchConfig.getTableNameWithType());
     String segmentNameGeneratorType = batchConfig.getSegmentNameGeneratorType();
-    if (segmentNameGeneratorType == null) {
-      segmentNameGeneratorType = DEFAULT_SEGMENT_NAME_GENERATOR_TYPE;
-    }
     switch (segmentNameGeneratorType) {
       case BatchConfigProperties.SegmentNameGeneratorType.FIXED:
         return new FixedSegmentNameGenerator(batchConfig.getSegmentName());
@@ -185,38 +176,102 @@ public final class IngestionUtils {
   }
 
   /**
-   * Uploads the segment tar files to the provided controller
+   * Uploads the segments from the provided segmentTar URIs to the table, using push details from the batchConfig
+   * @param tableNameWithType name of the table to upload the segment
+   * @param batchConfig batchConfig with details about push such as controllerURI, pushAttempts, pushParallelism, etc
+   * @param segmentTarURIs list of URI for the segment tar files
    */
-  public static void uploadSegment(String tableNameWithType, List<File> tarFiles, URI controllerUri,
-      final String authToken)
-      throws RetriableOperationException, AttemptsExceededException {
-    for (File tarFile : tarFiles) {
-      String fileName = tarFile.getName();
-      Preconditions.checkArgument(fileName.endsWith(Constants.TAR_GZ_FILE_EXT));
-      String segmentName = fileName.substring(0, fileName.length() - Constants.TAR_GZ_FILE_EXT.length());
+  public static void uploadSegment(String tableNameWithType, BatchConfig batchConfig, List<URI> segmentTarURIs)
+      throws Exception {
 
-      RetryPolicies.exponentialBackoffRetryPolicy(DEFAULT_ATTEMPTS, DEFAULT_RETRY_WAIT_MS, 5).attempt(() -> {
-        try (InputStream inputStream = new FileInputStream(tarFile)) {
-          SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT
-              .uploadSegment(FileUploadDownloadClient.getUploadSegmentURI(controllerUri), segmentName, inputStream,
-                  FileUploadDownloadClient.makeAuthHeader(authToken),
-                  FileUploadDownloadClient.makeTableParam(tableNameWithType),
-                  FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
-          LOGGER.info("Response for pushing table {} segment {} - {}: {}", tableNameWithType, segmentName,
-              response.getStatusCode(), response.getResponse());
-          return true;
-        } catch (HttpErrorStatusException e) {
-          int statusCode = e.getStatusCode();
-          if (statusCode >= 500) {
-            LOGGER.warn("Caught temporary exception while pushing table: {} segment: {}, will retry", tableNameWithType,
-                segmentName, e);
-            return false;
-          } else {
-            throw e;
-          }
+    SegmentGenerationJobSpec segmentUploadSpec = generateSegmentUploadSpec(tableNameWithType, batchConfig);
+
+    String pushMode = batchConfig.getPushMode();
+    switch (BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase())) {
+      case TAR:
+        try {
+          SegmentPushUtils.pushSegments(segmentUploadSpec, LOCAL_PINOT_FS,
+              segmentTarURIs.stream().map(URI::toString).collect(Collectors.toList()));
+        } catch (RetriableOperationException | AttemptsExceededException e) {
+          throw new RuntimeException(e);
         }
-      });
+        break;
+      case URI:
+        try {
+          URI outputSegmentDirURI = null;
+          if (StringUtils.isNotBlank(batchConfig.getOutputSegmentDirURI())) {
+            outputSegmentDirURI = URI.create(batchConfig.getOutputSegmentDirURI());
+          }
+          List<String> segmentUris = new ArrayList<>();
+          for (URI segmentTarURI : segmentTarURIs) {
+            URI updatedURI = SegmentPushUtils.generateSegmentTarURI(outputSegmentDirURI, segmentTarURI,
+                segmentUploadSpec.getPushJobSpec().getSegmentUriPrefix(),
+                segmentUploadSpec.getPushJobSpec().getSegmentUriSuffix());
+            segmentUris.add(updatedURI.toString());
+          }
+          SegmentPushUtils.sendSegmentUris(segmentUploadSpec, segmentUris);
+        } catch (RetriableOperationException | AttemptsExceededException e) {
+          throw new RuntimeException(e);
+        }
+        break;
+      case METADATA:
+        try {
+          URI outputSegmentDirURI = null;
+          if (StringUtils.isNotBlank(batchConfig.getOutputSegmentDirURI())) {
+            outputSegmentDirURI = URI.create(batchConfig.getOutputSegmentDirURI());
+          }
+          PinotFS outputFileFS = getOutputPinotFS(batchConfig, outputSegmentDirURI);
+          Map<String, String> segmentUriToTarPathMap = SegmentPushUtils
+              .getSegmentUriToTarPathMap(outputSegmentDirURI, segmentUploadSpec.getPushJobSpec().getSegmentUriPrefix(),
+                  segmentUploadSpec.getPushJobSpec().getSegmentUriSuffix(), new String[]{segmentTarURIs.toString()});
+          SegmentPushUtils.sendSegmentUriAndMetadata(segmentUploadSpec, outputFileFS, segmentUriToTarPathMap);
+        } catch (RetriableOperationException | AttemptsExceededException e) {
+          throw new RuntimeException(e);
+        }
+        break;
+      default:
+        throw new UnsupportedOperationException("Unrecognized push mode - " + pushMode);
     }
+  }
+
+  private static SegmentGenerationJobSpec generateSegmentUploadSpec(String tableName, BatchConfig batchConfig) {
+
+    TableSpec tableSpec = new TableSpec();
+    tableSpec.setTableName(tableName);
+
+    PinotClusterSpec pinotClusterSpec = new PinotClusterSpec();
+    pinotClusterSpec.setControllerURI(batchConfig.getPushControllerURI());
+    PinotClusterSpec[] pinotClusterSpecs = new PinotClusterSpec[]{pinotClusterSpec};
+
+    PushJobSpec pushJobSpec = new PushJobSpec();
+    pushJobSpec.setPushAttempts(batchConfig.getPushAttempts());
+    pushJobSpec.setPushParallelism(batchConfig.getPushParallelism());
+    pushJobSpec.setPushRetryIntervalMillis(batchConfig.getPushIntervalRetryMillis());
+    pushJobSpec.setSegmentUriPrefix(batchConfig.getPushSegmentURIPrefix());
+    pushJobSpec.setSegmentUriSuffix(batchConfig.getPushSegmentURISuffix());
+
+    SegmentGenerationJobSpec spec = new SegmentGenerationJobSpec();
+    spec.setPushJobSpec(pushJobSpec);
+    spec.setTableSpec(tableSpec);
+    spec.setPinotClusterSpecs(pinotClusterSpecs);
+    spec.setAuthToken(batchConfig.getAuthToken());
+    return spec;
+  }
+
+  /**
+   * Creates an instance of the PinotFS using the fileURI and fs properties from BatchConfig
+   */
+  public static PinotFS getOutputPinotFS(BatchConfig batchConfig, URI fileURI) {
+    String fileURIScheme = (fileURI == null) ? null : fileURI.getScheme();
+    if (fileURIScheme == null) {
+      fileURIScheme = PinotFSFactory.LOCAL_PINOT_FS_SCHEME;
+    }
+    if (!PinotFSFactory.isSchemeSupported(fileURIScheme)) {
+      String fsClass = batchConfig.getOutputFsClassName();
+      PinotConfiguration fsProps = IngestionConfigUtils.getOutputFsProps(batchConfig.getBatchConfigMap());
+      PinotFSFactory.register(fileURIScheme, fsClass, fsProps);
+    }
+    return PinotFSFactory.create(fileURIScheme);
   }
 
   /**

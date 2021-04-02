@@ -52,6 +52,17 @@ public class BatchConfig {
   private final boolean _excludeSequenceId;
   private final String _sequenceId;
 
+  private final String _pushMode;
+  private final int _pushAttempts;
+  private final int _pushParallelism;
+  private final long _pushIntervalRetryMillis;
+  private final String _pushSegmentURIPrefix;
+  private final String _pushSegmentURISuffix;
+  private final String _pushControllerURI;
+  private final String _outputSegmentDirURI;
+
+  private final String _authToken;
+
   public BatchConfig(String tableNameWithType, Map<String, String> batchConfigsMap) {
     _batchConfigMap = batchConfigsMap;
     _tableNameWithType = tableNameWithType;
@@ -87,6 +98,17 @@ public class BatchConfig {
     _segmentNamePostfix = segmentNameGeneratorProps.get(BatchConfigProperties.SEGMENT_NAME_POSTFIX);
     _excludeSequenceId = Boolean.parseBoolean(segmentNameGeneratorProps.get(BatchConfigProperties.EXCLUDE_SEQUENCE_ID));
     _sequenceId = batchConfigsMap.get(BatchConfigProperties.SEQUENCE_ID);
+
+    _pushMode = IngestionConfigUtils.getPushMode(batchConfigsMap);
+    _pushAttempts = IngestionConfigUtils.getPushAttempts(batchConfigsMap);
+    _pushParallelism = IngestionConfigUtils.getPushParallelism(batchConfigsMap);
+    _pushIntervalRetryMillis = IngestionConfigUtils.getPushRetryIntervalMillis(batchConfigsMap);
+    _pushSegmentURIPrefix = batchConfigsMap.get(BatchConfigProperties.PUSH_SEGMENT_URI_PREFIX);
+    _pushSegmentURISuffix = batchConfigsMap.get(BatchConfigProperties.PUSH_SEGMENT_URI_SUFFIX);
+    _pushControllerURI = batchConfigsMap.get(BatchConfigProperties.PUSH_CONTROLLER_URI);
+    _outputSegmentDirURI = batchConfigsMap.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI);
+
+    _authToken = batchConfigsMap.get(BatchConfigProperties.AUTH_TOKEN);
   }
 
   public String getTableNameWithType() {
@@ -163,6 +185,42 @@ public class BatchConfig {
 
   public String getSequenceId() {
     return _sequenceId;
+  }
+
+  public String getPushMode() {
+    return _pushMode;
+  }
+
+  public int getPushAttempts() {
+    return _pushAttempts;
+  }
+
+  public int getPushParallelism() {
+    return _pushParallelism;
+  }
+
+  public long getPushIntervalRetryMillis() {
+    return _pushIntervalRetryMillis;
+  }
+
+  public String getPushSegmentURIPrefix() {
+    return _pushSegmentURIPrefix;
+  }
+
+  public String getPushSegmentURISuffix() {
+    return _pushSegmentURISuffix;
+  }
+
+  public String getPushControllerURI() {
+    return _pushControllerURI;
+  }
+
+  public String getOutputSegmentDirURI() {
+    return _outputSegmentDirURI;
+  }
+
+  public String getAuthToken() {
+    return _authToken;
   }
 
   public Map<String, String> getBatchConfigMap() {

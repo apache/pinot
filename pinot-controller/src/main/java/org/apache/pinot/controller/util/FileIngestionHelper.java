@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -36,11 +37,15 @@ import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
+import org.apache.pinot.spi.ingestion.segment.uploader.SegmentUploader;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
 import org.slf4j.Logger;
@@ -53,6 +58,7 @@ import org.slf4j.LoggerFactory;
  */
 public class FileIngestionHelper {
   private static final Logger LOGGER = LoggerFactory.getLogger(FileIngestionHelper.class);
+  private static final String SEGMENT_UPLOADER_CLASS = "org.apache.pinot.plugin.segmentuploader.SegmentUploaderDefault";
 
   private static final String WORKING_DIR_PREFIX = "working_dir";
   private static final String INPUT_DATA_DIR = "input_data_dir";
@@ -63,18 +69,13 @@ public class FileIngestionHelper {
   private final TableConfig _tableConfig;
   private final Schema _schema;
   private final BatchConfig _batchConfig;
-  private final URI _controllerUri;
   private final File _uploadDir;
-  private final String _authToken;
 
-  public FileIngestionHelper(TableConfig tableConfig, Schema schema, BatchConfig batchConfig, URI controllerUri,
-      File uploadDir, String authToken) {
+  public FileIngestionHelper(TableConfig tableConfig, Schema schema, BatchConfig batchConfig, File uploadDir) {
     _tableConfig = tableConfig;
     _schema = schema;
     _batchConfig = batchConfig;
-    _controllerUri = controllerUri;
     _uploadDir = uploadDir;
-    _authToken = authToken;
   }
 
   /**
@@ -123,13 +124,20 @@ public class FileIngestionHelper {
       String segmentName = IngestionUtils.buildSegment(segmentGeneratorConfig);
       LOGGER.info("Built segment: {}", segmentName);
 
-      // Tar and push segment
+      // Tar segment dir
       File segmentTarFile =
           new File(segmentTarDir, segmentName + org.apache.pinot.spi.ingestion.batch.spec.Constants.TAR_GZ_FILE_EXT);
       TarGzCompressionUtils.createTarGzFile(new File(outputDir, segmentName), segmentTarFile);
-      IngestionUtils
-          .uploadSegment(tableNameWithType, Lists.newArrayList(segmentTarFile), _controllerUri, _authToken);
-      LOGGER.info("Uploaded tar: {} to {}", segmentTarFile.getAbsolutePath(), _controllerUri);
+
+      // Upload segment
+      IngestionConfig ingestionConfigOverride = new IngestionConfig(batchIngestionConfigOverride, null, null, null);
+      TableConfig tableConfigOverride =
+          new TableConfigBuilder(_tableConfig.getTableType()).setTableName(_tableConfig.getTableName())
+              .setIngestionConfig(ingestionConfigOverride).build();
+      SegmentUploader segmentUploader = PluginManager.get().createInstance(SEGMENT_UPLOADER_CLASS);
+      segmentUploader.init(tableConfigOverride);
+      segmentUploader.uploadSegment(segmentTarFile.toURI());
+      LOGGER.info("Uploaded tar: {} to table: {}", segmentTarFile.getAbsolutePath(), tableNameWithType);
 
       return new SuccessResponse(
           "Successfully ingested file into table: " + tableNameWithType + " as segment: " + segmentName);
