@@ -89,7 +89,7 @@ public class BatchConfig {
     _recordReaderProps = IngestionConfigUtils
         .extractPropsMatchingPrefix(batchConfigsMap, BatchConfigProperties.RECORD_READER_PROP_PREFIX);
 
-    _segmentNameGeneratorType = batchConfigsMap.get(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE);
+    _segmentNameGeneratorType = IngestionConfigUtils.getSegmentNameGeneratorType(batchConfigsMap);
     _segmentNameGeneratorConfigs = IngestionConfigUtils
         .extractPropsMatchingPrefix(batchConfigsMap, BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX);
     Map<String, String> segmentNameGeneratorProps = IngestionConfigUtils.getSegmentNameGeneratorProps(batchConfigsMap);
