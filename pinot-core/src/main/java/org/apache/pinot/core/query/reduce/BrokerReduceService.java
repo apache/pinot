@@ -39,6 +39,7 @@ import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
@@ -145,7 +146,7 @@ public class BrokerReduceService {
       // Reduce on trace info.
       if (brokerRequest.isEnableTrace()) {
         brokerResponseNative.getTraceInfo()
-            .put(entry.getKey().getHostname(), metadata.get(DataTable.TRACE_INFO_METADATA_KEY));
+            .put(entry.getKey().getHostname(), metadata.get(MetadataKey.TRACE_INFO.getName()));
       }
 
       // Reduce on exceptions.
@@ -155,44 +156,44 @@ public class BrokerReduceService {
       }
 
       // Reduce on execution statistics.
-      String numDocsScannedString = metadata.get(DataTable.NUM_DOCS_SCANNED_METADATA_KEY);
+      String numDocsScannedString = metadata.get(MetadataKey.NUM_DOCS_SCANNED.getName());
       if (numDocsScannedString != null) {
         numDocsScanned += Long.parseLong(numDocsScannedString);
       }
-      String numEntriesScannedInFilterString = metadata.get(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY);
+      String numEntriesScannedInFilterString = metadata.get(MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName());
       if (numEntriesScannedInFilterString != null) {
         numEntriesScannedInFilter += Long.parseLong(numEntriesScannedInFilterString);
       }
-      String numEntriesScannedPostFilterString = metadata.get(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY);
+      String numEntriesScannedPostFilterString = metadata.get(MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName());
       if (numEntriesScannedPostFilterString != null) {
         numEntriesScannedPostFilter += Long.parseLong(numEntriesScannedPostFilterString);
       }
-      String numSegmentsQueriedString = metadata.get(DataTable.NUM_SEGMENTS_QUERIED);
+      String numSegmentsQueriedString = metadata.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName());
       if (numSegmentsQueriedString != null) {
         numSegmentsQueried += Long.parseLong(numSegmentsQueriedString);
       }
 
-      String numSegmentsProcessedString = metadata.get(DataTable.NUM_SEGMENTS_PROCESSED);
+      String numSegmentsProcessedString = metadata.get(MetadataKey.NUM_SEGMENTS_PROCESSED.getName());
       if (numSegmentsProcessedString != null) {
         numSegmentsProcessed += Long.parseLong(numSegmentsProcessedString);
       }
-      String numSegmentsMatchedString = metadata.get(DataTable.NUM_SEGMENTS_MATCHED);
+      String numSegmentsMatchedString = metadata.get(MetadataKey.NUM_SEGMENTS_MATCHED.getName());
       if (numSegmentsMatchedString != null) {
         numSegmentsMatched += Long.parseLong(numSegmentsMatchedString);
       }
 
-      String numConsumingString = metadata.get(DataTable.NUM_CONSUMING_SEGMENTS_PROCESSED);
+      String numConsumingString = metadata.get(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName());
       if (numConsumingString != null) {
         numConsumingSegmentsProcessed += Long.parseLong(numConsumingString);
       }
 
-      String minConsumingFreshnessTimeMsString = metadata.get(DataTable.MIN_CONSUMING_FRESHNESS_TIME_MS);
+      String minConsumingFreshnessTimeMsString = metadata.get(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName());
       if (minConsumingFreshnessTimeMsString != null) {
         minConsumingFreshnessTimeMs =
             Math.min(Long.parseLong(minConsumingFreshnessTimeMsString), minConsumingFreshnessTimeMs);
       }
 
-      String threadCpuTimeNsString = metadata.get(DataTable.MetadataKey.THREAD_CPU_TIME_NS.getName());
+      String threadCpuTimeNsString = metadata.get(MetadataKey.THREAD_CPU_TIME_NS.getName());
       if (threadCpuTimeNsString != null) {
         if (entry.getKey().getTableType() == TableType.OFFLINE) {
           offlineThreadCpuTimeNs += Long.parseLong(threadCpuTimeNsString);
@@ -201,11 +202,11 @@ public class BrokerReduceService {
         }
       }
 
-      String numTotalDocsString = metadata.get(DataTable.TOTAL_DOCS_METADATA_KEY);
+      String numTotalDocsString = metadata.get(MetadataKey.TOTAL_DOCS.getName());
       if (numTotalDocsString != null) {
         numTotalDocs += Long.parseLong(numTotalDocsString);
       }
-      numGroupsLimitReached |= Boolean.parseBoolean(metadata.get(DataTable.NUM_GROUPS_LIMIT_REACHED_KEY));
+      numGroupsLimitReached |= Boolean.parseBoolean(metadata.get(MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName()));
 
       // After processing the metadata, remove data tables without data rows inside.
       DataSchema dataSchema = dataTable.getDataSchema();

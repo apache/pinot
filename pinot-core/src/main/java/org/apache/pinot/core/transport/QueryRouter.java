@@ -30,6 +30,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.spi.config.table.TableType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,8 +75,8 @@ public class QueryRouter {
     _brokerId = brokerId;
     _brokerMetrics = brokerMetrics;
     _serverChannels = new ServerChannels(this, brokerMetrics);
-    _serverChannelsTls = Optional.ofNullable(tlsConfig)
-        .map(conf -> new ServerChannels(this, brokerMetrics, conf)).orElse(null);
+    _serverChannelsTls =
+        Optional.ofNullable(tlsConfig).map(conf -> new ServerChannels(this, brokerMetrics, conf)).orElse(null);
   }
 
   public AsyncQueryResponse submitQuery(long requestId, String rawTableName,
@@ -92,7 +93,8 @@ public class QueryRouter {
     if (offlineBrokerRequest != null) {
       assert offlineRoutingTable != null;
       for (Map.Entry<ServerInstance, List<String>> entry : offlineRoutingTable.entrySet()) {
-        ServerRoutingInstance serverRoutingInstance = entry.getKey().toServerRoutingInstance(TableType.OFFLINE, preferTls);
+        ServerRoutingInstance serverRoutingInstance =
+            entry.getKey().toServerRoutingInstance(TableType.OFFLINE, preferTls);
         InstanceRequest instanceRequest = getInstanceRequest(requestId, offlineBrokerRequest, entry.getValue());
         requestMap.put(serverRoutingInstance, instanceRequest);
       }
@@ -100,7 +102,8 @@ public class QueryRouter {
     if (realtimeBrokerRequest != null) {
       assert realtimeRoutingTable != null;
       for (Map.Entry<ServerInstance, List<String>> entry : realtimeRoutingTable.entrySet()) {
-        ServerRoutingInstance serverRoutingInstance = entry.getKey().toServerRoutingInstance(TableType.REALTIME, preferTls);
+        ServerRoutingInstance serverRoutingInstance =
+            entry.getKey().toServerRoutingInstance(TableType.REALTIME, preferTls);
         InstanceRequest instanceRequest = getInstanceRequest(requestId, realtimeBrokerRequest, entry.getValue());
         requestMap.put(serverRoutingInstance, instanceRequest);
       }
@@ -135,7 +138,7 @@ public class QueryRouter {
 
   void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, int responseSize,
       int deserializationTimeMs) {
-    long requestId = Long.parseLong(dataTable.getMetadata().get(DataTable.REQUEST_ID_METADATA_KEY));
+    long requestId = Long.parseLong(dataTable.getMetadata().get(MetadataKey.REQUEST_ID.getName()));
     AsyncQueryResponse asyncQueryResponse = _asyncQueryResponseMap.get(requestId);
 
     // Query future might be null if the query is already done (maybe due to failure)
