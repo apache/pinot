@@ -52,6 +52,18 @@ public class DataTableSerDeTest {
 
   private static final int NUM_ROWS = 100;
 
+  private static final int[] INTS = new int[NUM_ROWS];
+  private static final long[] LONGS = new long[NUM_ROWS];
+  private static final float[] FLOATS = new float[NUM_ROWS];
+  private static final double[] DOUBLES = new double[NUM_ROWS];
+  private static final String[] STRINGS = new String[NUM_ROWS];
+  private static final byte[][] BYTES = new byte[NUM_ROWS][];
+  private static final Object[] OBJECTS = new Object[NUM_ROWS];
+  private static final int[][] INT_ARRAYS = new int[NUM_ROWS][];
+  private static final long[][] LONG_ARRAYS = new long[NUM_ROWS][];
+  private static final float[][] FLOAT_ARRAYS = new float[NUM_ROWS][];
+  private static final double[][] DOUBLE_ARRAYS = new double[NUM_ROWS][];
+  private static final String[][] STRING_ARRAYS = new String[NUM_ROWS][];
   private static final Map<String, String> EXPECTED_METADATA =
       ImmutableMap.<String, String>builder().put(MetadataKey.NUM_DOCS_SCANNED.getName(), String.valueOf(20L))
           .put(MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName(), String.valueOf(5L))
@@ -132,30 +144,15 @@ public class DataTableSerDeTest {
       columnNames[i] = columnDataTypes[i].name();
     }
 
-    int[] ints = new int[NUM_ROWS];
-    long[] longs = new long[NUM_ROWS];
-    float[] floats = new float[NUM_ROWS];
-    double[] doubles = new double[NUM_ROWS];
-    String[] strings = new String[NUM_ROWS];
-    byte[][] bytes = new byte[NUM_ROWS][];
-    Object[] objects = new Object[NUM_ROWS];
-    int[][] intArrays = new int[NUM_ROWS][];
-    long[][] longArrays = new long[NUM_ROWS][];
-    float[][] floatArrays = new float[NUM_ROWS][];
-    double[][] doubleArrays = new double[NUM_ROWS][];
-    String[][] stringArrays = new String[NUM_ROWS][];
-
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
     DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);
-    fillDataTableWithRandomData(dataTableBuilder, columnDataTypes, numColumns, ints, longs, floats, doubles, strings,
-        bytes, objects, intArrays, longArrays, floatArrays, doubleArrays, stringArrays);
+    fillDataTableWithRandomData(dataTableBuilder, columnDataTypes, numColumns);
 
     DataTable dataTable = dataTableBuilder.build();
     DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
     Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
     Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
-    verifyDataIsSame(newDataTable, columnDataTypes, numColumns, ints, longs, floats, doubles, strings, bytes, objects,
-        intArrays, longArrays, floatArrays, doubleArrays, stringArrays);
+    verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
   }
 
   @Test
@@ -168,34 +165,19 @@ public class DataTableSerDeTest {
       columnNames[i] = columnDataTypes[i].name();
     }
 
-    int[] ints = new int[NUM_ROWS];
-    long[] longs = new long[NUM_ROWS];
-    float[] floats = new float[NUM_ROWS];
-    double[] doubles = new double[NUM_ROWS];
-    String[] strings = new String[NUM_ROWS];
-    byte[][] bytes = new byte[NUM_ROWS][];
-    Object[] objects = new Object[NUM_ROWS];
-    int[][] intArrays = new int[NUM_ROWS][];
-    long[][] longArrays = new long[NUM_ROWS][];
-    float[][] floatArrays = new float[NUM_ROWS][];
-    double[][] doubleArrays = new double[NUM_ROWS][];
-    String[][] stringArrays = new String[NUM_ROWS][];
-
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
     // Verify V3 broker can deserialize data table (has data, but has no metadata) send by V2 server
     DataTableBuilder.setCurrentDataTableVersion(DataTableBuilder.VERSION_2);
     DataTableBuilder dataTableBuilderV2WithDataOnly = new DataTableBuilder(dataSchema);
-    fillDataTableWithRandomData(dataTableBuilderV2WithDataOnly, columnDataTypes, numColumns, ints, longs, floats,
-        doubles, strings, bytes, objects, intArrays, longArrays, floatArrays, doubleArrays, stringArrays);
+    fillDataTableWithRandomData(dataTableBuilderV2WithDataOnly, columnDataTypes, numColumns);
 
     DataTable dataTableV2 = dataTableBuilderV2WithDataOnly.build(); // create a V2 data table
     DataTable newDataTable =
         DataTableFactory.getDataTable(dataTableV2.toBytes()); // Broker deserialize data table bytes as V2
     Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
     Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
-    verifyDataIsSame(newDataTable, columnDataTypes, numColumns, ints, longs, floats, doubles, strings, bytes, objects,
-        intArrays, longArrays, floatArrays, doubleArrays, stringArrays);
+    verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
     Assert.assertEquals(newDataTable.getMetadata().size(), 0);
 
     // Verify V3 broker can deserialize data table (has data and metadata) send by V2 server
@@ -205,8 +187,7 @@ public class DataTableSerDeTest {
     newDataTable = DataTableFactory.getDataTable(dataTableV2.toBytes()); // Broker deserialize data table bytes as V2
     Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
     Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
-    verifyDataIsSame(newDataTable, columnDataTypes, numColumns, ints, longs, floats, doubles, strings, bytes, objects,
-        intArrays, longArrays, floatArrays, doubleArrays, stringArrays);
+    verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
     Assert.assertEquals(newDataTable.getMetadata(), EXPECTED_METADATA);
 
     // Verify V3 broker can deserialize data table (only has metadata) send by V2 server
@@ -223,15 +204,13 @@ public class DataTableSerDeTest {
     // Verify V3 broker can deserialize (has data, but has no metadata) send by V3 server.
     DataTableBuilder.setCurrentDataTableVersion(DataTableBuilder.VERSION_3);
     DataTableBuilder dataTableBuilderV3WithDataOnly = new DataTableBuilder(dataSchema);
-    fillDataTableWithRandomData(dataTableBuilderV3WithDataOnly, columnDataTypes, numColumns, ints, longs, floats,
-        doubles, strings, bytes, objects, intArrays, longArrays, floatArrays, doubleArrays, stringArrays);
+    fillDataTableWithRandomData(dataTableBuilderV3WithDataOnly, columnDataTypes, numColumns);
     DataTable dataTableV3 = dataTableBuilderV3WithDataOnly.build(); // create a V3 data table
     // Deserialize data table bytes as V3
     newDataTable = DataTableFactory.getDataTable(dataTableV3.toBytes());
     Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
     Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
-    verifyDataIsSame(newDataTable, columnDataTypes, numColumns, ints, longs, floats, doubles, strings, bytes, objects,
-        intArrays, longArrays, floatArrays, doubleArrays, stringArrays);
+    verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
     // DataTable V3 serialization logic will add an extra THREAD_CPU_TIME_NS KV pair into metadata
     Assert.assertEquals(newDataTable.getMetadata().size(), 1);
     Assert.assertTrue(newDataTable.getMetadata().containsKey(MetadataKey.THREAD_CPU_TIME_NS.getName()));
@@ -243,8 +222,7 @@ public class DataTableSerDeTest {
     newDataTable = DataTableFactory.getDataTable(dataTableV3.toBytes()); // Broker deserialize data table bytes as V3
     Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
     Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
-    verifyDataIsSame(newDataTable, columnDataTypes, numColumns, ints, longs, floats, doubles, strings, bytes, objects,
-        intArrays, longArrays, floatArrays, doubleArrays, stringArrays);
+    verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
     newDataTable.getMetadata().remove(MetadataKey.THREAD_CPU_TIME_NS.getName());
     Assert.assertEquals(newDataTable.getMetadata(), EXPECTED_METADATA);
 
@@ -271,23 +249,9 @@ public class DataTableSerDeTest {
       columnNames[i] = columnDataTypes[i].name();
     }
 
-    int[] ints = new int[NUM_ROWS];
-    long[] longs = new long[NUM_ROWS];
-    float[] floats = new float[NUM_ROWS];
-    double[] doubles = new double[NUM_ROWS];
-    String[] strings = new String[NUM_ROWS];
-    byte[][] bytes = new byte[NUM_ROWS][];
-    Object[] objects = new Object[NUM_ROWS];
-    int[][] intArrays = new int[NUM_ROWS][];
-    long[][] longArrays = new long[NUM_ROWS][];
-    float[][] floatArrays = new float[NUM_ROWS][];
-    double[][] doubleArrays = new double[NUM_ROWS][];
-    String[][] stringArrays = new String[NUM_ROWS][];
-
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
     DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);
-    fillDataTableWithRandomData(dataTableBuilder, columnDataTypes, numColumns, ints, longs, floats, doubles, strings,
-        bytes, objects, intArrays, longArrays, floatArrays, doubleArrays, stringArrays);
+    fillDataTableWithRandomData(dataTableBuilder, columnDataTypes, numColumns);
 
     DataTable dataTable = dataTableBuilder.build();
     DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
@@ -311,23 +275,9 @@ public class DataTableSerDeTest {
       columnNames[i] = columnDataTypes[i].name();
     }
 
-    int[] ints = new int[NUM_ROWS];
-    long[] longs = new long[NUM_ROWS];
-    float[] floats = new float[NUM_ROWS];
-    double[] doubles = new double[NUM_ROWS];
-    String[] strings = new String[NUM_ROWS];
-    byte[][] bytes = new byte[NUM_ROWS][];
-    Object[] objects = new Object[NUM_ROWS];
-    int[][] intArrays = new int[NUM_ROWS][];
-    long[][] longArrays = new long[NUM_ROWS][];
-    float[][] floatArrays = new float[NUM_ROWS][];
-    double[][] doubleArrays = new double[NUM_ROWS][];
-    String[][] stringArrays = new String[NUM_ROWS][];
-
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
     DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);
-    fillDataTableWithRandomData(dataTableBuilder, columnDataTypes, numColumns, ints, longs, floats, doubles, strings,
-        bytes, objects, intArrays, longArrays, floatArrays, doubleArrays, stringArrays);
+    fillDataTableWithRandomData(dataTableBuilder, columnDataTypes, numColumns);
 
     DataTable dataTable = dataTableBuilder.build();
 
@@ -388,42 +338,40 @@ public class DataTableSerDeTest {
   }
 
   private void fillDataTableWithRandomData(DataTableBuilder dataTableBuilder,
-      DataSchema.ColumnDataType[] columnDataTypes, int numColumns, int[] ints, long[] longs, float[] floats,
-      double[] doubles, String[] strings, byte[][] bytes, Object[] objects, int[][] intArrays, long[][] longArrays,
-      float[][] floatArrays, double[][] doubleArrays, String[][] stringArrays)
+      DataSchema.ColumnDataType[] columnDataTypes, int numColumns)
       throws IOException {
     for (int rowId = 0; rowId < NUM_ROWS; rowId++) {
       dataTableBuilder.startRow();
       for (int colId = 0; colId < numColumns; colId++) {
         switch (columnDataTypes[colId]) {
           case INT:
-            ints[rowId] = RANDOM.nextInt();
-            dataTableBuilder.setColumn(colId, ints[rowId]);
+            INTS[rowId] = RANDOM.nextInt();
+            dataTableBuilder.setColumn(colId, INTS[rowId]);
             break;
           case LONG:
-            longs[rowId] = RANDOM.nextLong();
-            dataTableBuilder.setColumn(colId, longs[rowId]);
+            LONGS[rowId] = RANDOM.nextLong();
+            dataTableBuilder.setColumn(colId, LONGS[rowId]);
             break;
           case FLOAT:
-            floats[rowId] = RANDOM.nextFloat();
-            dataTableBuilder.setColumn(colId, floats[rowId]);
+            FLOATS[rowId] = RANDOM.nextFloat();
+            dataTableBuilder.setColumn(colId, FLOATS[rowId]);
             break;
           case DOUBLE:
-            doubles[rowId] = RANDOM.nextDouble();
-            dataTableBuilder.setColumn(colId, doubles[rowId]);
+            DOUBLES[rowId] = RANDOM.nextDouble();
+            dataTableBuilder.setColumn(colId, DOUBLES[rowId]);
             break;
           case STRING:
-            strings[rowId] = RandomStringUtils.random(RANDOM.nextInt(20));
-            dataTableBuilder.setColumn(colId, strings[rowId]);
+            STRINGS[rowId] = RandomStringUtils.random(RANDOM.nextInt(20));
+            dataTableBuilder.setColumn(colId, STRINGS[rowId]);
             break;
           case BYTES:
-            bytes[rowId] = RandomStringUtils.random(RANDOM.nextInt(20)).getBytes();
-            dataTableBuilder.setColumn(colId, new ByteArray(bytes[rowId]));
+            BYTES[rowId] = RandomStringUtils.random(RANDOM.nextInt(20)).getBytes();
+            dataTableBuilder.setColumn(colId, new ByteArray(BYTES[rowId]));
             break;
           // Just test Double here, all object types will be covered in ObjectCustomSerDeTest.
           case OBJECT:
-            objects[rowId] = RANDOM.nextDouble();
-            dataTableBuilder.setColumn(colId, objects[rowId]);
+            OBJECTS[rowId] = RANDOM.nextDouble();
+            dataTableBuilder.setColumn(colId, OBJECTS[rowId]);
             break;
           case INT_ARRAY:
             int length = RANDOM.nextInt(20);
@@ -431,7 +379,7 @@ public class DataTableSerDeTest {
             for (int i = 0; i < length; i++) {
               intArray[i] = RANDOM.nextInt();
             }
-            intArrays[rowId] = intArray;
+            INT_ARRAYS[rowId] = intArray;
             dataTableBuilder.setColumn(colId, intArray);
             break;
           case LONG_ARRAY:
@@ -440,7 +388,7 @@ public class DataTableSerDeTest {
             for (int i = 0; i < length; i++) {
               longArray[i] = RANDOM.nextLong();
             }
-            longArrays[rowId] = longArray;
+            LONG_ARRAYS[rowId] = longArray;
             dataTableBuilder.setColumn(colId, longArray);
             break;
           case FLOAT_ARRAY:
@@ -449,7 +397,7 @@ public class DataTableSerDeTest {
             for (int i = 0; i < length; i++) {
               floatArray[i] = RANDOM.nextFloat();
             }
-            floatArrays[rowId] = floatArray;
+            FLOAT_ARRAYS[rowId] = floatArray;
             dataTableBuilder.setColumn(colId, floatArray);
             break;
           case DOUBLE_ARRAY:
@@ -458,7 +406,7 @@ public class DataTableSerDeTest {
             for (int i = 0; i < length; i++) {
               doubleArray[i] = RANDOM.nextDouble();
             }
-            doubleArrays[rowId] = doubleArray;
+            DOUBLE_ARRAYS[rowId] = doubleArray;
             dataTableBuilder.setColumn(colId, doubleArray);
             break;
           case STRING_ARRAY:
@@ -467,7 +415,7 @@ public class DataTableSerDeTest {
             for (int i = 0; i < length; i++) {
               stringArray[i] = RandomStringUtils.random(RANDOM.nextInt(20));
             }
-            stringArrays[rowId] = stringArray;
+            STRING_ARRAYS[rowId] = stringArray;
             dataTableBuilder.setColumn(colId, stringArray);
             break;
         }
@@ -476,49 +424,48 @@ public class DataTableSerDeTest {
     }
   }
 
-  private void verifyDataIsSame(DataTable newDataTable, DataSchema.ColumnDataType[] columnDataTypes, int numColumns,
-      int[] ints, long[] longs, float[] floats, double[] doubles, String[] strings, byte[][] bytes, Object[] objects,
-      int[][] intArrays, long[][] longArrays, float[][] floatArrays, double[][] doubleArrays, String[][] stringArrays) {
+  private void verifyDataIsSame(DataTable newDataTable, DataSchema.ColumnDataType[] columnDataTypes, int numColumns) {
     for (int rowId = 0; rowId < NUM_ROWS; rowId++) {
       for (int colId = 0; colId < numColumns; colId++) {
         switch (columnDataTypes[colId]) {
           case INT:
-            Assert.assertEquals(newDataTable.getInt(rowId, colId), ints[rowId], ERROR_MESSAGE);
+            Assert.assertEquals(newDataTable.getInt(rowId, colId), INTS[rowId], ERROR_MESSAGE);
             break;
           case LONG:
-            Assert.assertEquals(newDataTable.getLong(rowId, colId), longs[rowId], ERROR_MESSAGE);
+            Assert.assertEquals(newDataTable.getLong(rowId, colId), LONGS[rowId], ERROR_MESSAGE);
             break;
           case FLOAT:
-            Assert.assertEquals(newDataTable.getFloat(rowId, colId), floats[rowId], ERROR_MESSAGE);
+            Assert.assertEquals(newDataTable.getFloat(rowId, colId), FLOATS[rowId], ERROR_MESSAGE);
             break;
           case DOUBLE:
-            Assert.assertEquals(newDataTable.getDouble(rowId, colId), doubles[rowId], ERROR_MESSAGE);
+            Assert.assertEquals(newDataTable.getDouble(rowId, colId), DOUBLES[rowId], ERROR_MESSAGE);
             break;
           case STRING:
-            Assert.assertEquals(newDataTable.getString(rowId, colId), strings[rowId], ERROR_MESSAGE);
+            Assert.assertEquals(newDataTable.getString(rowId, colId), STRINGS[rowId], ERROR_MESSAGE);
             break;
           case BYTES:
-            Assert.assertEquals(newDataTable.getBytes(rowId, colId).getBytes(), bytes[rowId], ERROR_MESSAGE);
+            Assert.assertEquals(newDataTable.getBytes(rowId, colId).getBytes(), BYTES[rowId], ERROR_MESSAGE);
             break;
           case OBJECT:
-            Assert.assertEquals(newDataTable.getObject(rowId, colId), objects[rowId], ERROR_MESSAGE);
+            Assert.assertEquals(newDataTable.getObject(rowId, colId), OBJECTS[rowId], ERROR_MESSAGE);
             break;
           case INT_ARRAY:
-            Assert.assertTrue(Arrays.equals(newDataTable.getIntArray(rowId, colId), intArrays[rowId]), ERROR_MESSAGE);
+            Assert.assertTrue(Arrays.equals(newDataTable.getIntArray(rowId, colId), INT_ARRAYS[rowId]), ERROR_MESSAGE);
             break;
           case LONG_ARRAY:
-            Assert.assertTrue(Arrays.equals(newDataTable.getLongArray(rowId, colId), longArrays[rowId]), ERROR_MESSAGE);
+            Assert
+                .assertTrue(Arrays.equals(newDataTable.getLongArray(rowId, colId), LONG_ARRAYS[rowId]), ERROR_MESSAGE);
             break;
           case FLOAT_ARRAY:
-            Assert
-                .assertTrue(Arrays.equals(newDataTable.getFloatArray(rowId, colId), floatArrays[rowId]), ERROR_MESSAGE);
+            Assert.assertTrue(Arrays.equals(newDataTable.getFloatArray(rowId, colId), FLOAT_ARRAYS[rowId]),
+                ERROR_MESSAGE);
             break;
           case DOUBLE_ARRAY:
-            Assert.assertTrue(Arrays.equals(newDataTable.getDoubleArray(rowId, colId), doubleArrays[rowId]),
+            Assert.assertTrue(Arrays.equals(newDataTable.getDoubleArray(rowId, colId), DOUBLE_ARRAYS[rowId]),
                 ERROR_MESSAGE);
             break;
           case STRING_ARRAY:
-            Assert.assertTrue(Arrays.equals(newDataTable.getStringArray(rowId, colId), stringArrays[rowId]),
+            Assert.assertTrue(Arrays.equals(newDataTable.getStringArray(rowId, colId), STRING_ARRAYS[rowId]),
                 ERROR_MESSAGE);
             break;
         }
