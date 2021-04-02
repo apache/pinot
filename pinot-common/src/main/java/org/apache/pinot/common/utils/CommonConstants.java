@@ -383,7 +383,7 @@ public class CommonConstants {
   public static class Segment {
     public static class Realtime {
       public enum Status {
-        // Means the segment is not completed and still consuming stream data
+        // Means the segment is in CONSUMING state
         IN_PROGRESS,
         // Means the segment is completed and sealed by some Pinot server and uploaded
         DONE,
