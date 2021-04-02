@@ -52,6 +52,11 @@ public interface BrokerResponse {
   void setTimeUsedMs(long timeUsedMs);
 
   /**
+   * Set the total thread cpu time used in request handling, into the broker response.
+   */
+  void setThreadCpuTimeNs(long timeUsedMs);
+
+  /**
    * Convert the broker response to JSON String.
    */
   String toJsonString()

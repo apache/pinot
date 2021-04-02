@@ -39,7 +39,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  *
  * Supports serialization via JSON.
  */
-@JsonPropertyOrder({"selectionResults", "aggregationResults", "resultTable", "exceptions", "numServersQueried", "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numGroupsLimitReached", "totalDocs", "timeUsedMs", "segmentStatistics", "traceInfo"})
+@JsonPropertyOrder({"selectionResults", "aggregationResults", "resultTable", "exceptions", "numServersQueried", "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numGroupsLimitReached", "totalDocs", "timeUsedMs", "threadCpuTimeNs", "segmentStatistics", "traceInfo"})
 public class BrokerResponseNative implements BrokerResponse {
   public static final BrokerResponseNative EMPTY_RESULT = BrokerResponseNative.empty();
   public static final BrokerResponseNative NO_TABLE_RESULT =
@@ -61,6 +61,7 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _totalDocs = 0L;
   private boolean _numGroupsLimitReached = false;
   private long _timeUsedMs = 0L;
+  private long _threadCpuTimeNs = 0L;
 
   private SelectionResults _selectionResults;
   private List<AggregationResult> _aggregationResults;
@@ -275,6 +276,17 @@ public class BrokerResponseNative implements BrokerResponse {
   @Override
   public void setTimeUsedMs(long timeUsedMs) {
     _timeUsedMs = timeUsedMs;
+  }
+
+  @JsonProperty("threadCpuTimeNs")
+  public long getThreadCpuTimeNs() {
+    return _threadCpuTimeNs;
+  }
+
+  @JsonProperty("threadCpuTimeNs")
+  @Override
+  public void setThreadCpuTimeNs(long timeUsedMs) {
+    _threadCpuTimeNs = timeUsedMs;
   }
 
   @JsonProperty("segmentStatistics")

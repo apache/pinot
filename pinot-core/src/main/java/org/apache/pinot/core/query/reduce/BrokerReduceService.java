@@ -28,6 +28,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
@@ -104,6 +105,7 @@ public class BrokerReduceService {
     long numConsumingSegmentsProcessed = 0L;
     long minConsumingFreshnessTimeMs = Long.MAX_VALUE;
     long numTotalDocs = 0L;
+    long threadCpuTimeNs = 0L;
     boolean numGroupsLimitReached = false;
 
     // Cache a data schema from data tables (try to cache one with data rows associated with it).
@@ -166,6 +168,11 @@ public class BrokerReduceService {
             Math.min(Long.parseLong(minConsumingFreshnessTimeMsString), minConsumingFreshnessTimeMs);
       }
 
+      String threadCpuTimeNsString = metadata.get(DataTable.MetadataKey.THREAD_CPU_TIME_NS.getName());
+      if (threadCpuTimeNsString != null) {
+        threadCpuTimeNs += Long.parseLong(threadCpuTimeNsString);
+      }
+
       String numTotalDocsString = metadata.get(DataTable.TOTAL_DOCS_METADATA_KEY);
       if (numTotalDocsString != null) {
         numTotalDocs += Long.parseLong(numTotalDocsString);
@@ -198,6 +205,7 @@ public class BrokerReduceService {
     brokerResponseNative.setNumSegmentsMatched(numSegmentsMatched);
     brokerResponseNative.setTotalDocs(numTotalDocs);
     brokerResponseNative.setNumGroupsLimitReached(numGroupsLimitReached);
+    brokerResponseNative.setThreadCpuTimeNs(threadCpuTimeNs);
     if (numConsumingSegmentsProcessed > 0) {
       brokerResponseNative.setNumConsumingSegmentsQueried(numConsumingSegmentsProcessed);
       brokerResponseNative.setMinConsumingFreshnessTimeMs(minConsumingFreshnessTimeMs);
@@ -212,7 +220,8 @@ public class BrokerReduceService {
           .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER, numEntriesScannedInFilter);
       brokerMetrics
           .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER, numEntriesScannedPostFilter);
-
+      brokerMetrics
+          .addValueToTableGauge(rawTableName, BrokerGauge.THREAD_CPU_TIME_NS, threadCpuTimeNs);
       if (numConsumingSegmentsProcessed > 0 && minConsumingFreshnessTimeMs > 0) {
         brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.FRESHNESS_LAG_MS,
             System.currentTimeMillis() - minConsumingFreshnessTimeMs, TimeUnit.MILLISECONDS);
