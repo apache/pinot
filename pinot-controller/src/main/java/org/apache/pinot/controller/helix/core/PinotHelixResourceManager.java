@@ -72,6 +72,7 @@ import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.exception.SchemaBackwardIncompatibleException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.lineage.LineageEntry;
@@ -206,7 +207,6 @@ public class PinotHelixResourceManager {
                 if (adminPort > 0) {
                   protocol = CommonConstants.HTTP_PROTOCOL;
                   port = adminPort;
-
                 } else if (adminHttpsPort > 0) {
                   protocol = CommonConstants.HTTPS_PROTOCOL;
                   port = adminHttpsPort;
@@ -396,7 +396,8 @@ public class PinotHelixResourceManager {
         brokerTenantName = realtimeTableConfig.getTenantConfig().getBroker();
       }
     }
-    return HelixHelper.getInstancesConfigsWithTag(HelixHelper.getInstanceConfigs(_helixZkManager), TagNameUtils.getBrokerTagForTenant(brokerTenantName));
+    return HelixHelper.getInstancesConfigsWithTag(HelixHelper.getInstanceConfigs(_helixZkManager),
+        TagNameUtils.getBrokerTagForTenant(brokerTenantName));
   }
 
   /**
@@ -1052,7 +1053,7 @@ public class PinotHelixResourceManager {
   }
 
   public void updateSchema(Schema schema, boolean reload)
-      throws TableNotFoundException, SchemaNotFoundException {
+      throws SchemaNotFoundException, SchemaBackwardIncompatibleException, TableNotFoundException {
     ZNRecord record = SchemaUtils.toZNRecord(schema);
     String schemaName = schema.getSchemaName();
     Schema oldSchema = ZKMetadataProvider.getSchema(_propertyStore, schemaName);
@@ -1066,14 +1067,16 @@ public class PinotHelixResourceManager {
       return;
     }
 
+    if (!schema.isBackwardCompatibleWith(oldSchema)) {
+      throw new SchemaBackwardIncompatibleException(
+          String.format("New schema %s is not backward compatible with the current schema", schemaName));
+    }
+
     PinotHelixPropertyStoreZnRecordProvider propertyStoreHelper =
         PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore);
     propertyStoreHelper.set(schemaName, record);
 
-    boolean isNewSchemaBackwardCompatible = schema.isBackwardCompatibleWith(oldSchema);
-    if (!isNewSchemaBackwardCompatible) {
-      LOGGER.warn(String.format("New schema %s is not backward compatible", schemaName));
-    } else if (reload) {
+    if (reload) {
       LOGGER.info("Reloading tables with name: {}", schemaName);
       List<String> tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
       for (String tableNameWithType : tableNamesWithType) {
@@ -1683,10 +1686,12 @@ public class PinotHelixResourceManager {
             LOGGER.warn("Segment: {} already exists in the IdealState for table: {}, do not update", segmentName,
                 offlineTableName);
           } else {
-            List<String> assignedInstances = segmentAssignment.assignSegment(segmentName, currentAssignment, instancePartitionsMap);
+            List<String> assignedInstances =
+                segmentAssignment.assignSegment(segmentName, currentAssignment, instancePartitionsMap);
             LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
                 offlineTableName);
-            currentAssignment.put(segmentName, SegmentAssignmentUtils.getInstanceStateMap(assignedInstances, SegmentStateModel.ONLINE));
+            currentAssignment.put(segmentName,
+                SegmentAssignmentUtils.getInstanceStateMap(assignedInstances, SegmentStateModel.ONLINE));
           }
           return idealState;
         });
@@ -1893,7 +1898,8 @@ public class PinotHelixResourceManager {
       // resetPartition takes a segment which is in ERROR state, to OFFLINE state
       _helixAdmin
           .resetPartition(_helixClusterName, entry.getKey(), tableNameWithType, Lists.newArrayList(entry.getValue()));
-    } for (Map.Entry<String, Set<String>> entry : instanceToDisableSegmentsMap.entrySet()) {
+    }
+    for (Map.Entry<String, Set<String>> entry : instanceToDisableSegmentsMap.entrySet()) {
       // enablePartition takes a segment which is NOT in ERROR state, to OFFLINE state
       _helixAdmin.enablePartition(false, _helixClusterName, entry.getKey(), tableNameWithType,
           Lists.newArrayList(entry.getValue()));
