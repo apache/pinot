@@ -37,7 +37,6 @@ import org.apache.pinot.core.common.BlockDocIdValueSet;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
-import org.apache.pinot.core.common.datatable.DataTableImplV2;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.Table;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -193,34 +192,6 @@ public class IntermediateResultsBlock implements Block {
     _processingExceptions.add(processingException);
   }
 
-  public void setNumDocsScanned(long numDocsScanned) {
-    _numDocsScanned = numDocsScanned;
-  }
-
-  public void setNumEntriesScannedInFilter(long numEntriesScannedInFilter) {
-    _numEntriesScannedInFilter = numEntriesScannedInFilter;
-  }
-
-  public void setNumEntriesScannedPostFilter(long numEntriesScannedPostFilter) {
-    _numEntriesScannedPostFilter = numEntriesScannedPostFilter;
-  }
-
-  public void setNumSegmentsProcessed(int numSegmentsProcessed) {
-    _numSegmentsProcessed = numSegmentsProcessed;
-  }
-
-  public void setNumSegmentsMatched(int numSegmentsMatched) {
-    _numSegmentsMatched = numSegmentsMatched;
-  }
-
-  public void setNumTotalDocs(long numTotalDocs) {
-    _numTotalDocs = numTotalDocs;
-  }
-
-  public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
-    _numGroupsLimitReached = numGroupsLimitReached;
-  }
-
   public void setNumResizes(int numResizes) {
     _numResizes = numResizes;
   }
@@ -229,12 +200,12 @@ public class IntermediateResultsBlock implements Block {
     _resizeTimeMs = resizeTimeMs;
   }
 
-  public void setExecutionThreadCpuTimeNs(long executionThreadCpuTimeNs) {
-    _executionThreadCpuTimeNs = executionThreadCpuTimeNs;
-  }
-
   public long getExecutionThreadCpuTimeNs() {
     return _executionThreadCpuTimeNs;
+  }
+
+  public void setExecutionThreadCpuTimeNs(long executionThreadCpuTimeNs) {
+    _executionThreadCpuTimeNs = executionThreadCpuTimeNs;
   }
 
   @VisibleForTesting
@@ -242,9 +213,17 @@ public class IntermediateResultsBlock implements Block {
     return _numDocsScanned;
   }
 
+  public void setNumDocsScanned(long numDocsScanned) {
+    _numDocsScanned = numDocsScanned;
+  }
+
   @VisibleForTesting
   public long getNumEntriesScannedInFilter() {
     return _numEntriesScannedInFilter;
+  }
+
+  public void setNumEntriesScannedInFilter(long numEntriesScannedInFilter) {
+    _numEntriesScannedInFilter = numEntriesScannedInFilter;
   }
 
   @VisibleForTesting
@@ -252,9 +231,17 @@ public class IntermediateResultsBlock implements Block {
     return _numEntriesScannedPostFilter;
   }
 
+  public void setNumEntriesScannedPostFilter(long numEntriesScannedPostFilter) {
+    _numEntriesScannedPostFilter = numEntriesScannedPostFilter;
+  }
+
   @VisibleForTesting
   public int getNumSegmentsProcessed() {
     return _numSegmentsProcessed;
+  }
+
+  public void setNumSegmentsProcessed(int numSegmentsProcessed) {
+    _numSegmentsProcessed = numSegmentsProcessed;
   }
 
   @VisibleForTesting
@@ -262,14 +249,26 @@ public class IntermediateResultsBlock implements Block {
     return _numSegmentsMatched;
   }
 
+  public void setNumSegmentsMatched(int numSegmentsMatched) {
+    _numSegmentsMatched = numSegmentsMatched;
+  }
+
   @VisibleForTesting
   public long getNumTotalDocs() {
     return _numTotalDocs;
   }
 
+  public void setNumTotalDocs(long numTotalDocs) {
+    _numTotalDocs = numTotalDocs;
+  }
+
   @VisibleForTesting
   public boolean isNumGroupsLimitReached() {
     return _numGroupsLimitReached;
+  }
+
+  public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
+    _numGroupsLimitReached = numGroupsLimitReached;
   }
 
   public DataTable getDataTable()
@@ -423,7 +422,7 @@ public class IntermediateResultsBlock implements Block {
   }
 
   private DataTable getMetadataDataTable() {
-    return attachMetadataToDataTable(new DataTableImplV2());
+    return attachMetadataToDataTable(DataTableBuilder.getEmptyDataTable());
   }
 
   private DataTable attachMetadataToDataTable(DataTable dataTable) {

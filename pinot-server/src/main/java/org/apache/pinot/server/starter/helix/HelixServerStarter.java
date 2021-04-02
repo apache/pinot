@@ -59,6 +59,7 @@ import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
@@ -146,6 +147,11 @@ public class HelixServerStarter implements ServiceStartable {
     ThreadTimer.setThreadCpuTimeMeasurementEnabled(_serverConf
         .getProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
             Server.DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT));
+
+    // Set data table version send to broker.
+    DataTableBuilder.setCurrentDataTableVersion(_serverConf
+        .getProperty(Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION,
+            Server.DEFAULT_CURRENT_DATA_TABLE_VERSION));
   }
 
   /**
