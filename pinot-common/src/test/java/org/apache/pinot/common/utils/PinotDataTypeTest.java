@@ -94,11 +94,10 @@ public class PinotDataTypeTest {
 
   @Test
   public void testObject() {
-    assertEquals(OBJECT.toInteger(new NumberObject("123")).intValue(), 123);
-    assertEquals(OBJECT.toLong(new NumberObject("123")).intValue(), 123);
-    assertEquals(OBJECT.toFloat(new NumberObject("123")).intValue(), 123);
-    assertEquals(OBJECT.toDouble(new NumberObject("123")).intValue(), 123);
-    assertEquals(OBJECT.toInteger(new NumberObject("123")).intValue(), 123);
+    assertEquals(OBJECT.toInt(new NumberObject("123")), 123);
+    assertEquals(OBJECT.toLong(new NumberObject("123")), 123L);
+    assertEquals(OBJECT.toFloat(new NumberObject("123")), 123f);
+    assertEquals(OBJECT.toDouble(new NumberObject("123")), 123.0);
     assertEquals(OBJECT.toString(new NumberObject("123")), "123");
     assertEquals(OBJECT_ARRAY.getSingleValueType(), OBJECT);
   }

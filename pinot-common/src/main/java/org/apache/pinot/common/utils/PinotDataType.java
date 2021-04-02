@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BytesUtils;
 
 
@@ -28,7 +29,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
  *  The <code>PinotDataType</code> enum represents the data type of a value in a row from recordReader and provides
  *  utility methods to convert value across types if applicable.
  *  <p>We don't use <code>PinotDataType</code> to maintain type information, but use it to help organize the data and
- *  use {@link FieldSpec.DataType} to maintain type information separately across various readers.
+ *  use {@link DataType} to maintain type information separately across various readers.
  *  <p>NOTE:
  *  <ul>
  *    <li>We will silently lose information if a conversion causes us to do so (e.g. DOUBLE to INT)</li>
@@ -40,22 +41,22 @@ public enum PinotDataType {
 
   BOOLEAN {
     @Override
-    public Integer toInteger(Object value) {
+    public int toInt(Object value) {
       return ((Boolean) value) ? 1 : 0;
     }
 
     @Override
-    public Long toLong(Object value) {
+    public long toLong(Object value) {
       return ((Boolean) value) ? 1L : 0L;
     }
 
     @Override
-    public Float toFloat(Object value) {
+    public float toFloat(Object value) {
       return ((Boolean) value) ? 1f : 0f;
     }
 
     @Override
-    public Double toDouble(Object value) {
+    public double toDouble(Object value) {
       return ((Boolean) value) ? 1d : 0d;
     }
 
@@ -72,22 +73,22 @@ public enum PinotDataType {
 
   BYTE {
     @Override
-    public Integer toInteger(Object value) {
+    public int toInt(Object value) {
       return ((Byte) value).intValue();
     }
 
     @Override
-    public Long toLong(Object value) {
+    public long toLong(Object value) {
       return ((Byte) value).longValue();
     }
 
     @Override
-    public Float toFloat(Object value) {
+    public float toFloat(Object value) {
       return ((Byte) value).floatValue();
     }
 
     @Override
-    public Double toDouble(Object value) {
+    public double toDouble(Object value) {
       return ((Byte) value).doubleValue();
     }
 
@@ -104,22 +105,22 @@ public enum PinotDataType {
 
   CHARACTER {
     @Override
-    public Integer toInteger(Object value) {
+    public int toInt(Object value) {
       return (int) ((Character) value);
     }
 
     @Override
-    public Long toLong(Object value) {
+    public long toLong(Object value) {
       return (long) ((Character) value);
     }
 
     @Override
-    public Float toFloat(Object value) {
+    public float toFloat(Object value) {
       return (float) ((Character) value);
     }
 
     @Override
-    public Double toDouble(Object value) {
+    public double toDouble(Object value) {
       return (double) ((Character) value);
     }
 
@@ -136,22 +137,22 @@ public enum PinotDataType {
 
   SHORT {
     @Override
-    public Integer toInteger(Object value) {
+    public int toInt(Object value) {
       return ((Short) value).intValue();
     }
 
     @Override
-    public Long toLong(Object value) {
+    public long toLong(Object value) {
       return ((Short) value).longValue();
     }
 
     @Override
-    public Float toFloat(Object value) {
+    public float toFloat(Object value) {
       return ((Short) value).floatValue();
     }
 
     @Override
-    public Double toDouble(Object value) {
+    public double toDouble(Object value) {
       return ((Short) value).doubleValue();
     }
 
@@ -168,22 +169,22 @@ public enum PinotDataType {
 
   INTEGER {
     @Override
-    public Integer toInteger(Object value) {
+    public int toInt(Object value) {
       return (Integer) value;
     }
 
     @Override
-    public Long toLong(Object value) {
+    public long toLong(Object value) {
       return ((Integer) value).longValue();
     }
 
     @Override
-    public Float toFloat(Object value) {
+    public float toFloat(Object value) {
       return ((Integer) value).floatValue();
     }
 
     @Override
-    public Double toDouble(Object value) {
+    public double toDouble(Object value) {
       return ((Integer) value).doubleValue();
     }
 
@@ -199,28 +200,28 @@ public enum PinotDataType {
 
     @Override
     public Integer convert(Object value, PinotDataType sourceType) {
-      return sourceType.toInteger(value);
+      return sourceType.toInt(value);
     }
   },
 
   LONG {
     @Override
-    public Integer toInteger(Object value) {
+    public int toInt(Object value) {
       return ((Long) value).intValue();
     }
 
     @Override
-    public Long toLong(Object value) {
+    public long toLong(Object value) {
       return (Long) value;
     }
 
     @Override
-    public Float toFloat(Object value) {
+    public float toFloat(Object value) {
       return ((Long) value).floatValue();
     }
 
     @Override
-    public Double toDouble(Object value) {
+    public double toDouble(Object value) {
       return ((Long) value).doubleValue();
     }
 
@@ -242,22 +243,22 @@ public enum PinotDataType {
 
   FLOAT {
     @Override
-    public Integer toInteger(Object value) {
+    public int toInt(Object value) {
       return ((Float) value).intValue();
     }
 
     @Override
-    public Long toLong(Object value) {
+    public long toLong(Object value) {
       return ((Float) value).longValue();
     }
 
     @Override
-    public Float toFloat(Object value) {
+    public float toFloat(Object value) {
       return (Float) value;
     }
 
     @Override
-    public Double toDouble(Object value) {
+    public double toDouble(Object value) {
       return ((Float) value).doubleValue();
     }
 
@@ -279,22 +280,22 @@ public enum PinotDataType {
 
   DOUBLE {
     @Override
-    public Integer toInteger(Object value) {
+    public int toInt(Object value) {
       return ((Double) value).intValue();
     }
 
     @Override
-    public Long toLong(Object value) {
+    public long toLong(Object value) {
       return ((Double) value).longValue();
     }
 
     @Override
-    public Float toFloat(Object value) {
+    public float toFloat(Object value) {
       return ((Double) value).floatValue();
     }
 
     @Override
-    public Double toDouble(Object value) {
+    public double toDouble(Object value) {
       return (Double) value;
     }
 
@@ -316,35 +317,35 @@ public enum PinotDataType {
 
   STRING {
     @Override
-    public Integer toInteger(Object value) {
-      return Integer.valueOf(((String) value).trim());
+    public int toInt(Object value) {
+      return Integer.parseInt(value.toString().trim());
     }
 
     @Override
-    public Long toLong(Object value) {
-      return Long.valueOf(((String) value).trim());
+    public long toLong(Object value) {
+      return Long.parseLong(value.toString().trim());
     }
 
     @Override
-    public Float toFloat(Object value) {
+    public float toFloat(Object value) {
       // NOTE: No need to trim here because Float.valueOf() will trim the string
-      return Float.valueOf((String) value);
+      return Float.parseFloat(value.toString());
     }
 
     @Override
-    public Double toDouble(Object value) {
+    public double toDouble(Object value) {
       // NOTE: No need to trim here because Double.valueOf() will trim the string
-      return Double.valueOf((String) value);
+      return Double.parseDouble(value.toString());
     }
 
     @Override
     public String toString(Object value) {
-      return (String) value;
+      return value.toString();
     }
 
     @Override
     public byte[] toBytes(Object value) {
-      return BytesUtils.toBytes(((String) value).trim());
+      return BytesUtils.toBytes(value.toString().trim());
     }
 
     @Override
@@ -355,22 +356,22 @@ public enum PinotDataType {
 
   BYTES {
     @Override
-    public Integer toInteger(Object value) {
+    public int toInt(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from BYTES to INTEGER");
     }
 
     @Override
-    public Long toLong(Object value) {
+    public long toLong(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from BYTES to LONG");
     }
 
     @Override
-    public Float toFloat(Object value) {
+    public float toFloat(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from BYTES to FLOAT");
     }
 
     @Override
-    public Double toDouble(Object value) {
+    public double toDouble(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from BYTES to DOUBLE");
     }
 
@@ -392,22 +393,22 @@ public enum PinotDataType {
 
   OBJECT {
     @Override
-    public Integer toInteger(Object value) {
+    public int toInt(Object value) {
       return ((Number) value).intValue();
     }
 
     @Override
-    public Long toLong(Object value) {
+    public long toLong(Object value) {
       return ((Number) value).longValue();
     }
 
     @Override
-    public Float toFloat(Object value) {
+    public float toFloat(Object value) {
       return ((Number) value).floatValue();
     }
 
     @Override
-    public Double toDouble(Object value) {
+    public double toDouble(Object value) {
       return ((Number) value).doubleValue();
     }
 
@@ -439,10 +440,31 @@ public enum PinotDataType {
 
   SHORT_ARRAY,
 
+  /*
+    NOTE:
+      Primitive array is used in query execution, query response, scalar function arguments and return values.
+      Object array is used in GenericRow for data ingestion.
+      We need to keep them separately because they cannot automatically cast to the other type.
+   */
+
+  PRIMITIVE_INT_ARRAY {
+    @Override
+    public int[] convert(Object value, PinotDataType sourceType) {
+      return sourceType.toPrimitiveIntArray(value);
+    }
+  },
+
   INTEGER_ARRAY {
     @Override
     public Integer[] convert(Object value, PinotDataType sourceType) {
       return sourceType.toIntegerArray(value);
+    }
+  },
+
+  PRIMITIVE_LONG_ARRAY {
+    @Override
+    public long[] convert(Object value, PinotDataType sourceType) {
+      return sourceType.toPrimitiveLongArray(value);
     }
   },
 
@@ -453,10 +475,24 @@ public enum PinotDataType {
     }
   },
 
+  PRIMITIVE_FLOAT_ARRAY {
+    @Override
+    public float[] convert(Object value, PinotDataType sourceType) {
+      return sourceType.toPrimitiveFloatArray(value);
+    }
+  },
+
   FLOAT_ARRAY {
     @Override
     public Float[] convert(Object value, PinotDataType sourceType) {
       return sourceType.toFloatArray(value);
+    }
+  },
+
+  PRIMITIVE_DOUBLE_ARRAY {
+    @Override
+    public double[] convert(Object value, PinotDataType sourceType) {
+      return sourceType.toPrimitiveDoubleArray(value);
     }
   },
 
@@ -477,49 +513,91 @@ public enum PinotDataType {
   OBJECT_ARRAY;
 
   /**
-   * NOTE: override toInteger(), toLong(), toFloat(), toDouble(), toString() and toBytes() for single-value types.
+   * NOTE: override toInt(), toLong(), toFloat(), toDouble(), toString() and toBytes() for single-value types.
    */
 
-  public Integer toInteger(Object value) {
-    return getSingleValueType().toInteger(((Object[]) value)[0]);
+  public int toInt(Object value) {
+    return getSingleValueType().toInt(toObjectArray(value)[0]);
   }
 
-  public Long toLong(Object value) {
-    return getSingleValueType().toLong(((Object[]) value)[0]);
+  public long toLong(Object value) {
+    return getSingleValueType().toLong(toObjectArray(value)[0]);
   }
 
-  public Float toFloat(Object value) {
-    return getSingleValueType().toFloat(((Object[]) value)[0]);
+  public float toFloat(Object value) {
+    return getSingleValueType().toFloat(toObjectArray(value)[0]);
   }
 
-  public Double toDouble(Object value) {
-    return getSingleValueType().toDouble(((Object[]) value)[0]);
+  public double toDouble(Object value) {
+    return getSingleValueType().toDouble(toObjectArray(value)[0]);
   }
 
   public String toString(Object value) {
-    return getSingleValueType().toString(((Object[]) value)[0]);
+    return getSingleValueType().toString(toObjectArray(value)[0]);
   }
 
   public byte[] toBytes(Object value) {
-    return getSingleValueType().toBytes(((Object[]) value)[0]);
+    return getSingleValueType().toBytes(toObjectArray(value)[0]);
+  }
+
+  public int[] toPrimitiveIntArray(Object value) {
+    if (value instanceof int[]) {
+      return (int[]) value;
+    }
+    if (isSingleValue()) {
+      return new int[]{toInt(value)};
+    } else {
+      Object[] valueArray = toObjectArray(value);
+      int length = valueArray.length;
+      int[] intArray = new int[length];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        intArray[i] = singleValueType.toInt(valueArray[i]);
+      }
+      return intArray;
+    }
   }
 
   public Integer[] toIntegerArray(Object value) {
+    if (value instanceof Integer[]) {
+      return (Integer[]) value;
+    }
     if (isSingleValue()) {
-      return new Integer[]{toInteger(value)};
+      return new Integer[]{toInt(value)};
     } else {
       Object[] valueArray = toObjectArray(value);
       int length = valueArray.length;
       Integer[] integerArray = new Integer[length];
       PinotDataType singleValueType = getSingleValueType();
       for (int i = 0; i < length; i++) {
-        integerArray[i] = singleValueType.toInteger(valueArray[i]);
+        integerArray[i] = singleValueType.toInt(valueArray[i]);
       }
       return integerArray;
     }
   }
 
+  public long[] toPrimitiveLongArray(Object value) {
+    if (value instanceof long[]) {
+      return (long[]) value;
+    }
+    if (isSingleValue()) {
+      return new long[]{toLong(value)};
+    } else {
+      Object[] valueArray = toObjectArray(value);
+      int length = valueArray.length;
+      long[] longArray = new long[length];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        longArray[i] = singleValueType.toLong(valueArray[i]);
+      }
+      return longArray;
+    }
+  }
+
   public Long[] toLongArray(Object value) {
+    if (value instanceof Long[]) {
+      return (Long[]) value;
+    }
     if (isSingleValue()) {
       return new Long[]{toLong(value)};
     } else {
@@ -534,7 +612,28 @@ public enum PinotDataType {
     }
   }
 
+  public float[] toPrimitiveFloatArray(Object value) {
+    if (value instanceof float[]) {
+      return (float[]) value;
+    }
+    if (isSingleValue()) {
+      return new float[]{toFloat(value)};
+    } else {
+      Object[] valueArray = toObjectArray(value);
+      int length = valueArray.length;
+      float[] floatArray = new float[length];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        floatArray[i] = singleValueType.toFloat(valueArray[i]);
+      }
+      return floatArray;
+    }
+  }
+
   public Float[] toFloatArray(Object value) {
+    if (value instanceof Float[]) {
+      return (Float[]) value;
+    }
     if (isSingleValue()) {
       return new Float[]{toFloat(value)};
     } else {
@@ -549,7 +648,28 @@ public enum PinotDataType {
     }
   }
 
+  public double[] toPrimitiveDoubleArray(Object value) {
+    if (value instanceof double[]) {
+      return (double[]) value;
+    }
+    if (isSingleValue()) {
+      return new double[]{toDouble(value)};
+    } else {
+      Object[] valueArray = toObjectArray(value);
+      int length = valueArray.length;
+      double[] doubleArray = new double[length];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        doubleArray[i] = singleValueType.toDouble(valueArray[i]);
+      }
+      return doubleArray;
+    }
+  }
+
   public Double[] toDoubleArray(Object value) {
+    if (value instanceof Double[]) {
+      return (Double[]) value;
+    }
     if (isSingleValue()) {
       return new Double[]{toDouble(value)};
     } else {
@@ -565,6 +685,9 @@ public enum PinotDataType {
   }
 
   public String[] toStringArray(Object value) {
+    if (value instanceof String[]) {
+      return (String[]) value;
+    }
     if (isSingleValue()) {
       return new String[]{toString(value)};
     } else {
@@ -616,12 +739,16 @@ public enum PinotDataType {
         return CHARACTER;
       case SHORT_ARRAY:
         return SHORT;
+      case PRIMITIVE_INT_ARRAY:
       case INTEGER_ARRAY:
         return INTEGER;
+      case PRIMITIVE_LONG_ARRAY:
       case LONG_ARRAY:
         return LONG;
+      case PRIMITIVE_FLOAT_ARRAY:
       case FLOAT_ARRAY:
         return FLOAT;
+      case PRIMITIVE_DOUBLE_ARRAY:
       case DOUBLE_ARRAY:
         return DOUBLE;
       case STRING_ARRAY:
@@ -633,8 +760,12 @@ public enum PinotDataType {
     }
   }
 
-  public static PinotDataType getPinotDataType(FieldSpec fieldSpec) {
-    FieldSpec.DataType dataType = fieldSpec.getDataType();
+  /**
+   * Returns the {@link PinotDataType} for the given {@link FieldSpec} for data ingestion purpose. Returns object array
+   * type for multi-valued types.
+   */
+  public static PinotDataType getPinotDataTypeForIngestion(FieldSpec fieldSpec) {
+    DataType dataType = fieldSpec.getDataType();
     switch (dataType) {
       case INT:
         return fieldSpec.isSingleValueField() ? PinotDataType.INTEGER : PinotDataType.INTEGER_ARRAY;
@@ -658,7 +789,11 @@ public enum PinotDataType {
     }
   }
 
-  public static PinotDataType getPinotDataType(ColumnDataType columnDataType) {
+  /**
+   * Returns the {@link PinotDataType} for the given {@link ColumnDataType} for query execution purpose. Returns
+   * primitive array type for multi-valued types.
+   */
+  public static PinotDataType getPinotDataTypeForExecution(ColumnDataType columnDataType) {
     switch (columnDataType) {
       case INT:
         return INTEGER;
@@ -673,13 +808,13 @@ public enum PinotDataType {
       case BYTES:
         return BYTES;
       case INT_ARRAY:
-        return INTEGER_ARRAY;
+        return PRIMITIVE_INT_ARRAY;
       case LONG_ARRAY:
-        return LONG_ARRAY;
+        return PRIMITIVE_LONG_ARRAY;
       case FLOAT_ARRAY:
-        return FLOAT_ARRAY;
+        return PRIMITIVE_FLOAT_ARRAY;
       case DOUBLE_ARRAY:
-        return DOUBLE_ARRAY;
+        return PRIMITIVE_DOUBLE_ARRAY;
       case STRING_ARRAY:
         return STRING_ARRAY;
       default:

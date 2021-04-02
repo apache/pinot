@@ -71,7 +71,7 @@ public class DataTypeTransformer implements RecordTransformer {
   public DataTypeTransformer(Schema schema) {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
-        _dataTypes.put(fieldSpec.getName(), PinotDataType.getPinotDataType(fieldSpec));
+        _dataTypes.put(fieldSpec.getName(), PinotDataType.getPinotDataTypeForIngestion(fieldSpec));
       }
     }
   }

@@ -35,7 +35,6 @@ import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
@@ -241,25 +240,9 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
 
   private static Comparable convertValue(String stringValue, DataType dataType) {
     try {
-      switch (dataType) {
-        case INT:
-          return Integer.valueOf(stringValue);
-        case LONG:
-          return Long.valueOf(stringValue);
-        case FLOAT:
-          return Float.valueOf(stringValue);
-        case DOUBLE:
-          return Double.valueOf(stringValue);
-        case STRING:
-          return stringValue;
-        case BYTES:
-          return BytesUtils.toByteArray(stringValue);
-        default:
-          throw new IllegalStateException();
-      }
+      return dataType.convertInternal(stringValue);
     } catch (Exception e) {
-      throw new BadQueryRequestException(String.format("Cannot convert value: '%s' to type: %s", stringValue, dataType),
-          e);
+      throw new BadQueryRequestException(e);
     }
   }
 }

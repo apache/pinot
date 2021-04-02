@@ -198,6 +198,8 @@ public class GroupByDataTableReducer implements DataTableReducer {
     }
     Iterator<Record> sortedIterator = indexedTable.iterator();
     DataSchema prePostAggregationDataSchema = getPrePostAggregationDataSchema(dataSchema);
+    ColumnDataType[] columnDataTypes = prePostAggregationDataSchema.getColumnDataTypes();
+    int numColumns = columnDataTypes.length;
     int limit = _queryContext.getLimit();
     List<Object[]> rows = new ArrayList<>(limit);
 
@@ -206,13 +208,15 @@ public class GroupByDataTableReducer implements DataTableReducer {
 
       PostAggregationHandler postAggregationHandler =
           new PostAggregationHandler(_queryContext, prePostAggregationDataSchema);
-      DataSchema resultTableSchema = postAggregationHandler.getResultDataSchema();
       FilterContext havingFilter = _queryContext.getHavingFilter();
       if (havingFilter != null) {
         HavingFilterHandler havingFilterHandler = new HavingFilterHandler(havingFilter, postAggregationHandler);
         while (rows.size() < limit && sortedIterator.hasNext()) {
           Object[] row = sortedIterator.next().getValues();
           extractFinalAggregationResults(row);
+          for (int i = 0; i < numColumns; i++) {
+            row[i] = columnDataTypes[i].convert(row[i]);
+          }
           if (havingFilterHandler.isMatch(row)) {
             rows.add(row);
           }
@@ -221,11 +225,25 @@ public class GroupByDataTableReducer implements DataTableReducer {
         for (int i = 0; i < limit && sortedIterator.hasNext(); i++) {
           Object[] row = sortedIterator.next().getValues();
           extractFinalAggregationResults(row);
+          for (int j = 0; j < numColumns; j++) {
+            row[j] = columnDataTypes[j].convert(row[j]);
+          }
           rows.add(row);
         }
       }
-      rows.replaceAll(postAggregationHandler::getResult);
-      brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, rows));
+      DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
+      ColumnDataType[] resultColumnDataTypes = resultDataSchema.getColumnDataTypes();
+      int numResultColumns = resultColumnDataTypes.length;
+      int numResultRows = rows.size();
+      List<Object[]> resultRows = new ArrayList<>(numResultRows);
+      for (Object[] row : rows) {
+        Object[] resultRow = postAggregationHandler.getResult(row);
+        for (int i = 0; i < numResultColumns; i++) {
+          resultRow[i] = resultColumnDataTypes[i].format(resultRow[i]);
+        }
+        resultRows.add(resultRow);
+      }
+      brokerResponseNative.setResultTable(new ResultTable(resultDataSchema, resultRows));
     } else {
       // PQL query with SQL group-by mode and response format
       // NOTE: For PQL query, keep the order of columns as is (group-by expressions followed by aggregations), no need
@@ -234,6 +252,9 @@ public class GroupByDataTableReducer implements DataTableReducer {
       for (int i = 0; i < limit && sortedIterator.hasNext(); i++) {
         Object[] row = sortedIterator.next().getValues();
         extractFinalAggregationResults(row);
+        for (int j = 0; j < numColumns; j++) {
+          row[j] = columnDataTypes[j].convertAndFormat(row[j]);
+        }
         rows.add(row);
       }
       brokerResponseNative.setResultTable(new ResultTable(prePostAggregationDataSchema, rows));
@@ -246,8 +267,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
   private void extractFinalAggregationResults(Object[] row) {
     for (int i = 0; i < _numAggregationFunctions; i++) {
       int valueIndex = i + _numGroupByExpressions;
-      row[valueIndex] =
-          AggregationFunctionUtils.getSerializableValue(_aggregationFunctions[i].extractFinalResult(row[valueIndex]));
+      row[valueIndex] = _aggregationFunctions[i].extractFinalResult(row[valueIndex]);
     }
   }
 
