@@ -33,8 +33,6 @@ import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 
-import static org.apache.pinot.core.common.datatable.DataTableUtils.decodeString;
-
 
 /**
  * Base implementation of the DataTable interface.
@@ -123,12 +121,12 @@ public abstract class BaseDataTable implements DataTable {
       Map<String, Map<Integer, String>> dictionaryMap = new HashMap<>(numDictionaries);
 
       for (int i = 0; i < numDictionaries; i++) {
-        String column = decodeString(dataInputStream);
+        String column = DataTableUtils.decodeString(dataInputStream);
         int dictionarySize = dataInputStream.readInt();
         Map<Integer, String> dictionary = new HashMap<>(dictionarySize);
         for (int j = 0; j < dictionarySize; j++) {
           int key = dataInputStream.readInt();
-          String value = decodeString(dataInputStream);
+          String value = DataTableUtils.decodeString(dataInputStream);
           dictionary.put(key, value);
         }
         dictionaryMap.put(column, dictionary);
@@ -138,49 +136,59 @@ public abstract class BaseDataTable implements DataTable {
     }
   }
 
+  @Override
   public Map<String, String> getMetadata() {
     return _metadata;
   }
 
+  @Override
   public DataSchema getDataSchema() {
     return _dataSchema;
   }
 
+  @Override
   public int getNumberOfRows() {
     return _numRows;
   }
 
+  @Override
   public int getInt(int rowId, int colId) {
     _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
     return _fixedSizeData.getInt();
   }
 
+  @Override
   public long getLong(int rowId, int colId) {
     _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
     return _fixedSizeData.getLong();
   }
 
+  @Override
   public float getFloat(int rowId, int colId) {
     _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
     return _fixedSizeData.getFloat();
   }
 
+  @Override
   public double getDouble(int rowId, int colId) {
     _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
     return _fixedSizeData.getDouble();
   }
 
+  @Override
   public String getString(int rowId, int colId) {
     _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
     int dictId = _fixedSizeData.getInt();
     return _dictionaryMap.get(_dataSchema.getColumnName(colId)).get(dictId);
   }
 
+  @Override
   public ByteArray getBytes(int rowId, int colId) {
     // NOTE: DataTable V2/V3 uses String to store BYTES value
     return BytesUtils.toByteArray(getString(rowId, colId));
   }
 
+  @Override
   public <T> T getObject(int rowId, int colId) {
     int size = positionCursorInVariableBuffer(rowId, colId);
     int objectTypeValue = _variableSizeData.getInt();
@@ -189,6 +197,7 @@ public abstract class BaseDataTable implements DataTable {
     return ObjectSerDeUtils.deserialize(byteBuffer, objectTypeValue);
   }
 
+  @Override
   public int[] getIntArray(int rowId, int colId) {
     int length = positionCursorInVariableBuffer(rowId, colId);
     int[] ints = new int[length];
@@ -198,6 +207,7 @@ public abstract class BaseDataTable implements DataTable {
     return ints;
   }
 
+  @Override
   public long[] getLongArray(int rowId, int colId) {
     int length = positionCursorInVariableBuffer(rowId, colId);
     long[] longs = new long[length];
@@ -207,6 +217,7 @@ public abstract class BaseDataTable implements DataTable {
     return longs;
   }
 
+  @Override
   public float[] getFloatArray(int rowId, int colId) {
     int length = positionCursorInVariableBuffer(rowId, colId);
     float[] floats = new float[length];
@@ -216,6 +227,7 @@ public abstract class BaseDataTable implements DataTable {
     return floats;
   }
 
+  @Override
   public double[] getDoubleArray(int rowId, int colId) {
     int length = positionCursorInVariableBuffer(rowId, colId);
     double[] doubles = new double[length];
@@ -225,6 +237,7 @@ public abstract class BaseDataTable implements DataTable {
     return doubles;
   }
 
+  @Override
   public String[] getStringArray(int rowId, int colId) {
     int length = positionCursorInVariableBuffer(rowId, colId);
     String[] strings = new String[length];
@@ -241,6 +254,7 @@ public abstract class BaseDataTable implements DataTable {
     return _fixedSizeData.getInt();
   }
 
+  @Override
   public String toString() {
     if (_dataSchema == null) {
       return _metadata.toString();

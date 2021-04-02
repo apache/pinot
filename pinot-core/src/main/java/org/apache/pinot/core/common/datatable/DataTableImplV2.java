@@ -31,9 +31,6 @@ import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.StringUtil;
 
-import static org.apache.pinot.core.common.datatable.DataTableBuilder.VERSION_2;
-import static org.apache.pinot.core.common.datatable.DataTableUtils.decodeString;
-
 
 public class DataTableImplV2 extends BaseDataTable {
   // VERSION
@@ -140,8 +137,8 @@ public class DataTableImplV2 extends BaseDataTable {
       Map<String, String> metadata = new HashMap<>(numEntries);
 
       for (int i = 0; i < numEntries; i++) {
-        String key = decodeString(dataInputStream);
-        String value = decodeString(dataInputStream);
+        String key = DataTableUtils.decodeString(dataInputStream);
+        String value = DataTableUtils.decodeString(dataInputStream);
         metadata.put(key, value);
       }
 
@@ -173,7 +170,7 @@ public class DataTableImplV2 extends BaseDataTable {
       throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
-    dataOutputStream.writeInt(VERSION_2);
+    dataOutputStream.writeInt(DataTableBuilder.VERSION_2);
     dataOutputStream.writeInt(_numRows);
     dataOutputStream.writeInt(_numColumns);
     int dataOffset = HEADER_SIZE;

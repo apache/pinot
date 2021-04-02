@@ -65,7 +65,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.utils.DataTable.MetadataKey.THREAD_CPU_TIME_NS;
 import static org.testng.Assert.*;
 
 
@@ -1559,7 +1558,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       if (responseType.equals(CommonConstants.Query.Response.ResponseType.DATA)) {
         // verify the returned data table metadata only contains "threadCpuTimeNs".
         Map<String, String> metadata = dataTable.getMetadata();
-        assertTrue(metadata.size() == 1 && metadata.containsKey(THREAD_CPU_TIME_NS.getName()));
+        assertTrue(metadata.size() == 1 && metadata.containsKey(DataTable.MetadataKey.THREAD_CPU_TIME_NS.getName()));
         assertNotNull(dataTable.getDataSchema());
         numTotalDocs += dataTable.getNumberOfRows();
       } else {
