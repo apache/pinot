@@ -43,6 +43,7 @@ import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
@@ -55,7 +56,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.utils.DataTable.MetadataKey.TABLE;
 import static org.apache.pinot.core.query.scheduler.TestHelper.createQueryRequest;
 import static org.apache.pinot.core.query.scheduler.TestHelper.createServerQueryRequest;
 import static org.testng.Assert.assertEquals;
@@ -149,7 +149,7 @@ public class PrioritySchedulerTest {
     validationBarrier.await();
     byte[] resultData = result.get();
     DataTable table = DataTableFactory.getDataTable(resultData);
-    assertEquals(table.getMetadata().get(TABLE.getName()), "1");
+    assertEquals(table.getMetadata().get(MetadataKey.TABLE.getName()), "1");
     // verify that accounting is handled right
     assertEquals(group.numPending(), 0);
     assertEquals(group.getThreadsInUse(), 0);
@@ -227,7 +227,7 @@ public class PrioritySchedulerTest {
     // start is not called
     DataTable response = DataTableFactory.getDataTable(result.get());
     assertTrue(response.getExceptions().containsKey(QueryException.SERVER_SCHEDULER_DOWN_ERROR.getErrorCode()));
-    assertFalse(response.getMetadata().containsKey(TABLE.getName()));
+    assertFalse(response.getMetadata().containsKey(MetadataKey.TABLE.getName()));
     scheduler.stop();
   }
 
@@ -307,7 +307,7 @@ public class PrioritySchedulerTest {
         }
       }
       DataTable result = DataTableBuilder.getEmptyDataTable();
-      result.getMetadata().put(TABLE.getName(), queryRequest.getTableNameWithType());
+      result.getMetadata().put(MetadataKey.TABLE.getName(), queryRequest.getTableNameWithType());
       if (useBarrier) {
         try {
           validationBarrier.await();

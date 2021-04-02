@@ -22,9 +22,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.apache.pinot.common.utils.DataTable;
 
-import static org.apache.pinot.core.common.datatable.DataTableBuilder.VERSION_2;
-import static org.apache.pinot.core.common.datatable.DataTableBuilder.VERSION_3;
-
 
 public class DataTableFactory {
   private DataTableFactory() {
@@ -34,9 +31,9 @@ public class DataTableFactory {
       throws IOException {
     int version = byteBuffer.getInt();
     switch (version) {
-      case VERSION_2:
+      case DataTableBuilder.VERSION_2:
         return new DataTableImplV2(byteBuffer);
-      case VERSION_3:
+      case DataTableBuilder.VERSION_3:
         return new DataTableImplV3(byteBuffer);
       default:
         throw new UnsupportedOperationException("Unsupported data table version: " + version);

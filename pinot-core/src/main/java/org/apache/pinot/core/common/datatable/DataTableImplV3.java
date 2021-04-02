@@ -34,12 +34,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 
-import static org.apache.pinot.common.utils.DataTable.MetadataKey.THREAD_CPU_TIME_NS;
-import static org.apache.pinot.core.common.datatable.DataTableBuilder.VERSION_3;
-import static org.apache.pinot.core.common.datatable.DataTableUtils.decodeInt;
-import static org.apache.pinot.core.common.datatable.DataTableUtils.decodeLong;
-import static org.apache.pinot.core.common.datatable.DataTableUtils.decodeString;
-
 
 /**
  * Datatable V3 implementation.
@@ -197,7 +191,7 @@ public class DataTableImplV3 extends BaseDataTable {
 
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
-    dataOutputStream.writeInt(VERSION_3);
+    dataOutputStream.writeInt(DataTableBuilder.VERSION_3);
     dataOutputStream.writeInt(_numRows);
     dataOutputStream.writeInt(_numColumns);
     int dataOffset = HEADER_SIZE;
@@ -273,9 +267,9 @@ public class DataTableImplV3 extends BaseDataTable {
     // TODO: currently log/emit a total thread cpu time for query execution time and data table serialization time.
     //  Figure out a way to log/emit separately. Probably via providing an API on the DataTable to get/set query
     //  context, which is supposed to be used at server side only.
-    long threadCpuTimeNs =
-        Long.parseLong(getMetadata().getOrDefault(THREAD_CPU_TIME_NS.getName(), "0")) + responseSerializationCpuTimeNs;
-    getMetadata().put(THREAD_CPU_TIME_NS.getName(), String.valueOf(threadCpuTimeNs));
+    long threadCpuTimeNs = Long.parseLong(getMetadata().getOrDefault(MetadataKey.THREAD_CPU_TIME_NS.getName(), "0"))
+        + responseSerializationCpuTimeNs;
+    getMetadata().put(MetadataKey.THREAD_CPU_TIME_NS.getName(), String.valueOf(threadCpuTimeNs));
 
     // Write metadata: length followed by actual metadata bytes.
     byte[] metadataBytes = serializeMetadata();
@@ -348,13 +342,13 @@ public class DataTableImplV3 extends BaseDataTable {
           continue;
         }
         if (key.getValueType() == MetadataValueType.INT) {
-          String value = String.valueOf(decodeInt(dataInputStream));
+          String value = String.valueOf(DataTableUtils.decodeInt(dataInputStream));
           metadata.put(key.getName(), value);
         } else if (key.getValueType() == MetadataValueType.LONG) {
-          String value = String.valueOf(decodeLong(dataInputStream));
+          String value = String.valueOf(DataTableUtils.decodeLong(dataInputStream));
           metadata.put(key.getName(), value);
         } else {
-          String value = String.valueOf(decodeString(dataInputStream));
+          String value = String.valueOf(DataTableUtils.decodeString(dataInputStream));
           metadata.put(key.getName(), value);
         }
       }
@@ -389,7 +383,7 @@ public class DataTableImplV3 extends BaseDataTable {
       Map<Integer, String> exceptions = new HashMap<>(numExceptions);
       for (int i = 0; i < numExceptions; i++) {
         int errCode = dataInputStream.readInt();
-        String errMessage = decodeString(dataInputStream);
+        String errMessage = DataTableUtils.decodeString(dataInputStream);
         exceptions.put(errCode, errMessage);
       }
       return exceptions;
