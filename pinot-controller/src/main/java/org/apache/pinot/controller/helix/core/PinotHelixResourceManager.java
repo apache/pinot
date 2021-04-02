@@ -1659,6 +1659,11 @@ public class PinotHelixResourceManager {
       Preconditions.checkState(isUpsertTable(tableNameWithType),
           "Upload segment " + segmentName + " for non upsert enabled realtime table " + tableNameWithType
               + " is not supported");
+      // In an upsert enabled LLC realtime table, all segments of the same partition are collocated on the same server
+      // -- consuming or completed. So it is fine to use CONSUMING as the InstancePartitionsType.
+      // TODO When upload segments is open to all realtime tables, we should change the type to COMPLETED instead.
+      // In addition, RealtimeSegmentAssignment.assignSegment(..) method should be updated so that the method does not
+      // assign segments to CONSUMING instance partition only.
       instancePartitionsType = InstancePartitionsType.CONSUMING;
       // Build the realtime segment zk metadata with necessary fields.
       LLCRealtimeSegmentZKMetadata segmentZKMetadata = new LLCRealtimeSegmentZKMetadata();

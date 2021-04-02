@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.util;
+package org.apache.pinot.common.utils;
 
 import com.google.common.base.Preconditions;
 import java.util.Set;
@@ -24,12 +24,13 @@ import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import org.apache.pinot.common.utils.LLCSegmentName;
 
 
 // Util functions related to segments.
 public class SegmentUtils {
   // Returns the partition id of a realtime segment based segment name and segment metadata info retrieved via Helix.
+  // Important: The method is costly because it may read data from zookeeper. Do not use it in any query execution
+  // path.
   public static int getRealtimeSegmentPartitionId(String segmentName, String realtimeTableName,
       HelixManager helixManager, String partitionColumn) {
     // A fast path if the segmentName is a LLC segment name and we can get the partition id from the name directly.
@@ -60,8 +61,8 @@ public class SegmentUtils {
         segmentName, realtimeTableName, partitionColumn);
     Set<Integer> partitions = partitionMetadata.getPartitions();
     Preconditions.checkState(partitions.size() == 1,
-        "Segment ZK metadata for segment: %s of table: %s contains multiple partitions for column: %s with %s", segmentName,
-        realtimeTableName, partitionColumn, partitions);
+        "Segment ZK metadata for segment: %s of table: %s contains multiple partitions for column: %s with %s",
+        segmentName, realtimeTableName, partitionColumn, partitions);
     return partitions.iterator().next();
   }
 }

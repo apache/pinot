@@ -74,9 +74,9 @@ public class ZKOperator {
       return;
     }
 
-    LOGGER.info("Segment {} from table {} already exists, refreshing if necessary", segmentName, tableNameWithType);
     // TODO Allow segment refreshing for realtime tables.
     if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
+      LOGGER.info("Segment {} from table {} already exists, refreshing if necessary", segmentName, tableNameWithType);
       throw new ControllerApplicationException(LOGGER,
           "Refresh existing segment " + segmentName + " for realtime table " + tableNameWithType + " is not yet supported ",
           Response.Status.NOT_IMPLEMENTED
