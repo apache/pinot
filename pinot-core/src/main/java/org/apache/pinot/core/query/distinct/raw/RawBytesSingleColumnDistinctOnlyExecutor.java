@@ -22,6 +22,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -30,8 +31,8 @@ import org.apache.pinot.spi.utils.ByteArray;
  */
 public class RawBytesSingleColumnDistinctOnlyExecutor extends BaseRawBytesSingleColumnDistinctExecutor {
 
-  public RawBytesSingleColumnDistinctOnlyExecutor(ExpressionContext expression, int limit) {
-    super(expression, limit);
+  public RawBytesSingleColumnDistinctOnlyExecutor(ExpressionContext expression, DataType dataType, int limit) {
+    super(expression, dataType, limit);
   }
 
   @Override

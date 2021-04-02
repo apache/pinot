@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
+import java.sql.Timestamp;
 import java.util.Collections;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -40,6 +41,7 @@ public class RecordTransformerTest {
       // For data type conversion
       .addSingleValueDimension("svInt", DataType.INT).addSingleValueDimension("svLong", DataType.LONG)
       .addSingleValueDimension("svFloat", DataType.FLOAT).addSingleValueDimension("svDouble", DataType.DOUBLE)
+      .addSingleValueDimension("svBoolean", DataType.BOOLEAN).addSingleValueDimension("svTimestamp", DataType.TIMESTAMP)
       .addSingleValueDimension("svBytes", DataType.BYTES).addMultiValueDimension("mvInt", DataType.INT)
       .addMultiValueDimension("mvLong", DataType.LONG).addMultiValueDimension("mvFloat", DataType.FLOAT)
       .addMultiValueDimension("mvDouble", DataType.DOUBLE)
@@ -63,6 +65,8 @@ public class RecordTransformerTest {
     record.putValue("svLong", (char) 123);
     record.putValue("svFloat", Collections.singletonList((short) 123));
     record.putValue("svDouble", new String[]{"123"});
+    record.putValue("svBoolean", "true");
+    record.putValue("svTimestamp", "2020-02-02 22:22:22.222");
     record.putValue("svBytes", "7b7b"/*new byte[]{123, 123}*/);
     record.putValue("mvInt", new Object[]{123L});
     record.putValue("mvLong", Collections.singletonList(123f));
@@ -130,6 +134,8 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("svLong"), 123L);
       assertEquals(record.getValue("svFloat"), 123f);
       assertEquals(record.getValue("svDouble"), 123d);
+      assertEquals(record.getValue("svBoolean"), 1);
+      assertEquals(record.getValue("svTimestamp"), Timestamp.valueOf("2020-02-02 22:22:22.222").getTime());
       assertEquals(record.getValue("svBytes"), new byte[]{123, 123});
       assertEquals(record.getValue("mvInt"), new Object[]{123});
       assertEquals(record.getValue("mvLong"), new Object[]{123L});
@@ -172,6 +178,8 @@ public class RecordTransformerTest {
     assertEquals(record.getValue("svLong"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
     assertEquals(record.getValue("svFloat"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT);
     assertEquals(record.getValue("svDouble"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE);
+    assertEquals(record.getValue("svBoolean"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BOOLEAN);
+    assertEquals(record.getValue("svTimestamp"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP);
     assertEquals(record.getValue("svBytes"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES);
     assertEquals(record.getValue("mvInt"), new Object[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT});
     assertEquals(record.getValue("mvLong"), new Object[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG});
@@ -188,6 +196,8 @@ public class RecordTransformerTest {
     assertTrue(record.isNullValue("svLong"));
     assertTrue(record.isNullValue("svFloat"));
     assertTrue(record.isNullValue("svDouble"));
+    assertTrue(record.isNullValue("svBoolean"));
+    assertTrue(record.isNullValue("svTimestamp"));
     assertTrue(record.isNullValue("svBytes"));
     assertTrue(record.isNullValue("mvInt"));
     assertTrue(record.isNullValue("mvLong"));
@@ -209,6 +219,8 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("svLong"), 123L);
       assertEquals(record.getValue("svFloat"), 123f);
       assertEquals(record.getValue("svDouble"), 123d);
+      assertEquals(record.getValue("svBoolean"), 1);
+      assertEquals(record.getValue("svTimestamp"), Timestamp.valueOf("2020-02-02 22:22:22.222").getTime());
       assertEquals(record.getValue("svBytes"), new byte[]{123, 123});
       assertEquals(record.getValue("mvInt"), new Object[]{123});
       assertEquals(record.getValue("mvLong"), new Object[]{123L});
@@ -229,6 +241,8 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("svLong"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
       assertEquals(record.getValue("svFloat"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT);
       assertEquals(record.getValue("svDouble"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE);
+      assertEquals(record.getValue("svBoolean"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BOOLEAN);
+      assertEquals(record.getValue("svTimestamp"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP);
       assertEquals(record.getValue("svBytes"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES);
       assertEquals(record.getValue("mvInt"), new Object[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT});
       assertEquals(record.getValue("mvLong"), new Object[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG});

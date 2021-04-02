@@ -248,7 +248,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     }
 
     int length = metadata.getCardinality();
-    switch (dataType) {
+    switch (dataType.getStoredType()) {
       case INT:
         return (loadOnHeap) ? new OnHeapIntDictionary(dictionaryBuffer, length)
             : new IntDictionary(dictionaryBuffer, length);
@@ -280,9 +280,8 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     }
   }
 
-  private static ForwardIndexReader<?> loadRawForwardIndex(PinotDataBuffer forwardIndexBuffer,
-      DataType dataType) {
-    switch (dataType) {
+  private static ForwardIndexReader<?> loadRawForwardIndex(PinotDataBuffer forwardIndexBuffer, DataType dataType) {
+    switch (dataType.getStoredType()) {
       case INT:
       case LONG:
       case FLOAT:

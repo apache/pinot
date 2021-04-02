@@ -52,7 +52,7 @@ public class DefaultNullValueVirtualColumnProvider extends BaseVirtualColumnProv
   @Override
   public Dictionary buildDictionary(VirtualColumnContext context) {
     FieldSpec fieldSpec = context.getFieldSpec();
-    switch (fieldSpec.getDataType()) {
+    switch (fieldSpec.getDataType().getStoredType()) {
       case INT:
         return new ConstantValueIntDictionary((int) fieldSpec.getDefaultNullValue());
       case LONG:

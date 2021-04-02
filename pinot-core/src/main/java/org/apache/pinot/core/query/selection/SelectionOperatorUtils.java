@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.selection;
 
 import java.io.Serializable;
+import java.sql.Timestamp;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
@@ -187,13 +188,16 @@ public class SelectionOperatorUtils {
    * @return data schema for final results
    */
   public static DataSchema getResultTableDataSchema(DataSchema dataSchema, List<String> selectionColumns) {
-    int numColumns = selectionColumns.size();
     Map<String, ColumnDataType> columnNameToDataType = new HashMap<>();
-    ColumnDataType[] finalColumnDataTypes = new ColumnDataType[numColumns];
-    for (int i = 0; i < dataSchema.size(); i++) {
-      columnNameToDataType.put(dataSchema.getColumnName(i), dataSchema.getColumnDataType(i));
-    }
+    String[] columnNames = dataSchema.getColumnNames();
+    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+    int numColumns = columnNames.length;
     for (int i = 0; i < numColumns; i++) {
+      columnNameToDataType.put(columnNames[i], columnDataTypes[i]);
+    }
+    int numResultColumns = selectionColumns.size();
+    ColumnDataType[] finalColumnDataTypes = new ColumnDataType[numResultColumns];
+    for (int i = 0; i < numResultColumns; i++) {
       finalColumnDataTypes[i] = columnNameToDataType.get(selectionColumns.get(i));
     }
     return new DataSchema(selectionColumns.toArray(new String[0]), finalColumnDataTypes);
@@ -246,15 +250,15 @@ public class SelectionOperatorUtils {
    */
   public static DataTable getDataTableFromRows(Collection<Object[]> rows, DataSchema dataSchema)
       throws Exception {
-    int numColumns = dataSchema.size();
+    ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
+    int numColumns = storedColumnDataTypes.length;
 
     DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);
     for (Object[] row : rows) {
       dataTableBuilder.startRow();
       for (int i = 0; i < numColumns; i++) {
         Object columnValue = row[i];
-        ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
-        switch (columnDataType) {
+        switch (storedColumnDataTypes[i]) {
           // Single-value column
           case INT:
             dataTableBuilder.setColumn(i, ((Number) columnValue).intValue());
@@ -323,8 +327,9 @@ public class SelectionOperatorUtils {
             break;
 
           default:
-            throw new UnsupportedOperationException(
-                "Unsupported data type: " + columnDataType + " for column: " + dataSchema.getColumnName(i));
+            throw new IllegalStateException(String
+                .format("Unsupported data type: %s for column: %s", storedColumnDataTypes[i],
+                    dataSchema.getColumnName(i)));
         }
       }
       dataTableBuilder.finishRow();
@@ -342,12 +347,12 @@ public class SelectionOperatorUtils {
    */
   public static Object[] extractRowFromDataTable(DataTable dataTable, int rowId) {
     DataSchema dataSchema = dataTable.getDataSchema();
-    int numColumns = dataSchema.size();
+    ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
+    int numColumns = storedColumnDataTypes.length;
 
     Object[] row = new Object[numColumns];
     for (int i = 0; i < numColumns; i++) {
-      ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
-      switch (columnDataType) {
+      switch (storedColumnDataTypes[i]) {
         // Single-value column
         case INT:
           row[i] = dataTable.getInt(rowId, i);
@@ -386,8 +391,9 @@ public class SelectionOperatorUtils {
           break;
 
         default:
-          throw new UnsupportedOperationException(
-              "Unsupported column data type: " + columnDataType + " for column: " + dataSchema.getColumnName(i));
+          throw new IllegalStateException(String
+              .format("Unsupported data type: %s for column: %s", storedColumnDataTypes[i],
+                  dataSchema.getColumnName(i)));
       }
     }
 
@@ -519,6 +525,10 @@ public class SelectionOperatorUtils {
         return THREAD_LOCAL_FLOAT_FORMAT.get().format(((Number) value).floatValue());
       case DOUBLE:
         return THREAD_LOCAL_DOUBLE_FORMAT.get().format(((Number) value).doubleValue());
+      case BOOLEAN:
+        return (Integer) value == 1 ? "true" : "false";
+      case TIMESTAMP:
+        return new Timestamp((Long) value).toString();
       // NOTE: Return String for BYTES columns for backward-compatibility
       case BYTES:
         return ((ByteArray) value).toHexString();

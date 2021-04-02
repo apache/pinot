@@ -42,20 +42,23 @@ public class PredicateEvaluatorProvider {
         // dictionary based predicate evaluators
         switch (predicate.getType()) {
           case EQ:
-            return EqualsPredicateEvaluatorFactory.newDictionaryBasedEvaluator((EqPredicate) predicate, dictionary);
+            return EqualsPredicateEvaluatorFactory
+                .newDictionaryBasedEvaluator((EqPredicate) predicate, dictionary, dataType);
           case NOT_EQ:
             return NotEqualsPredicateEvaluatorFactory
-                .newDictionaryBasedEvaluator((NotEqPredicate) predicate, dictionary);
+                .newDictionaryBasedEvaluator((NotEqPredicate) predicate, dictionary, dataType);
           case IN:
-            return InPredicateEvaluatorFactory.newDictionaryBasedEvaluator((InPredicate) predicate, dictionary);
+            return InPredicateEvaluatorFactory
+                .newDictionaryBasedEvaluator((InPredicate) predicate, dictionary, dataType);
           case NOT_IN:
-            return NotInPredicateEvaluatorFactory.newDictionaryBasedEvaluator((NotInPredicate) predicate, dictionary);
+            return NotInPredicateEvaluatorFactory
+                .newDictionaryBasedEvaluator((NotInPredicate) predicate, dictionary, dataType);
           case RANGE:
             return RangePredicateEvaluatorFactory
                 .newDictionaryBasedEvaluator((RangePredicate) predicate, dictionary, dataType);
           case REGEXP_LIKE:
             return RegexpLikePredicateEvaluatorFactory
-                .newDictionaryBasedEvaluator((RegexpLikePredicate) predicate, dictionary);
+                .newDictionaryBasedEvaluator((RegexpLikePredicate) predicate, dictionary, dataType);
           default:
             throw new UnsupportedOperationException("Unsupported predicate type: " + predicate.getType());
         }

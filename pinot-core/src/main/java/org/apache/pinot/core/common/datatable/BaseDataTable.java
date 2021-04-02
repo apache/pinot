@@ -27,6 +27,7 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -264,10 +265,11 @@ public abstract class BaseDataTable implements DataTable {
     stringBuilder.append(_dataSchema.toString()).append('\n');
     stringBuilder.append("numRows: ").append(_numRows).append('\n');
 
+    ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
     _fixedSizeData.position(0);
     for (int rowId = 0; rowId < _numRows; rowId++) {
       for (int colId = 0; colId < _numColumns; colId++) {
-        switch (_dataSchema.getColumnDataType(colId)) {
+        switch (storedColumnDataTypes[colId]) {
           case INT:
             stringBuilder.append(_fixedSizeData.getInt());
             break;

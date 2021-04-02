@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.data;
 
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -52,6 +53,9 @@ public class DateTimeFormatSpecTest {
     entries.add(new Object[]{"1:MILLISECONDS:EPOCH", "1498892400000", 1498892400000L});
     entries.add(new Object[]{"1:HOURS:EPOCH", "0", 0L});
     entries.add(new Object[]{"5:MINUTES:EPOCH", "4996308", 1498892400000L});
+    entries.add(new Object[]{"1:MILLISECONDS:TIMESTAMP", "2017-07-01 00:00:00", Timestamp
+        .valueOf("2017-07-01 00:00:00").getTime()});
+    entries.add(new Object[]{"1:MILLISECONDS:TIMESTAMP", "1498892400000", 1498892400000L});
     entries.add(new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "20170701", DateTimeFormat.forPattern("yyyyMMdd")
         .withZoneUTC().parseMillis("20170701")});
     entries.add(new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(America/Chicago)", "20170701", DateTimeFormat
@@ -82,6 +86,8 @@ public class DateTimeFormatSpecTest {
     entries.add(new Object[]{"1:MILLISECONDS:EPOCH", 1498892400000L, "1498892400000"});
     entries.add(new Object[]{"1:HOURS:EPOCH", 0L, "0"});
     entries.add(new Object[]{"5:MINUTES:EPOCH", 1498892400000L, "4996308"});
+    entries.add(new Object[]{"1:MILLISECONDS:TIMESTAMP", Timestamp
+        .valueOf("2017-07-01 00:00:00").getTime(), "2017-07-01 00:00:00.0"});
     entries.add(new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", 1498892400000L, DateTimeFormat.forPattern("yyyyMMdd")
         .withZoneUTC().print(1498892400000L)});
     entries.add(new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(America/New_York)", 1498892400000L, DateTimeFormat

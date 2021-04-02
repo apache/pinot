@@ -26,6 +26,7 @@ import org.apache.avro.SchemaBuilder;
 import org.apache.avro.generic.GenericData;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorFramework;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
 
@@ -74,9 +75,9 @@ public final class SegmentProcessorAvroUtils {
 
     for (FieldSpec fieldSpec : pinotSchema.getAllFieldSpecs()) {
       String name = fieldSpec.getName();
-      FieldSpec.DataType dataType = fieldSpec.getDataType();
+      DataType storedType = fieldSpec.getDataType().getStoredType();
       if (fieldSpec.isSingleValueField()) {
-        switch (dataType) {
+        switch (storedType) {
           case INT:
             fieldAssembler = fieldAssembler.name(name).type().intType().noDefault();
             break;
@@ -96,10 +97,10 @@ public final class SegmentProcessorAvroUtils {
             fieldAssembler = fieldAssembler.name(name).type().bytesType().noDefault();
             break;
           default:
-            throw new RuntimeException("Unsupported data type: " + dataType);
+            throw new RuntimeException("Unsupported data type: " + storedType);
         }
       } else {
-        switch (dataType) {
+        switch (storedType) {
           case INT:
             fieldAssembler = fieldAssembler.name(name).type().array().items().intType().noDefault();
             break;
@@ -116,7 +117,7 @@ public final class SegmentProcessorAvroUtils {
             fieldAssembler = fieldAssembler.name(name).type().array().items().stringType().noDefault();
             break;
           default:
-            throw new RuntimeException("Unsupported data type: " + dataType);
+            throw new RuntimeException("Unsupported data type: " + storedType);
         }
       }
     }

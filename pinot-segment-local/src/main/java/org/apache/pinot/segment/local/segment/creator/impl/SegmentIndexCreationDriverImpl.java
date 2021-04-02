@@ -57,6 +57,7 @@ import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.IngestionSchemaValidator;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.SchemaValidatorFactory;
@@ -388,10 +389,11 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       }
 
       String columnName = fieldSpec.getName();
+      DataType storedType = fieldSpec.getDataType().getStoredType();
       ColumnStatistics columnProfile = segmentStats.getColumnProfileFor(columnName);
       boolean useVarLengthDictionary = varLengthDictionaryColumns.contains(columnName);
       Object defaultNullValue = fieldSpec.getDefaultNullValue();
-      if (fieldSpec.getDataType() == FieldSpec.DataType.BYTES) {
+      if (storedType == DataType.BYTES) {
         if (!columnProfile.isFixedLength()) {
           useVarLengthDictionary = true;
         }

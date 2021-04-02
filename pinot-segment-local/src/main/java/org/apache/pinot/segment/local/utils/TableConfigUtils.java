@@ -48,6 +48,7 @@ import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -492,7 +493,7 @@ public final class TableConfigUtils {
     if (indexingConfig.getVarLengthDictionaryColumns() != null) {
       for (String varLenDictCol : indexingConfig.getVarLengthDictionaryColumns()) {
         FieldSpec varLenDictFieldSpec = schema.getFieldSpecFor(varLenDictCol);
-        switch (varLenDictFieldSpec.getDataType()) {
+        switch (varLenDictFieldSpec.getDataType().getStoredType()) {
           case STRING:
           case BYTES:
             continue;
@@ -506,10 +507,10 @@ public final class TableConfigUtils {
 
     if (indexingConfig.getJsonIndexColumns() != null) {
       for (String jsonIndexCol : indexingConfig.getJsonIndexColumns()) {
-        Preconditions.checkState(
-            schema.getFieldSpecFor(jsonIndexCol).isSingleValueField() && schema.getFieldSpecFor(jsonIndexCol)
-                .getDataType().equals(FieldSpec.DataType.STRING),
-            "Json index can only be created for single value String column. Invalid for column: " + jsonIndexCol);
+        FieldSpec fieldSpec = schema.getFieldSpecFor(jsonIndexCol);
+        Preconditions
+            .checkState(fieldSpec.isSingleValueField() && fieldSpec.getDataType().getStoredType() == DataType.STRING,
+                "Json index can only be created for single value String column. Invalid for column: %s", jsonIndexCol);
       }
     }
   }
@@ -545,12 +546,12 @@ public final class TableConfigUtils {
           Preconditions.checkArgument(fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY,
               "FST Index is only enabled on dictionary encoded columns");
           Preconditions.checkState(
-              fieldConfigColSpec.isSingleValueField() && fieldConfigColSpec.getDataType() == FieldSpec.DataType.STRING,
+              fieldConfigColSpec.isSingleValueField() && fieldConfigColSpec.getDataType() == DataType.STRING,
               "FST Index is only supported for single value string columns");
           break;
         case TEXT:
           Preconditions.checkState(
-              fieldConfigColSpec.isSingleValueField() && fieldConfigColSpec.getDataType() == FieldSpec.DataType.STRING,
+              fieldConfigColSpec.isSingleValueField() && fieldConfigColSpec.getDataType() == DataType.STRING,
               "TEXT Index is only supported for single value string columns");
       }
     }

@@ -24,6 +24,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
@@ -32,8 +33,8 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 public class DictionaryBasedMultiColumnDistinctOnlyExecutor extends BaseDictionaryBasedMultiColumnDistinctExecutor {
 
   public DictionaryBasedMultiColumnDistinctOnlyExecutor(List<ExpressionContext> expressions,
-      List<Dictionary> dictionaries, int limit) {
-    super(expressions, dictionaries, limit);
+      List<Dictionary> dictionaries, List<DataType> dataTypes, int limit) {
+    super(expressions, dictionaries, dataTypes, limit);
   }
 
   @Override
