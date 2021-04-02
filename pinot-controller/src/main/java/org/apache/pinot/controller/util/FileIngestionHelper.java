@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.controller.api.resources.SuccessResponse;
 import org.apache.pinot.core.util.IngestionUtils;
@@ -113,6 +114,15 @@ public class FileIngestionHelper {
       Map<String, String> batchConfigMapOverride = new HashMap<>(_batchConfig.getBatchConfigMap());
       batchConfigMapOverride.put(BatchConfigProperties.INPUT_DIR_URI, inputFile.getAbsolutePath());
       batchConfigMapOverride.put(BatchConfigProperties.OUTPUT_DIR_URI, outputDir.getAbsolutePath());
+
+      String segmentNamePostfixProp = String.format("%s.%s", BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX,
+          BatchConfigProperties.SEGMENT_NAME_POSTFIX);
+      if (StringUtils.isBlank(batchConfigMapOverride.get(segmentNamePostfixProp))) {
+        // Default segmentNameGenerator is SIMPLE.
+        // Adding this suffix to prevent creating a segment with the same name as an existing segment,
+        // if a file with the same time range is received again
+        batchConfigMapOverride.put(segmentNamePostfixProp, String.valueOf(System.currentTimeMillis()));
+      }
       BatchIngestionConfig batchIngestionConfigOverride =
           new BatchIngestionConfig(Lists.newArrayList(batchConfigMapOverride),
               IngestionConfigUtils.getBatchSegmentIngestionType(_tableConfig),
