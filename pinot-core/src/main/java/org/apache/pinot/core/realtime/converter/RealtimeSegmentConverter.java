@@ -27,14 +27,12 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
-import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
-import org.apache.pinot.core.upsert.TableUpsertMetadataManager;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -97,11 +95,11 @@ public class RealtimeSegmentConverter {
     }
     if (_noDictionaryColumns != null) {
       genConfig.setRawIndexCreationColumns(_noDictionaryColumns);
-      Map<String, ChunkCompressorFactory.CompressionType> columnToCompressionType = new HashMap<>();
+      Map<String, ChunkCompressionType> columnToCompressionType = new HashMap<>();
       for (String column : _noDictionaryColumns) {
         FieldSpec fieldSpec = _dataSchema.getFieldSpecFor(column);
         if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.METRIC)) {
-          columnToCompressionType.put(column, ChunkCompressorFactory.CompressionType.PASS_THROUGH);
+          columnToCompressionType.put(column, ChunkCompressionType.PASS_THROUGH);
         }
       }
       genConfig.setRawIndexCompressionType(columnToCompressionType);

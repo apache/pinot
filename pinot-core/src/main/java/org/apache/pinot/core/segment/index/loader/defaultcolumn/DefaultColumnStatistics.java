@@ -19,8 +19,8 @@
 package org.apache.pinot.core.segment.index.loader.defaultcolumn;
 
 import java.util.Set;
-import org.apache.pinot.core.data.partition.PartitionFunction;
-import org.apache.pinot.core.segment.creator.ColumnStatistics;
+import org.apache.pinot.segment.spi.creator.ColumnStatistics;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 
 
 public class DefaultColumnStatistics implements ColumnStatistics {

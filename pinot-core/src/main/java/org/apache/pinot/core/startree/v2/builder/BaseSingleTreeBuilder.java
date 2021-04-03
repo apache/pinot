@@ -30,27 +30,27 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
-import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.core.data.aggregator.ValueAggregator;
 import org.apache.pinot.core.data.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.core.data.readers.PinotSegmentColumnReader;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
-import org.apache.pinot.core.io.compression.ChunkCompressorFactory.CompressionType;
-import org.apache.pinot.core.segment.creator.ForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.core.startree.StarTreeBuilderUtils;
 import org.apache.pinot.core.startree.StarTreeBuilderUtils.TreeNode;
-import org.apache.pinot.core.startree.StarTreeNode;
-import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.StarTreeNode;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.MetadataKey;
-import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.STAR_IN_FORWARD_INDEX;
-import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.STAR_TREE_INDEX_FILE_NAME;
+import static org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants.MetadataKey;
+import static org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants.STAR_IN_FORWARD_INDEX;
+import static org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants.STAR_TREE_INDEX_FILE_NAME;
 
 
 /**
@@ -468,11 +468,11 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       DataType valueType = valueAggregator.getAggregatedValueType();
       if (valueType == DataType.BYTES) {
         metricIndexCreators[i] =
-            new SingleValueVarByteRawIndexCreator(_outputDir, CompressionType.PASS_THROUGH, metric, _numDocs,
+            new SingleValueVarByteRawIndexCreator(_outputDir, ChunkCompressionType.PASS_THROUGH, metric, _numDocs,
                 DataType.BYTES, valueAggregator.getMaxAggregatedValueByteSize());
       } else {
         metricIndexCreators[i] =
-            new SingleValueFixedByteRawIndexCreator(_outputDir, CompressionType.PASS_THROUGH, metric, _numDocs,
+            new SingleValueFixedByteRawIndexCreator(_outputDir, ChunkCompressionType.PASS_THROUGH, metric, _numDocs,
                 valueType);
       }
     }

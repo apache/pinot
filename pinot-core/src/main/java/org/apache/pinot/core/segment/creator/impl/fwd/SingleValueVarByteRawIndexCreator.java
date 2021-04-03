@@ -21,11 +21,11 @@ package org.apache.pinot.core.segment.creator.impl.fwd;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
-import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.core.io.writer.impl.VarByteChunkSVForwardIndexWriter;
-import org.apache.pinot.core.segment.creator.ForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -50,7 +50,7 @@ public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
    * @param maxLength length of longest entry (in bytes)
    * @throws IOException
    */
-  public SingleValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressorFactory.CompressionType compressionType,
+  public SingleValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType,
       String column, int totalDocs, DataType valueType, int maxLength)
       throws IOException {
     this(baseIndexDir, compressionType, column, totalDocs, valueType, maxLength, false,
@@ -69,7 +69,7 @@ public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
    * @param writerVersion writer format version
    * @throws IOException
    */
-  public SingleValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressorFactory.CompressionType compressionType,
+  public SingleValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType,
       String column, int totalDocs, DataType valueType, int maxLength, boolean deriveNumDocsPerChunk, int writerVersion)
       throws IOException {
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);

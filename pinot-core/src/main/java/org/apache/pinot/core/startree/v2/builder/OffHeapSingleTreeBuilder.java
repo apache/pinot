@@ -31,10 +31,10 @@ import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 
-import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.STAR_IN_FORWARD_INDEX;
+import static org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants.STAR_IN_FORWARD_INDEX;
 
 
 /**

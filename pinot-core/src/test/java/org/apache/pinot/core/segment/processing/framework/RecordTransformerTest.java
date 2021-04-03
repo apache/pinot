@@ -30,7 +30,9 @@ import org.apache.pinot.core.segment.processing.transformer.TransformFunctionRec
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 /**

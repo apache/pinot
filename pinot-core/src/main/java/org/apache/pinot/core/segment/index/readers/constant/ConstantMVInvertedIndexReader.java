@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.segment.index.readers.constant;
 
-import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 

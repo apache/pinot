@@ -29,8 +29,8 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
-import org.apache.pinot.core.startree.v2.StarTreeV2;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
 
 public class StarTreeTransformPlanNode implements PlanNode {

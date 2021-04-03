@@ -73,7 +73,7 @@ You can also write your own by implementing the ``org.apache.pinot.controller.he
 
 6. Data partitioning strategies
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-We have various algorithms to partition data during segment creation, as listed under the interface `PartitionFunction <https://github.com/apache/incubator-pinot/blob/master/pinot-core/src/main/java/org/apache/pinot/core/data/partition/PartitionFunction.java>`_. No partitioning is done by default. You can write your own partitioning function by implementing the interface for ``org.apache.pinot.core.data.partition.PartitionFunction``. The partitioning function can be configured on the required columns in the table config as
+We have various algorithms to partition data during segment creation, as listed under the interface `PartitionFunction <https://github.com/apache/incubator-pinot/blob/master/pinot-core/src/main/java/org/apache/pinot/core/data/partition/PartitionFunction.java>`_. No partitioning is done by default. You can write your own partitioning function by implementing the interface for ``org.apache.pinot.segment.spi.PartitionFunction``. The partitioning function can be configured on the required columns in the table config as
 
 
 .. code-block:: none

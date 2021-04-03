@@ -19,7 +19,7 @@
 package org.apache.pinot.core.data.manager;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.segment.spi.IndexSegment;
 
 
 /**

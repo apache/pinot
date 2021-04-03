@@ -24,9 +24,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
-import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
@@ -49,10 +47,12 @@ import org.apache.pinot.core.query.request.context.predicate.Predicate;
 import org.apache.pinot.core.query.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.core.query.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.segment.index.datasource.MutableDataSource;
-import org.apache.pinot.core.segment.index.readers.JsonIndexReader;
-import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
-import org.apache.pinot.core.segment.index.readers.ValidDocIndexReader;
 import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.segment.spi.index.reader.ValidDocIndexReader;
 
 
 public class FilterPlanNode implements PlanNode {

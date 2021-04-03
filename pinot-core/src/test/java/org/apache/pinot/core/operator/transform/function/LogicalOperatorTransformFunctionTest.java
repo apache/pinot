@@ -21,8 +21,6 @@ package org.apache.pinot.core.operator.transform.function;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FunctionContext;

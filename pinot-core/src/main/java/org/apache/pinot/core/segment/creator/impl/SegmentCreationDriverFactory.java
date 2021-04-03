@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.segment.creator.impl;
 
-import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.segment.spi.creator.SegmentVersion;
 
 
 /**

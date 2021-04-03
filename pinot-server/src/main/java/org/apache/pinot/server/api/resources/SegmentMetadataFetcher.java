@@ -28,9 +28,9 @@ import java.util.Objects;
 import java.util.Set;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentImpl;
-import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
+import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.utils.JsonUtils;
 

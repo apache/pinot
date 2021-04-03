@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
 import org.locationtech.jts.geom.Geometry;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapWriter;

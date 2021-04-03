@@ -31,8 +31,8 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
-import org.apache.pinot.core.segment.creator.DictionaryBasedInvertedIndexCreator;
-import org.apache.pinot.core.segment.creator.TextIndexCreator;
+import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
+import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 
 
 /**

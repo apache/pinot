@@ -28,7 +28,7 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.pinot.core.segment.creator.impl.text.LuceneTextIndexCreator;
-import org.apache.pinot.core.segment.index.readers.TextIndexReader;
+import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;

@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.docidsets;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.common.utils.Pairs.IntPair;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.AndDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapBasedDocIdIterator;
@@ -28,6 +27,7 @@ import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterato
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.SortedDocIdIterator;
 import org.apache.pinot.core.util.SortedRangeIntersection;
+import org.apache.pinot.spi.utils.Pairs.IntPair;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 

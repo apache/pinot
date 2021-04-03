@@ -20,6 +20,7 @@ package org.apache.pinot.core.startree;
 
 import java.util.Iterator;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.index.startree.StarTreeNode;
 
 import static org.apache.pinot.core.startree.StarTreeBuilderUtils.INVALID_ID;
 

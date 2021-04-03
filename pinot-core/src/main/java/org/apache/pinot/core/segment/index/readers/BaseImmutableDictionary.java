@@ -27,6 +27,7 @@ import org.apache.pinot.core.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.core.io.util.ValueReader;
 import org.apache.pinot.core.io.util.VarLengthValueReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.utils.ByteArray;
 
 

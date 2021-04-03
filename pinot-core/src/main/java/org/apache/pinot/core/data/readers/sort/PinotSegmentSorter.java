@@ -22,9 +22,9 @@ import it.unimi.dsi.fastutil.Arrays;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.core.data.readers.PinotSegmentColumnReader;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.core.data.readers.PinotSegmentColumnReader;
 
 
 /**

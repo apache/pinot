@@ -19,10 +19,10 @@
 package org.apache.pinot.core.operator.docidsets;
 
 import java.util.Map;
-import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.dociditerators.ExpressionScanDocIdIterator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
 public final class ExpressionFilterDocIdSet implements FilterBlockDocIdSet {

@@ -25,7 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.startree.operator.StarTreeFilterOperator;
-import org.apache.pinot.core.startree.v2.StarTreeV2;
+import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
 
 public class StarTreeFilterPlanNode implements PlanNode {

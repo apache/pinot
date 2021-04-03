@@ -24,7 +24,7 @@ import org.apache.pinot.core.data.partition.ByteArrayPartitionFunction;
 import org.apache.pinot.core.data.partition.HashCodePartitionFunction;
 import org.apache.pinot.core.data.partition.ModuloPartitionFunction;
 import org.apache.pinot.core.data.partition.MurmurPartitionFunction;
-import org.apache.pinot.core.data.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 
 
 public class PartitionFunctionFactory {

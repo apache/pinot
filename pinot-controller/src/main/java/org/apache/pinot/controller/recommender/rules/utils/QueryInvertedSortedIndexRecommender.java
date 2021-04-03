@@ -18,6 +18,15 @@
  */
 package org.apache.pinot.controller.recommender.rules.utils;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.controller.recommender.io.InputManager;
 import org.apache.pinot.controller.recommender.rules.io.configs.IndexConfig;
@@ -34,10 +43,9 @@ import org.apache.pinot.core.query.request.context.predicate.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
-import java.util.stream.Collectors;
-
-import static org.apache.pinot.controller.recommender.rules.utils.PredicateParseResult.*;
+import static org.apache.pinot.controller.recommender.rules.utils.PredicateParseResult.NESI_ZERO;
+import static org.apache.pinot.controller.recommender.rules.utils.PredicateParseResult.PERCENT_SELECT_ALL;
+import static org.apache.pinot.controller.recommender.rules.utils.PredicateParseResult.PERCENT_SELECT_ZERO;
 
 
 /**

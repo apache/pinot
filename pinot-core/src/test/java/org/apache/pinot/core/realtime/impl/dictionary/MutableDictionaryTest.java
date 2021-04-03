@@ -33,7 +33,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
-import org.apache.pinot.core.segment.index.readers.MutableDictionary;
+import org.apache.pinot.segment.spi.index.reader.MutableDictionary;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.testng.Assert;

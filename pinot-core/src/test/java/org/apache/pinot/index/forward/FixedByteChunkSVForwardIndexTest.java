@@ -22,7 +22,7 @@ import java.io.File;
 import java.net.URL;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.core.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.core.io.writer.impl.FixedByteChunkSVForwardIndexWriter;
 import org.apache.pinot.core.segment.index.readers.forward.BaseChunkSVForwardIndexReader.ChunkReaderContext;
@@ -52,7 +52,7 @@ public class FixedByteChunkSVForwardIndexTest {
   @Test
   public void testWithCompression()
       throws Exception {
-    ChunkCompressorFactory.CompressionType compressionType = ChunkCompressorFactory.CompressionType.SNAPPY;
+    ChunkCompressionType compressionType = ChunkCompressionType.SNAPPY;
     testInt(compressionType);
     testLong(compressionType);
     testFloat(compressionType);
@@ -62,14 +62,14 @@ public class FixedByteChunkSVForwardIndexTest {
   @Test
   public void testWithoutCompression()
       throws Exception {
-    ChunkCompressorFactory.CompressionType compressionType = ChunkCompressorFactory.CompressionType.PASS_THROUGH;
+    ChunkCompressionType compressionType = ChunkCompressionType.PASS_THROUGH;
     testInt(compressionType);
     testLong(compressionType);
     testFloat(compressionType);
     testDouble(compressionType);
   }
 
-  public void testInt(ChunkCompressorFactory.CompressionType compressionType)
+  public void testInt(ChunkCompressionType compressionType)
       throws Exception {
     int[] expected = new int[NUM_VALUES];
     for (int i = 0; i < NUM_VALUES; i++) {
@@ -110,7 +110,7 @@ public class FixedByteChunkSVForwardIndexTest {
     FileUtils.deleteQuietly(outFileEightByte);
   }
 
-  public void testLong(ChunkCompressorFactory.CompressionType compressionType)
+  public void testLong(ChunkCompressionType compressionType)
       throws Exception {
     long[] expected = new long[NUM_VALUES];
     for (int i = 0; i < NUM_VALUES; i++) {
@@ -151,7 +151,7 @@ public class FixedByteChunkSVForwardIndexTest {
     FileUtils.deleteQuietly(outFileEightByte);
   }
 
-  public void testFloat(ChunkCompressorFactory.CompressionType compressionType)
+  public void testFloat(ChunkCompressionType compressionType)
       throws Exception {
     float[] expected = new float[NUM_VALUES];
     for (int i = 0; i < NUM_VALUES; i++) {
@@ -192,7 +192,7 @@ public class FixedByteChunkSVForwardIndexTest {
     FileUtils.deleteQuietly(outFileEightByte);
   }
 
-  public void testDouble(ChunkCompressorFactory.CompressionType compressionType)
+  public void testDouble(ChunkCompressionType compressionType)
       throws Exception {
     double[] expected = new double[NUM_VALUES];
     for (int i = 0; i < NUM_VALUES; i++) {

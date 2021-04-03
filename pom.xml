@@ -39,6 +39,7 @@
 
   <modules>
     <module>pinot-spi</module>
+    <module>pinot-segment-spi</module>
     <module>pinot-broker</module>
     <module>pinot-common</module>
     <module>pinot-clients</module>
@@ -272,6 +273,11 @@
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-spi</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-segment-spi</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>

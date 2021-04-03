@@ -22,7 +22,7 @@ import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.util.Arrays;
 import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 
 
 public class StringColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
