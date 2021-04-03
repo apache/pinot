@@ -240,7 +240,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   // Segment end criteria
   private volatile long _consumeEndTime = 0;
-  private boolean _endOfPartitionGroup = false;
+  private volatile boolean _endOfPartitionGroup = false;
   private StreamPartitionMsgOffset _finalOffset; // Used when we want to catch up to this one
   private volatile boolean _shouldStop = false;
 
@@ -1262,16 +1262,16 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           // TODO: currentPartitionGroupMetadata should be fetched from idealState + segmentZkMetadata, so that we get back accurate partitionGroups info
           //  However this is not an issue for Kafka, since partitionGroups never expire and every partitionGroup has a single partition
           //  Fix this before opening support for partitioning in Kinesis
-          int numStreamPartitions = _streamMetadataProvider
+          int numPartitionGroups = _streamMetadataProvider
               .getPartitionGroupInfoList(_clientId, _partitionLevelStreamConfig,
                   Collections.emptyList(), /*maxWaitTimeMs=*/5000).size();
 
-          if (numStreamPartitions != numPartitions) {
+          if (numPartitionGroups != numPartitions) {
             segmentLogger.warn(
                 "Number of stream partitions: {} does not match number of partitions in the partition config: {}, using number of stream partitions",
-                numStreamPartitions, numPartitions);
+                numPartitionGroups, numPartitions);
             _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_PARTITION_MISMATCH, 1);
-            numPartitions = numStreamPartitions;
+            numPartitions = numPartitionGroups;
           }
         } catch (Exception e) {
           segmentLogger.warn(

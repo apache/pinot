@@ -38,6 +38,7 @@ import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
+import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,6 +52,8 @@ public class PinotTableIdealStateBuilder {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableIdealStateBuilder.class);
   public static final String ONLINE = "ONLINE";
   public static final String OFFLINE = "OFFLINE";
+  private static final RetryPolicy DEFAULT_IDEALSTATE_UPDATE_RETRY_POLICY =
+      RetryPolicies.randomDelayRetryPolicy(3, 100L, 200L);
 
   /**
    *
@@ -150,7 +153,7 @@ public class PinotTableIdealStateBuilder {
     PartitionGroupInfoFetcher partitionGroupInfoFetcher =
         new PartitionGroupInfoFetcher(streamConfig, currentPartitionGroupMetadataList);
     try {
-      RetryPolicies.noDelayRetryPolicy(3).attempt(partitionGroupInfoFetcher);
+      DEFAULT_IDEALSTATE_UPDATE_RETRY_POLICY.attempt(partitionGroupInfoFetcher);
       return partitionGroupInfoFetcher.getPartitionGroupInfoList();
     } catch (Exception e) {
       Exception fetcherException = partitionGroupInfoFetcher.getException();

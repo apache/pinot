@@ -505,7 +505,7 @@ public class PinotLLCRealtimeSegmentManager {
         getNewPartitionGroupInfoList(streamConfig, currentPartitionGroupMetadataList);
     Set<Integer> newPartitionGroupSet =
         newPartitionGroupInfoList.stream().map(PartitionGroupInfo::getPartitionGroupId).collect(Collectors.toSet());
-    int numPartitions = newPartitionGroupInfoList.size();
+    int numPartitionGroups = newPartitionGroupInfoList.size();
 
     // Only if committingSegment's partitionGroup is present in the newPartitionGroupInfoList, we create new segment metadata
     String newConsumingSegmentName = null;
@@ -515,7 +515,7 @@ public class PinotLLCRealtimeSegmentManager {
       LLCSegmentName newLLCSegment = new LLCSegmentName(rawTableName, committingSegmentPartitionGroupId,
           committingLLCSegment.getSequenceNumber() + 1, newSegmentCreationTimeMs);
       createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegment, newSegmentCreationTimeMs,
-          committingSegmentDescriptor, committingSegmentZKMetadata, instancePartitions, numPartitions, numReplicas);
+          committingSegmentDescriptor, committingSegmentZKMetadata, instancePartitions, numPartitionGroups, numReplicas);
       newConsumingSegmentName = newLLCSegment.getSegmentName();
     }
 
@@ -1009,10 +1009,10 @@ public class PinotLLCRealtimeSegmentManager {
             if (!isExceededMaxSegmentCompletionTime(realtimeTableName, latestSegmentName, currentTimeMs)) {
               continue;
             }
-            LOGGER.info("Repairing segment: {} which is DONE in segment ZK metadata, but is CONSUMING in IdealState",
-                latestSegmentName);
-
             if (newPartitionGroupSet.contains(partitionGroupId)) {
+              LOGGER.info("Repairing segment: {} which is DONE in segment ZK metadata, but is CONSUMING in IdealState",
+                  latestSegmentName);
+
               LLCSegmentName newLLCSegmentName = getNextLLCSegmentName(latestLLCSegmentName, currentTimeMs);
               String newSegmentName = newLLCSegmentName.getSegmentName();
               CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(latestSegmentName,
@@ -1043,14 +1043,15 @@ public class PinotLLCRealtimeSegmentManager {
             // Create a new segment to re-consume from the previous start offset
             LLCSegmentName newLLCSegmentName = getNextLLCSegmentName(latestLLCSegmentName, currentTimeMs);
             StreamPartitionMsgOffset startOffset = offsetFactory.create(latestSegmentZKMetadata.getStartOffset());
-            StreamPartitionMsgOffset partitionGroupStartOffset = getPartitionGroupStartOffset(streamConfig, partitionGroupId);
+            StreamPartitionMsgOffset partitionGroupSmallestOffset =
+                getPartitionGroupSmallestOffset(streamConfig, partitionGroupId);
 
             // Start offset must be higher than the start offset of the stream
-            if (partitionGroupStartOffset.compareTo(startOffset) > 0) {
+            if (partitionGroupSmallestOffset.compareTo(startOffset) > 0) {
               LOGGER.error("Data lost from offset: {} to: {} for partition: {} of table: {}", startOffset,
-                  partitionGroupStartOffset, partitionGroupId, realtimeTableName);
+                  partitionGroupSmallestOffset, partitionGroupId, realtimeTableName);
               _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_STREAM_DATA_LOSS, 1L);
-              startOffset = partitionGroupStartOffset;
+              startOffset = partitionGroupSmallestOffset;
             }
 
             CommittingSegmentDescriptor committingSegmentDescriptor =
@@ -1124,7 +1125,7 @@ public class PinotLLCRealtimeSegmentManager {
     return idealState;
   }
 
-  private StreamPartitionMsgOffset getPartitionGroupStartOffset(StreamConfig streamConfig, int partitionGroupId) {
+  private StreamPartitionMsgOffset getPartitionGroupSmallestOffset(StreamConfig streamConfig, int partitionGroupId) {
     Map<String, String> streamConfigMapWithSmallestOffsetCriteria = new HashMap<>(streamConfig.getStreamConfigsMap());
     streamConfigMapWithSmallestOffsetCriteria.put(StreamConfigProperties
             .constructStreamProperty(streamConfig.getType(), StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA),
