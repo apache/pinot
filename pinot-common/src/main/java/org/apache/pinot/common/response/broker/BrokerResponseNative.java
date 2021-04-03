@@ -39,7 +39,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  *
  * Supports serialization via JSON.
  */
-@JsonPropertyOrder({"selectionResults", "aggregationResults", "resultTable", "exceptions", "numServersQueried", "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numGroupsLimitReached", "totalDocs", "timeUsedMs", "threadCpuTimeNs", "segmentStatistics", "traceInfo"})
+@JsonPropertyOrder({"selectionResults", "aggregationResults", "resultTable", "exceptions", "numServersQueried", "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numGroupsLimitReached", "totalDocs", "timeUsedMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "segmentStatistics", "traceInfo"})
 public class BrokerResponseNative implements BrokerResponse {
   public static final BrokerResponseNative EMPTY_RESULT = BrokerResponseNative.empty();
   public static final BrokerResponseNative NO_TABLE_RESULT =
@@ -61,7 +61,8 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _totalDocs = 0L;
   private boolean _numGroupsLimitReached = false;
   private long _timeUsedMs = 0L;
-  private long _threadCpuTimeNs = 0L;
+  private long _offlineThreadCpuTimeNs = 0L;
+  private long _realtimeThreadCpuTimeNs = 0L;
 
   private SelectionResults _selectionResults;
   private List<AggregationResult> _aggregationResults;
@@ -278,15 +279,29 @@ public class BrokerResponseNative implements BrokerResponse {
     _timeUsedMs = timeUsedMs;
   }
 
-  @JsonProperty("threadCpuTimeNs")
-  public long getThreadCpuTimeNs() {
-    return _threadCpuTimeNs;
+  @JsonProperty("offlineThreadCpuTimeNs")
+  @Override
+  public long getOfflineThreadCpuTimeNs() {
+    return _offlineThreadCpuTimeNs;
   }
 
-  @JsonProperty("threadCpuTimeNs")
+  @JsonProperty("offlineThreadCpuTimeNs")
   @Override
-  public void setThreadCpuTimeNs(long timeUsedMs) {
-    _threadCpuTimeNs = timeUsedMs;
+  public void setOfflineThreadCpuTimeNs(long timeUsedMs) {
+    _offlineThreadCpuTimeNs = timeUsedMs;
+  }
+
+
+  @JsonProperty("realtimeThreadCpuTimeNs")
+  @Override
+  public long getRealtimeThreadCpuTimeNs() {
+    return _realtimeThreadCpuTimeNs;
+  }
+
+  @JsonProperty("realtimeThreadCpuTimeNs")
+  @Override
+  public void setRealtimeThreadCpuTimeNs(long timeUsedMs) {
+    _realtimeThreadCpuTimeNs = timeUsedMs;
   }
 
   @JsonProperty("segmentStatistics")

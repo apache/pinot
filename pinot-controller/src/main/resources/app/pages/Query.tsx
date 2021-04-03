@@ -132,7 +132,9 @@ const responseStatCols = [
   'numEntriesScannedPostFilter',
   'numGroupsLimitReached',
   'partialResponse',
-  'minConsumingFreshnessTimeMs'
+  'minConsumingFreshnessTimeMs',
+  'offlineThreadCpuTimeNs',
+  'realtimeThreadCpuTimeNs'
 ];
 
 const QueryPage = () => {

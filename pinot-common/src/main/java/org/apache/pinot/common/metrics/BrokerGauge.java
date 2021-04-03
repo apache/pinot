@@ -32,7 +32,8 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   NETTY_CONNECTION_CONNECT_TIME_MS("nettyConnection", true),
   REQUEST_SIZE("requestSize", false),
   RESIZE_TIME_MS("milliseconds", false),
-  THREAD_CPU_TIME_NS("nanoseconds", false);
+  OFFLINE_THREAD_CPU_TIME_NS("nanoseconds", false),
+  REALTIME_THREAD_CPU_TIME_NS("nanoseconds", false);
 
   private final String brokerGaugeName;
   private final String unit;

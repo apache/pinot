@@ -52,9 +52,14 @@ public interface BrokerResponse {
   void setTimeUsedMs(long timeUsedMs);
 
   /**
-   * Set the total thread cpu time used in request handling, into the broker response.
+   * Set the total thread cpu time used against realtime table in request handling, into the broker response.
    */
-  void setThreadCpuTimeNs(long timeUsedMs);
+  void setRealtimeThreadCpuTimeNs(long timeUsedMs);
+
+  /**
+   * Set the total thread cpu time used against offline table in request handling, into the broker response.
+   */
+  void setOfflineThreadCpuTimeNs(long timeUsedMs);
 
   /**
    * Convert the broker response to JSON String.
@@ -131,4 +136,14 @@ public interface BrokerResponse {
    * Get the list of exceptions
    */
   List<QueryProcessingException> getProcessingExceptions();
+
+  /**
+   * Get the total thread cpu time used against realtime table in request handling, into the broker response.
+   */
+  long getRealtimeThreadCpuTimeNs();
+
+  /**
+   * Get the total thread cpu time used against offline table in request handling, into the broker response.
+   */
+  long getOfflineThreadCpuTimeNs();
 }

@@ -43,6 +43,7 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -56,15 +57,12 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class BrokerReduceService {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(BrokerReduceService.class);
-
-  // brw -> Shorthand for broker reduce worker threads.
-  private static final String REDUCE_THREAD_NAME_FORMAT = "brw-%d";
-
   // Set the reducer priority higher than NORM but lower than MAX, because if a query is complete
   // we want to deserialize and return response as soon. This is the same as server side 'pqr' threads.
   protected static final int QUERY_RUNNER_THREAD_PRIORITY = 7;
-
+  private static final Logger LOGGER = LoggerFactory.getLogger(BrokerReduceService.class);
+  // brw -> Shorthand for broker reduce worker threads.
+  private static final String REDUCE_THREAD_NAME_FORMAT = "brw-%d";
   private final ExecutorService _reduceExecutorService;
   private final int _maxReduceThreadsPerQuery;
   private final int _groupByTrimThreshold;
@@ -87,6 +85,31 @@ public class BrokerReduceService {
     _reduceExecutorService = Executors.newFixedThreadPool(numThreadsInExecutorService, reduceThreadFactory);
   }
 
+  private static void updateAlias(QueryContext queryContext, BrokerResponseNative brokerResponseNative) {
+    ResultTable resultTable = brokerResponseNative.getResultTable();
+    if (resultTable == null) {
+      return;
+    }
+    Map<ExpressionContext, String> aliasMap = queryContext.getAliasMap();
+    if (aliasMap.isEmpty()) {
+      return;
+    }
+
+    String[] columnNames = resultTable.getDataSchema().getColumnNames();
+    List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
+    int numSelectExpressions = selectExpressions.size();
+    // For query like `SELECT *`, we skip alias update.
+    if (columnNames.length != numSelectExpressions) {
+      return;
+    }
+    for (int i = 0; i < numSelectExpressions; i++) {
+      String alias = aliasMap.get(selectExpressions.get(i));
+      if (alias != null) {
+        columnNames[i] = alias;
+      }
+    }
+  }
+
   public BrokerResponseNative reduceOnDataTable(BrokerRequest brokerRequest,
       Map<ServerRoutingInstance, DataTable> dataTableMap, long reduceTimeOutMs, @Nullable BrokerMetrics brokerMetrics) {
     if (dataTableMap.size() == 0) {
@@ -105,7 +128,8 @@ public class BrokerReduceService {
     long numConsumingSegmentsProcessed = 0L;
     long minConsumingFreshnessTimeMs = Long.MAX_VALUE;
     long numTotalDocs = 0L;
-    long threadCpuTimeNs = 0L;
+    long offlineThreadCpuTimeNs = 0L;
+    long realtimeThreadCpuTimeNs = 0L;
     boolean numGroupsLimitReached = false;
 
     // Cache a data schema from data tables (try to cache one with data rows associated with it).
@@ -170,7 +194,11 @@ public class BrokerReduceService {
 
       String threadCpuTimeNsString = metadata.get(DataTable.MetadataKey.THREAD_CPU_TIME_NS.getName());
       if (threadCpuTimeNsString != null) {
-        threadCpuTimeNs += Long.parseLong(threadCpuTimeNsString);
+        if (entry.getKey().getTableType() == TableType.OFFLINE) {
+          offlineThreadCpuTimeNs += Long.parseLong(threadCpuTimeNsString);
+        } else {
+          realtimeThreadCpuTimeNs += Long.parseLong(threadCpuTimeNsString);
+        }
       }
 
       String numTotalDocsString = metadata.get(DataTable.TOTAL_DOCS_METADATA_KEY);
@@ -205,7 +233,8 @@ public class BrokerReduceService {
     brokerResponseNative.setNumSegmentsMatched(numSegmentsMatched);
     brokerResponseNative.setTotalDocs(numTotalDocs);
     brokerResponseNative.setNumGroupsLimitReached(numGroupsLimitReached);
-    brokerResponseNative.setThreadCpuTimeNs(threadCpuTimeNs);
+    brokerResponseNative.setOfflineThreadCpuTimeNs(offlineThreadCpuTimeNs);
+    brokerResponseNative.setRealtimeThreadCpuTimeNs(realtimeThreadCpuTimeNs);
     if (numConsumingSegmentsProcessed > 0) {
       brokerResponseNative.setNumConsumingSegmentsQueried(numConsumingSegmentsProcessed);
       brokerResponseNative.setMinConsumingFreshnessTimeMs(minConsumingFreshnessTimeMs);
@@ -220,8 +249,9 @@ public class BrokerReduceService {
           .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER, numEntriesScannedInFilter);
       brokerMetrics
           .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER, numEntriesScannedPostFilter);
+      brokerMetrics.addValueToTableGauge(rawTableName, BrokerGauge.OFFLINE_THREAD_CPU_TIME_NS, offlineThreadCpuTimeNs);
       brokerMetrics
-          .addValueToTableGauge(rawTableName, BrokerGauge.THREAD_CPU_TIME_NS, threadCpuTimeNs);
+          .addValueToTableGauge(rawTableName, BrokerGauge.REALTIME_THREAD_CPU_TIME_NS, realtimeThreadCpuTimeNs);
       if (numConsumingSegmentsProcessed > 0 && minConsumingFreshnessTimeMs > 0) {
         brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.FRESHNESS_LAG_MS,
             System.currentTimeMillis() - minConsumingFreshnessTimeMs, TimeUnit.MILLISECONDS);
@@ -241,31 +271,6 @@ public class BrokerReduceService {
             _groupByTrimThreshold), brokerMetrics);
     updateAlias(queryContext, brokerResponseNative);
     return brokerResponseNative;
-  }
-
-  private static void updateAlias(QueryContext queryContext, BrokerResponseNative brokerResponseNative) {
-    ResultTable resultTable = brokerResponseNative.getResultTable();
-    if (resultTable == null) {
-      return;
-    }
-    Map<ExpressionContext, String> aliasMap = queryContext.getAliasMap();
-    if (aliasMap.isEmpty()) {
-      return;
-    }
-
-    String[] columnNames = resultTable.getDataSchema().getColumnNames();
-    List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
-    int numSelectExpressions = selectExpressions.size();
-    // For query like `SELECT *`, we skip alias update.
-    if (columnNames.length != numSelectExpressions) {
-      return;
-    }
-    for (int i = 0; i < numSelectExpressions; i++) {
-      String alias = aliasMap.get(selectExpressions.get(i));
-      if (alias != null) {
-        columnNames[i] = alias;
-      }
-    }
   }
 
   public void shutDown() {
