@@ -304,6 +304,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     if ((offlineTableName == null) && (realtimeTableName == null)) {
       // No table matches the request
+      if (_tableCache.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName)) == null
+          && _tableCache.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName)) == null) {
+        LOGGER.info("Table not found for request {}: {}", requestId, query);
+        requestStatistics.setErrorCode(QueryException.TABLE_DOES_NOT_EXIST_ERROR_CODE);
+        return BrokerResponseNative.TABLE_DOES_NOT_EXIST;
+      }
       LOGGER.info("No table matches for request {}: {}", requestId, query);
       requestStatistics.setErrorCode(QueryException.BROKER_RESOURCE_MISSING_ERROR_CODE);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.RESOURCE_MISSING_EXCEPTIONS, 1);
@@ -643,6 +649,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     if ((offlineTableName == null) && (realtimeTableName == null)) {
       // No table matches the request
+      if (_tableCache.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName)) == null
+          && _tableCache.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName)) == null) {
+        LOGGER.info("Table not found for request {}: {}", requestId, query);
+        requestStatistics.setErrorCode(QueryException.TABLE_DOES_NOT_EXIST_ERROR_CODE);
+        return BrokerResponseNative.TABLE_DOES_NOT_EXIST;
+      }
       LOGGER.info("No table matches for request {}: {}", requestId, query);
       requestStatistics.setErrorCode(QueryException.BROKER_RESOURCE_MISSING_ERROR_CODE);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.RESOURCE_MISSING_EXCEPTIONS, 1);
