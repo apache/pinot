@@ -24,7 +24,7 @@ import io.swagger.jaxrs.config.BeanConfig;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;

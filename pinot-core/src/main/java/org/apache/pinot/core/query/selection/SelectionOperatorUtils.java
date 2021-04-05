@@ -32,18 +32,18 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextConvertUtils;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
-import org.apache.pinot.core.util.ArrayCopyUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -155,7 +155,7 @@ public class SelectionOperatorUtils {
 
       List<String> allColumns = new ArrayList<>(numColumns);
       for (String column : columnNames) {
-        if (QueryContextConverterUtils.getExpression(column).getType() == ExpressionContext.Type.IDENTIFIER) {
+        if (RequestContextConvertUtils.getExpression(column).getType() == ExpressionContext.Type.IDENTIFIER) {
           allColumns.add(column);
         }
       }

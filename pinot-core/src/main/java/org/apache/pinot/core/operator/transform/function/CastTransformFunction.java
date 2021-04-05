@@ -48,7 +48,7 @@ public class CastTransformFunction extends BaseTransformFunction {
     TransformFunction castFormatTransformFunction = arguments.get(1);
 
     if (castFormatTransformFunction instanceof LiteralTransformFunction) {
-      _toFormat = ((LiteralTransformFunction)castFormatTransformFunction).getLiteral().toUpperCase();
+      _toFormat = ((LiteralTransformFunction) castFormatTransformFunction).getLiteral().toUpperCase();
       switch (_toFormat) {
         case "INT":
         case "INTEGER":

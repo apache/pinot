@@ -37,19 +37,18 @@ import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.core.data.manager.TableDataManager;
-import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
-import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
-import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
+import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -58,6 +57,7 @@ import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -103,9 +103,9 @@ public class LLRealtimeSegmentDataManagerTest {
           + "  \"tableIndexConfig\": {\n" + "    \"invertedIndexColumns\": [" + "    ], \n"
           + "    \"lazyLoad\": \"false\", \n" + "    \"loadMode\": \"HEAP\", \n"
           + "    \"segmentFormatVersion\": null, \n" + "    \"sortedColumn\": [], \n" + "    \"streamConfigs\": {\n"
-          + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS + "\": \"" + maxRowsInSegment + "\", \n" + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME
-          + "\": \"" + maxTimeForSegmentCloseMs + "\", \n"
-          + "      \"stream.fakeStream.broker.list\": \"broker:7777\", \n"
+          + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS + "\": \"" + maxRowsInSegment + "\", \n"
+          + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME + "\": \"" + maxTimeForSegmentCloseMs
+          + "\", \n" + "      \"stream.fakeStream.broker.list\": \"broker:7777\", \n"
           + "      \"stream.fakeStream.consumer.prop.auto.offset.reset\": \"smallest\", \n"
           + "      \"stream.fakeStream.consumer.type\": \"simple\", \n"
           + "      \"stream.fakeStream.consumer.factory.class.name\": \"" + FakeStreamConsumerFactory.class.getName()
@@ -119,17 +119,14 @@ public class LLRealtimeSegmentDataManagerTest {
           + "      \"streamType\": \"fakeStream\"\n" + "    }\n" + "  }, \n"
           + "  \"tableName\": \"Coffee_REALTIME\", \n" + "  \"tableType\": \"realtime\", \n" + "  \"tenants\": {\n"
           + "    \"broker\": \"shared\", \n" + "    \"server\": \"server-1\"\n" + "  },\n"
-          + " \"upsertConfig\": {\"mode\": \"FULL\" } \n"
-          + "}";
+          + " \"upsertConfig\": {\"mode\": \"FULL\" } \n" + "}";
 
   private String makeSchema() {
     return "{" + "  \"schemaName\":\"SchemaTest\"," + "  \"metricFieldSpecs\":[" + "    {\"name\":\"m\",\"dataType\":\""
         + "LONG" + "\"}" + "  ]," + "  \"dimensionFieldSpecs\":[" + "    {\"name\":\"d\",\"dataType\":\"" + "STRING"
         + "\",\"singleValueField\":" + "true" + "}" + "  ]," + "  \"timeFieldSpec\":{"
         + "    \"incomingGranularitySpec\":{\"dataType\":\"LONG\",\"timeType\":\"MILLISECONDS\",\"name\":\"time\"},"
-        + "    \"defaultNullValue\":12345" + "  },\n"
-        + "\"primaryKeyColumns\": [\"event_id\"] \n"
-        + "}";
+        + "    \"defaultNullValue\":12345" + "  },\n" + "\"primaryKeyColumns\": [\"event_id\"] \n" + "}";
   }
 
   private TableConfig createTableConfig()
@@ -139,7 +136,8 @@ public class LLRealtimeSegmentDataManagerTest {
 
   private RealtimeTableDataManager createTableDataManager(TableConfig tableConfig) {
     final String instanceId = "server-1";
-    SegmentBuildTimeLeaseExtender.getOrCreate(instanceId, new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), tableConfig.getTableName());
+    SegmentBuildTimeLeaseExtender.getOrCreate(instanceId, new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()),
+        tableConfig.getTableName());
     RealtimeTableDataManager tableDataManager = mock(RealtimeTableDataManager.class);
     when(tableDataManager.getServerInstance()).thenReturn(instanceId);
     RealtimeSegmentStatsHistory statsHistory = mock(RealtimeSegmentStatsHistory.class);
@@ -196,14 +194,9 @@ public class LLRealtimeSegmentDataManagerTest {
     {
       //  Controller sends catchup response with both offset as well as streamPartitionMsgOffset
       String responseStr =
-          "{"
-              + "  \"streamPartitionMsgOffset\" : \"" + offset + "\","
-              + "  \"offset\" : " + offset + ","
-              + "  \"buildTimeSec\" : -1,"
-              + "  \"isSplitCommitType\" : false,"
-              + "  \"segmentLocation\" : \"file:///a/b\","
-              + "  \"status\" : \"CATCH_UP\""
-              + "}";
+          "{" + "  \"streamPartitionMsgOffset\" : \"" + offset + "\"," + "  \"offset\" : " + offset + ","
+              + "  \"buildTimeSec\" : -1," + "  \"isSplitCommitType\" : false,"
+              + "  \"segmentLocation\" : \"file:///a/b\"," + "  \"status\" : \"CATCH_UP\"" + "}";
       SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       StreamPartitionMsgOffset extractedOffset = segmentDataManager.extractOffset(response);
       Assert.assertEquals(extractedOffset.compareTo(new LongMsgOffset(offset)), 0);
@@ -211,27 +204,17 @@ public class LLRealtimeSegmentDataManagerTest {
     {
       //  Controller sends catchup response with offset only
       String responseStr =
-          "{"
-              + "  \"offset\" : " + offset + ","
-              + "  \"buildTimeSec\" : -1,"
-              + "  \"isSplitCommitType\" : false,"
-              + "  \"segmentLocation\" : \"file:///a/b\","
-              + "  \"status\" : \"CATCH_UP\""
-              + "}";
+          "{" + "  \"offset\" : " + offset + "," + "  \"buildTimeSec\" : -1," + "  \"isSplitCommitType\" : false,"
+              + "  \"segmentLocation\" : \"file:///a/b\"," + "  \"status\" : \"CATCH_UP\"" + "}";
       SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       StreamPartitionMsgOffset extractedOffset = segmentDataManager.extractOffset(response);
       Assert.assertEquals(extractedOffset.compareTo(new LongMsgOffset(offset)), 0);
     }
     {
       //  Controller sends catchup response streamPartitionMsgOffset only
-      String responseStr =
-          "{"
-              + "  \"streamPartitionMsgOffset\" : \"" + offset + "\","
-              + "  \"buildTimeSec\" : -1,"
-              + "  \"isSplitCommitType\" : false,"
-              + "  \"segmentLocation\" : \"file:///a/b\","
-              + "  \"status\" : \"CATCH_UP\""
-              + "}";
+      String responseStr = "{" + "  \"streamPartitionMsgOffset\" : \"" + offset + "\"," + "  \"buildTimeSec\" : -1,"
+          + "  \"isSplitCommitType\" : false," + "  \"segmentLocation\" : \"file:///a/b\","
+          + "  \"status\" : \"CATCH_UP\"" + "}";
       SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       StreamPartitionMsgOffset extractedOffset = segmentDataManager.extractOffset(response);
       Assert.assertEquals(extractedOffset.compareTo(new LongMsgOffset(offset)), 0);

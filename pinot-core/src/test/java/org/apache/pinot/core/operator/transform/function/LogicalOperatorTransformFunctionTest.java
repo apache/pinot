@@ -21,10 +21,10 @@ package org.apache.pinot.core.operator.transform.function;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.apache.pinot.core.query.exception.BadQueryRequestException;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.FunctionContext;
-import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.RequestContextConvertUtils;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -45,9 +45,9 @@ public abstract class LogicalOperatorTransformFunctionTest extends BaseTransform
   @Test
   public void testLogicalOperatorTransformFunction() {
     ExpressionContext intEqualsExpr =
-        QueryContextConverterUtils.getExpression(String.format("EQUALS(%s, %d)", INT_SV_COLUMN, _intSVValues[0]));
+        RequestContextConvertUtils.getExpression(String.format("EQUALS(%s, %d)", INT_SV_COLUMN, _intSVValues[0]));
     ExpressionContext longEqualsExpr =
-        QueryContextConverterUtils.getExpression(String.format("EQUALS(%s, %d)", LONG_SV_COLUMN, _longSVValues[0]));
+        RequestContextConvertUtils.getExpression(String.format("EQUALS(%s, %d)", LONG_SV_COLUMN, _longSVValues[0]));
     ExpressionContext expression = ExpressionContext.forFunction(
         new FunctionContext(FunctionContext.Type.TRANSFORM, getFuncName(),
             Arrays.asList(intEqualsExpr, longEqualsExpr)));
@@ -64,7 +64,7 @@ public abstract class LogicalOperatorTransformFunctionTest extends BaseTransform
   public void testIllegalArguments(String[] expressions) {
     List<ExpressionContext> expressionContextList = new ArrayList<>();
     for (int i = 0; i < expressions.length; i++) {
-      expressionContextList.add(QueryContextConverterUtils.getExpression(expressions[i]));
+      expressionContextList.add(RequestContextConvertUtils.getExpression(expressions[i]));
     }
     TransformFunctionFactory.get(ExpressionContext
             .forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM, getFuncName(), expressionContextList)),

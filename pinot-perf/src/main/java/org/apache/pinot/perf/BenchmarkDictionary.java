@@ -20,10 +20,10 @@ package org.apache.pinot.perf;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
-import org.apache.pinot.core.realtime.impl.dictionary.LongOffHeapMutableDictionary;
-import org.apache.pinot.core.realtime.impl.dictionary.LongOnHeapMutableDictionary;
+import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
+import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.segment.local.realtime.impl.dictionary.LongOffHeapMutableDictionary;
+import org.apache.pinot.segment.local.realtime.impl.dictionary.LongOnHeapMutableDictionary;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Mode;

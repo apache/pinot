@@ -25,8 +25,8 @@ import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
 import javax.ws.rs.ext.Provider;
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 // A class to add the controller host and version in the response headers for all APIs.

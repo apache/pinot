@@ -22,9 +22,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.config.instance.Instance;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Helix;
 
 
 public class InstanceUtils {

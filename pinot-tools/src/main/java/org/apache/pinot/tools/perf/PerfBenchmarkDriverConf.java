@@ -18,10 +18,7 @@
  */
 package org.apache.pinot.tools.perf;
 
-import org.apache.pinot.common.utils.CommonConstants;
-import org.yaml.snakeyaml.DumperOptions;
-import org.yaml.snakeyaml.DumperOptions.FlowStyle;
-import org.yaml.snakeyaml.Yaml;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 public class PerfBenchmarkDriverConf {

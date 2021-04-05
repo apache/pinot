@@ -20,7 +20,7 @@ package org.apache.pinot.core.metadata;
 
 import java.io.File;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 
 

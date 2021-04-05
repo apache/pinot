@@ -21,8 +21,8 @@ package org.apache.pinot.integration.tests;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.spi.utils.ReadMode;
 
 
 public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends RealtimeClusterIntegrationTest {
