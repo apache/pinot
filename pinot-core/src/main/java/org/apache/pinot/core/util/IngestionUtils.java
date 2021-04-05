@@ -38,6 +38,7 @@ import org.apache.pinot.segment.spi.creator.name.FixedSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
+import org.apache.pinot.spi.auth.AuthContext;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
@@ -180,11 +181,13 @@ public final class IngestionUtils {
    * @param tableNameWithType name of the table to upload the segment
    * @param batchConfig batchConfig with details about push such as controllerURI, pushAttempts, pushParallelism, etc
    * @param segmentTarURIs list of URI for the segment tar files
+   * @param authContext auth details required to upload the Pinot segment to controller
    */
-  public static void uploadSegment(String tableNameWithType, BatchConfig batchConfig, List<URI> segmentTarURIs)
+  public static void uploadSegment(String tableNameWithType, BatchConfig batchConfig, List<URI> segmentTarURIs,
+      AuthContext authContext)
       throws Exception {
 
-    SegmentGenerationJobSpec segmentUploadSpec = generateSegmentUploadSpec(tableNameWithType, batchConfig);
+    SegmentGenerationJobSpec segmentUploadSpec = generateSegmentUploadSpec(tableNameWithType, batchConfig, authContext);
 
     String pushMode = batchConfig.getPushMode();
     switch (BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase())) {
@@ -234,7 +237,8 @@ public final class IngestionUtils {
     }
   }
 
-  private static SegmentGenerationJobSpec generateSegmentUploadSpec(String tableName, BatchConfig batchConfig) {
+  private static SegmentGenerationJobSpec generateSegmentUploadSpec(String tableName, BatchConfig batchConfig,
+      AuthContext authContext) {
 
     TableSpec tableSpec = new TableSpec();
     tableSpec.setTableName(tableName);
@@ -254,7 +258,7 @@ public final class IngestionUtils {
     spec.setPushJobSpec(pushJobSpec);
     spec.setTableSpec(tableSpec);
     spec.setPinotClusterSpecs(pinotClusterSpecs);
-    spec.setAuthToken(batchConfig.getAuthToken());
+    spec.setAuthToken(authContext.getAuthToken());
     return spec;
   }
 

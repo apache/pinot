@@ -61,8 +61,6 @@ public class BatchConfig {
   private final String _pushControllerURI;
   private final String _outputSegmentDirURI;
 
-  private final String _authToken;
-
   public BatchConfig(String tableNameWithType, Map<String, String> batchConfigsMap) {
     _batchConfigMap = batchConfigsMap;
     _tableNameWithType = tableNameWithType;
@@ -107,8 +105,6 @@ public class BatchConfig {
     _pushSegmentURISuffix = batchConfigsMap.get(BatchConfigProperties.PUSH_SEGMENT_URI_SUFFIX);
     _pushControllerURI = batchConfigsMap.get(BatchConfigProperties.PUSH_CONTROLLER_URI);
     _outputSegmentDirURI = batchConfigsMap.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI);
-
-    _authToken = batchConfigsMap.get(BatchConfigProperties.AUTH_TOKEN);
   }
 
   public String getTableNameWithType() {
@@ -217,10 +213,6 @@ public class BatchConfig {
 
   public String getOutputSegmentDirURI() {
     return _outputSegmentDirURI;
-  }
-
-  public String getAuthToken() {
-    return _authToken;
   }
 
   public Map<String, String> getBatchConfigMap() {

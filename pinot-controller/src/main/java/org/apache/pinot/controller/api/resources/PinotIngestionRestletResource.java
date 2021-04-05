@@ -37,7 +37,6 @@ import javax.ws.rs.container.AsyncResponse;
 import javax.ws.rs.container.Suspended;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessType;
@@ -49,7 +48,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
-import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
@@ -190,17 +188,12 @@ public class PinotIngestionRestletResource {
     Map<String, String> batchConfigMap =
         JsonUtils.stringToObject(batchConfigMapStr, new TypeReference<Map<String, String>>() {
         });
-    if (StringUtils.isBlank(batchConfigMap.get(BatchConfigProperties.PUSH_CONTROLLER_URI))) {
-      batchConfigMap.put(BatchConfigProperties.PUSH_CONTROLLER_URI, getControllerUri().toString());
-    }
-    if (StringUtils.isBlank(batchConfigMap.get(BatchConfigProperties.AUTH_TOKEN))) {
-      batchConfigMap.put(BatchConfigProperties.AUTH_TOKEN, getAuthToken());
-    }
     BatchConfig batchConfig = new BatchConfig(tableNameWithType, batchConfigMap);
     Schema schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
 
     FileIngestionHelper fileIngestionHelper =
-        new FileIngestionHelper(tableConfig, schema, batchConfig, new File(_controllerConf.getDataDir(), UPLOAD_DIR));
+        new FileIngestionHelper(tableConfig, schema, batchConfig, getControllerUri(),
+            new File(_controllerConf.getDataDir(), UPLOAD_DIR), getAuthToken());
     return fileIngestionHelper.buildSegmentAndPush(payload);
   }
 

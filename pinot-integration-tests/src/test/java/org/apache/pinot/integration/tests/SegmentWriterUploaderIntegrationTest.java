@@ -126,7 +126,7 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
       // flush to segment
       URI segmentTarURI = segmentWriter.flush();
       // upload
-      segmentUploader.uploadSegment(segmentTarURI);
+      segmentUploader.uploadSegment(segmentTarURI, null);
 
       // check num segments
       Assert.assertEquals(getNumSegments(), i + 1);
@@ -141,7 +141,7 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
     checkNumSegments(0);
 
     // upload all together using dir
-    segmentUploader.uploadSegments(_tarDir.toURI());
+    segmentUploader.uploadSegments(_tarDir.toURI(), null);
     // check num segments
     Assert.assertEquals(getNumSegments(), 3);
     // check totalDocs in query
