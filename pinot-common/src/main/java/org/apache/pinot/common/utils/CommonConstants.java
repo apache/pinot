@@ -384,12 +384,8 @@ public class CommonConstants {
     public static class Realtime {
       public enum Status {
         // Means the segment is in CONSUMING state.
-        CONSUMING,
-        // Means the segment is in ONLINE state (segment completed consuming and has been saved in segment store).
-        COMPLETED,
-        // (Deprecated; use CONSUMING instead) Means the segment is in CONSUMING state.
         IN_PROGRESS,
-        // (Deprecated; use COMPLETED instead) Means the segment is in ONLINE state (segment completed consuming and has been saved in segment store).
+        // Means the segment is in ONLINE state (segment completed consuming and has been saved in segment store).
         DONE,
         // Means the segment is uploaded to a Pinot controller by an external party.
         UPLOADED
