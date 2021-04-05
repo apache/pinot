@@ -59,8 +59,8 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.stream.LongMsgOffset;
-import org.apache.pinot.spi.stream.PartitionGroupInfo;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
+import org.apache.pinot.spi.stream.PartitionGroupStatus;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -252,11 +252,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
       // Expected
     }
 
-    // committing segment's partitionGroupId no longer in the newPartitionGroupInfoList
-    List<PartitionGroupInfo> partitionGroupInfoListWithout0 =
-        segmentManager.getNewPartitionGroupInfoList(segmentManager._streamConfig, Collections.emptyList());
-    partitionGroupInfoListWithout0.remove(0);
-    segmentManager._partitionGroupInfoList = partitionGroupInfoListWithout0;
+    // committing segment's partitionGroupId no longer in the newPartitionGroupMetadataList
+    List<PartitionGroupMetadata> partitionGroupMetadataListWithout0 =
+        segmentManager.getNewPartitionGroupMetadataList(segmentManager._streamConfig, Collections.emptyList());
+    partitionGroupMetadataListWithout0.remove(0);
+    segmentManager._partitionGroupMetadataList = partitionGroupMetadataListWithout0;
 
     // Commit a segment for partition 0 - No new entries created for partition which reached end of life
     committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 2, CURRENT_TIME_MS).getSegmentName();
@@ -564,10 +564,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
      * End of shard cases
      */
     // 1 reached end of shard.
-    List<PartitionGroupInfo> partitionGroupInfoListWithout1 =
-        segmentManager.getNewPartitionGroupInfoList(segmentManager._streamConfig, Collections.emptyList());
-    partitionGroupInfoListWithout1.remove(1);
-    segmentManager._partitionGroupInfoList = partitionGroupInfoListWithout1;
+    List<PartitionGroupMetadata> partitionGroupMetadataListWithout1 =
+        segmentManager.getNewPartitionGroupMetadataList(segmentManager._streamConfig, Collections.emptyList());
+    partitionGroupMetadataListWithout1.remove(1);
+    segmentManager._partitionGroupMetadataList = partitionGroupMetadataListWithout1;
     // noop
     testRepairs(segmentManager, Collections.emptyList());
 
@@ -582,7 +582,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     testRepairs(segmentManager, Lists.newArrayList(1));
 
     // make the last ONLINE segment of the shard as CONSUMING (failed between step1 and 3)
-    segmentManager._partitionGroupInfoList = partitionGroupInfoListWithout1;
+    segmentManager._partitionGroupMetadataList = partitionGroupMetadataListWithout1;
     consumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 1, 1, CURRENT_TIME_MS).getSegmentName();
     turnNewConsumingSegmentConsuming(instanceStatesMap, consumingSegment);
 
@@ -930,7 +930,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     Map<String, Integer> _segmentZKMetadataVersionMap = new HashMap<>();
     IdealState _idealState;
     int _numPartitions;
-    List<PartitionGroupInfo> _partitionGroupInfoList = null;
+    List<PartitionGroupMetadata> _partitionGroupMetadataList = null;
     boolean _exceededMaxSegmentCompletionTime = false;
 
     FakePinotLLCRealtimeSegmentManager() {
@@ -962,7 +962,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     public void ensureAllPartitionsConsuming() {
       ensureAllPartitionsConsuming(_tableConfig, _streamConfig, _idealState,
-          getNewPartitionGroupInfoList(_streamConfig, Collections.emptyList()));
+          getNewPartitionGroupMetadataList(_streamConfig, Collections.emptyList()));
     }
 
     @Override
@@ -1028,12 +1028,12 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    List<PartitionGroupInfo> getNewPartitionGroupInfoList(StreamConfig streamConfig,
-        List<PartitionGroupMetadata> currentPartitionGroupMetadataList) {
-      if (_partitionGroupInfoList != null) {
-        return _partitionGroupInfoList;
+    List<PartitionGroupMetadata> getNewPartitionGroupMetadataList(StreamConfig streamConfig,
+        List<PartitionGroupStatus> currentPartitionGroupStatusList) {
+      if (_partitionGroupMetadataList != null) {
+        return _partitionGroupMetadataList;
       } else {
-        return IntStream.range(0, _numPartitions).mapToObj(i -> new PartitionGroupInfo(i, PARTITION_OFFSET))
+        return IntStream.range(0, _numPartitions).mapToObj(i -> new PartitionGroupMetadata(i, PARTITION_OFFSET))
             .collect(Collectors.toList());
       }
     }

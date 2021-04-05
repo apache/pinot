@@ -20,67 +20,26 @@ package org.apache.pinot.spi.stream;
 
 /**
  * A PartitionGroup is a group of partitions/shards that the same consumer should consume from.
- * This class contains metadata about the latest state of a partition group,
- * derived by looking at the segment zk metadata of the latest segment of each partition group.
- * It consists of:
- * 1. partitionGroupId - A unique ID for the partitionGroup
- * 2. sequenceNumber - The sequenceNumber this partitionGroup is currently at
- * 3. startOffset - The start offset that the latest segment started consuming from
- * 4. endOffset - The endOffset (if segment consuming from this partition group has finished consuming the segment and recorded the end offset)
- * 5. status - IN_PROGRESS/DONE
- *
- * This information is useful when coming up with the new partition groups for the stream.
+ * This class is a container for the metadata regarding a partition group, that is needed by a consumer to start consumption.
+ * It consists of
+ * 1. A unique partition group id for this partition group
+ * 2. The start offset to begin consumption for this partition group
  */
 public class PartitionGroupMetadata {
 
   private final int _partitionGroupId;
-  private int _sequenceNumber;
-  private StreamPartitionMsgOffset _startOffset;
-  private StreamPartitionMsgOffset _endOffset;
-  private String _status;
+  private final StreamPartitionMsgOffset _startOffset;
 
-  public PartitionGroupMetadata(int partitionGroupId, int sequenceNumber, StreamPartitionMsgOffset startOffset,
-      StreamPartitionMsgOffset endOffset, String status) {
+  public PartitionGroupMetadata(int partitionGroupId, StreamPartitionMsgOffset startOffset) {
     _partitionGroupId = partitionGroupId;
-    _sequenceNumber = sequenceNumber;
     _startOffset = startOffset;
-    _endOffset = endOffset;
-    _status = status;
   }
 
   public int getPartitionGroupId() {
     return _partitionGroupId;
   }
 
-  public int getSequenceNumber() {
-    return _sequenceNumber;
-  }
-
-  public void setSequenceNumber(int sequenceNumber) {
-    _sequenceNumber = sequenceNumber;
-  }
-
   public StreamPartitionMsgOffset getStartOffset() {
     return _startOffset;
-  }
-
-  public void setStartOffset(StreamPartitionMsgOffset startOffset) {
-    _startOffset = startOffset;
-  }
-
-  public StreamPartitionMsgOffset getEndOffset() {
-    return _endOffset;
-  }
-
-  public void setEndOffset(StreamPartitionMsgOffset endOffset) {
-    _endOffset = endOffset;
-  }
-
-  public String getStatus() {
-    return _status;
-  }
-
-  public void setStatus(String status) {
-    _status = status;
   }
 }

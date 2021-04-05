@@ -32,9 +32,9 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.stream.PartitionGroupInfo;
-import org.apache.pinot.spi.stream.PartitionGroupInfoFetcher;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
+import org.apache.pinot.spi.stream.PartitionGroupMetadataFetcher;
+import org.apache.pinot.spi.stream.PartitionGroupStatus;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -121,12 +121,13 @@ public class PinotTableIdealStateBuilder {
   }
 
   /**
-   * Fetches the list of {@link PartitionGroupInfo} for the new partition groups for the stream,
-   * with the help of the {@link PartitionGroupMetadata} of the current partitionGroups.
+   * Fetches the list of {@link PartitionGroupMetadata} for the new partition groups for the stream,
+   * with the help of the {@link PartitionGroupStatus} of the current partitionGroups.
    *
-   * Reasons why <code>currentPartitionGroupMetadata</code> is needed:
+   * Reasons why <code>partitionGroupStatusList</code> is needed:
    *
-   * The current partition group metadata is used to determine the offsets that have been consumed for a partition group.
+   * 1)
+   * The current {@link PartitionGroupStatus} is used to determine the offsets that have been consumed for a partition group.
    * An example of where the offsets would be used:
    * e.g. If partition group 1 contains shardId 1, with status DONE and endOffset 150. There's 2 possibilities:
    * 1) the stream indicates that shardId's last offset is 200.
@@ -135,29 +136,29 @@ public class PinotTableIdealStateBuilder {
    * This tells Pinot that all messages of partition group 1 have been consumed, and it need not be included in the response.
    * Thus, this call will skip a partition group when it has reached end of life and all messages from that partition group have been consumed.
    *
-   * The current partition group metadata is also used to know about existing groupings of partitions,
+   * The current {@link PartitionGroupStatus} is also used to know about existing groupings of partitions,
    * and accordingly make the new partition groups.
    * e.g. Assume that partition group 1 has status IN_PROGRESS and contains shards 0,1,2
    * and partition group 2 has status DONE and contains shards 3,4.
-   * In the above example, the currentPartitionGroupMetadataList indicates that
+   * In the above example, the <code>partitionGroupStatusList</code> indicates that
    * the collection of shards in partition group 1, should remain unchanged in the response,
    * whereas shards 3,4 can be added to new partition groups if needed.
    *
    * @param streamConfig the streamConfig from the tableConfig
-   * @param currentPartitionGroupMetadataList List of {@link PartitionGroupMetadata} for the current partition groups.
+   * @param partitionGroupStatusList List of {@link PartitionGroupStatus} for the current partition groups.
    *                                          The size of this list is equal to the number of partition groups,
    *                                          and is created using the latest segment zk metadata.
    */
-  public static List<PartitionGroupInfo> getPartitionGroupInfoList(StreamConfig streamConfig,
-      List<PartitionGroupMetadata> currentPartitionGroupMetadataList) {
-    PartitionGroupInfoFetcher partitionGroupInfoFetcher =
-        new PartitionGroupInfoFetcher(streamConfig, currentPartitionGroupMetadataList);
+  public static List<PartitionGroupMetadata> getPartitionGroupMetadataList(StreamConfig streamConfig,
+      List<PartitionGroupStatus> partitionGroupStatusList) {
+    PartitionGroupMetadataFetcher partitionGroupMetadataFetcher =
+        new PartitionGroupMetadataFetcher(streamConfig, partitionGroupStatusList);
     try {
-      DEFAULT_IDEALSTATE_UPDATE_RETRY_POLICY.attempt(partitionGroupInfoFetcher);
-      return partitionGroupInfoFetcher.getPartitionGroupInfoList();
+      DEFAULT_IDEALSTATE_UPDATE_RETRY_POLICY.attempt(partitionGroupMetadataFetcher);
+      return partitionGroupMetadataFetcher.getPartitionGroupMetadataList();
     } catch (Exception e) {
-      Exception fetcherException = partitionGroupInfoFetcher.getException();
-      LOGGER.error("Could not get partition group info for topic: {} of table: {}", streamConfig.getTopicName(),
+      Exception fetcherException = partitionGroupMetadataFetcher.getException();
+      LOGGER.error("Could not get PartitionGroupMetadata for topic: {} of table: {}", streamConfig.getTopicName(),
           streamConfig.getTableNameWithType(), fetcherException);
       throw new RuntimeException(fetcherException);
     }

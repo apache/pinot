@@ -19,7 +19,6 @@
 package org.apache.pinot.spi.stream;
 
 import java.util.Set;
-import org.apache.pinot.spi.data.Schema;
 
 
 /**
@@ -78,8 +77,8 @@ public abstract class StreamConsumerFactory {
    * Creates a partition group consumer, which can fetch messages from a partition group
    */
   public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
-      PartitionGroupMetadata partitionGroupMetadata) {
-    return createPartitionLevelConsumer(clientId, partitionGroupMetadata.getPartitionGroupId());
+      PartitionGroupStatus partitionGroupStatus) {
+    return createPartitionLevelConsumer(clientId, partitionGroupStatus.getPartitionGroupId());
   }
 
 }
