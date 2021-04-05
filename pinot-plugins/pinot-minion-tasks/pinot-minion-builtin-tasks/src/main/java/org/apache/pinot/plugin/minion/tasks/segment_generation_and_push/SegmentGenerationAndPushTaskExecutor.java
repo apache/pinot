@@ -49,6 +49,7 @@ import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationTaskSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentNameGeneratorSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -221,29 +222,39 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     return outputSegmentTarURI;
   }
 
-  private PinotFS getInputPinotFS(Map<String, String> taskConfigs, URI fileURI) {
+  private PinotFS getInputPinotFS(Map<String, String> taskConfigs, URI fileURI)
+      throws Exception {
     String fileURIScheme = fileURI.getScheme();
     if (fileURIScheme == null) {
-      fileURIScheme = PinotFSFactory.LOCAL_PINOT_FS_SCHEME;
+      return LOCAL_PINOT_FS;
     }
-    if (!PinotFSFactory.isSchemeSupported(fileURIScheme)) {
-      String fsClass = taskConfigs.get(BatchConfigProperties.INPUT_FS_CLASS);
+    // Try to create PinotFS using given Input FileSystem config always
+    String fsClass = taskConfigs.get(BatchConfigProperties.INPUT_FS_CLASS);
+    if (fsClass != null) {
+      PinotFS pinotFS = PluginManager.get().createInstance(fsClass);
       PinotConfiguration fsProps = IngestionConfigUtils.getInputFsProps(taskConfigs);
-      PinotFSFactory.register(fileURIScheme, fsClass, fsProps);
+      pinotFS.init(fsProps);
+      return pinotFS;
     }
+    // Fallback to use the PinotFS created by Minion Server configs
     return PinotFSFactory.create(fileURIScheme);
   }
 
-  private PinotFS getOutputPinotFS(Map<String, String> taskConfigs, URI fileURI) {
+  private PinotFS getOutputPinotFS(Map<String, String> taskConfigs, URI fileURI)
+      throws Exception {
     String fileURIScheme = (fileURI == null) ? null : fileURI.getScheme();
     if (fileURIScheme == null) {
-      fileURIScheme = PinotFSFactory.LOCAL_PINOT_FS_SCHEME;
+      return LOCAL_PINOT_FS;
     }
-    if (!PinotFSFactory.isSchemeSupported(fileURIScheme)) {
-      String fsClass = taskConfigs.get(BatchConfigProperties.OUTPUT_FS_CLASS);
+    // Try to create PinotFS using given Input FileSystem config always
+    String fsClass = taskConfigs.get(BatchConfigProperties.OUTPUT_FS_CLASS);
+    if (fsClass != null) {
+      PinotFS pinotFS = PluginManager.get().createInstance(fsClass);
       PinotConfiguration fsProps = IngestionConfigUtils.getOutputFsProps(taskConfigs);
-      PinotFSFactory.register(fileURIScheme, fsClass, fsProps);
+      pinotFS.init(fsProps);
+      return pinotFS;
     }
+    // Fallback to use the PinotFS created by Minion Server configs
     return PinotFSFactory.create(fileURIScheme);
   }
 
