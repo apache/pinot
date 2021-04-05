@@ -184,7 +184,7 @@ public final class IngestionUtils {
    * @param authContext auth details required to upload the Pinot segment to controller
    */
   public static void uploadSegment(String tableNameWithType, BatchConfig batchConfig, List<URI> segmentTarURIs,
-      AuthContext authContext)
+      @Nullable AuthContext authContext)
       throws Exception {
 
     SegmentGenerationJobSpec segmentUploadSpec = generateSegmentUploadSpec(tableNameWithType, batchConfig, authContext);
@@ -238,7 +238,7 @@ public final class IngestionUtils {
   }
 
   private static SegmentGenerationJobSpec generateSegmentUploadSpec(String tableName, BatchConfig batchConfig,
-      AuthContext authContext) {
+      @Nullable AuthContext authContext) {
 
     TableSpec tableSpec = new TableSpec();
     tableSpec.setTableName(tableName);
@@ -258,7 +258,9 @@ public final class IngestionUtils {
     spec.setPushJobSpec(pushJobSpec);
     spec.setTableSpec(tableSpec);
     spec.setPinotClusterSpecs(pinotClusterSpecs);
-    spec.setAuthToken(authContext.getAuthToken());
+    if (authContext != null && StringUtils.isNotBlank(authContext.getAuthToken())) {
+      spec.setAuthToken(authContext.getAuthToken());
+    }
     return spec;
   }
 
