@@ -19,18 +19,21 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Collections;
+import java.util.List;
 import java.util.Random;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -96,24 +99,23 @@ public class LiteralOnlyBrokerRequestTest {
     SingleConnectionBrokerRequestHandler requestHandler =
         new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), null, ACCESS_CONTROL_FACTORY, null, null,
             new BrokerMetrics("", PinotMetricUtils.getPinotMetricsRegistry(), true, Collections.emptySet()), null);
-    long randNum = RANDOM.nextLong();
-    byte[] randBytes = new byte[12];
-    RANDOM.nextBytes(randBytes);
-    String ranStr = BytesUtils.toHexString(randBytes);
-    JsonNode request = new ObjectMapper().readTree(String.format("{\"sql\":\"SELECT %d, '%s'\"}", randNum, ranStr));
+    long randomSmallNumber = RANDOM.nextInt();
+    long randomLargeNumber = Long.MAX_VALUE - Math.abs(RANDOM.nextInt());
+    String randomString = RandomStringUtils.randomAlphanumeric(10);
+    JsonNode request = JsonUtils.stringToJsonNode(
+        String.format("{\"sql\":\"SELECT %d, %d, '%s'\"}", randomSmallNumber, randomLargeNumber, randomString));
     RequestStatistics requestStats = new RequestStatistics();
     BrokerResponseNative brokerResponse =
         (BrokerResponseNative) requestHandler.handleRequest(request, null, requestStats);
-    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), String.format("%d", randNum));
-    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(0),
-        DataSchema.ColumnDataType.LONG);
-    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(1), ranStr);
-    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(1),
-        DataSchema.ColumnDataType.STRING);
-    Assert.assertEquals(brokerResponse.getResultTable().getRows().size(), 1);
-    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0).length, 2);
-    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0)[0], randNum);
-    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0)[1], ranStr);
+    ResultTable resultTable = brokerResponse.getResultTable();
+    DataSchema dataSchema = resultTable.getDataSchema();
+    Assert.assertEquals(dataSchema.getColumnNames(),
+        new String[]{Long.toString(randomSmallNumber), Long.toString(randomLargeNumber), randomString});
+    Assert.assertEquals(dataSchema.getColumnDataTypes(),
+        new ColumnDataType[]{ColumnDataType.LONG, ColumnDataType.LONG, ColumnDataType.STRING});
+    List<Object[]> rows = resultTable.getRows();
+    Assert.assertEquals(rows.size(), 1);
+    Assert.assertEquals(rows.get(0), new Object[]{randomSmallNumber, Long.toString(randomLargeNumber), randomString});
     Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
   }
 
@@ -124,18 +126,16 @@ public class LiteralOnlyBrokerRequestTest {
         new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), null, ACCESS_CONTROL_FACTORY, null, null,
             new BrokerMetrics("", PinotMetricUtils.getPinotMetricsRegistry(), true, Collections.emptySet()), null);
     long currentTsMin = System.currentTimeMillis();
-    JsonNode request = new ObjectMapper().readTree(
+    JsonNode request = JsonUtils.stringToJsonNode(
         "{\"sql\":\"SELECT now() as currentTs, fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') as firstDayOf2020\"}");
     RequestStatistics requestStats = new RequestStatistics();
     BrokerResponseNative brokerResponse =
         (BrokerResponseNative) requestHandler.handleRequest(request, null, requestStats);
     long currentTsMax = System.currentTimeMillis();
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), "currentTs");
-    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(0),
-        DataSchema.ColumnDataType.LONG);
+    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(0), ColumnDataType.LONG);
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(1), "firstDayOf2020");
-    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(1),
-        DataSchema.ColumnDataType.LONG);
+    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(1), ColumnDataType.LONG);
     Assert.assertEquals(brokerResponse.getResultTable().getRows().size(), 1);
     Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0).length, 2);
     Assert.assertTrue(Long.parseLong(brokerResponse.getResultTable().getRows().get(0)[0].toString()) > currentTsMin);

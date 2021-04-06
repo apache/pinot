@@ -35,6 +35,13 @@ import org.apache.pinot.spi.utils.EqualityUtils;
  * The <code>DataSchema</code> class describes the schema of {@link DataTable}.
  */
 public class DataSchema {
+  // NOTE:
+  //   The MIN_SAFE_INTEGER and MAX_SAFE_INTEGER stores the minimum and maximum safe integer in JavaScript.
+  //   When formatting the values to be used in the json response, if a long value is not in the safe integer range, we
+  //   format the value into a string so that it can be correctly parsed on the client side.
+  private static final long MIN_SAFE_INTEGER = -((1L << 53) - 1);
+  private static final long MAX_SAFE_INTEGER = (1L << 53) - 1;
+
   private final String[] _columnNames;
   private final ColumnDataType[] _columnDataTypes;
 
@@ -337,8 +344,12 @@ public class DataSchema {
      */
     public Serializable format(Object value) {
       switch (this) {
+        case LONG:
+          return format((long) value);
         case BYTES:
           return BytesUtils.toHexString((byte[]) value);
+        case LONG_ARRAY:
+          return format((long[]) value);
         default:
           return (Serializable) value;
       }
@@ -352,7 +363,7 @@ public class DataSchema {
         case INT:
           return ((Number) value).intValue();
         case LONG:
-          return ((Number) value).longValue();
+          return format(((Number) value).longValue());
         case FLOAT:
           return ((Number) value).floatValue();
         case DOUBLE:
@@ -365,7 +376,7 @@ public class DataSchema {
           return (int[]) value;
         case LONG_ARRAY:
           if (value instanceof long[]) {
-            return (long[]) value;
+            return format((long[]) value);
           } else {
             int[] intValues = (int[]) value;
             int length = intValues.length;
@@ -410,6 +421,35 @@ public class DataSchema {
         default:
           throw new IllegalStateException(String.format("Cannot convert and format: '%s' to type: %s", value, this));
       }
+    }
+
+    /**
+     * Helper method to format the long value into a string if it is not within the JavaScript safe integer range.
+     */
+    private static Serializable format(long value) {
+      if (value >= MIN_SAFE_INTEGER && value <= MAX_SAFE_INTEGER) {
+        return value;
+      } else {
+        return Long.toString(value);
+      }
+    }
+
+    /**
+     * Helper method to format the long value within the array into a string if it is not within the JavaScript safe
+     * integer range.
+     */
+    private static Serializable format(long[] values) {
+      for (long value : values) {
+        if (value < MIN_SAFE_INTEGER || value > MAX_SAFE_INTEGER) {
+          int numValues = values.length;
+          Serializable[] formattedValues = new Serializable[numValues];
+          for (int i = 0; i < numValues; i++) {
+            formattedValues[i] = format(values[i]);
+          }
+          return formattedValues;
+        }
+      }
+      return values;
     }
 
     public static ColumnDataType fromDataType(DataType dataType, boolean isSingleValue) {

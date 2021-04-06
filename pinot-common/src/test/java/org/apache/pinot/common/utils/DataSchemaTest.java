@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.Assert;
@@ -178,5 +179,21 @@ public class DataSchemaTest {
     Assert.assertEquals(fromDataType(FieldSpec.DataType.DOUBLE, false), DOUBLE_ARRAY);
     Assert.assertEquals(fromDataType(FieldSpec.DataType.STRING, true), STRING);
     Assert.assertEquals(fromDataType(FieldSpec.DataType.STRING, false), STRING_ARRAY);
+  }
+
+  @Test
+  public void testFormat() {
+    Assert.assertEquals(LONG.format(-((1L << 53) - 1)), -((1L << 53) - 1));
+    Assert.assertEquals(LONG.format(-(1L << 53)), Long.toString(-(1L << 53)));
+    Assert.assertEquals(LONG.format((1L << 53) - 1), (1L << 53) - 1);
+    Assert.assertEquals(LONG.format(1L << 53), Long.toString(1L << 53));
+
+    Serializable result = LONG_ARRAY.format(new long[]{-((1L << 53) - 1), -(1L << 53), (1L << 53) - 1, 1L << 53});
+    Assert.assertTrue(result instanceof Serializable[]);
+    Serializable[] formattedValues = (Serializable[]) result;
+    Assert.assertEquals(formattedValues[0], -((1L << 53) - 1));
+    Assert.assertEquals(formattedValues[1], Long.toString(-(1L << 53)));
+    Assert.assertEquals(formattedValues[2], (1L << 53) - 1);
+    Assert.assertEquals(formattedValues[3], Long.toString(1L << 53));
   }
 }
