@@ -20,8 +20,8 @@ package org.apache.pinot.core.segment.index.readers.bloom;
 
 import com.google.common.base.Preconditions;
 import org.apache.pinot.core.segment.creator.impl.bloom.OnHeapGuavaBloomFilterCreator;
-import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 
 
 public class BloomFilterReaderFactory {

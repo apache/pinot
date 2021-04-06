@@ -20,6 +20,7 @@ package org.apache.pinot.core.io.compression;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 
 
 /**

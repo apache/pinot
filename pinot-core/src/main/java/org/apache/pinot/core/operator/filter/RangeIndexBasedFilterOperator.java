@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.filter;
 
-import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
@@ -30,6 +29,7 @@ import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFa
 import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.LongRawValueBasedRangePredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.SortedDictionaryBasedRangePredicateEvaluator;
 import org.apache.pinot.core.segment.index.readers.RangeIndexReader;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 

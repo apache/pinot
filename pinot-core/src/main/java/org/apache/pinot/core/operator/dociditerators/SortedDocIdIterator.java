@@ -19,9 +19,9 @@
 package org.apache.pinot.core.operator.dociditerators;
 
 import java.util.List;
-import org.apache.pinot.common.utils.Pairs.IntPair;
 import org.apache.pinot.core.common.BlockDocIdIterator;
-import org.apache.pinot.core.common.Constants;
+import org.apache.pinot.segment.spi.Constants;
+import org.apache.pinot.spi.utils.Pairs.IntPair;
 
 
 /**

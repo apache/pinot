@@ -26,9 +26,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

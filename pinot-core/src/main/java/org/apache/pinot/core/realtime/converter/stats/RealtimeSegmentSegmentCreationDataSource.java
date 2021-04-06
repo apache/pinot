@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.core.realtime.converter.stats;
 
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.core.realtime.converter.RealtimeSegmentRecordReader;
-import org.apache.pinot.core.segment.creator.SegmentCreationDataSource;
-import org.apache.pinot.core.segment.creator.SegmentPreIndexStatsContainer;
-import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.creator.SegmentCreationDataSource;
+import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsContainer;
+import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.RecordReader;
 
 
 /**

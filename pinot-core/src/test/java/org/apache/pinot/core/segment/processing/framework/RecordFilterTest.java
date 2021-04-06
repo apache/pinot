@@ -33,7 +33,7 @@ import static org.testng.Assert.fail;
 
 
 /**
- * Tests for {@link org.apache.pinot.core.segment.processing.filter.RecordFilter}
+ * Tests for {@link RecordFilter}
  */
 public class RecordFilterTest {
 

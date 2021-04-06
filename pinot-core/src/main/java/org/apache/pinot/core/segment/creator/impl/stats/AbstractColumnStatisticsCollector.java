@@ -21,9 +21,10 @@ package org.apache.pinot.core.segment.creator.impl.stats;
 import java.util.HashSet;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.core.data.partition.PartitionFunction;
-import org.apache.pinot.core.segment.creator.ColumnStatistics;
-import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
+import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
+import org.apache.pinot.segment.spi.creator.ColumnStatistics;
+import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -61,9 +62,14 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
   public AbstractColumnStatisticsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     this.column = column;
     fieldSpec = statsCollectorConfig.getFieldSpecForColumn(column);
-    partitionFunction = statsCollectorConfig.getPartitionFunction(column);
-    numPartitions = statsCollectorConfig.getNumPartitions(column);
-    if (partitionFunction != null) {
+
+    String partitionFunctionName = statsCollectorConfig.getPartitionFunctionName(column);
+    int numPartitions = statsCollectorConfig.getNumPartitions(column);
+    partitionFunction = (partitionFunctionName != null) ? PartitionFunctionFactory
+        .getPartitionFunction(partitionFunctionName, numPartitions) : null;
+
+    this.numPartitions = statsCollectorConfig.getNumPartitions(column);
+    if (this.partitionFunction != null) {
       _partitions = new HashSet<>();
     } else {
       _partitions = null;

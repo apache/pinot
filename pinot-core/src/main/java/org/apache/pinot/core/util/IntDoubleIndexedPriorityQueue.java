@@ -20,7 +20,7 @@ package org.apache.pinot.core.util;
 
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import javax.annotation.concurrent.NotThreadSafe;
-import org.apache.pinot.common.utils.Pairs.IntDoublePair;
+import org.apache.pinot.spi.utils.Pairs.IntDoublePair;
 
 
 /**

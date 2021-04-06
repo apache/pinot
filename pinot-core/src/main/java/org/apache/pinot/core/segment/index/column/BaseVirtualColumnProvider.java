@@ -22,6 +22,7 @@ import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnIndexContainer;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProvider;
+import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.spi.data.FieldSpec;
 
 

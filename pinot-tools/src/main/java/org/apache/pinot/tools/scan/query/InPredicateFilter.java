@@ -21,7 +21,7 @@ package org.apache.pinot.tools.scan.query;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.List;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
 
 public class InPredicateFilter implements PredicateFilter {

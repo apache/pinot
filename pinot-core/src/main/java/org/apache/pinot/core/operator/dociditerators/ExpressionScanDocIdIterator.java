@@ -19,8 +19,6 @@
 package org.apache.pinot.core.operator.dociditerators;
 
 import java.util.Map;
-import org.apache.pinot.core.common.Constants;
-import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
@@ -29,6 +27,8 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.segment.spi.Constants;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;

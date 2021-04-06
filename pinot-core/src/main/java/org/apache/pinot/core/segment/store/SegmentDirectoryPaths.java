@@ -22,11 +22,10 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import javax.annotation.Nullable;
-import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.creator.impl.text.LuceneTextIndexCreator;
-import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneFSTIndexCreator;
 import org.apache.pinot.core.segment.index.readers.text.LuceneTextIndexReader;
+import org.apache.pinot.segment.spi.creator.SegmentVersion;
 
 import static org.apache.pinot.core.segment.creator.impl.V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
 

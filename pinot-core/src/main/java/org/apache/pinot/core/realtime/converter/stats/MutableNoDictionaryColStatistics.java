@@ -19,13 +19,13 @@
 package org.apache.pinot.core.realtime.converter.stats;
 
 import java.util.Set;
-import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.common.DataSourceMetadata;
-import org.apache.pinot.core.data.partition.PartitionFunction;
-import org.apache.pinot.core.segment.index.readers.MutableForwardIndex;
-import org.apache.pinot.core.segment.creator.ColumnStatistics;
+import org.apache.pinot.segment.spi.creator.ColumnStatistics;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.index.reader.MutableForwardIndex;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 
-import static org.apache.pinot.core.common.Constants.UNKNOWN_CARDINALITY;
+import static org.apache.pinot.segment.spi.Constants.UNKNOWN_CARDINALITY;
 
 
 public class MutableNoDictionaryColStatistics implements ColumnStatistics {

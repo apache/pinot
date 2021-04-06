@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.query;
 
 import java.util.Collections;
-import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -30,6 +29,7 @@ import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunct
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctExecutorFactory;
 import org.apache.pinot.core.query.distinct.DistinctTable;
+import org.apache.pinot.segment.spi.IndexSegment;
 
 
 /**

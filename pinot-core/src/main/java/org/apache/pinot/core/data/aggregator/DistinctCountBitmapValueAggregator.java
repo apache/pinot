@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.data.aggregator;
 
-import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
 

@@ -19,15 +19,15 @@
 package org.apache.pinot.core.segment.virtualcolumn;
 
 import java.io.IOException;
-import org.apache.pinot.common.utils.Pairs;
 import org.apache.pinot.core.segment.index.column.BaseVirtualColumnProvider;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.DocIdDictionary;
-import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
-import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
-import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
-import org.apache.pinot.core.segment.index.readers.SortedIndexReader;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
+import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
+import org.apache.pinot.spi.utils.Pairs;
 
 
 /**

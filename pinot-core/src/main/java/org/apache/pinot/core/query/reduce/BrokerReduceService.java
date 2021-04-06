@@ -123,10 +123,9 @@ public class BrokerReduceService {
       }
 
       // Reduce on exceptions.
-      for (String key : metadata.keySet()) {
-        if (key.startsWith(DataTable.EXCEPTION_METADATA_KEY)) {
-          processingExceptions.add(new QueryProcessingException(Integer.parseInt(key.substring(9)), metadata.get(key)));
-        }
+      Map<Integer, String> exceptions = dataTable.getExceptions();
+      for (int key : exceptions.keySet()) {
+        processingExceptions.add(new QueryProcessingException(key, exceptions.get(key)));
       }
 
       // Reduce on execution statistics.

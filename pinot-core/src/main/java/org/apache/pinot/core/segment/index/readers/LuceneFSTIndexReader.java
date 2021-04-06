@@ -18,19 +18,19 @@
  */
 package org.apache.pinot.core.segment.index.readers;
 
+import java.io.IOException;
+import java.util.List;
 import org.apache.lucene.util.fst.FST;
 import org.apache.lucene.util.fst.OffHeapFSTStore;
 import org.apache.lucene.util.fst.PositiveIntOutputs;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import org.apache.pinot.core.util.fst.RegexpMatcher;
 import org.apache.pinot.core.util.fst.PinotBufferIndexInput;
+import org.apache.pinot.core.util.fst.RegexpMatcher;
+import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.util.List;
 
 
 /**

@@ -18,16 +18,16 @@
  */
 package org.apache.pinot.core.segment.index.readers;
 
+import java.io.File;
+import java.io.IOException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import java.io.File;
-import java.io.IOException;
 
 
 public class NullValueVectorReaderImplTest {

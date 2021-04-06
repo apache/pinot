@@ -26,15 +26,10 @@ import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.core.segment.index.readers.BitmapInvertedIndexReader;
-import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.BytesDictionary;
 import org.apache.pinot.core.segment.index.readers.DoubleDictionary;
 import org.apache.pinot.core.segment.index.readers.FloatDictionary;
-import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
-import org.apache.pinot.core.segment.index.readers.H3IndexReader;
 import org.apache.pinot.core.segment.index.readers.IntDictionary;
-import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
-import org.apache.pinot.core.segment.index.readers.JsonIndexReader;
 import org.apache.pinot.core.segment.index.readers.LongDictionary;
 import org.apache.pinot.core.segment.index.readers.LuceneFSTIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReaderImpl;
@@ -44,9 +39,7 @@ import org.apache.pinot.core.segment.index.readers.OnHeapIntDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapLongDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapStringDictionary;
 import org.apache.pinot.core.segment.index.readers.RangeIndexReader;
-import org.apache.pinot.core.segment.index.readers.SortedIndexReader;
 import org.apache.pinot.core.segment.index.readers.StringDictionary;
-import org.apache.pinot.core.segment.index.readers.TextIndexReader;
 import org.apache.pinot.core.segment.index.readers.bloom.BloomFilterReaderFactory;
 import org.apache.pinot.core.segment.index.readers.forward.FixedBitMVForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
@@ -59,6 +52,15 @@ import org.apache.pinot.core.segment.index.readers.text.LuceneTextIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
+import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
+import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
+import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
+import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
@@ -231,7 +233,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   }
 
   @Override
-  public NullValueVectorReaderImpl getNullValueVector() {
+  public NullValueVectorReader getNullValueVector() {
     return _nullValueVectorReader;
   }
 

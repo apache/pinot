@@ -24,7 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import org.apache.pinot.common.utils.Pairs;
+import org.apache.pinot.spi.utils.Pairs;
 import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
 import org.apache.pinot.core.util.IntObjectIndexedPriorityQueue;
 import org.testng.Assert;

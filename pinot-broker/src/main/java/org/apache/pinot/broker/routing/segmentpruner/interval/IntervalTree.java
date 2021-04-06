@@ -25,7 +25,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.utils.Pairs;
+import org.apache.pinot.spi.utils.Pairs;
 
 
 /**

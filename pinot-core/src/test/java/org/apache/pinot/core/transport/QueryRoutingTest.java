@@ -26,7 +26,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.common.datatable.DataTableImplV2;
+import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.TableType;
@@ -79,7 +79,7 @@ public class QueryRoutingTest {
   public void testValidResponse()
       throws Exception {
     long requestId = 123;
-    DataTable dataTable = new DataTableImplV2();
+    DataTable dataTable = DataTableBuilder.getEmptyDataTable();
     dataTable.getMetadata().put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(requestId));
     byte[] responseBytes = dataTable.toBytes();
 
@@ -156,7 +156,7 @@ public class QueryRoutingTest {
   public void testNonMatchingRequestId()
       throws Exception {
     long requestId = 123;
-    DataTable dataTable = new DataTableImplV2();
+    DataTable dataTable = DataTableBuilder.getEmptyDataTable();
     dataTable.getMetadata().put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(requestId));
     byte[] responseBytes = dataTable.toBytes();
 
@@ -186,7 +186,7 @@ public class QueryRoutingTest {
   public void testServerDown()
       throws Exception {
     long requestId = 123;
-    DataTable dataTable = new DataTableImplV2();
+    DataTable dataTable = DataTableBuilder.getEmptyDataTable();
     dataTable.getMetadata().put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(requestId));
     byte[] responseBytes = dataTable.toBytes();
 

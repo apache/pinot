@@ -45,8 +45,8 @@ import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
 import org.apache.pinot.common.utils.grpc.GrpcRequestBuilder;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
-import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -1556,7 +1556,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       String responseType =
           streamingResponse.getMetadataMap().get(CommonConstants.Query.Response.MetadataKeys.RESPONSE_TYPE);
       if (responseType.equals(CommonConstants.Query.Response.ResponseType.DATA)) {
-        assertTrue(dataTable.getMetadata().isEmpty());
+        // verify the returned data table metadata only contains "threadCpuTimeNs".
+        Map<String, String> metadata = dataTable.getMetadata();
+        assertTrue(metadata.size() == 1 && metadata.containsKey(DataTable.MetadataKey.THREAD_CPU_TIME_NS.getName()));
         assertNotNull(dataTable.getDataSchema());
         numTotalDocs += dataTable.getNumberOfRows();
       } else {

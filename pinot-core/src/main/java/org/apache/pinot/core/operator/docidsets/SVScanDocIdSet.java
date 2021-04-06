@@ -20,7 +20,7 @@ package org.apache.pinot.core.operator.docidsets;
 
 import org.apache.pinot.core.operator.dociditerators.SVScanDocIdIterator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 
 
 public final class SVScanDocIdSet implements FilterBlockDocIdSet {

@@ -20,9 +20,9 @@ package org.apache.pinot.core.segment.index.datasource;
 
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.core.common.DataSourceMetadata;
-import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
 
 

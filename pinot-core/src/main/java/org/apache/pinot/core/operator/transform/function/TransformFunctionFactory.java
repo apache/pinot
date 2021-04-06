@@ -27,7 +27,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.geospatial.transform.function.StAreaFunction;
 import org.apache.pinot.core.geospatial.transform.function.StAsBinaryFunction;
 import org.apache.pinot.core.geospatial.transform.function.StAsTextFunction;
@@ -50,6 +49,7 @@ import org.apache.pinot.core.operator.transform.function.SingleParamMathTransfor
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FunctionContext;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
 /**
