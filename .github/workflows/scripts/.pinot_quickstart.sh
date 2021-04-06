@@ -48,8 +48,8 @@ PID=$!
 
 PASS=0
 
-# Wait for 30 seconds for table to be set up, then at most 5 minutes to reach the desired state
-sleep 30
+# Wait for 1 minute for table to be set up, then at most 5 minutes to reach the desired state
+sleep 60
 for i in $(seq 1 150)
 do
   QUERY_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from baseballStats limit 1","trace":false}' http://localhost:8000/query/sql`
@@ -87,8 +87,8 @@ PID=$!
 
 PASS=0
 
-# Wait for 30 seconds for table to be set up, then at most 5 minutes to reach the desired state
-sleep 30
+# Wait for 1 minute for table to be set up, then at most 5 minutes to reach the desired state
+sleep 60
 for i in $(seq 1 150)
 do
   QUERY_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from baseballStats limit 1","trace":false}' http://localhost:8000/query/sql`
@@ -115,8 +115,8 @@ PID=$!
 PASS=0
 RES_1=0
 
-# Wait for 30 seconds for table to be set up, then at most 5 minutes to reach the desired state
-sleep 30
+# Wait for 1 minute for table to be set up, then at most 5 minutes to reach the desired state
+sleep 60
 for i in $(seq 1 150)
 do
   QUERY_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from meetupRsvp limit 1","trace":false}' http://localhost:8000/query/sql`
@@ -153,8 +153,8 @@ PID=$!
 PASS=0
 RES_1=0
 
-# Wait for 30 seconds for table to be set up, then at most 5 minutes to reach the desired state
-sleep 30
+# Wait for 1 minute for table to be set up, then at most 5 minutes to reach the desired state
+sleep 60
 for i in $(seq 1 150)
 do
   QUERY_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from airlineStats limit 1","trace":false}' http://localhost:8000/query/sql`
