@@ -60,13 +60,13 @@ public interface StreamMetadataProvider extends Closeable {
   }
 
   /**
-   * Computes the list of {@link PartitionGroupMetadata} for the latest state of the stream, using the current {@link PartitionGroupStatus}
+   * Computes the list of {@link PartitionGroupMetadata} for the latest state of the stream, using the current {@link PartitionGroupConsumptionStatus}
    *
    * Default behavior is the one for the Kafka stream, where each partition group contains only one partition
-   * @param partitionGroupStatus list of {@link PartitionGroupStatus} for current partition groups
+   * @param partitionGroupConsumptionStatuses list of {@link PartitionGroupConsumptionStatus} for current partition groups
    */
   default List<PartitionGroupMetadata> computePartitionGroupMetadata(String clientId, StreamConfig streamConfig,
-      List<PartitionGroupStatus> partitionGroupStatus, int timeoutMillis)
+      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis)
       throws TimeoutException, IOException {
     int partitionCount = fetchPartitionCount(timeoutMillis);
     List<PartitionGroupMetadata> newPartitionGroupMetadataList = new ArrayList<>(partitionCount);
@@ -74,14 +74,14 @@ public interface StreamMetadataProvider extends Closeable {
     // Add a PartitionGroupMetadata into the list, foreach partition already present in current.
     // Setting endOffset (exclusive) as the startOffset for new partition group.
     // If partition group is still in progress, this value will be null
-    for (PartitionGroupStatus currentPartitionGroupStatus : partitionGroupStatus) {
-      newPartitionGroupMetadataList.add(new PartitionGroupMetadata(currentPartitionGroupStatus.getPartitionGroupId(),
-          currentPartitionGroupStatus.getEndOffset()));
+    for (PartitionGroupConsumptionStatus currentPartitionGroupConsumptionStatus : partitionGroupConsumptionStatuses) {
+      newPartitionGroupMetadataList.add(new PartitionGroupMetadata(currentPartitionGroupConsumptionStatus.getPartitionGroupId(),
+          currentPartitionGroupConsumptionStatus.getEndOffset()));
     }
     // Add PartitionGroupMetadata for new partitions
     // Use offset criteria from stream config
     StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
-    for (int i = partitionGroupStatus.size(); i < partitionCount; i++) {
+    for (int i = partitionGroupConsumptionStatuses.size(); i < partitionCount; i++) {
       StreamMetadataProvider partitionMetadataProvider =
           streamConsumerFactory.createPartitionMetadataProvider(clientId, i);
       StreamPartitionMsgOffset streamPartitionMsgOffset =

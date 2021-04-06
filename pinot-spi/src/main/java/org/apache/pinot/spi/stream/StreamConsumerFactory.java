@@ -77,8 +77,8 @@ public abstract class StreamConsumerFactory {
    * Creates a partition group consumer, which can fetch messages from a partition group
    */
   public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
-      PartitionGroupStatus partitionGroupStatus) {
-    return createPartitionLevelConsumer(clientId, partitionGroupStatus.getPartitionGroupId());
+      PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
+    return createPartitionLevelConsumer(clientId, partitionGroupConsumptionStatus.getPartitionGroupId());
   }
 
 }

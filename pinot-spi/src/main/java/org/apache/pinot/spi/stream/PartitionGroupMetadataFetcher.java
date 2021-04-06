@@ -34,16 +34,16 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
 
   private List<PartitionGroupMetadata> _newPartitionGroupMetadataList;
   private final StreamConfig _streamConfig;
-  private final List<PartitionGroupStatus> _partitionGroupStatusList;
+  private final List<PartitionGroupConsumptionStatus> _partitionGroupConsumptionStatusList;
   private final StreamConsumerFactory _streamConsumerFactory;
   private Exception _exception;
   private final String _topicName;
 
-  public PartitionGroupMetadataFetcher(StreamConfig streamConfig, List<PartitionGroupStatus> partitionGroupStatusList) {
+  public PartitionGroupMetadataFetcher(StreamConfig streamConfig, List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList) {
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
     _topicName = streamConfig.getTopicName();
     _streamConfig = streamConfig;
-    _partitionGroupStatusList = partitionGroupStatusList;
+    _partitionGroupConsumptionStatusList = partitionGroupConsumptionStatusList;
   }
 
   public List<PartitionGroupMetadata> getPartitionGroupMetadataList() {
@@ -56,7 +56,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
 
   /**
    * Callable to fetch the {@link PartitionGroupMetadata} list, from the stream.
-   * The stream requires the list of {@link PartitionGroupStatus} to compute the new {@link PartitionGroupMetadata}
+   * The stream requires the list of {@link PartitionGroupConsumptionStatus} to compute the new {@link PartitionGroupMetadata}
    */
   @Override
   public Boolean call()
@@ -65,7 +65,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
     try (
         StreamMetadataProvider streamMetadataProvider = _streamConsumerFactory.createStreamMetadataProvider(clientId)) {
       _newPartitionGroupMetadataList = streamMetadataProvider
-          .computePartitionGroupMetadata(clientId, _streamConfig, _partitionGroupStatusList, /*maxWaitTimeMs=*/5000);
+          .computePartitionGroupMetadata(clientId, _streamConfig, _partitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/5000);
       if (_exception != null) {
         // We had at least one failure, but succeeded now. Log an info
         LOGGER.info("Successfully retrieved PartitionGroupMetadata for topic {}", _topicName);

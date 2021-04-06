@@ -60,7 +60,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
-import org.apache.pinot.spi.stream.PartitionGroupStatus;
+import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -1029,7 +1029,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     @Override
     List<PartitionGroupMetadata> getNewPartitionGroupMetadataList(StreamConfig streamConfig,
-        List<PartitionGroupStatus> currentPartitionGroupStatusList) {
+        List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList) {
       if (_partitionGroupMetadataList != null) {
         return _partitionGroupMetadataList;
       } else {

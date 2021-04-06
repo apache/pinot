@@ -34,7 +34,7 @@ import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentMa
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.PartitionGroupMetadataFetcher;
-import org.apache.pinot.spi.stream.PartitionGroupStatus;
+import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -122,12 +122,12 @@ public class PinotTableIdealStateBuilder {
 
   /**
    * Fetches the list of {@link PartitionGroupMetadata} for the new partition groups for the stream,
-   * with the help of the {@link PartitionGroupStatus} of the current partitionGroups.
+   * with the help of the {@link PartitionGroupConsumptionStatus} of the current partitionGroups.
    *
-   * Reasons why <code>partitionGroupStatusList</code> is needed:
+   * Reasons why <code>partitionGroupConsumptionStatusList</code> is needed:
    *
    * 1)
-   * The current {@link PartitionGroupStatus} is used to determine the offsets that have been consumed for a partition group.
+   * The current {@link PartitionGroupConsumptionStatus} is used to determine the offsets that have been consumed for a partition group.
    * An example of where the offsets would be used:
    * e.g. If partition group 1 contains shardId 1, with status DONE and endOffset 150. There's 2 possibilities:
    * 1) the stream indicates that shardId's last offset is 200.
@@ -136,23 +136,23 @@ public class PinotTableIdealStateBuilder {
    * This tells Pinot that all messages of partition group 1 have been consumed, and it need not be included in the response.
    * Thus, this call will skip a partition group when it has reached end of life and all messages from that partition group have been consumed.
    *
-   * The current {@link PartitionGroupStatus} is also used to know about existing groupings of partitions,
+   * The current {@link PartitionGroupConsumptionStatus} is also used to know about existing groupings of partitions,
    * and accordingly make the new partition groups.
    * e.g. Assume that partition group 1 has status IN_PROGRESS and contains shards 0,1,2
    * and partition group 2 has status DONE and contains shards 3,4.
-   * In the above example, the <code>partitionGroupStatusList</code> indicates that
+   * In the above example, the <code>partitionGroupConsumptionStatusList</code> indicates that
    * the collection of shards in partition group 1, should remain unchanged in the response,
    * whereas shards 3,4 can be added to new partition groups if needed.
    *
    * @param streamConfig the streamConfig from the tableConfig
-   * @param partitionGroupStatusList List of {@link PartitionGroupStatus} for the current partition groups.
+   * @param partitionGroupConsumptionStatusList List of {@link PartitionGroupConsumptionStatus} for the current partition groups.
    *                                          The size of this list is equal to the number of partition groups,
    *                                          and is created using the latest segment zk metadata.
    */
   public static List<PartitionGroupMetadata> getPartitionGroupMetadataList(StreamConfig streamConfig,
-      List<PartitionGroupStatus> partitionGroupStatusList) {
+      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList) {
     PartitionGroupMetadataFetcher partitionGroupMetadataFetcher =
-        new PartitionGroupMetadataFetcher(streamConfig, partitionGroupStatusList);
+        new PartitionGroupMetadataFetcher(streamConfig, partitionGroupConsumptionStatusList);
     try {
       DEFAULT_IDEALSTATE_UPDATE_RETRY_POLICY.attempt(partitionGroupMetadataFetcher);
       return partitionGroupMetadataFetcher.getPartitionGroupMetadataList();

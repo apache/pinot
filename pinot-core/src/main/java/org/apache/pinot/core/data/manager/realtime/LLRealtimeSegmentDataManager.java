@@ -73,7 +73,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
-import org.apache.pinot.spi.stream.PartitionGroupStatus;
+import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.RowMetadata;
@@ -251,7 +251,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private Thread _consumerThread;
   private final String _streamTopic;
   private final int _partitionGroupId;
-  private final PartitionGroupStatus _partitionGroupStatus;
+  private final PartitionGroupConsumptionStatus _partitionGroupConsumptionStatus;
   final String _clientId;
   private final LLCSegmentName _llcSegmentName;
   private final RecordTransformer _recordTransformer;
@@ -1141,7 +1141,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _llcSegmentName = llcSegmentName;
     _partitionGroupId = _llcSegmentName.getPartitionGroupId();
-    _partitionGroupStatus = new PartitionGroupStatus(_partitionGroupId, _llcSegmentName.getSequenceNumber(),
+    _partitionGroupConsumptionStatus = new PartitionGroupConsumptionStatus(_partitionGroupId, _llcSegmentName.getSequenceNumber(),
         _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getStartOffset()),
         _segmentZKMetadata.getEndOffset() == null ? null
             : _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getEndOffset()),
@@ -1259,7 +1259,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         //       long as the partition function is not changed.
         int numPartitions = columnPartitionConfig.getNumPartitions();
         try {
-          // TODO: currentPartitionGroupStatus should be fetched from idealState + segmentZkMetadata, so that we get back accurate partitionGroups info
+          // TODO: currentPartitionGroupConsumptionStatus should be fetched from idealState + segmentZkMetadata,
+          //  so that we get back accurate partitionGroups info
           //  However this is not an issue for Kafka, since partitionGroups never expire and every partitionGroup has a single partition
           //  Fix this before opening support for partitioning in Kinesis
           int numPartitionGroups = _streamMetadataProvider
@@ -1334,7 +1335,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       closePartitionGroupConsumer();
     }
     segmentLogger.info("Creating new stream consumer, reason: {}", reason);
-    _partitionGroupConsumer = _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupStatus);
+    _partitionGroupConsumer = _streamConsumerFactory.createPartitionGroupConsumer(_clientId,
+        _partitionGroupConsumptionStatus);
   }
 
   /**
