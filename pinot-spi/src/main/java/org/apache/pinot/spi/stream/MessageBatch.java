@@ -81,4 +81,11 @@ public interface MessageBatch<T> {
   default StreamPartitionMsgOffset getNextStreamParitionMsgOffsetAtIndex(int index) {
     return new LongMsgOffset(getNextStreamMessageOffsetAtIndex(index));
   }
+
+  /**
+   * Returns true if end of the consumer detects that no more records can be read from this partition group for good
+   */
+  default boolean isEndOfPartitionGroup() {
+    return false;
+  }
 }
