@@ -30,4 +30,14 @@
     <isMultiline>true</isMultiline>
     <padLines>false</padLines>
   </rst_style>
+  <javadoc_style>
+    <firstLine>/**</firstLine>
+    <beforeEachLine> * </beforeEachLine>
+    <endLine> */</endLine>
+    <firstLineDetectionPattern>(\s|\t)*/\*.*$</firstLineDetectionPattern>
+    <lastLineDetectionPattern>.*\*/(\s|\t)*$</lastLineDetectionPattern>
+    <allowBlankLines>false</allowBlankLines>
+    <isMultiline>true</isMultiline>
+    <padLines>false</padLines>
+  </javadoc_style>
 </additionalHeaders>

@@ -1,3 +1,22 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
 {"hsqls":["SELECT DivReachedDest, FirstDepTime, DepDelayMinutes FROM mytable WHERE DestState IN ('VI', 'UT', 'VA') OR ArrTime < 806 ORDER BY OriginAirportSeqID, ArrivalDelayGroups LIMIT 10000"],"pql":"SELECT DivReachedDest, FirstDepTime, DepDelayMinutes FROM mytable WHERE DestState IN ('VI', 'UT', 'VA') OR ArrTime < 806 ORDER BY OriginAirportSeqID, ArrivalDelayGroups LIMIT 10"}
 {"hsqls":["SELECT DistanceGroup, Carrier, DepTime FROM mytable WHERE Cancelled IN (1, 0) AND Flights BETWEEN 1 AND 1 OR TaxiOut <> 32 LIMIT 10000"],"pql":"SELECT DistanceGroup, Carrier, DepTime FROM mytable WHERE Cancelled IN (1, 0) AND Flights BETWEEN 1 AND 1 OR TaxiOut <> 32 LIMIT 7"}
 {"hsqls":["SELECT ActualElapsedTime, CancellationCode, DivArrDelay, MIN(Month) FROM mytable WHERE DayofMonth BETWEEN 12 AND 24 GROUP BY ActualElapsedTime, CancellationCode, DivArrDelay LIMIT 10000","SELECT ActualElapsedTime, CancellationCode, DivArrDelay, AVG(CAST(DivAirportLandings AS DOUBLE)) FROM mytable WHERE DayofMonth BETWEEN 12 AND 24 GROUP BY ActualElapsedTime, CancellationCode, DivArrDelay LIMIT 10000"],"pql":"SELECT MIN(Month), AVG(DivAirportLandings) FROM mytable WHERE DayofMonth BETWEEN 12 AND 24 GROUP BY ActualElapsedTime, CancellationCode, DivArrDelay TOP 29"}
