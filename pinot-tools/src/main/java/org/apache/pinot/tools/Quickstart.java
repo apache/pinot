@@ -48,12 +48,16 @@ public class Quickstart {
     return "examples/batch/baseballStats";
   }
 
+  public int getNumMinions() {
+    return 0;
+  }
+
   public String getAuthToken() {
     return null;
   }
 
   public Map<String, Object> getConfigOverrides() {
-    return new HashMap<>();
+    return null;
   }
 
   public static void printStatus(Color color, String message) {
@@ -172,8 +176,8 @@ public class Quickstart {
     FileUtils.copyURLToFile(resource, tableConfigFile);
 
     QuickstartTableRequest request = new QuickstartTableRequest(baseDir.getAbsolutePath());
-    final QuickstartRunner runner =
-        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 1, dataDir, true, getAuthToken(),
+    QuickstartRunner runner =
+        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, getNumMinions(), dataDir, true, getAuthToken(),
             getConfigOverrides());
 
     printStatus(Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");

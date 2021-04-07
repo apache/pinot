@@ -27,6 +27,11 @@ public class BatchQuickstartWithMinion extends Quickstart {
     return "examples/minions/batch/baseballStats";
   }
 
+  @Override
+  public int getNumMinions() {
+    return 1;
+  }
+
   public static void main(String[] args)
       throws Exception {
     PluginManager.get().init();
