@@ -138,7 +138,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
   private RealtimeTableDataManager createTableDataManager(TableConfig tableConfig) {
     final String instanceId = "server-1";
-    SegmentBuildTimeLeaseExtender.getOrCreate(instanceId, new ServerMetrics(new MetricsRegistry()), _tableName);
+    SegmentBuildTimeLeaseExtender.getOrCreate(instanceId, new ServerMetrics(new MetricsRegistry()), tableConfig.getTableName());
     RealtimeTableDataManager tableDataManager = mock(RealtimeTableDataManager.class);
     when(tableDataManager.getServerInstance()).thenReturn(instanceId);
     RealtimeSegmentStatsHistory statsHistory = mock(RealtimeSegmentStatsHistory.class);
