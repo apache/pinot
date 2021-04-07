@@ -183,7 +183,7 @@
   </build>
   <profiles>
     <profile>
-      <id>apache-release</id>
+      <id>src-dist</id>
       <build>
         <plugins>
           <plugin>
