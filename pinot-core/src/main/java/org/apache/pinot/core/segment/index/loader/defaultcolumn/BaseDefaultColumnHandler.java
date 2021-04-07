@@ -133,6 +133,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     // Compute the action needed for each column.
     Map<String, DefaultColumnAction> defaultColumnActionMap = computeDefaultColumnActionMap();
     if (defaultColumnActionMap.isEmpty()) {
+      LOGGER.info("No default column action needed for the segment {}.", _segmentMetadata.getName());
       return;
     }
 
