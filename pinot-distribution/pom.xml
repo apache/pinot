@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.8.0-SNAPSHOT</version>
+    <version>0.7.1</version>
     <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-distribution</artifactId>
