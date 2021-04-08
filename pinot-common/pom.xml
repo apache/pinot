@@ -313,6 +313,10 @@
                       <shadedPattern>shaded.com.google.common.base</shadedPattern>
                     </relocation>
                     <relocation>
+                      <pattern>com.google.common.cache</pattern>
+                      <shadedPattern>shaded.com.google.common.cache</shadedPattern>
+                    </relocation>
+                    <relocation>
                       <pattern>org.apache.http</pattern>
                       <shadedPattern>shaded.org.apache.http</shadedPattern>
                     </relocation>
