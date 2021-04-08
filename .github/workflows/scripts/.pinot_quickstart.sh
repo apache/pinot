@@ -46,6 +46,9 @@ cd "${DIST_BIN_DIR}"
 bin/quick-start-batch.sh &
 PID=$!
 
+# Print the JVM settings
+jps -lvm
+
 PASS=0
 
 # Wait for 1 minute for table to be set up, then at most 5 minutes to reach the desired state
