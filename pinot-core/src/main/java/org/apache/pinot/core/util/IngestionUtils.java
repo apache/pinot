@@ -189,23 +189,25 @@ public final class IngestionUtils {
 
     SegmentGenerationJobSpec segmentUploadSpec = generateSegmentUploadSpec(tableNameWithType, batchConfig, authContext);
 
+    List<String> segmentTarURIStrs = segmentTarURIs.stream().map(URI::toString).collect(Collectors.toList());
     String pushMode = batchConfig.getPushMode();
     switch (BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase())) {
       case TAR:
         try {
-          SegmentPushUtils.pushSegments(segmentUploadSpec, LOCAL_PINOT_FS,
-              segmentTarURIs.stream().map(URI::toString).collect(Collectors.toList()));
+          SegmentPushUtils.pushSegments(segmentUploadSpec, LOCAL_PINOT_FS, segmentTarURIStrs);
         } catch (RetriableOperationException | AttemptsExceededException e) {
-          throw new RuntimeException(e);
+          throw new RuntimeException(String
+              .format("Caught exception while uploading segments. Push mode: TAR, segment tars: [%s]",
+                  segmentTarURIStrs), e);
         }
         break;
       case URI:
+        List<String> segmentUris = new ArrayList<>();
         try {
           URI outputSegmentDirURI = null;
           if (StringUtils.isNotBlank(batchConfig.getOutputSegmentDirURI())) {
             outputSegmentDirURI = URI.create(batchConfig.getOutputSegmentDirURI());
           }
-          List<String> segmentUris = new ArrayList<>();
           for (URI segmentTarURI : segmentTarURIs) {
             URI updatedURI = SegmentPushUtils.generateSegmentTarURI(outputSegmentDirURI, segmentTarURI,
                 segmentUploadSpec.getPushJobSpec().getSegmentUriPrefix(),
@@ -214,7 +216,8 @@ public final class IngestionUtils {
           }
           SegmentPushUtils.sendSegmentUris(segmentUploadSpec, segmentUris);
         } catch (RetriableOperationException | AttemptsExceededException e) {
-          throw new RuntimeException(e);
+          throw new RuntimeException(String
+              .format("Caught exception while uploading segments. Push mode: URI, segment URIs: [%s]", segmentUris), e);
         }
         break;
       case METADATA:
@@ -229,7 +232,9 @@ public final class IngestionUtils {
                   segmentUploadSpec.getPushJobSpec().getSegmentUriSuffix(), new String[]{segmentTarURIs.toString()});
           SegmentPushUtils.sendSegmentUriAndMetadata(segmentUploadSpec, outputFileFS, segmentUriToTarPathMap);
         } catch (RetriableOperationException | AttemptsExceededException e) {
-          throw new RuntimeException(e);
+          throw new RuntimeException(String
+              .format("Caught exception while uploading segments. Push mode: METADATA, segment URIs: [%s]",
+                  segmentTarURIStrs), e);
         }
         break;
       default:
@@ -273,11 +278,14 @@ public final class IngestionUtils {
       fileURIScheme = PinotFSFactory.LOCAL_PINOT_FS_SCHEME;
     }
     if (!PinotFSFactory.isSchemeSupported(fileURIScheme)) {
-      String fsClass = batchConfig.getOutputFsClassName();
-      PinotConfiguration fsProps = IngestionConfigUtils.getOutputFsProps(batchConfig.getBatchConfigMap());
-      PinotFSFactory.register(fileURIScheme, fsClass, fsProps);
+      registerPinotFS(fileURIScheme, batchConfig.getOutputFsClassName(),
+          IngestionConfigUtils.getOutputFsProps(batchConfig.getBatchConfigMap()));
     }
     return PinotFSFactory.create(fileURIScheme);
+  }
+
+  private static void registerPinotFS(String fileURIScheme, String fsClass, PinotConfiguration fsProps) {
+    PinotFSFactory.register(fileURIScheme, fsClass, fsProps);
   }
 
   /**

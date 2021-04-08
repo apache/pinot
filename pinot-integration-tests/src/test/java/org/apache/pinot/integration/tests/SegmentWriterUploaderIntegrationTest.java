@@ -141,7 +141,7 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
     checkNumSegments(0);
 
     // upload all together using dir
-    segmentUploader.uploadSegments(_tarDir.toURI(), null);
+    segmentUploader.uploadSegmentsFromDir(_tarDir.toURI(), null);
     // check num segments
     Assert.assertEquals(getNumSegments(), 3);
     // check totalDocs in query

@@ -168,22 +168,15 @@ public final class IngestionConfigUtils {
    * Extracts the segment name generator type from the batchConfigMap, or returns default value if not found
    */
   public static String getSegmentNameGeneratorType(Map<String, String> batchConfigMap) {
-    String segmentNameGeneratorType = batchConfigMap.get(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE);
-    if (segmentNameGeneratorType == null) {
-      segmentNameGeneratorType = DEFAULT_SEGMENT_NAME_GENERATOR_TYPE;
-    }
-    return segmentNameGeneratorType;
+    return batchConfigMap
+        .getOrDefault(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE, DEFAULT_SEGMENT_NAME_GENERATOR_TYPE);
   }
 
   /**
    * Extracts the push mode from the batchConfigMap, or returns default value if not found
    */
   public static String getPushMode(Map<String, String> batchConfigMap) {
-    String pushMode = batchConfigMap.get(BatchConfigProperties.PUSH_MODE);
-    if (pushMode == null) {
-      pushMode = DEFAULT_PUSH_MODE;
-    }
-    return pushMode;
+    return batchConfigMap.getOrDefault(BatchConfigProperties.PUSH_MODE, DEFAULT_PUSH_MODE);
   }
 
   /**

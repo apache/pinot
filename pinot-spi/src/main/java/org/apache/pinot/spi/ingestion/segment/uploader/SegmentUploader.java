@@ -52,6 +52,6 @@ public interface SegmentUploader {
    * @param segmentDir URI of directory containing segment tar files
    * @param authContext auth details required to upload pinot segment to controller
    */
-  void uploadSegments(URI segmentDir, @Nullable AuthContext authContext)
+  void uploadSegmentsFromDir(URI segmentDir, @Nullable AuthContext authContext)
       throws Exception;
 }

@@ -82,15 +82,15 @@ public class SegmentUploaderDefault implements SegmentUploader {
   }
 
   @Override
-  public void uploadSegments(URI segmentDir, @Nullable AuthContext authContext)
+  public void uploadSegmentsFromDir(URI segmentDir, @Nullable AuthContext authContext)
       throws Exception {
 
     List<URI> segmentTarURIs = new ArrayList<>();
     PinotFS outputPinotFS = IngestionUtils.getOutputPinotFS(_batchConfig, segmentDir);
-    String[] files = outputPinotFS.listFiles(segmentDir, true);
-    for (String file : files) {
-      URI uri = URI.create(file);
-      if (!outputPinotFS.isDirectory(uri) && file.endsWith(Constants.TAR_GZ_FILE_EXT)) {
+    String[] filePaths = outputPinotFS.listFiles(segmentDir, true);
+    for (String filePath : filePaths) {
+      URI uri = URI.create(filePath);
+      if (!outputPinotFS.isDirectory(uri) && filePath.endsWith(Constants.TAR_GZ_FILE_EXT)) {
         segmentTarURIs.add(uri);
       }
     }
