@@ -19,6 +19,8 @@
 package org.apache.pinot.tools.query.comparison;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -27,9 +29,9 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.URIUtils;
-import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -45,8 +47,6 @@ import org.apache.pinot.tools.admin.command.UploadSegmentCommand;
 import org.apache.pinot.tools.perf.PerfBenchmarkDriver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.tools.admin.command.AbstractBaseAdminCommand.sendPostRequest;
 
 
 public class ClusterStarter {
@@ -184,25 +184,23 @@ public class ClusterStarter {
 
   private void addTable()
       throws Exception {
-    if (_tableConfigFile != null) {
-      AddTableCommand addTableCommand =
-          new AddTableCommand().setControllerPort(_controllerPort).setSchemaFile(_schemaFileName)
-              .setTableConfigFile(_tableConfigFile).setExecute(true);
-      addTableCommand.execute();
-      return;
-    }
-
-    if (_tableName == null) {
+    if (_tableConfigFile == null && _tableName == null) {
       LOGGER.error("Table info not specified in configuration, please specify either config file or table name");
       return;
     }
-
-    String controllerAddress = "http://" + _localhost + ":" + _controllerPort;
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(_tableName).setTimeColumnName(_timeColumnName)
-            .setTimeType(_timeUnit).setNumReplicas(3).setBrokerTenant("broker").setServerTenant("server").build();
-    sendPostRequest(ControllerRequestURLBuilder.baseUrl(controllerAddress).forTableCreate(),
-        tableConfig.toJsonString());
+    if (_tableConfigFile == null) {
+      TableConfig tableConfig =
+          new TableConfigBuilder(TableType.OFFLINE).setTableName(_tableName).setTimeColumnName(_timeColumnName)
+              .setTimeType(_timeUnit).setNumReplicas(3).setBrokerTenant("broker").setServerTenant("server").build();
+      File tableConfigFile =
+          new File(new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis())),
+              "table_config.json");
+      FileUtils.copyInputStreamToFile(new ByteArrayInputStream(tableConfig.toJsonString().getBytes()), tableConfigFile);
+      _tableConfigFile = tableConfigFile.getAbsolutePath();
+    }
+    new AddTableCommand().setControllerPort(_controllerPort).setSchemaFile(_schemaFileName)
+        .setTableConfigFile(_tableConfigFile).setExecute(true).execute();
+    return;
   }
 
   private void uploadData()

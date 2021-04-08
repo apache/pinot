@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import java.io.BufferedOutputStream;
 import java.io.Closeable;
@@ -57,12 +58,14 @@ import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.apache.http.entity.mime.content.ContentBody;
 import org.apache.http.entity.mime.content.FileBody;
 import org.apache.http.entity.mime.content.InputStreamBody;
+import org.apache.http.entity.mime.content.StringBody;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -494,6 +497,23 @@ public class FileUploadDownloadClient implements Closeable {
     requestBuilder.addHeader("Authorization", authToken);
     setTimeout(requestBuilder, GET_REQUEST_SOCKET_TIMEOUT_MS);
     return sendRequest(requestBuilder.build());
+  }
+
+  public SimpleHttpResponse createTable(String uri, JsonNode tableConfig, List<Header> headers)
+      throws IOException, HttpErrorStatusException {
+    HttpUriRequest tableCreationRequest = getTableCreationRequest(URI.create(uri), tableConfig, headers, null,
+        DEFAULT_SOCKET_TIMEOUT_MS);
+    return sendRequest(tableCreationRequest);
+  }
+
+  private static HttpUriRequest getTableCreationRequest(URI uri, JsonNode tableConfig,
+      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
+    RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
+        .setHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+        .setEntity(new StringEntity(tableConfig.toString(), ContentType.APPLICATION_JSON));
+    addHeadersAndParameters(requestBuilder, headers, parameters);
+    setTimeout(requestBuilder, socketTimeoutMs);
+    return requestBuilder.build();
   }
 
   /**

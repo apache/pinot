@@ -215,7 +215,7 @@ public class QuickstartRunner {
         boolean success = false;
         for (int retry = 0; retry < TABLE_REQUEST_RETRIES; retry++) {
           final Future<Boolean> tableRequestResFuture = executorService.submit(
-              () -> new BootstrapTableTool("http", InetAddress.getLocalHost().getHostName(), _controllerPorts.get(0),
+              () -> new BootstrapTableTool("http", "localhost", _controllerPorts.get(0),
                   request.getBootstrapTableDir(), _authToken).execute());
           try {
             if (tableRequestResFuture.get(30, TimeUnit.SECONDS)) {

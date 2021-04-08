@@ -22,10 +22,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.NetUtil;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.Command;
@@ -146,7 +149,7 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
     return this;
   }
 
-  public void uploadSchema()
+  private void uploadSchema()
       throws Exception {
     File schemaFile;
     Schema schema;
@@ -168,13 +171,19 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
     }
   }
 
-  public boolean sendTableCreationRequest(JsonNode node)
+  private boolean sendTableCreationRequest(JsonNode tableConfig)
       throws IOException {
-    String res = AbstractBaseAdminCommand
-        .sendRequest("POST", ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableCreate(), node.toString(),
-            makeAuthHeader(makeAuthToken(_authToken, _user, _password)));
-    LOGGER.info(res);
-    return res.contains("succesfully added");
+    final SimpleHttpResponse response;
+    try {
+      response = new FileUploadDownloadClient()
+          .createTable(ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableCreate(), tableConfig,
+              makeAuthHeader(makeAuthToken(_authToken, _user, _password)));
+      LOGGER.info(response.getResponse());
+      return true;
+    } catch (HttpErrorStatusException e) {
+      LOGGER.warn("Got http error with code: {}", e.getStatusCode(), e);
+      return false;
+    }
   }
 
   @Override

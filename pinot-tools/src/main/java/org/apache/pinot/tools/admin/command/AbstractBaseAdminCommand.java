@@ -66,21 +66,6 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
     return Integer.parseInt(processName.split("@")[0]);
   }
 
-  public static String sendPostRequest(String urlString, String payload)
-      throws IOException {
-    return sendRequest("POST", urlString, payload);
-  }
-
-  public static String sendDeleteRequest(String urlString, String payload)
-      throws IOException {
-    return sendRequest("DELETE", urlString, payload);
-  }
-
-  public static String sendRequest(String requestMethod, String urlString, String payload)
-      throws IOException {
-    return sendRequest(requestMethod, urlString, payload, Collections.emptyList());
-  }
-
   public static String sendRequest(String requestMethod, String urlString, String payload, List<Header> headers)
       throws IOException {
     final URL url = new URL(urlString);
