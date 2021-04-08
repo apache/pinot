@@ -31,9 +31,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -41,8 +45,8 @@ import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.tools.QuickstartTableRequest;
 import org.apache.pinot.tools.BootstrapTableTool;
+import org.apache.pinot.tools.QuickstartTableRequest;
 import org.apache.pinot.tools.utils.JarUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,6 +60,7 @@ public class QuickstartRunner {
 
   private static final int ZK_PORT = 2123;
   private static final String ZK_ADDRESS = "localhost:" + ZK_PORT;
+  private static final int TABLE_REQUEST_RETRIES = 5;
 
   private static final int DEFAULT_CONTROLLER_PORT = 9000;
   private static final int DEFAULT_BROKER_PORT = 8000;
@@ -204,11 +209,30 @@ public class QuickstartRunner {
 
   public void bootstrapTable()
       throws Exception {
-    for (QuickstartTableRequest request : _tableRequests) {
-      if (!new BootstrapTableTool("http", InetAddress.getLocalHost().getHostName(), _controllerPorts.get(0),
-          request.getBootstrapTableDir(), _authToken).execute()) {
-        throw new RuntimeException("Failed to bootstrap table with request - " + request);
+    ExecutorService executorService = Executors.newCachedThreadPool();
+    try {
+      for (QuickstartTableRequest request : _tableRequests) {
+        boolean success = false;
+        for (int retry = 0; retry < TABLE_REQUEST_RETRIES; retry++) {
+          final Future<Boolean> tableRequestResFuture = executorService.submit(
+              () -> new BootstrapTableTool("http", InetAddress.getLocalHost().getHostName(), _controllerPorts.get(0),
+                  request.getBootstrapTableDir(), _authToken).execute());
+          try {
+            if (tableRequestResFuture.get(30, TimeUnit.SECONDS)) {
+              success = true;
+              break;
+            }
+          } catch (TimeoutException e) {
+            // Skip TimeoutException
+            LOGGER.warn("Got timeout for QuickstartTableRequest: {}", request, e);
+          }
+        }
+        if (!success) {
+          throw new RuntimeException("Failed to bootstrap table with request - " + request);
+        }
       }
+    } finally {
+      executorService.shutdown();
     }
   }
 

@@ -85,4 +85,6 @@ jobs:
         with:
           java-version: ${{ matrix.java }}
       - name: Quickstart on JDK ${{ matrix.java }}
+        env:
+          JAVA_OPTS: "-Xms2G -Dlog4j2.configurationFile=conf/quickstart-log4j2.xml"
         run: .github/workflows/scripts/.pinot_quickstart.sh
