@@ -19,26 +19,36 @@
 package org.apache.pinot.core.query.pruner;
 
 import java.util.Collections;
-import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.common.DataSourceMetadata;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
-import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class ColumnValueSegmentPrunerTest {
   private static final ColumnValueSegmentPruner PRUNER = new ColumnValueSegmentPruner();
+  private static final int MAX_DEFAULT_THRESHOLD_FOR_IN_PREDICATE = 10;
+  private static final String CONFIG_VALUE_FOR_IN_PREDICATE = "pinot.segment.pruner.columnvalue.in.threshold";
 
   @Test
   public void testMinMaxValuePruning() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CONFIG_VALUE_FOR_IN_PREDICATE, MAX_DEFAULT_THRESHOLD_FOR_IN_PREDICATE);
+    PinotConfiguration configuration = new PinotConfiguration(properties);
+    PRUNER.init(configuration);
+
     IndexSegment indexSegment = mock(IndexSegment.class);
 
     DataSource dataSource = mock(DataSource.class);
@@ -67,6 +77,14 @@ public class ColumnValueSegmentPrunerTest {
     // Invalid range predicate
     assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column BETWEEN 20 AND 10"));
     assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column BETWEEN 30 AND 20"));
+    // In Predicate
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column IN (0)"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column IN (0, 5, 8)"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column IN (21, 30)"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column IN (10)"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column IN (5, 10, 15)"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column IN (0, 1, 2, 3, 4, 5, 6, 7, 8, 9)"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column IN (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)"));
     // AND operator
     assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column = 0 AND column > 10"));
     assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column > 0 AND column < 10"));

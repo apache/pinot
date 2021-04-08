@@ -18,17 +18,16 @@
  */
 package org.apache.pinot.core.segment.creator.impl.inv.text;
 
-import org.apache.lucene.store.OutputStreamDataOutput;
-import org.apache.lucene.util.fst.FST;
-import org.apache.pinot.core.segment.creator.TextIndexCreator;
-import org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
-import org.apache.pinot.core.util.fst.FSTBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import org.apache.lucene.store.OutputStreamDataOutput;
+import org.apache.lucene.util.fst.FST;
+import org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
+import org.apache.pinot.core.util.fst.FSTBuilder;
+import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.core.segment.creator.impl.V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
 

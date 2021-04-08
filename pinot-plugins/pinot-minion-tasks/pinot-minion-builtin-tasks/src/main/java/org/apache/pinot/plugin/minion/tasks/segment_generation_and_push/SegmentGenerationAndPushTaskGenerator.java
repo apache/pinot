@@ -45,9 +45,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
-import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -268,14 +266,9 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
   }
 
   private List<URI> getInputFilesFromDirectory(Map<String, String> batchConfigMap, URI inputDirURI,
-      Set<String> existingSegmentInputFileURIs) {
-    String inputDirURIScheme = inputDirURI.getScheme();
-    if (!PinotFSFactory.isSchemeSupported(inputDirURIScheme)) {
-      String fsClass = batchConfigMap.get(BatchConfigProperties.INPUT_FS_CLASS);
-      PinotConfiguration fsProps = IngestionConfigUtils.getInputFsProps(batchConfigMap);
-      PinotFSFactory.register(inputDirURIScheme, fsClass, fsProps);
-    }
-    PinotFS inputDirFS = PinotFSFactory.create(inputDirURIScheme);
+      Set<String> existingSegmentInputFileURIs)
+      throws Exception {
+    PinotFS inputDirFS = SegmentGenerationAndPushTaskUtils.getInputPinotFS(batchConfigMap, inputDirURI);
 
     String includeFileNamePattern = batchConfigMap.get(BatchConfigProperties.INCLUDE_FILE_NAME_PATTERN);
     String excludeFileNamePattern = batchConfigMap.get(BatchConfigProperties.EXCLUDE_FILE_NAME_PATTERN);

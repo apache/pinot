@@ -21,6 +21,7 @@ package org.apache.pinot.core.segment.creator.impl.inv.geospatial;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
+import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapWriter;
 

@@ -22,9 +22,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.ProjectionOperator;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
 /**

@@ -43,7 +43,6 @@ import org.apache.pinot.pql.parsers.pql2.ast.LiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.PredicateAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
 import org.apache.pinot.spi.utils.BytesUtils;
-import org.apache.pinot.sql.parsers.SqlCompilationException;
 
 
 public class RequestUtils {
@@ -127,6 +126,18 @@ public class RequestUtils {
     return expression;
   }
 
+  public static Expression getLiteralExpression(long value) {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setLongValue(value);
+    return expression;
+  }
+
+  public static Expression getLiteralExpression(double value) {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setDoubleValue(value);
+    return expression;
+  }
+
   public static Expression getLiteralExpression(String value) {
     Expression expression = createNewLiteralExpression();
     expression.getLiteral().setStringValue(value);
@@ -139,50 +150,17 @@ public class RequestUtils {
     return expression;
   }
 
-  public static Expression getLiteralExpression(Integer value) {
-    return getLiteralExpression(value.longValue());
-  }
-
-  public static Expression getLiteralExpression(Long value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setLongValue(value);
-    return expression;
-  }
-
-  public static Expression getLiteralExpression(Float value) {
-    return getLiteralExpression(value.doubleValue());
-  }
-
-  public static Expression getLiteralExpression(Double value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setDoubleValue(value);
-    return expression;
-  }
-
   public static Expression getLiteralExpression(Object object) {
-    if (object instanceof Integer) {
-      return RequestUtils.getLiteralExpression((Integer) object);
+    if (object instanceof Integer || object instanceof Long) {
+      return RequestUtils.getLiteralExpression(((Number) object).longValue());
     }
-    if (object instanceof Long) {
-      return RequestUtils.getLiteralExpression((Long) object);
-    }
-    if (object instanceof Float) {
-      return RequestUtils.getLiteralExpression((Float) object);
-    }
-    if (object instanceof Double) {
-      return RequestUtils.getLiteralExpression((Double) object);
-    }
-    if (object instanceof String) {
-      return RequestUtils.getLiteralExpression((String) object);
-    }
-    if (object instanceof SqlLiteral) {
-      return RequestUtils.getLiteralExpression((SqlLiteral) object);
+    if (object instanceof Float || object instanceof Double) {
+      return RequestUtils.getLiteralExpression(((Number) object).doubleValue());
     }
     if (object instanceof byte[]) {
       return RequestUtils.getLiteralExpression((byte[]) object);
     }
-    throw new SqlCompilationException(
-        new IllegalArgumentException("Unsupported Literal value type - " + object.getClass()));
+    return RequestUtils.getLiteralExpression(object.toString());
   }
 
   public static Expression getFunctionExpression(String operator) {

@@ -26,7 +26,7 @@ import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.plan.PlanNode;
-import org.apache.pinot.core.startree.v2.StarTreeV2;
+import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
 
 public class StarTreeDocIdSetPlanNode implements PlanNode {

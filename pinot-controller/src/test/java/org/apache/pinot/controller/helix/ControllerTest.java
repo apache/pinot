@@ -531,6 +531,11 @@ public abstract class ControllerTest {
         _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType(tableName)));
   }
 
+  protected void dropAllSegments(String tableName, TableType tableType) throws IOException {
+    sendDeleteRequest(
+        _controllerRequestURLBuilder.forSegmentDeleteAllAPI(tableName, tableType.toString()));
+  }
+
   protected void reloadOfflineTable(String tableName) throws IOException {
     sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, TableType.OFFLINE.name()), null);
   }

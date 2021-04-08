@@ -25,7 +25,6 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
-import java.net.InetAddress;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,7 +32,6 @@ import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -41,8 +39,8 @@ import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.tools.QuickstartTableRequest;
 import org.apache.pinot.tools.BootstrapTableTool;
+import org.apache.pinot.tools.QuickstartTableRequest;
 import org.apache.pinot.tools.utils.JarUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,12 +55,11 @@ public class QuickstartRunner {
   private static final int ZK_PORT = 2123;
   private static final String ZK_ADDRESS = "localhost:" + ZK_PORT;
 
-  private static final int DEFAULT_SERVER_NETTY_PORT = 7000;
-  private static final int DEFAULT_SERVER_ADMIN_API_PORT = 7500;
-  private static final int DEFAULT_BROKER_PORT = 8000;
   private static final int DEFAULT_CONTROLLER_PORT = 9000;
+  private static final int DEFAULT_BROKER_PORT = 8000;
+  private static final int DEFAULT_SERVER_ADMIN_API_PORT = 7500;
+  private static final int DEFAULT_SERVER_NETTY_PORT = 7000;
   private static final int DEFAULT_MINION_PORT = 6000;
-
 
   private static final String DEFAULT_ZK_DIR = "PinotZkDir";
   private static final String DEFAULT_CONTROLLER_DIR = "PinotControllerDir";
@@ -70,33 +67,27 @@ public class QuickstartRunner {
   private static final String DEFAULT_SERVER_SEGMENT_DIR = "PinotServerSegmentDir";
 
   private final List<QuickstartTableRequest> _tableRequests;
-  private final int _numServers;
-  private final int _numBrokers;
   private final int _numControllers;
+  private final int _numBrokers;
+  private final int _numServers;
   private final int _numMinions;
   private final File _tempDir;
   private final boolean _enableTenantIsolation;
   private final String _authToken;
   private final Map<String, Object> _configOverrides;
 
-  private final List<Integer> _brokerPorts = new ArrayList<>();
   private final List<Integer> _controllerPorts = new ArrayList<>();
-  private final List<String> _segmentDirs = new ArrayList<>();
+  private final List<Integer> _brokerPorts = new ArrayList<>();
   private boolean _isStopped = false;
 
-  public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numServers, int numBrokers,
-      int numControllers, File tempDir, boolean enableIsolation)
-      throws Exception {
-    this(tableRequests, numServers, numBrokers, numControllers, 1, tempDir, enableIsolation, null, null);
-  }
-
-  public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numServers, int numBrokers,
-      int numControllers, int numMinions, File tempDir, boolean enableIsolation, String authToken, Map<String, Object> configOverrides)
+  public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
+      int numServers, int numMinions, File tempDir, boolean enableIsolation, String authToken,
+      Map<String, Object> configOverrides)
       throws Exception {
     _tableRequests = tableRequests;
-    _numServers = numServers;
-    _numBrokers = numBrokers;
     _numControllers = numControllers;
+    _numBrokers = numBrokers;
+    _numServers = numServers;
     _numMinions = numMinions;
     _tempDir = tempDir;
     _enableTenantIsolation = enableIsolation;
@@ -105,10 +96,10 @@ public class QuickstartRunner {
     clean();
   }
 
-  public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numServers, int numBrokers,
-      int numControllers, File tempDir)
+  public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
+      int numServers, File tempDir)
       throws Exception {
-    this(tableRequests, numServers, numBrokers, numControllers, 1, tempDir, true, null, null);
+    this(tableRequests, numControllers, numBrokers, numServers, 0, tempDir, true, null, null);
   }
 
   private void startZookeeper()
@@ -125,7 +116,8 @@ public class QuickstartRunner {
       StartControllerCommand controllerStarter = new StartControllerCommand();
       controllerStarter.setControllerPort(String.valueOf(DEFAULT_CONTROLLER_PORT + i)).setZkAddress(ZK_ADDRESS)
           .setClusterName(CLUSTER_NAME).setTenantIsolation(_enableTenantIsolation)
-          .setDataDir(new File(_tempDir, DEFAULT_CONTROLLER_DIR + i).getAbsolutePath()).setConfigOverrides(_configOverrides);
+          .setDataDir(new File(_tempDir, DEFAULT_CONTROLLER_DIR + i).getAbsolutePath())
+          .setConfigOverrides(_configOverrides);
       controllerStarter.execute();
       _controllerPorts.add(DEFAULT_CONTROLLER_PORT + i);
     }
@@ -135,7 +127,8 @@ public class QuickstartRunner {
       throws Exception {
     for (int i = 0; i < _numBrokers; i++) {
       StartBrokerCommand brokerStarter = new StartBrokerCommand();
-      brokerStarter.setPort(DEFAULT_BROKER_PORT + i).setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME).setConfigOverrides(_configOverrides);
+      brokerStarter.setPort(DEFAULT_BROKER_PORT + i).setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME)
+          .setConfigOverrides(_configOverrides);
       brokerStarter.execute();
       _brokerPorts.add(DEFAULT_BROKER_PORT + i);
     }
@@ -148,7 +141,8 @@ public class QuickstartRunner {
       serverStarter.setPort(DEFAULT_SERVER_NETTY_PORT + i).setAdminPort(DEFAULT_SERVER_ADMIN_API_PORT + i)
           .setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME)
           .setDataDir(new File(_tempDir, DEFAULT_SERVER_DATA_DIR + i).getAbsolutePath())
-          .setSegmentDir(new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath()).setConfigOverrides(_configOverrides);
+          .setSegmentDir(new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath())
+          .setConfigOverrides(_configOverrides);
       serverStarter.execute();
     }
   }
@@ -157,8 +151,8 @@ public class QuickstartRunner {
       throws Exception {
     for (int i = 0; i < _numMinions; i++) {
       StartMinionCommand minionStarter = new StartMinionCommand();
-      minionStarter.setMinionPort(DEFAULT_MINION_PORT + i)
-          .setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME).setConfigOverrides(_configOverrides);
+      minionStarter.setMinionPort(DEFAULT_MINION_PORT + i).setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME)
+          .setConfigOverrides(_configOverrides);
       minionStarter.execute();
     }
   }
@@ -184,6 +178,7 @@ public class QuickstartRunner {
       return;
     }
 
+    // TODO: Stop Minion
     StopProcessCommand stopper = new StopProcessCommand(false);
     stopper.stopController().stopBroker().stopServer().stopZookeeper();
     stopper.execute();
@@ -208,8 +203,8 @@ public class QuickstartRunner {
   public void bootstrapTable()
       throws Exception {
     for (QuickstartTableRequest request : _tableRequests) {
-      if (!new BootstrapTableTool("http", InetAddress.getLocalHost().getHostName(), _controllerPorts.get(0),
-          request.getBootstrapTableDir(), _authToken).execute()) {
+      if (!new BootstrapTableTool("http", "localhost", _controllerPorts.get(0), request.getBootstrapTableDir(),
+          _authToken).execute()) {
         throw new RuntimeException("Failed to bootstrap table with request - " + request);
       }
     }
@@ -258,7 +253,8 @@ public class QuickstartRunner {
   }
 
   public static void registerDefaultPinotFS() {
-    registerPinotFS("s3", "org.apache.pinot.plugin.filesystem.S3PinotFS", ImmutableMap.of("region", System.getProperty("AWS_REGION", "us-west-2")));
+    registerPinotFS("s3", "org.apache.pinot.plugin.filesystem.S3PinotFS",
+        ImmutableMap.of("region", System.getProperty("AWS_REGION", "us-west-2")));
   }
 
   public static void registerPinotFS(String scheme, String fsClassName, Map<String, Object> configs) {
@@ -270,7 +266,8 @@ public class QuickstartRunner {
       PinotFSFactory.register(scheme, fsClassName, new PinotConfiguration(configs));
       LOGGER.info("Registered PinotFS for scheme: {}", scheme);
     } catch (Exception e) {
-      LOGGER.info("Unable to init PinotFS for scheme: {}, class name: {}, configs: {}, Error: {}", scheme, fsClassName, configs, e);
+      LOGGER
+          .error("Unable to init PinotFS for scheme: {}, class name: {}, configs: {}", scheme, fsClassName, configs, e);
     }
   }
 }

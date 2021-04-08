@@ -20,7 +20,7 @@ package org.apache.pinot.server.api;
 
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;

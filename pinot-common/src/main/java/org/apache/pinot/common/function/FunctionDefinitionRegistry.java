@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.common.function;
 
+import org.apache.pinot.segment.spi.AggregationFunctionType;
+
+
 /**
  * Place where all functions are registered.
  */

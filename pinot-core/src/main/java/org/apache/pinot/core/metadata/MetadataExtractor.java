@@ -19,7 +19,7 @@
 package org.apache.pinot.core.metadata;
 
 import java.io.File;
-import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 
 
 /**

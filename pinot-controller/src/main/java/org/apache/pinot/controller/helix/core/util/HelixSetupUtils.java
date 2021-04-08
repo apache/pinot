@@ -205,10 +205,10 @@ public class HelixSetupUtils {
     if (resourceConfig == null) {
       resourceConfig = new ResourceConfig(LEAD_CONTROLLER_RESOURCE_NAME);
     }
-    // Set RESOURCE_ENABLED to false if it's absent in resource config
-    if (resourceConfig.getSimpleConfig(LEAD_CONTROLLER_RESOURCE_ENABLED_KEY) == null) {
-      resourceConfig.putSimpleConfig(LEAD_CONTROLLER_RESOURCE_ENABLED_KEY, Boolean.FALSE.toString());
-    }
+    // Explicitly set RESOURCE_ENABLED to true, so that the lead controller resource is always enabled.
+    // This is to help keep the behavior consistent in all clusters for better maintenance.
+    // TODO: remove the logic of handling this config in both controller and server in the next official release.
+    resourceConfig.putSimpleConfig(LEAD_CONTROLLER_RESOURCE_ENABLED_KEY, Boolean.TRUE.toString());
     configAccessor.setResourceConfig(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME, resourceConfig);
   }
 }

@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.TreeSet;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.core.common.BlockDocIdIterator;
-import org.apache.pinot.core.common.Constants;
+import org.apache.pinot.segment.spi.Constants;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

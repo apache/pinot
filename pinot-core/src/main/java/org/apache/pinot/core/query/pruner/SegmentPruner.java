@@ -20,8 +20,8 @@ package org.apache.pinot.core.query.pruner;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 

@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator;
 
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -44,8 +45,9 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
     DataTable dataTable = instanceResponseBlock.getInstanceResponseDataTable();
 
     mainThreadTimer.stop();
-    long totalThreadCpuTimeNs = intermediateResultsBlock.getExecutionThreadCpuTimeNs() + mainThreadTimer.getThreadTimeNs();
-    dataTable.getMetadata().put(DataTable.EXECUTION_THREAD_CPU_TIME_NS_METADATA_KEY, String.valueOf(totalThreadCpuTimeNs));
+    long totalThreadCpuTimeNs =
+        intermediateResultsBlock.getExecutionThreadCpuTimeNs() + mainThreadTimer.getThreadTimeNs();
+    dataTable.getMetadata().put(MetadataKey.THREAD_CPU_TIME_NS.getName(), String.valueOf(totalThreadCpuTimeNs));
 
     return instanceResponseBlock;
   }

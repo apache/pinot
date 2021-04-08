@@ -307,6 +307,9 @@ public class CommonConstants {
     public static final String SERVER_TLS_PREFIX = "pinot.server.tls";
     public static final String SERVER_NETTYTLS_PREFIX = "pinot.server.nettytls";
 
+    // The complete config key is pinot.server.instance.segment.store.uri
+    public static final String CONFIG_OF_SEGMENT_STORE_URI = "segment.store.uri";
+
     public static class SegmentCompletionProtocol {
       public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";
 
@@ -336,6 +339,9 @@ public class CommonConstants {
     public static final String CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT =
         "pinot.server.instance.enableThreadCpuTimeMeasurement";
     public static final boolean DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT = false;
+
+    public static final String CONFIG_OF_CURRENT_DATA_TABLE_VERSION = "pinot.server.instance.currentDataTableVersion";
+    public static final int DEFAULT_CURRENT_DATA_TABLE_VERSION = 3;
   }
 
   public static class Controller {

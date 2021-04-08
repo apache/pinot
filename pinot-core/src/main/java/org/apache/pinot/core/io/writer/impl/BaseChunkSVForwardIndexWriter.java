@@ -26,8 +26,9 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import org.apache.pinot.core.io.compression.ChunkCompressor;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,7 +68,7 @@ public abstract class BaseChunkSVForwardIndexWriter implements Closeable {
    * @param version version of File
    * @throws FileNotFoundException
    */
-  protected BaseChunkSVForwardIndexWriter(File file, ChunkCompressorFactory.CompressionType compressionType,
+  protected BaseChunkSVForwardIndexWriter(File file, ChunkCompressionType compressionType,
       int totalDocs, int numDocsPerChunk, int chunkSize, int sizeOfEntry, int version)
       throws FileNotFoundException {
     Preconditions.checkArgument(version == DEFAULT_VERSION || version == CURRENT_VERSION);
@@ -117,7 +118,7 @@ public abstract class BaseChunkSVForwardIndexWriter implements Closeable {
    * @param version Version of file
    * @return Size of header
    */
-  private int writeHeader(ChunkCompressorFactory.CompressionType compressionType, int totalDocs, int numDocsPerChunk,
+  private int writeHeader(ChunkCompressionType compressionType, int totalDocs, int numDocsPerChunk,
       int sizeOfEntry, int version) {
     int numChunks = (totalDocs + numDocsPerChunk - 1) / numDocsPerChunk;
     int headerSize = (7 * Integer.BYTES) + (numChunks * _headerEntryChunkOffsetSize);

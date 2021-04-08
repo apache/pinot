@@ -19,23 +19,24 @@
 package org.apache.pinot.core.query.pruner;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.common.DataSourceMetadata;
-import org.apache.pinot.core.data.partition.PartitionFunction;
-import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.predicate.EqPredicate;
+import org.apache.pinot.core.query.request.context.predicate.InPredicate;
 import org.apache.pinot.core.query.request.context.predicate.Predicate;
 import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
-import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
@@ -60,8 +61,13 @@ import org.apache.pinot.spi.utils.BytesUtils;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class ColumnValueSegmentPruner implements SegmentPruner {
 
+  private int _inPredicateThreshold;
+  public static final int DEFAULT_VALUE_FOR_IN_PREDICATE = 10;
+  public static final String CONFIG_MAX_VALUE_FOR_IN_PREDICATE = "pinot.segment.pruner.columnvalue.in.threshold";
+
   @Override
   public void init(PinotConfiguration config) {
+    _inPredicateThreshold = config.getProperty(CONFIG_MAX_VALUE_FOR_IN_PREDICATE, DEFAULT_VALUE_FOR_IN_PREDICATE);
   }
 
   @Override
@@ -103,6 +109,8 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
           return pruneEqPredicate(segment, (EqPredicate) predicate, dataSourceCache);
         } else if (predicateType == Predicate.Type.RANGE) {
           return pruneRangePredicate(segment, (RangePredicate) predicate, dataSourceCache);
+        } else if (predicateType == Predicate.Type.IN) {
+          return pruneInPredicate(segment, (InPredicate) predicate, dataSourceCache);
         } else {
           return false;
         }
@@ -129,17 +137,8 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
     Comparable value = convertValue(eqPredicate.getValue(), dataSourceMetadata.getDataType());
 
     // Check min/max value
-    Comparable minValue = dataSourceMetadata.getMinValue();
-    if (minValue != null) {
-      if (value.compareTo(minValue) < 0) {
-        return true;
-      }
-    }
-    Comparable maxValue = dataSourceMetadata.getMaxValue();
-    if (maxValue != null) {
-      if (value.compareTo(maxValue) > 0) {
-        return true;
-      }
+    if (checkMinMaxRange(dataSourceMetadata, value)) {
+      return true;
     }
 
     // Check column partition
@@ -239,27 +238,54 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
     return false;
   }
 
+  /**
+   * For IN predicate, prune the segment based on:
+   * <ul>
+   *   <li>Column min/max value</li>
+   * </ul>
+   */
+  private boolean pruneInPredicate(IndexSegment segment, InPredicate inPredicate, Map<String, DataSource> dataSourceCache) {
+    String column = inPredicate.getLhs().getIdentifier();
+    DataSource dataSource = dataSourceCache.computeIfAbsent(column, segment::getDataSource);
+    // NOTE: Column must exist after DataSchemaSegmentPruner
+    assert dataSource != null;
+    DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
+    List<String> values = inPredicate.getValues();
+    //set max threshold value
+    if (values.size() > _inPredicateThreshold) {
+      return false;
+    }
+
+    for (String value : values) {
+      Comparable inValue = convertValue(value, dataSourceMetadata.getDataType());
+      if (!checkMinMaxRange(dataSourceMetadata, inValue)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private boolean checkMinMaxRange(DataSourceMetadata dataSourceMetadata, Comparable value) {
+    Comparable minValue = dataSourceMetadata.getMinValue();
+    if (minValue != null) {
+      if (value.compareTo(minValue) < 0) {
+        return true;
+      }
+    }
+    Comparable maxValue = dataSourceMetadata.getMaxValue();
+    if (maxValue != null) {
+      if (value.compareTo(maxValue) > 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private static Comparable convertValue(String stringValue, DataType dataType) {
     try {
-      switch (dataType) {
-        case INT:
-          return Integer.valueOf(stringValue);
-        case LONG:
-          return Long.valueOf(stringValue);
-        case FLOAT:
-          return Float.valueOf(stringValue);
-        case DOUBLE:
-          return Double.valueOf(stringValue);
-        case STRING:
-          return stringValue;
-        case BYTES:
-          return BytesUtils.toByteArray(stringValue);
-        default:
-          throw new IllegalStateException();
-      }
+      return dataType.convertInternal(stringValue);
     } catch (Exception e) {
-      throw new BadQueryRequestException(String.format("Cannot convert value: '%s' to type: %s", stringValue, dataType),
-          e);
+      throw new BadQueryRequestException(e);
     }
   }
 }

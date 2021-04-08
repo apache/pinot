@@ -20,11 +20,11 @@ package org.apache.pinot.core.segment.index.readers.sorted;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import org.apache.pinot.common.utils.Pairs;
 import org.apache.pinot.core.io.util.FixedByteValueReaderWriter;
-import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
-import org.apache.pinot.core.segment.index.readers.SortedIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
+import org.apache.pinot.spi.utils.Pairs;
 
 
 /**

@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.core.data.function.FunctionEvaluator;
 import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -61,14 +62,15 @@ public class SchemaUtils {
 
   /**
    * Validates the following:
-   * 1) Checks valid transform function -
+   * 1) Column name should not contain blank space.
+   * 2) Checks valid transform function -
    *   for a field spec with transform function, the source column name and destination column name are exclusive i.e. do not allow using source column name for destination column
    *   ensure transform function string can be used to create a {@link FunctionEvaluator}
-   * 2) Checks for chained transforms/derived transform - not supported yet
-   * TODO: Transform functions have moved to table config. Once we stop supporting them in schema, remove the validations 1 and 2
-   * 3) Checks valid timeFieldSpec - if incoming and outgoing granularity spec are different a) the names cannot be same b) cannot use SIMPLE_DATE_FORMAT for conversion
-   * 4) Checks valid dateTimeFieldSpecs - checks format and granularity string
-   * 5) Schema validations from {@link Schema#validate}
+   * 3) Checks for chained transforms/derived transform - not supported yet
+   * TODO: Transform functions have moved to table config. Once we stop supporting them in schema, remove the validations 2 and 3
+   * 4) Checks valid timeFieldSpec - if incoming and outgoing granularity spec are different a) the names cannot be same b) cannot use SIMPLE_DATE_FORMAT for conversion
+   * 5) Checks valid dateTimeFieldSpecs - checks format and granularity string
+   * 6) Schema validations from {@link Schema#validate}
    */
   public static void validate(Schema schema) {
     schema.validate();
@@ -79,6 +81,8 @@ public class SchemaUtils {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
         String column = fieldSpec.getName();
+        Preconditions.checkState(!StringUtils.containsWhitespace(column),
+            "The column name \"%s\" should not contain blank space.", column);
         primaryKeyColumnCandidates.add(column);
         String transformFunction = fieldSpec.getTransformFunction();
         if (transformFunction != null) {
@@ -108,8 +112,8 @@ public class SchemaUtils {
         transformedColumns.retainAll(argumentColumns));
     if (schema.getPrimaryKeyColumns() != null) {
       for (String primaryKeyColumn : schema.getPrimaryKeyColumns()) {
-        Preconditions.checkState(primaryKeyColumnCandidates.contains(primaryKeyColumn),
-            "The primary key column must exist");
+        Preconditions
+            .checkState(primaryKeyColumnCandidates.contains(primaryKeyColumn), "The primary key column must exist");
       }
     }
   }

@@ -34,6 +34,7 @@ import java.util.PriorityQueue;
 import org.apache.pinot.core.io.util.VarLengthValueWriter;
 import org.apache.pinot.core.segment.creator.impl.inv.BitmapInvertedIndexWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.spi.utils.StringUtils;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapWriter;
@@ -42,7 +43,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /**
- * Implementation of {@link org.apache.pinot.core.segment.creator.JsonIndexCreator} that uses off-heap memory.
+ * Implementation of {@link JsonIndexCreator} that uses off-heap memory.
  * <p>The posting lists (map from value to doc ids) are initially stored in a TreeMap, then flushed into a file for
  * every 100,000 documents (unflattened records) added. After all the documents are added, we read all the posting lists
  * from the file and merge them using a priority queue to calculate the final posting lists. Then we generate the string

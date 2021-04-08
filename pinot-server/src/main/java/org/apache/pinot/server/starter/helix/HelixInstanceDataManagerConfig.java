@@ -29,6 +29,8 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.common.utils.CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI;
+
 
 /**
  * The config used for HelixInstanceDataManager.
@@ -147,6 +149,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public String getInstanceBootstrapSegmentDir() {
     return _instanceDataManagerConfiguration.getProperty(INSTANCE_BOOTSTRAP_SEGMENT_DIR);
+  }
+
+  @Override
+  public String getSegmentStoreUri() {
+    return _instanceDataManagerConfiguration.getProperty(CONFIG_OF_SEGMENT_STORE_URI);
   }
 
   @Override

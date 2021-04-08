@@ -50,6 +50,9 @@ public class BatchConfigProperties {
   public static final String OVERWRITE_OUTPUT = "overwriteOutput";
   public static final String INPUT_DATA_FILE_URI_KEY = "input.data.file.uri";
   public static final String PUSH_MODE = "push.mode";
+  public static final String PUSH_ATTEMPTS = "push.attempts";
+  public static final String PUSH_PARALLELISM = "push.parallelism";
+  public static final String PUSH_RETRY_INTERVAL_MILLIS = "push.retry.interval.millis";
   public static final String PUSH_CONTROLLER_URI = "push.controllerUri";
   public static final String PUSH_SEGMENT_URI_PREFIX = "push.segmentUriPrefix";
   public static final String PUSH_SEGMENT_URI_SUFFIX = "push.segmentUriSuffix";

@@ -19,7 +19,7 @@
 package org.apache.pinot.core.data.aggregator;
 
 import java.math.BigDecimal;
-import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 

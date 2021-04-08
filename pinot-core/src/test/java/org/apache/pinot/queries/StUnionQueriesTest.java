@@ -31,15 +31,16 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.GroupByResult;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.geospatial.GeometryUtils;
 import org.apache.pinot.core.geospatial.serde.GeometrySerializer;
-import org.apache.pinot.core.indexsegment.IndexSegment;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.core.geospatial.transform.function.ScalarFunctions;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
@@ -47,12 +48,15 @@ import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
@@ -70,6 +74,7 @@ import static org.testng.AssertJUnit.assertNotNull;
 /**
  * Queries test for ST_UNION queries.
  */
+@SuppressWarnings("rawtypes")
 public class StUnionQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "StUnionQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";
@@ -158,22 +163,50 @@ public class StUnionQueriesTest extends BaseQueriesTest {
     QueriesTestUtils.testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, NUM_RECORDS,
         NUM_RECORDS);
     List<Object> aggregationResult = resultsBlock.getAggregationResult();
-
     assertNotNull(aggregationResult);
-
+    assertEquals(aggregationResult.size(), 1);
     assertEquals(aggregationResult.get(0), _intermediateResult);
 
     // Inter segments
     String[] expectedResults = new String[1];
-    expectedResults[0] = new ByteArray(_expectedResults).toHexString();
+    expectedResults[0] = BytesUtils.toHexString(_expectedResults);
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
     QueriesTestUtils
         .testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 4 * NUM_RECORDS, 4 * NUM_RECORDS,
             expectedResults);
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 4 * NUM_RECORDS, 4 * NUM_RECORDS,
-            expectedResults);
+  }
+
+  @Test
+  public void testPostAggregation() {
+    String query =
+        "SELECT ST_AS_TEXT(ST_UNION(pointColumn)), TO_GEOMETRY(ST_UNION(pointColumn)), TO_SPHERICAL_GEOGRAPHY(ST_UNION(pointColumn)), ST_AS_TEXT(TO_SPHERICAL_GEOGRAPHY(ST_UNION(pointColumn))) FROM testTable";
+
+    // Inner segment
+    Operator operator = getOperatorForPqlQuery(query);
+    assertTrue(operator instanceof AggregationOperator);
+    IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, NUM_RECORDS,
+        NUM_RECORDS);
+    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(aggregationResult.size(), 4);
+    for (Object value : aggregationResult) {
+      assertEquals(value, _intermediateResult);
+    }
+
+    // Inter segment
+    BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+    ResultTable resultTable = brokerResponse.getResultTable();
+    DataSchema expectedDataSchema = new DataSchema(
+        new String[]{"st_as_text(st_union(pointColumn))", "to_geometry(st_union(pointColumn))", "to_spherical_geography(st_union(pointColumn))", "st_as_text(to_spherical_geography(st_union(pointColumn)))"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.BYTES, ColumnDataType.BYTES, ColumnDataType.STRING});
+    assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0), new Object[]{ScalarFunctions.stAsText(_expectedResults), BytesUtils.toHexString(
+        ScalarFunctions.toGeometry(_expectedResults)), BytesUtils.toHexString(
+        ScalarFunctions.toSphericalGeography(_expectedResults)), ScalarFunctions.stAsText(
+        ScalarFunctions.toSphericalGeography(_expectedResults))});
   }
 
   @Test
@@ -186,17 +219,14 @@ public class StUnionQueriesTest extends BaseQueriesTest {
     IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), 0, 0, 0, NUM_RECORDS);
     List<Object> aggregationResult = resultsBlock.getAggregationResult();
-
     assertNotNull(aggregationResult);
-
+    assertEquals(aggregationResult.size(), 1);
     assertEquals(aggregationResult.get(0), GeometryUtils.EMPTY_POINT);
 
     // Inter segments
     String[] expectedResults = new String[1];
-    expectedResults[0] = new ByteArray(GeometrySerializer.serialize(GeometryUtils.EMPTY_POINT)).toHexString();
+    expectedResults[0] = BytesUtils.toHexString(GeometrySerializer.serialize(GeometryUtils.EMPTY_POINT));
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 0, 0, 0, 4 * NUM_RECORDS, expectedResults);
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 0, 0, 0, 4 * NUM_RECORDS, expectedResults);
   }
 
@@ -244,8 +274,7 @@ public class StUnionQueriesTest extends BaseQueriesTest {
         assertEquals(group.size(), 1);
         int key = Integer.parseInt(group.get(0));
         assertTrue(_values.containsKey(key));
-        assertEquals(groupByResult.getValue(),
-            new ByteArray(GeometrySerializer.serialize(_values.get(key))).toHexString());
+        assertEquals(groupByResult.getValue(), BytesUtils.toHexString(GeometrySerializer.serialize(_values.get(key))));
       }
     }
   }

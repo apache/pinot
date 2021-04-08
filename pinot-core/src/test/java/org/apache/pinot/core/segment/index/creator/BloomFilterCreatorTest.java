@@ -20,12 +20,12 @@ package org.apache.pinot.core.segment.index.creator;
 
 import java.io.File;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.segment.creator.BloomFilterCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.creator.impl.bloom.OnHeapGuavaBloomFilterCreator;
-import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.bloom.BloomFilterReaderFactory;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
+import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;

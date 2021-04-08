@@ -27,8 +27,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.core.indexsegment.IndexSegment;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -83,7 +83,7 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(segmentNames.get(0), _realtimeIndexSegments.get(0).getSegmentName());
 
     IndexSegment secondSegment =
-        setUpSegment(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), "0", _realtimeIndexSegments);
+        setUpSegment(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), null, "0", _realtimeIndexSegments);
     tableSegments = _webTarget.path(segmentsPath).request().get(TableSegments.class);
     Assert.assertNotNull(tableSegments);
     segmentNames = tableSegments.getSegments();
@@ -209,6 +209,36 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(metadata.getTableName(), TableNameBuilder.extractRawTableName(tableNameWithType));
 
     FileUtils.forceDelete(tempMetadataDir);
+  }
+
+  @Test
+  public void testUploadSegments() throws Exception {
+    setUpSegment(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS, null, _realtimeIndexSegments);
+    setUpSegment(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), LLC_SEGMENT_NAME_FOR_UPLOAD_FAILURE, null, _realtimeIndexSegments);
+
+    // Verify segment uploading succeed.
+    Response response = _webTarget.path(String.format("/segments/%s/%s/upload", TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
+        LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS)).request().post(null);
+    Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+    Assert.assertEquals(response.readEntity(String.class), SEGMENT_DOWNLOAD_URL);
+
+    // Verify bad request: table type is offline
+    response = _webTarget.path(String.format("/segments/%s/%s/upload", TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME), _offlineIndexSegments.get(0).getSegmentName())).request().post(null);
+    Assert.assertEquals(response.getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+
+    // Verify bad request: segment is not low level consumer segment
+    response = _webTarget.path(String.format("/segments/%s/%s/upload", TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), _realtimeIndexSegments.get(0).getSegmentName())).request().post(null);
+    Assert.assertEquals(response.getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+
+    // Verify non-existent segment uploading fail with NOT_FOUND status.
+    response = _webTarget.path(String.format("/segments/%s/%s_dummy/upload", TABLE_NAME,
+        LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS)).request().post(null);
+    Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+
+    // Verify fail to upload segment to segment store with internal server error.
+    response = _webTarget.path(String.format("/segments/%s/%s/upload", TABLE_NAME,
+        LLC_SEGMENT_NAME_FOR_UPLOAD_FAILURE)).request().post(null);
+    Assert.assertEquals(response.getStatus(), Response.Status.INTERNAL_SERVER_ERROR.getStatusCode());
   }
 
   @Test

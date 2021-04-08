@@ -23,7 +23,9 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.util.Map;
 import java.util.StringJoiner;
+import org.apache.http.client.utils.URIBuilder;
 
 
 public class URIUtils {
@@ -84,5 +86,29 @@ public class URIUtils {
       // Should never happen
       throw new RuntimeException(e);
     }
+  }
+
+  /**
+   * Builds the URI using the schema, host, port, path and map of params.
+   * The URI builder automatically encodes fields as needed
+   */
+  public static URI buildURI(String schema, String hostPort, String path, Map<String, String> params) {
+    URIBuilder uriBuilder = new URIBuilder().setScheme(schema).setHost(hostPort).setPath(path);
+    for (Map.Entry<String, String> entry : params.entrySet()) {
+      uriBuilder.addParameter(entry.getKey(), entry.getValue());
+    }
+    try {
+      return uriBuilder.build();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * Builds the URI using the schema, host, port, path and map of params.
+   * The URI builder automatically encodes fields as needed
+   */
+  public static URI buildURI(String schema, String host, int port, String path, Map<String, String> params) {
+    return buildURI(schema, String.format("%s:%d", host, port), path, params);
   }
 }

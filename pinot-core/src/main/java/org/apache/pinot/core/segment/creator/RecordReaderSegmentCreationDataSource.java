@@ -20,18 +20,21 @@ package org.apache.pinot.core.segment.creator;
 
 import java.util.Collection;
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.core.util.IngestionUtils;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
 import org.apache.pinot.core.segment.creator.impl.stats.SegmentPreIndexStatsCollectorImpl;
+import org.apache.pinot.core.util.IngestionUtils;
+import org.apache.pinot.segment.spi.creator.SegmentCreationDataSource;
+import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsCollector;
+import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * {@link org.apache.pinot.core.segment.creator.SegmentCreationDataSource} that uses a
+ * {@link SegmentCreationDataSource} that uses a
  * {@link RecordReader} as the underlying data source.
  */
 // TODO: make it Closeable so that resource in record reader can be released

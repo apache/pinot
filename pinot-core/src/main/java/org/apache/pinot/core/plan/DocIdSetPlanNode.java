@@ -19,9 +19,9 @@
 package org.apache.pinot.core.plan;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.spi.IndexSegment;
 
 
 public class DocIdSetPlanNode implements PlanNode {

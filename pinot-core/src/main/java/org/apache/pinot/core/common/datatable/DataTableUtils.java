@@ -18,13 +18,18 @@
  */
 package org.apache.pinot.core.common.datatable;
 
+import com.google.common.primitives.Ints;
+import com.google.common.primitives.Longs;
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctTable;
@@ -232,5 +237,45 @@ public class DataTableUtils {
     dataTableBuilder.setColumn(0, distinctTable);
     dataTableBuilder.finishRow();
     return dataTableBuilder.build();
+  }
+
+  /**
+   * Helper method to decode string.
+   */
+  public static String decodeString(DataInputStream dataInputStream)
+      throws IOException {
+    int length = dataInputStream.readInt();
+    if (length == 0) {
+      return StringUtils.EMPTY;
+    } else {
+      byte[] buffer = new byte[length];
+      int numBytesRead = dataInputStream.read(buffer);
+      assert numBytesRead == length;
+      return StringUtil.decodeUtf8(buffer);
+    }
+  }
+
+  /**
+   * Helper method to decode int.
+   */
+  public static int decodeInt(DataInputStream dataInputStream)
+      throws IOException {
+    int length = Integer.BYTES;
+    byte[] buffer = new byte[length];
+    int numBytesRead = dataInputStream.read(buffer);
+    assert numBytesRead == length;
+    return Ints.fromByteArray(buffer);
+  }
+
+  /**
+   * Helper method to decode long.
+   */
+  public static long decodeLong(DataInputStream dataInputStream)
+      throws IOException {
+    int length = Long.BYTES;
+    byte[] buffer = new byte[length];
+    int numBytesRead = dataInputStream.read(buffer);
+    assert numBytesRead == length;
+    return Longs.fromByteArray(buffer);
   }
 }

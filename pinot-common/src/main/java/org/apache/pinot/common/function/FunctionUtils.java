@@ -42,10 +42,10 @@ public class FunctionUtils {
     put(Double.class, PinotDataType.DOUBLE);
     put(String.class, PinotDataType.STRING);
     put(byte[].class, PinotDataType.BYTES);
-    put(int[].class, PinotDataType.INTEGER_ARRAY);
-    put(long[].class, PinotDataType.LONG_ARRAY);
-    put(float[].class, PinotDataType.FLOAT_ARRAY);
-    put(double[].class, PinotDataType.DOUBLE_ARRAY);
+    put(int[].class, PinotDataType.PRIMITIVE_INT_ARRAY);
+    put(long[].class, PinotDataType.PRIMITIVE_LONG_ARRAY);
+    put(float[].class, PinotDataType.PRIMITIVE_FLOAT_ARRAY);
+    put(double[].class, PinotDataType.PRIMITIVE_DOUBLE_ARRAY);
     put(String[].class, PinotDataType.STRING_ARRAY);
   }};
 
@@ -61,13 +61,13 @@ public class FunctionUtils {
     put(Double.class, PinotDataType.DOUBLE);
     put(String.class, PinotDataType.STRING);
     put(byte[].class, PinotDataType.BYTES);
-    put(int[].class, PinotDataType.INTEGER_ARRAY);
+    put(int[].class, PinotDataType.PRIMITIVE_INT_ARRAY);
     put(Integer[].class, PinotDataType.INTEGER_ARRAY);
-    put(long[].class, PinotDataType.LONG_ARRAY);
+    put(long[].class, PinotDataType.PRIMITIVE_LONG_ARRAY);
     put(Long[].class, PinotDataType.LONG_ARRAY);
-    put(float[].class, PinotDataType.FLOAT_ARRAY);
+    put(float[].class, PinotDataType.PRIMITIVE_FLOAT_ARRAY);
     put(Float[].class, PinotDataType.FLOAT_ARRAY);
-    put(double[].class, PinotDataType.DOUBLE_ARRAY);
+    put(double[].class, PinotDataType.PRIMITIVE_DOUBLE_ARRAY);
     put(Double[].class, PinotDataType.DOUBLE_ARRAY);
     put(String[].class, PinotDataType.STRING_ARRAY);
   }};
@@ -84,13 +84,9 @@ public class FunctionUtils {
     put(String.class, DataType.STRING);
     put(byte[].class, DataType.BYTES);
     put(int[].class, DataType.INT);
-    put(Integer[].class, DataType.INT);
     put(long[].class, DataType.LONG);
-    put(Long[].class, DataType.LONG);
     put(float[].class, DataType.FLOAT);
-    put(Float[].class, DataType.FLOAT);
     put(double[].class, DataType.DOUBLE);
-    put(Double[].class, DataType.DOUBLE);
     put(String[].class, DataType.STRING);
   }};
 
@@ -106,13 +102,9 @@ public class FunctionUtils {
     put(String.class, ColumnDataType.STRING);
     put(byte[].class, ColumnDataType.BYTES);
     put(int[].class, ColumnDataType.INT_ARRAY);
-    put(Integer[].class, ColumnDataType.INT_ARRAY);
     put(long[].class, ColumnDataType.LONG_ARRAY);
-    put(Long[].class, ColumnDataType.LONG_ARRAY);
     put(float[].class, ColumnDataType.FLOAT_ARRAY);
-    put(Float[].class, ColumnDataType.FLOAT_ARRAY);
     put(double[].class, ColumnDataType.DOUBLE_ARRAY);
-    put(Double[].class, ColumnDataType.DOUBLE_ARRAY);
     put(String[].class, ColumnDataType.STRING_ARRAY);
   }};
 

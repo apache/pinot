@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import java.nio.charset.StandardCharsets;
-import java.text.Normalizer;
 import it.unimi.dsi.fastutil.ints.IntLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
+import java.nio.charset.StandardCharsets;
+import java.text.Normalizer;
 import java.util.Arrays;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.ArrayUtils;

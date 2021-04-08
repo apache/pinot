@@ -19,8 +19,8 @@
 package org.apache.pinot.core.operator.docidsets;
 
 import java.util.List;
-import org.apache.pinot.common.utils.Pairs.IntPair;
 import org.apache.pinot.core.operator.dociditerators.SortedDocIdIterator;
+import org.apache.pinot.spi.utils.Pairs.IntPair;
 
 
 public final class SortedDocIdSet implements FilterBlockDocIdSet {
