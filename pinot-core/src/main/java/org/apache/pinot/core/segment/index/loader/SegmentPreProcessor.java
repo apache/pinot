@@ -81,7 +81,7 @@ public class SegmentPreProcessor implements AutoCloseable {
   public void process()
       throws Exception {
     if (_segmentMetadata.getTotalDocs() == 0) {
-      LOGGER.info("Skip preprocessing because the segment {} has 0 doc.", _segmentMetadata.getName());
+      LOGGER.info("Skip preprocessing empty segment: {}", _segmentMetadata.getName());
       return;
     }
     // Remove all the existing inverted index temp files before loading segments.
