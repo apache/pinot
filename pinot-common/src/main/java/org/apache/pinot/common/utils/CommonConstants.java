@@ -140,6 +140,10 @@ public class CommonConstants {
     public static final String DEFAULT_FLAPPING_TIME_WINDOW_MS = "1";
 
     public static final String PINOT_SERVICE_ROLE = "pinot.service.role";
+
+    // Cluster wide config which controls if the Cluster manager UI should display
+    // only the Query Console (and hide everything else).
+    public static final String CONFIG_OF_QUERY_CONSOLE_ONLY_VIEW = "queryConsoleOnlyView";
   }
 
   public static class Broker {
