@@ -74,7 +74,6 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
   @Override
   public boolean prune(IndexSegment segment, QueryContext query) {
     FilterContext filter = query.getFilter();
-
     if (filter == null) {
       return false;
     }
