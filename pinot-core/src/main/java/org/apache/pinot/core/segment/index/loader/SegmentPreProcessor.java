@@ -81,6 +81,7 @@ public class SegmentPreProcessor implements AutoCloseable {
   public void process()
       throws Exception {
     if (_segmentMetadata.getTotalDocs() == 0) {
+      LOGGER.info("Skip preprocessing empty segment: {}", _segmentMetadata.getName());
       return;
     }
     // Remove all the existing inverted index temp files before loading segments.
@@ -104,6 +105,8 @@ public class SegmentPreProcessor implements AutoCloseable {
         defaultColumnHandler.updateDefaultColumns();
         _segmentMetadata = new SegmentMetadataImpl(_indexDir);
         _segmentDirectory.reloadMetadata();
+      } else {
+        LOGGER.warn("Skip creating default columns for segment: {} without schema", _segmentMetadata.getName());
       }
 
       // Create column inverted indices according to the index config.
