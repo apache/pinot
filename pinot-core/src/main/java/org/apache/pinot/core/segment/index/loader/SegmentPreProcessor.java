@@ -106,7 +106,7 @@ public class SegmentPreProcessor implements AutoCloseable {
         _segmentMetadata = new SegmentMetadataImpl(_indexDir);
         _segmentDirectory.reloadMetadata();
       } else {
-        LOGGER.warn("The table schema is null for the segment {}.", _segmentMetadata.getName());
+        LOGGER.warn("Skip creating default columns for segment: {} without schema", _segmentMetadata.getName());
       }
 
       // Create column inverted indices according to the index config.
