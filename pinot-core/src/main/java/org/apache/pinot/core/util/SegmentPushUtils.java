@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.ingestion.batch.common;
+package org.apache.pinot.core.util;
 
 import com.google.common.base.Preconditions;
 import java.io.File;

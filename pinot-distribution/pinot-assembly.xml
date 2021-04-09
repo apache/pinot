@@ -140,6 +140,12 @@
       <destName>plugins/pinot-segment-writer/pinot-segment-writer-file-based/pinot-segment-writer-file-based-${project.version}-shaded.jar</destName>
     </file>
     <!-- End Include Pinot Segment Writer Plugins-->
+    <!-- Start Include Pinot Segment Uploader Plugins-->
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-segment-uploader/pinot-segment-uploader-default/target/pinot-segment-uploader-default-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-segment-uploader/pinot-segment-uploader-default/pinot-segment-uploader-default-${project.version}-shaded.jar</destName>
+    </file>
+    <!-- End Include Pinot Segment Uploader Plugins-->
     <!-- End Include Pinot Plugins-->
   </files>
   <fileSets>
