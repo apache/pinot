@@ -20,6 +20,7 @@
 import com.google.common.base.Preconditions;
 import com.holdenkarau.spark.testing.SharedJavaSparkContext;
 import java.io.File;
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -28,8 +29,8 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
-import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
@@ -55,28 +56,15 @@ import static org.testng.Assert.assertTrue;
 
 
 public class SegmentCreationSparkTest extends SharedJavaSparkContext implements Serializable {
-  private static final File SAMPLE_DATA_FILE = new File(Preconditions
-      .checkNotNull(SegmentCreationSparkTest.class.getClassLoader().getResource("test_sample_data.csv"))
-      .getFile());
-
-  private File _tempDir;
+  private static final String SAMPLE_DATA_PATH =
+      Preconditions.checkNotNull(SegmentCreationSparkTest.class.getClassLoader().getResource("test_sample_data.csv"))
+          .getPath();
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "SegmentCreationSparkTest");
 
   @BeforeClass
-  public void setup() {
-    _tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName());
-    _tempDir.mkdir();
-    System.out.println("Temp dir: " + _tempDir.getAbsolutePath());
-  }
-
-  @Test
-  public void testManualCreation() {
-    String[] jars = new String[]{};
-    java.util.Map<String, String> environment = new java.util.HashMap<>();
-    new JavaSparkContext(new SparkConf().setMaster("local").setAppName("name")).stop();
-    new JavaSparkContext("local", "name", new SparkConf()).stop();
-    new JavaSparkContext("local", "name").stop();
-    new JavaSparkContext("local", "name", "sparkHome", jars).stop();
-    new JavaSparkContext("local", "name", "sparkHome", jars, environment).stop();
+  public void setUp()
+      throws IOException {
+    FileUtils.deleteQuietly(TEMP_DIR);
   }
 
   @Test
@@ -85,11 +73,12 @@ public class SegmentCreationSparkTest extends SharedJavaSparkContext implements 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).build();
     Schema tableSchema = new Schema.SchemaBuilder().setSchemaName(tableName).build();
 
-    SparkConf conf = new SparkConf().setMaster("local").setAppName("test").set("spark.ui.enabled", "false");
+    SparkConf conf = new SparkConf().setMaster("local").setAppName("test").set("spark.driver.host", "localhost")
+        .set("spark.ui.enabled", "false");
     JavaSparkContext jsc = new JavaSparkContext(conf);
     SQLContext sqlContext = new SQLContext(jsc);
 
-    Dataset<Row> df = sqlContext.read().format("csv").load("file://" + SAMPLE_DATA_FILE.getAbsolutePath());
+    Dataset<Row> df = sqlContext.read().format("csv").load("file://" + SAMPLE_DATA_PATH);
     StructType dfSchema = df.schema();
     JavaRDD<GenericRow> transformedRDD = df.javaRDD().map((Function<Row, GenericRow>) row -> {
       GenericRow genericRow = new GenericRow();
@@ -115,7 +104,7 @@ public class SegmentCreationSparkTest extends SharedJavaSparkContext implements 
       }
 
       SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, tableSchema);
-      segmentGeneratorConfig.setOutDir(_tempDir.getPath());
+      segmentGeneratorConfig.setOutDir(TEMP_DIR.getPath());
       segmentGeneratorConfig.setOnHeap(true);
 
       // Set segment name
@@ -128,14 +117,15 @@ public class SegmentCreationSparkTest extends SharedJavaSparkContext implements 
       driver.build();
     });
 
-    String[] segments = _tempDir.list();
+    String[] segments = TEMP_DIR.list();
     assertNotNull(segments);
     assertEquals(segments.length, expectedSegmentNames.size());
     assertTrue(expectedSegmentNames.containsAll(Arrays.asList(segments)));
   }
 
   @AfterClass
-  public void teardown() {
-    _tempDir.delete();
+  public void tearDown()
+      throws IOException {
+    FileUtils.deleteDirectory(TEMP_DIR);
   }
 }
