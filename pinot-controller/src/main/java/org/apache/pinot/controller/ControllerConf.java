@@ -28,6 +28,7 @@ import java.util.Random;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.rackawareness.Provider;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
@@ -64,6 +65,11 @@ public class ControllerConf extends PinotConfiguration {
   public static final String EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT = "controller.upload.onlineToOfflineTimeout";
   public static final String CONTROLLER_MODE = "controller.mode";
   public static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY = "controller.resource.rebalance.strategy";
+  public static final String RACK_AWARENESS_ENABLE = "controller.rackAwareness.enable";
+  public static final String RACK_AWARENESS_PROVIDER = "controller.rackAwareness.provider";
+  public static final String RACK_AWARENESS_CONNECTION_MAX_RETRY = "controller.rackAwareness.connection.maxRetry";
+  public static final String RACK_AWARENESS_CONNECTION_CONNECTION_TIME_OUT = "controller.rackAwareness.connection.connectionTimeOut";
+  public static final String RACK_AWARENESS_CONNECTION_REQUEST_TIME_OUT = "controller.rackAwareness.connection.requestTimeOut";
 
   public enum ControllerMode {
     DUAL, PINOT_ONLY, HELIX_ONLY
@@ -188,7 +194,7 @@ public class ControllerConf extends PinotConfiguration {
   public ControllerConf() {
     super(new HashMap<>());
   }
-  
+
   public ControllerConf(Map<String, Object> baseProperties) {
     super(baseProperties);
   }
@@ -301,7 +307,7 @@ public class ControllerConf extends PinotConfiguration {
   public String getControllerPort() {
     return getProperty(CONTROLLER_PORT);
   }
-  
+
   public List<String> getControllerAccessProtocols() {
     return getProperty(CONTROLLER_ACCESS_PROTOCOLS,
         getControllerPort() == null ? Arrays.asList("http") : Arrays.asList());
@@ -376,7 +382,7 @@ public class ControllerConf extends PinotConfiguration {
 
             // No protocol defines a port as VIP. Fallback on legacy controller.port property.
             .orElseGet(this::getControllerPort));
-  }  
+  }
 
   public String getControllerVipProtocol() {
     return getSupportedProtocol(CONTROLLER_VIP_PROTOCOL);
@@ -707,4 +713,30 @@ public class ControllerConf extends PinotConfiguration {
         "Unsupported %s protocol '%s'", property, value);
     return value;
   }
+
+  public boolean getRackAwarenessEnable() {
+    return getProperty(RACK_AWARENESS_ENABLE, CommonConstants.Helix.RACK_AWARENESS_ENABLED_DEFAULT_VALUE);
+  }
+
+  public Optional<Provider> getRackAwarenessProvider() {
+    return Provider.fromString(getProperty(RACK_AWARENESS_PROVIDER,
+        CommonConstants.Helix.RACK_AWARENESS_PROVIDER_DEFAULT_VALUE));
+  }
+
+  public int getRackAwarenessConnectionMaxRetry() {
+    return getProperty(RACK_AWARENESS_CONNECTION_MAX_RETRY,
+        CommonConstants.Helix.RACK_AWARENESS_CONNECTION_MAX_RETRY_DEFAULT_VALUE);
+  }
+
+  public int getRackAwarenessConnectionConnectionTimeOut() {
+    return getProperty(RACK_AWARENESS_CONNECTION_CONNECTION_TIME_OUT,
+        CommonConstants.Helix.RACK_AWARENESS_CONNECTION_CONNECTION_TIME_OUT_DEFAULT_VALUE);
+  }
+
+  public int getRackAwarenessConnectionRequestTimeOut() {
+    return getProperty(RACK_AWARENESS_CONNECTION_REQUEST_TIME_OUT,
+        CommonConstants.Helix.RACK_AWARENESS_CONNECTION_REQUEST_TIME_OUT_DEFAULT_VALUE);
+  }
+
+
 }

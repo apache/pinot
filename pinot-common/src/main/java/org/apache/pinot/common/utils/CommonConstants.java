@@ -59,6 +59,17 @@ public class CommonConstants {
     public static final String DEFAULT_HYPERLOGLOG_LOG2M_KEY = "default.hyperloglog.log2m";
     public static final int DEFAULT_HYPERLOGLOG_LOG2M = 8;
 
+    // Configurations for rack awareness
+    public static final String RACK_AWARENESS_ENABLED_KEY = "rackAwarenessEnabled";
+    public static final String RACK_AWARENESS_PROVIDER_KEY = "rackAwarenessProvider";
+
+    public static final boolean RACK_AWARENESS_ENABLED_DEFAULT_VALUE = false;
+    public static final String RACK_AWARENESS_PROVIDER_DEFAULT_VALUE = "";
+    public static final int RACK_AWARENESS_CONNECTION_MAX_RETRY_DEFAULT_VALUE = 3;
+    public static final int RACK_AWARENESS_CONNECTION_CONNECTION_TIME_OUT_DEFAULT_VALUE = 600_000;
+    public static final int RACK_AWARENESS_CONNECTION_REQUEST_TIME_OUT_DEFAULT_VALUE = 600_000;
+
+
     // Whether to rewrite DistinctCount to DistinctCountBitmap
     public static final String ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY = "enable.distinct.count.bitmap.override";
 

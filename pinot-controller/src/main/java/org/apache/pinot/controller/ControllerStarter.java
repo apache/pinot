@@ -301,7 +301,7 @@ public class ControllerStarter implements ServiceStartable {
     // Register and connect instance as Helix controller.
     LOGGER.info("Starting Helix controller");
     _helixControllerManager =
-        HelixSetupUtils.setupHelixController(_helixClusterName, _helixZkURL, _helixControllerInstanceId);
+        HelixSetupUtils.setupHelixController(_helixClusterName, _helixZkURL, _helixControllerInstanceId, _config);
 
     // Emit helix controller metrics
     _controllerMetrics.addCallbackGauge(CommonConstants.Helix.INSTANCE_CONNECTED_METRIC_NAME,

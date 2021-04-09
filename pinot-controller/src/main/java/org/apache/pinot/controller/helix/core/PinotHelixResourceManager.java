@@ -164,6 +164,10 @@ public class PinotHelixResourceManager {
   private final boolean _enableBatchMessageMode;
   private final boolean _allowHLCTables;
 
+  private final int _connectionMaxRetry;
+  private final int _connectionTimeOut;
+  private final int _requestTimeOut;
+
   private HelixManager _helixZkManager;
   private String _instanceId;
   private HelixAdmin _helixAdmin;
@@ -176,7 +180,7 @@ public class PinotHelixResourceManager {
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
       long externalViewOnlineToOfflineTimeoutMillis, boolean isSingleTenantCluster, boolean enableBatchMessageMode,
-      boolean allowHLCTables) {
+      boolean allowHLCTables, int connectionMaxRetry, int connectionTimeOut, int requestTimeOut) {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;
     _dataDir = dataDir;
@@ -184,6 +188,9 @@ public class PinotHelixResourceManager {
     _isSingleTenantCluster = isSingleTenantCluster;
     _enableBatchMessageMode = enableBatchMessageMode;
     _allowHLCTables = allowHLCTables;
+    _connectionMaxRetry = connectionMaxRetry;
+    _connectionTimeOut = connectionTimeOut;
+    _requestTimeOut = requestTimeOut;
     _instanceAdminEndpointCache =
         CacheBuilder.newBuilder().expireAfterWrite(CACHE_ENTRY_EXPIRE_TIME_HOURS, TimeUnit.HOURS)
             .build(new CacheLoader<String, String>() {
@@ -225,7 +232,9 @@ public class PinotHelixResourceManager {
   public PinotHelixResourceManager(ControllerConf controllerConf) {
     this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(), controllerConf.getDataDir(),
         controllerConf.getExternalViewOnlineToOfflineTimeout(), controllerConf.tenantIsolationEnabled(),
-        controllerConf.getEnableBatchMessageMode(), controllerConf.getHLCTablesAllowed());
+        controllerConf.getEnableBatchMessageMode(), controllerConf.getHLCTablesAllowed(),
+        controllerConf.getRackAwarenessConnectionMaxRetry(), controllerConf.getRackAwarenessConnectionConnectionTimeOut(),
+        controllerConf.getRackAwarenessConnectionRequestTimeOut());
   }
 
   /**
@@ -246,6 +255,8 @@ public class PinotHelixResourceManager {
     addInstanceGroupTagIfNeeded();
     _segmentDeletionManager = new SegmentDeletionManager(_dataDir, _helixAdmin, _helixClusterName, _propertyStore);
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
+
+    ZKMetadataProvider.setAzureInstanceMetadataFetcherProperties(_propertyStore, _connectionMaxRetry, _connectionTimeOut, _requestTimeOut);
 
     // Initialize TableCache
     HelixConfigScope helixConfigScope =

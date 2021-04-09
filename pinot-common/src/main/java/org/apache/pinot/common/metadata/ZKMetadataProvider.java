@@ -21,6 +21,7 @@ package org.apache.pinot.common.metadata;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.I0Itec.zkclient.exception.ZkBadVersionException;
@@ -31,12 +32,13 @@ import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.rackawareness.AzureInstanceMetadataFetcherProperties;
+import org.apache.pinot.common.rackawareness.Provider;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
-import org.apache.pinot.spi.config.BaseJsonConfig;
 import org.apache.pinot.spi.config.ConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -62,6 +64,10 @@ public class ZKMetadataProvider {
   private static final String PROPERTYSTORE_CLUSTER_CONFIGS_PREFIX = "/CONFIGS/CLUSTER";
   private static final String PROPERTYSTORE_SEGMENT_LINEAGE = "/SEGMENT_LINEAGE";
   private static final String PROPERTYSTORE_MINION_TASK_METADATA_PREFIX = "/MINION_TASK_METADATA";
+  private static final String PROPERTYSTORE_RACK_AWARENESS_PREFIX = PROPERTYSTORE_CLUSTER_CONFIGS_PREFIX + "/RACKAWARENESS";
+  private static final String RACK_AWARENESS_AZURE_CONNECTION_MAX_RETRY_KEY = "connectionMaxRetry";
+  private static final String RACK_AWARENESS_AZURE_CONNECTION_TIMEOUT_KEY = "connectionTimeOut";
+  private static final String RACK_AWARENESS_AZURE_REQUEST_TIMEOUT_KEY = "requestTimeOut";
 
   public static void setRealtimeTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String realtimeTableName,
       ZNRecord znRecord) {
@@ -121,6 +127,10 @@ public class ZKMetadataProvider {
 
   public static String constructPropertyStorePathForMinionTaskMetadata(String taskType, String tableNameWithType) {
     return StringUtil.join("/", PROPERTYSTORE_MINION_TASK_METADATA_PREFIX, taskType, tableNameWithType);
+  }
+
+  private static String constructPropertyStorePathForRackAwareness(String providerStr) {
+    return StringUtil.join("/", PROPERTYSTORE_RACK_AWARENESS_PREFIX, providerStr);
   }
 
   public static boolean isSegmentExisted(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceNameForResource,
@@ -464,5 +474,41 @@ public class ZKMetadataProvider {
     } else {
       return true;
     }
+  }
+
+  public static void setAzureInstanceMetadataFetcherProperties(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      int connectionMaxRetryValue, int connectionTimeOutValue, int requestTimeOutValue) {
+    final ZNRecord znRecord;
+    final String path = constructPropertyStorePathForRackAwareness(Provider.AZURE.getzNodeName());
+
+    if (!propertyStore.exists(path, AccessOption.PERSISTENT)) {
+      znRecord = new ZNRecord(Provider.AZURE.getzNodeName());
+    } else {
+      znRecord = propertyStore.get(path, null, AccessOption.PERSISTENT);
+    }
+
+    znRecord.setIntField(RACK_AWARENESS_AZURE_CONNECTION_MAX_RETRY_KEY, connectionMaxRetryValue);
+    znRecord.setIntField(RACK_AWARENESS_AZURE_CONNECTION_TIMEOUT_KEY, connectionTimeOutValue);
+    znRecord.setIntField(RACK_AWARENESS_AZURE_REQUEST_TIMEOUT_KEY, requestTimeOutValue);
+
+    propertyStore.set(path, znRecord, AccessOption.PERSISTENT);
+  }
+
+  public static AzureInstanceMetadataFetcherProperties getAzureInstanceMetadataFetcherProperties(
+      ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    final String path = constructPropertyStorePathForRackAwareness(Provider.AZURE.getzNodeName());
+    if (!propertyStore.exists(path, AccessOption.PERSISTENT)) {
+      return AzureInstanceMetadataFetcherProperties.getDefaultProperties();
+    }
+
+    ZNRecord znRecord = propertyStore.get(path, null, AccessOption.PERSISTENT);
+    Map<String, String> fieldMap = znRecord.getSimpleFields();
+    return new AzureInstanceMetadataFetcherProperties(
+        znRecord.getIntField(RACK_AWARENESS_AZURE_CONNECTION_MAX_RETRY_KEY,
+            CommonConstants.Helix.RACK_AWARENESS_CONNECTION_MAX_RETRY_DEFAULT_VALUE),
+        znRecord.getIntField(RACK_AWARENESS_AZURE_CONNECTION_TIMEOUT_KEY,
+            CommonConstants.Helix.RACK_AWARENESS_CONNECTION_CONNECTION_TIME_OUT_DEFAULT_VALUE),
+        znRecord.getIntField(RACK_AWARENESS_AZURE_REQUEST_TIMEOUT_KEY,
+            CommonConstants.Helix.RACK_AWARENESS_CONNECTION_REQUEST_TIME_OUT_DEFAULT_VALUE));
   }
 }
