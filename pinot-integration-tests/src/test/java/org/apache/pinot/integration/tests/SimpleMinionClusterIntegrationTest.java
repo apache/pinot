@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
@@ -46,16 +47,11 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 /**
@@ -68,6 +64,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   private static final String TABLE_NAME_2 = "testTable2";
   private static final String TABLE_NAME_3 = "testTable3";
   private static final long STATE_TRANSITION_TIMEOUT_MS = 60_000L;  // 1 minute
+  private static final long ZK_CALLBACK_TIMEOUT_MS = 30_000L;       // 30 seconds
   private static final int NUM_TASKS = 2;
   private static final int NUM_CONFIGS = 3;
 
@@ -141,12 +138,16 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
       return true;
     }, STATE_TRANSITION_TIMEOUT_MS, "Failed to get all tasks IN_PROGRESS");
 
-    Assert.assertEquals(_controllerStarter.getControllerMetrics()
-        .getValueOfTableGauge(TASK_TYPE + "." + TaskState.IN_PROGRESS, ControllerGauge.TASK_STATUS), NUM_TASKS);
-    Assert.assertEquals(_controllerStarter.getControllerMetrics()
-        .getValueOfTableGauge(TASK_TYPE + "." + TaskState.COMPLETED, ControllerGauge.TASK_STATUS), 0);
-    Assert.assertEquals(_controllerStarter.getControllerMetrics()
-        .getValueOfTableGauge(TASK_TYPE + "." + TaskState.STOPPED, ControllerGauge.TASK_STATUS), 0);
+    // Wait at most 30 seconds for ZK callback to update the controller gauges
+    ControllerMetrics controllerMetrics = _controllerStarter.getControllerMetrics();
+    String inProgressGauge = TASK_TYPE + "." + TaskState.IN_PROGRESS;
+    String stoppedGauge = TASK_TYPE + "." + TaskState.STOPPED;
+    String completedGauge = TASK_TYPE + "." + TaskState.COMPLETED;
+    TestUtils.waitForCondition(
+        input -> controllerMetrics.getValueOfTableGauge(inProgressGauge, ControllerGauge.TASK_STATUS) == NUM_TASKS
+            && controllerMetrics.getValueOfTableGauge(stoppedGauge, ControllerGauge.TASK_STATUS) == 0
+            && controllerMetrics.getValueOfTableGauge(completedGauge, ControllerGauge.TASK_STATUS) == 0,
+        ZK_CALLBACK_TIMEOUT_MS, "Failed to update the controller gauges");
 
     // Stop the task queue
     _helixTaskResourceManager.stopTaskQueue(TASK_TYPE);
@@ -167,12 +168,12 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
       return true;
     }, STATE_TRANSITION_TIMEOUT_MS, "Failed to get all tasks STOPPED");
 
-    Assert.assertEquals(_controllerStarter.getControllerMetrics()
-        .getValueOfTableGauge(TASK_TYPE + "." + TaskState.IN_PROGRESS, ControllerGauge.TASK_STATUS), 0);
-    Assert.assertEquals(_controllerStarter.getControllerMetrics()
-        .getValueOfTableGauge(TASK_TYPE + "." + TaskState.COMPLETED, ControllerGauge.TASK_STATUS), 0);
-    Assert.assertEquals(_controllerStarter.getControllerMetrics()
-        .getValueOfTableGauge(TASK_TYPE + "." + TaskState.STOPPED, ControllerGauge.TASK_STATUS), NUM_TASKS);
+    // Wait at most 30 seconds for ZK callback to update the controller gauges
+    TestUtils.waitForCondition(
+        input -> controllerMetrics.getValueOfTableGauge(inProgressGauge, ControllerGauge.TASK_STATUS) == 0
+            && controllerMetrics.getValueOfTableGauge(stoppedGauge, ControllerGauge.TASK_STATUS) == NUM_TASKS
+            && controllerMetrics.getValueOfTableGauge(completedGauge, ControllerGauge.TASK_STATUS) == 0,
+        ZK_CALLBACK_TIMEOUT_MS, "Failed to update the controller gauges");
 
     // Resume the task queue, and let the task complete
     _helixTaskResourceManager.resumeTaskQueue(TASK_TYPE);
@@ -194,12 +195,12 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
       return true;
     }, STATE_TRANSITION_TIMEOUT_MS, "Failed to get all tasks COMPLETED");
 
-    Assert.assertEquals(_controllerStarter.getControllerMetrics()
-        .getValueOfTableGauge(TASK_TYPE + "." + TaskState.IN_PROGRESS, ControllerGauge.TASK_STATUS), 0);
-    Assert.assertEquals(_controllerStarter.getControllerMetrics()
-        .getValueOfTableGauge(TASK_TYPE + "." + TaskState.COMPLETED, ControllerGauge.TASK_STATUS), NUM_TASKS);
-    Assert.assertEquals(_controllerStarter.getControllerMetrics()
-        .getValueOfTableGauge(TASK_TYPE + "." + TaskState.STOPPED, ControllerGauge.TASK_STATUS), 0);
+    // Wait at most 30 seconds for ZK callback to update the controller gauges
+    TestUtils.waitForCondition(
+        input -> controllerMetrics.getValueOfTableGauge(inProgressGauge, ControllerGauge.TASK_STATUS) == 0
+            && controllerMetrics.getValueOfTableGauge(stoppedGauge, ControllerGauge.TASK_STATUS) == 0
+            && controllerMetrics.getValueOfTableGauge(completedGauge, ControllerGauge.TASK_STATUS) == NUM_TASKS,
+        ZK_CALLBACK_TIMEOUT_MS, "Failed to update the controller gauges");
 
     // Delete the task queue
     _helixTaskResourceManager.deleteTaskQueue(TASK_TYPE, false);
@@ -208,12 +209,12 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     TestUtils.waitForCondition(input -> !_helixTaskResourceManager.getTaskTypes().contains(TASK_TYPE),
         STATE_TRANSITION_TIMEOUT_MS, "Failed to delete the task queue");
 
-    Assert.assertEquals(_controllerStarter.getControllerMetrics()
-        .getValueOfTableGauge(TASK_TYPE + "." + TaskState.IN_PROGRESS, ControllerGauge.TASK_STATUS), 0);
-    Assert.assertEquals(_controllerStarter.getControllerMetrics()
-        .getValueOfTableGauge(TASK_TYPE + "." + TaskState.COMPLETED, ControllerGauge.TASK_STATUS), NUM_TASKS);
-    Assert.assertEquals(_controllerStarter.getControllerMetrics()
-        .getValueOfTableGauge(TASK_TYPE + "." + TaskState.STOPPED, ControllerGauge.TASK_STATUS), 0);
+    // Wait at most 30 seconds for ZK callback to update the controller gauges
+    TestUtils.waitForCondition(
+        input -> controllerMetrics.getValueOfTableGauge(inProgressGauge, ControllerGauge.TASK_STATUS) == 0
+            && controllerMetrics.getValueOfTableGauge(stoppedGauge, ControllerGauge.TASK_STATUS) == 0
+            && controllerMetrics.getValueOfTableGauge(completedGauge, ControllerGauge.TASK_STATUS) == 0,
+        ZK_CALLBACK_TIMEOUT_MS, "Failed to update the controller gauges");
   }
 
   @AfterClass
