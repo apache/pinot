@@ -152,6 +152,10 @@
           <groupId>org.reactivestreams</groupId>
           <artifactId>reactive-streams</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>netty-codec</artifactId>
+        </exclusion>
       </exclusions>
       <scope>runtime</scope>
     </dependency>
