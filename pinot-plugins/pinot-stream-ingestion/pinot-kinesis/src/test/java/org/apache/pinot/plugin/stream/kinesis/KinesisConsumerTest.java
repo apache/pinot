@@ -35,6 +35,7 @@ import software.amazon.awssdk.services.kinesis.model.GetRecordsResponse;
 import software.amazon.awssdk.services.kinesis.model.GetShardIteratorRequest;
 import software.amazon.awssdk.services.kinesis.model.GetShardIteratorResponse;
 import software.amazon.awssdk.services.kinesis.model.Record;
+import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.createMock;
@@ -43,6 +44,8 @@ import static org.easymock.EasyMock.replay;
 
 
 public class KinesisConsumerTest {
+  private static final String STREAM_NAME = "kinesis-test";
+  private static final String AWS_REGION = "us-west-2";
   public static final int TIMEOUT = 1000;
   public static final int NUM_RECORDS = 10;
   public static final String DUMMY_RECORD_PREFIX = "DUMMY_RECORD-";
@@ -53,6 +56,15 @@ public class KinesisConsumerTest {
   private static StreamConsumerFactory streamConsumerFactory;
   private static KinesisClient kinesisClient;
   private List<Record> recordList;
+
+  private KinesisConfig getKinesisConfig() {
+    Map<String, String> props = new HashMap<>();
+    props.put("stream.kinesis.topic.name", STREAM_NAME);
+    props.put(KinesisConfig.AWS_REGION, AWS_REGION);
+    props.put(KinesisConfig.MAX_RECORDS_TO_FETCH, "10");
+    props.put(KinesisConfig.SHARD_ITERATOR_TYPE, ShardIteratorType.AT_SEQUENCE_NUMBER.toString());
+    return new KinesisConfig(props);
+  }
 
   @BeforeMethod
   public void setupTest() {
@@ -86,12 +98,12 @@ public class KinesisConsumerTest {
 
     replay(kinesisClient);
 
-    KinesisConsumer kinesisConsumer = new KinesisConsumer(TestUtils.getKinesisConfig(), kinesisClient);
+    KinesisConsumer kinesisConsumer = new KinesisConsumer(getKinesisConfig(), kinesisClient);
 
     Map<String, String> shardToSequenceMap = new HashMap<>();
     shardToSequenceMap.put("0", "1");
-    KinesisCheckpoint kinesisCheckpoint = new KinesisCheckpoint(shardToSequenceMap);
-    KinesisRecordsBatch kinesisRecordsBatch = kinesisConsumer.fetchMessages(kinesisCheckpoint, null, TIMEOUT);
+    KinesisPartitionGroupOffset kinesisPartitionGroupOffset = new KinesisPartitionGroupOffset(shardToSequenceMap);
+    KinesisRecordsBatch kinesisRecordsBatch = kinesisConsumer.fetchMessages(kinesisPartitionGroupOffset, null, TIMEOUT);
 
     Assert.assertEquals(kinesisRecordsBatch.getMessageCount(), NUM_RECORDS);
 
@@ -119,14 +131,14 @@ public class KinesisConsumerTest {
 
     replay(kinesisClient);
 
-    KinesisConfig kinesisConfig = TestUtils.getKinesisConfig();
+    KinesisConfig kinesisConfig = getKinesisConfig();
     kinesisConfig.setMaxRecordsToFetch(maxRecordsLimit);
     KinesisConsumer kinesisConsumer = new KinesisConsumer(kinesisConfig, kinesisClient);
 
     Map<String, String> shardToSequenceMap = new HashMap<>();
     shardToSequenceMap.put("0", "1");
-    KinesisCheckpoint kinesisCheckpoint = new KinesisCheckpoint(shardToSequenceMap);
-    KinesisRecordsBatch kinesisRecordsBatch = kinesisConsumer.fetchMessages(kinesisCheckpoint, null, TIMEOUT);
+    KinesisPartitionGroupOffset kinesisPartitionGroupOffset = new KinesisPartitionGroupOffset(shardToSequenceMap);
+    KinesisRecordsBatch kinesisRecordsBatch = kinesisConsumer.fetchMessages(kinesisPartitionGroupOffset, null, TIMEOUT);
 
     Assert.assertEquals(kinesisRecordsBatch.getMessageCount(), maxRecordsLimit);
 
@@ -156,14 +168,14 @@ public class KinesisConsumerTest {
 
     replay(kinesisClient);
 
-    KinesisConfig kinesisConfig = TestUtils.getKinesisConfig();
+    KinesisConfig kinesisConfig = getKinesisConfig();
     kinesisConfig.setMaxRecordsToFetch(maxRecordsLimit);
     KinesisConsumer kinesisConsumer = new KinesisConsumer(kinesisConfig, kinesisClient);
 
     Map<String, String> shardToSequenceMap = new HashMap<>();
     shardToSequenceMap.put("0", "1");
-    KinesisCheckpoint kinesisCheckpoint = new KinesisCheckpoint(shardToSequenceMap);
-    KinesisRecordsBatch kinesisRecordsBatch = kinesisConsumer.fetchMessages(kinesisCheckpoint, null, TIMEOUT);
+    KinesisPartitionGroupOffset kinesisPartitionGroupOffset = new KinesisPartitionGroupOffset(shardToSequenceMap);
+    KinesisRecordsBatch kinesisRecordsBatch = kinesisConsumer.fetchMessages(kinesisPartitionGroupOffset, null, TIMEOUT);
 
     Assert.assertTrue(kinesisRecordsBatch.isEndOfPartitionGroup());
     Assert.assertEquals(kinesisRecordsBatch.getMessageCount(), NUM_RECORDS);

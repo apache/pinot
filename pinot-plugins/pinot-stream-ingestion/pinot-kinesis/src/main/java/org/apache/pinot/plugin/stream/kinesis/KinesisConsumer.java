@@ -26,9 +26,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.spi.stream.Checkpoint;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
-import org.apache.pinot.spi.stream.PartitionGroupMetadata;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.services.kinesis.KinesisClient;
@@ -49,10 +48,10 @@ import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
  */
 public class KinesisConsumer extends KinesisConnectionHandler implements PartitionGroupConsumer {
   private final Logger LOG = LoggerFactory.getLogger(KinesisConsumer.class);
-  String _stream;
-  Integer _maxRecords;
-  ExecutorService _executorService;
-  ShardIteratorType _shardIteratorType;
+  private final String _stream;
+  private final int _maxRecords;
+  private final ExecutorService _executorService;
+  private final ShardIteratorType _shardIteratorType;
 
   public KinesisConsumer(KinesisConfig kinesisConfig) {
     super(kinesisConfig.getStream(), kinesisConfig.getAwsRegion());
@@ -75,7 +74,8 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
    * Fetch records from the Kinesis stream between the start and end KinesisCheckpoint
    */
   @Override
-  public KinesisRecordsBatch fetchMessages(Checkpoint startCheckpoint, Checkpoint endCheckpoint, int timeoutMs) {
+  public KinesisRecordsBatch fetchMessages(StreamPartitionMsgOffset startCheckpoint,
+      StreamPartitionMsgOffset endCheckpoint, int timeoutMs) {
     List<Record> recordList = new ArrayList<>();
     Future<KinesisRecordsBatch> kinesisFetchResultFuture =
         _executorService.submit(() -> getResult(startCheckpoint, endCheckpoint, recordList));
@@ -83,12 +83,13 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     try {
       return kinesisFetchResultFuture.get(timeoutMs, TimeUnit.MILLISECONDS);
     } catch (Exception e) {
-      return handleException((KinesisCheckpoint) startCheckpoint, recordList);
+      return handleException((KinesisPartitionGroupOffset) startCheckpoint, recordList);
     }
   }
 
-  private KinesisRecordsBatch getResult(Checkpoint start, Checkpoint end, List<Record> recordList) {
-    KinesisCheckpoint kinesisStartCheckpoint = (KinesisCheckpoint) start;
+  private KinesisRecordsBatch getResult(StreamPartitionMsgOffset start, StreamPartitionMsgOffset end,
+      List<Record> recordList) {
+    KinesisPartitionGroupOffset kinesisStartCheckpoint = (KinesisPartitionGroupOffset) start;
 
     try {
 
@@ -98,13 +99,14 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
 
       //TODO: iterate upon all the shardIds in the map
       // Okay for now, since we have assumed that every partition group contains a single shard
-      Map.Entry<String, String> next = kinesisStartCheckpoint.getShardToStartSequenceMap().entrySet().iterator().next();
-      String shardIterator = getShardIterator(next.getKey(), next.getValue());
+      Map.Entry<String, String> shardToSequenceNum =
+          kinesisStartCheckpoint.getShardToStartSequenceMap().entrySet().iterator().next();
+      String shardIterator = getShardIterator(shardToSequenceNum.getKey(), shardToSequenceNum.getValue());
 
       String kinesisEndSequenceNumber = null;
 
       if (end != null) {
-        KinesisCheckpoint kinesisEndCheckpoint = (KinesisCheckpoint) end;
+        KinesisPartitionGroupOffset kinesisEndCheckpoint = (KinesisPartitionGroupOffset) end;
         kinesisEndSequenceNumber = kinesisEndCheckpoint.getShardToStartSequenceMap().values().iterator().next();
       }
 
@@ -119,8 +121,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
           recordList.addAll(getRecordsResponse.records());
           nextStartSequenceNumber = recordList.get(recordList.size() - 1).sequenceNumber();
 
-          if (kinesisEndSequenceNumber != null
-              && kinesisEndSequenceNumber.compareTo(recordList.get(recordList.size() - 1).sequenceNumber()) <= 0) {
+          if (kinesisEndSequenceNumber != null && kinesisEndSequenceNumber.compareTo(nextStartSequenceNumber) <= 0) {
             nextStartSequenceNumber = kinesisEndSequenceNumber;
             break;
           }
@@ -139,10 +140,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
         shardIterator = getRecordsResponse.nextShardIterator();
       }
 
-      if (nextStartSequenceNumber == null && recordList.size() > 0) {
-        nextStartSequenceNumber = recordList.get(recordList.size() - 1).sequenceNumber();
-      }
-      return new KinesisRecordsBatch(recordList, next.getKey(), isEndOfShard);
+      return new KinesisRecordsBatch(recordList, shardToSequenceNum.getKey(), isEndOfShard);
     } catch (IllegalStateException e) {
       LOG.warn("Illegal state exception, connection is broken", e);
       return handleException(kinesisStartCheckpoint, recordList);
@@ -166,7 +164,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     }
   }
 
-  private KinesisRecordsBatch handleException(KinesisCheckpoint start, List<Record> recordList) {
+  private KinesisRecordsBatch handleException(KinesisPartitionGroupOffset start, List<Record> recordList) {
     String shardId = start.getShardToStartSequenceMap().entrySet().iterator().next().getKey();
 
     if (recordList.size() > 0) {

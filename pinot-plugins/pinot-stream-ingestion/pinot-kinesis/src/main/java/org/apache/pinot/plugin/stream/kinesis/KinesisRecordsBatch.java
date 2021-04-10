@@ -65,7 +65,7 @@ public class KinesisRecordsBatch implements MessageBatch<byte[]> {
   public StreamPartitionMsgOffset getNextStreamParitionMsgOffsetAtIndex(int index) {
     Map<String, String> shardToSequenceMap = new HashMap<>();
     shardToSequenceMap.put(_shardId, _recordList.get(index).sequenceNumber());
-    return new KinesisCheckpoint(shardToSequenceMap);
+    return new KinesisPartitionGroupOffset(shardToSequenceMap);
   }
 
   @Override

@@ -20,29 +20,27 @@ package org.apache.pinot.plugin.stream.kinesis;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.Map;
-import org.apache.pinot.spi.stream.Checkpoint;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
- * A {@link Checkpoint} implementation for the Kinesis partition group consumption
+ * A {@link StreamPartitionMsgOffset} implementation for the Kinesis partition group consumption
  * A partition group consists of 1 or more shards. The KinesisCheckpoint maintains a Map of shards to the sequenceNumber
  */
-public class KinesisCheckpoint implements StreamPartitionMsgOffset {
+public class KinesisPartitionGroupOffset implements StreamPartitionMsgOffset {
   private final Map<String, String> _shardToStartSequenceMap;
-  public static final ObjectMapper objectMapper = new ObjectMapper();
 
-  public KinesisCheckpoint(Map<String, String> shardToStartSequenceMap) {
+  public KinesisPartitionGroupOffset(Map<String, String> shardToStartSequenceMap) {
     _shardToStartSequenceMap = shardToStartSequenceMap;
   }
 
-  public KinesisCheckpoint(String checkpointStr)
+  public KinesisPartitionGroupOffset(String offsetStr)
       throws IOException {
-    _shardToStartSequenceMap = objectMapper.readValue(checkpointStr, new TypeReference<Map<String, String>>(){});
+    _shardToStartSequenceMap = JsonUtils.stringToObject(offsetStr, new TypeReference<Map<String, String>>() {
+    });
   }
 
   public Map<String, String> getShardToStartSequenceMap() {
@@ -50,31 +48,28 @@ public class KinesisCheckpoint implements StreamPartitionMsgOffset {
   }
 
   @Override
-  public String serialize() {
+  public String toString() {
     try {
-      return objectMapper.writeValueAsString(_shardToStartSequenceMap);
+      return JsonUtils.objectToString(_shardToStartSequenceMap);
     } catch (JsonProcessingException e) {
-      throw new IllegalStateException();
+      throw new IllegalStateException(
+          "Caught exception when converting KinesisCheckpoint to string: " + _shardToStartSequenceMap);
     }
   }
 
   @Override
-  public String toString() {
-    return serialize();
-  }
-
-  @Override
-  public KinesisCheckpoint deserialize(String blob) {
+  public KinesisPartitionGroupOffset fromString(String kinesisCheckpointStr) {
     try {
-      return new KinesisCheckpoint(blob);
+      return new KinesisPartitionGroupOffset(kinesisCheckpointStr);
     } catch (IOException e) {
-      throw new IllegalStateException();
+      throw new IllegalStateException(
+          "Caught exception when converting string to KinesisCheckpoint: " + kinesisCheckpointStr);
     }
   }
 
   @Override
   public int compareTo(Object o) {
     return this._shardToStartSequenceMap.values().iterator().next()
-        .compareTo(((KinesisCheckpoint) o)._shardToStartSequenceMap.values().iterator().next());
+        .compareTo(((KinesisPartitionGroupOffset) o)._shardToStartSequenceMap.values().iterator().next());
   }
 }

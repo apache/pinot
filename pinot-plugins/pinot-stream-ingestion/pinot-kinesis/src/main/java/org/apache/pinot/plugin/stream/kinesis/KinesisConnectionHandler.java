@@ -31,7 +31,7 @@ import software.amazon.awssdk.services.kinesis.model.Shard;
  * Manages the Kinesis stream connection, given the stream name and aws region
  */
 public class KinesisConnectionHandler {
-  KinesisClient _kinesisClient;
+  protected KinesisClient _kinesisClient;
   private final String _stream;
   private final String _awsRegion;
 

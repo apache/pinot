@@ -29,16 +29,16 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.spi.stream.Checkpoint;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
-import org.apache.pinot.spi.stream.PartitionGroupInfo;
+import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import software.amazon.awssdk.services.kinesis.model.Shard;
 
 
@@ -59,7 +59,8 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
     _fetchTimeoutMs = streamConfig.getFetchTimeoutMillis();
   }
 
-  public KinesisStreamMetadataProvider(String clientId, StreamConfig streamConfig, KinesisConnectionHandler kinesisConnectionHandler, StreamConsumerFactory streamConsumerFactory) {
+  public KinesisStreamMetadataProvider(String clientId, StreamConfig streamConfig,
+      KinesisConnectionHandler kinesisConnectionHandler, StreamConsumerFactory streamConsumerFactory) {
     KinesisConfig kinesisConfig = new KinesisConfig(streamConfig);
     _kinesisConnectionHandler = kinesisConnectionHandler;
     _kinesisStreamConsumerFactory = streamConsumerFactory;
@@ -79,19 +80,19 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
 
   /**
    * This call returns all active shards, taking into account the consumption status for those shards.
-   * PartitionGroupInfo is returned for a shard if:
+   * {@link PartitionGroupMetadata} is returned for a shard if:
    * 1. It is a branch new shard AND its parent has been consumed completely
    * 2. It is still being actively consumed from i.e. the consuming partition has not reached the end of the shard
    */
   @Override
-  public List<PartitionGroupInfo> getPartitionGroupInfoList(String clientId, StreamConfig streamConfig,
-      List<PartitionGroupMetadata> currentPartitionGroupsMetadata, int timeoutMillis)
+  public List<PartitionGroupMetadata> computePartitionGroupMetadata(String clientId, StreamConfig streamConfig,
+      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis)
       throws IOException, TimeoutException {
 
-    List<PartitionGroupInfo> newPartitionGroupInfos = new ArrayList<>();
+    List<PartitionGroupMetadata> newPartitionGroupMetadatas = new ArrayList<>();
 
-    Map<String, Shard> shardIdToShardMap =
-        _kinesisConnectionHandler.getShards().stream().collect(Collectors.toMap(Shard::shardId, s -> s, (s1, s2) -> s1));
+    Map<String, Shard> shardIdToShardMap = _kinesisConnectionHandler.getShards().stream()
+        .collect(Collectors.toMap(Shard::shardId, s -> s, (s1, s2) -> s1));
     Set<String> shardsInCurrent = new HashSet<>();
     Set<String> shardsEnded = new HashSet<>();
 
@@ -99,48 +100,51 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
     //  we need to iterate over all shards to check if any of them have reached end
 
     // Process existing shards. Add them to new list if still consuming from them
-    for (PartitionGroupMetadata currentPartitionGroupMetadata : currentPartitionGroupsMetadata) {
-      KinesisCheckpoint kinesisStartCheckpoint = (KinesisCheckpoint) currentPartitionGroupMetadata.getStartCheckpoint();
+    for (PartitionGroupConsumptionStatus currentPartitionGroupConsumptionStatus : partitionGroupConsumptionStatuses) {
+      KinesisPartitionGroupOffset kinesisStartCheckpoint =
+          (KinesisPartitionGroupOffset) currentPartitionGroupConsumptionStatus.getStartOffset();
       String shardId = kinesisStartCheckpoint.getShardToStartSequenceMap().keySet().iterator().next();
       Shard shard = shardIdToShardMap.get(shardId);
       shardsInCurrent.add(shardId);
 
-      Checkpoint newStartCheckpoint;
-      Checkpoint currentEndCheckpoint = currentPartitionGroupMetadata.getEndCheckpoint();
-      if (currentEndCheckpoint != null) { // Segment DONE (committing/committed)
+      StreamPartitionMsgOffset newStartOffset;
+      StreamPartitionMsgOffset currentEndOffset = currentPartitionGroupConsumptionStatus.getEndOffset();
+      if (currentEndOffset != null) { // Segment DONE (committing/committed)
         String endingSequenceNumber = shard.sequenceNumberRange().endingSequenceNumber();
         if (endingSequenceNumber != null) { // Shard has ended, check if we're also done consuming it
-          if (consumedEndOfShard(currentEndCheckpoint, currentPartitionGroupMetadata)) {
+          if (consumedEndOfShard(currentEndOffset, currentPartitionGroupConsumptionStatus)) {
             shardsEnded.add(shardId);
             continue; // Shard ended and we're done consuming it. Skip
           }
         }
-        newStartCheckpoint = currentEndCheckpoint;
+        newStartOffset = currentEndOffset;
       } else { // Segment IN_PROGRESS
-        newStartCheckpoint = currentPartitionGroupMetadata.getStartCheckpoint();
+        newStartOffset = currentPartitionGroupConsumptionStatus.getStartOffset();
       }
-      newPartitionGroupInfos.add(new PartitionGroupInfo(currentPartitionGroupMetadata.getPartitionGroupId(), newStartCheckpoint));
+      newPartitionGroupMetadatas.add(
+          new PartitionGroupMetadata(currentPartitionGroupConsumptionStatus.getPartitionGroupId(), newStartOffset));
     }
 
-    // Add new shards. Parent should be null (new table case, very first shards) OR we should be flagged as reached EOL and completely consumed.
+    // Add new shards. Parent should be null (new table case, very first shards)
+    // OR it should be flagged as reached EOL and completely consumed.
     for (Map.Entry<String, Shard> entry : shardIdToShardMap.entrySet()) {
       String newShardId = entry.getKey();
       if (shardsInCurrent.contains(newShardId)) {
         continue;
       }
-      Checkpoint newStartCheckpoint;
+      StreamPartitionMsgOffset newStartOffset;
       Shard newShard = entry.getValue();
       String parentShardId = newShard.parentShardId();
 
       if (parentShardId == null || shardsEnded.contains(parentShardId)) {
         Map<String, String> shardToSequenceNumberMap = new HashMap<>();
         shardToSequenceNumberMap.put(newShardId, newShard.sequenceNumberRange().startingSequenceNumber());
-        newStartCheckpoint = new KinesisCheckpoint(shardToSequenceNumberMap);
+        newStartOffset = new KinesisPartitionGroupOffset(shardToSequenceNumberMap);
         int partitionGroupId = getPartitionGroupIdFromShardId(newShardId);
-        newPartitionGroupInfos.add(new PartitionGroupInfo(partitionGroupId, newStartCheckpoint));
+        newPartitionGroupMetadatas.add(new PartitionGroupMetadata(partitionGroupId, newStartOffset));
       }
     }
-    return newPartitionGroupInfos;
+    return newPartitionGroupMetadatas;
   }
 
   /**
@@ -152,10 +156,10 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
     return shardIdNum.isEmpty() ? 0 : Integer.parseInt(shardIdNum);
   }
 
-  private boolean consumedEndOfShard(Checkpoint startCheckpoint, PartitionGroupMetadata partitionGroupMetadata)
+  private boolean consumedEndOfShard(StreamPartitionMsgOffset startCheckpoint, PartitionGroupConsumptionStatus partitionGroupConsumptionStatus)
       throws IOException, TimeoutException {
     PartitionGroupConsumer partitionGroupConsumer =
-        _kinesisStreamConsumerFactory.createPartitionGroupConsumer(_clientId, partitionGroupMetadata);
+        _kinesisStreamConsumerFactory.createPartitionGroupConsumer(_clientId, partitionGroupConsumptionStatus);
 
     MessageBatch messageBatch;
     try {

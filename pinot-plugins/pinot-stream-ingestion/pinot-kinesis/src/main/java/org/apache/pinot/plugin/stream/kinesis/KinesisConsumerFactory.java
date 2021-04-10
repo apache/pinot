@@ -20,7 +20,7 @@ package org.apache.pinot.plugin.stream.kinesis;
 
 import java.util.Set;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
-import org.apache.pinot.spi.stream.PartitionGroupMetadata;
+import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamLevelConsumer;
@@ -56,7 +56,7 @@ public class KinesisConsumerFactory extends StreamConsumerFactory {
 
   @Override
   public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
-      PartitionGroupMetadata partitionGroupMetadata) {
+      PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
     return new KinesisConsumer(new KinesisConfig(_streamConfig));
   }
 

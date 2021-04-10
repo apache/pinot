@@ -52,8 +52,8 @@ public class KinesisConsumerIntegrationTest {
               .sequenceNumberRange().endingSequenceNumber() + " >");
       Map<String, String> shardIdToSeqNumMap = new HashMap<>();
       shardIdToSeqNumMap.put(shard.shardId(), shard.sequenceNumberRange().startingSequenceNumber());
-      KinesisCheckpoint kinesisCheckpoint = new KinesisCheckpoint(shardIdToSeqNumMap);
-      KinesisRecordsBatch kinesisRecordsBatch = kinesisConsumer.fetchMessages(kinesisCheckpoint, null, 60 * 1000);
+      KinesisPartitionGroupOffset kinesisPartitionGroupOffset = new KinesisPartitionGroupOffset(shardIdToSeqNumMap);
+      KinesisRecordsBatch kinesisRecordsBatch = kinesisConsumer.fetchMessages(kinesisPartitionGroupOffset, null, 60 * 1000);
       int n = kinesisRecordsBatch.getMessageCount();
 
       System.out.println("Found " + n + " messages ");
