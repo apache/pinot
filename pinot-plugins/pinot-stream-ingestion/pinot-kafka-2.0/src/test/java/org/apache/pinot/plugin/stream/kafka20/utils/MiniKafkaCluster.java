@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.stream.kafka20.utils;
 
+import io.netty.util.NetUtil;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -70,7 +71,7 @@ public final class MiniKafkaCluster implements Closeable {
       kafkaServer.add(new KafkaServer(c, Time.SYSTEM, Option.empty(), seq));
     }
     Properties props = new Properties();
-    props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:" + port);
+    props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, NetUtil.LOCALHOST.getHostAddress() + ":" + port);
     adminClient = AdminClient.create(props);
   }
 
@@ -90,7 +91,7 @@ public final class MiniKafkaCluster implements Closeable {
     props.put("broker.id", nodeId);
     props.put("port", Integer.toString(port));
     props.put("log.dir", Files.createTempDirectory(tempDir, "broker-").toAbsolutePath().toString());
-    props.put("zookeeper.connect", "localhost:" + zkServer.getPort());
+    props.put("zookeeper.connect", NetUtil.LOCALHOST.getHostAddress() + ":" + zkServer.getPort());
     props.put("replica.socket.timeout.ms", "1500");
     props.put("controller.socket.timeout.ms", "1500");
     props.put("controlled.shutdown.enable", "true");

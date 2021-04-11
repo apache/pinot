@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.stream.kafka20;
 
+import io.netty.util.NetUtil;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -54,11 +55,11 @@ public class KafkaPartitionLevelConsumerTest {
   private static final String TEST_TOPIC_2 = "bar";
   private static final int NUM_MSG_PRODUCED_PER_PARTITION = 1000;
 
-  private static MiniKafkaCluster kafkaCluster;
-  private static String brokerAddress;
+  private MiniKafkaCluster kafkaCluster;
+  private String brokerAddress;
 
   @BeforeClass
-  public static void setup()
+  public void setup()
       throws Exception {
     kafkaCluster = new MiniKafkaCluster.Builder().newServer("0").build();
     LOGGER.info("Trying to start MiniKafkaCluster");
@@ -71,7 +72,7 @@ public class KafkaPartitionLevelConsumerTest {
     Thread.sleep(STABILIZE_SLEEP_DELAYS);
   }
 
-  private static void produceMsgToKafka() {
+  private void produceMsgToKafka() {
     Properties props = new Properties();
     props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, brokerAddress);
     props.put(ProducerConfig.CLIENT_ID_CONFIG, "clientId");
@@ -86,12 +87,12 @@ public class KafkaPartitionLevelConsumerTest {
     }
   }
 
-  private static String getKafkaBroker() {
-    return "localhost:" + kafkaCluster.getKafkaServerPort(0);
+  private String getKafkaBroker() {
+    return NetUtil.LOCALHOST.getHostAddress() + ":" + kafkaCluster.getKafkaServerPort(0);
   }
 
   @AfterClass
-  public static void shutDown()
+  public void shutDown()
       throws Exception {
     kafkaCluster.deleteTopic(TEST_TOPIC_1);
     kafkaCluster.deleteTopic(TEST_TOPIC_2);
