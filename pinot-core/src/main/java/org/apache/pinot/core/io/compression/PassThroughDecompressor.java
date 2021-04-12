@@ -19,6 +19,7 @@
 package org.apache.pinot.core.io.compression;
 
 import java.nio.ByteBuffer;
+import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 
 
 /**

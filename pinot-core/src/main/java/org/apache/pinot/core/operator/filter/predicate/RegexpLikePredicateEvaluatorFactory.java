@@ -24,7 +24,7 @@ import it.unimi.dsi.fastutil.ints.IntList;
 import java.util.regex.Pattern;
 import org.apache.pinot.core.query.request.context.predicate.Predicate;
 import org.apache.pinot.core.query.request.context.predicate.RegexpLikePredicate;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 

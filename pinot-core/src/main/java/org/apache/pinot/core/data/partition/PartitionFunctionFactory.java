@@ -21,6 +21,7 @@ package org.apache.pinot.core.data.partition;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nonnull;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 
 
 /**

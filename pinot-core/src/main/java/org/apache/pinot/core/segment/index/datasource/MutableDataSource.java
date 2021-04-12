@@ -20,16 +20,16 @@ package org.apache.pinot.core.segment.index.datasource;
 
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.core.common.DataSourceMetadata;
-import org.apache.pinot.core.data.partition.PartitionFunction;
-import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
-import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
-import org.apache.pinot.core.segment.index.readers.H3IndexReader;
-import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
-import org.apache.pinot.core.segment.index.readers.JsonIndexReader;
-import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
-import org.apache.pinot.core.segment.index.readers.TextIndexReader;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
+import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
+import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
 
 

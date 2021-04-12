@@ -23,13 +23,14 @@ import java.io.IOException;
 import java.util.Map;
 import org.apache.pinot.core.io.util.VarLengthValueWriter;
 import org.apache.pinot.core.segment.creator.impl.inv.BitmapInvertedIndexWriter;
+import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.spi.utils.StringUtils;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapWriter;
 
 
 /**
- * Implementation of {@link org.apache.pinot.core.segment.creator.JsonIndexCreator} that uses on-heap memory.
+ * Implementation of {@link JsonIndexCreator} that uses on-heap memory.
  * <p>On-heap creator uses more heap memory, but is cheaper on computation and does not flush data to disk which can
  * slow down the creation because of the IO latency. Use on-heap creator in the environment where there is enough heap
  * memory and garbage collection won't cause performance issue (e.g. Hadoop/Spark/Pinot Minion).

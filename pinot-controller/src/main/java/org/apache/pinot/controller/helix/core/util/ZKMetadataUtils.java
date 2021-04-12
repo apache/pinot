@@ -23,10 +23,10 @@ import java.util.Map;
 
 import org.apache.pinot.common.metadata.segment.*;
 import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
-import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
-import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 
 
 public class ZKMetadataUtils {

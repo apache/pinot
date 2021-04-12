@@ -19,6 +19,7 @@
 package org.apache.pinot.core.data.partition;
 
 import com.google.common.base.Preconditions;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 
 
 /**

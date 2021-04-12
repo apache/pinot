@@ -85,6 +85,10 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-segment-spi</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-yammer</artifactId>
       <scope>test</scope>
     </dependency>
@@ -307,6 +311,10 @@
                     <relocation>
                       <pattern>com.google.common.base</pattern>
                       <shadedPattern>shaded.com.google.common.base</shadedPattern>
+                    </relocation>
+                    <relocation>
+                      <pattern>com.google.common.cache</pattern>
+                      <shadedPattern>shaded.com.google.common.cache</shadedPattern>
                     </relocation>
                     <relocation>
                       <pattern>org.apache.http</pattern>

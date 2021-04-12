@@ -25,13 +25,13 @@ import org.apache.pinot.core.segment.index.readers.ConstantValueFloatDictionary;
 import org.apache.pinot.core.segment.index.readers.ConstantValueIntDictionary;
 import org.apache.pinot.core.segment.index.readers.ConstantValueLongDictionary;
 import org.apache.pinot.core.segment.index.readers.ConstantValueStringDictionary;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
-import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
-import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.constant.ConstantMVForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.constant.ConstantMVInvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.constant.ConstantSortedIndexReader;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnContext;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.spi.data.FieldSpec;
 
 

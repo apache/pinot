@@ -35,7 +35,7 @@ import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.common.datatable.DataTableImplV2;
+import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -107,7 +107,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       String hexString = requestBytes != null ? BytesUtils.toHexString(requestBytes) : "";
       long reqestId = instanceRequest != null ? instanceRequest.getRequestId() : 0;
       LOGGER.error("Exception while processing instance request: {}", hexString, e);
-      sendErrorResponse(ctx, reqestId, queryArrivalTimeMs, new DataTableImplV2(), e);
+      sendErrorResponse(ctx, reqestId, queryArrivalTimeMs, DataTableBuilder.getEmptyDataTable(), e);
     }
   }
 
@@ -121,7 +121,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
           sendResponse(ctx, queryArrivalTimeMs, responseBytes);
         } else {
           // Send exception response.
-          sendErrorResponse(ctx, queryRequest.getRequestId(), queryArrivalTimeMs, new DataTableImplV2(),
+          sendErrorResponse(ctx, queryRequest.getRequestId(), queryArrivalTimeMs, DataTableBuilder.getEmptyDataTable(),
               new Exception("Null query response."));
         }
       }
@@ -130,7 +130,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       public void onFailure(Throwable t) {
         // Send exception response.
         LOGGER.error("Exception while processing instance request", t);
-        sendErrorResponse(ctx, instanceRequest.getRequestId(), queryArrivalTimeMs, new DataTableImplV2(),
+        sendErrorResponse(ctx, instanceRequest.getRequestId(), queryArrivalTimeMs, DataTableBuilder.getEmptyDataTable(),
             new Exception(t));
       }
     };
@@ -142,7 +142,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     // will only be called if for some remote reason we are unable to handle exceptions in channelRead0.
     String message = "Unhandled Exception in " + getClass().getCanonicalName();
     LOGGER.error(message, cause);
-    sendErrorResponse(ctx, 0, System.currentTimeMillis(), new DataTableImplV2(), new Exception(message, cause));
+    sendErrorResponse(ctx, 0, System.currentTimeMillis(), DataTableBuilder.getEmptyDataTable(),
+        new Exception(message, cause));
   }
 
   /**

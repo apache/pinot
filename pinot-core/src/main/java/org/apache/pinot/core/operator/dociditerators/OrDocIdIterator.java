@@ -20,7 +20,7 @@ package org.apache.pinot.core.operator.dociditerators;
 
 import java.util.Arrays;
 import org.apache.pinot.core.common.BlockDocIdIterator;
-import org.apache.pinot.core.common.Constants;
+import org.apache.pinot.segment.spi.Constants;
 
 
 /**

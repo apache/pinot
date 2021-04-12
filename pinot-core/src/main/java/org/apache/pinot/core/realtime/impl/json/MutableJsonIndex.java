@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.predicate.EqPredicate;
@@ -33,10 +34,12 @@ import org.apache.pinot.core.query.request.context.predicate.InPredicate;
 import org.apache.pinot.core.query.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.core.query.request.context.predicate.NotInPredicate;
 import org.apache.pinot.core.query.request.context.predicate.Predicate;
-import org.apache.pinot.core.segment.creator.JsonIndexCreator;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.segment.creator.impl.inv.json.BaseJsonIndexCreator;
-import org.apache.pinot.core.segment.index.readers.JsonIndexReader;
+import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
+import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -101,7 +104,14 @@ public class MutableJsonIndex implements JsonIndexReader {
   }
 
   @Override
-  public MutableRoaringBitmap getMatchingDocIds(FilterContext filter) {
+  public MutableRoaringBitmap getMatchingDocIds(String filterString) {
+    FilterContext filter;
+    try {
+      filter = QueryContextConverterUtils.getFilter(CalciteSqlParser.compileToExpression(filterString));
+    } catch (Exception e) {
+      throw new BadQueryRequestException("Invalid json match filter: " + filterString);
+    }
+
     _readLock.lock();
     try {
       if (filter.getType() == FilterContext.Type.PREDICATE && isExclusive(filter.getPredicate().getType())) {

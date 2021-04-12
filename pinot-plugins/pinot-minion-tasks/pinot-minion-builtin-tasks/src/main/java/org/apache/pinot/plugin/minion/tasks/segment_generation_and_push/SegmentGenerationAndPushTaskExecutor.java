@@ -30,16 +30,13 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.core.util.SegmentPushUtils;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
-import org.apache.pinot.plugin.ingestion.batch.common.SegmentPushUtils;
 import org.apache.pinot.plugin.minion.tasks.BaseTaskExecutor;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFS;
-import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
@@ -93,7 +90,6 @@ import org.slf4j.LoggerFactory;
 public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGenerationAndPushTaskExecutor.class);
 
-  private static final PinotFS LOCAL_PINOT_FS = new LocalPinotFS();
   private static final int DEFUALT_PUSH_ATTEMPTS = 5;
   private static final int DEFAULT_PUSH_PARALLELISM = 1;
   private static final long DEFAULT_PUSH_RETRY_INTERVAL_MILLIS = 1000L;
@@ -122,6 +118,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
 
       resultBuilder.setSegmentName(segmentName);
       // Segment push task
+      // TODO: Make this use SegmentUploader
       pushSegment(taskSpec.getTableConfig().getTableName(), taskConfigs, outputSegmentTarURI);
       resultBuilder.setSucceed(true);
     } catch (Exception e) {
@@ -151,11 +148,12 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     if (taskConfigs.containsKey(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI)) {
       outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
     }
-    PinotFS outputFileFS = getOutputPinotFS(taskConfigs, outputSegmentDirURI);
+    PinotFS outputFileFS = SegmentGenerationAndPushTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI);
     switch (BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase())) {
       case TAR:
         try {
-          SegmentPushUtils.pushSegments(spec, LOCAL_PINOT_FS, Arrays.asList(outputSegmentTarURI.toString()));
+          SegmentPushUtils.pushSegments(spec, SegmentGenerationAndPushTaskUtils.getLocalPinotFs(),
+              Arrays.asList(outputSegmentTarURI.toString()));
         } catch (RetriableOperationException | AttemptsExceededException e) {
           throw new RuntimeException(e);
         }
@@ -210,7 +208,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
       return localSegmentTarFile.toURI();
     }
     URI outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
-    PinotFS outputFileFS = getOutputPinotFS(taskConfigs, outputSegmentDirURI);
+    PinotFS outputFileFS = SegmentGenerationAndPushTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI);
     URI outputSegmentTarURI = URI.create(outputSegmentDirURI + localSegmentTarFile.getName());
     if (!Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.OVERWRITE_OUTPUT)) && outputFileFS
         .exists(outputSegmentDirURI)) {
@@ -219,32 +217,6 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
       outputFileFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
     }
     return outputSegmentTarURI;
-  }
-
-  private PinotFS getInputPinotFS(Map<String, String> taskConfigs, URI fileURI) {
-    String fileURIScheme = fileURI.getScheme();
-    if (fileURIScheme == null) {
-      fileURIScheme = PinotFSFactory.LOCAL_PINOT_FS_SCHEME;
-    }
-    if (!PinotFSFactory.isSchemeSupported(fileURIScheme)) {
-      String fsClass = taskConfigs.get(BatchConfigProperties.INPUT_FS_CLASS);
-      PinotConfiguration fsProps = IngestionConfigUtils.getInputFsProps(taskConfigs);
-      PinotFSFactory.register(fileURIScheme, fsClass, fsProps);
-    }
-    return PinotFSFactory.create(fileURIScheme);
-  }
-
-  private PinotFS getOutputPinotFS(Map<String, String> taskConfigs, URI fileURI) {
-    String fileURIScheme = (fileURI == null) ? null : fileURI.getScheme();
-    if (fileURIScheme == null) {
-      fileURIScheme = PinotFSFactory.LOCAL_PINOT_FS_SCHEME;
-    }
-    if (!PinotFSFactory.isSchemeSupported(fileURIScheme)) {
-      String fsClass = taskConfigs.get(BatchConfigProperties.OUTPUT_FS_CLASS);
-      PinotConfiguration fsProps = IngestionConfigUtils.getOutputFsProps(taskConfigs);
-      PinotFSFactory.register(fileURIScheme, fsClass, fsProps);
-    }
-    return PinotFSFactory.create(fileURIScheme);
   }
 
   private File tarSegmentDir(SegmentGenerationTaskSpec taskSpec, String segmentName)
@@ -266,7 +238,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
       throws Exception {
     SegmentGenerationTaskSpec taskSpec = new SegmentGenerationTaskSpec();
     URI inputFileURI = URI.create(taskConfigs.get(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY));
-    PinotFS inputFileFS = getInputPinotFS(taskConfigs, inputFileURI);
+    PinotFS inputFileFS = SegmentGenerationAndPushTaskUtils.getInputPinotFS(taskConfigs, inputFileURI);
 
     File localInputTempDir = new File(localTempDir, "input");
     FileUtils.forceMkdir(localInputTempDir);
@@ -310,12 +282,13 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     taskSpec.setTableConfig(tableConfig);
     taskSpec.setSequenceId(Integer.parseInt(taskConfigs.get(BatchConfigProperties.SEQUENCE_ID)));
     if (taskConfigs.containsKey(BatchConfigProperties.FAIL_ON_EMPTY_SEGMENT)) {
-      taskSpec.setFailOnEmptySegment(Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.FAIL_ON_EMPTY_SEGMENT)));
+      taskSpec
+          .setFailOnEmptySegment(Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.FAIL_ON_EMPTY_SEGMENT)));
     }
     SegmentNameGeneratorSpec segmentNameGeneratorSpec = new SegmentNameGeneratorSpec();
     segmentNameGeneratorSpec.setType(taskConfigs.get(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE));
-    segmentNameGeneratorSpec.setConfigs(
-        IngestionConfigUtils.getConfigMapWithPrefix(taskConfigs, BatchConfigProperties.SEGMENT_NAME_GENERATOR_CONFIGS));
+    segmentNameGeneratorSpec.setConfigs(IngestionConfigUtils
+        .getConfigMapWithPrefix(taskConfigs, BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX));
     taskSpec.setSegmentNameGeneratorSpec(segmentNameGeneratorSpec);
     taskSpec.setCustomProperty(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, inputFileURI.toString());
     return taskSpec;

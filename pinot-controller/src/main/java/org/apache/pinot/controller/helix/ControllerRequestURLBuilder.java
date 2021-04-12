@@ -251,6 +251,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "segments");
   }
 
+  public String forSegmentMetadata(String tableName, String segmentName) {
+    return StringUtil.join("/", _baseUrl, "segments", tableName, segmentName, "metadata");
+  }
+
   public String forListAllCrcInformationForTable(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "segments", "crc");
   }

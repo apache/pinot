@@ -41,6 +41,7 @@ import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryCon
 import org.apache.pinot.core.requesthandler.BrokerRequestOptimizer;
 import org.apache.pinot.core.requesthandler.PinotQueryParserFactory;
 import org.apache.pinot.parsers.AbstractCompiler;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -141,7 +142,7 @@ public class InputManager {
       throws InvalidInputException {
     LOGGER.info("Preprocessing Input:");
     reorderDimsAndBuildMap();
-    registerColnameFieldType();
+    registerColNameFieldType();
     validateQueries();
     if (_useCardinalityNormalization){
       regulateCardinalityForAll();
@@ -181,15 +182,20 @@ public class InputManager {
     invalidQueries.forEach(_queryWeightMap::remove);
   }
 
-  public void registerColnameFieldType() { // create a map from colname to data type
+  // create a map from col name to data type
+  private void registerColNameFieldType() {
     for (DimensionFieldSpec dimensionFieldSpec : _schema.getDimensionFieldSpecs()) {
       _colNameFieldTypeMap.put(dimensionFieldSpec.getName(), dimensionFieldSpec.getDataType());
     }
     for (MetricFieldSpec metricFieldSpec : _schema.getMetricFieldSpecs()) {
       _colNameFieldTypeMap.put(metricFieldSpec.getName(), metricFieldSpec.getDataType());
     }
-    //TODO: add support for multiple getDateTimeFieldSpecs
-    _colNameFieldTypeMap.put(_schema.getTimeFieldSpec().getName(), _schema.getTimeFieldSpec().getDataType());
+    for (DateTimeFieldSpec dateTimeFieldSpec : _schema.getDateTimeFieldSpecs()) {
+      _colNameFieldTypeMap.put(dateTimeFieldSpec.getName(), dateTimeFieldSpec.getDataType());
+    }
+    if (_schemaWithMetaData.getTimeFieldSpec() != null) {
+      _colNameFieldTypeMap.put(_schema.getTimeFieldSpec().getName(), _schema.getTimeFieldSpec().getDataType());
+    }
   }
 
   private void reorderDimsAndBuildMap()
@@ -361,7 +367,9 @@ public class InputManager {
     _schemaWithMetaData.getDateTimeFieldSpecs().forEach(fieldMetadata -> {
       _metaDataMap.put(fieldMetadata.getName(), fieldMetadata);
     });
-    _metaDataMap.put(_schemaWithMetaData.getTimeFieldSpec().getName(), _schemaWithMetaData.getTimeFieldSpec());
+    if (_schemaWithMetaData.getTimeFieldSpec() != null) {
+      _metaDataMap.put(_schemaWithMetaData.getTimeFieldSpec().getName(), _schemaWithMetaData.getTimeFieldSpec());
+    }
   }
 
   @JsonIgnore

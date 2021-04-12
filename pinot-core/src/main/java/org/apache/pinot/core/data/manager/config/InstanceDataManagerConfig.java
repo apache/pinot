@@ -35,6 +35,8 @@ public interface InstanceDataManagerConfig {
 
   String getInstanceBootstrapSegmentDir();
 
+  String getSegmentStoreUri();
+
   ReadMode getReadMode();
 
   String getSegmentFormatVersion();

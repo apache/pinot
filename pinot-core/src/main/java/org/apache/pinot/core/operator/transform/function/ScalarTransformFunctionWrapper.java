@@ -26,10 +26,10 @@ import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.utils.PinotDataType;
-import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -39,13 +39,14 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
   private final String _name;
   private final FunctionInvoker _functionInvoker;
+  private final PinotDataType _resultType;
+  private final TransformResultMetadata _resultMetadata;
 
   private Object[] _arguments;
   private int _numNonLiteralArguments;
   private int[] _nonLiteralIndices;
   private TransformFunction[] _nonLiteralFunctions;
   private Object[][] _nonLiteralValues;
-  private TransformResultMetadata _resultMetadata;
 
   private int[] _intResults;
   private float[] _floatResults;
@@ -69,6 +70,17 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     for (int i = 0; i < numParameters; i++) {
       Preconditions.checkArgument(parameterTypes[i] != null, "Unsupported parameter class: %s for method: %s",
           parameterClasses[i], functionInfo.getMethod());
+    }
+    Class<?> resultClass = _functionInvoker.getResultClass();
+    PinotDataType resultType = FunctionUtils.getParameterType(resultClass);
+    if (resultType != null) {
+      _resultType = resultType;
+      _resultMetadata =
+          new TransformResultMetadata(FunctionUtils.getDataType(resultClass), _resultType.isSingleValue(), false);
+    } else {
+      // Handle unrecognized result class with STRING
+      _resultType = PinotDataType.STRING;
+      _resultMetadata = new TransformResultMetadata(DataType.STRING, true, false);
     }
   }
 
@@ -100,15 +112,6 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       }
     }
     _nonLiteralValues = new Object[_numNonLiteralArguments][];
-
-    Class<?> resultClass = _functionInvoker.getResultClass();
-    DataType resultDataType = FunctionUtils.getDataType(resultClass);
-    // Handle unrecognized result class with STRING
-    if (resultDataType == null) {
-      resultDataType = DataType.STRING;
-    }
-    boolean isSingleValue = !resultClass.isArray();
-    _resultMetadata = new TransformResultMetadata(resultDataType, isSingleValue, false);
   }
 
   @Override
@@ -331,9 +334,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
   private void getNonLiteralValues(ProjectionBlock projectionBlock) {
     PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
     for (int i = 0; i < _numNonLiteralArguments; i++) {
-      int index = _nonLiteralIndices[i];
+      PinotDataType parameterType = parameterTypes[_nonLiteralIndices[i]];
       TransformFunction transformFunction = _nonLiteralFunctions[i];
-      switch (parameterTypes[index]) {
+      switch (parameterType) {
         case INTEGER:
           _nonLiteralValues[i] = ArrayUtils.toObject(transformFunction.transformToIntValuesSV(projectionBlock));
           break;
@@ -352,23 +355,23 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         case BYTES:
           _nonLiteralValues[i] = transformFunction.transformToBytesValuesSV(projectionBlock);
           break;
-        case INTEGER_ARRAY:
+        case PRIMITIVE_INT_ARRAY:
           _nonLiteralValues[i] = transformFunction.transformToIntValuesMV(projectionBlock);
           break;
-        case LONG_ARRAY:
+        case PRIMITIVE_LONG_ARRAY:
           _nonLiteralValues[i] = transformFunction.transformToLongValuesMV(projectionBlock);
           break;
-        case FLOAT_ARRAY:
+        case PRIMITIVE_FLOAT_ARRAY:
           _nonLiteralValues[i] = transformFunction.transformToFloatValuesMV(projectionBlock);
           break;
-        case DOUBLE_ARRAY:
+        case PRIMITIVE_DOUBLE_ARRAY:
           _nonLiteralValues[i] = transformFunction.transformToDoubleValuesMV(projectionBlock);
           break;
         case STRING_ARRAY:
           _nonLiteralValues[i] = transformFunction.transformToStringValuesMV(projectionBlock);
           break;
         default:
-          throw new IllegalStateException();
+          throw new IllegalStateException("Unsupported parameter type: " + parameterType);
       }
     }
   }

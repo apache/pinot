@@ -29,12 +29,15 @@ import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
-import org.apache.pinot.core.indexsegment.IndexSegment;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -166,12 +169,17 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
 
     // Inter segment
     BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
-    List<Object[]> rows = brokerResponse.getResultTable().getRows();
+    ResultTable resultTable = brokerResponse.getResultTable();
+    DataSchema expectedDataSchema = new DataSchema(
+        new String[]{"sumprecision(intColumn)", "sumprecision(longColumn)", "sumprecision(floatColumn)", "sumprecision(doubleColumn)", "sumprecision(stringColumn)", "sumprecision(bytesColumn)"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING});
+    assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+    List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 1);
-    BigDecimal intSum = _intSum.multiply(FOUR);
-    BigDecimal longSum = _longSum.multiply(FOUR);
-    BigDecimal floatSum = _floatSum.multiply(FOUR);
-    BigDecimal doubleSum = _doubleSum.multiply(FOUR);
+    String intSum = _intSum.multiply(FOUR).toString();
+    String longSum = _longSum.multiply(FOUR).toString();
+    String floatSum = _floatSum.multiply(FOUR).toString();
+    String doubleSum = _doubleSum.multiply(FOUR).toString();
     assertEquals(rows.get(0), new Object[]{intSum, longSum, floatSum, doubleSum, doubleSum, doubleSum});
   }
 
@@ -195,13 +203,18 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
 
     // Inter segment
     BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
-    List<Object[]> rows = brokerResponse.getResultTable().getRows();
+    ResultTable resultTable = brokerResponse.getResultTable();
+    DataSchema expectedDataSchema = new DataSchema(
+        new String[]{"sumprecision(intColumn)", "sumprecision(longColumn)", "sumprecision(floatColumn)", "sumprecision(doubleColumn)", "sumprecision(stringColumn)", "sumprecision(bytesColumn)"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING});
+    assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+    List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 1);
     MathContext mathContext = new MathContext(6, RoundingMode.HALF_EVEN);
-    BigDecimal intSum = _intSum.multiply(FOUR).round(mathContext);
-    BigDecimal longSum = _longSum.multiply(FOUR).round(mathContext);
-    BigDecimal floatSum = _floatSum.multiply(FOUR).round(mathContext);
-    BigDecimal doubleSum = _doubleSum.multiply(FOUR).round(mathContext);
+    String intSum = _intSum.multiply(FOUR).round(mathContext).toString();
+    String longSum = _longSum.multiply(FOUR).round(mathContext).toString();
+    String floatSum = _floatSum.multiply(FOUR).round(mathContext).toString();
+    String doubleSum = _doubleSum.multiply(FOUR).round(mathContext).toString();
     assertEquals(rows.get(0), new Object[]{intSum, longSum, floatSum, doubleSum, doubleSum, doubleSum});
   }
 
@@ -225,14 +238,43 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
 
     // Inter segment
     BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
-    List<Object[]> rows = brokerResponse.getResultTable().getRows();
+    ResultTable resultTable = brokerResponse.getResultTable();
+    DataSchema expectedDataSchema = new DataSchema(
+        new String[]{"sumprecision(intColumn)", "sumprecision(longColumn)", "sumprecision(floatColumn)", "sumprecision(doubleColumn)", "sumprecision(stringColumn)", "sumprecision(bytesColumn)"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING});
+    assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+    List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 1);
     MathContext mathContext = new MathContext(10, RoundingMode.HALF_EVEN);
-    BigDecimal intSum = _intSum.multiply(FOUR).round(mathContext).setScale(3, RoundingMode.HALF_EVEN);
-    BigDecimal longSum = _longSum.multiply(FOUR).round(mathContext).setScale(3, RoundingMode.HALF_EVEN);
-    BigDecimal floatSum = _floatSum.multiply(FOUR).round(mathContext).setScale(3, RoundingMode.HALF_EVEN);
-    BigDecimal doubleSum = _doubleSum.multiply(FOUR).round(mathContext).setScale(3, RoundingMode.HALF_EVEN);
+    String intSum = _intSum.multiply(FOUR).round(mathContext).setScale(3, RoundingMode.HALF_EVEN).toString();
+    String longSum = _longSum.multiply(FOUR).round(mathContext).setScale(3, RoundingMode.HALF_EVEN).toString();
+    String floatSum = _floatSum.multiply(FOUR).round(mathContext).setScale(3, RoundingMode.HALF_EVEN).toString();
+    String doubleSum = _doubleSum.multiply(FOUR).round(mathContext).setScale(3, RoundingMode.HALF_EVEN).toString();
     assertEquals(rows.get(0), new Object[]{intSum, longSum, floatSum, doubleSum, doubleSum, doubleSum});
+  }
+
+  @Test
+  public void testPostAggregation() {
+    String query = "SELECT SUM_PRECISION(intColumn) * 2 FROM testTable";
+
+    // Inner segment
+    Operator operator = getOperatorForSqlQuery(query);
+    assertTrue(operator instanceof AggregationOperator);
+    List<Object> aggregationResult = ((AggregationOperator) operator).nextBlock().getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(aggregationResult.size(), 1);
+    assertEquals(aggregationResult.get(0), _intSum);
+
+    // Inter segment
+    BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+    ResultTable resultTable = brokerResponse.getResultTable();
+    DataSchema expectedDataSchema = new DataSchema(new String[]{"times(sum_precision(intColumn),'2')"},
+        new ColumnDataType[]{ColumnDataType.DOUBLE});
+    assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+    double expectedResult = _intSum.multiply(FOUR).doubleValue() * 2;
+    assertEquals(rows.get(0), new Object[]{expectedResult});
   }
 
   @AfterClass

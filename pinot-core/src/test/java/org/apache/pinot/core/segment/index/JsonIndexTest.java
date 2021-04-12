@@ -21,16 +21,14 @@ package org.apache.pinot.core.segment.index;
 import java.io.File;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.realtime.impl.json.MutableJsonIndex;
-import org.apache.pinot.core.segment.creator.JsonIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.creator.impl.inv.json.OffHeapJsonIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.json.OnHeapJsonIndexCreator;
-import org.apache.pinot.core.segment.index.readers.JsonIndexReader;
 import org.apache.pinot.core.segment.index.readers.json.ImmutableJsonIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
+import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -62,12 +60,8 @@ public class JsonIndexTest {
   public void testSmallIndex()
       throws Exception {
     //@formatter:off
-    String[] records = new String[]{
-        "{\"name\":\"adam\",\"age\":20,\"addresses\":[{\"street\":\"street-00\",\"country\":\"us\"},{\"street\":\"street-01\",\"country\":\"us\"},{\"street\":\"street-02\",\"country\":\"ca\"}],\"skills\":[\"english\",\"programming\"]}",
-        "{\"name\":\"bob\",\"age\":25,\"addresses\":[{\"street\":\"street-10\",\"country\":\"ca\"},{\"street\":\"street-11\",\"country\":\"us\"},{\"street\":\"street-12\",\"country\":\"in\"}],\"skills\":[]}",
-        "{\"name\":\"charles\",\"age\":30,\"addresses\":[{\"street\":\"street-20\",\"country\":\"jp\"},{\"street\":\"street-21\",\"country\":\"kr\"},{\"street\":\"street-22\",\"country\":\"cn\"}],\"skills\":[\"japanese\",\"korean\",\"chinese\"]}",
-        "{\"name\":\"david\",\"age\":35,\"addresses\":[{\"street\":\"street-30\",\"country\":\"ca\",\"types\":[\"home\",\"office\"]},{\"street\":\"street-31\",\"country\":\"ca\"},{\"street\":\"street-32\",\"country\":\"ca\"}],\"skills\":null}"
-    };
+    String[] records =
+        new String[]{"{\"name\":\"adam\",\"age\":20,\"addresses\":[{\"street\":\"street-00\",\"country\":\"us\"},{\"street\":\"street-01\",\"country\":\"us\"},{\"street\":\"street-02\",\"country\":\"ca\"}],\"skills\":[\"english\",\"programming\"]}", "{\"name\":\"bob\",\"age\":25,\"addresses\":[{\"street\":\"street-10\",\"country\":\"ca\"},{\"street\":\"street-11\",\"country\":\"us\"},{\"street\":\"street-12\",\"country\":\"in\"}],\"skills\":[]}", "{\"name\":\"charles\",\"age\":30,\"addresses\":[{\"street\":\"street-20\",\"country\":\"jp\"},{\"street\":\"street-21\",\"country\":\"kr\"},{\"street\":\"street-22\",\"country\":\"cn\"}],\"skills\":[\"japanese\",\"korean\",\"chinese\"]}", "{\"name\":\"david\",\"age\":35,\"addresses\":[{\"street\":\"street-30\",\"country\":\"ca\",\"types\":[\"home\",\"office\"]},{\"street\":\"street-31\",\"country\":\"ca\"},{\"street\":\"street-32\",\"country\":\"ca\"}],\"skills\":null}"};
     //@formatter:on
 
     String onHeapColumnName = "onHeap";
@@ -208,9 +202,7 @@ public class JsonIndexTest {
     }
   }
 
-  private MutableRoaringBitmap getMatchingDocIds(JsonIndexReader indexReader, String filter)
-      throws Exception {
-    return indexReader
-        .getMatchingDocIds(QueryContextConverterUtils.getFilter(CalciteSqlParser.compileToExpression(filter)));
+  private MutableRoaringBitmap getMatchingDocIds(JsonIndexReader indexReader, String filter) {
+    return indexReader.getMatchingDocIds(filter);
   }
 }

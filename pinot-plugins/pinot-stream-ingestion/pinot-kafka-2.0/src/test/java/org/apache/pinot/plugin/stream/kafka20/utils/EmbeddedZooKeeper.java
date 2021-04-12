@@ -36,12 +36,12 @@ public class EmbeddedZooKeeper implements Closeable {
   private final File tmpDir;
   private final int port;
 
-  EmbeddedZooKeeper() throws IOException, InterruptedException {
+  EmbeddedZooKeeper()
+      throws IOException, InterruptedException {
     this.tmpDir = Files.createTempDirectory(null).toFile();
     this.factory = new NIOServerCnxnFactory();
-    this.zookeeper = new ZooKeeperServer(new File(tmpDir, "data"), new File(tmpDir, "log"),
-        TICK_TIME);
-    InetSocketAddress addr = new InetSocketAddress("127.0.0.1", 0);
+    this.zookeeper = new ZooKeeperServer(new File(tmpDir, "data"), new File(tmpDir, "log"), TICK_TIME);
+    InetSocketAddress addr = new InetSocketAddress("localhost", 0);
     factory.configure(addr, 0);
     factory.startup(zookeeper);
     this.port = zookeeper.getClientPort();
@@ -52,7 +52,8 @@ public class EmbeddedZooKeeper implements Closeable {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     zookeeper.shutdown();
     factory.shutdown();
     FileUtils.deleteDirectory(tmpDir);

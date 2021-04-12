@@ -70,7 +70,7 @@ public final class MiniKafkaCluster implements Closeable {
       kafkaServer.add(new KafkaServer(c, Time.SYSTEM, Option.empty(), seq));
     }
     Properties props = new Properties();
-    props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "127.0.0.1:" + port);
+    props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:" + port);
     adminClient = AdminClient.create(props);
   }
 
@@ -90,7 +90,7 @@ public final class MiniKafkaCluster implements Closeable {
     props.put("broker.id", nodeId);
     props.put("port", Integer.toString(port));
     props.put("log.dir", Files.createTempDirectory(tempDir, "broker-").toAbsolutePath().toString());
-    props.put("zookeeper.connect", "127.0.0.1:" + zkServer.getPort());
+    props.put("zookeeper.connect", "localhost:" + zkServer.getPort());
     props.put("replica.socket.timeout.ms", "1500");
     props.put("controller.socket.timeout.ms", "1500");
     props.put("controlled.shutdown.enable", "true");

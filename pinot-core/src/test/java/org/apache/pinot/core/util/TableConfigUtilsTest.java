@@ -24,10 +24,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
-import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
@@ -430,13 +430,6 @@ public class TableConfigUtilsTest {
         new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable_OFFLINE").setIngestionConfig(ingestionConfig)
             .build();
     TableConfigUtils.validateIngestionConfig(tableConfig, null);
-    batchConfigMap.remove(BatchConfigProperties.INPUT_FORMAT);
-    try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, null);
-      Assert.fail("Should fail for invalid batch config map");
-    } catch (IllegalStateException e) {
-      // expected
-    }
   }
 
   @Test

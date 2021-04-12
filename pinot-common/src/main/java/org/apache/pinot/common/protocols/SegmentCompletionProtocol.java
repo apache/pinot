@@ -19,12 +19,14 @@
 package org.apache.pinot.common.protocols;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -135,6 +137,7 @@ public class SegmentCompletionProtocol {
 
   public static final String REASON_ROW_LIMIT = "rowLimit";  // Stop reason sent by server as max num rows reached
   public static final String REASON_TIME_LIMIT = "timeLimit";  // Stop reason sent by server as max time reached
+  public static final String REASON_END_OF_PARTITION_GROUP = "endOfPartitionGroup"; // Stop reason sent by server as end of partitionGroup reached
 
   // Canned responses
   public static final Response RESP_NOT_LEADER =
@@ -180,20 +183,39 @@ public class SegmentCompletionProtocol {
     }
 
     public String getUrl(String hostPort, String protocol) {
-      return protocol + "://" + hostPort + "/" + _msgType + "?" + PARAM_SEGMENT_NAME + "=" + _params.getSegmentName()
-          + "&" + PARAM_OFFSET + "=" + _params.getOffset() + "&" + PARAM_INSTANCE_ID + "=" + _params.getInstanceId() + (
-          _params.getReason() == null ? "" : ("&" + PARAM_REASON + "=" + _params.getReason())) + (
-          _params.getBuildTimeMillis() <= 0 ? "" : ("&" + PARAM_BUILD_TIME_MILLIS + "=" + _params.getBuildTimeMillis()))
-          + (_params.getWaitTimeMillis() <= 0 ? "" : ("&" + PARAM_WAIT_TIME_MILLIS + "=" + _params.getWaitTimeMillis()))
-          + (_params.getExtraTimeSec() <= 0 ? "" : ("&" + PARAM_EXTRA_TIME_SEC + "=" + _params.getExtraTimeSec())) + (
-          _params.getMemoryUsedBytes() <= 0 ? "" : ("&" + PARAM_MEMORY_USED_BYTES + "=" + _params.getMemoryUsedBytes()))
-          + (_params.getSegmentSizeBytes() <= 0 ? ""
-          : ("&" + PARAM_SEGMENT_SIZE_BYTES + "=" + _params.getSegmentSizeBytes())) + (_params.getNumRows() <= 0 ? ""
-          : ("&" + PARAM_ROW_COUNT + "=" + _params.getNumRows())) + (_params.getSegmentLocation() == null ? ""
-          : ("&" + PARAM_SEGMENT_LOCATION + "=" + _params.getSegmentLocation()))
-          + (_params.getStreamPartitionMsgOffset() == null ? ""
-          : ("&" + PARAM_STREAM_PARTITION_MSG_OFFSET + "=" + _params.getStreamPartitionMsgOffset()))
-          ;
+
+      Map<String, String> params = new HashMap<>();
+      params.put(PARAM_SEGMENT_NAME, _params.getSegmentName());
+      params.put(PARAM_OFFSET, String.valueOf(_params.getOffset()));
+      params.put(PARAM_INSTANCE_ID, _params.getInstanceId());
+      if (_params.getReason() != null) {
+        params.put(PARAM_REASON, _params.getReason());
+      }
+      if ( _params.getBuildTimeMillis() > 0) {
+        params.put(PARAM_BUILD_TIME_MILLIS, String.valueOf(_params.getBuildTimeMillis()));
+      }
+      if ( _params.getWaitTimeMillis() > 0) {
+        params.put(PARAM_WAIT_TIME_MILLIS, String.valueOf(_params.getWaitTimeMillis()));
+      }
+      if ( _params.getExtraTimeSec() > 0) {
+        params.put(PARAM_EXTRA_TIME_SEC, String.valueOf(_params.getExtraTimeSec()));
+      }
+      if ( _params.getMemoryUsedBytes() > 0) {
+        params.put(PARAM_MEMORY_USED_BYTES, String.valueOf(_params.getMemoryUsedBytes()));
+      }
+      if ( _params.getSegmentSizeBytes() > 0) {
+        params.put(PARAM_SEGMENT_SIZE_BYTES, String.valueOf(_params.getSegmentSizeBytes()));
+      }
+      if ( _params.getNumRows() > 0) {
+        params.put(PARAM_ROW_COUNT, String.valueOf(_params.getNumRows()));
+      }
+      if (_params.getSegmentLocation() != null) {
+        params.put(PARAM_SEGMENT_LOCATION, _params.getSegmentLocation());
+      }
+      if (_params.getStreamPartitionMsgOffset() != null) {
+        params.put(PARAM_STREAM_PARTITION_MSG_OFFSET, _params.getStreamPartitionMsgOffset());
+      }
+      return URIUtils.buildURI(protocol, hostPort, _msgType, params).toString();
     }
 
     public static class Params {
@@ -296,13 +318,6 @@ public class SegmentCompletionProtocol {
 
       public Params withStreamPartitionMsgOffset(String offset) {
         _streamPartitionMsgOffset = offset;
-        // Try to populate the offset if possible.
-        // TODO Issue 5359 Remove this code once we have both sides be able to live without _offset.
-        try {
-          _offset = Long.parseLong(_streamPartitionMsgOffset);
-        } catch (Exception e) {
-          // Ignore, if the recipient excepts _offset, it will return an error to the sender.
-        }
         return this;
       }
 
@@ -352,12 +367,7 @@ public class SegmentCompletionProtocol {
       }
 
       public String getStreamPartitionMsgOffset() {
-        if (_streamPartitionMsgOffset != null) {
-          return _streamPartitionMsgOffset;
-        } else {
-          // TODO 5359 remove this once we are all upgraded in controllers and servers.
-          return Long.toString(_offset);
-        }
+        return _streamPartitionMsgOffset;
       }
 
       public String toString() {

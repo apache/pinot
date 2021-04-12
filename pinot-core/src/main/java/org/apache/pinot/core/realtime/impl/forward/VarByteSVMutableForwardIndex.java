@@ -22,7 +22,7 @@ import java.io.IOException;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.writer.impl.MutableOffHeapByteArrayStore;
-import org.apache.pinot.core.segment.index.readers.MutableForwardIndex;
+import org.apache.pinot.segment.spi.index.reader.MutableForwardIndex;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 

@@ -20,9 +20,9 @@ package org.apache.pinot.core.segment.creator.impl.stats;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.core.segment.creator.ColumnStatistics;
-import org.apache.pinot.core.segment.creator.SegmentPreIndexStatsCollector;
-import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.creator.ColumnStatistics;
+import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsCollector;
+import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;

@@ -18,6 +18,11 @@
  */
 package org.apache.pinot.core.io.compression;
 
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.compression.ChunkCompressor;
+import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
+
+
 /**
  * Factory for Chunk compressors/de-compressors.
  */
@@ -28,27 +33,13 @@ public class ChunkCompressorFactory {
 
   }
 
-  public enum CompressionType {
-    PASS_THROUGH(0), SNAPPY(1);
-
-    private final int _value;
-
-    CompressionType(int value) {
-      _value = value;
-    }
-
-    public int getValue() {
-      return _value;
-    }
-  }
-
   /**
    * Returns the chunk compressor for the specified name.
    *
    * @param compressionType Type of compressor.
    * @return Compressor for the specified type.
    */
-  public static ChunkCompressor getCompressor(CompressionType compressionType) {
+  public static ChunkCompressor getCompressor(ChunkCompressionType compressionType) {
     switch (compressionType) {
 
       case PASS_THROUGH:
@@ -68,7 +59,7 @@ public class ChunkCompressorFactory {
    * @param compressionType Type of compression
    * @return decompressor for the specified name
    */
-  public static ChunkDecompressor getDecompressor(CompressionType compressionType) {
+  public static ChunkDecompressor getDecompressor(ChunkCompressionType compressionType) {
     switch (compressionType) {
       case PASS_THROUGH:
         return new PassThroughDecompressor();

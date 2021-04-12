@@ -35,14 +35,15 @@ import java.util.Set;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
-import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.util.ArrayCopyUtils;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -177,8 +178,8 @@ public class SelectionOperatorUtils {
    */
   public static DataSchema getResultTableDataSchema(DataSchema dataSchema, List<String> selectionColumns) {
     int numColumns = selectionColumns.size();
-    Map<String, DataSchema.ColumnDataType> columnNameToDataType = new HashMap<>();
-    DataSchema.ColumnDataType[] finalColumnDataTypes = new DataSchema.ColumnDataType[numColumns];
+    Map<String, ColumnDataType> columnNameToDataType = new HashMap<>();
+    ColumnDataType[] finalColumnDataTypes = new ColumnDataType[numColumns];
     for (int i = 0; i < dataSchema.size(); i++) {
       columnNameToDataType.put(dataSchema.getColumnName(i), dataSchema.getColumnDataType(i));
     }
@@ -242,7 +243,7 @@ public class SelectionOperatorUtils {
       dataTableBuilder.startRow();
       for (int i = 0; i < numColumns; i++) {
         Object columnValue = row[i];
-        DataSchema.ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
+        ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
         switch (columnDataType) {
           // Single-value column
           case INT:
@@ -335,7 +336,7 @@ public class SelectionOperatorUtils {
 
     Object[] row = new Object[numColumns];
     for (int i = 0; i < numColumns; i++) {
-      DataSchema.ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
+      ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
       switch (columnDataType) {
         // Single-value column
         case INT:
@@ -417,13 +418,13 @@ public class SelectionOperatorUtils {
       List<String> selectionColumns, boolean preserveType) {
     int numRows = rows.size();
     List<Serializable[]> resultRows = new ArrayList<>(numRows);
-    DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
     int numColumns = columnDataTypes.length;
     if (preserveType) {
       for (Object[] row : rows) {
         Serializable[] resultRow = new Serializable[numColumns];
         for (int i = 0; i < numColumns; i++) {
-          resultRow[i] = convertValueToType(row[i], columnDataTypes[i]);
+          resultRow[i] = columnDataTypes[i].convertAndFormat(row[i]);
         }
         resultRows.add(resultRow);
       }
@@ -452,12 +453,12 @@ public class SelectionOperatorUtils {
   public static ResultTable renderResultTableWithoutOrdering(List<Object[]> rows, DataSchema dataSchema) {
     int numRows = rows.size();
     List<Object[]> resultRows = new ArrayList<>(numRows);
-    DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
     int numColumns = columnDataTypes.length;
     for (Object[] row : rows) {
       Object[] resultRow = new Object[numColumns];
       for (int i = 0; i < numColumns; i++) {
-        resultRow[i] = convertValueToType(row[i], columnDataTypes[i]);
+        resultRow[i] = columnDataTypes[i].convertAndFormat(row[i]);
       }
       resultRows.add(resultRow);
     }
@@ -491,81 +492,13 @@ public class SelectionOperatorUtils {
   }
 
   /**
-   * Converts a value into the given data type. (Broker side)
-   * <p>Actual value type can be different with data type passed in, but they must be type compatible.
-   */
-  public static Serializable convertValueToType(Object value, DataSchema.ColumnDataType dataType) {
-    switch (dataType) {
-      // Single-value column
-      case INT:
-        return ((Number) value).intValue();
-      case LONG:
-        return ((Number) value).longValue();
-      case FLOAT:
-        return ((Number) value).floatValue();
-      case DOUBLE:
-        return ((Number) value).doubleValue();
-      // NOTE: Return hex-encoded String for BYTES columns for backward-compatibility
-      // TODO: Revisit to see whether we should return byte[] instead
-      case BYTES:
-        return ((ByteArray) value).toHexString();
-
-      // Multi-value column
-      case LONG_ARRAY:
-        // LONG_ARRAY type covers INT_ARRAY and LONG_ARRAY
-        if (value instanceof int[]) {
-          int[] ints = (int[]) value;
-          int length = ints.length;
-          long[] longs = new long[length];
-          for (int i = 0; i < length; i++) {
-            longs[i] = ints[i];
-          }
-          return longs;
-        } else {
-          return (long[]) value;
-        }
-      case DOUBLE_ARRAY:
-        // DOUBLE_ARRAY type covers INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY and DOUBLE_ARRAY
-        if (value instanceof int[]) {
-          int[] ints = (int[]) value;
-          int length = ints.length;
-          double[] doubles = new double[length];
-          for (int i = 0; i < length; i++) {
-            doubles[i] = ints[i];
-          }
-          return doubles;
-        } else if (value instanceof long[]) {
-          long[] longs = (long[]) value;
-          int length = longs.length;
-          double[] doubles = new double[length];
-          for (int i = 0; i < length; i++) {
-            doubles[i] = longs[i];
-          }
-          return doubles;
-        } else if (value instanceof float[]) {
-          float[] floats = (float[]) value;
-          int length = floats.length;
-          double[] doubles = new double[length];
-          for (int i = 0; i < length; i++) {
-            doubles[i] = floats[i];
-          }
-          return doubles;
-        } else {
-          return (double[]) value;
-        }
-
-      default:
-        // For STRING, INT_ARRAY, FLOAT_ARRAY and STRING_ARRAY, no need to format
-        return (Serializable) value;
-    }
-  }
-
-  /**
+   * Deprecated because this method is only used to construct the PQL response, and PQL is already deprecated.
    * Formats a value into a {@code String} (single-value column) or {@code String[]} (multi-value column) based on the
    * data type. (Broker side)
    * <p>Actual value type can be different with data type passed in, but they must be type compatible.
    */
-  public static Serializable getFormattedValue(Object value, DataSchema.ColumnDataType dataType) {
+  @Deprecated
+  public static Serializable getFormattedValue(Object value, ColumnDataType dataType) {
     switch (dataType) {
       // Single-value column
       case INT:

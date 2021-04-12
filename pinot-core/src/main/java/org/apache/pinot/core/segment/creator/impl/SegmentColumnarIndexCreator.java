@@ -32,20 +32,9 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.utils.FileUtils;
-import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.geospatial.serde.GeometrySerializer;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.io.util.PinotDataBitSet;
 import org.apache.pinot.core.io.writer.impl.BaseChunkSVForwardIndexWriter;
-import org.apache.pinot.core.segment.creator.ColumnIndexCreationInfo;
-import org.apache.pinot.core.segment.creator.DictionaryBasedInvertedIndexCreator;
-import org.apache.pinot.core.segment.creator.ForwardIndexCreator;
-import org.apache.pinot.core.segment.creator.GeoSpatialIndexCreator;
-import org.apache.pinot.core.segment.creator.JsonIndexCreator;
-import org.apache.pinot.core.segment.creator.SegmentCreator;
-import org.apache.pinot.core.segment.creator.SegmentIndexCreationInfo;
-import org.apache.pinot.core.segment.creator.TextIndexCreator;
 import org.apache.pinot.core.segment.creator.TextIndexType;
 import org.apache.pinot.core.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
@@ -54,8 +43,6 @@ import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForward
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.OnHeapBitmapInvertedIndexCreator;
-import org.apache.pinot.core.segment.creator.impl.inv.geospatial.H3IndexConfig;
-import org.apache.pinot.core.segment.creator.impl.inv.geospatial.H3IndexResolution;
 import org.apache.pinot.core.segment.creator.impl.inv.geospatial.OffHeapH3IndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.geospatial.OnHeapH3IndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.json.OffHeapJsonIndexCreator;
@@ -63,6 +50,19 @@ import org.apache.pinot.core.segment.creator.impl.inv.json.OnHeapJsonIndexCreato
 import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneFSTIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.core.segment.creator.impl.text.LuceneTextIndexCreator;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
+import org.apache.pinot.segment.spi.creator.SegmentCreator;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
+import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
+import org.apache.pinot.segment.spi.index.creator.GeoSpatialIndexCreator;
+import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
+import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
+import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
+import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
+import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -233,7 +233,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         Preconditions.checkState(!invertedIndexColumns.contains(columnName),
             "Cannot create inverted index for raw index column: %s", columnName);
 
-        ChunkCompressorFactory.CompressionType compressionType =
+        ChunkCompressionType compressionType =
             getColumnCompressionType(segmentCreationSpec, fieldSpec);
 
         // Initialize forward index creator
@@ -332,16 +332,16 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    * @param fieldSpec Field spec for the column
    * @return Compression type to use
    */
-  private ChunkCompressorFactory.CompressionType getColumnCompressionType(SegmentGeneratorConfig segmentCreationSpec,
+  private ChunkCompressionType getColumnCompressionType(SegmentGeneratorConfig segmentCreationSpec,
       FieldSpec fieldSpec) {
-    ChunkCompressorFactory.CompressionType compressionType =
+    ChunkCompressionType compressionType =
         segmentCreationSpec.getRawIndexCompressionType().get(fieldSpec.getName());
 
     if (compressionType == null) {
       if (fieldSpec.getFieldType().equals(FieldType.METRIC)) {
-        return ChunkCompressorFactory.CompressionType.PASS_THROUGH;
+        return ChunkCompressionType.PASS_THROUGH;
       } else {
-        return ChunkCompressorFactory.CompressionType.SNAPPY;
+        return ChunkCompressionType.SNAPPY;
       }
     } else {
       return compressionType;
@@ -736,7 +736,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    * @throws IOException
    */
   public static ForwardIndexCreator getRawIndexCreatorForColumn(File file,
-      ChunkCompressorFactory.CompressionType compressionType, String column, DataType dataType, int totalDocs,
+      ChunkCompressionType compressionType, String column, DataType dataType, int totalDocs,
       int lengthOfLongestEntry, boolean deriveNumDocsPerChunk, int writerVersion)
       throws IOException {
     switch (dataType) {

@@ -85,7 +85,7 @@ public class JoinQuickStart
         FileUtils.copyURLToFile(resource, tableConfigFile);
         QuickstartTableRequest dimTableRequest = new QuickstartTableRequest(dimBaseballTeamsBaseDir.getAbsolutePath());
 
-        final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request, dimTableRequest), 3, 1, 1, baseBallStatsDataDir);
+        QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request, dimTableRequest), 1, 1, 3, baseBallStatsDataDir);
 
         printStatus(Quickstart.Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");
         runner.startAll();

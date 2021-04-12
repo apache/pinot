@@ -19,9 +19,9 @@
 package org.apache.pinot.core.operator.filter;
 
 import org.apache.pinot.core.common.BlockDocIdIterator;
-import org.apache.pinot.core.common.Constants;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
+import org.apache.pinot.segment.spi.Constants;
 
 
 public class TestFilterOperator extends BaseFilterOperator {

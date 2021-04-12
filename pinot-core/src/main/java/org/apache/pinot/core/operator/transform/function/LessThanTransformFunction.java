@@ -21,8 +21,7 @@ package org.apache.pinot.core.operator.transform.function;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
 /**

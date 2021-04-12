@@ -19,7 +19,7 @@
 package org.apache.pinot.core.realtime.impl.dictionary;
 
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import org.apache.pinot.core.segment.index.readers.MutableDictionary;
+import org.apache.pinot.segment.spi.index.reader.MutableDictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 

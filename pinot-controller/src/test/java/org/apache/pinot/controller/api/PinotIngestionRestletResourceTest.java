@@ -38,6 +38,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -89,8 +90,8 @@ public class PinotIngestionRestletResourceTest extends ControllerTest {
 
     // ingest from file
     Map<String, String> batchConfigMap = new HashMap<>();
-    batchConfigMap.put("inputFormat", "csv");
-    batchConfigMap.put("recordReader.prop.delimiter", "|");
+    batchConfigMap.put(BatchConfigProperties.INPUT_FORMAT, "csv");
+    batchConfigMap.put(String.format("%s.delimiter", BatchConfigProperties.RECORD_READER_PROP_PREFIX), "|");
     sendHttpPost(_controllerRequestURLBuilder.forIngestFromFile(TABLE_NAME_WITH_TYPE, batchConfigMap));
     segments = _helixResourceManager.getSegmentsFor(TABLE_NAME_WITH_TYPE);
     Assert.assertEquals(segments.size(), 1);

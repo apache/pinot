@@ -21,7 +21,7 @@ package org.apache.pinot.core.segment.creator.impl.stats;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.Arrays;
-import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 
 
 public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
