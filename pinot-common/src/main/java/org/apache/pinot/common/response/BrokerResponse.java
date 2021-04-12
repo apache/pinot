@@ -54,12 +54,12 @@ public interface BrokerResponse {
   /**
    * Set the total thread cpu time used against realtime table in request handling, into the broker response.
    */
-  void setRealtimeThreadCpuTimeNs(long timeUsedMs);
+  void setRealtimeThreadCpuTimeNs(long realtimeThreadCpuTimeNs);
 
   /**
    * Set the total thread cpu time used against offline table in request handling, into the broker response.
    */
-  void setOfflineThreadCpuTimeNs(long timeUsedMs);
+  void setOfflineThreadCpuTimeNs(long offlineThreadCpuTimeNs);
 
   /**
    * Convert the broker response to JSON String.
