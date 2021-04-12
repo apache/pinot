@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -48,8 +49,10 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentName;
+import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
@@ -68,6 +71,9 @@ import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
+import org.apache.pinot.segment.local.segment.index.metadata.ColumnMetadata;
+import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -105,6 +111,7 @@ import org.slf4j.LoggerFactory;
  *   <li>commitSegmentMetadata(): From lead controller only</li>
  *   <li>segmentStoppedConsuming(): From lead controller only</li>
  *   <li>ensureAllPartitionsConsuming(): From lead controller only</li>
+ *   <li>uploadToSegmentStoreIfMissing(): From lead controller only</li>
  * </ul>
  */
 public class PinotLLCRealtimeSegmentManager {
@@ -138,6 +145,7 @@ public class PinotLLCRealtimeSegmentManager {
   private final Lock[] _idealStateUpdateLocks;
   private final TableConfigCache _tableConfigCache;
   private final FlushThresholdUpdateManager _flushThresholdUpdateManager;
+  private final FileUploadDownloadClient _fileUploadDownloadClient;
 
   private volatile boolean _isStopping = false;
   private AtomicInteger _numCompletingSegments = new AtomicInteger(0);
@@ -160,6 +168,12 @@ public class PinotLLCRealtimeSegmentManager {
     }
     _tableConfigCache = new TableConfigCache(_propertyStore);
     _flushThresholdUpdateManager = new FlushThresholdUpdateManager();
+    _fileUploadDownloadClient = initFileUploadDownloadClient();
+  }
+
+  @VisibleForTesting
+  FileUploadDownloadClient initFileUploadDownloadClient() {
+    return new FileUploadDownloadClient();
   }
 
   public boolean getIsSplitCommitEnabled() {
@@ -1241,6 +1255,61 @@ public class PinotLLCRealtimeSegmentManager {
 
       int numInstancesPerReplicaGroup = instancePartitions.getInstances(0, 0).size();
       return (numPartitions + numInstancesPerReplicaGroup - 1) / numInstancesPerReplicaGroup;
+    }
+  }
+
+  /**
+   * Validate the committed low level consumer segments to see if its segment store copy is available. Fix the missing segment store copy by asking servers to upload to segment store.
+   * Since uploading to segment store involves expensive compression step (first tar up the segment and then upload), we don't want to retry the uploading. Segment without segment store copy can still be downloaded from peer servers.
+   * @see <a href="https://cwiki.apache.org/confluence/display/PINOT/By-passing+deep-store+requirement+for+Realtime+segment+completion#BypassingdeepstorerequirementforRealtimesegmentcompletion-Failurecasesandhandling">By-passing deep-store requirement for Realtime segment completion:Failure cases and handling</a>
+   */
+  public void uploadToSegmentStoreIfMissing(TableConfig tableConfig) {
+    Preconditions.checkState(!_isStopping, "Segment manager is stopping");
+
+    String realtimeTableName = tableConfig.getTableName();
+    // Get the latest segment ZK metadata for each partition
+    Map<Integer, LLCRealtimeSegmentZKMetadata> llcSegmentZKMetadataMap =
+        getLatestSegmentZKMetadataMap(realtimeTableName);
+
+    // Iterate through llc segments and upload missing segment store copy by following steps:
+    //  1. Ask servers which have online segment replica to upload to segment store. Servers return segment store download url after successful uploading.
+    //  2. Update the llc segment ZK metadata by adding segment store download url.
+    for (LLCRealtimeSegmentZKMetadata segmentZKMetadata : llcSegmentZKMetadataMap.values()) {
+      String segmentName = segmentZKMetadata.getSegmentName();
+      // Only fix the committed llc segment without segment store copy
+      if (LLCSegmentName.isLowLevelConsumerSegmentName(segmentName) && segmentZKMetadata.getStatus() == Status.DONE && (segmentZKMetadata.getDownloadUrl() == null || segmentZKMetadata.getDownloadUrl().isEmpty())) {
+        try {
+          if (!isExceededMaxSegmentCompletionTime(realtimeTableName, segmentName, getCurrentTimeMs())) {
+            continue;
+          }
+          LOGGER.info("Fixing llc segment {} whose segment store copy is unavailable", segmentName);
+
+          // Find servers which have online replica
+          List<URI> peerSegmentURIs = PeerServerSegmentFinder
+              .getPeerServerURIs(segmentName, CommonConstants.HTTP_PROTOCOL, _helixManager);
+          if (peerSegmentURIs.isEmpty()) {
+            LOGGER.error("Failed to upload segment {} to segment store because no online replica is found", segmentName);
+            continue;
+          }
+
+          // Randomly ask one server to upload
+          Random r = new Random();
+          URI uri = peerSegmentURIs.get(r.nextInt(peerSegmentURIs.size()));
+          String segmentDownloadUrl = _fileUploadDownloadClient.uploadToSegmentStore(StringUtil
+              .join("/", uri.toString(), "upload"));
+
+          // Update the segment ZK metadata to include segment download url
+          if (segmentDownloadUrl == null || segmentDownloadUrl.isEmpty()) {
+            LOGGER.error("Failed to upload segment {} to segment store: no segment download url is returned from server.", segmentName);
+            continue;
+          }
+          segmentZKMetadata.setDownloadUrl(segmentDownloadUrl);
+          persistSegmentZKMetadata(realtimeTableName, segmentZKMetadata, -1);
+          LOGGER.info("Successfully uploaded llc segment {} to segment store", segmentName);
+        } catch (Exception e) {
+          LOGGER.error("Failed to upload segment {} to segment store", segmentName, e);
+        }
+      }
     }
   }
 }

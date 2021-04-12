@@ -43,7 +43,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Validates realtime ideal states and segment metadata, fixing any partitions which have stopped consuming
+ * Validates realtime ideal states and segment metadata, fixing any partitions which have stopped consuming, and uploading segments to segment store if missing.
  */
 public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<RealtimeSegmentValidationManager.Context> {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentValidationManager.class);
@@ -100,6 +100,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
           IngestionConfigUtils.getStreamConfigMap(tableConfig));
       if (streamConfig.hasLowLevelConsumerType()) {
         _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig);
+        _llcRealtimeSegmentManager.uploadToSegmentStoreIfMissing(tableConfig);
       }
     }
   }
