@@ -80,6 +80,8 @@ public class ControllerConf extends PinotConfiguration {
         "controller.offline.segment.interval.checker.frequencyInSeconds";
     public static final String REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS =
         "controller.realtime.segment.validation.frequencyInSeconds";
+    public static final String REALTIME_SEGMENT_VALIDATION_INITIAL_DELAY_IN_SECONDS =
+        "controller.realtime.segment.validation.initialDelayInSeconds";
     public static final String BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS =
         "controller.broker.resource.validation.frequencyInSeconds";
     public static final String BROKER_RESOURCE_VALIDATION_INITIAL_DELAY_IN_SECONDS =
@@ -628,7 +630,8 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public long getRealtimeSegmentValidationManagerInitialDelaySeconds() {
-    return getPeriodicTaskInitialDelayInSeconds();
+    return getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_INITIAL_DELAY_IN_SECONDS,
+        getPeriodicTaskInitialDelayInSeconds());
   }
 
   public long getPinotTaskManagerInitialDelaySeconds() {

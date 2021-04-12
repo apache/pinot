@@ -47,6 +47,7 @@ import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.common.utils.SegmentName;
+import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
@@ -263,24 +264,24 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
     Preconditions.checkNotNull(schema);
 
-    File indexDir = new File(_indexDir, segmentName);
+    File segmentDir = new File(_indexDir, segmentName);
     // Restart during segment reload might leave segment in inconsistent state (index directory might not exist but
     // segment backup directory existed), need to first try to recover from reload failure before checking the existence
     // of the index directory and loading segment from it
-    LoaderUtils.reloadFailureRecovery(indexDir);
+    LoaderUtils.reloadFailureRecovery(segmentDir);
 
     boolean isLLCSegment = SegmentName.isLowLevelConsumerSegmentName(segmentName);
-    if (indexDir.exists()) {
+    if (segmentDir.exists()) {
       // Segment already exists on disk
       if (realtimeSegmentZKMetadata.getStatus() == Status.DONE) {
         // Metadata has been committed, load the local segment
         try {
-          addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema));
+          addSegment(ImmutableSegmentLoader.load(segmentDir, indexLoadingConfig, schema));
           return;
         } catch (Exception e) {
           if (isLLCSegment) {
             // For LLC and segments, delete the local copy and download a new copy from the controller
-            FileUtils.deleteQuietly(indexDir);
+            FileUtils.deleteQuietly(segmentDir);
             if (e instanceof V3RemoveIndexException) {
               _logger.info("Unable to remove index from V3 format segment: {}, downloading a new copy", segmentName, e);
             } else {
@@ -294,8 +295,18 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         }
       } else {
         // Metadata has not been committed, delete the local segment
-        FileUtils.deleteQuietly(indexDir);
+        FileUtils.deleteQuietly(segmentDir);
       }
+    } else if (realtimeSegmentZKMetadata.getStatus() == Status.UPLOADED) {
+      // The segment is uploaded to an upsert enabled realtime table. Download the segment and load.
+      Preconditions.checkArgument(realtimeSegmentZKMetadata instanceof LLCRealtimeSegmentZKMetadata,
+          "Upload segment is not LLC segment");
+      String downURL = ((LLCRealtimeSegmentZKMetadata)realtimeSegmentZKMetadata).getDownloadUrl();
+      Preconditions.checkNotNull(downURL, "Upload segment metadata has no download url");
+      downloadSegmentFromDeepStore(segmentName, indexLoadingConfig, downURL);
+      _logger.info("Downloaded, untarred and add segment {} of table {} from {}", segmentName, tableConfig.getTableName(),
+          downURL);
+      return;
     }
 
     // Start a new consuming segment or download the segment from the controller
@@ -351,7 +362,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     columnToReaderMap.put(_timeColumnName, new PinotSegmentColumnReader(immutableSegment, _timeColumnName));
     int numTotalDocs = immutableSegment.getSegmentMetadata().getTotalDocs();
     String segmentName = immutableSegment.getSegmentName();
-    int partitionGroupId = new LLCSegmentName(immutableSegment.getSegmentName()).getPartitionGroupId();
+    int partitionGroupId = SegmentUtils
+        .getRealtimeSegmentPartitionId(segmentName, this.getTableName(), _helixManager, _primaryKeyColumns.get(0));
     PartitionUpsertMetadataManager partitionUpsertMetadataManager =
         _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionGroupId);
     int numPrimaryKeyColumns = _primaryKeyColumns.size();

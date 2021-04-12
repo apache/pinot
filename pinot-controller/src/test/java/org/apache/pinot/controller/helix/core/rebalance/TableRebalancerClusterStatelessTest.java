@@ -105,7 +105,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // Add the segments
     int numSegments = 10;
     for (int i = 0; i < numSegments; i++) {
-      _helixResourceManager.addNewSegment(RAW_TABLE_NAME,
+      _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
           SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME, SEGMENT_NAME_PREFIX + i), null);
     }
     Map<String, Map<String, String>> oldSegmentAssignment =
@@ -343,7 +343,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     long nowInDays = TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis());
     // keep decreasing end time from today in steps of 3. 3 segments don't move. 3 segment on tierA. 4 segments on tierB
     for (int i = 0; i < numSegments; i++) {
-      _helixResourceManager.addNewSegment(TIERED_TABLE_NAME, SegmentMetadataMockUtils
+      _helixResourceManager.addNewSegment(OFFLINE_TIERED_TABLE_NAME, SegmentMetadataMockUtils
           .mockSegmentMetadataWithEndTimeInfo(TIERED_TABLE_NAME, SEGMENT_NAME_PREFIX + i, nowInDays), null);
       nowInDays -= 3;
     }
