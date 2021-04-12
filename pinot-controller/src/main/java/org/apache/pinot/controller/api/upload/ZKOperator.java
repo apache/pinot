@@ -23,10 +23,7 @@ import java.net.URI;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.helix.ZNRecord;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -35,7 +32,6 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.resources.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.segment.spi.SegmentMetadata;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -76,13 +72,13 @@ public class ZKOperator {
 
     // TODO Allow segment refreshing for realtime tables.
     if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
-      LOGGER.info("Segment {} from table {} already exists, refreshing if necessary", segmentName, tableNameWithType);
       throw new ControllerApplicationException(LOGGER,
           "Refresh existing segment " + segmentName + " for realtime table " + tableNameWithType + " is not yet supported ",
           Response.Status.NOT_IMPLEMENTED
       );
     }
 
+    LOGGER.info("Segment {} from table {} already exists, refreshing if necessary", segmentName, tableNameWithType);
     processExistingSegment(segmentMetadata, finalSegmentLocationURI, currentSegmentLocation,
         enableParallelPushProtection, headers, zkDownloadURI, crypter, tableNameWithType, segmentName,
         segmentMetadataZnRecord, moveSegmentToFinalLocation);
