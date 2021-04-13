@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 import org.apache.pinot.controller.recommender.io.ConfigManager;
 import org.apache.pinot.controller.recommender.io.InputManager;
+import org.apache.pinot.controller.recommender.rules.impl.AggregateMetricsRule;
 import org.apache.pinot.controller.recommender.rules.impl.BloomFilterRule;
 import org.apache.pinot.controller.recommender.rules.impl.FlagQueryRule;
 import org.apache.pinot.controller.recommender.rules.impl.InvertedSortedIndexJointRule;
@@ -58,6 +59,8 @@ public class RulesToExecute {
           return new NoDictionaryOnHeapDictionaryJointRule(inputManager, outputManager);
         case VariedLengthDictionaryRule:
           return new VariedLengthDictionaryRule(inputManager, outputManager);
+        case AggregateMetricsRule:
+          return new AggregateMetricsRule(inputManager, outputManager);
         case RealtimeProvisioningRule:
           return new RealtimeProvisioningRule(inputManager, outputManager);
         default:
@@ -73,6 +76,7 @@ public class RulesToExecute {
   boolean _recommendNoDictionaryOnHeapDictionaryJoint = DEFAULT_RECOMMEND_NO_DICTIONARY_ONHEAP_DICTIONARY_JOINT;
   boolean _recommendVariedLengthDictionary = DEFAULT_RECOMMEND_VARIED_LENGTH_DICTIONARY;
   boolean _recommendFlagQuery = DEFAULT_RECOMMEND_FLAG_QUERY;
+  boolean _recommendAggregateMetrics = DEFAULT_RECOMMEND_AGGREGATE_METRICS;
   boolean _recommendRealtimeProvisioning = DEFAULT_RECOMMEND_REALTIME_PROVISIONING;
 
   @JsonSetter(nulls = Nulls.SKIP)
@@ -111,6 +115,11 @@ public class RulesToExecute {
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
+  public void setRecommendAggregateMetrics(boolean aggregateMetrics) {
+    _recommendAggregateMetrics = aggregateMetrics;
+  }
+
+  @JsonSetter(nulls = Nulls.SKIP)
   public void setRecommendRealtimeProvisioning(boolean recommendRealtimeProvisioning) {
     _recommendPinotTablePartition = recommendRealtimeProvisioning;
   }
@@ -143,6 +152,10 @@ public class RulesToExecute {
     return _recommendBloomFilter;
   }
 
+  public boolean isRecommendAggregateMetrics() {
+    return _recommendAggregateMetrics;
+  }
+
   public boolean isRecommendRealtimeProvisioning() {
     return _recommendRealtimeProvisioning;
   }
@@ -157,6 +170,7 @@ public class RulesToExecute {
     VariedLengthDictionaryRule, // VariedLengthDictionaryRule must go after NoDictionaryOnHeapDictionaryJointRule  since we do not recommend dictionary on NoDictionary cols
     PinotTablePartitionRule, // PinotTablePartitionRule must go after KafkaPartitionRule to recommend realtime partitions, after NoDictionaryOnHeapDictionaryJointRule to correctly calculate record size
     BloomFilterRule,
+    AggregateMetricsRule,
     RealtimeProvisioningRule // this rule must be the last one because it needs the output of other rules as its input
   }
 }
