@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.stream.kafka20.utils;
 
+import io.netty.util.NetUtil;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -41,7 +42,7 @@ public class EmbeddedZooKeeper implements Closeable {
     this.tmpDir = Files.createTempDirectory(null).toFile();
     this.factory = new NIOServerCnxnFactory();
     this.zookeeper = new ZooKeeperServer(new File(tmpDir, "data"), new File(tmpDir, "log"), TICK_TIME);
-    InetSocketAddress addr = new InetSocketAddress("localhost", 0);
+    InetSocketAddress addr = new InetSocketAddress(NetUtil.LOCALHOST.getHostAddress(), 0);
     factory.configure(addr, 0);
     factory.startup(zookeeper);
     this.port = zookeeper.getClientPort();
