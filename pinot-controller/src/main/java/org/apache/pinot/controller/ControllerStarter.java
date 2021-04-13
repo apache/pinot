@@ -53,7 +53,6 @@ import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ValidationMetrics;
-import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
@@ -91,6 +90,7 @@ import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -181,7 +181,7 @@ public class ControllerStarter implements ServiceStartable {
   private void inferHostnameIfNeeded(ControllerConf config) {
     if (config.getControllerHost() == null) {
       if (config.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false)) {
-        final String inferredHostname = NetUtil.getHostnameOrAddress();
+        final String inferredHostname = NetUtils.getHostnameOrAddress();
         if (inferredHostname != null) {
           config.setControllerHost(inferredHostname);
         } else {

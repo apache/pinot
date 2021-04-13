@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.stream.kafka20;
 
-import io.netty.util.NetUtil;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -36,6 +35,7 @@ import org.apache.pinot.spi.stream.PartitionLevelConsumer;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -64,7 +64,8 @@ public class KafkaPartitionLevelConsumerTest {
     kafkaCluster = new MiniKafkaCluster.Builder().newServer("0").build();
     LOGGER.info("Trying to start MiniKafkaCluster");
     kafkaCluster.start();
-    brokerAddress = getKafkaBroker();
+    brokerAddress = NetUtils.getHostAddress() + ":" + kafkaCluster.getKafkaServerPort(0);
+    LOGGER.info("Kafka Broker Address is {}", brokerAddress);
     kafkaCluster.createTopic(TEST_TOPIC_1, 1, 1);
     kafkaCluster.createTopic(TEST_TOPIC_2, 2, 1);
     Thread.sleep(STABILIZE_SLEEP_DELAYS);
@@ -75,20 +76,21 @@ public class KafkaPartitionLevelConsumerTest {
   private void produceMsgToKafka() {
     Properties props = new Properties();
     props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, brokerAddress);
-    props.put(ProducerConfig.CLIENT_ID_CONFIG, "clientId");
+    props.put(ProducerConfig.CLIENT_ID_CONFIG, this.getClass().getName());
     props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
     props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+    props.put(ProducerConfig.ACKS_CONFIG, "1");
     KafkaProducer p = new KafkaProducer<>(props);
     for (int i = 0; i < NUM_MSG_PRODUCED_PER_PARTITION; i++) {
       p.send(new ProducerRecord(TEST_TOPIC_1, "sample_msg_" + i));
+      p.flush();
       // TEST_TOPIC_2 has 2 partitions
       p.send(new ProducerRecord(TEST_TOPIC_2, "sample_msg_" + i));
+      p.flush();
       p.send(new ProducerRecord(TEST_TOPIC_2, "sample_msg_" + i));
+      p.flush();
     }
-  }
-
-  private String getKafkaBroker() {
-    return NetUtil.LOCALHOST.getHostAddress() + ":" + kafkaCluster.getKafkaServerPort(0);
+    p.close();
   }
 
   @AfterClass

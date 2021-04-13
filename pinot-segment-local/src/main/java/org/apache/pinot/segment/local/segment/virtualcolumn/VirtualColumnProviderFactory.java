@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.segment.local.segment.virtualcolumn;
 
-import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.segment.local.segment.index.column.DefaultNullValueVirtualColumnProvider;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
+import org.apache.pinot.spi.utils.NetUtils;
 
 
 /**
@@ -54,7 +54,7 @@ public class VirtualColumnProviderFactory {
 
     if (!schema.hasColumn(BuiltInVirtualColumn.HOSTNAME)) {
       schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.HOSTNAME, FieldSpec.DataType.STRING, true,
-          DefaultNullValueVirtualColumnProvider.class, NetUtil.getHostnameOrAddress()));
+          DefaultNullValueVirtualColumnProvider.class, NetUtils.getHostnameOrAddress()));
     }
 
     if (!schema.hasColumn(BuiltInVirtualColumn.SEGMENTNAME)) {

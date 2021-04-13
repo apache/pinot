@@ -49,7 +49,6 @@ import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
 import org.apache.pinot.common.utils.config.TagNameUtils;
@@ -77,6 +76,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.Instance;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.CommonConstants.Server.SegmentCompletionProtocol;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -128,8 +128,8 @@ public class HelixServerStarter implements ServiceStartable {
     _listenerConfigs = ListenerConfigUtil.buildServerAdminConfigs(_serverConf);
 
     _host = _serverConf.getProperty(Helix.KEY_OF_SERVER_NETTY_HOST,
-        _serverConf.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtil.getHostnameOrAddress()
-            : NetUtil.getHostAddress());
+        _serverConf.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils.getHostnameOrAddress()
+            : NetUtils.getHostAddress());
     _port = _serverConf.getProperty(Helix.KEY_OF_SERVER_NETTY_PORT, Helix.DEFAULT_SERVER_NETTY_PORT);
 
     String instanceId = _serverConf.getProperty(Server.CONFIG_OF_INSTANCE_ID);

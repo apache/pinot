@@ -25,8 +25,8 @@ import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
 import javax.ws.rs.ext.Provider;
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.NetUtils;
 
 
 // A class to add the controller host and version in the response headers for all APIs.
@@ -40,7 +40,7 @@ public class PinotControllerResponseFilter implements ContainerResponseFilter {
   private final String _controllerVersion;
 
   public PinotControllerResponseFilter() {
-    String controllerHost = NetUtil.getHostnameOrAddress();
+    String controllerHost = NetUtils.getHostnameOrAddress();
     if (controllerHost != null) {
       _controllerHost = controllerHost;
     } else {
