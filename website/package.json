@@ -40,11 +40,11 @@
   },
   "devDependencies": {
     "@docusaurus/module-type-aliases": "^2.0.0-alpha.64",
+    "@types/react": "^16.9.49",
     "add": "2.0.6",
-    "typescript": "^4.0.2",
-    "yarn": "^1.22.5",
     "prettier": "2.0.5",
-    "@types/react": "^16.9.49"
+    "typescript": "^4.0.2",
+    "yarn": "^1.22.10"
   },
   "resolutions": {
     "**/sharp": "^0.25.2"
