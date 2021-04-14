@@ -19,7 +19,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.RequestContextConvertUtils;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -31,7 +31,7 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
   @Test
   public void testCastTransformFunction() {
     ExpressionContext expression =
-        RequestContextConvertUtils.getExpression(String.format("cast(%s,%s)", INT_SV_COLUMN, "'String'"));
+        RequestContextUtils.getExpression(String.format("cast(%s,%s)", INT_SV_COLUMN, "'String'"));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CastTransformFunction);
     Assert.assertEquals(transformFunction.getName(), CastTransformFunction.FUNCTION_NAME);
@@ -41,7 +41,7 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = RequestContextConvertUtils.getExpression(
+    expression = RequestContextUtils.getExpression(
         String.format("cast(add(cast(%s, 'STRING'), %s), 'string')", STRING_SV_COLUMN, DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CastTransformFunction);
@@ -50,7 +50,7 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = RequestContextConvertUtils.getExpression(
+    expression = RequestContextUtils.getExpression(
         String.format("cast(cast(add(cast(%s, 'STRING'), %s), 'string'), 'double')", STRING_SV_COLUMN, INT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CastTransformFunction);
@@ -63,7 +63,7 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    ExpressionContext expression = RequestContextConvertUtils.getExpression(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 

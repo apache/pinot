@@ -32,7 +32,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.function.DateTimeUtils;
 import org.apache.pinot.common.function.TimeZoneKey;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.RequestContextConvertUtils;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
@@ -110,7 +110,7 @@ public class DateTruncTransformFunctionTest {
       ProjectionBlock projectionBlock = new ProjectionOperator(dataSourceMap,
           new DocIdSetOperator(new MatchAllFilterOperator(rows.size()), DocIdSetPlanNode.MAX_DOC_PER_CALL)).nextBlock();
 
-      ExpressionContext expression = RequestContextConvertUtils.getExpression(
+      ExpressionContext expression = RequestContextUtils.getExpression(
           String.format("dateTrunc('%s', %s, '%s', '%s')", unit, TIME_COLUMN, TimeUnit.MILLISECONDS, tz));
       TransformFunction transformFunction = TransformFunctionFactory.get(expression, dataSourceMap);
       Assert.assertTrue(transformFunction instanceof DateTruncTransformFunction);

@@ -28,7 +28,7 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.RequestContextConvertUtils;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
@@ -155,7 +155,7 @@ public class GeoFunctionTest {
     ProjectionBlock projectionBlock = new ProjectionOperator(dataSourceMap,
         new DocIdSetOperator(new MatchAllFilterOperator(length), DocIdSetPlanNode.MAX_DOC_PER_CALL)).nextBlock();
 
-    ExpressionContext expression = RequestContextConvertUtils.getExpression(function);
+    ExpressionContext expression = RequestContextUtils.getExpression(function);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, dataSourceMap);
     evaluator.accept(transformFunction, projectionBlock);
   }

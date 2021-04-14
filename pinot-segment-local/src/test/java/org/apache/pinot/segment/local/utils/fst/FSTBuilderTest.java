@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.util;
+package org.apache.pinot.segment.local.utils.fst;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -32,9 +32,6 @@ import org.apache.lucene.util.fst.OffHeapFSTStore;
 import org.apache.lucene.util.fst.Outputs;
 import org.apache.lucene.util.fst.PositiveIntOutputs;
 import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
-import org.apache.pinot.segment.local.utils.fst.FSTBuilder;
-import org.apache.pinot.segment.local.utils.fst.PinotBufferIndexInput;
-import org.apache.pinot.segment.local.utils.fst.RegexpMatcher;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

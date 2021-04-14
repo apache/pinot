@@ -19,7 +19,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.RequestContextConvertUtils;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.testng.Assert;
@@ -32,7 +32,7 @@ public abstract class ArrayBaseTransformFunctionTest extends BaseTransformFuncti
   @Test
   public void testArrayTransformFunction() {
     ExpressionContext expression =
-        RequestContextConvertUtils.getExpression(String.format("%s(%s)", getFunctionName(), INT_MV_COLUMN));
+        RequestContextUtils.getExpression(String.format("%s(%s)", getFunctionName(), INT_MV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertEquals(transformFunction.getClass().getName(), getArrayFunctionClass().getName());
     Assert.assertEquals(transformFunction.getName(), getFunctionName());
@@ -76,7 +76,7 @@ public abstract class ArrayBaseTransformFunctionTest extends BaseTransformFuncti
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    ExpressionContext expression = RequestContextConvertUtils.getExpression(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 

@@ -20,7 +20,7 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.RequestContextConvertUtils;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -31,7 +31,7 @@ public class TimeConversionTransformFunctionTest extends BaseTransformFunctionTe
 
   @Test(dataProvider = "testTimeConversionTransformFunction")
   public void testTimeConversionTransformFunction(String expressionStr) {
-    ExpressionContext expression = RequestContextConvertUtils.getExpression(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof TimeConversionTransformFunction);
     Assert.assertEquals(transformFunction.getName(), TimeConversionTransformFunction.FUNCTION_NAME);
@@ -60,7 +60,7 @@ public class TimeConversionTransformFunctionTest extends BaseTransformFunctionTe
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    ExpressionContext expression = RequestContextConvertUtils.getExpression(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 

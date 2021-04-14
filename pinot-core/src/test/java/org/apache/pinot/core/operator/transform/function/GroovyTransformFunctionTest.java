@@ -25,7 +25,7 @@ import java.util.IntSummaryStatistics;
 import java.util.List;
 import java.util.stream.IntStream;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.RequestContextConvertUtils;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.testng.Assert;
@@ -154,7 +154,7 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
   @Test(dataProvider = "groovyFunctionDataProvider")
   public void testGroovyTransformFunctions(String expressionStr, FieldSpec.DataType resultType,
       boolean isResultSingleValue, Object expectedResult) {
-    ExpressionContext expression = RequestContextConvertUtils.getExpression(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof GroovyTransformFunction);
     Assert.assertEquals(transformFunction.getName(), GroovyTransformFunction.FUNCTION_NAME);
@@ -245,7 +245,7 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    ExpressionContext expression = RequestContextConvertUtils.getExpression(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 
