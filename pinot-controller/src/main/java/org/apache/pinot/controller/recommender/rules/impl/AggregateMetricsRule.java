@@ -30,7 +30,7 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
 
 
 /**
- * This rule checks the provided queries and suggest the value for 'AggregateMetrics' flag in table config.
+ * This rule checks the provided queries and suggests the value for 'AggregateMetrics' flag in table config.
  * It looks at selection columns and if all of them are SUM function, the flag should be true, otherwise it's false.
  */
 public class AggregateMetricsRule extends AbstractRule {
