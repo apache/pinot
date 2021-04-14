@@ -23,9 +23,9 @@ import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.FilterOperator;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
 
 
 /**

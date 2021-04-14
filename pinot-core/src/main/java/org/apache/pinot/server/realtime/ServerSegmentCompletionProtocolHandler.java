@@ -18,33 +18,25 @@
  */
 package org.apache.pinot.server.realtime;
 
-import static org.apache.pinot.common.utils.CommonConstants.Server.SegmentCompletionProtocol.CONFIG_OF_CONTROLLER_HTTPS_ENABLED;
-import static org.apache.pinot.common.utils.CommonConstants.Server.SegmentCompletionProtocol.CONFIG_OF_CONTROLLER_HTTPS_PORT;
-import static org.apache.pinot.common.utils.CommonConstants.Server.SegmentCompletionProtocol.CONFIG_OF_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS;
-import static org.apache.pinot.common.utils.CommonConstants.Server.SegmentCompletionProtocol.DEFAULT_OTHER_REQUESTS_TIMEOUT;
-import static org.apache.pinot.common.utils.CommonConstants.Server.SegmentCompletionProtocol.DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS;
-
 import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Map;
-
 import javax.net.ssl.SSLContext;
-
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.core.data.manager.realtime.Server2ControllerSegmentUploader;
 import org.apache.pinot.core.util.SegmentCompletionProtocolUtils;
 import org.apache.pinot.pql.parsers.utils.Pair;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.common.utils.CommonConstants.Server.SegmentCompletionProtocol.*;
+import static org.apache.pinot.spi.utils.CommonConstants.Server.SegmentCompletionProtocol.*;
 
 
 /**

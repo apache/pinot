@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -26,7 +27,6 @@ import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 
 

@@ -31,17 +31,16 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.function.DateTimeUtils;
 import org.apache.pinot.common.function.TimeZoneKey;
-import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.core.data.readers.GenericRowRecordReader;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextConvertUtils;
 import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
-import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -51,6 +50,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -66,11 +66,12 @@ public class DateTruncTransformFunctionTest {
   private static final DateTimeZone WEIRD_DATE_TIME_ZONE = DateTimeZone.forID(WEIRD_ZONE.getId());
   private static final DateTime WEIRD_TIMESTAMP = new DateTime(2001, 8, 22, 3, 4, 5, 321, WEIRD_DATE_TIME_ZONE);
   private static final String WEIRD_TIMESTAMP_ISO8601_STRING = "2001-08-22T03:04:05.321+07:09";
-  private static final DateTimeZone UTC_TIME_ZONE = DateTimeUtils.DateTimeZoneIndex.getDateTimeZone(TimeZoneKey.UTC_KEY);
+  private static final DateTimeZone UTC_TIME_ZONE =
+      DateTimeUtils.DateTimeZoneIndex.getDateTimeZone(TimeZoneKey.UTC_KEY);
   private static final String TIMESTAMP_ISO8601_STRING = "2001-08-22T03:04:05.321+00:00";
 
   private static final DateTime TIMESTAMP = new DateTime(2001, 8, 22, 3, 4, 5, 321, UTC_TIME_ZONE);
-      // This is TIMESTAMP w/o TZ
+  // This is TIMESTAMP w/o TZ
 
   private static long iso8601ToUtcEpochMillis(String iso8601) {
     DateTimeFormatter formatter = ISODateTimeFormat.dateTimeParser().withOffsetParsed();
@@ -109,7 +110,7 @@ public class DateTruncTransformFunctionTest {
       ProjectionBlock projectionBlock = new ProjectionOperator(dataSourceMap,
           new DocIdSetOperator(new MatchAllFilterOperator(rows.size()), DocIdSetPlanNode.MAX_DOC_PER_CALL)).nextBlock();
 
-      ExpressionContext expression = QueryContextConverterUtils.getExpression(
+      ExpressionContext expression = RequestContextConvertUtils.getExpression(
           String.format("dateTrunc('%s', %s, '%s', '%s')", unit, TIME_COLUMN, TimeUnit.MILLISECONDS, tz));
       TransformFunction transformFunction = TransformFunctionFactory.get(expression, dataSourceMap);
       Assert.assertTrue(transformFunction instanceof DateTruncTransformFunction);

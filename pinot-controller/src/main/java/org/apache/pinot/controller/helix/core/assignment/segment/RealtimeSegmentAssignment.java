@@ -32,12 +32,12 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.tier.Tier;
-import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.common.utils.SegmentUtils;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -94,7 +94,7 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
     _realtimeTableName = tableConfig.getTableName();
     _replication = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
-            tableConfig.getValidationConfig().getReplicaGroupStrategyConfig();
+        tableConfig.getValidationConfig().getReplicaGroupStrategyConfig();
     _partitionColumn = replicaGroupStrategyConfig != null ? replicaGroupStrategyConfig.getPartitionColumn() : null;
 
     LOGGER.info("Initialized RealtimeSegmentAssignment with replication: {}, partitionColumn: {} for table: {}",
@@ -180,9 +180,8 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
 
   @Override
   public Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
-      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap,
-      @Nullable List<Tier> sortedTiers, @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap,
-      Configuration config) {
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, @Nullable List<Tier> sortedTiers,
+      @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, Configuration config) {
 
     InstancePartitions completedInstancePartitions = instancePartitionsMap.get(InstancePartitionsType.COMPLETED);
     InstancePartitions consumingInstancePartitions = instancePartitionsMap.get(InstancePartitionsType.CONSUMING);
@@ -304,8 +303,7 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
    * Rebalances segments in the current assignment using the instancePartitions and returns new assignment
    */
   private Map<String, Map<String, String>> reassignSegments(String instancePartitionType,
-      Map<String, Map<String, String>> currentAssignment, InstancePartitions instancePartitions,
-      boolean bootstrap) {
+      Map<String, Map<String, String>> currentAssignment, InstancePartitions instancePartitions, boolean bootstrap) {
     Map<String, Map<String, String>> newAssignment;
     if (bootstrap) {
       LOGGER.info("Bootstrapping segment assignment for {} segments of table: {}", instancePartitionType,
@@ -322,8 +320,8 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
       if (instancePartitions.getNumReplicaGroups() == 1) {
         // Non-replica-group based assignment
 
-        List<String> instances = SegmentAssignmentUtils
-            .getInstancesForNonReplicaGroupBasedAssignment(instancePartitions, _replication);
+        List<String> instances =
+            SegmentAssignmentUtils.getInstancesForNonReplicaGroupBasedAssignment(instancePartitions, _replication);
         newAssignment = SegmentAssignmentUtils
             .rebalanceTableWithHelixAutoRebalanceStrategy(currentAssignment, instances, _replication);
       } else {
@@ -345,8 +343,7 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
         }
 
         newAssignment = SegmentAssignmentUtils
-            .rebalanceReplicaGroupBasedTable(currentAssignment, instancePartitions,
-                partitionGroupIdToSegmentsMap);
+            .rebalanceReplicaGroupBasedTable(currentAssignment, instancePartitions, partitionGroupIdToSegmentsMap);
       }
     }
     return newAssignment;

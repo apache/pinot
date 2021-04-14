@@ -23,8 +23,8 @@ import org.apache.pinot.parsers.AbstractCompiler;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 
-import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.PQL;
-import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.SQL;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.PQL;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.SQL;
 
 
 public class PinotQueryParserFactory {

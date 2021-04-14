@@ -42,8 +42,6 @@ import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.common.utils.SegmentName;
@@ -52,21 +50,20 @@ import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
-import org.apache.pinot.core.data.readers.PinotSegmentColumnReader;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentImpl;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
-import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.core.segment.index.loader.LoaderUtils;
-import org.apache.pinot.core.segment.index.loader.V3RemoveIndexException;
-import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
-import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
-import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager.RecordInfo;
 import org.apache.pinot.core.upsert.TableUpsertMetadataManager;
-import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
-import org.apache.pinot.core.util.SchemaUtils;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
+import org.apache.pinot.segment.local.realtime.impl.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
+import org.apache.pinot.segment.local.segment.index.loader.V3RemoveIndexException;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
+import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
+import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.utils.IngestionUtils;
+import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -75,8 +72,10 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 
-import static org.apache.pinot.common.utils.CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD;
+import static org.apache.pinot.spi.utils.CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD;
 
 
 @ThreadSafe
@@ -329,8 +328,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       int partitionGroupId = llcSegmentName.getPartitionGroupId();
       Semaphore semaphore = _partitionGroupIdToSemaphoreMap.computeIfAbsent(partitionGroupId, k -> new Semaphore(1));
       PartitionUpsertMetadataManager partitionUpsertMetadataManager =
-          _tableUpsertMetadataManager != null ? _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionGroupId)
-              : null;
+          _tableUpsertMetadataManager != null ? _tableUpsertMetadataManager
+              .getOrCreatePartitionManager(partitionGroupId) : null;
       segmentDataManager =
           new LLRealtimeSegmentDataManager(realtimeSegmentZKMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
               indexLoadingConfig, schema, llcSegmentName, semaphore, _serverMetrics, partitionUpsertMetadataManager);
@@ -367,31 +366,32 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     PartitionUpsertMetadataManager partitionUpsertMetadataManager =
         _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionGroupId);
     int numPrimaryKeyColumns = _primaryKeyColumns.size();
-    Iterator<RecordInfo> recordInfoIterator = new Iterator<RecordInfo>() {
-      private int _docId = 0;
+    Iterator<PartitionUpsertMetadataManager.RecordInfo> recordInfoIterator =
+        new Iterator<PartitionUpsertMetadataManager.RecordInfo>() {
+          private int _docId = 0;
 
-      @Override
-      public boolean hasNext() {
-        return _docId < numTotalDocs;
-      }
-
-      @Override
-      public RecordInfo next() {
-        Object[] values = new Object[numPrimaryKeyColumns];
-        for (int i = 0; i < numPrimaryKeyColumns; i++) {
-          Object value = columnToReaderMap.get(_primaryKeyColumns.get(i)).getValue(_docId);
-          if (value instanceof byte[]) {
-            value = new ByteArray((byte[]) value);
+          @Override
+          public boolean hasNext() {
+            return _docId < numTotalDocs;
           }
-          values[i] = value;
-        }
-        PrimaryKey primaryKey = new PrimaryKey(values);
-        Object timeValue = columnToReaderMap.get(_timeColumnName).getValue(_docId);
-        Preconditions.checkArgument(timeValue instanceof Comparable, "time column shall be comparable");
-        long timestamp = IngestionUtils.extractTimeValue((Comparable) timeValue);
-        return new RecordInfo(primaryKey, _docId++, timestamp);
-      }
-    };
+
+          @Override
+          public PartitionUpsertMetadataManager.RecordInfo next() {
+            Object[] values = new Object[numPrimaryKeyColumns];
+            for (int i = 0; i < numPrimaryKeyColumns; i++) {
+              Object value = columnToReaderMap.get(_primaryKeyColumns.get(i)).getValue(_docId);
+              if (value instanceof byte[]) {
+                value = new ByteArray((byte[]) value);
+              }
+              values[i] = value;
+            }
+            PrimaryKey primaryKey = new PrimaryKey(values);
+            Object timeValue = columnToReaderMap.get(_timeColumnName).getValue(_docId);
+            Preconditions.checkArgument(timeValue instanceof Comparable, "time column shall be comparable");
+            long timestamp = IngestionUtils.extractTimeValue((Comparable) timeValue);
+            return new PartitionUpsertMetadataManager.RecordInfo(primaryKey, _docId++, timestamp);
+          }
+        };
     ThreadSafeMutableRoaringBitmap validDocIds =
         partitionUpsertMetadataManager.addSegment(segmentName, recordInfoIterator);
     immutableSegment.enableUpsert(partitionUpsertMetadataManager, validDocIds);

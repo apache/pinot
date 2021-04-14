@@ -18,15 +18,15 @@
  */
 package org.apache.pinot.core.geospatial.transform;
 
-import org.apache.pinot.core.geospatial.GeometryUtils;
-import org.apache.pinot.core.geospatial.serde.GeometrySerializer;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextConvertUtils;
 import org.apache.pinot.core.geospatial.transform.function.StPointFunction;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunctionTest;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
-import org.apache.pinot.core.query.exception.BadQueryRequestException;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.segment.local.utils.GeometrySerializer;
+import org.apache.pinot.segment.local.utils.GeometryUtils;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Point;
 import org.testng.Assert;
@@ -43,7 +43,7 @@ public class StPointFunctionTest extends BaseTransformFunctionTest {
 
   @Test
   public void testStPointLiteralFunction() {
-    ExpressionContext expression = QueryContextConverterUtils.getExpression(String.format("ST_Point(20,10, 1)"));
+    ExpressionContext expression = RequestContextConvertUtils.getExpression(String.format("ST_Point(20,10, 1)"));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     byte[][] expectedValues = new byte[NUM_ROWS][];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -55,7 +55,7 @@ public class StPointFunctionTest extends BaseTransformFunctionTest {
   }
 
   private void testStPointFunction(int isGeography) {
-    ExpressionContext expression = QueryContextConverterUtils
+    ExpressionContext expression = RequestContextConvertUtils
         .getExpression(String.format("ST_Point(%s,%s, %d)", DOUBLE_SV_COLUMN, DOUBLE_SV_COLUMN, isGeography));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof StPointFunction);
@@ -73,7 +73,7 @@ public class StPointFunctionTest extends BaseTransformFunctionTest {
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    ExpressionContext expression = QueryContextConverterUtils.getExpression(expressionStr);
+    ExpressionContext expression = RequestContextConvertUtils.getExpression(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 

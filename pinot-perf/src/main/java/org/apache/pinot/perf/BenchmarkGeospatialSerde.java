@@ -20,6 +20,8 @@ package org.apache.pinot.perf;
 
 import com.google.common.base.Joiner;
 import com.google.common.io.Resources;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.io.WKTReader;
@@ -38,16 +40,12 @@ import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openjdk.jmh.runner.options.VerboseMode;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-
 import static com.google.common.io.Resources.getResource;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.apache.pinot.core.common.ObjectSerDeUtils.serialize;
+import static org.apache.pinot.segment.local.utils.GeometrySerializer.deserialize;
 import static org.openjdk.jmh.annotations.Mode.Throughput;
-
-import static org.apache.pinot.core.geospatial.serde.GeometrySerializer.serialize;
-import static org.apache.pinot.core.geospatial.serde.GeometrySerializer.deserialize;
 
 
 @State(Scope.Thread)
