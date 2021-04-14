@@ -293,7 +293,7 @@ function Installation() {
                     </TabItem>
                     <TabItem value="binary">
                         <CodeBlock className="language-bash">
-                            {`VERSION=0.7.0\nwget https://downloads.apache.org/incubator/pinot/apache-pinot-incubating-$VERSION/apache-pinot-incubating-$VERSION-bin.tar.gz\ntar vxf apache-pinot-incubating-*-bin.tar.gz\ncd apache-pinot-incubating-*-bin\nbin/quick-start-batch.sh`}
+                            {`VERSION=0.7.1\nwget https://downloads.apache.org/incubator/pinot/apache-pinot-incubating-$VERSION/apache-pinot-incubating-$VERSION-bin.tar.gz\ntar vxf apache-pinot-incubating-*-bin.tar.gz\ncd apache-pinot-incubating-*-bin\nbin/quick-start-batch.sh`}
                         </CodeBlock>
                     </TabItem>
                     <TabItem value="github">
@@ -352,11 +352,11 @@ function Home() {
             >
                 <div className="container">
                     <Link
-                        to="https://docs.pinot.apache.org/basics/releases/0.7.0"
+                        to="https://docs.pinot.apache.org/basics/releases/0.7.1"
                         className={styles.indexAnnouncement}
                     >
                         <span className="badge badge-primary">release</span>
-                        v0.7.0 has been released! Check the release notes
+                        v0.7.1 has been released! Check the release notes
                     </Link>
                     <h1 className="hero__title">{siteConfig.title}</h1>
                     <p className="hero__subtitle">
