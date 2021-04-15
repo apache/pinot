@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils;
+package org.apache.pinot.spi.utils;
 
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -24,7 +24,7 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 
 
-public class NetUtil {
+public class NetUtils {
   private static final String DUMMY_OUT_IP = "74.125.224.0";
 
   /**

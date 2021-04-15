@@ -33,7 +33,6 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
@@ -51,6 +50,7 @@ import org.apache.pinot.server.api.access.AllowAllAccessFactory;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.helix.AdminApiApplication;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
@@ -128,7 +128,7 @@ public abstract class BaseResourceTest {
             CommonConstants.HTTP_PROTOCOL, new TlsConfig())));
 
     _webTarget = ClientBuilder.newClient()
-        .target(String.format("http://%s:%d", NetUtil.getHostAddress(), CommonConstants.Server.DEFAULT_ADMIN_API_PORT));
+        .target(String.format("http://%s:%d", NetUtils.getHostAddress(), CommonConstants.Server.DEFAULT_ADMIN_API_PORT));
   }
 
   @AfterClass

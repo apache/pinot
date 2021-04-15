@@ -30,11 +30,11 @@ import java.util.Optional;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.StringUtils;
-import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,7 +59,7 @@ public class PinotConfigUtils {
     Map<String, Object> properties = new HashMap<>();
     properties.put(ControllerConf.ZK_STR, zkAddress);
     properties.put(ControllerConf.HELIX_CLUSTER_NAME, clusterName);
-    properties.put(ControllerConf.CONTROLLER_HOST, !StringUtils.isEmpty(controllerHost) ? controllerHost : NetUtil.getHostAddress());
+    properties.put(ControllerConf.CONTROLLER_HOST, !StringUtils.isEmpty(controllerHost) ? controllerHost : NetUtils.getHostAddress());
     properties.put(ControllerConf.CONTROLLER_PORT, !StringUtils.isEmpty(controllerPort) ? controllerPort:getAvailablePort());
     properties.put(ControllerConf.DATA_DIR, !StringUtils.isEmpty(dataDir) ? dataDir : TMP_DIR + String.format("Controller_%s_%s/controller/data", controllerHost, controllerPort));
     properties.put(ControllerConf.CONTROLLER_VIP_HOST, controllerHost);
@@ -149,7 +149,7 @@ public class PinotConfigUtils {
   public static Map<String, Object> generateServerConf(String serverHost, int serverPort, int serverAdminPort,
       String serverDataDir, String serverSegmentDir) throws SocketException, UnknownHostException {
     if (serverHost == null) {
-      serverHost = NetUtil.getHostAddress();
+      serverHost = NetUtils.getHostAddress();
     }
     if (serverPort == 0) {
       serverPort = getAvailablePort();
@@ -176,7 +176,7 @@ public class PinotConfigUtils {
   public static Map<String, Object> generateMinionConf(String minionHost, int minionPort)
       throws SocketException, UnknownHostException {
     if (minionHost == null) {
-      minionHost = NetUtil.getHostAddress();
+      minionHost = NetUtils.getHostAddress();
     }
     Map<String, Object> properties = new HashMap<>();
     properties.put(CommonConstants.Helix.KEY_OF_MINION_HOST, minionHost);

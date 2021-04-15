@@ -41,12 +41,12 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.Configuration;
-import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.service.PinotServiceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -162,7 +162,7 @@ public class PinotServiceManagerInstanceResource {
             Optional.ofNullable(properties.get(ControllerConf.CONTROLLER_HOST)).map(Object::toString).orElse(null);
         if (controllerHost == null) {
           try {
-            controllerHost = NetUtil.getHostAddress();
+            controllerHost = NetUtils.getHostAddress();
           } catch (Exception e) {
             controllerHost = "localhost";
           }
@@ -195,7 +195,7 @@ public class PinotServiceManagerInstanceResource {
         if (!properties.containsKey(CommonConstants.Broker.METRICS_CONFIG_PREFIX)) {
           String hostname;
           try {
-            hostname = NetUtil.getHostAddress();
+            hostname = NetUtils.getHostAddress();
           } catch (Exception e) {
             hostname = "localhost";
           }
@@ -208,7 +208,7 @@ public class PinotServiceManagerInstanceResource {
         if (!properties.containsKey(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST)) {
           String hostname;
           try {
-            hostname = NetUtil.getHostAddress();
+            hostname = NetUtils.getHostAddress();
           } catch (Exception e) {
             hostname = "localhost";
           }
@@ -247,7 +247,7 @@ public class PinotServiceManagerInstanceResource {
         if (!properties.containsKey(CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX_KEY)) {
           String hostname;
           try {
-            hostname = NetUtil.getHostAddress();
+            hostname = NetUtils.getHostAddress();
           } catch (Exception e) {
             hostname = "localhost";
           }

@@ -21,11 +21,11 @@ package org.apache.pinot.integration.tests;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -70,7 +70,7 @@ public class ServerStarterIntegrationTest extends ControllerTest {
   @Test
   public void testDefaultServerConf()
       throws Exception {
-    String expectedHost = NetUtil.getHostAddress();
+    String expectedHost = NetUtils.getHostAddress();
     String expectedInstanceId = PREFIX_OF_SERVER_INSTANCE + expectedHost + "_" + DEFAULT_SERVER_NETTY_PORT;
     
     verifyInstanceConfig(new PinotConfiguration(), expectedInstanceId, expectedHost, DEFAULT_SERVER_NETTY_PORT);
@@ -79,7 +79,7 @@ public class ServerStarterIntegrationTest extends ControllerTest {
   @Test
   public void testSetInstanceIdToHostname()
       throws Exception {
-    String expectedHost = NetUtil.getHostnameOrAddress();
+    String expectedHost = NetUtils.getHostnameOrAddress();
     String expectedInstanceId = PREFIX_OF_SERVER_INSTANCE + expectedHost + "_" + DEFAULT_SERVER_NETTY_PORT;
     
     Map<String, Object> properties = new HashMap<>();
@@ -94,7 +94,7 @@ public class ServerStarterIntegrationTest extends ControllerTest {
     Map<String, Object> properties = new HashMap<>();
     properties.put(CONFIG_OF_INSTANCE_ID, CUSTOM_INSTANCE_ID);
     
-    verifyInstanceConfig(new PinotConfiguration(properties), CUSTOM_INSTANCE_ID, NetUtil.getHostAddress(), DEFAULT_SERVER_NETTY_PORT);
+    verifyInstanceConfig(new PinotConfiguration(properties), CUSTOM_INSTANCE_ID, NetUtils.getHostAddress(), DEFAULT_SERVER_NETTY_PORT);
   }
 
   @Test
@@ -111,7 +111,7 @@ public class ServerStarterIntegrationTest extends ControllerTest {
   @Test
   public void testCustomPort()
       throws Exception {
-    String expectedHost = NetUtil.getHostAddress();
+    String expectedHost = NetUtils.getHostAddress();
     String expectedInstanceId = PREFIX_OF_SERVER_INSTANCE + expectedHost + "_" + CUSTOM_PORT;
 
     Map<String, Object> properties = new HashMap<>();
