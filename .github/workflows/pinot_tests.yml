@@ -50,37 +50,37 @@ jobs:
         env:
           RUN_INTEGRATION_TESTS: false
         run: .github/workflows/scripts/.pinot_test.sh
-      - name: Upload coverage to Codecov
-        run: |
-          bash <(curl -s https://codecov.io/bash) -cF unittests
-
-  integration-test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Set up JDK 1.8
-        uses: actions/setup-java@v1
-        with:
-          java-version: 1.8
-      - name: Integration Test
-        env:
-          RUN_INTEGRATION_TESTS: true
-        run: .github/workflows/scripts/.pinot_test.sh
-      - name: Upload coverage to Codecov
-        run: |
-          bash <(curl -s https://codecov.io/bash) -cF integration
-
-  quickstarts:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        java: [ 1.8, 10, 11, 12, 13, 14, 15 ]
-    name: Pinot Quickstart on JDK ${{ matrix.java }}
-    steps:
-      - uses: actions/checkout@v2
-      - name: Set up JDK ${{ matrix.java }}
-        uses: actions/setup-java@v1
-        with:
-          java-version: ${{ matrix.java }}
-      - name: Quickstart on JDK ${{ matrix.java }}
-        run: .github/workflows/scripts/.pinot_quickstart.sh
+#      - name: Upload coverage to Codecov
+#        run: |
+#          bash <(curl -s https://codecov.io/bash) -cF unittests
+#
+#  integration-test:
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v2
+#      - name: Set up JDK 1.8
+#        uses: actions/setup-java@v1
+#        with:
+#          java-version: 1.8
+#      - name: Integration Test
+#        env:
+#          RUN_INTEGRATION_TESTS: true
+#        run: .github/workflows/scripts/.pinot_test.sh
+#      - name: Upload coverage to Codecov
+#        run: |
+#          bash <(curl -s https://codecov.io/bash) -cF integration
+#
+#  quickstarts:
+#    runs-on: ubuntu-latest
+#    strategy:
+#      matrix:
+#        java: [ 1.8, 10, 11, 12, 13, 14, 15 ]
+#    name: Pinot Quickstart on JDK ${{ matrix.java }}
+#    steps:
+#      - uses: actions/checkout@v2
+#      - name: Set up JDK ${{ matrix.java }}
+#        uses: actions/setup-java@v1
+#        with:
+#          java-version: ${{ matrix.java }}
+#      - name: Quickstart on JDK ${{ matrix.java }}
+#        run: .github/workflows/scripts/.pinot_quickstart.sh

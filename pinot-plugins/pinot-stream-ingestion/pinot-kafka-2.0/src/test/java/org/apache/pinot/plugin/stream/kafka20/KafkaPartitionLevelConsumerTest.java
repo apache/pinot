@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.stream.kafka20;
 
-import io.netty.util.NetUtil;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -48,55 +47,58 @@ import org.testng.annotations.Test;
  * Tests for the KafkaPartitionLevelConsumer.
  */
 public class KafkaPartitionLevelConsumerTest {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaPartitionLevelConsumerTest.class);
   private static final long STABILIZE_SLEEP_DELAYS = 3000;
   private static final String TEST_TOPIC_1 = "foo";
   private static final String TEST_TOPIC_2 = "bar";
   private static final int NUM_MSG_PRODUCED_PER_PARTITION = 1000;
 
-  private MiniKafkaCluster kafkaCluster;
-  private String brokerAddress;
+  private MiniKafkaCluster _kafkaCluster;
+  private String _kafkaBrokerAddress;
 
   @BeforeClass
-  public void setup()
+  public void setUp()
       throws Exception {
-    kafkaCluster = new MiniKafkaCluster.Builder().newServer("0").build();
+    _kafkaCluster = new MiniKafkaCluster("0");
     LOGGER.info("Trying to start MiniKafkaCluster");
-    kafkaCluster.start();
-    brokerAddress = getKafkaBroker();
-    kafkaCluster.createTopic(TEST_TOPIC_1, 1, 1);
-    kafkaCluster.createTopic(TEST_TOPIC_2, 2, 1);
+    System.out.println("Starting kafka cluster");
+    _kafkaCluster.start();
+    System.out.println("Finish starting kafka cluster");
+    _kafkaBrokerAddress = _kafkaCluster.getKafkaServerAddress();
+    System.out.println("brokerAddress: " + _kafkaBrokerAddress);
+    System.out.println("Creating topics");
+    _kafkaCluster.createTopic(TEST_TOPIC_1, 1, 1);
+    _kafkaCluster.createTopic(TEST_TOPIC_2, 2, 1);
+    System.out.println("Finish creating topics");
     Thread.sleep(STABILIZE_SLEEP_DELAYS);
+    System.out.println("Producing messages");
     produceMsgToKafka();
+    System.out.println("Finish producing messages");
     Thread.sleep(STABILIZE_SLEEP_DELAYS);
   }
 
   private void produceMsgToKafka() {
     Properties props = new Properties();
-    props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, brokerAddress);
+    props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, _kafkaBrokerAddress);
     props.put(ProducerConfig.CLIENT_ID_CONFIG, "clientId");
     props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
     props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-    KafkaProducer p = new KafkaProducer<>(props);
-    for (int i = 0; i < NUM_MSG_PRODUCED_PER_PARTITION; i++) {
-      p.send(new ProducerRecord(TEST_TOPIC_1, "sample_msg_" + i));
-      // TEST_TOPIC_2 has 2 partitions
-      p.send(new ProducerRecord(TEST_TOPIC_2, "sample_msg_" + i));
-      p.send(new ProducerRecord(TEST_TOPIC_2, "sample_msg_" + i));
+    try (KafkaProducer<String, String> producer = new KafkaProducer<>(props)) {
+      for (int i = 0; i < NUM_MSG_PRODUCED_PER_PARTITION; i++) {
+        producer.send(new ProducerRecord<>(TEST_TOPIC_1, "sample_msg_" + i));
+        // TEST_TOPIC_2 has 2 partitions
+        producer.send(new ProducerRecord<>(TEST_TOPIC_2, "sample_msg_" + i));
+        producer.send(new ProducerRecord<>(TEST_TOPIC_2, "sample_msg_" + i));
+      }
     }
   }
 
-  private String getKafkaBroker() {
-    return NetUtil.LOCALHOST.getHostAddress() + ":" + kafkaCluster.getKafkaServerPort(0);
-  }
-
   @AfterClass
-  public void shutDown()
+  public void tearDown()
       throws Exception {
-    kafkaCluster.deleteTopic(TEST_TOPIC_1);
-    kafkaCluster.deleteTopic(TEST_TOPIC_2);
-    kafkaCluster.close();
+    _kafkaCluster.deleteTopic(TEST_TOPIC_1);
+    _kafkaCluster.deleteTopic(TEST_TOPIC_2);
+    _kafkaCluster.close();
   }
 
   @Test
@@ -104,7 +106,7 @@ public class KafkaPartitionLevelConsumerTest {
       throws Exception {
     String streamType = "kafka";
     String streamKafkaTopicName = "theTopic";
-    String streamKafkaBrokerList = brokerAddress;
+    String streamKafkaBrokerList = _kafkaBrokerAddress;
     String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
     String tableNameWithType = "tableName_REALTIME";
@@ -121,8 +123,12 @@ public class KafkaPartitionLevelConsumerTest {
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
     // test default value
+    System.out.println("Creating consumer");
     KafkaPartitionLevelConsumer kafkaSimpleStreamConsumer = new KafkaPartitionLevelConsumer(clientId, streamConfig, 0);
+    System.out.println("Finish creating consumer");
+    System.out.println("Fetching messages");
     kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), new LongMsgOffset(23456L), 10000);
+    System.out.println("Finish fetching messages");
 
     Assert.assertEquals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE_DEFAULT,
         kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaBufferSize());
@@ -148,7 +154,7 @@ public class KafkaPartitionLevelConsumerTest {
   @Test
   public void testGetPartitionCount() {
     String streamType = "kafka";
-    String streamKafkaBrokerList = brokerAddress;
+    String streamKafkaBrokerList = _kafkaBrokerAddress;
     String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
     String tableNameWithType = "tableName_REALTIME";
@@ -183,7 +189,7 @@ public class KafkaPartitionLevelConsumerTest {
       throws Exception {
     String streamType = "kafka";
     String streamKafkaTopicName = "theTopic";
-    String streamKafkaBrokerList = brokerAddress;
+    String streamKafkaBrokerList = _kafkaBrokerAddress;
     String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
     String tableNameWithType = "tableName_REALTIME";
@@ -213,7 +219,7 @@ public class KafkaPartitionLevelConsumerTest {
   private void testFetchOffsets(String topic)
       throws Exception {
     String streamType = "kafka";
-    String streamKafkaBrokerList = brokerAddress;
+    String streamKafkaBrokerList = _kafkaBrokerAddress;
     String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
     String tableNameWithType = "tableName_REALTIME";
@@ -248,7 +254,7 @@ public class KafkaPartitionLevelConsumerTest {
   private void testConsumer(String topic)
       throws TimeoutException {
     String streamType = "kafka";
-    String streamKafkaBrokerList = brokerAddress;
+    String streamKafkaBrokerList = _kafkaBrokerAddress;
     String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
     String tableNameWithType = "tableName_REALTIME";
