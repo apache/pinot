@@ -19,9 +19,11 @@
 package org.apache.pinot.segment.spi;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.reader.ValidDocIndexReader;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
@@ -85,6 +87,12 @@ public interface IndexSegment {
    * @return Record for the given document Id
    */
   GenericRow getRecord(int docId, GenericRow reuse);
+
+  /**
+   * Returns a map of Column and its Index Container or null if there is no such map
+   * @return Column Index Container Map
+   */
+  Map<String, ? extends ColumnIndexContainer> getIndexContainerMap();
 
   /**
    * Destroys segment in memory and closes file handlers if in MMAP mode.

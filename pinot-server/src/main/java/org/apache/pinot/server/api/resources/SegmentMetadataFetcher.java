@@ -20,6 +20,7 @@ package org.apache.pinot.server.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -27,10 +28,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
-import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
-import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -70,16 +69,10 @@ public class SegmentMetadataFetcher {
    * Get the JSON object with the segment column's indexing metadata.
    */
   private static Map<String, Map<String, String>> getIndexesForSegmentColumns(SegmentDataManager segmentDataManager) {
-    Map<String, Map<String, String>> columnIndexMap = null;
-    if (segmentDataManager instanceof ImmutableSegmentDataManager) {
-      ImmutableSegmentDataManager immutableSegmentDataManager = (ImmutableSegmentDataManager) segmentDataManager;
-      ImmutableSegment immutableSegment = immutableSegmentDataManager.getSegment();
-      if (immutableSegment instanceof ImmutableSegmentImpl) {
-        ImmutableSegmentImpl immutableSegmentImpl = (ImmutableSegmentImpl) immutableSegment;
-        Map<String, ColumnIndexContainer> columnIndexContainerMap = immutableSegmentImpl.getIndexContainerMap();
-        columnIndexMap = getImmutableSegmentColumnIndexes(columnIndexContainerMap);
-      }
-    }
+    Map<String, Map<String, String>> columnIndexMap = Collections.EMPTY_MAP;
+    IndexSegment indexSegment = segmentDataManager.getSegment();
+    Map<String,? extends ColumnIndexContainer> indexContainerMap = indexSegment.getIndexContainerMap();
+    columnIndexMap = getSegmentColumnIndexes(indexContainerMap);
     return columnIndexMap;
   }
 
@@ -87,9 +80,9 @@ public class SegmentMetadataFetcher {
    * Helper to loop through column index container to create a index map as follows for each column:
    * {<"bloom-filter", "YES">, <"dictionary", "NO">}
    */
-  private static Map<String, Map<String, String>> getImmutableSegmentColumnIndexes(Map<String, ColumnIndexContainer> columnIndexContainerMap) {
+  private static Map<String, Map<String, String>> getSegmentColumnIndexes(Map<String, ? extends ColumnIndexContainer> columnIndexContainerMap) {
     Map<String, Map<String, String>> columnIndexMap = new LinkedHashMap<>();
-    for (Map.Entry<String, ColumnIndexContainer> entry : columnIndexContainerMap.entrySet()) {
+    for (Map.Entry<String, ? extends ColumnIndexContainer> entry : columnIndexContainerMap.entrySet()) {
       ColumnIndexContainer columnIndexContainer = entry.getValue();
       Map<String, String> indexStatus = new LinkedHashMap<>();
       if (Objects.isNull(columnIndexContainer.getBloomFilter())) {
