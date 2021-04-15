@@ -170,7 +170,7 @@ public class ControllerStarter implements ServiceStartable {
       // Initialize FunctionRegistry before starting the admin application (PinotQueryResource requires it to compile
       // queries)
       FunctionRegistry.init();
-      _adminApp = new ControllerAdminApiApplication();
+      _adminApp = new ControllerAdminApiApplication(conf);
       // Do not use this before the invocation of {@link PinotHelixResourceManager::start()}, which happens in {@link ControllerStarter::start()}
       _helixResourceManager = new PinotHelixResourceManager(_config);
       _executorService =
