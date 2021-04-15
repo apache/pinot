@@ -51,7 +51,6 @@ public class TableMetadataReader {
 
   /**
    * This method retrieves the full segment metadata for a given table.
-   * Currently supports only OFFLINE tables.
    * @return a map of segmentName to its metadata
    */
   public JsonNode getSegmentsMetadata(String tableNameWithType, int timeoutMs)

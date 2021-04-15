@@ -554,7 +554,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     String refreshTimeStr = _refreshTime != Long.MIN_VALUE ? dateFormat.format(new Date(_refreshTime)) : null;
     segmentMetadata.put("refreshTimeReadable", refreshTimeStr);
 
-    segmentMetadata.put("segmentVersion", _segmentVersion.toString());
+    if(_segmentVersion!=null){
+      segmentMetadata.put("segmentVersion", _segmentVersion.toString());
+    }
     segmentMetadata.put("creatorName", _creatorName);
     segmentMetadata.put("paddingCharacter", String.valueOf(_paddingCharacter));
 
