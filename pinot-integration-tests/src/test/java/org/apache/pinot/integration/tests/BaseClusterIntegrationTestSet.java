@@ -60,9 +60,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
   // Default settings
   private static final String DEFAULT_PQL_QUERY_FILE_NAME =
-      "On_Time_On_Time_Performance_2014_100k_subset.test_queries_500.pql";
+      "On_Time_On_Time_Performance_2014_100k_subset.test_queries_200.pql";
   private static final String DEFAULT_SQL_QUERY_FILE_NAME =
-      "On_Time_On_Time_Performance_2014_100k_subset.test_queries_500.sql";
+      "On_Time_On_Time_Performance_2014_100k_subset.test_queries_200.sql";
   private static final int DEFAULT_NUM_QUERIES_TO_GENERATE = 100;
   private static final int DEFAULT_MAX_NUM_QUERIES_TO_SKIP_IN_QUERY_FILE = 200;
 
