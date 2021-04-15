@@ -1598,9 +1598,6 @@
             <exclude>target/**</exclude>
             <exclude>pinot-*/target/**</exclude>
 
-            <!-- Pinot Website (not part of the distribution) -->
-            <exclude>website/**</exclude>
-
             <!-- Docker and Kubernetes (not part of the distribution) -->
             <exclude>kubernetes/**</exclude>
             <exclude>docker/**</exclude>
@@ -1712,9 +1709,6 @@
 
             <!-- IDE files -->
             <exclude>**/*.iml</exclude>
-
-            <!-- Pinot Website (not part of the distribution) -->
-            <exclude>website/**</exclude>
 
             <!-- Docker and Kubernetes (not part of the distribution) -->
             <exclude>kubernetes/**</exclude>
