@@ -17,10 +17,10 @@
 # under the License.
 #
 
-description: Yaml file for deleting a offline table
+description: Yaml file for deleting a segment
 operations:
-  - type: tableOp
-    description: Delete table feature-test-1.json
+  - type: segmentOp
+    description: Delete segment FeatureTest1_Segment
     op: DELETE
-    schemaFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/FeatureTest1-schema.json
-    tableConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/feature-test-1.json
+    tableConfigFileName: feature-test-1.json
+    segmentName: FeatureTest1_Segment

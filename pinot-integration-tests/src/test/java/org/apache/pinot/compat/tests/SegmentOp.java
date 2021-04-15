@@ -158,7 +158,7 @@ public class SegmentOp extends BaseOp {
       FileUtils.forceMkdir(localOutputTempDir);
       // replace the placeholder in the data file.
       File localReplacedInputDataFile = new File(localTempDir, "replaced");
-      Utils.replaceContent(new File(_inputDataFileName), localReplacedInputDataFile, GENERATION_NUMBER_PLACEHOLDER,
+      Utils.replaceContent(new File(getAbsoluteFileName(_inputDataFileName)), localReplacedInputDataFile, GENERATION_NUMBER_PLACEHOLDER,
           String.valueOf(_generationNumber));
 
       File segmentTarFile = generateSegment(localOutputTempDir, localReplacedInputDataFile.getAbsolutePath());
@@ -182,16 +182,16 @@ public class SegmentOp extends BaseOp {
    */
   private File generateSegment(File outputDir, String localReplacedInputDataFilePath)
       throws Exception {
-    TableConfig tableConfig = JsonUtils.fileToObject(new File(_tableConfigFileName), TableConfig.class);
+    TableConfig tableConfig = JsonUtils.fileToObject(new File(getAbsoluteFileName(_tableConfigFileName)), TableConfig.class);
     _tableName = tableConfig.getTableName();
     // if user does not specify segmentName, use tableName_generationNumber
     if (_segmentName == null || _segmentName.isEmpty()) {
       _segmentName = _tableName + "_" + _generationNumber;
     }
 
-    Schema schema = JsonUtils.fileToObject(new File(_schemaFileName), Schema.class);
+    Schema schema = JsonUtils.fileToObject(new File(getAbsoluteFileName(_schemaFileName)), Schema.class);
     RecordReaderConfig recordReaderConfig =
-        RecordReaderFactory.getRecordReaderConfig(DEFAULT_FILE_FORMAT, _recordReaderConfigFileName);
+        RecordReaderFactory.getRecordReaderConfig(DEFAULT_FILE_FORMAT,getAbsoluteFileName(_recordReaderConfigFileName));
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setInputFilePath(localReplacedInputDataFilePath);
@@ -283,7 +283,7 @@ public class SegmentOp extends BaseOp {
    */
   private boolean deleteSegment() {
     try {
-      TableConfig tableConfig = JsonUtils.fileToObject(new File(_tableConfigFileName), TableConfig.class);
+      TableConfig tableConfig = JsonUtils.fileToObject(new File(getAbsoluteFileName(_tableConfigFileName)), TableConfig.class);
       _tableName = tableConfig.getTableName();
       // if user does not specify segmentName, use tableName_generationNumber
       if (_segmentName == null || _segmentName.isEmpty()) {
