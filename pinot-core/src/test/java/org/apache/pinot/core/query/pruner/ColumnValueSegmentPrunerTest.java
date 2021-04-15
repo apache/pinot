@@ -19,6 +19,8 @@
 package org.apache.pinot.core.query.pruner;
 
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.partition.PartitionFunctionFactory;
@@ -26,6 +28,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -39,6 +42,12 @@ public class ColumnValueSegmentPrunerTest {
 
   @Test
   public void testMinMaxValuePruning() {
+    Map<String, Object> properties = new HashMap<>();
+    //override default value
+    properties.put(PRUNER.IN_PREDICATE_THRESHOLD, 5);
+    PinotConfiguration configuration = new PinotConfiguration(properties);
+    PRUNER.init(configuration);
+
     IndexSegment indexSegment = mock(IndexSegment.class);
 
     DataSource dataSource = mock(DataSource.class);
@@ -67,6 +76,15 @@ public class ColumnValueSegmentPrunerTest {
     // Invalid range predicate
     assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column BETWEEN 20 AND 10"));
     assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column BETWEEN 30 AND 20"));
+    // In Predicate
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column IN (0)"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column IN (0, 5, 8)"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column IN (21, 30)"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column IN (10)"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column IN (5, 10, 15)"));
+    //although the segment can be pruned, it will not be pruned as the size of values is greater than threshold
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column IN (0, 1, 2, 3, 4, 5, 6, 7, 8, 9)"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column IN (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)"));
     // AND operator
     assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column = 0 AND column > 10"));
     assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column > 0 AND column < 10"));
