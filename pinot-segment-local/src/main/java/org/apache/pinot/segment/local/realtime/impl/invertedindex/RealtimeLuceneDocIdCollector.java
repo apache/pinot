@@ -57,7 +57,8 @@ public class RealtimeLuceneDocIdCollector implements Collector {
 
       @Override
       public void collect(int doc) throws IOException {
-        _docIds.add(doc);
+        // Compute the absolute lucene docID across sub-indexes as doc that is passed is relative to the current reader
+        _docIds.add(context.docBase + doc);
       }
     };
   }
