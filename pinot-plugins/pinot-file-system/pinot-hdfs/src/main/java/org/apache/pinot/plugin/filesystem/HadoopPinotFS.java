@@ -19,6 +19,7 @@
 
 package org.apache.pinot.plugin.filesystem;
 
+import com.google.common.base.Strings;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -26,7 +27,6 @@ import java.io.InputStream;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -38,8 +38,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.base.Strings;
 
 /**
  * Implementation of PinotFS for the Hadoop Filesystem

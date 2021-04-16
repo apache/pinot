@@ -19,8 +19,6 @@
 package org.apache.pinot.segment.spi.creator.name;
 
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.segment.spi.creator.name.NormalizedDateSegmentNameGenerator;
-import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.testng.annotations.Test;
 

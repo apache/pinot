@@ -18,13 +18,6 @@
  */
 package org.apache.pinot.spi.utils.retry;
 
-import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
-import org.apache.pinot.spi.utils.retry.ExponentialBackoffRetryPolicy;
-import org.apache.pinot.spi.utils.retry.FixedDelayRetryPolicy;
-import org.apache.pinot.spi.utils.retry.NoDelayRetryPolicy;
-import org.apache.pinot.spi.utils.retry.RetriableOperationException;
-import org.apache.pinot.spi.utils.retry.RetryPolicies;
-import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

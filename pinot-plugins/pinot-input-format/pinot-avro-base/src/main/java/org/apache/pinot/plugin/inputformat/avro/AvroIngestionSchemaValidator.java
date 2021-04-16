@@ -23,8 +23,8 @@ import java.io.IOException;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.IngestionSchemaValidator;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.SchemaValidatorResult;
 
 

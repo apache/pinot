@@ -41,4 +41,3 @@ class IndexEntry {
     return key.toString() + " : [" + startOffset + "," + (startOffset + size) + ")";
   }
 }
-

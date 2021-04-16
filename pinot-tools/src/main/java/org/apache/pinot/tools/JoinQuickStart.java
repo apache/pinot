@@ -20,12 +20,11 @@ package org.apache.pinot.tools;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import java.io.File;
+import java.net.URL;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
-
-import java.io.File;
-import java.net.URL;
 
 import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
 import static org.apache.pinot.tools.Quickstart.printStatus;

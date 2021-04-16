@@ -30,12 +30,10 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
-import org.apache.http.message.BasicHeader;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.tools.AbstractBaseCommand;

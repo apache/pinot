@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.query.scheduler.fcfs;
 
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListenableFutureTask;
 import java.util.concurrent.atomic.LongAccumulator;
-
 import javax.annotation.Nonnull;
-
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
@@ -31,9 +31,6 @@ import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.query.scheduler.resources.QueryExecutorService;
 import org.apache.pinot.core.query.scheduler.resources.UnboundedResourceManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
-
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListenableFutureTask;
 
 
 /**

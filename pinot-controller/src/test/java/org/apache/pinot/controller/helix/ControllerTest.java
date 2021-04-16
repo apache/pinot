@@ -80,8 +80,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 
-import static org.apache.pinot.spi.utils.CommonConstants.Helix.Instance.ADMIN_PORT_KEY;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.*;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.Instance.ADMIN_PORT_KEY;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;

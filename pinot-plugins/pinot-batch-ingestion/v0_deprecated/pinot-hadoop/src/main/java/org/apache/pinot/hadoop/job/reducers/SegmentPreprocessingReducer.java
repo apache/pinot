@@ -82,4 +82,3 @@ public class SegmentPreprocessingReducer<T> extends Reducer<T, AvroValue<Generic
     }
   }
 }
-

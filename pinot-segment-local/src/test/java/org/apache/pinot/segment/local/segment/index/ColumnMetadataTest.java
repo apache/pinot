@@ -196,4 +196,3 @@ public class ColumnMetadataTest {
     Assert.assertEquals(paddingCharacter, '\0');
   }
 }
-

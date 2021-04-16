@@ -21,7 +21,6 @@ package org.apache.pinot.common.response.broker;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-import java.io.Serializable;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
 
