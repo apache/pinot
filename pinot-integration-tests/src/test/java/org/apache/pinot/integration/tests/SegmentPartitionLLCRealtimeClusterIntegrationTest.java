@@ -30,7 +30,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
-import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -187,8 +187,8 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       JsonNode responseToCompare = postQuery(queryToCompare);
 
       // Should only query the segments for partition 0
-      assertEquals(response.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), 2);
-      assertEquals(responseToCompare.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), 4);
+      assertEquals(response.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), 2);
+      assertEquals(responseToCompare.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), 4);
 
       assertEquals(response.get("aggregationResults").get(0).get("value").asInt(),
           responseToCompare.get("aggregationResults").get(0).get("value").asInt());
@@ -203,8 +203,8 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       JsonNode responseToCompare = postQuery(queryToCompare);
 
       // Should only query the segments for partition 1
-      assertEquals(response.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), 2);
-      assertEquals(responseToCompare.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), 4);
+      assertEquals(response.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), 2);
+      assertEquals(responseToCompare.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), 4);
 
       assertEquals(response.get("aggregationResults").get(0).get("value").asInt(),
           responseToCompare.get("aggregationResults").get(0).get("value").asInt());
@@ -271,8 +271,8 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       JsonNode responseToCompare = postQuery(queryToCompare);
 
       // Should skip the first completed segments and the consuming segment for partition 1
-      assertEquals(response.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), numSegments - 2);
-      assertEquals(responseToCompare.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), numSegments);
+      assertEquals(response.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), numSegments - 2);
+      assertEquals(responseToCompare.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), numSegments);
 
       // The result won't match because the consuming segment for partition 1 is pruned out
     }
@@ -286,8 +286,8 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       JsonNode responseToCompare = postQuery(queryToCompare);
 
       // Should skip the first completed segments and the consuming segment for partition 0
-      assertEquals(response.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), numSegments - 2);
-      assertEquals(responseToCompare.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), numSegments);
+      assertEquals(response.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), numSegments - 2);
+      assertEquals(responseToCompare.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), numSegments);
 
       // The result won't match because the consuming segment for partition 0 is pruned out
     }
@@ -350,8 +350,8 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       JsonNode responseToCompare = postQuery(queryToCompare);
 
       // Should skip 2 completed segments and the consuming segment for partition 1
-      assertEquals(response.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), numSegments - 3);
-      assertEquals(responseToCompare.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), numSegments);
+      assertEquals(response.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), numSegments - 3);
+      assertEquals(responseToCompare.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), numSegments);
 
       // The result should match again after all the segments with the non-partitioning records are committed
       assertEquals(response.get("aggregationResults").get(0).get("value").asInt(),
@@ -367,8 +367,8 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       JsonNode responseToCompare = postQuery(queryToCompare);
 
       // Should skip 2 completed segments and the consuming segment for partition 0
-      assertEquals(response.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), numSegments - 3);
-      assertEquals(responseToCompare.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), numSegments);
+      assertEquals(response.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), numSegments - 3);
+      assertEquals(responseToCompare.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), numSegments);
 
       // The result should match again after all the segments with the non-partitioning records are committed
       assertEquals(response.get("aggregationResults").get(0).get("value").asInt(),

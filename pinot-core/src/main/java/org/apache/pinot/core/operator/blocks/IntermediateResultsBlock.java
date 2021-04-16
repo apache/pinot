@@ -31,6 +31,7 @@ import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.BlockDocIdValueSet;
@@ -426,19 +427,19 @@ public class IntermediateResultsBlock implements Block {
   }
 
   private DataTable attachMetadataToDataTable(DataTable dataTable) {
-    dataTable.getMetadata().put(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, String.valueOf(_numDocsScanned));
+    dataTable.getMetadata().put(MetadataKey.NUM_DOCS_SCANNED.getName(), String.valueOf(_numDocsScanned));
     dataTable.getMetadata()
-        .put(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, String.valueOf(_numEntriesScannedInFilter));
+        .put(MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName(), String.valueOf(_numEntriesScannedInFilter));
     dataTable.getMetadata()
-        .put(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, String.valueOf(_numEntriesScannedPostFilter));
-    dataTable.getMetadata().put(DataTable.NUM_SEGMENTS_PROCESSED, String.valueOf(_numSegmentsProcessed));
-    dataTable.getMetadata().put(DataTable.NUM_SEGMENTS_MATCHED, String.valueOf(_numSegmentsMatched));
-    dataTable.getMetadata().put(DataTable.NUM_RESIZES_METADATA_KEY, String.valueOf(_numResizes));
-    dataTable.getMetadata().put(DataTable.RESIZE_TIME_MS_METADATA_KEY, String.valueOf(_resizeTimeMs));
+        .put(MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName(), String.valueOf(_numEntriesScannedPostFilter));
+    dataTable.getMetadata().put(MetadataKey.NUM_SEGMENTS_PROCESSED.getName(), String.valueOf(_numSegmentsProcessed));
+    dataTable.getMetadata().put(MetadataKey.NUM_SEGMENTS_MATCHED.getName(), String.valueOf(_numSegmentsMatched));
+    dataTable.getMetadata().put(MetadataKey.NUM_RESIZES.getName(), String.valueOf(_numResizes));
+    dataTable.getMetadata().put(MetadataKey.RESIZE_TIME_MS.getName(), String.valueOf(_resizeTimeMs));
 
-    dataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(_numTotalDocs));
+    dataTable.getMetadata().put(MetadataKey.TOTAL_DOCS.getName(), String.valueOf(_numTotalDocs));
     if (_numGroupsLimitReached) {
-      dataTable.getMetadata().put(DataTable.NUM_GROUPS_LIMIT_REACHED_KEY, "true");
+      dataTable.getMetadata().put(MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(), "true");
     }
     if (_processingExceptions != null && _processingExceptions.size() > 0) {
       for (ProcessingException exception : _processingExceptions) {
