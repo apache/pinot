@@ -48,9 +48,9 @@ import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 
 
-public class RequestContextConvertUtils {
+public class RequestContextUtils {
 
-  private RequestContextConvertUtils() {
+  private RequestContextUtils() {
 
   }
 

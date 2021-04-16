@@ -22,7 +22,7 @@ import java.util.List;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
-import org.apache.pinot.common.request.context.RequestContextConvertUtils;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -79,7 +79,7 @@ public class PredicateTest {
     String predicateExpression = rangePredicate.toString();
     assertEquals(predicateExpression, "(foo >= '123' AND foo < '456')");
     Expression thriftExpression = CalciteSqlParser.compileToExpression(predicateExpression);
-    FilterContext filter = RequestContextConvertUtils.getFilter(thriftExpression);
+    FilterContext filter = RequestContextUtils.getFilter(thriftExpression);
     assertEquals(filter.getType(), FilterContext.Type.AND);
     List<FilterContext> children = filter.getChildren();
     assertEquals(children.size(), 2);
@@ -95,7 +95,7 @@ public class PredicateTest {
       throws Exception {
     // Parse and convert the string predicate expression into Predicate
     Expression thriftExpression = CalciteSqlParser.compileToExpression(predicateExpression);
-    FilterContext filter = RequestContextConvertUtils.getFilter(thriftExpression);
+    FilterContext filter = RequestContextUtils.getFilter(thriftExpression);
     assertEquals(filter.getType(), FilterContext.Type.PREDICATE);
     Predicate predicate = filter.getPredicate();
 
@@ -104,7 +104,7 @@ public class PredicateTest {
 
     // Deserialize and compare
     thriftExpression = CalciteSqlParser.compileToExpression(predicateExpression);
-    filter = RequestContextConvertUtils.getFilter(thriftExpression);
+    filter = RequestContextUtils.getFilter(thriftExpression);
     assertEquals(filter.getType(), FilterContext.Type.PREDICATE);
     assertEquals(filter.getPredicate(), predicate);
 

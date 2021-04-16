@@ -20,7 +20,7 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.RequestContextConvertUtils;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -32,7 +32,7 @@ public class DateTimeConversionTransformFunctionTest extends BaseTransformFuncti
   @Test
   public void testDateTimeConversionTransformFunction() {
     // NOTE: functionality of DateTimeConverter is covered in DateTimeConverterTest
-    ExpressionContext expression = RequestContextConvertUtils.getExpression(
+    ExpressionContext expression = RequestContextUtils.getExpression(
         String.format("dateTimeConvert(%s,'1:MILLISECONDS:EPOCH','1:MINUTES:EPOCH','1:MINUTES')", TIME_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof DateTimeConversionTransformFunction);
@@ -54,7 +54,7 @@ public class DateTimeConversionTransformFunctionTest extends BaseTransformFuncti
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    ExpressionContext expression = RequestContextConvertUtils.getExpression(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 

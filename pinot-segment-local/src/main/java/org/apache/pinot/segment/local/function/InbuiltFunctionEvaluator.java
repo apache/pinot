@@ -26,7 +26,7 @@ import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
-import org.apache.pinot.common.request.context.RequestContextConvertUtils;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -47,7 +47,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
   public InbuiltFunctionEvaluator(String functionExpression) {
     _arguments = new ArrayList<>();
-    ExpressionContext expression = RequestContextConvertUtils.getExpression(functionExpression);
+    ExpressionContext expression = RequestContextUtils.getExpression(functionExpression);
     _rootNode = planExecution(expression);
   }
 

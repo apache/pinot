@@ -19,7 +19,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.RequestContextConvertUtils;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -48,7 +48,7 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
 
   @Test
   public void testBinaryOperatorTransformFunction() {
-    ExpressionContext expression = RequestContextConvertUtils
+    ExpressionContext expression = RequestContextUtils
         .getExpression(String.format("%s(%s, %d)", getFuncName(), INT_SV_COLUMN, _intSVValues[0]));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertEquals(transformFunction.getName(), getFuncName().toLowerCase());
@@ -58,7 +58,7 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
     }
     testTransformFunction(transformFunction, expectedIntValues);
 
-    expression = RequestContextConvertUtils
+    expression = RequestContextUtils
         .getExpression(String.format("%s(%s, %d)", getFuncName(), LONG_SV_COLUMN, _longSVValues[0]));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     int[] expectedLongValues = new int[NUM_ROWS];
@@ -67,7 +67,7 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
     }
     testTransformFunction(transformFunction, expectedLongValues);
 
-    expression = RequestContextConvertUtils
+    expression = RequestContextUtils
         .getExpression(String.format("%s(%s, %f)", getFuncName(), FLOAT_SV_COLUMN, _floatSVValues[0]));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     int[] expectedFloatValues = new int[NUM_ROWS];
@@ -76,7 +76,7 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
     }
     testTransformFunction(transformFunction, expectedFloatValues);
 
-    expression = RequestContextConvertUtils
+    expression = RequestContextUtils
         .getExpression(String.format("%s(%s, %.20f)", getFuncName(), DOUBLE_SV_COLUMN, _doubleSVValues[0]));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     int[] expectedDoubleValues = new int[NUM_ROWS];
@@ -85,7 +85,7 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
     }
     testTransformFunction(transformFunction, expectedDoubleValues);
 
-    expression = RequestContextConvertUtils
+    expression = RequestContextUtils
         .getExpression(String.format("%s(%s, '%s')", getFuncName(), STRING_SV_COLUMN, _stringSVValues[0]));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     int[] expectedStringValues = new int[NUM_ROWS];
@@ -97,7 +97,7 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    ExpressionContext expression = RequestContextConvertUtils.getExpression(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 

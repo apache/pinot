@@ -410,12 +410,6 @@ public class RealtimeSegmentStatsHistory implements Serializable {
       enableResolveObject(true);
     }
 
-    protected CustomObjectInputStream()
-        throws IOException, SecurityException {
-      super();
-      enableResolveObject(true);
-    }
-
     @Override
     protected ObjectStreamClass readClassDescriptor()
         throws SecurityException, IOException, ClassNotFoundException {

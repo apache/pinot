@@ -34,7 +34,7 @@ import java.util.PriorityQueue;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
-import org.apache.pinot.common.request.context.RequestContextConvertUtils;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
@@ -155,7 +155,7 @@ public class SelectionOperatorUtils {
 
       List<String> allColumns = new ArrayList<>(numColumns);
       for (String column : columnNames) {
-        if (RequestContextConvertUtils.getExpression(column).getType() == ExpressionContext.Type.IDENTIFIER) {
+        if (RequestContextUtils.getExpression(column).getType() == ExpressionContext.Type.IDENTIFIER) {
           allColumns.add(column);
         }
       }

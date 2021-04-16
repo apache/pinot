@@ -23,7 +23,7 @@ import java.nio.ByteOrder;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
-import org.apache.pinot.common.request.context.RequestContextConvertUtils;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
@@ -81,7 +81,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
   public MutableRoaringBitmap getMatchingDocIds(String filterString) {
     FilterContext filter;
     try {
-      filter = RequestContextConvertUtils.getFilter(CalciteSqlParser.compileToExpression(filterString));
+      filter = RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterString));
     } catch (Exception e) {
       throw new BadQueryRequestException("Invalid json match filter: " + filterString);
     }
