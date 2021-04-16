@@ -248,12 +248,16 @@ public class CalciteSqlParser {
    * @param expression String expression.
    * @return {@link Expression} equivalent of the string.
    *
-   * @throws SqlParseException Throws parse exception if String is not a valid expression.
+   * @throws SqlCompilationException if String is not a valid expression.
    */
-  public static Expression compileToExpression(String expression)
-      throws SqlParseException {
+  public static Expression compileToExpression(String expression) {
     SqlParser sqlParser = SqlParser.create(expression, PARSER_CONFIG);
-    SqlNode sqlNode = sqlParser.parseExpression();
+    SqlNode sqlNode;
+    try {
+      sqlNode = sqlParser.parseExpression();
+    } catch (SqlParseException e) {
+      throw new SqlCompilationException("Caught exception while parsing expression: " + expression, e);
+    }
     return toExpression(sqlNode);
   }
 
@@ -280,7 +284,7 @@ public class CalciteSqlParser {
     try {
       sqlNode = sqlParser.parseQuery();
     } catch (SqlParseException e) {
-      throw new SqlCompilationException(e);
+      throw new SqlCompilationException("Caught exception while parsing query: " + sql, e);
     }
 
     SqlSelect selectNode;
@@ -1012,9 +1016,9 @@ public class CalciteSqlParser {
           Object result = invoker.invoke(arguments);
           return RequestUtils.getLiteralExpression(result);
         } catch (Exception e) {
-          throw new SqlCompilationException(new RuntimeException(
+          throw new SqlCompilationException(
               "Caught exception while invoking method: " + functionInfo.getMethod() + " with arguments: " + Arrays
-                  .toString(arguments), e));
+                  .toString(arguments), e);
         }
       }
     }

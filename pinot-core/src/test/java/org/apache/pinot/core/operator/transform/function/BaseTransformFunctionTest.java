@@ -78,7 +78,7 @@ public abstract class BaseTransformFunctionTest {
   protected static final String DOUBLE_MV_COLUMN = "doubleMV";
   protected static final String STRING_MV_COLUMN = "stringMV";
   protected static final String STRING_ALPHANUM_MV_COLUMN = "stringAlphaNumMV";
-  protected static final String TIME_COLUMN = "time";
+  protected static final String TIME_COLUMN = "timeColumn";
   protected static final String JSON_COLUMN = "json";
   protected final int[] _intSVValues = new int[NUM_ROWS];
   protected final long[] _longSVValues = new long[NUM_ROWS];

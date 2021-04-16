@@ -140,9 +140,9 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     int docId2 = docId1 + 1 + _random.nextInt(50);
     // NOTE: put all columns into group-by so that transform operator has expressions for all columns
     String query = String
-        .format("SELECT COUNT(*) FROM table WHERE %s IN (%d, %d) GROUP BY %s, %s", FILTER_COLUMN, docId1, docId2,
+        .format("SELECT COUNT(*) FROM testTable WHERE %s IN (%d, %d) GROUP BY %s, %s", FILTER_COLUMN, docId1, docId2,
             StringUtils.join(SV_COLUMNS, ", "), StringUtils.join(MV_COLUMNS, ", "));
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(query);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
 
     List<ExpressionContext> expressions = new ArrayList<>();
     for (String column : SV_COLUMNS) {

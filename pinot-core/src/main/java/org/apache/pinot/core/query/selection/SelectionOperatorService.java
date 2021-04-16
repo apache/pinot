@@ -74,7 +74,7 @@ public class SelectionOperatorService {
    * @param dataSchema data schema.
    */
   public SelectionOperatorService(QueryContext queryContext, DataSchema dataSchema) {
-    _selectionColumns = SelectionOperatorUtils.getSelectionColumns(queryContext.getSelectExpressions(), dataSchema);
+    _selectionColumns = SelectionOperatorUtils.getSelectionColumns(queryContext, dataSchema);
     _dataSchema = dataSchema;
     // Select rows from offset to offset + limit.
     _offset = queryContext.getOffset();

@@ -141,7 +141,7 @@ public class BrokerRequestToQueryContextConverter {
       List<String> selectionColumns = selections.getSelectionColumns();
       selectExpressions = new ArrayList<>(selectionColumns.size());
       for (String expression : selectionColumns) {
-        selectExpressions.add(RequestContextUtils.getExpression(expression));
+        selectExpressions.add(RequestContextUtils.getExpressionFromPQL(expression));
       }
 
       // NOTE: Some old Pinot clients (E.g. Presto segment level query) set LIMIT in Selection object.
@@ -162,13 +162,13 @@ public class BrokerRequestToQueryContextConverter {
         if (functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
           // For DISTINCT query, all arguments are expressions
           for (String expression : stringExpressions) {
-            arguments.add(RequestContextUtils.getExpression(expression));
+            arguments.add(RequestContextUtils.getExpressionFromPQL(expression));
           }
         } else {
           // For non-DISTINCT query, only the first argument is expression, others are literals
           // NOTE: We directly use the string as the literal value because of the legacy behavior of PQL compiler
           //       treating string literal as identifier in the aggregation function.
-          arguments.add(RequestContextUtils.getExpression(stringExpressions.get(0)));
+          arguments.add(RequestContextUtils.getExpressionFromPQL(stringExpressions.get(0)));
           for (int i = 1; i < numArguments; i++) {
             arguments.add(ExpressionContext.forLiteral(stringExpressions.get(i)));
           }
@@ -183,7 +183,7 @@ public class BrokerRequestToQueryContextConverter {
         List<String> stringExpressions = groupBy.getExpressions();
         groupByExpressions = new ArrayList<>(stringExpressions.size());
         for (String stringExpression : stringExpressions) {
-          groupByExpressions.add(RequestContextUtils.getExpression(stringExpression));
+          groupByExpressions.add(RequestContextUtils.getExpressionFromPQL(stringExpression));
         }
 
         // NOTE: Use TOP in GROUP-BY clause as LIMIT for backward-compatibility.
@@ -204,7 +204,7 @@ public class BrokerRequestToQueryContextConverter {
       orderByExpressions = new ArrayList<>(orderBy.size());
       Set<ExpressionContext> expressionSet = new HashSet<>();
       for (SelectionSort selectionSort : orderBy) {
-        ExpressionContext expression = RequestContextUtils.getExpression(selectionSort.getColumn());
+        ExpressionContext expression = RequestContextUtils.getExpressionFromPQL(selectionSort.getColumn());
         if (expressionSet.add(expression)) {
           orderByExpressions.add(new OrderByExpressionContext(expression, selectionSort.isIsAsc()));
         }

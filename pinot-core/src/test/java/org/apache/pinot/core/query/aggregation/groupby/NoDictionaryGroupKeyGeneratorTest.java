@@ -147,8 +147,8 @@ public class NoDictionaryGroupKeyGeneratorTest {
 
     // Create transform operator and block
     // NOTE: put all columns into group-by so that transform operator has expressions for all columns
-    String query = "SELECT COUNT(*) FROM table GROUP BY " + StringUtils.join(COLUMNS, ", ");
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(query);
+    String query = "SELECT COUNT(*) FROM testTable GROUP BY " + StringUtils.join(COLUMNS, ", ");
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
     List<ExpressionContext> expressions = new ArrayList<>();
     for (String column : COLUMNS) {
       expressions.add(ExpressionContext.forIdentifier(column));

@@ -45,17 +45,26 @@ import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.LiteralAstNode;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
-import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
 
 public class RequestContextUtils {
-
   private RequestContextUtils() {
-
   }
 
   private static final Pql2Compiler PQL_COMPILER = new Pql2Compiler();
-  private static final CalciteSqlCompiler SQL_COMPILER = new CalciteSqlCompiler();
+
+  /**
+   * Converts the given SQL expression into an {@link ExpressionContext}.
+   */
+  public static ExpressionContext getExpressionFromSQL(String sqlExpression) {
+    if (sqlExpression.equals("*")) {
+      // For 'SELECT *' and 'SELECT COUNT(*)'
+      return ExpressionContext.forIdentifier("*");
+    } else {
+      return getExpression(CalciteSqlParser.compileToExpression(sqlExpression));
+    }
+  }
 
   /**
    * Converts the given Thrift {@link Expression} into an {@link ExpressionContext}.
@@ -74,14 +83,14 @@ public class RequestContextUtils {
   }
 
   /**
-   * Converts the given string representation of the expression into an {@link ExpressionContext}.
+   * Converts the given PQL expression into an {@link ExpressionContext}.
    */
-  public static ExpressionContext getExpression(String stringExpression) {
-    if (stringExpression.equals("*")) {
+  public static ExpressionContext getExpressionFromPQL(String pqlExpression) {
+    if (pqlExpression.equals("*")) {
       // For 'SELECT *' and 'SELECT COUNT(*)'
       return ExpressionContext.forIdentifier("*");
     } else {
-      return getExpression(PQL_COMPILER.parseToAstNode(stringExpression));
+      return getExpression(PQL_COMPILER.parseToAstNode(pqlExpression));
     }
   }
 
@@ -267,34 +276,34 @@ public class RequestContextUtils {
         return new FilterContext(FilterContext.Type.OR, children, null);
       case EQUALITY:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new EqPredicate(getExpression(node.getColumn()), node.getValue().get(0)));
+            new EqPredicate(getExpressionFromPQL(node.getColumn()), node.getValue().get(0)));
       case NOT:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new NotEqPredicate(getExpression(node.getColumn()), node.getValue().get(0)));
+            new NotEqPredicate(getExpressionFromPQL(node.getColumn()), node.getValue().get(0)));
       case IN:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new InPredicate(getExpression(node.getColumn()), node.getValue()));
+            new InPredicate(getExpressionFromPQL(node.getColumn()), node.getValue()));
       case NOT_IN:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new NotInPredicate(getExpression(node.getColumn()), node.getValue()));
+            new NotInPredicate(getExpressionFromPQL(node.getColumn()), node.getValue()));
       case RANGE:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new RangePredicate(getExpression(node.getColumn()), node.getValue().get(0)));
+            new RangePredicate(getExpressionFromPQL(node.getColumn()), node.getValue().get(0)));
       case REGEXP_LIKE:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new RegexpLikePredicate(getExpression(node.getColumn()), node.getValue().get(0)));
+            new RegexpLikePredicate(getExpressionFromPQL(node.getColumn()), node.getValue().get(0)));
       case TEXT_MATCH:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new TextMatchPredicate(getExpression(node.getColumn()), node.getValue().get(0)));
+            new TextMatchPredicate(getExpressionFromPQL(node.getColumn()), node.getValue().get(0)));
       case JSON_MATCH:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new JsonMatchPredicate(getExpression(node.getColumn()), node.getValue().get(0)));
+            new JsonMatchPredicate(getExpressionFromPQL(node.getColumn()), node.getValue().get(0)));
       case IS_NULL:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new IsNullPredicate(getExpression(node.getColumn())));
+            new IsNullPredicate(getExpressionFromPQL(node.getColumn())));
       case IS_NOT_NULL:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new IsNotNullPredicate(getExpression(node.getColumn())));
+            new IsNotNullPredicate(getExpressionFromPQL(node.getColumn())));
       default:
         throw new IllegalStateException();
     }

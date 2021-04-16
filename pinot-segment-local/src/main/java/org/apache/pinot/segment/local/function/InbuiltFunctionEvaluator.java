@@ -47,8 +47,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
   public InbuiltFunctionEvaluator(String functionExpression) {
     _arguments = new ArrayList<>();
-    ExpressionContext expression = RequestContextUtils.getExpression(functionExpression);
-    _rootNode = planExecution(expression);
+    _rootNode = planExecution(RequestContextUtils.getExpressionFromSQL(functionExpression));
   }
 
   private ExecutableNode planExecution(ExpressionContext expression) {
