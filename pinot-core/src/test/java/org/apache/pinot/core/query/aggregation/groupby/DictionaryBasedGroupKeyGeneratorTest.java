@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby;
 
-import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -425,12 +423,9 @@ public class DictionaryBasedGroupKeyGeneratorTest {
 
   @Test
   public void testMapDefaultValue() {
-    Long2IntOpenHashMap longMap = DictionaryBasedGroupKeyGenerator.THREAD_LOCAL_LONG_MAP.get();
-    assertEquals(longMap.get(0L), GroupKeyGenerator.INVALID_ID);
-
-    Object2IntOpenHashMap<DictionaryBasedGroupKeyGenerator.IntArray> intArrayMap =
-        DictionaryBasedGroupKeyGenerator.THREAD_LOCAL_INT_ARRAY_MAP.get();
-    assertEquals(intArrayMap.getInt(new DictionaryBasedGroupKeyGenerator.IntArray(new int[0])),
+    assertEquals(DictionaryBasedGroupKeyGenerator.THREAD_LOCAL_LONG_MAP.get().defaultReturnValue(),
+        GroupKeyGenerator.INVALID_ID);
+    assertEquals(DictionaryBasedGroupKeyGenerator.THREAD_LOCAL_INT_ARRAY_MAP.get().defaultReturnValue(),
         GroupKeyGenerator.INVALID_ID);
   }
 
