@@ -1572,7 +1572,9 @@
               <include>src/main/java/**/*.java</include>
               <include>src/test/java/**/*.java</include>
             </includes>
-            <importOrder />
+            <importOrder>
+              <order>,\#</order>
+            </importOrder>
             <removeUnusedImports />
           </java>
         </configuration>
