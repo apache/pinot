@@ -111,8 +111,9 @@ public class KafkaStarterUtils {
   }
 
   public static StreamDataServerStartable startServer(final int port, final int brokerId, final String zkStr,
-      final Properties configuration) {
+      final Properties baseConf) {
     StreamDataServerStartable kafkaStarter;
+    Properties configuration = new Properties(baseConf);
     try {
       configureOffsetsTopicReplicationFactor(configuration, (short) 1);
       configuration.put(KafkaStarterUtils.PORT, port);
@@ -125,5 +126,11 @@ public class KafkaStarterUtils {
     }
     kafkaStarter.start();
     return kafkaStarter;
+  }
+
+  public static Properties getDefaultKafkaConfiguration(ZkStarter.ZookeeperInstance zookeeperInstance) {
+    Properties kafkaConfiguration = getDefaultKafkaConfiguration();
+    kafkaConfiguration.put(ZOOKEEPER_CONNECT, zookeeperInstance.getZkUrl() + "/kafka");
+    return kafkaConfiguration;
   }
 }

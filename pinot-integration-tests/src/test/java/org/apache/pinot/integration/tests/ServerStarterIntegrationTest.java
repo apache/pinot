@@ -21,7 +21,6 @@ package org.apache.pinot.integration.tests;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -56,7 +55,7 @@ public class ServerStarterIntegrationTest extends ControllerTest {
       int expectedPort)
       throws Exception {
     HelixServerStarter helixServerStarter =
-        new HelixServerStarter(getHelixClusterName(), ZkStarter.getDefaultZkStr(), serverConf);
+        new HelixServerStarter(getHelixClusterName(), getZkUrl(), serverConf);
     helixServerStarter.start();
     helixServerStarter.stop();
 

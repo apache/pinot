@@ -50,7 +50,6 @@ import org.apache.http.message.BasicNameValuePair;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.core.requesthandler.PinotQueryRequest;
 import org.apache.pinot.minion.MinionStarter;
@@ -106,7 +105,7 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void startBrokers(int numBrokers)
       throws Exception {
-    startBrokers(numBrokers, DEFAULT_BROKER_PORT, ZkStarter.getDefaultZkStr());
+    startBrokers(numBrokers, DEFAULT_BROKER_PORT, getZkUrl());
   }
 
   protected void startBrokers(int numBrokers, int basePort, String zkStr)
@@ -144,12 +143,12 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void startServer(PinotConfiguration configuration) {
     startServers(1, configuration, Server.DEFAULT_ADMIN_API_PORT, Helix.DEFAULT_SERVER_NETTY_PORT,
-        ZkStarter.getDefaultZkStr());
+        getZkUrl());
   }
 
   protected void startServers(int numServers) {
     startServers(numServers, getDefaultServerConfiguration(), Server.DEFAULT_ADMIN_API_PORT,
-        Helix.DEFAULT_SERVER_NETTY_PORT, ZkStarter.getDefaultZkStr());
+        Helix.DEFAULT_SERVER_NETTY_PORT, getZkUrl());
   }
 
   protected void startServers(int numServers, int baseAdminApiPort, int baseNettyPort, String zkStr) {
@@ -190,7 +189,7 @@ public abstract class ClusterTest extends ControllerTest {
       @Nullable List<MinionEventObserverFactory> eventObserverFactories) {
     FileUtils.deleteQuietly(new File(Minion.DEFAULT_INSTANCE_BASE_DIR));
     try {
-      _minionStarter = new MinionStarter(getHelixClusterName(), ZkStarter.getDefaultZkStr(), getDefaultMinionConfiguration());
+      _minionStarter = new MinionStarter(getHelixClusterName(), getZkUrl(), getDefaultMinionConfiguration());
       // Register task executor factories
       if (taskExecutorFactories != null) {
         for (PinotTaskExecutorFactory taskExecutorFactory : taskExecutorFactories) {

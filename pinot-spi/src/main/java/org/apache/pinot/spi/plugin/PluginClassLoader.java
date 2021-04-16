@@ -19,7 +19,6 @@
 package org.apache.pinot.spi.plugin;
 
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.Enumeration;

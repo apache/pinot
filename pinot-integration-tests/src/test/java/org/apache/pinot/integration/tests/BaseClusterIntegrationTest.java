@@ -36,7 +36,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.Request;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -160,7 +159,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected String getKafkaZKAddress() {
-    return KafkaStarterUtils.getDefaultKafkaZKAddress();
+    return getZkUrl() + "/kafka";
   }
 
   protected int getNumKafkaPartitions() {
@@ -399,7 +398,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected org.apache.pinot.client.Connection getPinotConnection() {
     if (_pinotConnection == null) {
-      _pinotConnection = ConnectionFactory.fromZookeeper(ZkStarter.getDefaultZkStr() + "/" + getHelixClusterName());
+      _pinotConnection = ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName());
     }
     return _pinotConnection;
   }
@@ -502,7 +501,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected void startKafka() {
     Properties kafkaConfig = KafkaStarterUtils.getDefaultKafkaConfiguration();
-    kafkaConfig.put(KafkaStarterUtils.ZOOKEEPER_CONNECT, getKafkaZKAddress());
     _kafkaStarters = KafkaStarterUtils.startServers(getNumKafkaBrokers(), getBaseKafkaPort(), getKafkaZKAddress(),
         kafkaConfig);
     _kafkaStarters.get(0)

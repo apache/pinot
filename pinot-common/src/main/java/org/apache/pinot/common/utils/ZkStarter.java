@@ -36,15 +36,21 @@ public class ZkStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(ZkStarter.class);
   public static final int DEFAULT_ZK_TEST_PORT = 2191;
   private static final int DEFAULT_ZK_CLIENT_RETRIES = 10;
-  private static int ZK_TEST_PORT = 2191;
 
   public static class ZookeeperInstance {
     private PublicZooKeeperServerMain _serverMain;
     private String _dataDirPath;
+    private int _port;
 
-    private ZookeeperInstance(PublicZooKeeperServerMain serverMain, String dataDirPath) {
+    private ZookeeperInstance(PublicZooKeeperServerMain serverMain, String dataDirPath,
+        int port) {
       _serverMain = serverMain;
       _dataDirPath = dataDirPath;
+      _port = port;
+    }
+
+    public String getZkUrl() {
+      return "localhost:" + _port;
     }
   }
 
@@ -131,12 +137,11 @@ public class ZkStarter {
    * Starts an empty local Zk instance on the default port
    */
   public static ZookeeperInstance startLocalZkServer() {
-    ZK_TEST_PORT = findRandomOpenPort();
-    return startLocalZkServer(ZK_TEST_PORT);
+    return startLocalZkServer(findRandomOpenPort());
   }
 
   public static String getDefaultZkStr() {
-    return "localhost:" + ZK_TEST_PORT;
+    return "localhost:" + DEFAULT_ZK_TEST_PORT;
   }
 
   private static int findRandomOpenPort() {
@@ -194,7 +199,7 @@ public class ZkStarter {
           }
         }
       }
-      return new ZookeeperInstance(zookeeperServerMain, dataDirPath);
+      return new ZookeeperInstance(zookeeperServerMain, dataDirPath, port);
     } catch (Exception e) {
       LOGGER.warn("Caught exception while starting ZK", e);
       throw new RuntimeException(e);

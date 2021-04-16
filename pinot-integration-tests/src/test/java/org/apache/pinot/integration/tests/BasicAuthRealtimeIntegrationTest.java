@@ -32,7 +32,6 @@ import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.Request;
 import org.apache.pinot.client.ResultSetGroup;
-import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
@@ -144,7 +143,7 @@ public class BasicAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest
   protected Connection getPinotConnection() {
     if (_pinotConnection == null) {
       _pinotConnection =
-          ConnectionFactory.fromZookeeper(ZkStarter.getDefaultZkStr() + "/" + getHelixClusterName(), AUTH_HEADER);
+          ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(), AUTH_HEADER);
     }
     return _pinotConnection;
   }

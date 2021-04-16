@@ -28,7 +28,6 @@ import org.apache.helix.model.ConstraintItem;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.Message;
-import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
@@ -152,7 +151,7 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
       return result;
     }, TIMEOUT_IN_MS, "No one should be the partition leader for tables");
 
-    ZkClient zkClient = new ZkClient(ZkStarter.getDefaultZkStr());
+    ZkClient zkClient = new ZkClient(getZkUrl());
     TestUtils
         .waitForCondition(aVoid -> !zkClient.exists("/" + getHelixClusterName() + "/CONTROLLER/LEADER"), TIMEOUT_IN_MS,
             "No cluster leader should be shown in Helix cluster");
@@ -287,7 +286,7 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
 
   @AfterMethod
   public void cleanUpCluster() {
-    ZkClient zkClient = new ZkClient(ZkStarter.getDefaultZkStr());
+    ZkClient zkClient = new ZkClient(getZkUrl());
     if (zkClient.exists("/" + getHelixClusterName())) {
       zkClient.deleteRecursive("/" + getHelixClusterName());
     }

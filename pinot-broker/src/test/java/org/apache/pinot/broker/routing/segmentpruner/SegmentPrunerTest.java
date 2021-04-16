@@ -104,7 +104,7 @@ public class SegmentPrunerTest {
   public void setUp() {
     _zkInstance = ZkStarter.startLocalZkServer();
     _zkClient =
-        new ZkClient(ZkStarter.getDefaultZkStr(), ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT,
+        new ZkClient(_zkInstance.getZkUrl(), ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT,
             new ZNRecordSerializer());
     _propertyStore =
         new ZkHelixPropertyStore<>(new ZkBaseDataAccessor<>(_zkClient), "/SegmentPrunerTest/PROPERTYSTORE", null);

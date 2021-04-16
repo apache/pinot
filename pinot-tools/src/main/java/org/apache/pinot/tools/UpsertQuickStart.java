@@ -67,10 +67,10 @@ public class UpsertQuickStart {
     final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, dataDir);
 
     printStatus(Color.CYAN, "***** Starting Kafka *****");
-    final ZkStarter.ZookeeperInstance zookeeperInstance = ZkStarter.startLocalZkServer();
+    ZkStarter.ZookeeperInstance zookeeperInstance = ZkStarter.startLocalZkServer();
     try {
       _kafkaStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME,
-          KafkaStarterUtils.getDefaultKafkaConfiguration());
+          KafkaStarterUtils.getDefaultKafkaConfiguration(zookeeperInstance));
     } catch (Exception e) {
       throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
     }
