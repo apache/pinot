@@ -221,6 +221,7 @@ const QueryPage = () => {
   };
 
   const fetchSQLData = async (tableName) => {
+    setQueryLoader(true);
     const result = await PinotMethodUtils.getTableSchemaData(tableName);
     const tableSchema = Utils.syncTableSchemaData(result, false);
     setTableSchema(tableSchema);
@@ -320,6 +321,7 @@ const QueryPage = () => {
           fetchSQLData={fetchSQLData}
           tableSchema={tableSchema}
           selectedTable={selectedTable}
+          queryLoader={queryLoader}
         />
       </Grid>
       <Grid
