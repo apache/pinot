@@ -19,9 +19,7 @@
 package org.apache.pinot.core.query.scheduler.tokenbucket;
 
 import java.util.concurrent.atomic.LongAccumulator;
-
 import javax.annotation.Nonnull;
-
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.scheduler.MultiLevelPriorityQueue;

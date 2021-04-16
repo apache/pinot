@@ -317,5 +317,3 @@ public class BenchmarkGeospatialSerde {
     new Runner(options).run();
   }
 }
-
-

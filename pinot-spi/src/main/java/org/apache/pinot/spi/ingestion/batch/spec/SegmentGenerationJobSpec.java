@@ -300,5 +300,3 @@ public class SegmentGenerationJobSpec implements Serializable {
     _authToken = authToken;
   }
 }
-
-

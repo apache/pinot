@@ -59,4 +59,3 @@ public class ByteArrayPartitionFunction implements PartitionFunction {
     return (n == Integer.MIN_VALUE) ? 0 : Math.abs(n);
   }
 }
-

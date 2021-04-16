@@ -21,7 +21,6 @@ package org.apache.pinot.spi.crypt;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
-
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.Assert;
 import org.testng.annotations.Test;

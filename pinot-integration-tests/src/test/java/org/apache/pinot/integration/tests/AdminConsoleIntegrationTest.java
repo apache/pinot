@@ -96,5 +96,3 @@ public class AdminConsoleIntegrationTest extends BaseClusterIntegrationTest {
   }
 
 }
-
-

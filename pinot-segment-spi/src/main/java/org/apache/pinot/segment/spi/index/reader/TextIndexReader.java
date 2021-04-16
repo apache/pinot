@@ -19,8 +19,6 @@
 package org.apache.pinot.segment.spi.index.reader;
 
 import java.io.Closeable;
-
-import org.apache.commons.lang.mutable.Mutable;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 

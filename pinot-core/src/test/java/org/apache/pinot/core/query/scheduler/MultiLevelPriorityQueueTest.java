@@ -18,10 +18,7 @@
  */
 package org.apache.pinot.core.query.scheduler;
 
-import static org.apache.pinot.core.query.scheduler.TestHelper.createQueryRequest;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
-
+import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.BrokenBarrierException;
@@ -29,7 +26,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
@@ -40,7 +36,9 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import com.google.common.base.Preconditions;
+import static org.apache.pinot.core.query.scheduler.TestHelper.createQueryRequest;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class MultiLevelPriorityQueueTest {

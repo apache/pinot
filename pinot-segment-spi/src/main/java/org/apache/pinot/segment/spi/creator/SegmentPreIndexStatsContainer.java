@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.spi.creator;
 
 import java.io.Serializable;
-import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 
 
 /**

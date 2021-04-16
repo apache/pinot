@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.util;
 
 import java.util.List;
-
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;

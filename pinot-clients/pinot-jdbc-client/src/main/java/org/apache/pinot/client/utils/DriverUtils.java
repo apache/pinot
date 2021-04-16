@@ -18,10 +18,8 @@
  */
 package org.apache.pinot.client.utils;
 
-import com.ning.http.client.uri.Uri;
 import java.net.URI;
 import java.sql.Types;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.slf4j.Logger;

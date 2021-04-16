@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.spi.creator;
 
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;

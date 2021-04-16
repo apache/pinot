@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.controller.recommender.rules.impl;
 
+import java.util.*;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.controller.recommender.io.ConfigManager;
 import org.apache.pinot.controller.recommender.io.InputManager;
@@ -28,9 +30,6 @@ import org.apache.pinot.controller.recommender.rules.utils.PredicateParseResult;
 import org.apache.pinot.controller.recommender.rules.utils.QueryInvertedSortedIndexRecommender;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.*;
-import java.util.stream.Collectors;
 
 
 /**

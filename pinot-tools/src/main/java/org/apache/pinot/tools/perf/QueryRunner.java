@@ -843,4 +843,3 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     }
   }
 }
-

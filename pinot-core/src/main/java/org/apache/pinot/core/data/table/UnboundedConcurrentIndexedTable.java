@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.data.table;
 
-import com.google.common.base.Preconditions;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
 

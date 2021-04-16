@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.segment.spi.creator.name;
 
-import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
-import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;

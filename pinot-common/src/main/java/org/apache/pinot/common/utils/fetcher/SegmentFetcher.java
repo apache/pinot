@@ -21,7 +21,6 @@ package org.apache.pinot.common.utils.fetcher;
 import java.io.File;
 import java.net.URI;
 import java.util.List;
-
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
