@@ -19,11 +19,11 @@
 
 package org.apache.pinot.controller.recommender.rules.impl;
 
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.controller.recommender.exceptions.InvalidInputException;
 import org.apache.pinot.controller.recommender.io.ConfigManager;
 import org.apache.pinot.controller.recommender.io.InputManager;
 import org.apache.pinot.controller.recommender.rules.AbstractRule;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
 
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.HYBRID;
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.REALTIME;
