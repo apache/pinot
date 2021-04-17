@@ -21,7 +21,6 @@ package org.apache.pinot.spi.ingestion.batch;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.spi.data.readers.FileFormat;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -82,15 +81,5 @@ public class BatchConfigTest {
     assertEquals(batchConfig.getRecordReaderProps().get(BatchConfigProperties.RECORD_READER_PROP_PREFIX + ".separator"),
         separator);
     assertEquals(batchConfig.getTableNameWithType(), tableName);
-
-    // Missing props
-    Map<String, String> testBatchConfigMap = new HashMap<>(batchConfigMap);
-    testBatchConfigMap.remove(BatchConfigProperties.INPUT_FORMAT);
-    try {
-      new BatchConfig(tableName, testBatchConfigMap);
-      Assert.fail("Should fail for missing 'inputFormat");
-    } catch (IllegalStateException e) {
-      // expected
-    }
   }
 }

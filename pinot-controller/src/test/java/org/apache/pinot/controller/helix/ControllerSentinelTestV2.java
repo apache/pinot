@@ -19,13 +19,14 @@
 package org.apache.pinot.controller.helix;
 
 import java.io.IOException;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeClass;
@@ -64,8 +65,9 @@ public class ControllerSentinelTestV2 {
       Assert.assertEquals(
           ControllerTestUtils
               .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(), TABLE_NAME + "_OFFLINE").getNumPartitions(), i);
-      ControllerTestUtils.getHelixResourceManager().addNewSegment(TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME),
-          "downloadUrl");
+      ControllerTestUtils.getHelixResourceManager()
+          .addNewSegment(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME),
+              SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME), "downloadUrl");
       Assert.assertEquals(
           ControllerTestUtils
               .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(), TABLE_NAME + "_OFFLINE").getNumPartitions(),

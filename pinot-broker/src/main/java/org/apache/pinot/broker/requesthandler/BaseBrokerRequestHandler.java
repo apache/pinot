@@ -50,8 +50,8 @@ import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.broker.routing.RoutingTable;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.function.TransformFunctionType;
+import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
@@ -72,9 +72,6 @@ import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.CommonConstants.Broker;
-import org.apache.pinot.common.utils.CommonConstants.Query.Range;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.helix.TableCache;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -87,10 +84,14 @@ import org.apache.pinot.core.requesthandler.PinotQueryRequest;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.QueryOptions;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.apache.pinot.spi.utils.CommonConstants.Query.Range;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.slf4j.Logger;
@@ -179,6 +180,16 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     requestStatistics.setRequestId(requestId);
     requestStatistics.setRequestArrivalTimeMillis(System.currentTimeMillis());
 
+    // first-stage access control to prevent unauthenticated requests from using up resources
+    // secondary table-level check comes later
+    boolean hasAccess = _accessControlFactory.create().hasAccess(requesterIdentity);
+    if (!hasAccess) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
+      LOGGER.info("Access denied for requestId {}", requestId);
+      requestStatistics.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
+      return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
+    }
+
     PinotQueryRequest pinotQueryRequest = getPinotQueryRequest(request);
     String query = pinotQueryRequest.getQuery();
     LOGGER.debug("Query string for request {}: {}", requestId, pinotQueryRequest.getQuery());
@@ -244,9 +255,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         compilationEndTimeNs - compilationStartTimeNs);
     _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERIES, 1);
 
-    // Check table access
-    boolean hasAccess = _accessControlFactory.create().hasAccess(requesterIdentity, brokerRequest);
-    if (!hasAccess) {
+    // second-stage table-level access control
+    boolean hasTableAccess = _accessControlFactory.create().hasAccess(requesterIdentity, brokerRequest);
+    if (!hasTableAccess) {
       _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
       LOGGER.info("Access denied for requestId {}, table {}", requestId, tableName);
       requestStatistics.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
@@ -307,6 +318,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e));
     }
+
+    _brokerMetrics.addValueToTableGauge(rawTableName, BrokerGauge.REQUEST_SIZE, query.length());
 
     // Prepare offline and real-time requests
     BrokerRequest offlineBrokerRequest = null;
@@ -429,7 +442,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       // Table name might have been changed (with suffix _OFFLINE/_REALTIME appended)
       LOGGER.info("requestId={},table={},timeMs={},docs={}/{},entries={}/{},"
               + "segments(queried/processed/matched/consuming/unavailable):{}/{}/{}/{}/{},consumingFreshnessTimeMs={},"
-              + "servers={}/{},groupLimitReached={},brokerReduceTimeMs={},exceptions={},serverStats={},query={}", requestId,
+              + "servers={}/{},groupLimitReached={},brokerReduceTimeMs={},exceptions={},serverStats={},query={},"
+              + "offlineThreadCpuTimeNs={},realtimeThreadCpuTimeNs={}", requestId,
           brokerRequest.getQuerySource().getTableName(), totalTimeMs, brokerResponse.getNumDocsScanned(),
           brokerResponse.getTotalDocs(), brokerResponse.getNumEntriesScannedInFilter(),
           brokerResponse.getNumEntriesScannedPostFilter(), brokerResponse.getNumSegmentsQueried(),
@@ -438,7 +452,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           brokerResponse.getMinConsumingFreshnessTimeMs(), brokerResponse.getNumServersResponded(),
           brokerResponse.getNumServersQueried(), brokerResponse.isNumGroupsLimitReached(),
           requestStatistics.getReduceTimeMillis(), brokerResponse.getExceptionsSize(), serverStats.getServerStats(),
-          StringUtils.substring(query, 0, _queryLogLength));
+          StringUtils.substring(query, 0, _queryLogLength), brokerResponse.getOfflineThreadCpuTimeNs(),
+          brokerResponse.getRealtimeThreadCpuTimeNs());
 
       // Limit the dropping log message at most once per second.
       if (_numDroppedLogRateLimiter.tryAcquire()) {

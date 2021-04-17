@@ -25,17 +25,23 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.request.InstanceRequest;
-import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.common.utils.DataTable.MetadataKey;
+import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.thrift.TDeserializer;
+import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,67 +66,127 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     _serverMetrics = serverMetrics;
   }
 
+  /**
+   * Always return a response even when query execution throws exception; otherwise, broker
+   * will keep waiting until timeout.
+   */
   @Override
   protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) {
-    long queryArrivalTimeMs = System.currentTimeMillis();
-    _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES, 1);
-    int requestSize = msg.readableBytes();
-    _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_BYTES_RECEIVED, requestSize);
-    byte[] requestBytes = new byte[requestSize];
-    msg.readBytes(requestBytes);
+    long queryArrivalTimeMs = 0;
+    InstanceRequest instanceRequest = null;
+    byte[] requestBytes = null;
 
-    InstanceRequest instanceRequest = new InstanceRequest();
     try {
+      // Put all code inside try block to catch all exceptions.
+      int requestSize = msg.readableBytes();
+
+      instanceRequest = new InstanceRequest();
+      ServerQueryRequest queryRequest;
+      requestBytes = new byte[requestSize];
+
+      queryArrivalTimeMs = System.currentTimeMillis();
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES, 1);
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_BYTES_RECEIVED, requestSize);
+
+      // Parse instance request into ServerQueryRequest.
+      msg.readBytes(requestBytes);
       _deserializer.deserialize(instanceRequest, requestBytes);
+      queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics, queryArrivalTimeMs);
+      queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.REQUEST_DESERIALIZATION, queryArrivalTimeMs)
+          .stopAndRecord();
+
+      // Submit query for execution and register callback for execution results.
+      Futures.addCallback(_queryScheduler.submit(queryRequest),
+          createCallback(ctx, queryArrivalTimeMs, instanceRequest, queryRequest), MoreExecutors.directExecutor());
     } catch (Exception e) {
-      LOGGER
-          .error("Caught exception while deserializing the instance request: {}", BytesUtils.toHexString(requestBytes),
-              e);
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
-      return;
+      if (e instanceof TException) {
+        // Deserialization exception
+        _serverMetrics.addMeteredGlobalValue(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
+      }
+
+      // Send error response
+      String hexString = requestBytes != null ? BytesUtils.toHexString(requestBytes) : "";
+      long reqestId = instanceRequest != null ? instanceRequest.getRequestId() : 0;
+      LOGGER.error("Exception while processing instance request: {}", hexString, e);
+      sendErrorResponse(ctx, reqestId, queryArrivalTimeMs, DataTableBuilder.getEmptyDataTable(), e);
     }
+  }
 
-    ServerQueryRequest queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics, queryArrivalTimeMs);
-    queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.REQUEST_DESERIALIZATION, queryArrivalTimeMs)
-        .stopAndRecord();
-
-    // NOTE: executor must be provided as addCallback(future, callback) is removed from newer guava version
-    Futures.addCallback(_queryScheduler.submit(queryRequest), new FutureCallback<byte[]>() {
+  private FutureCallback<byte[]> createCallback(ChannelHandlerContext ctx, long queryArrivalTimeMs,
+      InstanceRequest instanceRequest, ServerQueryRequest queryRequest) {
+    return new FutureCallback<byte[]>() {
       @Override
       public void onSuccess(@Nullable byte[] responseBytes) {
-        // NOTE: response bytes can be null if data table serialization throws exception
         if (responseBytes != null) {
-          long sendResponseStartTimeMs = System.currentTimeMillis();
-          int queryProcessingTimeMs = (int) (sendResponseStartTimeMs - queryArrivalTimeMs);
-          ctx.writeAndFlush(Unpooled.wrappedBuffer(responseBytes)).addListener(f -> {
-            long sendResponseEndTimeMs = System.currentTimeMillis();
-            int sendResponseLatencyMs = (int) (sendResponseEndTimeMs - sendResponseStartTimeMs);
-            _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_RESPONSES_SENT, 1);
-            _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_BYTES_SENT, responseBytes.length);
-            _serverMetrics.addTimedValue(ServerTimer.NETTY_CONNECTION_SEND_RESPONSE_LATENCY, sendResponseLatencyMs,
-                TimeUnit.MILLISECONDS);
-
-            int totalQueryTimeMs = (int) (sendResponseEndTimeMs - queryArrivalTimeMs);
-            if (totalQueryTimeMs > SLOW_QUERY_LATENCY_THRESHOLD_MS) {
-              LOGGER.info(
-                  "Slow query: request handler processing time: {}, send response latency: {}, total time to handle request: {}",
-                  queryProcessingTimeMs, sendResponseLatencyMs, totalQueryTimeMs);
-            }
-          });
+          // responseBytes contains either query results or exception.
+          sendResponse(ctx, queryArrivalTimeMs, responseBytes);
+        } else {
+          // Send exception response.
+          sendErrorResponse(ctx, queryRequest.getRequestId(), queryArrivalTimeMs, DataTableBuilder.getEmptyDataTable(),
+              new Exception("Null query response."));
         }
       }
 
       @Override
       public void onFailure(Throwable t) {
-        LOGGER.error("Caught exception while processing instance request", t);
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
+        // Send exception response.
+        LOGGER.error("Exception while processing instance request", t);
+        sendErrorResponse(ctx, instanceRequest.getRequestId(), queryArrivalTimeMs, DataTableBuilder.getEmptyDataTable(),
+            new Exception(t));
       }
-    }, MoreExecutors.directExecutor());
+    };
   }
 
   @Override
   public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-    LOGGER.error("Caught exception while fetching instance request", cause);
-    _serverMetrics.addMeteredGlobalValue(ServerMeter.REQUEST_FETCH_EXCEPTIONS, 1);
+    // All exceptions should be caught and handled in channelRead0 method. This is a fallback method that
+    // will only be called if for some remote reason we are unable to handle exceptions in channelRead0.
+    String message = "Unhandled Exception in " + getClass().getCanonicalName();
+    LOGGER.error(message, cause);
+    sendErrorResponse(ctx, 0, System.currentTimeMillis(), DataTableBuilder.getEmptyDataTable(),
+        new Exception(message, cause));
+  }
+
+  /**
+   * Send an exception back to broker as response to the query request.
+   */
+  private void sendErrorResponse(ChannelHandlerContext ctx, long requestId, long queryArrivalTimeMs,
+      DataTable dataTable, Exception e) {
+    try {
+      Map<String, String> dataTableMetadata = dataTable.getMetadata();
+      dataTableMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+      dataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
+      byte[] serializedDataTable = dataTable.toBytes();
+      sendResponse(ctx, queryArrivalTimeMs, serializedDataTable);
+    } catch (Exception exception) {
+      LOGGER.error("Exception while sending query processing error to Broker.", exception);
+    } finally {
+      // Log query processing exception
+      LOGGER.error("Query processing error: ", e);
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
+    }
+  }
+
+  /**
+   * Send a response (either query results or exception) back to broker as response to the query request.
+   */
+  private void sendResponse(ChannelHandlerContext ctx, long queryArrivalTimeMs, byte[] serializedDataTable) {
+    long sendResponseStartTimeMs = System.currentTimeMillis();
+    int queryProcessingTimeMs = (int) (sendResponseStartTimeMs - queryArrivalTimeMs);
+    ctx.writeAndFlush(Unpooled.wrappedBuffer(serializedDataTable)).addListener(f -> {
+      long sendResponseEndTimeMs = System.currentTimeMillis();
+      int sendResponseLatencyMs = (int) (sendResponseEndTimeMs - sendResponseStartTimeMs);
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_RESPONSES_SENT, 1);
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_BYTES_SENT, serializedDataTable.length);
+      _serverMetrics.addTimedValue(ServerTimer.NETTY_CONNECTION_SEND_RESPONSE_LATENCY, sendResponseLatencyMs,
+          TimeUnit.MILLISECONDS);
+
+      int totalQueryTimeMs = (int) (sendResponseEndTimeMs - queryArrivalTimeMs);
+      if (totalQueryTimeMs > SLOW_QUERY_LATENCY_THRESHOLD_MS) {
+        LOGGER.info(
+            "Slow query: request handler processing time: {}, send response latency: {}, total time to handle request: {}",
+            queryProcessingTimeMs, sendResponseLatencyMs, totalQueryTimeMs);
+      }
+    });
   }
 }

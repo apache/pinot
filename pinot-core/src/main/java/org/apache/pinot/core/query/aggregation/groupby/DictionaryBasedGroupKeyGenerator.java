@@ -27,12 +27,11 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.Arrays;
 import java.util.Iterator;
-import java.util.NoSuchElementException;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
 
 /**
@@ -65,11 +64,20 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   private static final int INITIAL_MAP_SIZE = (int) ((1 << 9) * 0.75f);
   private static final int MAX_CACHING_MAP_SIZE = (int) ((1 << 20) * 0.75f);
 
-  private static final ThreadLocal<IntGroupIdMap> THREAD_LOCAL_INT_MAP = ThreadLocal.withInitial(IntGroupIdMap::new);
-  private static final ThreadLocal<Long2IntOpenHashMap> THREAD_LOCAL_LONG_MAP =
-      ThreadLocal.withInitial(() -> new Long2IntOpenHashMap(INITIAL_MAP_SIZE));
-  private static final ThreadLocal<Object2IntOpenHashMap<IntArray>> THREAD_LOCAL_INT_ARRAY_MAP =
-      ThreadLocal.withInitial(() -> new Object2IntOpenHashMap<>(INITIAL_MAP_SIZE));
+  @VisibleForTesting
+  static final ThreadLocal<IntGroupIdMap> THREAD_LOCAL_INT_MAP = ThreadLocal.withInitial(IntGroupIdMap::new);
+  @VisibleForTesting
+  static final ThreadLocal<Long2IntOpenHashMap> THREAD_LOCAL_LONG_MAP = ThreadLocal.withInitial(() -> {
+    Long2IntOpenHashMap map = new Long2IntOpenHashMap(INITIAL_MAP_SIZE);
+    map.defaultReturnValue(INVALID_ID);
+    return map;
+  });
+  @VisibleForTesting
+  static final ThreadLocal<Object2IntOpenHashMap<IntArray>> THREAD_LOCAL_INT_ARRAY_MAP = ThreadLocal.withInitial(() -> {
+    Object2IntOpenHashMap<IntArray> map = new Object2IntOpenHashMap<>(INITIAL_MAP_SIZE);
+    map.defaultReturnValue(INVALID_ID);
+    return map;
+  });
 
   private final ExpressionContext[] _groupByExpressions;
   private final int _numGroupByExpressions;
@@ -189,11 +197,16 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   @Override
-  public Iterator<GroupKey> getUniqueGroupKeys() {
-    return _rawKeyHolder.iterator();
+  public Iterator<GroupKey> getGroupKeys() {
+    return _rawKeyHolder.getGroupKeys();
   }
 
-  private interface RawKeyHolder extends Iterable<GroupKey> {
+  @Override
+  public Iterator<StringGroupKey> getStringGroupKeys() {
+    return _rawKeyHolder.getStringGroupKeys();
+  }
+
+  private interface RawKeyHolder {
 
     /**
      * Process a block of documents for all single-valued group-by columns case.
@@ -217,6 +230,16 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
      * @return Upper bound of group id inside the holder
      */
     int getGroupIdUpperBound();
+
+    /**
+     * Returns an iterator of {@link GroupKey}. Use this interface to iterate through all the group keys.
+     */
+    Iterator<GroupKey> getGroupKeys();
+
+    /**
+     * Returns an iterator of {@link StringGroupKey}. Use this interface to iterate through all the group keys.
+     */
+    Iterator<StringGroupKey> getStringGroupKeys();
   }
 
   private class ArrayBasedHolder implements RawKeyHolder {
@@ -252,7 +275,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     @Override
-    public Iterator<GroupKey> iterator() {
+    public Iterator<GroupKey> getGroupKeys() {
       return new Iterator<GroupKey>() {
         private int _currentGroupId;
         private final GroupKey _groupKey = new GroupKey();
@@ -267,11 +290,37 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
         @Override
         public GroupKey next() {
-          if (!hasNext()) {
-            throw new NoSuchElementException();
-          }
           _groupKey._groupId = _currentGroupId;
-          _groupKey._stringKey = getGroupKey(_currentGroupId);
+          _groupKey._keys = getKeys(_currentGroupId);
+          _currentGroupId++;
+          return _groupKey;
+        }
+
+        @Override
+        public void remove() {
+          throw new UnsupportedOperationException();
+        }
+      };
+    }
+
+    @Override
+    public Iterator<StringGroupKey> getStringGroupKeys() {
+      return new Iterator<StringGroupKey>() {
+        private int _currentGroupId;
+        private final StringGroupKey _groupKey = new StringGroupKey();
+
+        @Override
+        public boolean hasNext() {
+          while (_currentGroupId < _globalGroupIdUpperBound && !_flags[_currentGroupId]) {
+            _currentGroupId++;
+          }
+          return _currentGroupId < _globalGroupIdUpperBound;
+        }
+
+        @Override
+        public StringGroupKey next() {
+          _groupKey._groupId = _currentGroupId;
+          _groupKey._stringKey = getStringKey(_currentGroupId);
           _currentGroupId++;
           return _groupKey;
         }
@@ -320,10 +369,10 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     @Override
-    public Iterator<GroupKey> iterator() {
+    public Iterator<GroupKey> getGroupKeys() {
       return new Iterator<GroupKey>() {
-        private final GroupKey _groupKey = new GroupKey();
         private final Iterator<IntGroupIdMap.Entry> _iterator = _groupIdMap.iterator();
+        private final GroupKey _groupKey = new GroupKey();
 
         @Override
         public boolean hasNext() {
@@ -334,7 +383,33 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         public GroupKey next() {
           IntGroupIdMap.Entry entry = _iterator.next();
           _groupKey._groupId = entry._groupId;
-          _groupKey._stringKey = getGroupKey(entry._rawKey);
+          _groupKey._keys = getKeys(entry._rawKey);
+          return _groupKey;
+        }
+
+        @Override
+        public void remove() {
+          throw new UnsupportedOperationException();
+        }
+      };
+    }
+
+    @Override
+    public Iterator<StringGroupKey> getStringGroupKeys() {
+      return new Iterator<StringGroupKey>() {
+        private final Iterator<IntGroupIdMap.Entry> _iterator = _groupIdMap.iterator();
+        private final StringGroupKey _groupKey = new StringGroupKey();
+
+        @Override
+        public boolean hasNext() {
+          return _iterator.hasNext();
+        }
+
+        @Override
+        public StringGroupKey next() {
+          IntGroupIdMap.Entry entry = _iterator.next();
+          _groupKey._groupId = entry._groupId;
+          _groupKey._stringKey = getStringKey(entry._rawKey);
           return _groupKey;
         }
 
@@ -425,12 +500,27 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   /**
-   * Helper method to get group key from raw key.
-   *
-   * @param rawKey Integer raw key
-   * @return String group key
+   * Helper method to get the keys from the raw key.
    */
-  private String getGroupKey(int rawKey) {
+  private Object[] getKeys(int rawKey) {
+    // Specialize single group-by column case
+    if (_numGroupByExpressions == 1) {
+      return new Object[]{_dictionaries[0].getInternal(rawKey)};
+    } else {
+      Object[] groupKeys = new Object[_numGroupByExpressions];
+      for (int i = 0; i < _numGroupByExpressions; i++) {
+        int cardinality = _cardinalities[i];
+        groupKeys[i] = _dictionaries[i].getInternal(rawKey % cardinality);
+        rawKey /= cardinality;
+      }
+      return groupKeys;
+    }
+  }
+
+  /**
+   * Helper method to get the string key from the raw key.
+   */
+  private String getStringKey(int rawKey) {
     // Specialize single group-by column case
     if (_numGroupByExpressions == 1) {
       return _dictionaries[0].getStringValue(rawKey);
@@ -494,7 +584,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     @Override
-    public Iterator<GroupKey> iterator() {
+    public Iterator<GroupKey> getGroupKeys() {
       return new Iterator<GroupKey>() {
         private final ObjectIterator<Long2IntMap.Entry> _iterator = _groupIdMap.long2IntEntrySet().fastIterator();
         private final GroupKey _groupKey = new GroupKey();
@@ -508,7 +598,33 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         public GroupKey next() {
           Long2IntMap.Entry entry = _iterator.next();
           _groupKey._groupId = entry.getIntValue();
-          _groupKey._stringKey = getGroupKey(entry.getLongKey());
+          _groupKey._keys = getKeys(entry.getLongKey());
+          return _groupKey;
+        }
+
+        @Override
+        public void remove() {
+          throw new UnsupportedOperationException();
+        }
+      };
+    }
+
+    @Override
+    public Iterator<StringGroupKey> getStringGroupKeys() {
+      return new Iterator<StringGroupKey>() {
+        private final ObjectIterator<Long2IntMap.Entry> _iterator = _groupIdMap.long2IntEntrySet().fastIterator();
+        private final StringGroupKey _groupKey = new StringGroupKey();
+
+        @Override
+        public boolean hasNext() {
+          return _iterator.hasNext();
+        }
+
+        @Override
+        public StringGroupKey next() {
+          Long2IntMap.Entry entry = _iterator.next();
+          _groupKey._groupId = entry.getIntValue();
+          _groupKey._stringKey = getStringKey(entry.getLongKey());
           return _groupKey;
         }
 
@@ -594,12 +710,22 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   /**
-   * Helper method to get group key from raw key.
-   *
-   * @param rawKey Long raw key
-   * @return String group key
+   * Helper method to get the keys from the raw key.
    */
-  private String getGroupKey(long rawKey) {
+  private Object[] getKeys(long rawKey) {
+    Object[] groupKeys = new Object[_numGroupByExpressions];
+    for (int i = 0; i < _numGroupByExpressions; i++) {
+      int cardinality = _cardinalities[i];
+      groupKeys[i] = _dictionaries[i].getInternal((int) (rawKey % cardinality));
+      rawKey /= cardinality;
+    }
+    return groupKeys;
+  }
+
+  /**
+   * Helper method to get the string key from the raw key.
+   */
+  private String getStringKey(long rawKey) {
     int cardinality = _cardinalities[0];
     StringBuilder groupKeyBuilder = new StringBuilder(_dictionaries[0].getStringValue((int) (rawKey % cardinality)));
     rawKey /= cardinality;
@@ -658,7 +784,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     @Override
-    public Iterator<GroupKey> iterator() {
+    public Iterator<GroupKey> getGroupKeys() {
       return new Iterator<GroupKey>() {
         private final ObjectIterator<Object2IntMap.Entry<IntArray>> _iterator =
             _groupIdMap.object2IntEntrySet().fastIterator();
@@ -673,7 +799,34 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         public GroupKey next() {
           Object2IntMap.Entry<IntArray> entry = _iterator.next();
           _groupKey._groupId = entry.getIntValue();
-          _groupKey._stringKey = getGroupKey(entry.getKey());
+          _groupKey._keys = getKeys(entry.getKey());
+          return _groupKey;
+        }
+
+        @Override
+        public void remove() {
+          throw new UnsupportedOperationException();
+        }
+      };
+    }
+
+    @Override
+    public Iterator<StringGroupKey> getStringGroupKeys() {
+      return new Iterator<StringGroupKey>() {
+        private final ObjectIterator<Object2IntMap.Entry<IntArray>> _iterator =
+            _groupIdMap.object2IntEntrySet().fastIterator();
+        private final StringGroupKey _groupKey = new StringGroupKey();
+
+        @Override
+        public boolean hasNext() {
+          return _iterator.hasNext();
+        }
+
+        @Override
+        public StringGroupKey next() {
+          Object2IntMap.Entry<IntArray> entry = _iterator.next();
+          _groupKey._groupId = entry.getIntValue();
+          _groupKey._stringKey = getStringKey(entry.getKey());
           return _groupKey;
         }
 
@@ -763,12 +916,20 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   /**
-   * Helper method to get group key from raw key.
-   *
-   * @param rawKey IntArray raw key
-   * @return String group key
+   * Helper method to get the keys from the raw key.
    */
-  private String getGroupKey(IntArray rawKey) {
+  private Object[] getKeys(IntArray rawKey) {
+    Object[] groupKeys = new Object[_numGroupByExpressions];
+    for (int i = 0; i < _numGroupByExpressions; i++) {
+      groupKeys[i] = _dictionaries[i].getInternal(rawKey._elements[i]);
+    }
+    return groupKeys;
+  }
+
+  /**
+   * Helper method to get the string key from the raw key.
+   */
+  private String getStringKey(IntArray rawKey) {
     StringBuilder groupKeyBuilder = new StringBuilder(_dictionaries[0].getStringValue(rawKey._elements[0]));
     for (int i = 1; i < _numGroupByExpressions; i++) {
       groupKeyBuilder.append(GroupKeyGenerator.DELIMITER);
@@ -933,8 +1094,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   /**
    * Drop un-necessary checks for highest performance.
    */
+  @VisibleForTesting
   @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
-  private static class IntArray {
+  static class IntArray {
     public int[] _elements;
 
     public IntArray(int[] elements) {

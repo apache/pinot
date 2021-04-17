@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -59,6 +59,15 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
   @Option(name = "-exec", required = false, metaVar = "<boolean>", usage = "Execute the command.")
   private boolean _exec;
 
+  @Option(name = "-user", required = false, metaVar = "<String>", usage = "Username for basic auth.")
+  private String _user;
+
+  @Option(name = "-password", required = false, metaVar = "<String>", usage = "Password for basic auth.")
+  private String _password;
+
+  @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
+  private String _authToken;
+
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
@@ -94,6 +103,21 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
     return this;
   }
 
+  public AddTenantCommand setUser(String user) {
+    _user = user;
+    return this;
+  }
+
+  public AddTenantCommand setPassword(String password) {
+    _password = password;
+    return this;
+  }
+
+  public AddTenantCommand setAuthToken(String authToken) {
+    _authToken = authToken;
+    return this;
+  }
+
   public AddTenantCommand setExecute(boolean exec) {
     _exec = exec;
     return this;
@@ -104,7 +128,7 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
       throws Exception {
     if (_controllerAddress == null) {
       if (_controllerHost == null) {
-        _controllerHost = NetUtil.getHostAddress();
+        _controllerHost = NetUtils.getHostAddress();
       }
       _controllerAddress = _controllerProtocol + "://" + _controllerHost + ":" + _controllerPort;
     }
@@ -118,8 +142,8 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
     LOGGER.info("Executing command: " + toString());
     Tenant tenant = new Tenant(_role, _name, _instanceCount, _offlineInstanceCount, _realtimeInstanceCount);
     String res = AbstractBaseAdminCommand
-        .sendPostRequest(ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTenantCreate(),
-            tenant.toJsonString());
+        .sendRequest("POST", ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTenantCreate(),
+            tenant.toJsonString(), makeAuthHeader(makeAuthToken(_authToken, _user, _password)));
 
     LOGGER.info(res);
     System.out.print(res);

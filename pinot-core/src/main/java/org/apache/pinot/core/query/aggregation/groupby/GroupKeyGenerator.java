@@ -67,16 +67,28 @@ public interface GroupKeyGenerator {
   int getCurrentGroupKeyUpperBound();
 
   /**
-   * Returns an iterator of group keys. Use this interface to iterate through all the group keys.
-   *
-   * @return iterator of group keys.
+   * Returns an iterator of {@link GroupKey}. Use this interface to iterate through all the group keys.
    */
-  Iterator<GroupKey> getUniqueGroupKeys();
+  Iterator<GroupKey> getGroupKeys();
+
+  /**
+   * Returns an iterator of {@link StringGroupKey}. Use this interface to iterate through all the group keys.
+   * TODO: Remove this interface after deprecating PQL.
+   */
+  Iterator<StringGroupKey> getStringGroupKeys();
+
+  /**
+   * This class encapsulates the integer group id and the group keys.
+   */
+  class GroupKey {
+    public int _groupId;
+    public Object[] _keys;
+  }
 
   /**
    * This class encapsulates the integer group id and the string group key.
    */
-  class GroupKey {
+  class StringGroupKey {
     public int _groupId;
     public String _stringKey;
 

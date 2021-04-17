@@ -91,7 +91,7 @@ public class Server2ControllerSegmentUploaderTest {
       throws URISyntaxException {
     Server2ControllerSegmentUploader uploader =
         new Server2ControllerSegmentUploader(_logger, _fileUploadDownloadClient, GOOD_CONTROLLER_VIP, "segmentName",
-            10000, mock(ServerMetrics.class));
+            10000, mock(ServerMetrics.class), null);
     URI segmentURI = uploader.uploadSegment(_file, _llcSegmentName);
     Assert.assertEquals(segmentURI.toString(), SEGMENT_LOCATION);
   }
@@ -101,7 +101,7 @@ public class Server2ControllerSegmentUploaderTest {
       throws URISyntaxException {
     Server2ControllerSegmentUploader uploader =
         new Server2ControllerSegmentUploader(_logger, _fileUploadDownloadClient, BAD_CONTROLLER_VIP, "segmentName",
-            10000, mock(ServerMetrics.class));
+            10000, mock(ServerMetrics.class), null);
     URI segmentURI = uploader.uploadSegment(_file, _llcSegmentName);
     Assert.assertNull(segmentURI);
   }

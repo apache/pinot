@@ -19,15 +19,14 @@
 package org.apache.pinot.tools.admin.command;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Iterator;
-import org.apache.commons.io.IOUtils;
+import java.util.List;
 import org.apache.commons.lang.StringUtils;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.NetUtil;
+import org.apache.http.Header;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -45,6 +44,15 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
 
   @Option(name = "-controllerProtocol", required = false, metaVar = "<String>", usage = "protocol for controller.")
   private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
+
+  @Option(name = "-user", required = false, metaVar = "<String>", usage = "Username for basic auth.")
+  private String _user;
+
+  @Option(name = "-password", required = false, metaVar = "<String>", usage = "Password for basic auth.")
+  private String _password;
+
+  @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
+  private String _authToken;
 
   @Option(name = "-config", metaVar = "<string>", usage = "Cluster config to operate.")
   private String _config;
@@ -67,8 +75,9 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
 
   @Override
   public String toString() {
-    String toString = "Operate ClusterConfig -controllerProtocol " + _controllerProtocol + " -controllerHost "
-        + _controllerHost + " -controllerPort " + _controllerPort + " -operation " + _operation;
+    String toString =
+        "Operate ClusterConfig -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
+            + " -controllerPort " + _controllerPort + " -operation " + _operation;
     if (_config != null) {
       toString += " -config " + _config;
     }
@@ -100,6 +109,21 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
     return this;
   }
 
+  public OperateClusterConfigCommand setUser(String user) {
+    _user = user;
+    return this;
+  }
+
+  public OperateClusterConfigCommand setPassword(String password) {
+    _password = password;
+    return this;
+  }
+
+  public OperateClusterConfigCommand setAuthToken(String authToken) {
+    _authToken = authToken;
+    return this;
+  }
+
   public OperateClusterConfigCommand setConfig(String config) {
     _config = config;
     return this;
@@ -113,13 +137,15 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
   public String run()
       throws Exception {
     if (_controllerHost == null) {
-      _controllerHost = NetUtil.getHostAddress();
+      _controllerHost = NetUtils.getHostAddress();
     }
     LOGGER.info("Executing command: " + toString());
     if (StringUtils.isEmpty(_config) && !_operation.equalsIgnoreCase("GET")) {
       throw new UnsupportedOperationException("Empty config: " + _config);
     }
-    String clusterConfigUrl = _controllerProtocol + "://" + _controllerHost + ":" + _controllerPort + "/cluster/configs";
+    String clusterConfigUrl =
+        _controllerProtocol + "://" + _controllerHost + ":" + _controllerPort + "/cluster/configs";
+    List<Header> headers = makeAuthHeader(makeAuthToken(_authToken, _user, _password));
     switch (_operation.toUpperCase()) {
       case "ADD":
       case "UPDATE":
@@ -129,9 +155,9 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
               "Bad config: " + _config + ". Please follow the pattern of [Config Key]=[Config Value]");
         }
         String request = JsonUtils.objectToString(Collections.singletonMap(splits[0], splits[1]));
-        return sendPostRequest(clusterConfigUrl, request);
+        return sendRequest("POST", clusterConfigUrl, request, headers);
       case "GET":
-        String response = IOUtils.toString(new URI(clusterConfigUrl), StandardCharsets.UTF_8);
+        String response = sendRequest("GET", clusterConfigUrl, null, headers);
         JsonNode jsonNode = JsonUtils.stringToJsonNode(response);
         Iterator<String> fieldNamesIterator = jsonNode.fieldNames();
         String results = "";
@@ -142,7 +168,7 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
         }
         return results;
       case "DELETE":
-        return sendDeleteRequest(String.format("%s/%s", clusterConfigUrl, _config), null);
+        return sendRequest("DELETE", String.format("%s/%s", clusterConfigUrl, _config), null, headers);
       default:
         throw new UnsupportedOperationException("Unsupported operation: " + _operation);
     }

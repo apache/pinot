@@ -26,8 +26,6 @@ import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.transport.TlsConfig;
@@ -35,6 +33,8 @@ import org.apache.pinot.server.api.access.AccessControl;
 import org.apache.pinot.server.api.access.AccessControlFactory;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.helix.AdminApiApplication;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -65,7 +65,7 @@ public class AccessControlTest {
     _adminApiApplication.start(Collections.singletonList(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, "0.0.0.0",
         CommonConstants.Server.DEFAULT_ADMIN_API_PORT, CommonConstants.HTTP_PROTOCOL, new TlsConfig())));
 
-    _webTarget = ClientBuilder.newClient().target(String.format("http://%s:%d", NetUtil.getHostAddress(),
+    _webTarget = ClientBuilder.newClient().target(String.format("http://%s:%d", NetUtils.getHostAddress(),
         CommonConstants.Server.DEFAULT_ADMIN_API_PORT));
   }
 

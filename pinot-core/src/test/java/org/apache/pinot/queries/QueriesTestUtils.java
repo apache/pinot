@@ -30,9 +30,9 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
+import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.testng.Assert;
 
 
@@ -64,9 +64,9 @@ public class QueriesTestUtils {
   public static void testInnerSegmentAggregationGroupByResult(AggregationGroupByResult aggregationGroupByResult,
       String expectedGroupKey, long expectedCountResult, long expectedSumResult, int expectedMaxResult,
       int expectedMinResult, long expectedAvgResultSum, long expectedAvgResultCount) {
-    Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+    Iterator<GroupKeyGenerator.StringGroupKey> groupKeyIterator = aggregationGroupByResult.getStringGroupKeyIterator();
     while (groupKeyIterator.hasNext()) {
-      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
+      GroupKeyGenerator.StringGroupKey groupKey = groupKeyIterator.next();
       if (groupKey._stringKey.equals(expectedGroupKey)) {
         Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(groupKey, 0)).longValue(),
             expectedCountResult);

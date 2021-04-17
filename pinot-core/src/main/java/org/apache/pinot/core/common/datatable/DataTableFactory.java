@@ -31,8 +31,10 @@ public class DataTableFactory {
       throws IOException {
     int version = byteBuffer.getInt();
     switch (version) {
-      case 2:
+      case DataTableBuilder.VERSION_2:
         return new DataTableImplV2(byteBuffer);
+      case DataTableBuilder.VERSION_3:
+        return new DataTableImplV3(byteBuffer);
       default:
         throw new UnsupportedOperationException("Unsupported data table version: " + version);
     }

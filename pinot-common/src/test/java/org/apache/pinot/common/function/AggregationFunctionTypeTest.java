@@ -18,10 +18,9 @@
  */
 package org.apache.pinot.common.function;
 
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
 
 
 public class AggregationFunctionTypeTest {

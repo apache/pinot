@@ -1,9 +1,0 @@
-{{!-- Custom Cell Template for Ember-models-table  --}}
-
-{{#if record.start}}
-  {{moment-format record.start "MM/DD/YYYY hh:mm A"}}
-  {{#if (not-eq record.start record.end)}}
-    -
-    {{moment-format record.end "MM/DD/YYYY hh:mm A"}}
-  {{/if}}
-{{/if}}

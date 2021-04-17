@@ -20,9 +20,9 @@ package org.apache.pinot.common.metadata.segment;
 
 import java.util.Map;
 import org.apache.helix.ZNRecord;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
-import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.SegmentType;
 
 import static org.apache.pinot.spi.utils.EqualityUtils.hashCodeOf;
 import static org.apache.pinot.spi.utils.EqualityUtils.isEqual;

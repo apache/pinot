@@ -18,10 +18,7 @@
  */
 package org.apache.pinot.core.query.scheduler;
 
-import static org.apache.pinot.core.query.scheduler.TestHelper.createQueryRequest;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
-
+import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.BrokenBarrierException;
@@ -29,7 +26,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
-
+import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
 import org.apache.pinot.core.query.scheduler.resources.ResourceLimitPolicy;
@@ -39,13 +36,14 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import com.google.common.base.Preconditions;
-import com.yammer.metrics.core.MetricsRegistry;
+import static org.apache.pinot.core.query.scheduler.TestHelper.createQueryRequest;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class MultiLevelPriorityQueueTest {
   SchedulerGroup group;
-  final ServerMetrics metrics = new ServerMetrics(new MetricsRegistry());
+  final ServerMetrics metrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
 
   final SchedulerGroupMapper groupMapper = new TableBasedGroupMapper();
   final TestSchedulerGroupFactory groupFactory = new TestSchedulerGroupFactory();
@@ -81,9 +79,9 @@ public class MultiLevelPriorityQueueTest {
       throws OutOfCapacityException {
     Map<String, Object> properties = new HashMap<>();
     properties.put(MultiLevelPriorityQueue.MAX_PENDING_PER_GROUP_KEY, 2);
-    
+
     PinotConfiguration configuration =new PinotConfiguration(properties);
-    
+
     ResourceManager rm = new UnboundedResourceManager(configuration);
     MultiLevelPriorityQueue queue = createQueue(configuration, rm);
     queue.put(createQueryRequest(groupOne, metrics));
@@ -129,12 +127,12 @@ public class MultiLevelPriorityQueueTest {
     properties.put(ResourceManager.QUERY_RUNNER_CONFIG_KEY, 10);
     properties.put(ResourceLimitPolicy.TABLE_THREADS_SOFT_LIMIT, 20);
     properties.put(ResourceLimitPolicy.TABLE_THREADS_HARD_LIMIT, 80);
-    
+
     PinotConfiguration configuration = new PinotConfiguration(properties);
-    
+
     PolicyBasedResourceManager rm = new PolicyBasedResourceManager(configuration);
     MultiLevelPriorityQueue queue = createQueue(configuration, rm);
-    
+
     queue.put(createQueryRequest(groupOne, metrics));
     queue.put(createQueryRequest(groupOne, metrics));
     queue.put(createQueryRequest(groupTwo, metrics));

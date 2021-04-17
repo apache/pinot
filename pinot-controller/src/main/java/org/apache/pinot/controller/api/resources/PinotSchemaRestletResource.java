@@ -43,6 +43,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.common.exception.SchemaBackwardIncompatibleException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -54,7 +55,7 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
 import org.apache.pinot.controller.api.events.SchemaEventType;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.core.util.SchemaUtils;
+import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -243,9 +244,8 @@ public class PinotSchemaRestletResource {
       return new SuccessResponse(schemaName + " successfully added");
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
-      throw new ControllerApplicationException(LOGGER,
-          String.format("Failed to add new schema %s.", schemaName), Response.Status.INTERNAL_SERVER_ERROR,
-          e);
+      throw new ControllerApplicationException(LOGGER, String.format("Failed to add new schema %s.", schemaName),
+          Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 
@@ -262,16 +262,15 @@ public class PinotSchemaRestletResource {
       SchemaUtils.validate(schema, tableConfigs);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
-          "Cannot add invalid schema: " + schemaName + ". Reason: " + e.getMessage(),
+          String.format("Cannot add invalid schema: %s. Reason: %s", schemaName, e.getMessage()),
           Response.Status.BAD_REQUEST, e);
     }
 
     if (schemaName != null && !schema.getSchemaName().equals(schemaName)) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
-      final String message =
-          "Schema name mismatch for uploaded schema, tried to add schema with name " + schema.getSchemaName() + " as "
-              + schemaName;
-      throw new ControllerApplicationException(LOGGER, message, Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, String
+          .format("Schema name mismatch for uploaded schema, tried to add schema with name %s as %s",
+              schema.getSchemaName(), schema), Response.Status.BAD_REQUEST);
     }
 
     try {
@@ -284,6 +283,11 @@ public class PinotSchemaRestletResource {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER, String.format("Failed to find schema %s", schemaName),
           Response.Status.NOT_FOUND, e);
+    } catch (SchemaBackwardIncompatibleException e) {
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Backward incompatible schema %s. Only allow adding new columns", schemaName),
+          Response.Status.BAD_REQUEST, e);
     } catch (TableNotFoundException e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER, String.format("Failed to find table %s to reload", schemaName),

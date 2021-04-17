@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
-import org.apache.pinot.core.query.request.context.predicate.NotEqPredicate;
-import org.apache.pinot.core.query.request.context.predicate.Predicate;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
+import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;

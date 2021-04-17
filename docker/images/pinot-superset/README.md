@@ -57,4 +57,4 @@ The data volume is located at `/app/superset_home` and it is where you would mou
 
 ## Kubernetes Examples
 
-Please refer to [`superset.yaml`](../../../kubernetes/examples/helm/superset.yaml) as k8s deployment example.
+Please refer to [`superset.yaml`](../../../kubernetes/helm/superset.yaml) as k8s deployment example.

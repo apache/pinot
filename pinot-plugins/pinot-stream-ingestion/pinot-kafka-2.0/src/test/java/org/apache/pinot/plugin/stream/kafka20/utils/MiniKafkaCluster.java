@@ -19,62 +19,47 @@
 package org.apache.pinot.plugin.stream.kafka20.utils;
 
 import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
 import java.net.ServerSocket;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import kafka.server.KafkaConfig;
 import kafka.server.KafkaServer;
 import org.apache.commons.io.FileUtils;
 import org.apache.kafka.clients.admin.AdminClient;
-import org.apache.kafka.clients.admin.CreateTopicsResult;
-import org.apache.kafka.clients.admin.DeleteTopicsResult;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.producer.ProducerConfig;
-import org.apache.kafka.common.network.ListenerName;
-import org.apache.kafka.common.security.auth.SecurityProtocol;
 import org.apache.kafka.common.utils.Time;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import scala.Option;
+import scala.collection.JavaConverters;
 import scala.collection.Seq;
 
 
 public final class MiniKafkaCluster implements Closeable {
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "MiniKafkaCluster");
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(MiniKafkaCluster.class);
-  private final EmbeddedZooKeeper zkServer;
-  private final ArrayList<KafkaServer> kafkaServer;
-  private final Path tempDir;
-  private final AdminClient adminClient;
+  private final EmbeddedZooKeeper _zkServer;
+  private final KafkaServer _kafkaServer;
+  private final String _kafkaServerAddress;
+  private final AdminClient _adminClient;
 
   @SuppressWarnings({"rawtypes", "unchecked"})
-  private MiniKafkaCluster(List<String> brokerIds)
+  public MiniKafkaCluster(String brokerId)
       throws IOException, InterruptedException {
-    this.zkServer = new EmbeddedZooKeeper();
-    this.tempDir = Files.createTempDirectory(Paths.get(System.getProperty("java.io.tmpdir")), "mini-kafka-cluster");
-    this.kafkaServer = new ArrayList<>();
-    int port = 0;
-    for (String id : brokerIds) {
-      port = getAvailablePort();
-      KafkaConfig c = new KafkaConfig(createBrokerConfig(id, port));
-      Seq seq =
-          scala.collection.JavaConverters.collectionAsScalaIterableConverter(Collections.emptyList()).asScala().toSeq();
-      kafkaServer.add(new KafkaServer(c, Time.SYSTEM, Option.empty(), seq));
-    }
-    Properties props = new Properties();
-    props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "127.0.0.1:" + port);
-    adminClient = AdminClient.create(props);
+    _zkServer = new EmbeddedZooKeeper();
+    int kafkaServerPort = getAvailablePort();
+    KafkaConfig kafkaBrokerConfig = new KafkaConfig(createBrokerConfig(brokerId, kafkaServerPort));
+    Seq seq = JavaConverters.collectionAsScalaIterableConverter(Collections.emptyList()).asScala().toSeq();
+    _kafkaServer = new KafkaServer(kafkaBrokerConfig, Time.SYSTEM, Option.empty(), seq);
+    _kafkaServerAddress = "localhost:" + kafkaServerPort;
+    Properties kafkaClientConfig = new Properties();
+    kafkaClientConfig.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, _kafkaServerAddress);
+    _adminClient = AdminClient.create(kafkaClientConfig);
   }
 
-  static int getAvailablePort() {
+  private static int getAvailablePort() {
     try {
       try (ServerSocket socket = new ServerSocket(0)) {
         return socket.getLocalPort();
@@ -84,13 +69,16 @@ public final class MiniKafkaCluster implements Closeable {
     }
   }
 
-  private Properties createBrokerConfig(String nodeId, int port)
-      throws IOException {
+  private Properties createBrokerConfig(String brokerId, int port) {
     Properties props = new Properties();
-    props.put("broker.id", nodeId);
+    props.put("broker.id", brokerId);
+    // We need to explicitly set the network interface we want to let Kafka bind to.
+    // By default, it will bind to all the network interfaces, which might not be accessible always
+    // in a container based environment.
+    props.put("host.name", "localhost");
     props.put("port", Integer.toString(port));
-    props.put("log.dir", Files.createTempDirectory(tempDir, "broker-").toAbsolutePath().toString());
-    props.put("zookeeper.connect", "127.0.0.1:" + zkServer.getPort());
+    props.put("log.dir", new File(TEMP_DIR, "log").getPath());
+    props.put("zookeeper.connect", _zkServer.getZkAddress());
     props.put("replica.socket.timeout.ms", "1500");
     props.put("controller.socket.timeout.ms", "1500");
     props.put("controlled.shutdown.enable", "true");
@@ -103,73 +91,29 @@ public final class MiniKafkaCluster implements Closeable {
   }
 
   public void start() {
-    for (KafkaServer s : kafkaServer) {
-      s.startup();
-    }
+    _kafkaServer.startup();
   }
 
   @Override
   public void close()
       throws IOException {
-    for (KafkaServer s : kafkaServer) {
-      s.shutdown();
-    }
-    this.zkServer.close();
-    FileUtils.deleteDirectory(tempDir.toFile());
+    _kafkaServer.shutdown();
+    _zkServer.close();
+    FileUtils.deleteDirectory(TEMP_DIR);
   }
 
-  public EmbeddedZooKeeper getZkServer() {
-    return zkServer;
+  public String getKafkaServerAddress() {
+    return _kafkaServerAddress;
   }
 
-  public List<KafkaServer> getKafkaServer() {
-    return kafkaServer;
-  }
-
-  public int getKafkaServerPort(int index) {
-    return kafkaServer.get(index).socketServer()
-        .boundPort(ListenerName.forSecurityProtocol(SecurityProtocol.PLAINTEXT));
-  }
-
-  public AdminClient getAdminClient() {
-    return adminClient;
-  }
-
-  public boolean createTopic(String topicName, int numPartitions, int replicationFactor) {
+  public void createTopic(String topicName, int numPartitions, int replicationFactor)
+      throws ExecutionException, InterruptedException {
     NewTopic newTopic = new NewTopic(topicName, numPartitions, (short) replicationFactor);
-    CreateTopicsResult createTopicsResult = this.adminClient.createTopics(Arrays.asList(newTopic));
-    try {
-      createTopicsResult.all().get();
-    } catch (InterruptedException | ExecutionException e) {
-      LOGGER.error("Failed to create Kafka topic: {}, Exception: {}", newTopic.toString(), e);
-      return false;
-    }
-    return true;
+    _adminClient.createTopics(Collections.singletonList(newTopic)).all().get();
   }
 
-  public boolean deleteTopic(String topicName) {
-    final DeleteTopicsResult deleteTopicsResult = this.adminClient.deleteTopics(Collections.singletonList(topicName));
-    try {
-      deleteTopicsResult.all().get();
-    } catch (InterruptedException | ExecutionException e) {
-      LOGGER.error("Failed to delete Kafka topic: {}, Exception: {}", topicName, e);
-      return false;
-    }
-    return true;
-  }
-
-  public static class Builder {
-
-    private List<String> brokerIds = new ArrayList<>();
-
-    public Builder newServer(String brokerId) {
-      brokerIds.add(brokerId);
-      return this;
-    }
-
-    public MiniKafkaCluster build()
-        throws IOException, InterruptedException {
-      return new MiniKafkaCluster(brokerIds);
-    }
+  public void deleteTopic(String topicName)
+      throws ExecutionException, InterruptedException {
+    _adminClient.deleteTopics(Collections.singletonList(topicName)).all().get();
   }
 }

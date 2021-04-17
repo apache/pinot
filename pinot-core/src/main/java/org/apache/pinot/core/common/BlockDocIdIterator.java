@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.common;
 
+import org.apache.pinot.segment.spi.Constants;
+
+
 /**
  * The interface <code>BlockDocIdIterator</code> represents the iterator for <code>BlockDocIdSet</code>. The document
  * ids returned from the iterator should be in ascending order.

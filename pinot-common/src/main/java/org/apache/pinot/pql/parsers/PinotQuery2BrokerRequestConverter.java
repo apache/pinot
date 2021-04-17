@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.function.FunctionDefinitionRegistry;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -44,6 +43,7 @@ import org.apache.pinot.parsers.CompilerConstants;
 import org.apache.pinot.parsers.utils.ParserUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.pql.parsers.pql2.ast.OrderByAstNode;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 public class PinotQuery2BrokerRequestConverter {

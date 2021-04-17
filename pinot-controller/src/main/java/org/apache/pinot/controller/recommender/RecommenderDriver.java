@@ -24,11 +24,11 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import org.apache.pinot.controller.recommender.io.ConfigManager;
 import org.apache.pinot.controller.recommender.exceptions.InvalidInputException;
+import org.apache.pinot.controller.recommender.io.ConfigManager;
+import org.apache.pinot.controller.recommender.io.InputManager;
 import org.apache.pinot.controller.recommender.rules.AbstractRule;
 import org.apache.pinot.controller.recommender.rules.RulesToExecute;
-import org.apache.pinot.controller.recommender.io.InputManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

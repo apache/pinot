@@ -26,20 +26,25 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.controller.recommender.exceptions.InvalidInputException;
 import org.apache.pinot.controller.recommender.io.metadata.FieldMetadata;
 import org.apache.pinot.controller.recommender.io.metadata.SchemaWithMetaData;
 import org.apache.pinot.controller.recommender.rules.RulesToExecute;
-import org.apache.pinot.controller.recommender.rules.io.params.FlagQueryRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.*;
+import org.apache.pinot.controller.recommender.rules.io.params.FlagQueryRuleParams;
+import org.apache.pinot.controller.recommender.rules.io.params.RealtimeProvisioningRuleParams;
 import org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
 import org.apache.pinot.core.requesthandler.BrokerRequestOptimizer;
 import org.apache.pinot.core.requesthandler.PinotQueryParserFactory;
 import org.apache.pinot.parsers.AbstractCompiler;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -47,10 +52,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.lang.Math.max;
 import static java.lang.Math.pow;
@@ -102,6 +103,7 @@ public class InputManager {
   public NoDictionaryOnHeapDictionaryJointRuleParams _noDictionaryOnHeapDictionaryJointRuleParams =
       new NoDictionaryOnHeapDictionaryJointRuleParams();
   public FlagQueryRuleParams _flagQueryRuleParams = new FlagQueryRuleParams();
+  public RealtimeProvisioningRuleParams _realtimeProvisioningRuleParams;
 
   // For forward compatibility: 1. dev/sre to overwrite field(s) 2. incremental recommendation on existing/staging tables
   public ConfigManager _overWrittenConfigs = new ConfigManager();
@@ -139,7 +141,7 @@ public class InputManager {
       throws InvalidInputException {
     LOGGER.info("Preprocessing Input:");
     reorderDimsAndBuildMap();
-    registerColnameFieldType();
+    registerColNameFieldType();
     validateQueries();
     if (_useCardinalityNormalization){
       regulateCardinalityForAll();
@@ -179,15 +181,20 @@ public class InputManager {
     invalidQueries.forEach(_queryWeightMap::remove);
   }
 
-  public void registerColnameFieldType() { // create a map from colname to data type
+  // create a map from col name to data type
+  private void registerColNameFieldType() {
     for (DimensionFieldSpec dimensionFieldSpec : _schema.getDimensionFieldSpecs()) {
       _colNameFieldTypeMap.put(dimensionFieldSpec.getName(), dimensionFieldSpec.getDataType());
     }
     for (MetricFieldSpec metricFieldSpec : _schema.getMetricFieldSpecs()) {
       _colNameFieldTypeMap.put(metricFieldSpec.getName(), metricFieldSpec.getDataType());
     }
-    //TODO: add support for multiple getDateTimeFieldSpecs
-    _colNameFieldTypeMap.put(_schema.getTimeFieldSpec().getName(), _schema.getTimeFieldSpec().getDataType());
+    for (DateTimeFieldSpec dateTimeFieldSpec : _schema.getDateTimeFieldSpecs()) {
+      _colNameFieldTypeMap.put(dateTimeFieldSpec.getName(), dateTimeFieldSpec.getDataType());
+    }
+    if (_schemaWithMetaData.getTimeFieldSpec() != null) {
+      _colNameFieldTypeMap.put(_schema.getTimeFieldSpec().getName(), _schema.getTimeFieldSpec().getDataType());
+    }
   }
 
   private void reorderDimsAndBuildMap()
@@ -314,6 +321,11 @@ public class InputManager {
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
+  public void setRealtimeProvisioningRuleParams(RealtimeProvisioningRuleParams realtimeProvisioningRuleParams) {
+    _realtimeProvisioningRuleParams = realtimeProvisioningRuleParams;
+  }
+
+  @JsonSetter(nulls = Nulls.SKIP)
   public void setPartitionRuleParams(PartitionRuleParams partitionRuleParams) {
     _partitionRuleParams = partitionRuleParams;
   }
@@ -354,7 +366,9 @@ public class InputManager {
     _schemaWithMetaData.getDateTimeFieldSpecs().forEach(fieldMetadata -> {
       _metaDataMap.put(fieldMetadata.getName(), fieldMetadata);
     });
-    _metaDataMap.put(_schemaWithMetaData.getTimeFieldSpec().getName(), _schemaWithMetaData.getTimeFieldSpec());
+    if (_schemaWithMetaData.getTimeFieldSpec() != null) {
+      _metaDataMap.put(_schemaWithMetaData.getTimeFieldSpec().getName(), _schemaWithMetaData.getTimeFieldSpec());
+    }
   }
 
   @JsonIgnore
@@ -462,6 +476,10 @@ public class InputManager {
     return _bloomFilterRuleParams;
   }
 
+  public RealtimeProvisioningRuleParams getRealtimeProvisioningRuleParams() {
+    return _realtimeProvisioningRuleParams;
+  }
+
   public PartitionRuleParams getPartitionRuleParams() {
     return _partitionRuleParams;
   }
@@ -484,6 +502,10 @@ public class InputManager {
 
   public Schema getSchema() {
     return _schema;
+  }
+
+  public SchemaWithMetaData getSchemaWithMetadata() {
+    return _schemaWithMetaData;
   }
 
   @JsonIgnore

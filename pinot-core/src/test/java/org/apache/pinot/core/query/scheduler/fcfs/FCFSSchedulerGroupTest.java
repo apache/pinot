@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.query.scheduler.fcfs;
 
-import com.yammer.metrics.core.MetricsRegistry;
+import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.query.scheduler.SchedulerQueryContext;
 import org.testng.annotations.Test;
@@ -29,7 +29,7 @@ import static org.testng.Assert.assertNull;
 
 
 public class FCFSSchedulerGroupTest {
-  static final ServerMetrics metrics = new ServerMetrics(new MetricsRegistry());
+  static ServerMetrics metrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
 
   @Test
   public void testCompare() {

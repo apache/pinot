@@ -29,12 +29,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.GroupByResult;
-import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.core.data.readers.GenericRowRecordReader;
-import org.apache.pinot.core.indexsegment.IndexSegment;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
@@ -46,12 +40,18 @@ import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.core.query.utils.idset.Roaring64NavigableMapIdSet;
 import org.apache.pinot.core.query.utils.idset.RoaringBitmapIdSet;
-import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -274,29 +274,29 @@ public class IdSetQueriesTest extends BaseQueriesTest {
       AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
       assertNotNull(aggregationGroupByResult);
       Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
-      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-      RoaringBitmapIdSet intIdSet = (RoaringBitmapIdSet) aggregationGroupByResult.getResultForKey(groupKey, 0);
+      int groupId = groupKeyIterator.next()._groupId;
+      RoaringBitmapIdSet intIdSet = (RoaringBitmapIdSet) aggregationGroupByResult.getResultForGroupId(0, groupId);
       for (int i = 0; i < NUM_RECORDS; i++) {
         assertTrue(intIdSet.contains(_values[i]));
       }
       Roaring64NavigableMapIdSet longIdSet =
-          (Roaring64NavigableMapIdSet) aggregationGroupByResult.getResultForKey(groupKey, 1);
+          (Roaring64NavigableMapIdSet) aggregationGroupByResult.getResultForGroupId(1, groupId);
       for (int i = 0; i < NUM_RECORDS; i++) {
         assertTrue(longIdSet.contains(_values[i] + (long) Integer.MAX_VALUE));
       }
-      BloomFilterIdSet floatIdSet = (BloomFilterIdSet) aggregationGroupByResult.getResultForKey(groupKey, 2);
+      BloomFilterIdSet floatIdSet = (BloomFilterIdSet) aggregationGroupByResult.getResultForGroupId(2, groupId);
       for (int i = 0; i < NUM_RECORDS; i++) {
         assertTrue(floatIdSet.contains(_values[i] + 0.5f));
       }
-      BloomFilterIdSet doubleIdSet = (BloomFilterIdSet) aggregationGroupByResult.getResultForKey(groupKey, 3);
+      BloomFilterIdSet doubleIdSet = (BloomFilterIdSet) aggregationGroupByResult.getResultForGroupId(3, groupId);
       for (int i = 0; i < NUM_RECORDS; i++) {
         assertTrue(doubleIdSet.contains(_values[i] + 0.25));
       }
-      BloomFilterIdSet stringIdSet = (BloomFilterIdSet) aggregationGroupByResult.getResultForKey(groupKey, 4);
+      BloomFilterIdSet stringIdSet = (BloomFilterIdSet) aggregationGroupByResult.getResultForGroupId(4, groupId);
       for (int i = 0; i < NUM_RECORDS; i++) {
         assertTrue(stringIdSet.contains(Integer.toString(_values[i])));
       }
-      BloomFilterIdSet bytesIdSet = (BloomFilterIdSet) aggregationGroupByResult.getResultForKey(groupKey, 5);
+      BloomFilterIdSet bytesIdSet = (BloomFilterIdSet) aggregationGroupByResult.getResultForGroupId(5, groupId);
       for (int i = 0; i < NUM_RECORDS; i++) {
         assertTrue(bytesIdSet.contains(Integer.toString(_values[i]).getBytes()));
       }

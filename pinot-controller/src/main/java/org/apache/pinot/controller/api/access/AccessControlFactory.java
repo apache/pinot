@@ -20,11 +20,15 @@ package org.apache.pinot.controller.api.access;
 
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public interface AccessControlFactory {
+  default void init(PinotConfiguration pinotConfiguration) {
+    // left blank
+  }
 
   AccessControl create();
 }

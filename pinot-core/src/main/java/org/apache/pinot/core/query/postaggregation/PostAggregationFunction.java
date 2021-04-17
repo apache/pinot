@@ -41,13 +41,19 @@ public class PostAggregationFunction {
     Preconditions
         .checkArgument(functionInfo != null, "Unsupported function: %s with %s parameters", functionName, numArguments);
     _functionInvoker = new FunctionInvoker(functionInfo);
+    Class<?>[] parameterClasses = _functionInvoker.getParameterClasses();
     PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
-    Preconditions.checkArgument(numArguments == parameterTypes.length,
-        "Wrong number of arguments for method: %s, expected: %s, actual: %s", functionInfo.getMethod(),
-        parameterTypes.length, numArguments);
+    int numParameters = parameterClasses.length;
+    Preconditions.checkArgument(numArguments == numParameters,
+        "Wrong number of arguments for method: %s, expected: %s, actual: %s", functionInfo.getMethod(), numParameters,
+        numArguments);
+    for (int i = 0; i < numParameters; i++) {
+      Preconditions.checkArgument(parameterTypes[i] != null, "Unsupported parameter class: %s for method: %s",
+          parameterClasses[i], functionInfo.getMethod());
+    }
     _argumentTypes = new PinotDataType[numArguments];
     for (int i = 0; i < numArguments; i++) {
-      _argumentTypes[i] = PinotDataType.getPinotDataType(argumentTypes[i]);
+      _argumentTypes[i] = PinotDataType.getPinotDataTypeForExecution(argumentTypes[i]);
     }
     ColumnDataType resultType = FunctionUtils.getColumnDataType(_functionInvoker.getResultClass());
     // Handle unrecognized result class with STRING

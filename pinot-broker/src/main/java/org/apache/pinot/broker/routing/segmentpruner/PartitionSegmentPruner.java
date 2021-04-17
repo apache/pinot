@@ -34,11 +34,11 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.CommonConstants.Segment;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.core.data.partition.PartitionFunction;
-import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
+import org.apache.pinot.segment.local.partition.PartitionFunctionFactory;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.utils.CommonConstants.Segment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

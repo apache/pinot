@@ -77,6 +77,9 @@ import org.apache.pinot.spi.utils.ByteArray;
 // TODO:   3. Given a data schema, write all values one by one instead of using rowId and colId to position (save time).
 // TODO:   4. Store bytes as variable size data instead of String
 public class DataTableBuilder {
+  public static final int VERSION_2 = 2;
+  public static final int VERSION_3 = 3;
+  private static int _version = VERSION_3;
   private final DataSchema _dataSchema;
   private final int[] _columnOffsets;
   private final int _rowSizeInBytes;
@@ -94,6 +97,17 @@ public class DataTableBuilder {
     _dataSchema = dataSchema;
     _columnOffsets = new int[dataSchema.size()];
     _rowSizeInBytes = DataTableUtils.computeColumnOffsets(dataSchema, _columnOffsets);
+  }
+
+  public static DataTable getEmptyDataTable() {
+    return _version == VERSION_2 ? new DataTableImplV2() : new DataTableImplV3();
+  }
+
+  public static void setCurrentDataTableVersion(int version) {
+    if (version != VERSION_2 && version != VERSION_3) {
+      throw new IllegalArgumentException("Unsupported version: " + version);
+    }
+    _version = version;
   }
 
   public void startRow() {
@@ -263,7 +277,9 @@ public class DataTableBuilder {
   }
 
   public DataTable build() {
-    return new DataTableImplV2(_numRows, _dataSchema, _reverseDictionaryMap,
-        _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray());
+    return _version == VERSION_2 ? new DataTableImplV2(_numRows, _dataSchema, _reverseDictionaryMap,
+        _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray())
+        : new DataTableImplV3(_numRows, _dataSchema, _reverseDictionaryMap,
+            _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray());
   }
 }

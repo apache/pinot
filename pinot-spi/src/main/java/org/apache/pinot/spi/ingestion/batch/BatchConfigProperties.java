@@ -42,13 +42,22 @@ public class BatchConfigProperties {
   public static final String SCHEMA_URI = "schemaURI";
   public static final String SEQUENCE_ID = "sequenceId";
   public static final String SEGMENT_NAME_GENERATOR_TYPE = "segmentNameGenerator.type";
-  public static final String SEGMENT_NAME_GENERATOR_CONFIGS = "segmentNameGenerator.configs";
+  public static final String SEGMENT_NAME_GENERATOR_PROP_PREFIX = "segmentNameGenerator.configs";
+  public static final String SEGMENT_NAME = "segment.name";
+  public static final String SEGMENT_NAME_PREFIX = "segment.name.prefix";
+  public static final String SEGMENT_NAME_POSTFIX = "segment.name.postfix";
+  public static final String EXCLUDE_SEQUENCE_ID = "exclude.sequence.id";
   public static final String OVERWRITE_OUTPUT = "overwriteOutput";
   public static final String INPUT_DATA_FILE_URI_KEY = "input.data.file.uri";
   public static final String PUSH_MODE = "push.mode";
+  public static final String PUSH_ATTEMPTS = "push.attempts";
+  public static final String PUSH_PARALLELISM = "push.parallelism";
+  public static final String PUSH_RETRY_INTERVAL_MILLIS = "push.retry.interval.millis";
   public static final String PUSH_CONTROLLER_URI = "push.controllerUri";
   public static final String PUSH_SEGMENT_URI_PREFIX = "push.segmentUriPrefix";
   public static final String PUSH_SEGMENT_URI_SUFFIX = "push.segmentUriSuffix";
+  public static final String FAIL_ON_EMPTY_SEGMENT = "fail.on.empty.segment";
+  public static final String AUTH_TOKEN = "authToken";
 
   public static final String OUTPUT_SEGMENT_DIR_URI = "output.segment.dir.uri";
 
@@ -56,7 +65,7 @@ public class BatchConfigProperties {
     APPEND, REPLACE
   }
 
-  public class SegmentNameGeneratorType {
+  public static class SegmentNameGeneratorType {
     public static final String SIMPLE = "simple";
     public static final String NORMALIZED_DATE = "normalizedDate";
     public static final String FIXED = "fixed";

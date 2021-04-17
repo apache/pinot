@@ -21,7 +21,7 @@ package org.apache.pinot.tools.scan.query;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
-import org.apache.pinot.core.query.utils.Pair;
+import org.apache.pinot.spi.utils.Pair;
 
 
 public class DistinctCountFunction extends AggregationFunc {

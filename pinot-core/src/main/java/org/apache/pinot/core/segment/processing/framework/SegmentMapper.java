@@ -32,15 +32,15 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.segment.processing.filter.RecordFilter;
 import org.apache.pinot.core.segment.processing.filter.RecordFilterFactory;
-import org.apache.pinot.core.segment.processing.partitioner.Partitioner;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
 import org.apache.pinot.core.segment.processing.transformer.RecordTransformer;
 import org.apache.pinot.core.segment.processing.transformer.RecordTransformerFactory;
-import org.apache.pinot.core.segment.processing.utils.SegmentProcessorUtils;
+import org.apache.pinot.core.util.SegmentProcessorAvroUtils;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
+import org.apache.pinot.segment.spi.partition.Partitioner;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,7 +73,7 @@ public class SegmentMapper {
     _mapperOutputDir = mapperOutputDir;
 
     _mapperId = mapperId;
-    _avroSchema = SegmentProcessorUtils.convertPinotSchemaToAvroSchema(mapperConfig.getPinotSchema());
+    _avroSchema = SegmentProcessorAvroUtils.convertPinotSchemaToAvroSchema(mapperConfig.getPinotSchema());
     _recordFilter = RecordFilterFactory.getRecordFilter(mapperConfig.getRecordFilterConfig());
     _recordTransformer = RecordTransformerFactory.getRecordTransformer(mapperConfig.getRecordTransformerConfig());
     for (PartitionerConfig partitionerConfig : mapperConfig.getPartitionerConfigs()) {
@@ -129,7 +129,7 @@ public class SegmentMapper {
       }
 
       // Write record to avro file for its partition
-      SegmentProcessorUtils.convertGenericRowToAvroRecord(reusableRow, reusableRecord);
+      SegmentProcessorAvroUtils.convertGenericRowToAvroRecord(reusableRow, reusableRecord);
       recordWriter.append(reusableRecord);
     }
   }

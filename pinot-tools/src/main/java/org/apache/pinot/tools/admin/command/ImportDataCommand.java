@@ -74,6 +74,15 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
   @Option(name = "-controllerURI", metaVar = "<string>", usage = "Pinot Controller URI.")
   private String _controllerURI = "http://localhost:9000";
 
+  @Option(name = "-user", required = false, metaVar = "<String>", usage = "Username for basic auth.")
+  private String _user;
+
+  @Option(name = "-password", required = false, metaVar = "<String>", usage = "Password for basic auth.")
+  private String _password;
+
+  @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
+  private String _authToken;
+
   @Option(name = "-tempDir", metaVar = "<string>", usage = "Temporary directory used to hold data during segment creation.")
   private String _tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName()).getAbsolutePath();
 
@@ -121,6 +130,21 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
     return this;
   }
 
+  public ImportDataCommand setUser(String user) {
+    _user = user;
+    return this;
+  }
+
+  public ImportDataCommand setPassword(String password) {
+    _password = password;
+    return this;
+  }
+
+  public ImportDataCommand setAuthToken(String authToken) {
+    _authToken = authToken;
+    return this;
+  }
+
   public List<String> getAdditionalConfigs() {
     return _additionalConfigs;
   }
@@ -153,8 +177,8 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
   @Override
   public String toString() {
     String results = String
-        .format("InsertData -dataFilePath %s -format %s -table %s -controllerURI %s -tempDir %s", _dataFilePath,
-            _format, _table, _controllerURI, _tempDir);
+        .format("InsertData -dataFilePath %s -format %s -table %s -controllerURI %s -user %s -password %s -tempDir %s",
+            _dataFilePath, _format, _table, _controllerURI, _user, "[hidden]", _tempDir);
     if (_additionalConfigs != null) {
       results += " -additionalConfigs " + Arrays.toString(_additionalConfigs.toArray());
     }
@@ -226,6 +250,7 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
     spec.setCleanUpOutputDir(true);
     spec.setOverwriteOutput(true);
     spec.setJobType("SegmentCreationAndTarPush");
+    spec.setAuthToken(makeAuthToken(_authToken, _user, _password));
 
     // set ExecutionFrameworkSpec
     ExecutionFrameworkSpec executionFrameworkSpec = new ExecutionFrameworkSpec();

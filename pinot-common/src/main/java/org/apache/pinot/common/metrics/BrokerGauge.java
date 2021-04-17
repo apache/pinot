@@ -29,7 +29,11 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   QUERY_QUOTA_CAPACITY_UTILIZATION_RATE("tables", false),
   MAX_BURST_QPS("tables", false),
   QUERY_RATE_LIMIT_DISABLED("queryQuota", true),
-  NETTY_CONNECTION_CONNECT_TIME_MS("nettyConnection", true);
+  NETTY_CONNECTION_CONNECT_TIME_MS("nettyConnection", true),
+  REQUEST_SIZE("requestSize", false),
+  RESIZE_TIME_MS("milliseconds", false),
+  OFFLINE_THREAD_CPU_TIME_NS("nanoseconds", false),
+  REALTIME_THREAD_CPU_TIME_NS("nanoseconds", false);
 
   private final String brokerGaugeName;
   private final String unit;

@@ -20,8 +20,6 @@ package org.apache.pinot.client;
 
 import java.sql.ResultSet;
 import java.sql.Statement;
-import java.util.Collections;
-import java.util.concurrent.Future;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

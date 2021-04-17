@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 
 
 /**

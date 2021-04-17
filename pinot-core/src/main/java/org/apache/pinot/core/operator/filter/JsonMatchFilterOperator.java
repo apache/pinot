@@ -20,11 +20,7 @@ package org.apache.pinot.core.operator.filter;
 
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
-import org.apache.pinot.core.query.exception.BadQueryRequestException;
-import org.apache.pinot.core.query.request.context.FilterContext;
-import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
-import org.apache.pinot.core.segment.index.readers.JsonIndexReader;
-import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 
 
 /**
@@ -34,22 +30,18 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "JsonMatchFilterOperator";
 
   private final JsonIndexReader _jsonIndex;
-  private final FilterContext _filter;
+  private final String _filterString;
   private final int _numDocs;
 
   public JsonMatchFilterOperator(JsonIndexReader jsonIndex, String filterString, int numDocs) {
     _jsonIndex = jsonIndex;
-    try {
-      _filter = QueryContextConverterUtils.getFilter(CalciteSqlParser.compileToExpression(filterString));
-    } catch (Exception e) {
-      throw new BadQueryRequestException("Invalid json match filter: " + filterString);
-    }
+    _filterString = filterString;
     _numDocs = numDocs;
   }
 
   @Override
   protected FilterBlock getNextBlock() {
-    return new FilterBlock(new BitmapDocIdSet(_jsonIndex.getMatchingDocIds(_filter), _numDocs));
+    return new FilterBlock(new BitmapDocIdSet(_jsonIndex.getMatchingDocIds(_filterString), _numDocs));
   }
 
   @Override

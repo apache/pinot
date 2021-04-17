@@ -31,8 +31,8 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
-import org.apache.pinot.core.query.exception.EarlyTerminationException;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -65,7 +65,8 @@ public class CombineSlowOperatorsTest {
   public void testSelectionOnlyCombineOperator() {
     List<Operator> operators = getOperators();
     SelectionOnlyCombineOperator combineOperator = new SelectionOnlyCombineOperator(operators,
-        QueryContextConverterUtils.getQueryContextFromPQL("SELECT * FROM table"), _executorService, TIMEOUT_MS);
+        QueryContextConverterUtils.getQueryContextFromPQL("SELECT * FROM table"),
+        _executorService, TIMEOUT_MS);
     testCombineOperator(operators, combineOperator);
   }
 
@@ -76,7 +77,8 @@ public class CombineSlowOperatorsTest {
   public void testAggregationOnlyCombineOperator() {
     List<Operator> operators = getOperators();
     AggregationOnlyCombineOperator combineOperator = new AggregationOnlyCombineOperator(operators,
-        QueryContextConverterUtils.getQueryContextFromPQL("SELECT COUNT(*) FROM table"), _executorService, TIMEOUT_MS);
+        QueryContextConverterUtils.getQueryContextFromPQL("SELECT COUNT(*) FROM table"), _executorService,
+        TIMEOUT_MS);
     testCombineOperator(operators, combineOperator);
   }
 

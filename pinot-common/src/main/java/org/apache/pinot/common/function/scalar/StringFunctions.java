@@ -348,7 +348,7 @@ public class StringFunctions {
    * @return returns true if substring present in main string else false.
    */
   @ScalarFunction
-  public static Boolean contains(String input, String substring) {
+  public static boolean contains(String input, String substring) {
     return input.contains(substring);
   }
 }

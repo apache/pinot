@@ -114,4 +114,3 @@ public class StreamConfigProperties {
     return incoming.split(propertyPrefix + ".")[1];
   }
 }
-

@@ -25,7 +25,6 @@ import java.util.Map;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
-import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
@@ -44,6 +43,7 @@ import org.apache.pinot.spi.config.table.TunerConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 
 
 public class TableConfigBuilder {
@@ -94,6 +94,7 @@ public class TableConfigBuilder {
   private boolean _nullHandlingEnabled;
   private List<String> _varLengthDictionaryColumns;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
+  private List<String> _jsonIndexColumns;
 
   private TableCustomConfig _customConfig;
   private QuotaConfig _quotaConfig;
@@ -268,6 +269,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setJsonIndexColumns(List<String> jsonIndexColumns) {
+    _jsonIndexColumns = jsonIndexColumns;
+    return this;
+  }
+
   public TableConfigBuilder setStreamConfigs(Map<String, String> streamConfigs) {
     Preconditions.checkState(_tableType == TableType.REALTIME);
     _streamConfigs = streamConfigs;
@@ -386,6 +392,7 @@ public class TableConfigBuilder {
     indexingConfig.setNullHandlingEnabled(_nullHandlingEnabled);
     indexingConfig.setVarLengthDictionaryColumns(_varLengthDictionaryColumns);
     indexingConfig.setStarTreeIndexConfigs(_starTreeIndexConfigs);
+    indexingConfig.setJsonIndexColumns(_jsonIndexColumns);
 
     if (_customConfig == null) {
       _customConfig = new TableCustomConfig(null);

@@ -21,12 +21,11 @@ package org.apache.pinot.tools.admin.command;
 import java.io.File;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.util.HashMap;
 import java.util.Map;
-
 import org.apache.commons.configuration.ConfigurationException;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.minion.MinionStarter;
 import org.apache.pinot.spi.services.ServiceRole;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
 import org.kohsuke.args4j.Option;
@@ -52,6 +51,13 @@ public class StartMinionCommand extends AbstractBaseAdminCommand implements Comm
   private String _clusterName = "PinotCluster";
   @Option(name = "-configFileName", required = false, metaVar = "<Config File Name>", usage = "Minion Starter Config file.", forbids = {"-minionHost", "-minionPort"})
   private String _configFileName;
+
+  private Map<String, Object> _configOverrides = new HashMap<>();
+
+  public StartMinionCommand setConfigOverrides(Map<String, Object> configs) {
+    _configOverrides = configs;
+    return this;
+  }
 
   public boolean getHelp() {
     return _help;
@@ -101,10 +107,16 @@ public class StartMinionCommand extends AbstractBaseAdminCommand implements Comm
 
   private Map<String, Object> getMinionConf()
       throws ConfigurationException, SocketException, UnknownHostException {
+    Map<String, Object> properties = new HashMap<>();
     if (_configFileName != null) {
-      return PinotConfigUtils.readConfigFromFile(_configFileName);
+      properties.putAll(PinotConfigUtils.readConfigFromFile(_configFileName));
+    } else {
+      properties.putAll(PinotConfigUtils.generateMinionConf(_minionHost, _minionPort));
     }
-    return PinotConfigUtils.generateMinionConf(_minionHost, _minionPort);
+    if (_configOverrides != null) {
+      properties.putAll(_configOverrides);
+    }
+    return properties;
   }
 
   public StartMinionCommand setMinionHost(String minionHost) {

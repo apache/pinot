@@ -25,6 +25,7 @@ import QueryConsoleIcon from './SvgIcons/QueryConsoleIcon';
 import SwaggerIcon from './SvgIcons/SwaggerIcon';
 import ClusterManagerIcon from './SvgIcons/ClusterManagerIcon';
 import ZookeeperIcon from './SvgIcons/ZookeeperIcon';
+import app_state from '../app_state';
 
 const navigationItems = [
   { id: 1, name: 'Cluster Manager', link: '/', icon: <ClusterManagerIcon /> },
@@ -51,6 +52,10 @@ const Layout = (props) => {
     setOpenSidebar(newSidebarState);
   };
 
+  const filterNavigationItems = () => {
+    return navigationItems.filter((item)=>{return item.name.toLowerCase() === 'query console'});
+  }
+
   return (
     <Grid container direction="column">
       <Header
@@ -63,7 +68,7 @@ const Layout = (props) => {
         <Grid container>
           <Grid item>
             <Sidebar
-              list={navigationItems}
+              list={app_state.queryConsoleOnlyView ? filterNavigationItems() : navigationItems}
               showMenu={openSidebar}
               selectedId={selectedId}
               highlightSidebarLink={highlightSidebarLink}

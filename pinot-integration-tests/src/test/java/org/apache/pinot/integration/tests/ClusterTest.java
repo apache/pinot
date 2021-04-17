@@ -28,7 +28,6 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -50,10 +49,6 @@ import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
-import org.apache.pinot.common.utils.CommonConstants.Broker;
-import org.apache.pinot.common.utils.CommonConstants.Helix;
-import org.apache.pinot.common.utils.CommonConstants.Minion;
-import org.apache.pinot.common.utils.CommonConstants.Server;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.helix.ControllerTest;
@@ -69,6 +64,10 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.CommonConstants.Minion;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -91,6 +90,10 @@ public abstract class ClusterTest extends ControllerTest {
   private List<HelixServerStarter> _serverStarters;
   private MinionStarter _minionStarter;
 
+  protected PinotConfiguration getDefaultBrokerConfiguration() {
+    return new PinotConfiguration();
+  }
+
   protected void startBroker()
       throws Exception {
     startBrokers(1);
@@ -111,7 +114,7 @@ public abstract class ClusterTest extends ControllerTest {
     _brokerBaseApiUrl = "http://localhost:" + basePort;
     _brokerStarters = new ArrayList<>(numBrokers);
     for (int i = 0; i < numBrokers; i++) {
-      Map<String, Object> properties = new HashMap<>();
+      Map<String, Object> properties = getDefaultBrokerConfiguration().toMap();
       properties.put(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
       properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, basePort + i);
       properties.put(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
@@ -125,7 +128,7 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  public static PinotConfiguration getDefaultServerConfiguration() {
+  protected PinotConfiguration getDefaultServerConfiguration() {
     PinotConfiguration configuration = DefaultHelixStarterServerConfig.loadDefaultServerConf();
 
     configuration.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, LOCAL_HOST);
@@ -165,6 +168,9 @@ public abstract class ClusterTest extends ControllerTest {
             .setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
         configuration.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, baseAdminApiPort - i);
         configuration.setProperty(Server.CONFIG_OF_NETTY_PORT, baseNettyPort + i);
+        // Thread time measurement is disabled by default, enable it in integration tests.
+        // TODO: this can be removed when we eventually enable thread time measurement by default.
+        configuration.setProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
         HelixServerStarter helixServerStarter = new HelixServerStarter(getHelixClusterName(), zkStr, configuration);
         _serverStarters.add(helixServerStarter);
         helixServerStarter.start();
@@ -174,13 +180,17 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
+  protected PinotConfiguration getDefaultMinionConfiguration() {
+    return new PinotConfiguration();
+  }
+
   // NOTE: We don't allow multiple Minion instances in the same JVM because Minion uses singleton class MinionContext
   //       to manage the instance level configs
   protected void startMinion(@Nullable List<PinotTaskExecutorFactory> taskExecutorFactories,
       @Nullable List<MinionEventObserverFactory> eventObserverFactories) {
     FileUtils.deleteQuietly(new File(Minion.DEFAULT_INSTANCE_BASE_DIR));
     try {
-      _minionStarter = new MinionStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, new PinotConfiguration());
+      _minionStarter = new MinionStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, getDefaultMinionConfiguration());
       // Register task executor factories
       if (taskExecutorFactories != null) {
         for (PinotTaskExecutorFactory taskExecutorFactory : taskExecutorFactories) {
@@ -365,7 +375,15 @@ public abstract class ClusterTest extends ControllerTest {
    */
   public static JsonNode postQuery(PinotQueryRequest r, String brokerBaseApiUrl)
       throws Exception {
-    return postQuery(r.getQuery(), brokerBaseApiUrl, false, r.getQueryFormat());
+    return postQuery(r.getQuery(), brokerBaseApiUrl, false, r.getQueryFormat(), null);
+  }
+
+  /**
+   * Queries the broker's pql query endpoint (/query)
+   */
+  public static JsonNode postQuery(PinotQueryRequest r, String brokerBaseApiUrl, Map<String, String> headers)
+      throws Exception {
+    return postQuery(r.getQuery(), brokerBaseApiUrl, false, r.getQueryFormat(), headers);
   }
 
   /**
@@ -373,11 +391,19 @@ public abstract class ClusterTest extends ControllerTest {
    */
   public static JsonNode postQuery(String query, String brokerBaseApiUrl, boolean enableTrace, String queryType)
       throws Exception {
+    return postQuery(query, brokerBaseApiUrl, enableTrace, queryType, null);
+  }
+
+  /**
+   * Queries the broker's pql query endpoint (/query)
+   */
+  public static JsonNode postQuery(String query, String brokerBaseApiUrl, boolean enableTrace, String queryType, Map<String, String> headers)
+      throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put(queryType, query);
     payload.put("trace", enableTrace);
 
-    return JsonUtils.stringToJsonNode(sendPostRequest(brokerBaseApiUrl + "/query", payload.toString()));
+    return JsonUtils.stringToJsonNode(sendPostRequest(brokerBaseApiUrl + "/query", payload.toString(), headers));
   }
 
   /**
@@ -391,12 +417,20 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Queries the broker's sql query endpoint (/sql)
    */
-  static JsonNode postSqlQuery(String query, String brokerBaseApiUrl)
+  public static JsonNode postSqlQuery(String query, String brokerBaseApiUrl)
+      throws Exception {
+    return postSqlQuery(query, brokerBaseApiUrl, null);
+  }
+
+  /**
+   * Queries the broker's sql query endpoint (/sql)
+   */
+  public static JsonNode postSqlQuery(String query, String brokerBaseApiUrl, Map<String, String> headers)
       throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("sql", query);
     payload.put("queryOptions", "groupByMode=sql;responseFormat=sql");
 
-    return JsonUtils.stringToJsonNode(sendPostRequest(brokerBaseApiUrl + "/query/sql", payload.toString()));
+    return JsonUtils.stringToJsonNode(sendPostRequest(brokerBaseApiUrl + "/query/sql", payload.toString(), headers));
   }
 }

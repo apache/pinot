@@ -19,12 +19,12 @@
 package org.apache.pinot.tools.admin.command;
 
 import java.io.File;
+import java.util.HashMap;
 import java.util.Map;
-
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.services.ServiceRole;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
 import org.kohsuke.args4j.Option;
@@ -51,6 +51,8 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
   @Option(name = "-configFileName", required = false, metaVar = "<Config File Name>", usage = "Broker Starter Config file.", forbids = {"-brokerHost", "-brokerPort"})
   private String _configFileName;
   private HelixBrokerStarter _brokerStarter;
+
+  private Map<String, Object> _configOverrides = new HashMap<>();
 
   public boolean getHelp() {
     return _help;
@@ -102,6 +104,11 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
     return this;
   }
 
+  public StartBrokerCommand setConfigOverrides(Map<String, Object> configs) {
+    _configOverrides = configs;
+    return this;
+  }
+
   @Override
   public boolean execute()
       throws Exception {
@@ -123,9 +130,15 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
 
   private Map<String, Object> getBrokerConf()
       throws ConfigurationException {
+    Map<String, Object> properties = new HashMap<>();
     if (_configFileName != null) {
-      return PinotConfigUtils.readConfigFromFile(_configFileName);
+      properties.putAll(PinotConfigUtils.readConfigFromFile(_configFileName));
+    } else {
+      properties.putAll(PinotConfigUtils.generateBrokerConf(_brokerPort));
     }
-    return PinotConfigUtils.generateBrokerConf(_brokerPort);
+    if (_configOverrides != null) {
+      properties.putAll(_configOverrides);
+    }
+    return properties;
   }
 }

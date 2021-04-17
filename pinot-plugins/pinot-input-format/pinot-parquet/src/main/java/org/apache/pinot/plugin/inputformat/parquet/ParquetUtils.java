@@ -33,38 +33,41 @@ import org.apache.parquet.hadoop.ParquetFileReader;
 import org.apache.parquet.hadoop.ParquetReader;
 import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
+import org.apache.parquet.schema.MessageType;
 
 
 public class ParquetUtils {
+  private static final String DEFAULT_FS = "file:///";
+
   private ParquetUtils() {
   }
-
-  private static final String DEFAULT_FS = "file:///";
 
   /**
    * Returns a ParquetReader with the given path.
    */
-  public static ParquetReader<GenericRecord> getParquetReader(Path path)
+  public static ParquetReader<GenericRecord> getParquetAvroReader(Path path)
       throws IOException {
     //noinspection unchecked
     return AvroParquetReader.<GenericRecord>builder(path).disableCompatibility().withDataModel(GenericData.get())
-        .withConf(getConfiguration()).build();
+        .withConf(getParquetAvroReaderConfiguration()).build();
   }
 
   /**
    * Returns a ParquetWriter with the given path and schema.
    */
-  public static ParquetWriter<GenericRecord> getParquetWriter(Path path, Schema schema)
+  public static ParquetWriter<GenericRecord> getParquetAvroWriter(Path path, Schema schema)
       throws IOException {
-    return AvroParquetWriter.<GenericRecord>builder(path).withSchema(schema).withConf(getConfiguration()).build();
+    return AvroParquetWriter.<GenericRecord>builder(path).withSchema(schema)
+        .withConf(getParquetAvroReaderConfiguration()).build();
   }
 
   /**
    * Returns the schema for the given Parquet file path.
    */
-  public static Schema getParquetSchema(Path path)
+  public static Schema getParquetAvroSchema(Path path)
       throws IOException {
-    ParquetMetadata footer = ParquetFileReader.readFooter(getConfiguration(), path, ParquetMetadataConverter.NO_FILTER);
+    ParquetMetadata footer =
+        ParquetFileReader.readFooter(getParquetAvroReaderConfiguration(), path, ParquetMetadataConverter.NO_FILTER);
     Map<String, String> metaData = footer.getFileMetaData().getKeyValueMetaData();
     String schemaString = metaData.get("parquet.avro.schema");
     if (schemaString == null) {
@@ -74,11 +77,12 @@ public class ParquetUtils {
     if (schemaString != null) {
       return new Schema.Parser().parse(schemaString);
     } else {
-      return new AvroSchemaConverter().convert(footer.getFileMetaData().getSchema());
+      MessageType parquetSchema = footer.getFileMetaData().getSchema();
+      return new AvroSchemaConverter().convert(parquetSchema);
     }
   }
 
-  private static Configuration getConfiguration() {
+  private static Configuration getParquetAvroReaderConfiguration() {
     // The file path used in ParquetRecordReader is a local file path without prefix 'file:///',
     // so we have to make sure that the configuration item 'fs.defaultFS' is set to 'file:///'
     // in case that user's hadoop conf overwrite this item

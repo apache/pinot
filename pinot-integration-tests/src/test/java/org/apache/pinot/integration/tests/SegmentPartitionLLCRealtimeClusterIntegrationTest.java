@@ -30,8 +30,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
-import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
-import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -40,6 +39,7 @@ import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -165,9 +165,9 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       assertNotNull(columnPartitionMetadata);
       assertTrue(columnPartitionMetadata.getFunctionName().equalsIgnoreCase("murmur"));
       assertEquals(columnPartitionMetadata.getNumPartitions(), 2);
-      int streamPartitionId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionId();
-      assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(streamPartitionId));
-      numSegmentsForPartition[streamPartitionId]++;
+      int partitionGroupId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionGroupId();
+      assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(partitionGroupId));
+      numSegmentsForPartition[partitionGroupId]++;
     }
 
     // There should be 2 segments for partition 0, 2 segments for partition 1
@@ -187,8 +187,8 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       JsonNode responseToCompare = postQuery(queryToCompare);
 
       // Should only query the segments for partition 0
-      assertEquals(response.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), 2);
-      assertEquals(responseToCompare.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), 4);
+      assertEquals(response.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), 2);
+      assertEquals(responseToCompare.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), 4);
 
       assertEquals(response.get("aggregationResults").get(0).get("value").asInt(),
           responseToCompare.get("aggregationResults").get(0).get("value").asInt());
@@ -203,8 +203,8 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       JsonNode responseToCompare = postQuery(queryToCompare);
 
       // Should only query the segments for partition 1
-      assertEquals(response.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), 2);
-      assertEquals(responseToCompare.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), 4);
+      assertEquals(response.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), 2);
+      assertEquals(responseToCompare.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), 4);
 
       assertEquals(response.get("aggregationResults").get(0).get("value").asInt(),
           responseToCompare.get("aggregationResults").get(0).get("value").asInt());
@@ -236,18 +236,18 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       assertNotNull(columnPartitionMetadata);
       assertTrue(columnPartitionMetadata.getFunctionName().equalsIgnoreCase("murmur"));
       assertEquals(columnPartitionMetadata.getNumPartitions(), 2);
-      int streamPartitionId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionId();
-      numSegmentsForPartition[streamPartitionId]++;
+      int partitionGroupId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionGroupId();
+      numSegmentsForPartition[partitionGroupId]++;
 
       if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
         // For consuming segment, the partition metadata should only contain the stream partition
-        assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(streamPartitionId));
+        assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(partitionGroupId));
       } else {
         LLCSegmentName llcSegmentName = new LLCSegmentName(segmentZKMetadata.getSegmentName());
         int sequenceNumber = llcSegmentName.getSequenceNumber();
         if (sequenceNumber == 0) {
           // The partition metadata for the first completed segment should only contain the stream partition
-          assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(streamPartitionId));
+          assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(partitionGroupId));
         } else {
           // The partition metadata for the new completed segments should contain both partitions
           assertEquals(columnPartitionMetadata.getPartitions(), new HashSet<>(Arrays.asList(0, 1)));
@@ -271,8 +271,8 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       JsonNode responseToCompare = postQuery(queryToCompare);
 
       // Should skip the first completed segments and the consuming segment for partition 1
-      assertEquals(response.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), numSegments - 2);
-      assertEquals(responseToCompare.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), numSegments);
+      assertEquals(response.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), numSegments - 2);
+      assertEquals(responseToCompare.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), numSegments);
 
       // The result won't match because the consuming segment for partition 1 is pruned out
     }
@@ -286,8 +286,8 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       JsonNode responseToCompare = postQuery(queryToCompare);
 
       // Should skip the first completed segments and the consuming segment for partition 0
-      assertEquals(response.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), numSegments - 2);
-      assertEquals(responseToCompare.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), numSegments);
+      assertEquals(response.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), numSegments - 2);
+      assertEquals(responseToCompare.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), numSegments);
 
       // The result won't match because the consuming segment for partition 0 is pruned out
     }
@@ -313,19 +313,19 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       assertNotNull(columnPartitionMetadata);
       assertTrue(columnPartitionMetadata.getFunctionName().equalsIgnoreCase("murmur"));
       assertEquals(columnPartitionMetadata.getNumPartitions(), 2);
-      int streamPartitionId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionId();
-      numSegmentsForPartition[streamPartitionId]++;
+      int partitionGroupId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionGroupId();
+      numSegmentsForPartition[partitionGroupId]++;
 
       if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
         // For consuming segment, the partition metadata should only contain the stream partition
-        assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(streamPartitionId));
+        assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(partitionGroupId));
       } else {
         // The partition metadata for the new completed segments should only contain the stream partition
         LLCSegmentName llcSegmentName = new LLCSegmentName(segmentZKMetadata.getSegmentName());
         int sequenceNumber = llcSegmentName.getSequenceNumber();
         if (sequenceNumber == 0 || sequenceNumber >= 4) {
           // The partition metadata for the first and new completed segments should only contain the stream partition
-          assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(streamPartitionId));
+          assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(partitionGroupId));
         } else {
           // The partition metadata for the completed segments containing records from the second Avro file should
           // contain both partitions
@@ -350,8 +350,8 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       JsonNode responseToCompare = postQuery(queryToCompare);
 
       // Should skip 2 completed segments and the consuming segment for partition 1
-      assertEquals(response.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), numSegments - 3);
-      assertEquals(responseToCompare.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), numSegments);
+      assertEquals(response.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), numSegments - 3);
+      assertEquals(responseToCompare.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), numSegments);
 
       // The result should match again after all the segments with the non-partitioning records are committed
       assertEquals(response.get("aggregationResults").get(0).get("value").asInt(),
@@ -367,8 +367,8 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       JsonNode responseToCompare = postQuery(queryToCompare);
 
       // Should skip 2 completed segments and the consuming segment for partition 0
-      assertEquals(response.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), numSegments - 3);
-      assertEquals(responseToCompare.get(DataTable.NUM_SEGMENTS_QUERIED).asInt(), numSegments);
+      assertEquals(response.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), numSegments - 3);
+      assertEquals(responseToCompare.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), numSegments);
 
       // The result should match again after all the segments with the non-partitioning records are committed
       assertEquals(response.get("aggregationResults").get(0).get("value").asInt(),

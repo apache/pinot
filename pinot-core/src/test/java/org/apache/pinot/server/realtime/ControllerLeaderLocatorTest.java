@@ -30,9 +30,9 @@ import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.LiveInstance;
 import org.apache.helix.model.ResourceConfig;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
-import org.apache.pinot.core.query.utils.Pair;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.Pair;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

@@ -25,7 +25,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.7.0-SNAPSHOT</version>
+    <version>0.8.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-common</artifactId>
@@ -84,6 +84,15 @@
       <artifactId>pinot-spi</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-segment-spi</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-yammer</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpmime</artifactId>
     </dependency>
@@ -117,10 +126,6 @@
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
       <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.yammer.metrics</groupId>
-      <artifactId>metrics-core</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>
@@ -280,6 +285,10 @@
       <groupId>io.grpc</groupId>
       <artifactId>grpc-stub</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.apache.yetus</groupId>
+      <artifactId>audience-annotations</artifactId>
+    </dependency>
   </dependencies>
   <profiles>
     <profile>
@@ -299,6 +308,14 @@
                 </goals>
                 <configuration>
                   <relocations>
+                    <relocation>
+                      <pattern>com.google.common.base</pattern>
+                      <shadedPattern>shaded.com.google.common.base</shadedPattern>
+                    </relocation>
+                    <relocation>
+                      <pattern>com.google.common.cache</pattern>
+                      <shadedPattern>shaded.com.google.common.cache</shadedPattern>
+                    </relocation>
                     <relocation>
                       <pattern>org.apache.http</pattern>
                       <shadedPattern>shaded.org.apache.http</shadedPattern>

@@ -21,10 +21,10 @@ package org.apache.pinot.core.plan;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
-import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.transform.TransformOperator;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.spi.IndexSegment;
 
 
 /**

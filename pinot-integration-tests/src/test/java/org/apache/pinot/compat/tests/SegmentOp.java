@@ -19,6 +19,7 @@
 package org.apache.pinot.compat.tests;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -27,20 +28,21 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.controller.helix.ControllerTest;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
-import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.integration.tests.ClusterTest;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,6 +80,7 @@ public class SegmentOp extends BaseOp {
   private String _recordReaderConfigFileName;
   private String _tableName;
   private String _segmentName;
+  private int _generationNumber;
 
   public SegmentOp() {
     super(OpType.SEGMENT_OP);
@@ -132,7 +135,8 @@ public class SegmentOp extends BaseOp {
   }
 
   @Override
-  boolean runOp() {
+  boolean runOp(int generationNumber) {
+    _generationNumber = generationNumber;
     switch (_op) {
       case UPLOAD:
         return createAndUploadSegments();
@@ -147,14 +151,20 @@ public class SegmentOp extends BaseOp {
    * @return true if all successful, false in case of failure.
    */
   private boolean createAndUploadSegments() {
-    File localTempDir = new File(FileUtils.getTempDirectory(), "pinot-compat-test-" + UUID.randomUUID());
+    File localTempDir = new File(FileUtils.getTempDirectory(), "pinot-compat-test-segment-op-" + UUID.randomUUID());
     localTempDir.deleteOnExit();
     File localOutputTempDir = new File(localTempDir, "output");
     try {
       FileUtils.forceMkdir(localOutputTempDir);
-      File segmentTarFile = generateSegment(localOutputTempDir);
+      // replace the placeholder in the data file.
+      File localReplacedInputDataFile = new File(localTempDir, "replaced");
+      Utils.replaceContent(new File(_inputDataFileName), localReplacedInputDataFile, GENERATION_NUMBER_PLACEHOLDER,
+          String.valueOf(_generationNumber));
+
+      File segmentTarFile = generateSegment(localOutputTempDir, localReplacedInputDataFile.getAbsolutePath());
       uploadSegment(segmentTarFile);
-      return verifySegmentInState(CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE);
+      return verifySegmentInState(CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE)
+          && verifyRoutingTableUpdated();
     } catch (Exception e) {
       LOGGER.error("Failed to create and upload segment for input data file {}.", _inputDataFileName, e);
       return false;
@@ -170,17 +180,21 @@ public class SegmentOp extends BaseOp {
    * @return File object of the TarGz compressed segment file.
    * @throws Exception while generating segment files and/or compressing to TarGz.
    */
-  private File generateSegment(File outputDir)
+  private File generateSegment(File outputDir, String localReplacedInputDataFilePath)
       throws Exception {
     TableConfig tableConfig = JsonUtils.fileToObject(new File(_tableConfigFileName), TableConfig.class);
     _tableName = tableConfig.getTableName();
+    // if user does not specify segmentName, use tableName_generationNumber
+    if (_segmentName == null || _segmentName.isEmpty()) {
+      _segmentName = _tableName + "_" + _generationNumber;
+    }
 
     Schema schema = JsonUtils.fileToObject(new File(_schemaFileName), Schema.class);
     RecordReaderConfig recordReaderConfig =
         RecordReaderFactory.getRecordReaderConfig(DEFAULT_FILE_FORMAT, _recordReaderConfigFileName);
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
-    segmentGeneratorConfig.setInputFilePath(_inputDataFileName);
+    segmentGeneratorConfig.setInputFilePath(localReplacedInputDataFilePath);
     segmentGeneratorConfig.setFormat(DEFAULT_FILE_FORMAT);
     segmentGeneratorConfig.setOutDir(outputDir.getAbsolutePath());
     segmentGeneratorConfig.setReaderConfig(recordReaderConfig);
@@ -241,6 +255,28 @@ public class SegmentOp extends BaseOp {
     return true;
   }
 
+  // TODO: verify by getting the number of rows before adding the segment, and the number of rows after adding the
+  //       segment, then make sure that it has increased by the number of rows in the segment.
+  private boolean verifyRoutingTableUpdated()
+      throws Exception {
+    String query = "SELECT count(*) FROM " + _tableName;
+    JsonNode result = ClusterTest.postSqlQuery(query, ClusterDescriptor.BROKER_URL);
+    long startTime = System.currentTimeMillis();
+    while (SqlResultComparator.isEmpty(result)) {
+      if ((System.currentTimeMillis() - startTime) > DEFAULT_MAX_SLEEP_TIME_MS) {
+        LOGGER
+            .error("Upload segment verification failed, routing table has not been updated after max wait time {} ms.",
+                DEFAULT_MAX_SLEEP_TIME_MS);
+        return false;
+      }
+      LOGGER.warn("Routing table has not been updated yet, will retry after {} ms.", DEFAULT_SLEEP_INTERVAL_MS);
+      Thread.sleep(DEFAULT_SLEEP_INTERVAL_MS);
+      result = ClusterTest.postSqlQuery(query, ClusterDescriptor.BROKER_URL);
+    }
+    LOGGER.info("Routing table has been updated.");
+    return true;
+  }
+
   /**
    * Deletes the segment for the given segment name and table name.
    * @return true if delete successful, else false.
@@ -249,6 +285,10 @@ public class SegmentOp extends BaseOp {
     try {
       TableConfig tableConfig = JsonUtils.fileToObject(new File(_tableConfigFileName), TableConfig.class);
       _tableName = tableConfig.getTableName();
+      // if user does not specify segmentName, use tableName_generationNumber
+      if (_segmentName == null || _segmentName.isEmpty()) {
+        _segmentName = _tableName + "_" + _generationNumber;
+      }
 
       ControllerTest.sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL)
           .forSegmentDelete(_tableName, _segmentName));

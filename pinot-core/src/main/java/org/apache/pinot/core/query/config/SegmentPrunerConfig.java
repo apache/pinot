@@ -21,7 +21,6 @@ package org.apache.pinot.core.query.config;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 

@@ -32,8 +32,8 @@ public class CSVRecordReaderConfig implements RecordReaderConfig {
   private String _header;
   private char _delimiter = DEFAULT_DELIMITER;
   private char _multiValueDelimiter = DEFAULT_MULTI_VALUE_DELIMITER;
-
-  private Character _commentMarker;  // Default is null
+  private Character _commentMarker;   // Default is null
+  private Character _escapeCharacter; // Default is null
 
   public String getFileFormat() {
     return _fileFormat;
@@ -73,6 +73,14 @@ public class CSVRecordReaderConfig implements RecordReaderConfig {
 
   public void setCommentMarker(Character commentMarker) {
     _commentMarker = commentMarker;
+  }
+
+  public Character getEscapeCharacter() {
+    return _escapeCharacter;
+  }
+
+  public void setEscapeCharacter(Character escapeCharacter) {
+    _escapeCharacter = escapeCharacter;
   }
 
   @Override

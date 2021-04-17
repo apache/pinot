@@ -40,9 +40,20 @@ public class ConnectionFactory {
    * @return A connection that connects to the brokers in the given Helix cluster
    */
   public static Connection fromZookeeper(String zkUrl) {
+    return fromZookeeper(zkUrl, null);
+  }
+
+  /**
+   * Creates a connection to a Pinot cluster, given its Zookeeper URL
+   *
+   * @param zkUrl The URL to the Zookeeper cluster, must include the cluster name e.g host:port/chroot/pinot-cluster
+   * @param headers Map of key and values of header which need to be used during http call
+   * @return A connection that connects to the brokers in the given Helix cluster
+   */
+  public static Connection fromZookeeper(String zkUrl, Map<String, String> headers) {
     try {
       DynamicBrokerSelector dynamicBrokerSelector = new DynamicBrokerSelector(zkUrl);
-      return new Connection(dynamicBrokerSelector, _transportFactory.buildTransport(null));
+      return new Connection(dynamicBrokerSelector, _transportFactory.buildTransport(headers));
     } catch (Exception e) {
       throw new PinotClientException(e);
     }
@@ -55,8 +66,19 @@ public class ConnectionFactory {
    * @return A connection that connects to the brokers specified in the properties
    */
   public static Connection fromProperties(Properties properties) {
+    return fromProperties(properties, null);
+  }
+
+  /**
+   * Creates a connection from properties containing the connection parameters.
+   *
+   * @param properties The properties to use for the connection
+   * @param headers Map of key and values of header which need to be used during http call
+   * @return A connection that connects to the brokers specified in the properties
+   */
+  public static Connection fromProperties(Properties properties, Map<String, String> headers) {
     return new Connection(Arrays.asList(properties.getProperty("brokerList").split(",")),
-        _transportFactory.buildTransport(null));
+        _transportFactory.buildTransport(headers));
   }
 
   /**
@@ -66,7 +88,7 @@ public class ConnectionFactory {
    * @return A connection to the set of brokers specified
    */
   public static Connection fromHostList(String... brokers) {
-    return new Connection(Arrays.asList(brokers), _transportFactory.buildTransport(null));
+    return fromHostList(Arrays.asList(brokers), null);
   }
 
   /**

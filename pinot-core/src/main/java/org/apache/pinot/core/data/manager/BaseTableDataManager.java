@@ -33,8 +33,8 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,6 +55,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected File _indexDir;
   protected Logger _logger;
   protected HelixManager _helixManager;
+  protected String _authToken;
 
   @Override
   public void init(TableDataManagerConfig tableDataManagerConfig, String instanceId,
@@ -66,6 +67,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _propertyStore = propertyStore;
     _serverMetrics = serverMetrics;
     _helixManager = helixManager;
+    _authToken = tableDataManagerConfig.getAuthToken();
 
     _tableNameWithType = tableDataManagerConfig.getTableName();
     _tableDataDir = tableDataManagerConfig.getDataDir();
@@ -208,6 +210,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
         -segmentDataManager.getSegment().getSegmentMetadata().getTotalDocs());
     segmentDataManager.destroy();
     _logger.info("Closed segment: {} of table: {}", segmentName, _tableNameWithType);
+  }
+
+  @Override
+  public int getNumSegments() {
+    return _segmentDataManagerMap.size();
   }
 
   @Override

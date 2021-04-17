@@ -20,11 +20,9 @@ package org.apache.pinot.client.controller;
 
 import com.ning.http.client.AsyncHttpClient;
 import com.ning.http.client.Response;
-
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-
 import org.apache.pinot.client.PinotClientException;
 import org.apache.pinot.client.controller.response.ControllerTenantBrokerResponse;
 import org.apache.pinot.client.controller.response.SchemaResponse;

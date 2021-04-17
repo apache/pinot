@@ -58,4 +58,9 @@ public class IntToIdMap extends BaseValueToIdMap {
   public String getString(int id) {
     return Integer.toString(getInt(id));
   }
+
+  @Override
+  public Object get(int id) {
+    return getInt(id);
+  }
 }

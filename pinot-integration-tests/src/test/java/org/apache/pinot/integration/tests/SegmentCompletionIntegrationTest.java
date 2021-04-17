@@ -19,7 +19,6 @@
 package org.apache.pinot.integration.tests;
 
 import com.google.common.base.Function;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
@@ -32,11 +31,10 @@ import org.apache.helix.participant.statemachine.StateModel;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
+import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
@@ -45,7 +43,8 @@ import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.helix.SegmentOnlineOfflineStateModelFactory;
 import org.apache.pinot.spi.stream.LongMsgOffset;
-import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -95,7 +94,7 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
    */
   private void startFakeServer()
       throws Exception {
-    _serverInstance = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + NetUtil.getHostAddress() + "_"
+    _serverInstance = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + NetUtils.getHostAddress() + "_"
         + CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
 
     // Create server instance with the fake server state model
@@ -141,11 +140,11 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
     }, 60_000L, "Failed to reach CONSUMING state");
 
     // Now report to the controller that we had to stop consumption
-    ServerSegmentCompletionProtocolHandler protocolHandler =
-        new ServerSegmentCompletionProtocolHandler(new ServerMetrics(new MetricsRegistry()), realtimeTableName);
+    ServerSegmentCompletionProtocolHandler protocolHandler = new ServerSegmentCompletionProtocolHandler(
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), realtimeTableName);
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
     params.withStreamPartitionMsgOffset(new LongMsgOffset(45688L).toString()).withSegmentName(_currentSegment)
-        .withReason("RandomReason") .withInstanceId(_serverInstance);
+        .withReason("RandomReason").withInstanceId(_serverInstance);
     SegmentCompletionProtocol.Response response = protocolHandler.segmentStoppedConsuming(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED);
 

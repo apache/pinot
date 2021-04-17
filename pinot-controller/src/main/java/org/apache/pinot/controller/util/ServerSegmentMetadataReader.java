@@ -18,15 +18,12 @@
  */
 package org.apache.pinot.controller.util;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.BiMap;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

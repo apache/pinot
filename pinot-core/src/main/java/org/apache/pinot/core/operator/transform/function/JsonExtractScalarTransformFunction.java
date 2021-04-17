@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableSet;
 import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.Option;
+import com.jayway.jsonpath.ParseContext;
 import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.json.JsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
@@ -30,11 +31,10 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nonnull;
-import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -53,13 +53,12 @@ import org.apache.pinot.spi.utils.JsonUtils;
  *
  */
 public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
-
   public static final String FUNCTION_NAME = "jsonExtractScalar";
-  private static final Configuration LIST_RESPONSE_CONFIG =
-      Configuration.defaultConfiguration().addOptions(Option.SUPPRESS_EXCEPTIONS);
+  private static final ParseContext JSON_PARSER_CONTEXT =
+      JsonPath.using(Configuration.defaultConfiguration().addOptions(Option.SUPPRESS_EXCEPTIONS));
+
   private TransformFunction _jsonFieldTransformFunction;
   private String _jsonPath;
-  private String _resultsType;
   private Object _defaultValue = null;
   private TransformResultMetadata _resultMetadata;
 
@@ -69,7 +68,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(@Nonnull List<TransformFunction> arguments, @Nonnull Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     // Check that there are exactly 3 or 4 arguments
     if (arguments.size() < 3 || arguments.size() > 4) {
       throw new IllegalArgumentException(
@@ -83,41 +82,19 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     }
     _jsonFieldTransformFunction = firstArgument;
     _jsonPath = ((LiteralTransformFunction) arguments.get(1)).getLiteral();
-    _resultsType = ((LiteralTransformFunction) arguments.get(2)).getLiteral().toUpperCase();
-    boolean isSingleValue = !_resultsType.toUpperCase().endsWith("_ARRAY");
+    String resultsType = ((LiteralTransformFunction) arguments.get(2)).getLiteral().toUpperCase();
+    boolean isSingleValue = !resultsType.endsWith("_ARRAY");
     try {
-      FieldSpec.DataType fieldType = FieldSpec.DataType.valueOf(_resultsType.split("_ARRAY")[0]);
-
+      DataType dataType =
+          DataType.valueOf(isSingleValue ? resultsType : resultsType.substring(0, resultsType.length() - 6));
       if (arguments.size() == 4) {
-        String defaultValue = ((LiteralTransformFunction) arguments.get(3)).getLiteral();
-        switch (fieldType) {
-          case INT:
-            _defaultValue = Double.valueOf(defaultValue).intValue();
-            break;
-          case LONG:
-            _defaultValue = Double.valueOf(defaultValue).longValue();
-            break;
-          case FLOAT:
-            _defaultValue = Double.valueOf(defaultValue).floatValue();
-            break;
-          case DOUBLE:
-            _defaultValue = Double.valueOf(defaultValue);
-            break;
-          case BOOLEAN:
-          case STRING:
-            _defaultValue = defaultValue;
-            break;
-          case BYTES:
-            throw new UnsupportedOperationException(String.format(
-                "Unsupported results type: BYTES for 'jsonExtractScalar' Udf. Supported types are: INT/LONG/FLOAT/DOUBLE/STRING/INT_ARRAY/LONG/FLOAT_ARRAY/DOUBLE_ARRAY/STRING_ARRAY",
-                _resultsType));
-        }
+        _defaultValue = dataType.convert(((LiteralTransformFunction) arguments.get(3)).getLiteral());
       }
-      _resultMetadata = new TransformResultMetadata(fieldType, isSingleValue, false);
+      _resultMetadata = new TransformResultMetadata(dataType, isSingleValue, false);
     } catch (Exception e) {
-      throw new UnsupportedOperationException(String.format(
-          "Unsupported results type: %s for 'jsonExtractScalar' Udf. Supported types are: INT/LONG/FLOAT/DOUBLE/STRING/INT_ARRAY/LONG/FLOAT_ARRAY/DOUBLE_ARRAY/STRING_ARRAY",
-          _resultsType));
+      throw new IllegalStateException(String.format(
+          "Unsupported results type: %s for jsonExtractScalar function. Supported types are: INT/LONG/FLOAT/DOUBLE/STRING/INT_ARRAY/LONG_ARRAY/FLOAT_ARRAY/DOUBLE_ARRAY/STRING_ARRAY",
+          resultsType));
     }
   }
 
@@ -127,11 +104,11 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public int[] transformToIntValuesSV(@Nonnull ProjectionBlock projectionBlock) {
+  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
     final String[] stringValuesSV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     final int[] results = new int[projectionBlock.getNumDocs()];
     for (int i = 0; i < results.length; i++) {
-      Object read = JsonPath.read(stringValuesSV[i], _jsonPath);
+      Object read = JSON_PARSER_CONTEXT.parse(stringValuesSV[i]).read(_jsonPath);
       if (read == null) {
         if (_defaultValue != null) {
           results[i] = (int) _defaultValue;
@@ -150,11 +127,11 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public long[] transformToLongValuesSV(@Nonnull ProjectionBlock projectionBlock) {
+  public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
     final String[] stringValuesSV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     final long[] results = new long[projectionBlock.getNumDocs()];
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      Object read = JsonPath.read(stringValuesSV[i], _jsonPath);
+      Object read = JSON_PARSER_CONTEXT.parse(stringValuesSV[i]).read(_jsonPath);
       if (read == null) {
         if (_defaultValue != null) {
           results[i] = (long) _defaultValue;
@@ -174,11 +151,11 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public float[] transformToFloatValuesSV(@Nonnull ProjectionBlock projectionBlock) {
+  public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
     final String[] stringValuesSV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     final float[] results = new float[projectionBlock.getNumDocs()];
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      Object read = JsonPath.read(stringValuesSV[i], _jsonPath);
+      Object read = JSON_PARSER_CONTEXT.parse(stringValuesSV[i]).read(_jsonPath);
       if (read == null) {
         if (_defaultValue != null) {
           results[i] = (float) _defaultValue;
@@ -197,11 +174,11 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public double[] transformToDoubleValuesSV(@Nonnull ProjectionBlock projectionBlock) {
+  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     final String[] stringValuesSV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     final double[] results = new double[projectionBlock.getNumDocs()];
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      Object read = JsonPath.read(stringValuesSV[i], _jsonPath);
+      Object read = JSON_PARSER_CONTEXT.parse(stringValuesSV[i]).read(_jsonPath);
       if (read == null) {
         if (_defaultValue != null) {
           results[i] = (double) _defaultValue;
@@ -222,11 +199,11 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public String[] transformToStringValuesSV(@Nonnull ProjectionBlock projectionBlock) {
+  public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
     final String[] stringValuesSV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     final String[] results = new String[projectionBlock.getNumDocs()];
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      Object read = JsonPath.read(stringValuesSV[i], _jsonPath);
+      Object read = JSON_PARSER_CONTEXT.parse(stringValuesSV[i]).read(_jsonPath);
       if (read == null) {
         if (_defaultValue != null) {
           results[i] = (String) _defaultValue;
@@ -245,11 +222,11 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public int[][] transformToIntValuesMV(@Nonnull ProjectionBlock projectionBlock) {
+  public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
     final String[] stringValuesMV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     final int[][] results = new int[projectionBlock.getNumDocs()][];
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      final List<Integer> intVals = JsonPath.using(LIST_RESPONSE_CONFIG).parse(stringValuesMV[i]).read(_jsonPath);
+      final List<Integer> intVals = JSON_PARSER_CONTEXT.parse(stringValuesMV[i]).read(_jsonPath);
       if (intVals == null) {
         results[i] = new int[0];
         continue;
@@ -263,11 +240,11 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public long[][] transformToLongValuesMV(@Nonnull ProjectionBlock projectionBlock) {
+  public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
     final String[] stringValuesMV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     final long[][] results = new long[projectionBlock.getNumDocs()][];
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      final List<Long> longVals = JsonPath.using(LIST_RESPONSE_CONFIG).parse(stringValuesMV[i]).read(_jsonPath);
+      final List<Long> longVals = JSON_PARSER_CONTEXT.parse(stringValuesMV[i]).read(_jsonPath);
       if (longVals == null) {
         results[i] = new long[0];
         continue;
@@ -281,11 +258,11 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public float[][] transformToFloatValuesMV(@Nonnull ProjectionBlock projectionBlock) {
+  public float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock) {
     final String[] stringValuesMV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     final float[][] results = new float[projectionBlock.getNumDocs()][];
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      final List<Float> floatVals = JsonPath.using(LIST_RESPONSE_CONFIG).parse(stringValuesMV[i]).read(_jsonPath);
+      final List<Float> floatVals = JSON_PARSER_CONTEXT.parse(stringValuesMV[i]).read(_jsonPath);
       if (floatVals == null) {
         results[i] = new float[0];
         continue;
@@ -299,11 +276,11 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public double[][] transformToDoubleValuesMV(@Nonnull ProjectionBlock projectionBlock) {
+  public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
     final String[] stringValuesMV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     final double[][] results = new double[projectionBlock.getNumDocs()][];
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      final List<Double> doubleVals = JsonPath.using(LIST_RESPONSE_CONFIG).parse(stringValuesMV[i]).read(_jsonPath);
+      final List<Double> doubleVals = JSON_PARSER_CONTEXT.parse(stringValuesMV[i]).read(_jsonPath);
       if (doubleVals == null) {
         results[i] = new double[0];
         continue;
@@ -317,11 +294,11 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public String[][] transformToStringValuesMV(@Nonnull ProjectionBlock projectionBlock) {
+  public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
     final String[] stringValuesMV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     final String[][] results = new String[projectionBlock.getNumDocs()][];
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      final List<String> stringVals = JsonPath.using(LIST_RESPONSE_CONFIG).parse(stringValuesMV[i]).read(_jsonPath);
+      final List<String> stringVals = JSON_PARSER_CONTEXT.parse(stringValuesMV[i]).read(_jsonPath);
       if (stringVals == null) {
         results[i] = new String[0];
         continue;

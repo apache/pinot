@@ -18,10 +18,11 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.core.query.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -316,7 +317,7 @@ public class AggregationFunctionFactoryTest {
   }
 
   private FunctionContext getFunction(String functionName, String args) {
-    return QueryContextConverterUtils.getExpression(functionName + args).getFunction();
+    return RequestContextUtils.getExpression(functionName + args).getFunction();
   }
 
   @Test

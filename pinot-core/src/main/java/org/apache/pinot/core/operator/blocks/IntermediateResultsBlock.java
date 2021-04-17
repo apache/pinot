@@ -31,22 +31,19 @@ import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.BlockDocIdValueSet;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
-import org.apache.pinot.core.common.datatable.DataTableImplV2;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.Table;
-import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -69,6 +66,7 @@ public class IntermediateResultsBlock implements Block {
   private boolean _numGroupsLimitReached;
   private int _numResizes;
   private long _resizeTimeMs;
+  private long _executionThreadCpuTimeNs;
 
   private Table _table;
 
@@ -195,34 +193,6 @@ public class IntermediateResultsBlock implements Block {
     _processingExceptions.add(processingException);
   }
 
-  public void setNumDocsScanned(long numDocsScanned) {
-    _numDocsScanned = numDocsScanned;
-  }
-
-  public void setNumEntriesScannedInFilter(long numEntriesScannedInFilter) {
-    _numEntriesScannedInFilter = numEntriesScannedInFilter;
-  }
-
-  public void setNumEntriesScannedPostFilter(long numEntriesScannedPostFilter) {
-    _numEntriesScannedPostFilter = numEntriesScannedPostFilter;
-  }
-
-  public void setNumSegmentsProcessed(int numSegmentsProcessed) {
-    _numSegmentsProcessed = numSegmentsProcessed;
-  }
-
-  public void setNumSegmentsMatched(int numSegmentsMatched) {
-    _numSegmentsMatched = numSegmentsMatched;
-  }
-
-  public void setNumTotalDocs(long numTotalDocs) {
-    _numTotalDocs = numTotalDocs;
-  }
-
-  public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
-    _numGroupsLimitReached = numGroupsLimitReached;
-  }
-
   public void setNumResizes(int numResizes) {
     _numResizes = numResizes;
   }
@@ -231,9 +201,21 @@ public class IntermediateResultsBlock implements Block {
     _resizeTimeMs = resizeTimeMs;
   }
 
+  public long getExecutionThreadCpuTimeNs() {
+    return _executionThreadCpuTimeNs;
+  }
+
+  public void setExecutionThreadCpuTimeNs(long executionThreadCpuTimeNs) {
+    _executionThreadCpuTimeNs = executionThreadCpuTimeNs;
+  }
+
   @VisibleForTesting
   public long getNumDocsScanned() {
     return _numDocsScanned;
+  }
+
+  public void setNumDocsScanned(long numDocsScanned) {
+    _numDocsScanned = numDocsScanned;
   }
 
   @VisibleForTesting
@@ -241,9 +223,17 @@ public class IntermediateResultsBlock implements Block {
     return _numEntriesScannedInFilter;
   }
 
+  public void setNumEntriesScannedInFilter(long numEntriesScannedInFilter) {
+    _numEntriesScannedInFilter = numEntriesScannedInFilter;
+  }
+
   @VisibleForTesting
   public long getNumEntriesScannedPostFilter() {
     return _numEntriesScannedPostFilter;
+  }
+
+  public void setNumEntriesScannedPostFilter(long numEntriesScannedPostFilter) {
+    _numEntriesScannedPostFilter = numEntriesScannedPostFilter;
   }
 
   @VisibleForTesting
@@ -251,9 +241,17 @@ public class IntermediateResultsBlock implements Block {
     return _numSegmentsProcessed;
   }
 
+  public void setNumSegmentsProcessed(int numSegmentsProcessed) {
+    _numSegmentsProcessed = numSegmentsProcessed;
+  }
+
   @VisibleForTesting
   public int getNumSegmentsMatched() {
     return _numSegmentsMatched;
+  }
+
+  public void setNumSegmentsMatched(int numSegmentsMatched) {
+    _numSegmentsMatched = numSegmentsMatched;
   }
 
   @VisibleForTesting
@@ -261,9 +259,17 @@ public class IntermediateResultsBlock implements Block {
     return _numTotalDocs;
   }
 
+  public void setNumTotalDocs(long numTotalDocs) {
+    _numTotalDocs = numTotalDocs;
+  }
+
   @VisibleForTesting
   public boolean isNumGroupsLimitReached() {
     return _numGroupsLimitReached;
+  }
+
+  public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
+    _numGroupsLimitReached = numGroupsLimitReached;
   }
 
   public DataTable getDataTable()
@@ -417,23 +423,23 @@ public class IntermediateResultsBlock implements Block {
   }
 
   private DataTable getMetadataDataTable() {
-    return attachMetadataToDataTable(new DataTableImplV2());
+    return attachMetadataToDataTable(DataTableBuilder.getEmptyDataTable());
   }
 
   private DataTable attachMetadataToDataTable(DataTable dataTable) {
-    dataTable.getMetadata().put(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, String.valueOf(_numDocsScanned));
+    dataTable.getMetadata().put(MetadataKey.NUM_DOCS_SCANNED.getName(), String.valueOf(_numDocsScanned));
     dataTable.getMetadata()
-        .put(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, String.valueOf(_numEntriesScannedInFilter));
+        .put(MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName(), String.valueOf(_numEntriesScannedInFilter));
     dataTable.getMetadata()
-        .put(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, String.valueOf(_numEntriesScannedPostFilter));
-    dataTable.getMetadata().put(DataTable.NUM_SEGMENTS_PROCESSED, String.valueOf(_numSegmentsProcessed));
-    dataTable.getMetadata().put(DataTable.NUM_SEGMENTS_MATCHED, String.valueOf(_numSegmentsMatched));
-    dataTable.getMetadata().put(DataTable.NUM_RESIZES_METADATA_KEY, String.valueOf(_numResizes));
-    dataTable.getMetadata().put(DataTable.RESIZE_TIME_MS_METADATA_KEY, String.valueOf(_resizeTimeMs));
+        .put(MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName(), String.valueOf(_numEntriesScannedPostFilter));
+    dataTable.getMetadata().put(MetadataKey.NUM_SEGMENTS_PROCESSED.getName(), String.valueOf(_numSegmentsProcessed));
+    dataTable.getMetadata().put(MetadataKey.NUM_SEGMENTS_MATCHED.getName(), String.valueOf(_numSegmentsMatched));
+    dataTable.getMetadata().put(MetadataKey.NUM_RESIZES.getName(), String.valueOf(_numResizes));
+    dataTable.getMetadata().put(MetadataKey.RESIZE_TIME_MS.getName(), String.valueOf(_resizeTimeMs));
 
-    dataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(_numTotalDocs));
+    dataTable.getMetadata().put(MetadataKey.TOTAL_DOCS.getName(), String.valueOf(_numTotalDocs));
     if (_numGroupsLimitReached) {
-      dataTable.getMetadata().put(DataTable.NUM_GROUPS_LIMIT_REACHED_KEY, "true");
+      dataTable.getMetadata().put(MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(), "true");
     }
     if (_processingExceptions != null && _processingExceptions.size() > 0) {
       for (ProcessingException exception : _processingExceptions) {

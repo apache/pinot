@@ -20,11 +20,9 @@ package org.apache.pinot.core.segment.processing.framework;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import it.unimi.dsi.fastutil.booleans.BooleanComparator;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -38,7 +36,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.segment.processing.collector.CollectorConfig;
 import org.apache.pinot.core.segment.processing.collector.CollectorFactory;
 import org.apache.pinot.core.segment.processing.collector.ValueAggregatorFactory;
-import org.apache.pinot.core.segment.processing.utils.SegmentProcessorUtils;
+import org.apache.pinot.core.util.SegmentProcessorAvroUtils;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordReader;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -80,7 +78,7 @@ public class SegmentReducerTest {
     _pinotSchema = new Schema.SchemaBuilder().setSchemaName("mySchema")
         .addSingleValueDimension("campaign", FieldSpec.DataType.STRING).addMetric("clicks", FieldSpec.DataType.INT)
         .addDateTime("timeValue", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
-    org.apache.avro.Schema avroSchema = SegmentProcessorUtils.convertPinotSchemaToAvroSchema(_pinotSchema);
+    org.apache.avro.Schema avroSchema = SegmentProcessorAvroUtils.convertPinotSchemaToAvroSchema(_pinotSchema);
 
     // create 2 avro files
     DataFileWriter<GenericData.Record> recordWriter1 = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema));

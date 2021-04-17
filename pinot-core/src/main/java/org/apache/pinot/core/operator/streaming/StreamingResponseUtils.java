@@ -21,8 +21,8 @@ package org.apache.pinot.core.operator.streaming;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import org.apache.pinot.common.proto.Server;
-import org.apache.pinot.common.utils.CommonConstants.Query.Response;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.spi.utils.CommonConstants.Query.Response;
 
 
 public class StreamingResponseUtils {

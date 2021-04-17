@@ -87,11 +87,6 @@ public class LLCRealtimeSegmentZKMetadata extends RealtimeSegmentZKMetadata {
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = super.toZNRecord();
     znRecord.setSimpleField(START_OFFSET, _startOffset);
-    if (_endOffset == null) {
-      // TODO Issue 5359 Keep this until all components have upgraded to a version that can handle _offset being null
-      // For backward compatibility until all components have been upgraded to deal with null value for _endOffset
-      _endOffset = Long.toString(Long.MAX_VALUE);
-    }
     znRecord.setSimpleField(END_OFFSET, _endOffset);
     znRecord.setIntField(NUM_REPLICAS, _numReplicas);
     znRecord.setSimpleField(DOWNLOAD_URL, _downloadUrl);

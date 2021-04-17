@@ -1,8 +1,3 @@
-package org.apache.pinot.spi.stream;
-
-import com.google.common.annotations.VisibleForTesting;
-
-
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,6 +16,11 @@ import com.google.common.annotations.VisibleForTesting;
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.spi.stream;
+
+import com.google.common.annotations.VisibleForTesting;
+
+
 public class LongMsgOffset implements StreamPartitionMsgOffset {
   private final long _offset;
 
@@ -49,5 +49,10 @@ public class LongMsgOffset implements StreamPartitionMsgOffset {
   @Override
   public String toString() {
     return Long.toString(_offset);
+  }
+
+  @Override
+  public StreamPartitionMsgOffset fromString(String longOffset) {
+    return new LongMsgOffset(longOffset);
   }
 }
