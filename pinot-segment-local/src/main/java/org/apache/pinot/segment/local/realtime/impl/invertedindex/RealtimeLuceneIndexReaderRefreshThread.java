@@ -134,6 +134,7 @@ public class RealtimeLuceneIndexReaderRefreshThread implements Runnable {
             }
           }
         } finally {
+          _luceneRealtimeReaders.offer(realtimeReadersForSegment);
           realtimeReadersForSegment.getLock().unlock();
         }
       }
