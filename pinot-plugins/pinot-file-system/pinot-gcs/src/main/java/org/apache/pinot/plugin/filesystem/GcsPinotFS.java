@@ -112,7 +112,7 @@ public class GcsPinotFS  extends PinotFS {
       return uri;
     }
     try {
-      return new URI(uri.getScheme(), uri.getHost() + "/", sanitizePath(uri.getPath() + DELIMITER), null);
+      return new URI(uri.getScheme(), uri.getHost(), sanitizePath(uri.getPath() + DELIMITER), null);
     } catch (URISyntaxException e) {
       throw new IOException(e);
     }
