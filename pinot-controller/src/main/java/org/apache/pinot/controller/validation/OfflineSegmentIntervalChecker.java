@@ -98,8 +98,8 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
         }
       }
       if (numSegmentsWithInvalidIntervals > 0) {
-        LOGGER
-            .warn("Table: {} has {} segments with invalid interval", offlineTableName, numSegmentsWithInvalidIntervals);
+        LOGGER.warn("Table: {} has {} segments with invalid interval", offlineTableName,
+            numSegmentsWithInvalidIntervals);
       }
       Duration frequency =
           SegmentIntervalUtils.convertToDuration(IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig));

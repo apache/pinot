@@ -21,5 +21,5 @@ package org.apache.pinot.segment.spi.creator;
 public enum SegmentVersion {
   v1, // Each index in a separate file
   v2, // Use bit packing library instead of custom bit set for forward index format
-  v3  // All the indexes in a single file
+  v3 // All the indexes in a single file
 }

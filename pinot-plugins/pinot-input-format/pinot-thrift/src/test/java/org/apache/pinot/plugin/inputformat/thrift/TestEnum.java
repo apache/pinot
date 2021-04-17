@@ -24,7 +24,6 @@
  */
 package org.apache.pinot.plugin.inputformat.thrift;
 
-
 public enum TestEnum implements org.apache.thrift.TEnum {
   ALPHA(1),
   BETA(2),

@@ -46,8 +46,7 @@ public class JSONRecordReader implements RecordReader {
   public JSONRecordReader() {
   }
 
-  private void init()
-      throws IOException {
+  private void init() throws IOException {
     _inputStream = RecordReaderUtils.getBufferedInputStream(_dataFile);
     try {
       _iterator = JsonUtils.DEFAULT_READER.forType(new TypeReference<Map<String, Object>>() {
@@ -90,16 +89,14 @@ public class JSONRecordReader implements RecordReader {
   }
 
   @Override
-  public void rewind()
-      throws IOException {
+  public void rewind() throws IOException {
     _iterator.close();
     _inputStream.close();
     init();
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _iterator.close();
     _inputStream.close();
   }

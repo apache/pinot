@@ -68,8 +68,7 @@ public class LocalPinotFSTest {
   }
 
   @Test
-  public void testFS()
-      throws Exception {
+  public void testFS() throws Exception {
     LocalPinotFS localPinotFS = new LocalPinotFS();
     URI testFileUri = testFile.toURI();
     // Check whether a directory exists
@@ -169,8 +168,7 @@ public class LocalPinotFSTest {
     Assert.assertTrue(srcFile.createNewFile());
     dstFile = new File(_nonExistentTmpFolder.getPath() + "/srcFile");
     Assert.assertFalse(dstFile.exists());
-    Assert.assertTrue(localPinotFS
-        .move(_absoluteTmpDirPath.toURI(), _nonExistentTmpFolder.toURI(), true)); // overwrite flag has no impact
+    Assert.assertTrue(localPinotFS.move(_absoluteTmpDirPath.toURI(), _nonExistentTmpFolder.toURI(), true)); // overwrite flag has no impact
     Assert.assertTrue(dstFile.exists());
 
     localPinotFS.delete(secondTestFileUri, true);

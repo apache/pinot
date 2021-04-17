@@ -34,8 +34,7 @@ public class FileUtils {
    * @param srcFile
    * @param destFile
    */
-  public static void moveFileWithOverwrite(File srcFile, File destFile)
-      throws IOException {
+  public static void moveFileWithOverwrite(File srcFile, File destFile) throws IOException {
     if (destFile.exists()) {
       org.apache.commons.io.FileUtils.deleteQuietly(destFile);
     }
@@ -51,8 +50,7 @@ public class FileUtils {
    * @param dest Destination file channel
    * @throws IOException
    */
-  public static void transferBytes(FileChannel src, long position, long count, FileChannel dest)
-      throws IOException {
+  public static void transferBytes(FileChannel src, long position, long count, FileChannel dest) throws IOException {
     long numBytesTransferred;
     while ((numBytesTransferred = src.transferTo(position, count, dest)) < count) {
       position += numBytesTransferred;
@@ -80,8 +78,7 @@ public class FileUtils {
    * @param closeables collection of resources to close
    * @throws IOException
    */
-  public static void close(Iterable<? extends Closeable> closeables)
-      throws IOException {
+  public static void close(Iterable<? extends Closeable> closeables) throws IOException {
     IOException topLevelException = null;
 
     for (Closeable closeable : closeables) {
@@ -110,8 +107,7 @@ public class FileUtils {
    * @param closeables one or more resources to close
    * @throws IOException
    */
-  public static void close(Closeable... closeables)
-      throws IOException {
+  public static void close(Closeable... closeables) throws IOException {
     close(Arrays.asList(closeables));
   }
 }

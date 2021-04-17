@@ -38,6 +38,7 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
+
 @State(Scope.Benchmark)
 public class BenchmarkOffheapBitmapInvertedIndexCreator {
 
@@ -79,9 +80,8 @@ public class BenchmarkOffheapBitmapInvertedIndexCreator {
   @Setup(Level.Invocation)
   public void setup() throws IOException {
     indexDir = Files.createTempDirectory("index");
-    creator = new OffHeapBitmapInvertedIndexCreator(
-            indexDir.toFile(), new DimensionFieldSpec("foo", FieldSpec.DataType.STRING, true),
-            cardinality, numDocs, -1);
+    creator = new OffHeapBitmapInvertedIndexCreator(indexDir.toFile(),
+        new DimensionFieldSpec("foo", FieldSpec.DataType.STRING, true), cardinality, numDocs, -1);
     assignment.assign(creator, numDocs, cardinality);
   }
 
@@ -99,12 +99,10 @@ public class BenchmarkOffheapBitmapInvertedIndexCreator {
     return creator;
   }
 
-  public static void main(String[] args)
-          throws Exception {
+  public static void main(String[] args) throws Exception {
     ChainedOptionsBuilder opt =
-            new OptionsBuilder().include(BenchmarkOffheapBitmapInvertedIndexCreator.class.getSimpleName())
-                    .mode(Mode.SingleShotTime)
-                    .warmupIterations(8).measurementIterations(8).forks(5);
+        new OptionsBuilder().include(BenchmarkOffheapBitmapInvertedIndexCreator.class.getSimpleName())
+            .mode(Mode.SingleShotTime).warmupIterations(8).measurementIterations(8).forks(5);
 
     new Runner(opt.build()).run();
   }

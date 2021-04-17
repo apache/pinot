@@ -72,8 +72,8 @@ public final class MinionTaskMetadataUtils {
       int expectedVersion) {
     String path = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(taskType,
         realtimeToOfflineSegmentsTaskMetadata.getTableNameWithType());
-    if (!propertyStore
-        .set(path, realtimeToOfflineSegmentsTaskMetadata.toZNRecord(), expectedVersion, AccessOption.PERSISTENT)) {
+    if (!propertyStore.set(path, realtimeToOfflineSegmentsTaskMetadata.toZNRecord(), expectedVersion,
+        AccessOption.PERSISTENT)) {
       throw new ZkException(
           "Failed to persist minion RealtimeToOfflineSegmentsTask metadata: " + realtimeToOfflineSegmentsTaskMetadata);
     }

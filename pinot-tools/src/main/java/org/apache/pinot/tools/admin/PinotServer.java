@@ -27,8 +27,7 @@ import java.util.List;
  * Simple shim so that jps -l shows PinotServer instead of PinotAdministrator
  */
 public class PinotServer {
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     List<String> arguments = new ArrayList<>();
     arguments.add("StartServer");
     arguments.addAll(Arrays.asList(args));

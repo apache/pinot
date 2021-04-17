@@ -29,8 +29,7 @@ import org.slf4j.LoggerFactory;
 public class JobPreparationHelper {
   private static final Logger _logger = LoggerFactory.getLogger(JobPreparationHelper.class);
 
-  public static void mkdirs(FileSystem fileSystem, Path dirPath, String defaultPermissionsMask)
-      throws IOException {
+  public static void mkdirs(FileSystem fileSystem, Path dirPath, String defaultPermissionsMask) throws IOException {
     if (fileSystem.exists(dirPath)) {
       _logger.warn("Deleting existing file: {}", dirPath);
       fileSystem.delete(dirPath, true);

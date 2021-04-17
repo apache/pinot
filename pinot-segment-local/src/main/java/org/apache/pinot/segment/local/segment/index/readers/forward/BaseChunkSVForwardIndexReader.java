@@ -37,7 +37,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Base implementation for chunk-based single-value raw (non-dictionary-encoded) forward index reader.
  */
-public abstract class BaseChunkSVForwardIndexReader implements ForwardIndexReader<BaseChunkSVForwardIndexReader.ChunkReaderContext> {
+public abstract class BaseChunkSVForwardIndexReader
+    implements ForwardIndexReader<BaseChunkSVForwardIndexReader.ChunkReaderContext> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseChunkSVForwardIndexReader.class);
 
   protected final PinotDataBuffer _dataBuffer;
@@ -76,8 +77,7 @@ public abstract class BaseChunkSVForwardIndexReader implements ForwardIndexReade
       _dataBuffer.getInt(headerOffset); // Total docs
       headerOffset += Integer.BYTES;
 
-      ChunkCompressionType compressionType =
-          ChunkCompressionType.values()[_dataBuffer.getInt(headerOffset)];
+      ChunkCompressionType compressionType = ChunkCompressionType.values()[_dataBuffer.getInt(headerOffset)];
       _chunkDecompressor = ChunkCompressorFactory.getDecompressor(compressionType);
       _isCompressed = !compressionType.equals(ChunkCompressionType.PASS_THROUGH);
 
@@ -206,8 +206,7 @@ public abstract class BaseChunkSVForwardIndexReader implements ForwardIndexReade
     }
 
     @Override
-    public void close()
-        throws IOException {
+    public void close() throws IOException {
       if (CleanerUtil.UNMAP_SUPPORTED) {
         CleanerUtil.getCleaner().freeBuffer(_chunkBuffer);
       }

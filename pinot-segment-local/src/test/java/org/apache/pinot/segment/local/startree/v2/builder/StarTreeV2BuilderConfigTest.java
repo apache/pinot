@@ -83,8 +83,8 @@ public class StarTreeV2BuilderConfigTest {
     // No column should be skipped for star-node creation
     assertTrue(defaultConfig.getSkipStarNodeCreationForDimensions().isEmpty());
     // Should have COUNT(*) and SUM(m1) as the function column pairs
-    assertEquals(defaultConfig.getFunctionColumnPairs(), new HashSet<>(Arrays
-        .asList(AggregationFunctionColumnPair.COUNT_STAR,
+    assertEquals(defaultConfig.getFunctionColumnPairs(),
+        new HashSet<>(Arrays.asList(AggregationFunctionColumnPair.COUNT_STAR,
             new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "m1"))));
     assertEquals(defaultConfig.getMaxLeafRecords(), StarTreeV2BuilderConfig.DEFAULT_MAX_LEAF_RECORDS);
   }

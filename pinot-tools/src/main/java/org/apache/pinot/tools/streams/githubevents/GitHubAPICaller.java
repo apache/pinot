@@ -63,8 +63,7 @@ public class GitHubAPICaller {
   /**
    * Calls the events API
    */
-  public GitHubAPIResponse callEventsAPI(String etag)
-      throws IOException {
+  public GitHubAPIResponse callEventsAPI(String etag) throws IOException {
     HttpUriRequest request = buildRequest(EVENTS_API_URL, etag);
     return executeEventsRequest(request);
   }
@@ -72,8 +71,7 @@ public class GitHubAPICaller {
   /**
    * Calls the given url
    */
-  public GitHubAPIResponse callAPI(String url)
-      throws IOException {
+  public GitHubAPIResponse callAPI(String url) throws IOException {
     HttpUriRequest request = buildRequest(url, null);
     return executeGet(request);
   }
@@ -96,8 +94,7 @@ public class GitHubAPICaller {
   /**
    * Make an Http GET call to the /events API
    */
-  private GitHubAPIResponse executeEventsRequest(HttpUriRequest request)
-      throws IOException {
+  private GitHubAPIResponse executeEventsRequest(HttpUriRequest request) throws IOException {
     GitHubAPIResponse githubAPIResponse = new GitHubAPIResponse();
 
     try (CloseableHttpResponse httpResponse = _closeableHttpClient.execute(request)) {
@@ -134,8 +131,7 @@ public class GitHubAPICaller {
   /**
    * Makes an Http GET call to the provided URL
    */
-  private GitHubAPIResponse executeGet(HttpUriRequest request)
-      throws IOException {
+  private GitHubAPIResponse executeGet(HttpUriRequest request) throws IOException {
     GitHubAPIResponse githubAPIResponse = new GitHubAPIResponse();
 
     try (CloseableHttpResponse httpResponse = _closeableHttpClient.execute(request)) {
@@ -146,9 +142,8 @@ public class GitHubAPICaller {
       if (statusLine.getStatusCode() == 200) {
         githubAPIResponse.setResponseString(EntityUtils.toString(httpResponse.getEntity(), StandardCharsets.UTF_8));
       } else {
-        printStatus(Quickstart.Color.YELLOW,
-            "Status code " + githubAPIResponse.statusCode + " status message " + githubAPIResponse.statusMessage
-                + " uri " + request.getURI());
+        printStatus(Quickstart.Color.YELLOW, "Status code " + githubAPIResponse.statusCode + " status message "
+            + githubAPIResponse.statusMessage + " uri " + request.getURI());
       }
     } catch (SocketTimeoutException e) {
       githubAPIResponse.setStatusCode(408);
@@ -161,8 +156,7 @@ public class GitHubAPICaller {
     return githubAPIResponse;
   }
 
-  public void shutdown()
-      throws IOException {
+  public void shutdown() throws IOException {
     printStatus(Quickstart.Color.GREEN, "***** Shutting down GitHubAPICaller *****");
     _closeableHttpClient.close();
   }

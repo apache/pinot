@@ -44,16 +44,14 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
       new File(getClass().getClassLoader().getResource("test-file-with-int96-and-decimal.snappy.parquet").getFile());
 
   @Override
-  protected RecordReader createRecordReader()
-      throws Exception {
+  protected RecordReader createRecordReader() throws Exception {
     ParquetRecordReader recordReader = new ParquetRecordReader();
     recordReader.init(_dataFile, _sourceFields, null);
     return recordReader;
   }
 
   @Override
-  protected void writeRecordsToFile(List<Map<String, Object>> recordsToWrite)
-      throws Exception {
+  protected void writeRecordsToFile(List<Map<String, Object>> recordsToWrite) throws Exception {
     Schema schema = AvroUtils.getAvroSchemaFromPinotSchema(getPinotSchema());
     List<GenericRecord> records = new ArrayList<>();
     for (Map<String, Object> r : recordsToWrite) {
@@ -63,8 +61,8 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
       }
       records.add(record);
     }
-    try (ParquetWriter<GenericRecord> writer = ParquetUtils
-        .getParquetAvroWriter(new Path(_dataFile.getAbsolutePath()), schema)) {
+    try (ParquetWriter<GenericRecord> writer =
+        ParquetUtils.getParquetAvroWriter(new Path(_dataFile.getAbsolutePath()), schema)) {
       for (GenericRecord record : records) {
         writer.write(record);
       }
@@ -72,15 +70,13 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
   }
 
   @Test
-  public void testParquetAvroRecordReader()
-      throws IOException {
+  public void testParquetAvroRecordReader() throws IOException {
     ParquetAvroRecordReader avroRecordReader = new ParquetAvroRecordReader();
     avroRecordReader.init(_dataFile, null, new ParquetRecordReaderConfig());
     testReadParquetFile(avroRecordReader, SAMPLE_RECORDS_SIZE);
   }
 
-  private void testReadParquetFile(RecordReader reader, int totalRecords)
-      throws IOException {
+  private void testReadParquetFile(RecordReader reader, int totalRecords) throws IOException {
     int numRecordsRead = 0;
     while (reader.hasNext()) {
       reader.next();
@@ -90,8 +86,7 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
   }
 
   @Test
-  public void testParquetNativeRecordReader()
-      throws IOException {
+  public void testParquetNativeRecordReader() throws IOException {
     ParquetNativeRecordReader nativeRecordReader = new ParquetNativeRecordReader();
     nativeRecordReader.init(_testParquetFileWithInt96AndDecimal, ImmutableSet.of(), new ParquetRecordReaderConfig());
     testReadParquetFile(nativeRecordReader, 1965);
@@ -100,8 +95,7 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
   }
 
   @Test
-  public void testComparison()
-      throws IOException {
+  public void testComparison() throws IOException {
     testComparison(_dataFile, SAMPLE_RECORDS_SIZE);
     testComparison(new File(getClass().getClassLoader().getResource("users.parquet").getFile()), 1);
     testComparison(new File(getClass().getClassLoader().getResource("test-comparison.gz.parquet").getFile()), 363667);
@@ -113,8 +107,7 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
     testComparison(new File(getClass().getClassLoader().getResource("githubActivities.gz.parquet").getFile()), 2000);
   }
 
-  private void testComparison(File dataFile, int totalRecords)
-      throws IOException {
+  private void testComparison(File dataFile, int totalRecords) throws IOException {
     final ParquetRecordReader avroRecordReader = new ParquetRecordReader();
     avroRecordReader.init(dataFile, null, null);
     final ParquetRecordReader nativeRecordReader = new ParquetRecordReader();

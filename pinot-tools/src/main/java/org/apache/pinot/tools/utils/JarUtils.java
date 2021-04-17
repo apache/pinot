@@ -46,7 +46,7 @@ public class JarUtils {
       fromJarFilePath = fromJarFilePath.substring(FILE_PREFIX.length());
     }
     JarFile fromJar = new JarFile(fromJarFilePath);
-    for (Enumeration<JarEntry> entries = fromJar.entries(); entries.hasMoreElements(); ) {
+    for (Enumeration<JarEntry> entries = fromJar.entries(); entries.hasMoreElements();) {
       JarEntry entry = entries.nextElement();
       if (entry.getName().startsWith(jarDir + "/") && !entry.isDirectory()) {
         File dest = new File(destDir + "/" + entry.getName().substring(jarDir.length() + 1));

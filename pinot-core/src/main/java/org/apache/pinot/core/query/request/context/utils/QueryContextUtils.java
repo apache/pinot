@@ -40,8 +40,8 @@ public class QueryContextUtils {
    */
   public static boolean isAggregationQuery(QueryContext query) {
     AggregationFunction[] aggregationFunctions = query.getAggregationFunctions();
-    return aggregationFunctions != null && (aggregationFunctions.length != 1
-        || !(aggregationFunctions[0] instanceof DistinctAggregationFunction));
+    return aggregationFunctions != null
+        && (aggregationFunctions.length != 1 || !(aggregationFunctions[0] instanceof DistinctAggregationFunction));
   }
 
   /**

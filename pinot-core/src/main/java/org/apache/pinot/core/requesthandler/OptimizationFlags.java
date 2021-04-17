@@ -65,8 +65,7 @@ public class OptimizationFlags {
    * @param brokerRequest The broker request from which to extract the optimization flags
    * @return The optimization flags for this request, or null.
    */
-  public static @Nullable
-  OptimizationFlags getOptimizationFlags(BrokerRequest brokerRequest) {
+  public static @Nullable OptimizationFlags getOptimizationFlags(BrokerRequest brokerRequest) {
     if (brokerRequest == null || brokerRequest.getDebugOptions() == null) {
       return null;
     }

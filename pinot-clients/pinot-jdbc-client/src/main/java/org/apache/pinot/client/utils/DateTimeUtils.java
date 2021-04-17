@@ -32,24 +32,21 @@ public class DateTimeUtils {
   private static final SimpleDateFormat _dateFormat = new SimpleDateFormat(DATE_FORMAT);
   private static final SimpleDateFormat _timestampFormat = new SimpleDateFormat(TIMESTAMP_FORMAT);
 
-  public static Date getDateFromString(String value, Calendar cal)
-      throws ParseException {
+  public static Date getDateFromString(String value, Calendar cal) throws ParseException {
     _dateFormat.setTimeZone(cal.getTimeZone());
     java.util.Date date = _dateFormat.parse(value);
     Date sqlDate = new Date(date.getTime());
     return sqlDate;
   }
 
-  public static Time getTimeFromString(String value, Calendar cal)
-      throws ParseException {
+  public static Time getTimeFromString(String value, Calendar cal) throws ParseException {
     _timestampFormat.setTimeZone(cal.getTimeZone());
     java.util.Date date = _timestampFormat.parse(value);
     Time sqlTime = new Time(date.getTime());
     return sqlTime;
   }
 
-  public static Timestamp getTimestampFromString(String value, Calendar cal)
-      throws ParseException {
+  public static Timestamp getTimestampFromString(String value, Calendar cal) throws ParseException {
     _timestampFormat.setTimeZone(cal.getTimeZone());
     java.util.Date date = _timestampFormat.parse(value);
     Timestamp sqlTime = new Timestamp(date.getTime());

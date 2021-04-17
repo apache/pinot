@@ -68,8 +68,7 @@ public class Roaring64NavigableMapIdSet implements IdSet {
   }
 
   @Override
-  public byte[] toBytes()
-      throws IOException {
+  public byte[] toBytes() throws IOException {
     int numBytes = 1 + (int) _bitmap.serializedSizeInBytes();
     // NOTE: No need to close these streams.
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(numBytes);
@@ -83,15 +82,13 @@ public class Roaring64NavigableMapIdSet implements IdSet {
    * Deserializes the Roaring64NavigableMapIdSet from a ByteBuffer.
    * <p>NOTE: The ByteBuffer does not include the IdSet.Type byte.
    */
-  static Roaring64NavigableMapIdSet fromByteBuffer(ByteBuffer byteBuffer)
-      throws IOException {
+  static Roaring64NavigableMapIdSet fromByteBuffer(ByteBuffer byteBuffer) throws IOException {
     Preconditions.checkArgument(byteBuffer.hasArray(),
         "Cannot deserialize Roaring64NavigableMap from ByteBuffer not backed by an accessible byte array");
     Roaring64NavigableMap roaring64NavigableMap = new Roaring64NavigableMap();
     // NOTE: No need to close these streams.
-    roaring64NavigableMap.deserialize(new DataInputStream(
-        new ByteArrayInputStream(byteBuffer.array(), byteBuffer.arrayOffset() + byteBuffer.position(),
-            byteBuffer.remaining())));
+    roaring64NavigableMap.deserialize(new DataInputStream(new ByteArrayInputStream(byteBuffer.array(),
+        byteBuffer.arrayOffset() + byteBuffer.position(), byteBuffer.remaining())));
     return new Roaring64NavigableMapIdSet(roaring64NavigableMap);
   }
 

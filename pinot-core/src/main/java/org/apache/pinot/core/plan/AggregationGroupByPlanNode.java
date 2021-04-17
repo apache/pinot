@@ -68,13 +68,11 @@ public class AggregationGroupByPlanNode implements PlanNode {
             StarTreeUtils.extractPredicateEvaluatorsMap(indexSegment, queryContext.getFilter());
         if (predicateEvaluatorsMap != null) {
           for (StarTreeV2 starTreeV2 : starTrees) {
-            if (StarTreeUtils
-                .isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, _groupByExpressions,
-                    predicateEvaluatorsMap.keySet())) {
+            if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs,
+                _groupByExpressions, predicateEvaluatorsMap.keySet())) {
               _transformPlanNode = null;
-              _starTreeTransformPlanNode =
-                  new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, _groupByExpressions,
-                      predicateEvaluatorsMap, queryContext.getDebugOptions());
+              _starTreeTransformPlanNode = new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs,
+                  _groupByExpressions, predicateEvaluatorsMap, queryContext.getDebugOptions());
               return;
             }
           }

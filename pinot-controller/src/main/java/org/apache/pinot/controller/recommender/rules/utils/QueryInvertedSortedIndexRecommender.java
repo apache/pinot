@@ -71,13 +71,17 @@ public class QueryInvertedSortedIndexRecommender {
    */
   public enum IteratorEvalPriorityEnum {
     INDEXED, // sorted, bitmap, range, text
-    AND, OR, SCAN, EXPRESSION,
+    AND,
+    OR,
+    SCAN,
+    EXPRESSION,
   }
 
   public enum RecommendationPriorityEnum {
     BITMAP, // already optimized
     CANDIDATE_SCAN, // candidates
-    NON_CANDIDATE_SCAN, NESTED, // not applicable
+    NON_CANDIDATE_SCAN,
+    NESTED, // not applicable
   }
 
   /**
@@ -199,8 +203,7 @@ public class QueryInvertedSortedIndexRecommender {
             tmpNESIWithIdx += cache[j];
           }
           tmpNESIWithIdx += childResults.get(i)._nESIWithIdx;
-          totalNESIWithIdxSorted.add(Pair.of(tmpNESIWithIdx,
-              childResults.get(i))); // pair of totalNESIWithIdx and corresponding recommended indices
+          totalNESIWithIdxSorted.add(Pair.of(tmpNESIWithIdx, childResults.get(i))); // pair of totalNESIWithIdx and corresponding recommended indices
         }
       }
 
@@ -217,9 +220,8 @@ public class QueryInvertedSortedIndexRecommender {
       } else {
         totalNESIWithIdxSorted.sort(Comparator.comparing(Pair::getLeft));
         LOGGER.debug("parseTopLevel: AND: totalNESIWithIdxSorted {}", totalNESIWithIdxSorted);
-        double threshold =
-            _params.THRESHOLD_RATIO_MIN_AND_PREDICATE_TOP_CANDIDATES * (totalNESI - totalNESIWithIdxSorted.get(0)
-                .getLeft());
+        double threshold = _params.THRESHOLD_RATIO_MIN_AND_PREDICATE_TOP_CANDIDATES
+            * (totalNESI - totalNESIWithIdxSorted.get(0).getLeft());
         LOGGER.debug("threshold {}", threshold);
         for (Pair<Double, PredicateParseResult> pair : totalNESIWithIdxSorted) {
           if ((totalNESI - pair.getLeft()) >= threshold) { // TOP candidates
@@ -260,12 +262,11 @@ public class QueryInvertedSortedIndexRecommender {
           }
           LOGGER.debug("tmpTotalNESIWithIdx {}", tmpTotalNESIWithIdx);
           if (previousTotalNESIWithIdx - tmpTotalNESIWithIdx > _params.THRESHOLD_MIN_AND_PREDICATE_INCREMENTAL_VOTE) {
-            ret.add(
-                PredicateParseResult.PredicateParseResultBuilder.aPredicateParseResult().setCandidateDims(candidateDims)
-                    .setIteratorEvalPriorityEnum(IteratorEvalPriorityEnum.AND)
-                    .setRecommendationPriorityEnum(RecommendationPriorityEnum.BITMAP).setnESI(totalNESI)
-                    .setPercentSelected(tmpPercentSelected).setnESIWithIdx(tmpTotalNESIWithIdx)
-                    .setQueryWeight(queryWeight).build());
+            ret.add(PredicateParseResult.PredicateParseResultBuilder.aPredicateParseResult()
+                .setCandidateDims(candidateDims).setIteratorEvalPriorityEnum(IteratorEvalPriorityEnum.AND)
+                .setRecommendationPriorityEnum(RecommendationPriorityEnum.BITMAP).setnESI(totalNESI)
+                .setPercentSelected(tmpPercentSelected).setnESIWithIdx(tmpTotalNESIWithIdx).setQueryWeight(queryWeight)
+                .build());
             previousTotalNESIWithIdx = tmpTotalNESIWithIdx;
           } else {
             break;
@@ -379,9 +380,9 @@ public class QueryInvertedSortedIndexRecommender {
           .collect(Collectors.groupingBy(PredicateParseResult::getRecommendationPriorityEnum, Collectors.toList()));
 
       // Recommend nothing if any nested predicate list cannot be converted to a bitmap by applying sorted/inverted indices
-      if (groupedPredicates.containsKey(RecommendationPriorityEnum.NESTED) || (
-          !groupedPredicates.containsKey(RecommendationPriorityEnum.BITMAP) && !groupedPredicates
-              .containsKey(RecommendationPriorityEnum.CANDIDATE_SCAN))) {
+      if (groupedPredicates.containsKey(RecommendationPriorityEnum.NESTED)
+          || (!groupedPredicates.containsKey(RecommendationPriorityEnum.BITMAP)
+              && !groupedPredicates.containsKey(RecommendationPriorityEnum.CANDIDATE_SCAN))) {
         return PredicateParseResult.PredicateParseResultBuilder.aPredicateParseResult()
             .setCandidateDims(FixedLenBitset.IMMUTABLE_EMPTY_SET)
             .setIteratorEvalPriorityEnum(IteratorEvalPriorityEnum.AND)
@@ -393,14 +394,13 @@ public class QueryInvertedSortedIndexRecommender {
       // from the scanning based predicates
       Optional<PredicateParseResult> newCandidateOptional =
           groupedPredicates.getOrDefault(RecommendationPriorityEnum.CANDIDATE_SCAN, Collections.emptyList()).stream()
-              .filter(
-                  PredicateParseResult::hasCandidateDim) // The predicate should be index applicable to be recommended
+              .filter(PredicateParseResult::hasCandidateDim) // The predicate should be index applicable to be recommended
               .min(Comparator.comparing(PredicateParseResult::getPercentSelected));
 
       double bitmapPercentSelected = PERCENT_SELECT_ALL;
       double bitmapNESIWithIdx = NESI_ZERO;
-      for (PredicateParseResult predicateParseResult : groupedPredicates
-          .getOrDefault(RecommendationPriorityEnum.BITMAP, Collections.emptyList())) {
+      for (PredicateParseResult predicateParseResult : groupedPredicates.getOrDefault(RecommendationPriorityEnum.BITMAP,
+          Collections.emptyList())) {
         bitmapPercentSelected *= predicateParseResult.getPercentSelected();
         bitmapNESIWithIdx += predicateParseResult.getnESIWithIdx();
         candidateDims.union(predicateParseResult.getCandidateDims());
@@ -543,8 +543,8 @@ public class QueryInvertedSortedIndexRecommender {
     // e.g. a > 10 / b between 1 and 10
     else if (type == Predicate.Type.RANGE) {
       LOGGER.trace("Entering RANGE clause: {}", leafPredicate);
-      if (_useOverwrittenIndices && (_indexOverwritten.hasSortedIndex(colName) || _indexOverwritten
-          .hasRangeIndex(colName))) {
+      if (_useOverwrittenIndices
+          && (_indexOverwritten.hasSortedIndex(colName) || _indexOverwritten.hasRangeIndex(colName))) {
         return PredicateParseResult.PredicateParseResultBuilder.aPredicateParseResult()
             .setCandidateDims(FixedLenBitset.IMMUTABLE_EMPTY_SET)
             .setIteratorEvalPriorityEnum(IteratorEvalPriorityEnum.INDEXED)
@@ -584,8 +584,8 @@ public class QueryInvertedSortedIndexRecommender {
           : ((NotInPredicate) predicate).getValues();
       if (values.size() == 1) {
         numValuesSelected = 1;
-      } else if (values.get(RecommenderConstants.FIRST).equals(RecommenderConstants.IN_PREDICATE_ESTIMATE_LEN_FLAG) || (
-          isFirst =
+      } else if (values.get(RecommenderConstants.FIRST).equals(RecommenderConstants.IN_PREDICATE_ESTIMATE_LEN_FLAG)
+          || (isFirst =
               values.get(RecommenderConstants.SECOND).equals(RecommenderConstants.IN_PREDICATE_ESTIMATE_LEN_FLAG))) {
         numValuesSelected =
             Integer.parseInt(values.get(isFirst ? RecommenderConstants.FIRST : RecommenderConstants.SECOND));
@@ -595,8 +595,8 @@ public class QueryInvertedSortedIndexRecommender {
       Boolean isExclusive = leafPredicate.getPredicate().getType().isExclusive();
       LOGGER.debug("Length of in clause: {}", numValuesSelected);
 
-      if (_useOverwrittenIndices && (_indexOverwritten.hasInvertedIndex(colName) || _indexOverwritten
-          .hasSortedIndex(colName))) {
+      if (_useOverwrittenIndices
+          && (_indexOverwritten.hasInvertedIndex(colName) || _indexOverwritten.hasSortedIndex(colName))) {
         return PredicateParseResult.PredicateParseResultBuilder.aPredicateParseResult()
             .setCandidateDims(FixedLenBitset.IMMUTABLE_EMPTY_SET)
             .setIteratorEvalPriorityEnum(IteratorEvalPriorityEnum.INDEXED)
@@ -622,8 +622,8 @@ public class QueryInvertedSortedIndexRecommender {
       candidateDims.add(_inputManager.colNameToInt(colName));
       Boolean isExclusive = leafPredicate.getPredicate().getType().isExclusive();
 
-      if (_useOverwrittenIndices && (_indexOverwritten.hasInvertedIndex(colName) || _indexOverwritten
-          .hasSortedIndex(colName))) {
+      if (_useOverwrittenIndices
+          && (_indexOverwritten.hasInvertedIndex(colName) || _indexOverwritten.hasSortedIndex(colName))) {
         return PredicateParseResult.PredicateParseResultBuilder.aPredicateParseResult()
             .setCandidateDims(FixedLenBitset.IMMUTABLE_EMPTY_SET)
             .setIteratorEvalPriorityEnum(IteratorEvalPriorityEnum.INDEXED)

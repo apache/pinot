@@ -106,12 +106,12 @@ public class ServerChannels {
                 attachSSLHandler(ch);
               }
 
-              ch.pipeline()
-                  .addLast(new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, Integer.BYTES, 0, Integer.BYTES),
-                      new LengthFieldPrepender(Integer.BYTES),
-                      // NOTE: data table de-serialization happens inside this handler
-                      // Revisit if this becomes a bottleneck
-                      new DataTableHandler(_queryRouter, _serverRoutingInstance, _brokerMetrics));
+              ch.pipeline().addLast(
+                  new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, Integer.BYTES, 0, Integer.BYTES),
+                  new LengthFieldPrepender(Integer.BYTES),
+                  // NOTE: data table de-serialization happens inside this handler
+                  // Revisit if this becomes a bottleneck
+                  new DataTableHandler(_queryRouter, _serverRoutingInstance, _brokerMetrics));
             }
           });
     }
@@ -135,8 +135,7 @@ public class ServerChannels {
       }
     }
 
-    synchronized void sendRequest(InstanceRequest instanceRequest)
-        throws Exception {
+    synchronized void sendRequest(InstanceRequest instanceRequest) throws Exception {
       if (_channel == null || !_channel.isActive()) {
         long startTime = System.currentTimeMillis();
         _channel = _bootstrap.connect().sync().channel();

@@ -62,17 +62,17 @@ public class SelectionOperatorServiceTest {
       new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.STRING_ARRAY, DataSchema.ColumnDataType.BYTES};
   private final DataSchema _upgradedDataSchema = new DataSchema(_columnNames, _upgradedColumnDataTypes);
   private final Object[] _row1 =
-      {0, 1L, 2.0F, 3.0, "4", new int[]{5}, new long[]{6L}, new float[]{7.0F}, new double[]{8.0}, new String[]{"9"}, BytesUtils.toByteArray(
-          "1020")};
+      {0, 1L, 2.0F, 3.0, "4", new int[]{5}, new long[]{6L}, new float[]{7.0F}, new double[]{8.0}, new String[]{"9"}, BytesUtils
+          .toByteArray("1020")};
   private final Object[] _row2 =
-      {10, 11L, 12.0F, 13.0, "14", new int[]{15}, new long[]{16L}, new float[]{17.0F}, new double[]{18.0}, new String[]{"19"}, BytesUtils.toByteArray(
-          "3040")};
+      {10, 11L, 12.0F, 13.0, "14", new int[]{15}, new long[]{16L}, new float[]{17.0F}, new double[]{18.0}, new String[]{"19"}, BytesUtils
+          .toByteArray("3040")};
   private final Object[] _compatibleRow1 =
-      {1L, 2.0F, 3.0, 4, "5", new long[]{6L}, new float[]{7.0F}, new double[]{8.0}, new int[]{9}, new String[]{"10"}, BytesUtils.toByteArray(
-          "5060")};
+      {1L, 2.0F, 3.0, 4, "5", new long[]{6L}, new float[]{7.0F}, new double[]{8.0}, new int[]{9}, new String[]{"10"}, BytesUtils
+          .toByteArray("5060")};
   private final Object[] _compatibleRow2 =
-      {11L, 12.0F, 13.0, 14, "15", new long[]{16L}, new float[]{17.0F}, new double[]{18.0}, new int[]{19}, new String[]{"20"}, BytesUtils.toByteArray(
-          "7000")};
+      {11L, 12.0F, 13.0, 14, "15", new long[]{16L}, new float[]{17.0F}, new double[]{18.0}, new int[]{19}, new String[]{"20"}, BytesUtils
+          .toByteArray("7000")};
   private QueryContext _queryContext;
 
   @BeforeClass
@@ -133,10 +133,10 @@ public class SelectionOperatorServiceTest {
   public void testGetSelectionColumns() {
     // For non 'SELECT *', should return selection columns as is
     DataSchema dataSchema = mock(DataSchema.class);
-    List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(Arrays
-        .asList(RequestContextUtils.getExpression("add(foo,'1')"),
-            RequestContextUtils.getExpression("sub(bar,'2')"),
-            RequestContextUtils.getExpression("foobar")), dataSchema);
+    List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(
+        Arrays.asList(RequestContextUtils.getExpression("add(foo,'1')"),
+            RequestContextUtils.getExpression("sub(bar,'2')"), RequestContextUtils.getExpression("foobar")),
+        dataSchema);
     assertEquals(selectionColumns, Arrays.asList("add(foo,'1')", "sub(bar,'2')", "foobar"));
 
     // 'SELECT *' should return columns (no transform expressions) in alphabetical order
@@ -187,8 +187,7 @@ public class SelectionOperatorServiceTest {
   }
 
   @Test
-  public void testCompatibleRowsDataTableTransformation()
-      throws Exception {
+  public void testCompatibleRowsDataTableTransformation() throws Exception {
     Collection<Object[]> rows = new ArrayList<>(2);
     rows.add(_row1);
     rows.add(_compatibleRow1);
@@ -198,11 +197,11 @@ public class SelectionOperatorServiceTest {
     assertEquals(dataSchema, _upgradedDataSchema);
     DataTable dataTable = SelectionOperatorUtils.getDataTableFromRows(rows, dataSchema);
     Object[] expectedRow1 =
-        {0L, 1.0, 2.0, 3.0, "4", new long[]{5L}, new double[]{6.0}, new double[]{7.0}, new double[]{8.0}, new String[]{"9"}, BytesUtils.toByteArray(
-            "1020")};
+        {0L, 1.0, 2.0, 3.0, "4", new long[]{5L}, new double[]{6.0}, new double[]{7.0}, new double[]{8.0}, new String[]{"9"}, BytesUtils
+            .toByteArray("1020")};
     Object[] expectedCompatibleRow1 =
-        {1L, 2.0, 3.0, 4.0, "5", new long[]{6L}, new double[]{7.0}, new double[]{8.0}, new double[]{9.0}, new String[]{"10"}, BytesUtils.toByteArray(
-            "5060")};
+        {1L, 2.0, 3.0, 4.0, "5", new long[]{6L}, new double[]{7.0}, new double[]{8.0}, new double[]{9.0}, new String[]{"10"}, BytesUtils
+            .toByteArray("5060")};
     assertTrue(Arrays.deepEquals(SelectionOperatorUtils.extractRowFromDataTable(dataTable, 0), expectedRow1));
     assertTrue(Arrays.deepEquals(SelectionOperatorUtils.extractRowFromDataTable(dataTable, 1), expectedCompatibleRow1));
   }
@@ -212,8 +211,8 @@ public class SelectionOperatorServiceTest {
     List<Object[]> rows = new ArrayList<>(2);
     rows.add(_row1);
     rows.add(_compatibleRow1);
-    SelectionResults selectionResults = SelectionOperatorUtils
-        .renderSelectionResultsWithoutOrdering(rows, _upgradedDataSchema, Arrays.asList(_columnNames), true);
+    SelectionResults selectionResults = SelectionOperatorUtils.renderSelectionResultsWithoutOrdering(rows,
+        _upgradedDataSchema, Arrays.asList(_columnNames), true);
     List<Serializable[]> resultRows = selectionResults.getRows();
     Serializable[] expectedRow1 =
         {0L, 1.0, 2.0, 3.0, "4", new long[]{5L}, new double[]{6.0}, new double[]{7.0}, new double[]{8.0}, new String[]{"9"}, "1020"};
@@ -222,8 +221,8 @@ public class SelectionOperatorServiceTest {
     assertTrue(Arrays.deepEquals(resultRows.get(0), expectedRow1));
     assertTrue(Arrays.deepEquals(resultRows.get(1), expectedRow2));
 
-    selectionResults = SelectionOperatorUtils
-        .renderSelectionResultsWithoutOrdering(rows, _upgradedDataSchema, Arrays.asList(_columnNames), false);
+    selectionResults = SelectionOperatorUtils.renderSelectionResultsWithoutOrdering(rows, _upgradedDataSchema,
+        Arrays.asList(_columnNames), false);
     resultRows = selectionResults.getRows();
     Serializable[] expectedFormattedRow1 =
         {"0", "1.0", "2.0", "3.0", "4", new String[]{"5"}, new String[]{"6.0"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9"}, "1020"};

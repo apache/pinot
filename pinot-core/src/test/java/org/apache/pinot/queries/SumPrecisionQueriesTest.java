@@ -103,8 +103,7 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     _intSum = BigDecimal.ZERO;
@@ -278,8 +277,7 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     _indexSegment.destroy();
     FileUtils.deleteDirectory(INDEX_DIR);
   }

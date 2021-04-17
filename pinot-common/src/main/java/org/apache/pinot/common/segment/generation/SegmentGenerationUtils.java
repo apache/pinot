@@ -185,8 +185,7 @@ public class SegmentGenerationUtils {
    * @return
    * @throws URISyntaxException
    */
-  public static URI getFileURI(String uriStr, URI fullUriForPathOnlyUriStr)
-      throws URISyntaxException {
+  public static URI getFileURI(String uriStr, URI fullUriForPathOnlyUriStr) throws URISyntaxException {
     URI fileURI = URI.create(uriStr);
     if (fileURI.getScheme() == null) {
       return new URI(fullUriForPathOnlyUriStr.getScheme(), fullUriForPathOnlyUriStr.getUserInfo(),
@@ -204,8 +203,7 @@ public class SegmentGenerationUtils {
    * @return
    * @throws URISyntaxException
    */
-  public static URI getDirectoryURI(String uriStr)
-      throws URISyntaxException {
+  public static URI getDirectoryURI(String uriStr) throws URISyntaxException {
     URI uri = new URI(uriStr);
     if (uri.getScheme() == null) {
       uri = new File(uriStr).toURI();
@@ -221,8 +219,7 @@ public class SegmentGenerationUtils {
    * @return fetched document
    * @throws IOException on connection problems
    */
-  private static String fetchUrl(URL url, String authToken)
-      throws IOException {
+  private static String fetchUrl(URL url, String authToken) throws IOException {
     URLConnection connection = url.openConnection();
 
     if (StringUtils.isNotBlank(authToken)) {

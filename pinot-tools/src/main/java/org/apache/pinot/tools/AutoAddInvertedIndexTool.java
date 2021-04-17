@@ -30,37 +30,43 @@ public class AutoAddInvertedIndexTool extends AbstractBaseCommand implements Com
   @Option(name = "-clusterName", required = true, metaVar = "<string>", usage = "Pinot cluster name")
   private String _clusterName;
 
-  @Option(name = "-controllerAddress", required = true, metaVar = "<string>", usage = "Address of the Pinot controller (host:port)")
+  @Option(name = "-controllerAddress", required = true, metaVar = "<string>",
+      usage = "Address of the Pinot controller (host:port)")
   private String _controllerAddress;
 
-  @Option(name = "-brokerAddress", required = true, metaVar = "<string>", usage = "Address of the Pinot broker (host:port)")
+  @Option(name = "-brokerAddress", required = true, metaVar = "<string>",
+      usage = "Address of the Pinot broker (host:port)")
   private String _brokerAddress;
 
-  @Option(name = "-strategy", required = false, metaVar = "<Strategy>", usage = "Strategy to add inverted index (QUERY), default: QUERY")
+  @Option(name = "-strategy", required = false, metaVar = "<Strategy>",
+      usage = "Strategy to add inverted index (QUERY), default: QUERY")
   private AutoAddInvertedIndex.Strategy _strategy = AutoAddInvertedIndex.Strategy.QUERY;
 
-  @Option(name = "-mode", required = false, metaVar = "<Mode>", usage = "Mode to add inverted index (NEW|REMOVE|REFRESH|APPEND), default: NEW")
+  @Option(name = "-mode", required = false, metaVar = "<Mode>",
+      usage = "Mode to add inverted index (NEW|REMOVE|REFRESH|APPEND), default: NEW")
   private AutoAddInvertedIndex.Mode _mode = AutoAddInvertedIndex.Mode.NEW;
 
-  @Option(name = "-tableNamePattern", required = false, metaVar = "<string>", usage = "Optional table name pattern to trigger adding inverted index, default: null (match any table name)")
+  @Option(name = "-tableNamePattern", required = false, metaVar = "<string>",
+      usage = "Optional table name pattern to trigger adding inverted index, default: null (match any table name)")
   private String _tableNamePattern = null;
 
-  @Option(name = "-tableSizeThreshold", required = false, metaVar = "<long>", usage =
-      "Optional table size threshold to trigger adding inverted index, default: "
+  @Option(name = "-tableSizeThreshold", required = false, metaVar = "<long>",
+      usage = "Optional table size threshold to trigger adding inverted index, default: "
           + AutoAddInvertedIndex.DEFAULT_TABLE_SIZE_THRESHOLD)
   private long _tableSizeThreshold = AutoAddInvertedIndex.DEFAULT_TABLE_SIZE_THRESHOLD;
 
-  @Option(name = "-cardinalityThreshold", required = false, metaVar = "<long>", usage =
-      "Optional cardinality threshold to trigger adding inverted index, default: "
+  @Option(name = "-cardinalityThreshold", required = false, metaVar = "<long>",
+      usage = "Optional cardinality threshold to trigger adding inverted index, default: "
           + AutoAddInvertedIndex.DEFAULT_CARDINALITY_THRESHOLD)
   private long _cardinalityThreshold = AutoAddInvertedIndex.DEFAULT_CARDINALITY_THRESHOLD;
 
-  @Option(name = "-maxNumInvertedIndex", required = false, metaVar = "<int>", usage =
-      "Optional max number of inverted index added, default: "
+  @Option(name = "-maxNumInvertedIndex", required = false, metaVar = "<int>",
+      usage = "Optional max number of inverted index added, default: "
           + AutoAddInvertedIndex.DEFAULT_MAX_NUM_INVERTED_INDEX_ADDED)
   private int _maxNumInvertedIndex = AutoAddInvertedIndex.DEFAULT_MAX_NUM_INVERTED_INDEX_ADDED;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -79,12 +85,11 @@ public class AutoAddInvertedIndexTool extends AbstractBaseCommand implements Com
   }
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
     AutoAddInvertedIndex autoAddInvertedIndex =
         new AutoAddInvertedIndex(_zkAddress, _clusterName, _controllerAddress, _brokerAddress, _strategy, _mode);
-    autoAddInvertedIndex
-        .overrideDefaultSettings(_tableNamePattern, _tableSizeThreshold, _cardinalityThreshold, _maxNumInvertedIndex);
+    autoAddInvertedIndex.overrideDefaultSettings(_tableNamePattern, _tableSizeThreshold, _cardinalityThreshold,
+        _maxNumInvertedIndex);
     autoAddInvertedIndex.run();
     return true;
   }

@@ -29,43 +29,49 @@ public class PinotFSBenchmarkRunner extends AbstractBaseCommand implements Comma
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotFSBenchmarkRunner.class);
 
-  @Option(name = "-mode", required = true, metaVar = "<String>", usage = "Test mode. (ALL|LISTFILES|READWRITE|DELETE|RENAME)")
+  @Option(name = "-mode", required = true, metaVar = "<String>",
+      usage = "Test mode. (ALL|LISTFILES|READWRITE|DELETE|RENAME)")
   private String _mode;
 
-  @Option(name = "-pinotFSConfigFile", required = true, metaVar = "<String>", usage = "Path for PinotFS configuration file")
+  @Option(name = "-pinotFSConfigFile", required = true, metaVar = "<String>",
+      usage = "Path for PinotFS configuration file")
   private String _pinotFSConfigFile;
 
-  @Option(name = "-baseDirectoryUri", required = true, metaVar = "<String>", usage = "Temp directory path for running benchmark against. e.g. file:///path/to/test, abfss://host/path...")
+  @Option(name = "-baseDirectoryUri", required = true, metaVar = "<String>",
+      usage = "Temp directory path for running benchmark against. e.g. file:///path/to/test, abfss://host/path...")
   private String _baseDirectoryUri;
 
   @Option(name = "-localTempDir", required = false, metaVar = "<String>", usage = "Local temp directory for benchmark.")
   private String _localTempDir;
 
-  @Option(name = "-numSegmentsForListTest", required = false, metaVar = "<Integer>", usage = "The number of segments to create before running listFiles test.")
+  @Option(name = "-numSegmentsForListTest", required = false, metaVar = "<Integer>",
+      usage = "The number of segments to create before running listFiles test.")
   private Integer _numSegmentsForListTest;
 
-  @Option(name = "-dataSizeInMBsForCopyTest", required = false, metaVar = "<Integer>", usage = "Data size in MB for copy test. (e.g. 1024 = 1GB)")
+  @Option(name = "-dataSizeInMBsForCopyTest", required = false, metaVar = "<Integer>",
+      usage = "Data size in MB for copy test. (e.g. 1024 = 1GB)")
   private Integer _dataSizeInMBsForCopyTest;
 
-  @Option(name = "-numOps", required = false, metaVar = "<Integer>", usage = "The number of trials of operations when running a benchmark.")
+  @Option(name = "-numOps", required = false, metaVar = "<Integer>",
+      usage = "The number of trials of operations when running a benchmark.")
   private Integer _numOps;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   @Override
   public boolean execute() throws Exception {
     try {
       LOGGER.info("Run filesystem benchmark...");
-      PinotFSBenchmarkDriver driver = new PinotFSBenchmarkDriver(_mode, _pinotFSConfigFile, _baseDirectoryUri, _localTempDir,
-          _numSegmentsForListTest, _dataSizeInMBsForCopyTest, _numOps);
+      PinotFSBenchmarkDriver driver = new PinotFSBenchmarkDriver(_mode, _pinotFSConfigFile, _baseDirectoryUri,
+          _localTempDir, _numSegmentsForListTest, _dataSizeInMBsForCopyTest, _numOps);
       driver.run();
     } catch (Exception e) {
       LOGGER.error("Error while running benchmark: ", e);
     }
     return true;
   }
-
 
   @Override
   public String description() {

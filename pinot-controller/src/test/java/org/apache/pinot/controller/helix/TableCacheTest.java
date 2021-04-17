@@ -99,8 +99,7 @@ public class TableCacheTest {
 
     // Add a schema
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension("testColumn", DataType.INT)
-        .build();
+        .addSingleValueDimension("testColumn", DataType.INT).build();
     ControllerTestUtils.getHelixResourceManager().addSchema(schema, false);
     // Wait for at most 10 seconds for the callback to add the schema to the cache
     TestUtils.waitForCondition(aVoid -> tableCache.getSchema(TABLE_NAME) != null, 10_000L,

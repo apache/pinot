@@ -50,19 +50,18 @@ public class SegmentUploaderDefault implements SegmentUploader {
   private BatchConfig _batchConfig;
 
   @Override
-  public void init(TableConfig tableConfig)
-      throws Exception {
+  public void init(TableConfig tableConfig) throws Exception {
     _tableNameWithType = tableConfig.getTableName();
 
     Preconditions.checkState(
         tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getBatchIngestionConfig() != null
             && CollectionUtils
-            .isNotEmpty(tableConfig.getIngestionConfig().getBatchIngestionConfig().getBatchConfigMaps()),
+                .isNotEmpty(tableConfig.getIngestionConfig().getBatchIngestionConfig().getBatchConfigMaps()),
         "Must provide ingestionConfig->batchIngestionConfig->batchConfigMaps in tableConfig for table: %s",
         _tableNameWithType);
-    Preconditions
-        .checkState(tableConfig.getIngestionConfig().getBatchIngestionConfig().getBatchConfigMaps().size() == 1,
-            "batchConfigMaps must contain only 1 BatchConfig for table: %s", _tableNameWithType);
+    Preconditions.checkState(
+        tableConfig.getIngestionConfig().getBatchIngestionConfig().getBatchConfigMaps().size() == 1,
+        "batchConfigMaps must contain only 1 BatchConfig for table: %s", _tableNameWithType);
     _batchConfig = new BatchConfig(_tableNameWithType,
         tableConfig.getIngestionConfig().getBatchIngestionConfig().getBatchConfigMaps().get(0));
 
@@ -74,16 +73,14 @@ public class SegmentUploaderDefault implements SegmentUploader {
   }
 
   @Override
-  public void uploadSegment(URI segmentTarURI, @Nullable AuthContext authContext)
-      throws Exception {
-    IngestionUtils
-        .uploadSegment(_tableNameWithType, _batchConfig, Collections.singletonList(segmentTarURI), authContext);
+  public void uploadSegment(URI segmentTarURI, @Nullable AuthContext authContext) throws Exception {
+    IngestionUtils.uploadSegment(_tableNameWithType, _batchConfig, Collections.singletonList(segmentTarURI),
+        authContext);
     LOGGER.info("Successfully uploaded segment: {} to table: {}", segmentTarURI, _tableNameWithType);
   }
 
   @Override
-  public void uploadSegmentsFromDir(URI segmentDir, @Nullable AuthContext authContext)
-      throws Exception {
+  public void uploadSegmentsFromDir(URI segmentDir, @Nullable AuthContext authContext) throws Exception {
 
     List<URI> segmentTarURIs = new ArrayList<>();
     PinotFS outputPinotFS = IngestionUtils.getOutputPinotFS(_batchConfig, segmentDir);

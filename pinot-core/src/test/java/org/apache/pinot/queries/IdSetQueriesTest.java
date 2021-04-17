@@ -110,8 +110,7 @@ public class IdSetQueriesTest extends BaseQueriesTest {
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
 
     List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
@@ -148,8 +147,7 @@ public class IdSetQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testAggregationOnly()
-      throws IOException {
+  public void testAggregationOnly() throws IOException {
     String query =
         "SELECT IDSET(intColumn), IDSET(longColumn), IDSET(floatColumn), IDSET(doubleColumn), IDSET(stringColumn), IDSET(bytesColumn) FROM testTable";
 
@@ -192,8 +190,8 @@ public class IdSetQueriesTest extends BaseQueriesTest {
       // With filter
       AggregationOperator aggregationOperator = getOperatorForPqlQueryWithFilter(query);
       IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
-      QueriesTestUtils
-          .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, 0, 0, NUM_RECORDS);
+      QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, 0, 0,
+          NUM_RECORDS);
       List<Object> aggregationResult = resultsBlock.getAggregationResult();
       assertNotNull(aggregationResult);
       assertEquals(aggregationResult.size(), 6);
@@ -259,8 +257,7 @@ public class IdSetQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testAggregationGroupBy()
-      throws IOException {
+  public void testAggregationGroupBy() throws IOException {
     String query =
         "SELECT IDSET(intColumn), IDSET(longColumn), IDSET(floatColumn), IDSET(doubleColumn), IDSET(stringColumn), IDSET(bytesColumn) FROM testTable GROUP BY 1";
 
@@ -268,9 +265,8 @@ public class IdSetQueriesTest extends BaseQueriesTest {
     {
       AggregationGroupByOperator aggregationGroupByOperator = getOperatorForPqlQuery(query);
       IntermediateResultsBlock resultsBlock = aggregationGroupByOperator.nextBlock();
-      QueriesTestUtils
-          .testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
-              6 * NUM_RECORDS, NUM_RECORDS);
+      QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(),
+          NUM_RECORDS, 0, 6 * NUM_RECORDS, NUM_RECORDS);
       AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
       assertNotNull(aggregationGroupByResult);
       Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
@@ -351,8 +347,7 @@ public class IdSetQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testQueryWithParameters()
-      throws IOException {
+  public void testQueryWithParameters() throws IOException {
     String query = "SELECT IDSET(intColumn, 'sizeThresholdInBytes=0;expectedInsertions=1000') FROM testTable";
 
     // Inner segment
@@ -394,8 +389,7 @@ public class IdSetQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testInIdSet()
-      throws IOException {
+  public void testInIdSet() throws IOException {
     // Create an IdSet with the values from the first half records
     IdSet idSet = IdSets.create(DataType.INT);
     for (int i = 0; i < NUM_RECORDS / 2; i++) {
@@ -415,9 +409,8 @@ public class IdSetQueriesTest extends BaseQueriesTest {
       String query = "SELECT COUNT(*) FROM testTable where INIDSET(intColumn, '" + serializedIdSet + "') = 1";
       AggregationOperator aggregationOperator = getOperatorForPqlQuery(query);
       IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
-      QueriesTestUtils
-          .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), expectedNumMatchingRecords,
-              NUM_RECORDS, 0, NUM_RECORDS);
+      QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(),
+          expectedNumMatchingRecords, NUM_RECORDS, 0, NUM_RECORDS);
       List<Object> aggregationResult = resultsBlock.getAggregationResult();
       assertNotNull(aggregationResult);
       assertEquals(aggregationResult.size(), 1);
@@ -438,8 +431,7 @@ public class IdSetQueriesTest extends BaseQueriesTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     _indexSegment.destroy();
     FileUtils.deleteDirectory(INDEX_DIR);
   }

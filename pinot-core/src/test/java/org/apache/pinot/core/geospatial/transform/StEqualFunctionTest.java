@@ -23,8 +23,7 @@ import org.testng.annotations.Test;
 
 public class StEqualFunctionTest extends GeoFunctionTest {
   @Test
-  public void testEquals()
-      throws Exception {
+  public void testEquals() throws Exception {
     assertRelation("ST_Equals", "POINT (20 20)", "POINT (25 25)", false);
     assertRelation("ST_Equals", "POINT (20 20)", "POINT (20 20)", true);
     assertRelation("ST_Equals", "MULTIPOINT (20 20, 25 25)", "MULTIPOINT (20 20, 25 25)", true);

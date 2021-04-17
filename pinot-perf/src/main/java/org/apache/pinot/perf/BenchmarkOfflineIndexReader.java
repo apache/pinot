@@ -97,8 +97,7 @@ public class BenchmarkOfflineIndexReader {
   private StringDictionary _stringDictionary;
 
   @Setup
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     Preconditions.checkNotNull(RESOURCE_URL);
     FileUtils.deleteQuietly(TEMP_DIR);
 
@@ -147,8 +146,7 @@ public class BenchmarkOfflineIndexReader {
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
-  public int fixedBitSingleValueReader()
-      throws IOException {
+  public int fixedBitSingleValueReader() throws IOException {
     try (ForwardIndexReaderContext readerContext = _fixedBitSingleValueReader.createContext()) {
       int ret = 0;
       for (int i = 0; i < _numDocs; i++) {
@@ -284,8 +282,7 @@ public class BenchmarkOfflineIndexReader {
   }
 
   @TearDown
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     _fixedBitSingleValueReader.close();
     _sortedForwardIndexReader.close();
     _fixedBitMultiValueReader.close();
@@ -298,8 +295,7 @@ public class BenchmarkOfflineIndexReader {
     FileUtils.deleteQuietly(TEMP_DIR);
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     Options opt =
         new OptionsBuilder().include(BenchmarkOfflineIndexReader.class.getSimpleName()).warmupTime(TimeValue.seconds(5))
             .warmupIterations(2).measurementTime(TimeValue.seconds(5)).measurementIterations(3).forks(1).build();

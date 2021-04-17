@@ -157,9 +157,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _numDroppedLogRateLimiter = RateLimiter.create(1.0);
 
     _brokerReduceService = new BrokerReduceService(_config);
-    LOGGER
-        .info("Broker Id: {}, timeout: {}ms, query response limit: {}, query log length: {}, query log max rate: {}qps",
-            _brokerId, _brokerTimeoutMs, _queryResponseLimit, _queryLogLength, _queryLogRateLimiter.getRate());
+    LOGGER.info(
+        "Broker Id: {}, timeout: {}ms, query response limit: {}, query log length: {}, query log max rate: {}qps",
+        _brokerId, _brokerTimeoutMs, _queryResponseLimit, _queryLogLength, _queryLogRateLimiter.getRate());
   }
 
   private String getDefaultBrokerId() {
@@ -173,8 +173,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   @Override
   public BrokerResponse handleRequest(JsonNode request, @Nullable RequesterIdentity requesterIdentity,
-      RequestStatistics requestStatistics)
-      throws Exception {
+      RequestStatistics requestStatistics) throws Exception {
     long requestId = _requestIdGenerator.incrementAndGet();
     requestStatistics.setBrokerId(_brokerId);
     requestStatistics.setRequestId(requestId);
@@ -217,17 +216,16 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         return processLiteralOnlyBrokerRequest(brokerRequest, compilationStartTimeNs, requestStatistics);
       } catch (Exception e) {
         // TODO: refine the exceptions here to early termination the queries won't requires to send to servers.
-        LOGGER
-            .warn("Unable to execute literal request {}: {} at broker, fallback to server query. {}", requestId, query,
-                e.getMessage());
+        LOGGER.warn("Unable to execute literal request {}: {} at broker, fallback to server query. {}", requestId,
+            query, e.getMessage());
       }
     }
 
     try {
       handleSubquery(brokerRequest, request, requesterIdentity, requestStatistics);
     } catch (Exception e) {
-      LOGGER
-          .info("Caught exception while handling the subquery in request {}: {}, {}", requestId, query, e.getMessage());
+      LOGGER.info("Caught exception while handling the subquery in request {}: {}, {}", requestId, query,
+          e.getMessage());
       requestStatistics.setErrorCode(QueryException.QUERY_EXECUTION_ERROR_CODE);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
     }
@@ -263,8 +261,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       requestStatistics.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
       return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
     }
-    _brokerMetrics
-        .addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION, System.nanoTime() - compilationEndTimeNs);
+    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION,
+        System.nanoTime() - compilationEndTimeNs);
 
     // Get the tables hit by the request
     String offlineTableName = null;
@@ -420,8 +418,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         processBrokerRequest(requestId, brokerRequest, offlineBrokerRequest, offlineRoutingTable, realtimeBrokerRequest,
             realtimeRoutingTable, remainingTimeMs, serverStats, requestStatistics);
     long executionEndTimeNs = System.nanoTime();
-    _brokerMetrics
-        .addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_EXECUTION, executionEndTimeNs - routingEndTimeNs);
+    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_EXECUTION,
+        executionEndTimeNs - routingEndTimeNs);
 
     // Track number of queries with number of groups limit reached
     if (brokerResponse.isNumGroupsLimitReached()) {
@@ -440,11 +438,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // Please add new entries at the end
     if (_queryLogRateLimiter.tryAcquire() || forceLog(brokerResponse, totalTimeMs)) {
       // Table name might have been changed (with suffix _OFFLINE/_REALTIME appended)
-      LOGGER.info("requestId={},table={},timeMs={},docs={}/{},entries={}/{},"
+      LOGGER.info(
+          "requestId={},table={},timeMs={},docs={}/{},entries={}/{},"
               + "segments(queried/processed/matched/consuming/unavailable):{}/{}/{}/{}/{},consumingFreshnessTimeMs={},"
               + "servers={}/{},groupLimitReached={},brokerReduceTimeMs={},exceptions={},serverStats={},query={},"
-              + "offlineThreadCpuTimeNs={},realtimeThreadCpuTimeNs={}", requestId,
-          brokerRequest.getQuerySource().getTableName(), totalTimeMs, brokerResponse.getNumDocsScanned(),
+              + "offlineThreadCpuTimeNs={},realtimeThreadCpuTimeNs={}",
+          requestId, brokerRequest.getQuerySource().getTableName(), totalTimeMs, brokerResponse.getNumDocsScanned(),
           brokerResponse.getTotalDocs(), brokerResponse.getNumEntriesScannedInFilter(),
           brokerResponse.getNumEntriesScannedPostFilter(), brokerResponse.getNumSegmentsQueried(),
           brokerResponse.getNumSegmentsProcessed(), brokerResponse.getNumSegmentsMatched(),
@@ -478,8 +477,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * <p>Currently only supports subquery within the filter.
    */
   private void handleSubquery(BrokerRequest brokerRequest, JsonNode jsonRequest,
-      @Nullable RequesterIdentity requesterIdentity, RequestStatistics requestStatistics)
-      throws Exception {
+      @Nullable RequesterIdentity requesterIdentity, RequestStatistics requestStatistics) throws Exception {
     FilterQueryMap filterSubQueryMap = brokerRequest.getFilterSubQueryMap();
     if (filterSubQueryMap != null) {
       for (FilterQuery filterQuery : filterSubQueryMap.getFilterQueryMap().values()) {
@@ -509,8 +507,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * IN_ID_SET transform function.
    */
   private void handleSubquery(TransformExpressionTree expression, JsonNode jsonRequest,
-      @Nullable RequesterIdentity requesterIdentity, RequestStatistics requestStatistics)
-      throws Exception {
+      @Nullable RequesterIdentity requesterIdentity, RequestStatistics requestStatistics) throws Exception {
     if (expression.getExpressionType() != TransformExpressionTree.ExpressionType.FUNCTION) {
       return;
     }
@@ -520,12 +517,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       TransformExpressionTree subqueryExpression = children.get(1);
       Preconditions.checkState(subqueryExpression.getExpressionType() == TransformExpressionTree.ExpressionType.LITERAL,
           "Second argument of IN_SUBQUERY must be a literal (subquery)");
-      String serializedIdSet =
-          getSerializedIdSetFromSubquery(subqueryExpression.getValue(), jsonRequest, requesterIdentity,
-              requestStatistics);
+      String serializedIdSet = getSerializedIdSetFromSubquery(subqueryExpression.getValue(), jsonRequest,
+          requesterIdentity, requestStatistics);
       expression.setValue(TransformFunctionType.INIDSET.name());
-      children
-          .set(1, new TransformExpressionTree(TransformExpressionTree.ExpressionType.LITERAL, serializedIdSet, null));
+      children.set(1,
+          new TransformExpressionTree(TransformExpressionTree.ExpressionType.LITERAL, serializedIdSet, null));
     } else {
       for (TransformExpressionTree child : children) {
         handleSubquery(child, jsonRequest, requesterIdentity, requestStatistics);
@@ -541,8 +537,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * IN_ID_SET transform function.
    */
   private void handleSubquery(Expression expression, JsonNode jsonRequest,
-      @Nullable RequesterIdentity requesterIdentity, RequestStatistics requestStatistics)
-      throws Exception {
+      @Nullable RequesterIdentity requesterIdentity, RequestStatistics requestStatistics) throws Exception {
     Function function = expression.getFunctionCall();
     if (function == null) {
       return;
@@ -552,9 +547,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       Preconditions.checkState(operands.size() == 2, "IN_SUBQUERY requires 2 arguments: expression, subquery");
       Literal subqueryLiteral = operands.get(1).getLiteral();
       Preconditions.checkState(subqueryLiteral != null, "Second argument of IN_SUBQUERY must be a literal (subquery)");
-      String serializedIdSet =
-          getSerializedIdSetFromSubquery(subqueryLiteral.getStringValue(), jsonRequest, requesterIdentity,
-              requestStatistics);
+      String serializedIdSet = getSerializedIdSetFromSubquery(subqueryLiteral.getStringValue(), jsonRequest,
+          requesterIdentity, requestStatistics);
       function.setOperator(TransformFunctionType.INIDSET.name());
       operands.set(1, RequestUtils.getLiteralExpression(serializedIdSet));
     } else {
@@ -569,8 +563,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * <p>The subquery should be an aggregation-only query with one single IdSet aggregation function.
    */
   private String getSerializedIdSetFromSubquery(String subquery, JsonNode jsonRequest,
-      @Nullable RequesterIdentity requesterIdentity, RequestStatistics requestStatistics)
-      throws Exception {
+      @Nullable RequesterIdentity requesterIdentity, RequestStatistics requestStatistics) throws Exception {
     // Make a copy of the query request to construct the subquery request so that they share the query options
     ObjectNode subqueryRequest = jsonRequest.deepCopy();
 
@@ -812,8 +805,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Processes the literal only query.
    */
   private BrokerResponse processLiteralOnlyBrokerRequest(BrokerRequest brokerRequest, long compilationStartTimeNs,
-      RequestStatistics requestStatistics)
-      throws IllegalStateException {
+      RequestStatistics requestStatistics) throws IllegalStateException {
     BrokerResponseNative brokerResponse = new BrokerResponseNative();
     List<String> columnNames = new ArrayList<>();
     List<DataSchema.ColumnDataType> columnTypes = new ArrayList<>();
@@ -1130,8 +1122,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     long remainingTimeMs = queryTimeoutMs - timeSpentMs;
     if (remainingTimeMs <= 0) {
-      String errorMessage = String
-          .format("Query timed out (time spent: %dms, timeout: %dms) for table: %s before scattering the request",
+      String errorMessage =
+          String.format("Query timed out (time spent: %dms, timeout: %dms) for table: %s before scattering the request",
               timeSpentMs, queryTimeoutMs, tableNameWithType);
       throw new TimeoutException(errorMessage);
     }
@@ -1229,8 +1221,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // Checking for this upfront, to avoid executing the query and wasting resources
     QueryOptions queryOptions = new QueryOptions(brokerRequest.getQueryOptions());
     if (brokerRequest.isSetAggregationsInfo() && brokerRequest.getGroupBy() != null) {
-      if (brokerRequest.getAggregationsInfoSize() > 1 && queryOptions.isResponseFormatSQL() && !queryOptions
-          .isGroupByModeSQL()) {
+      if (brokerRequest.getAggregationsInfoSize() > 1 && queryOptions.isResponseFormatSQL()
+          && !queryOptions.isGroupByModeSQL()) {
         throw new UnsupportedOperationException(
             "The results of a GROUP BY query with multiple aggregations in PQL is not tabular, and cannot be returned in SQL responseFormat");
       }
@@ -1382,8 +1374,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected abstract BrokerResponse processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable,
-      long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics)
-      throws Exception;
+      long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics) throws Exception;
 
   /**
    * Helper class to pass the per server statistics.

@@ -49,14 +49,12 @@ public class VarByteChunkSVForwardIndexTest {
   private static final String TEST_FILE = System.getProperty("java.io.tmpdir") + File.separator + "varByteSVRTest";
 
   @Test
-  public void testWithCompression()
-      throws Exception {
+  public void testWithCompression() throws Exception {
     test(ChunkCompressionType.SNAPPY);
   }
 
   @Test
-  public void testWithoutCompression()
-      throws Exception {
+  public void testWithoutCompression() throws Exception {
     test(ChunkCompressionType.PASS_THROUGH);
   }
 
@@ -70,8 +68,7 @@ public class VarByteChunkSVForwardIndexTest {
    * @param compressionType Compression type
    * @throws Exception
    */
-  public void test(ChunkCompressionType compressionType)
-      throws Exception {
+  public void test(ChunkCompressionType compressionType) throws Exception {
     String[] expected = new String[NUM_ENTRIES];
     Random random = new Random();
 
@@ -88,12 +85,13 @@ public class VarByteChunkSVForwardIndexTest {
     }
 
     // test both formats (4-byte chunk offsets and 8-byte chunk offsets)
-    try (VarByteChunkSVForwardIndexWriter fourByteOffsetWriter = new VarByteChunkSVForwardIndexWriter(outFileFourByte,
-        compressionType, NUM_ENTRIES, NUM_DOCS_PER_CHUNK, maxStringLengthInBytes,
-        BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
-        VarByteChunkSVForwardIndexWriter eightByteOffsetWriter = new VarByteChunkSVForwardIndexWriter(outFileEightByte,
-            compressionType, NUM_ENTRIES, NUM_DOCS_PER_CHUNK, maxStringLengthInBytes,
-            BaseChunkSVForwardIndexWriter.CURRENT_VERSION)) {
+    try (
+        VarByteChunkSVForwardIndexWriter fourByteOffsetWriter =
+            new VarByteChunkSVForwardIndexWriter(outFileFourByte, compressionType, NUM_ENTRIES, NUM_DOCS_PER_CHUNK,
+                maxStringLengthInBytes, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
+        VarByteChunkSVForwardIndexWriter eightByteOffsetWriter =
+            new VarByteChunkSVForwardIndexWriter(outFileEightByte, compressionType, NUM_ENTRIES, NUM_DOCS_PER_CHUNK,
+                maxStringLengthInBytes, BaseChunkSVForwardIndexWriter.CURRENT_VERSION)) {
       // NOTE: No need to test BYTES explicitly because STRING is handled as UTF-8 encoded bytes
       for (int i = 0; i < NUM_ENTRIES; i++) {
         fourByteOffsetWriter.putString(expected[i]);
@@ -101,12 +99,15 @@ public class VarByteChunkSVForwardIndexTest {
       }
     }
 
-    try (VarByteChunkSVForwardIndexReader fourByteOffsetReader = new VarByteChunkSVForwardIndexReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.STRING);
-        BaseChunkSVForwardIndexReader.ChunkReaderContext fourByteOffsetReaderContext = fourByteOffsetReader.createContext();
+    try (
+        VarByteChunkSVForwardIndexReader fourByteOffsetReader = new VarByteChunkSVForwardIndexReader(
+            PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.STRING);
+        BaseChunkSVForwardIndexReader.ChunkReaderContext fourByteOffsetReaderContext =
+            fourByteOffsetReader.createContext();
         VarByteChunkSVForwardIndexReader eightByteOffsetReader = new VarByteChunkSVForwardIndexReader(
             PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte), DataType.STRING);
-        BaseChunkSVForwardIndexReader.ChunkReaderContext eightByteOffsetReaderContext = eightByteOffsetReader.createContext()) {
+        BaseChunkSVForwardIndexReader.ChunkReaderContext eightByteOffsetReaderContext =
+            eightByteOffsetReader.createContext()) {
       for (int i = 0; i < NUM_ENTRIES; i++) {
         Assert.assertEquals(fourByteOffsetReader.getString(i, fourByteOffsetReaderContext), expected[i]);
         Assert.assertEquals(eightByteOffsetReader.getString(i, eightByteOffsetReaderContext), expected[i]);
@@ -121,8 +122,7 @@ public class VarByteChunkSVForwardIndexTest {
    * This test ensures that the reader can read in an data file from version 1.
    */
   @Test
-  public void testBackwardCompatibilityV1()
-      throws Exception {
+  public void testBackwardCompatibilityV1() throws Exception {
     String[] expected = new String[]{"abcde", "fgh", "ijklmn", "12345"};
     testBackwardCompatibilityHelper("data/varByteStrings.v1", expected, 1009);
   }
@@ -131,23 +131,22 @@ public class VarByteChunkSVForwardIndexTest {
    * This test ensures that the reader can read in an data file from version 2.
    */
   @Test
-  public void testBackwardCompatibilityV2()
-      throws Exception {
+  public void testBackwardCompatibilityV2() throws Exception {
     String[] data = {"abcdefghijk", "12456887", "pqrstuv", "500"};
     testBackwardCompatibilityHelper("data/varByteStringsCompressed.v2", data, 1000);
     testBackwardCompatibilityHelper("data/varByteStringsRaw.v2", data, 1000);
   }
 
-  private void testBackwardCompatibilityHelper(String fileName, String[] data, int numDocs)
-      throws Exception {
+  private void testBackwardCompatibilityHelper(String fileName, String[] data, int numDocs) throws Exception {
     ClassLoader classLoader = getClass().getClassLoader();
     URL resource = classLoader.getResource(fileName);
     if (resource == null) {
       throw new RuntimeException("Input file not found: " + fileName);
     }
     File file = new File(resource.getFile());
-    try (VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(file), DataType.STRING);
+    try (
+        VarByteChunkSVForwardIndexReader reader =
+            new VarByteChunkSVForwardIndexReader(PinotDataBuffer.mapReadOnlyBigEndianFile(file), DataType.STRING);
         BaseChunkSVForwardIndexReader.ChunkReaderContext readerContext = reader.createContext()) {
       for (int i = 0; i < numDocs; i++) {
         String actual = reader.getString(i, readerContext);
@@ -157,8 +156,7 @@ public class VarByteChunkSVForwardIndexTest {
   }
 
   @Test
-  public void testVarCharWithDifferentSizes()
-      throws Exception {
+  public void testVarCharWithDifferentSizes() throws Exception {
     testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 10, 1000);
     testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 10, 1000);
 

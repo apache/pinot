@@ -67,8 +67,7 @@ public class BackfillSegmentUtils {
    * @return
    * @throws IOException
    */
-  public List<String> getAllSegments(String tableName, SegmentType segmentType)
-      throws IOException {
+  public List<String> getAllSegments(String tableName, SegmentType segmentType) throws IOException {
 
     List<String> allSegments = new ArrayList<>();
     String urlString = String.format(SEGMENTS_ENDPOINT, _controllerHttpHost.toURI(), tableName);

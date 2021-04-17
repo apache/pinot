@@ -92,8 +92,7 @@ public class DataTableImplV3 extends BaseDataTable {
   /**
    * Construct data table from byte array. (broker side)
    */
-  public DataTableImplV3(ByteBuffer byteBuffer)
-      throws IOException {
+  public DataTableImplV3(ByteBuffer byteBuffer) throws IOException {
     // Read header.
     _numRows = byteBuffer.getInt();
     _numColumns = byteBuffer.getInt();
@@ -184,8 +183,7 @@ public class DataTableImplV3 extends BaseDataTable {
   }
 
   @Override
-  public byte[] toBytes()
-      throws IOException {
+  public byte[] toBytes() throws IOException {
     ThreadTimer threadTimer = new ThreadTimer();
     threadTimer.start();
 
@@ -291,8 +289,7 @@ public class DataTableImplV3 extends BaseDataTable {
    * Unlike V2, where numeric metadata values (int and long) in V3 are encoded in UTF-8 in the wire format,
    * in V3 big endian representation is used.
    */
-  private byte[] serializeMetadata()
-      throws IOException {
+  private byte[] serializeMetadata() throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
 
@@ -328,8 +325,7 @@ public class DataTableImplV3 extends BaseDataTable {
    * This is to make V3 implementation keep the consumers of Map<String, String> getMetadata() API in the code happy
    * by internally converting it.
    */
-  private Map<String, String> deserializeMetadata(byte[] bytes)
-      throws IOException {
+  private Map<String, String> deserializeMetadata(byte[] bytes) throws IOException {
     try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
         DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream)) {
       int numEntries = dataInputStream.readInt();
@@ -356,8 +352,7 @@ public class DataTableImplV3 extends BaseDataTable {
     }
   }
 
-  private byte[] serializeExceptions()
-      throws IOException {
+  private byte[] serializeExceptions() throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
 
@@ -375,8 +370,7 @@ public class DataTableImplV3 extends BaseDataTable {
     return byteArrayOutputStream.toByteArray();
   }
 
-  private Map<Integer, String> deserializeExceptions(byte[] bytes)
-      throws IOException {
+  private Map<Integer, String> deserializeExceptions(byte[] bytes) throws IOException {
     try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
         DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream)) {
       int numExceptions = dataInputStream.readInt();

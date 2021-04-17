@@ -73,8 +73,8 @@ public class SortedDocIdIteratorTest {
 
   @Test
   public void testDocIdRangesWithSingleDocument() {
-    List<Pairs.IntPair> docIdRanges = Arrays
-        .asList(new Pairs.IntPair(3, 3), new Pairs.IntPair(8, 8), new Pairs.IntPair(15, 15), new Pairs.IntPair(20, 20));
+    List<Pairs.IntPair> docIdRanges = Arrays.asList(new Pairs.IntPair(3, 3), new Pairs.IntPair(8, 8),
+        new Pairs.IntPair(15, 15), new Pairs.IntPair(20, 20));
     SortedDocIdIterator docIdIterator = new SortedDocIdSet(docIdRanges).iterator();
     assertEquals(docIdIterator.next(), 3);
     assertEquals(docIdIterator.advance(5), 8);

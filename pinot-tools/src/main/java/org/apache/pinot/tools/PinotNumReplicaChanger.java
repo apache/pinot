@@ -48,8 +48,7 @@ public class PinotNumReplicaChanger extends PinotZKChanger {
     System.exit(1);
   }
 
-  public void changeNumReplicas(final String tableName)
-      throws Exception {
+  public void changeNumReplicas(final String tableName) throws Exception {
     // Get the number of replicas in the tableconfig.
     final String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     final TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(propertyStore, offlineTableName);
@@ -95,16 +94,14 @@ public class PinotNumReplicaChanger extends PinotZKChanger {
           instanceStateMap.remove(keys.iterator().next());
         }
       } else if (instanceStateMap.size() < newNumReplicas) {
-        throw new RuntimeException(
-            "Segment " + segmentId + " has " + instanceStateMap.size() + " replicas but want changed to "
-                + newNumReplicas);
+        throw new RuntimeException("Segment " + segmentId + " has " + instanceStateMap.size()
+            + " replicas but want changed to " + newNumReplicas);
       }
     }
     return idealState;
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     final boolean dryRun = true;
     if (args.length != 3) {
       usage();

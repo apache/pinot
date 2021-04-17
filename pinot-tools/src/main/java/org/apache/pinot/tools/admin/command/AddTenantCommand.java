@@ -35,7 +35,8 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
   @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
   private String _controllerHost;
 
-  @Option(name = "-controllerPort", required = false, metaVar = "<int>", usage = "Port number to start the controller at.")
+  @Option(name = "-controllerPort", required = false, metaVar = "<int>",
+      usage = "Port number to start the controller at.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
   @Option(name = "-controllerProtocol", required = false, metaVar = "<String>", usage = "protocol for controller.")
@@ -68,7 +69,8 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
   @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
   private String _authToken;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   private String _controllerAddress;
@@ -124,8 +126,7 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
   }
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
     if (_controllerAddress == null) {
       if (_controllerHost == null) {
         _controllerHost = NetUtils.getHostAddress();
@@ -141,9 +142,9 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
 
     LOGGER.info("Executing command: " + toString());
     Tenant tenant = new Tenant(_role, _name, _instanceCount, _offlineInstanceCount, _realtimeInstanceCount);
-    String res = AbstractBaseAdminCommand
-        .sendRequest("POST", ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTenantCreate(),
-            tenant.toJsonString(), makeAuthHeader(makeAuthToken(_authToken, _user, _password)));
+    String res = AbstractBaseAdminCommand.sendRequest("POST",
+        ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTenantCreate(), tenant.toJsonString(),
+        makeAuthHeader(makeAuthToken(_authToken, _user, _password)));
 
     LOGGER.info(res);
     System.out.print(res);
@@ -162,11 +163,10 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
 
   @Override
   public String toString() {
-    String retString =
-        ("AddTenant -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
-            + " -controllerPort " + _controllerPort + " -name " + _name + " -role " + _role + " -instanceCount "
-            + _instanceCount + " -offlineInstanceCount " + _offlineInstanceCount + " -realTimeInstanceCount "
-            + _realtimeInstanceCount);
+    String retString = ("AddTenant -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
+        + " -controllerPort " + _controllerPort + " -name " + _name + " -role " + _role + " -instanceCount "
+        + _instanceCount + " -offlineInstanceCount " + _offlineInstanceCount + " -realTimeInstanceCount "
+        + _realtimeInstanceCount);
 
     return ((_exec) ? (retString + " -exec") : retString);
   }

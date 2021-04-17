@@ -27,8 +27,7 @@ import java.util.List;
  * Simple shim so that jps -l shows PinotMinion instead of PinotAdministrator
  */
 public class PinotMinion {
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     List<String> arguments = new ArrayList<>();
     arguments.add("StartMinion");
     arguments.addAll(Arrays.asList(args));

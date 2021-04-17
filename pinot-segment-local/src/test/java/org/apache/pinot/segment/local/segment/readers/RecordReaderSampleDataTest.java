@@ -64,15 +64,15 @@ public class RecordReaderSampleDataTest {
   private final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
 
   @Test
-  public void testRecordReaders()
-      throws Exception {
+  public void testRecordReaders() throws Exception {
     CompositeTransformer defaultTransformer = CompositeTransformer.getDefaultTransformer(TABLE_CONFIG, SCHEMA);
-    try (RecordReader avroRecordReader = RecordReaderFactory
-        .getRecordReader(FileFormat.AVRO, AVRO_SAMPLE_DATA_FILE, SCHEMA.getColumnNames(), null);
-        RecordReader csvRecordReader = RecordReaderFactory
-            .getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE, SCHEMA.getColumnNames(), null);
-        RecordReader jsonRecordReader = RecordReaderFactory
-            .getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE, SCHEMA.getColumnNames(), null)) {
+    try (
+        RecordReader avroRecordReader =
+            RecordReaderFactory.getRecordReader(FileFormat.AVRO, AVRO_SAMPLE_DATA_FILE, SCHEMA.getColumnNames(), null);
+        RecordReader csvRecordReader =
+            RecordReaderFactory.getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE, SCHEMA.getColumnNames(), null);
+        RecordReader jsonRecordReader = RecordReaderFactory.getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE,
+            SCHEMA.getColumnNames(), null)) {
       int numRecords = 0;
       while (avroRecordReader.hasNext()) {
         assertTrue(csvRecordReader.hasNext());
@@ -110,10 +110,9 @@ public class RecordReaderSampleDataTest {
   }
 
   @Test
-  public void testRecordReaderEmptyFile()
-      throws Exception {
-    try (RecordReader jsonRecordReader = RecordReaderFactory
-        .getRecordReader(FileFormat.JSON, JSON_EMPTY_DATA_FILE, SCHEMA.getColumnNames(), null)) {
+  public void testRecordReaderEmptyFile() throws Exception {
+    try (RecordReader jsonRecordReader =
+        RecordReaderFactory.getRecordReader(FileFormat.JSON, JSON_EMPTY_DATA_FILE, SCHEMA.getColumnNames(), null)) {
       Assert.assertFalse(jsonRecordReader.hasNext());
     }
   }
@@ -123,15 +122,15 @@ public class RecordReaderSampleDataTest {
    * @throws Exception
    */
   @Test
-  public void testRecordExtractorAbsentFields()
-      throws Exception {
+  public void testRecordExtractorAbsentFields() throws Exception {
     HashSet<String> sourceFields = Sets.newHashSet("incoming", "time_day", "outgoing", "column2");
-    try (RecordReader avroRecordReader = RecordReaderFactory
-        .getRecordReader(FileFormat.AVRO, AVRO_SAMPLE_DATA_FILE, sourceFields, null);
-        RecordReader csvRecordReader = RecordReaderFactory
-            .getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE, sourceFields, null);
-        RecordReader jsonRecordReader = RecordReaderFactory
-            .getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE, sourceFields, null)) {
+    try (
+        RecordReader avroRecordReader =
+            RecordReaderFactory.getRecordReader(FileFormat.AVRO, AVRO_SAMPLE_DATA_FILE, sourceFields, null);
+        RecordReader csvRecordReader =
+            RecordReaderFactory.getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE, sourceFields, null);
+        RecordReader jsonRecordReader =
+            RecordReaderFactory.getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE, sourceFields, null)) {
       int numRecords = 0;
       while (avroRecordReader.hasNext()) {
         assertTrue(csvRecordReader.hasNext());

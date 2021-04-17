@@ -69,16 +69,14 @@ public class SegmentGenerationWithMultipleRecordsTest {
   }
 
   @Test
-  public void testNumDocs()
-      throws Exception {
+  public void testNumDocs() throws Exception {
     File segmentDir = buildSegment(_tableConfig, _schema);
     SegmentMetadataImpl metadata = SegmentDirectory.loadSegmentMetadata(segmentDir);
     Assert.assertEquals(metadata.getTotalDocs(), 6);
     Assert.assertTrue(metadata.getAllColumns().containsAll(Sets.newHashSet(SUB_COLUMN_1, SUB_COLUMN_2)));
   }
 
-  private File buildSegment(final TableConfig tableConfig, final Schema schema)
-      throws Exception {
+  private File buildSegment(final TableConfig tableConfig, final Schema schema) throws Exception {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(SEGMENT_DIR_NAME);
     config.setSegmentName(SEGMENT_NAME);

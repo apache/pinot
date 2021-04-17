@@ -40,9 +40,8 @@ public class DistinctPlanNode implements PlanNode {
     assert aggregationFunctions != null && aggregationFunctions.length == 1
         && aggregationFunctions[0] instanceof DistinctAggregationFunction;
     _distinctAggregationFunction = (DistinctAggregationFunction) aggregationFunctions[0];
-    _transformPlanNode =
-        new TransformPlanNode(_indexSegment, queryContext, _distinctAggregationFunction.getInputExpressions(),
-            DocIdSetPlanNode.MAX_DOC_PER_CALL);
+    _transformPlanNode = new TransformPlanNode(_indexSegment, queryContext,
+        _distinctAggregationFunction.getInputExpressions(), DocIdSetPlanNode.MAX_DOC_PER_CALL);
   }
 
   @Override

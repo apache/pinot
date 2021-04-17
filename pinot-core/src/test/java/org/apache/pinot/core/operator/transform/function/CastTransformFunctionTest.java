@@ -69,7 +69,7 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
 
   @DataProvider(name = "testIllegalArguments")
   public Object[][] testIllegalArguments() {
-    return new Object[][]{new Object[]{String.format("cast(%s)", INT_SV_COLUMN)}, new Object[]{String.format(
-        "cast(%s, %s, %s)", LONG_SV_COLUMN, "'STRING'", "'STRING'")}};
+    return new Object[][]{new Object[]{String.format("cast(%s)", INT_SV_COLUMN)}, new Object[]{String
+        .format("cast(%s, %s, %s)", LONG_SV_COLUMN, "'STRING'", "'STRING'")}};
   }
 }

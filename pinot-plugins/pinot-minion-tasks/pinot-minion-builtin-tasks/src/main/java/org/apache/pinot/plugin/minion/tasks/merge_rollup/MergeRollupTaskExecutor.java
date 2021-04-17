@@ -47,8 +47,7 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
 
   @Override
   protected List<SegmentConversionResult> convert(PinotTaskConfig pinotTaskConfig, List<File> originalIndexDirs,
-      File workingDir)
-      throws Exception {
+      File workingDir) throws Exception {
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String mergeTypeString = configs.get(MinionConstants.MergeRollupTask.MERGE_TYPE_KEY);
     // TODO: add the support for rollup
@@ -62,10 +61,9 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
 
     TableConfig tableConfig = getTableConfig(tableNameWithType);
 
-    MergeRollupSegmentConverter rollupSegmentConverter =
-        new MergeRollupSegmentConverter.Builder().setMergeType(mergeType).setTableName(tableNameWithType)
-            .setSegmentName(mergedSegmentName).setInputIndexDirs(originalIndexDirs).setWorkingDir(workingDir)
-            .setTableConfig(tableConfig).build();
+    MergeRollupSegmentConverter rollupSegmentConverter = new MergeRollupSegmentConverter.Builder()
+        .setMergeType(mergeType).setTableName(tableNameWithType).setSegmentName(mergedSegmentName)
+        .setInputIndexDirs(originalIndexDirs).setWorkingDir(workingDir).setTableConfig(tableConfig).build();
 
     List<File> resultFiles = rollupSegmentConverter.convert();
     List<SegmentConversionResult> results = new ArrayList<>();

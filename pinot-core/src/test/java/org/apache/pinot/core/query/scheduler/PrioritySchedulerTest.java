@@ -81,8 +81,7 @@ public class PrioritySchedulerTest {
 
   // Tests that there is no "hang" on stop
   @Test
-  public void testStartStop()
-      throws InterruptedException {
+  public void testStartStop() throws InterruptedException {
     TestPriorityScheduler scheduler = TestPriorityScheduler.create();
     scheduler.start();
     // 100 is arbitrary.. we need to wait for scheduler thread to have completely started
@@ -95,8 +94,7 @@ public class PrioritySchedulerTest {
   }
 
   @Test
-  public void testStartStopQueries()
-      throws ExecutionException, InterruptedException, IOException {
+  public void testStartStopQueries() throws ExecutionException, InterruptedException, IOException {
     TestPriorityScheduler scheduler = TestPriorityScheduler.create();
     scheduler.start();
 
@@ -124,8 +122,7 @@ public class PrioritySchedulerTest {
   }
 
   @Test
-  public void testOneQuery()
-      throws InterruptedException, ExecutionException, IOException, BrokenBarrierException {
+  public void testOneQuery() throws InterruptedException, ExecutionException, IOException, BrokenBarrierException {
     Map<String, Object> properties = new HashMap<>();
     properties.put(ResourceLimitPolicy.THREADS_PER_QUERY_PCT, 50);
     properties.put(ResourceLimitPolicy.TABLE_THREADS_HARD_LIMIT, 40);
@@ -161,8 +158,7 @@ public class PrioritySchedulerTest {
   }
 
   @Test
-  public void testMultiThreaded()
-      throws InterruptedException {
+  public void testMultiThreaded() throws InterruptedException {
     // add queries from multiple threads and verify that all those are executed
     Map<String, Object> properties = new HashMap<>();
     properties.put(ResourceManager.QUERY_WORKER_CONFIG_KEY, 60);
@@ -200,8 +196,7 @@ public class PrioritySchedulerTest {
    * Disabled because of race condition
    */
   @Test(enabled = false)
-  public void testOutOfCapacityResponse()
-      throws Exception {
+  public void testOutOfCapacityResponse() throws Exception {
     Map<String, Object> properties = new HashMap<>();
     properties.put(ResourceLimitPolicy.TABLE_THREADS_HARD_LIMIT, 5);
     properties.put(MultiLevelPriorityQueue.MAX_PENDING_PER_GROUP_KEY, 1);
@@ -220,8 +215,7 @@ public class PrioritySchedulerTest {
   }
 
   @Test
-  public void testSubmitBeforeRunning()
-      throws ExecutionException, InterruptedException, IOException {
+  public void testSubmitBeforeRunning() throws ExecutionException, InterruptedException, IOException {
     TestPriorityScheduler scheduler = TestPriorityScheduler.create();
     ListenableFuture<byte[]> result = scheduler.submit(createServerQueryRequest("1", metrics));
     // start is not called

@@ -55,8 +55,7 @@ public class IntArraysTest {
   }
 
   @BeforeClass
-  public static void before()
-      throws Exception {
+  public static void before() throws Exception {
     final String filePath =
         TestUtils.getFileFromResourceUrl(DictionariesTest.class.getClassLoader().getResource(AVRO_DATA));
     if (INDEX_DIR.exists()) {
@@ -65,9 +64,8 @@ public class IntArraysTest {
 
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
 
-    final SegmentGeneratorConfig config = SegmentTestUtils
-        .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "weeksSinceEpochSunday",
-            TimeUnit.DAYS, "test");
+    final SegmentGeneratorConfig config = SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(
+        new File(filePath), INDEX_DIR, "weeksSinceEpochSunday", TimeUnit.DAYS, "test");
     // The segment generation code in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable
     // range. For this test, we first need to fix the input avro data
@@ -88,8 +86,7 @@ public class IntArraysTest {
   }
 
   @Test
-  public void test1()
-      throws Exception {
+  public void test1() throws Exception {
     ImmutableSegment heapSegment = ImmutableSegmentLoader.load(INDEX_DIR.listFiles()[0], ReadMode.heap);
     ImmutableSegment mmapSegment = ImmutableSegmentLoader.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
     Map<String, ColumnMetadata> metadataMap =

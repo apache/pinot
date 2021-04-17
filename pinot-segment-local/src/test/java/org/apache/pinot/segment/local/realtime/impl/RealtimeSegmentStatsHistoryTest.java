@@ -48,8 +48,7 @@ public class RealtimeSegmentStatsHistoryTest {
   }
 
   @Test
-  public void zeroStatTest()
-      throws Exception {
+  public void zeroStatTest() throws Exception {
     final String tmpDir = System.getProperty("java.io.tmpdir");
     File serializedFile = new File(tmpDir, STATS_FILE_NAME);
     serializedFile.deleteOnExit();
@@ -80,8 +79,7 @@ public class RealtimeSegmentStatsHistoryTest {
   }
 
   @Test
-  public void serdeTest()
-      throws Exception {
+  public void serdeTest() throws Exception {
     final String tmpDir = System.getProperty("java.io.tmpdir");
     File serializedFile = new File(tmpDir, STATS_FILE_NAME);
     serializedFile.deleteOnExit();
@@ -187,8 +185,8 @@ public class RealtimeSegmentStatsHistoryTest {
     {
       RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(serializedFile);
       Assert.assertEquals(history.getEstimatedAvgColSize("new"), RealtimeSegmentStatsHistory.getDefaultEstAvgColSize());
-      Assert
-          .assertEquals(history.getEstimatedCardinality("new"), RealtimeSegmentStatsHistory.getDefaultEstCardinality());
+      Assert.assertEquals(history.getEstimatedCardinality("new"),
+          RealtimeSegmentStatsHistory.getDefaultEstCardinality());
       savedIsFull = history.isFull();
       savedCursor = history.getCursor();
     }
@@ -200,8 +198,7 @@ public class RealtimeSegmentStatsHistoryTest {
   }
 
   @Test
-  public void testMultiThreadedUse()
-      throws Exception {
+  public void testMultiThreadedUse() throws Exception {
     final int numThreads = 8;
     final int numIterations = 10;
     final long avgSleepTimeMs = 300;
@@ -228,8 +225,7 @@ public class RealtimeSegmentStatsHistoryTest {
   // from reading data serialized by earlier versions. The serialized data has one segment, with 2 columns -- "v1col1" and
   // "v1col2".
   @Test
-  public void testVersion1()
-      throws Exception {
+  public void testVersion1() throws Exception {
     final String fileName = "realtime-segment-stats-history-v1.ser";
     File v1StatsFile = new File(
         TestUtils.getFileFromResourceUrl(RealtimeSegmentStatsHistoryTest.class.getClassLoader().getResource("data")),
@@ -252,8 +248,7 @@ public class RealtimeSegmentStatsHistoryTest {
   }
 
   @Test
-  public void testLatestConsumedMemory()
-      throws IOException, ClassNotFoundException {
+  public void testLatestConsumedMemory() throws IOException, ClassNotFoundException {
     final String tmpDir = System.getProperty("java.io.tmpdir");
     File serializedFile = new File(tmpDir, STATS_FILE_NAME);
     serializedFile.deleteOnExit();

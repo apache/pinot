@@ -38,18 +38,15 @@ public class RecordReaderUtils {
 
   public static final String GZIP_FILE_EXTENSION = ".gz";
 
-  public static BufferedReader getBufferedReader(File dataFile)
-      throws IOException {
+  public static BufferedReader getBufferedReader(File dataFile) throws IOException {
     return new BufferedReader(new InputStreamReader(getInputStream(dataFile), StandardCharsets.UTF_8));
   }
 
-  public static BufferedInputStream getBufferedInputStream(File dataFile)
-      throws IOException {
+  public static BufferedInputStream getBufferedInputStream(File dataFile) throws IOException {
     return new BufferedInputStream(getInputStream(dataFile));
   }
 
-  public static InputStream getInputStream(File dataFile)
-      throws IOException {
+  public static InputStream getInputStream(File dataFile) throws IOException {
     if (dataFile.getName().endsWith(GZIP_FILE_EXTENSION)) {
       return new GZIPInputStream(new FileInputStream(dataFile));
     } else {

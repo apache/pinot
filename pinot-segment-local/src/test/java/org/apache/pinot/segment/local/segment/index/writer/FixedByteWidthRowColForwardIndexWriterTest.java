@@ -34,8 +34,7 @@ import org.testng.annotations.Test;
 @Test
 public class FixedByteWidthRowColForwardIndexWriterTest {
   @Test
-  public void testSingleColInt()
-      throws Exception {
+  public void testSingleColInt() throws Exception {
 
     File file = new File("test_single_col_writer.dat");
     file.delete();
@@ -52,8 +51,8 @@ public class FixedByteWidthRowColForwardIndexWriterTest {
     writer.close();
 
     File rfile = new File("test_single_col_writer.dat");
-    try (FixedByteSingleValueMultiColReader reader = new FixedByteSingleValueMultiColReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(rfile), rows, columnSizes)) {
+    try (FixedByteSingleValueMultiColReader reader =
+        new FixedByteSingleValueMultiColReader(PinotDataBuffer.mapReadOnlyBigEndianFile(rfile), rows, columnSizes)) {
       for (int i = 0; i < rows; i++) {
         Assert.assertEquals(reader.getInt(i, 0), data[i]);
       }
@@ -62,8 +61,7 @@ public class FixedByteWidthRowColForwardIndexWriterTest {
   }
 
   @Test
-  public void testSingleColFloat()
-      throws Exception {
+  public void testSingleColFloat() throws Exception {
 
     File wfile = new File("test_single_col_writer.dat");
     wfile.delete();
@@ -80,8 +78,8 @@ public class FixedByteWidthRowColForwardIndexWriterTest {
     writer.close();
 
     File rfile = new File("test_single_col_writer.dat");
-    try (FixedByteSingleValueMultiColReader reader = new FixedByteSingleValueMultiColReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(rfile), rows, columnSizes)) {
+    try (FixedByteSingleValueMultiColReader reader =
+        new FixedByteSingleValueMultiColReader(PinotDataBuffer.mapReadOnlyBigEndianFile(rfile), rows, columnSizes)) {
       for (int i = 0; i < rows; i++) {
         Assert.assertEquals(reader.getFloat(i, 0), data[i]);
       }
@@ -90,8 +88,7 @@ public class FixedByteWidthRowColForwardIndexWriterTest {
   }
 
   @Test
-  public void testSingleColDouble()
-      throws Exception {
+  public void testSingleColDouble() throws Exception {
 
     File wfile = new File("test_single_col_writer.dat");
     wfile.delete();
@@ -108,8 +105,8 @@ public class FixedByteWidthRowColForwardIndexWriterTest {
     writer.close();
 
     File rfile = new File("test_single_col_writer.dat");
-    try (FixedByteSingleValueMultiColReader reader = new FixedByteSingleValueMultiColReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(rfile), rows, columnSizes)) {
+    try (FixedByteSingleValueMultiColReader reader =
+        new FixedByteSingleValueMultiColReader(PinotDataBuffer.mapReadOnlyBigEndianFile(rfile), rows, columnSizes)) {
       for (int i = 0; i < rows; i++) {
         Assert.assertEquals(reader.getDouble(i, 0), data[i]);
       }
@@ -118,8 +115,7 @@ public class FixedByteWidthRowColForwardIndexWriterTest {
   }
 
   @Test
-  public void testSingleColLong()
-      throws Exception {
+  public void testSingleColLong() throws Exception {
 
     File wfile = new File("test_single_col_writer.dat");
     wfile.delete();
@@ -136,8 +132,8 @@ public class FixedByteWidthRowColForwardIndexWriterTest {
     writer.close();
 
     File rfile = new File("test_single_col_writer.dat");
-    try (FixedByteSingleValueMultiColReader reader = new FixedByteSingleValueMultiColReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(rfile), rows, columnSizes)) {
+    try (FixedByteSingleValueMultiColReader reader =
+        new FixedByteSingleValueMultiColReader(PinotDataBuffer.mapReadOnlyBigEndianFile(rfile), rows, columnSizes)) {
       for (int i = 0; i < rows; i++) {
         Assert.assertEquals(reader.getLong(i, 0), data[i]);
       }
@@ -146,8 +142,7 @@ public class FixedByteWidthRowColForwardIndexWriterTest {
   }
 
   @Test
-  public void testMultiCol()
-      throws Exception {
+  public void testMultiCol() throws Exception {
 
     File file = new File("test_single_col_writer.dat");
     file.delete();
@@ -175,8 +170,7 @@ public class FixedByteWidthRowColForwardIndexWriterTest {
   }
 
   @Test
-  public void testSpecialCharsForStringReaderWriter()
-      throws Exception {
+  public void testSpecialCharsForStringReaderWriter() throws Exception {
     final byte[] bytes1 = new byte[]{-17, -65, -67, -17, -65, -67, 32, 69, 120, 101, 99, 117, 116, 105, 118, 101};
     final byte[] bytes2 =
         new byte[]{-17, -65, -68, 32, 99, 97, 108, 103, 97, 114, 121, 32, 106, 117, 110, 107, 32, 114, 101, 109, 111, 118, 97, 108};
@@ -186,7 +180,7 @@ public class FixedByteWidthRowColForwardIndexWriterTest {
     int cols = 1;
     String testString1 = new String(bytes1);
     String testString2 = new String(bytes2);
-//    System.out.println(Arrays.toString(bytes2));
+    //    System.out.println(Arrays.toString(bytes2));
     int stringColumnMaxLength = Math.max(testString1.getBytes().length, testString2.getBytes().length);
     int[] columnSizes = new int[]{stringColumnMaxLength};
     FixedByteSingleValueMultiColWriter writer = new FixedByteSingleValueMultiColWriter(file, rows, cols, columnSizes);
@@ -217,8 +211,7 @@ public class FixedByteWidthRowColForwardIndexWriterTest {
   }
 
   @Test
-  public void testSpecialPaddingCharsForStringReaderWriter()
-      throws Exception {
+  public void testSpecialPaddingCharsForStringReaderWriter() throws Exception {
     for (int iter = 0; iter < 2; iter++) {
       char paddingChar = (iter == 0) ? '%' : '\0';
       final byte[] bytes1 = new byte[]{-17, -65, -67, -17, -65, -67, 32, 69, 120, 101, 99, 117, 116, 105, 118, 101};
@@ -230,7 +223,7 @@ public class FixedByteWidthRowColForwardIndexWriterTest {
       int cols = 1;
       String testString1 = new String(bytes1);
       String testString2 = new String(bytes2);
-//      System.out.println(Arrays.toString(bytes2));
+      //      System.out.println(Arrays.toString(bytes2));
       int stringColumnMaxLength = Math.max(testString1.getBytes().length, testString2.getBytes().length);
       int[] columnSizes = new int[]{stringColumnMaxLength};
       FixedByteSingleValueMultiColWriter writer = new FixedByteSingleValueMultiColWriter(file, rows, cols, columnSizes);

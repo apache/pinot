@@ -80,9 +80,8 @@ public abstract class ResourceManager {
     LOGGER.info("Initializing with {} query runner threads and {} worker threads", numQueryRunnerThreads,
         numQueryWorkerThreads);
     // pqr -> pinot query runner (to give short names)
-    ThreadFactory queryRunnerFactory =
-        new ThreadFactoryBuilder().setDaemon(false).setPriority(QUERY_RUNNER_THREAD_PRIORITY).setNameFormat("pqr-%d")
-            .build();
+    ThreadFactory queryRunnerFactory = new ThreadFactoryBuilder().setDaemon(false)
+        .setPriority(QUERY_RUNNER_THREAD_PRIORITY).setNameFormat("pqr-%d").build();
     queryRunners =
         MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(numQueryRunnerThreads, queryRunnerFactory));
 

@@ -251,10 +251,11 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     return _startTime == that._startTime && _endTime == that._endTime && _totalDocs == that._totalDocs
         && _crc == that._crc && _creationTime == that._creationTime
         && _segmentUploadStartTime == that._segmentUploadStartTime && Objects.equals(_segmentName, that._segmentName)
-        && _segmentType == that._segmentType && _timeUnit == that._timeUnit && Objects
-        .equals(_indexVersion, that._indexVersion) && Objects.equals(_partitionMetadata, that._partitionMetadata)
-        && Objects.equals(_crypterName, that._crypterName) && Objects.equals(_customMap, that._customMap) && Objects
-        .equals(_rawTableName, that._rawTableName);
+        && _segmentType == that._segmentType && _timeUnit == that._timeUnit
+        && Objects.equals(_indexVersion, that._indexVersion)
+        && Objects.equals(_partitionMetadata, that._partitionMetadata)
+        && Objects.equals(_crypterName, that._crypterName) && Objects.equals(_customMap, that._customMap)
+        && Objects.equals(_rawTableName, that._rawTableName);
   }
 
   @Override
@@ -282,9 +283,9 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
         String partitionMetadataJson = _partitionMetadata.toJsonString();
         znRecord.setSimpleField(Segment.PARTITION_METADATA, partitionMetadataJson);
       } catch (IOException e) {
-        LOGGER
-            .error("Exception caught while writing partition metadata into ZNRecord for segment '{}', will be dropped",
-                _segmentName, e);
+        LOGGER.error(
+            "Exception caught while writing partition metadata into ZNRecord for segment '{}', will be dropped",
+            _segmentName, e);
       }
     }
     if (_segmentUploadStartTime > 0) {

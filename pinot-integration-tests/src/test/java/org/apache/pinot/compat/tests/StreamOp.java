@@ -71,7 +71,8 @@ import org.slf4j.LoggerFactory;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class StreamOp extends BaseOp {
   public enum Op {
-    CREATE, PRODUCE
+    CREATE,
+    PRODUCE
   }
 
   private Op _op;
@@ -208,7 +209,6 @@ public class StreamOp extends BaseOp {
       Utils.replaceContent(new File(_inputDataFileName), localReplacedCSVFile, GENERATION_NUMBER_PLACEHOLDER,
           String.valueOf(_generationNumber));
 
-
       CSVRecordReaderConfig recordReaderConfig =
           JsonUtils.fileToObject(new File(_recordReaderConfigFileName), CSVRecordReaderConfig.class);
       Set<String> columnNames = new HashSet<>();
@@ -217,15 +217,14 @@ public class StreamOp extends BaseOp {
 
       String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
       String schemaName = TableNameBuilder.extractRawTableName(tableName);
-      String schemaString = ControllerTest.
-          sendGetRequest(
-              ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forSchemaGet(schemaName));
+      String schemaString = ControllerTest.sendGetRequest(
+          ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forSchemaGet(schemaName));
       Schema schema = JsonUtils.stringToObject(schemaString, Schema.class);
       DateTimeFormatSpec dateTimeFormatSpec =
           new DateTimeFormatSpec(schema.getSpecForTimeColumn(timeColumn).getFormat());
 
-      try (RecordReader csvRecordReader = RecordReaderFactory
-          .getRecordReader(FileFormat.CSV, localReplacedCSVFile, columnNames, recordReaderConfig)) {
+      try (RecordReader csvRecordReader =
+          RecordReaderFactory.getRecordReader(FileFormat.CSV, localReplacedCSVFile, columnNames, recordReaderConfig)) {
         int count = 0;
         while (count < _numRows) {
           if (!csvRecordReader.hasNext()) {
@@ -261,8 +260,7 @@ public class StreamOp extends BaseOp {
     }
   }
 
-  private long fetchExistingTotalDocs(String tableName)
-      throws Exception {
+  private long fetchExistingTotalDocs(String tableName) throws Exception {
     String query = "SELECT count(*) FROM " + tableName;
     JsonNode response = ClusterTest.postSqlQuery(query, ClusterDescriptor.BROKER_URL);
     if (response == null) {

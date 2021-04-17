@@ -114,8 +114,7 @@ public class SegmentWithNullValueVectorTest {
    * @throws Exception
    */
   @BeforeClass
-  public void setup()
-      throws Exception {
+  public void setup() throws Exception {
 
     _schema = new Schema();
     _schema.addField(new DimensionFieldSpec(INT_COLUMN, FieldSpec.DataType.INT, true));
@@ -133,8 +132,7 @@ public class SegmentWithNullValueVectorTest {
   }
 
   // Registers the segment and initializes Query Executor
-  private void setupQueryServer()
-      throws ConfigurationException {
+  private void setupQueryServer() throws ConfigurationException {
     _segmentNames.add(_segment.getSegmentName());
     // Mock the instance data manager
     _serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
@@ -143,9 +141,9 @@ public class SegmentWithNullValueVectorTest {
     Mockito.when(tableDataManagerConfig.getTableName()).thenReturn(TABLE_NAME);
     Mockito.when(tableDataManagerConfig.getDataDir()).thenReturn(FileUtils.getTempDirectoryPath());
     @SuppressWarnings("unchecked")
-    TableDataManager tableDataManager = TableDataManagerProvider
-        .getTableDataManager(tableDataManagerConfig, "testInstance", Mockito.mock(ZkHelixPropertyStore.class),
-            Mockito.mock(ServerMetrics.class), Mockito.mock(HelixManager.class));
+    TableDataManager tableDataManager = TableDataManagerProvider.getTableDataManager(tableDataManagerConfig,
+        "testInstance", Mockito.mock(ZkHelixPropertyStore.class), Mockito.mock(ServerMetrics.class),
+        Mockito.mock(HelixManager.class));
     tableDataManager.start();
     tableDataManager.addSegment(_segment);
     _instanceDataManager = Mockito.mock(InstanceDataManager.class);
@@ -168,8 +166,7 @@ public class SegmentWithNullValueVectorTest {
    * @throws Exception
    */
 
-  private void buildIndex(TableConfig tableConfig, Schema schema)
-      throws Exception {
+  private void buildIndex(TableConfig tableConfig, Schema schema) throws Exception {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
 
     config.setOutDir(SEGMENT_DIR_NAME);
@@ -230,8 +227,7 @@ public class SegmentWithNullValueVectorTest {
   }
 
   @Test
-  public void test()
-      throws Exception {
+  public void test() throws Exception {
     Map<String, NullValueVectorReader> nullValueVectorReaderMap = new HashMap<>();
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
 
@@ -268,9 +264,8 @@ public class SegmentWithNullValueVectorTest {
 
   @Test
   public void testNullWithAndPredicate() {
-    String query =
-        "SELECT COUNT(*) FROM " + TABLE_NAME + " where " + INT_COLUMN + " IS NOT NULL and " + LONG_COLUMN + " > "
-            + LONG_VALUE_THRESHOLD;
+    String query = "SELECT COUNT(*) FROM " + TABLE_NAME + " where " + INT_COLUMN + " IS NOT NULL and " + LONG_COLUMN
+        + " > " + LONG_VALUE_THRESHOLD;
     InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
     instanceRequest.setSearchSegments(_segmentNames);
     DataTable instanceResponse = _queryExecutor.processQuery(getQueryRequest(instanceRequest), QUERY_RUNNERS);
@@ -285,8 +280,7 @@ public class SegmentWithNullValueVectorTest {
    * Clean up after test
    */
   @AfterClass
-  public void cleanup()
-      throws IOException {
+  public void cleanup() throws IOException {
     _segment.destroy();
     FileUtils.deleteQuietly(new File(SEGMENT_DIR_NAME));
   }

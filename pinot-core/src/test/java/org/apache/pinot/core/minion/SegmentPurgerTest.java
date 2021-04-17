@@ -66,8 +66,7 @@ public class SegmentPurgerTest {
   private int _expectedNumRecordsModified;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
 
     _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -103,8 +102,7 @@ public class SegmentPurgerTest {
   }
 
   @Test
-  public void testPurgeSegment()
-      throws Exception {
+  public void testPurgeSegment() throws Exception {
     // Purge records with d1 = 0
     SegmentPurger.RecordPurger recordPurger = row -> row.getValue(D1).equals(0);
 
@@ -155,8 +153,9 @@ public class SegmentPurgerTest {
     }
 
     // Check inverted index
-    try (SegmentDirectory segmentDirectory = SegmentDirectory
-        .createFromLocalFS(purgedIndexDir, purgedSegmentMetadata, ReadMode.mmap);
+    try (
+        SegmentDirectory segmentDirectory =
+            SegmentDirectory.createFromLocalFS(purgedIndexDir, purgedSegmentMetadata, ReadMode.mmap);
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
       assertTrue(reader.hasIndexFor(D1, ColumnIndexType.INVERTED_INDEX));
       assertFalse(reader.hasIndexFor(D2, ColumnIndexType.INVERTED_INDEX));
@@ -164,8 +163,7 @@ public class SegmentPurgerTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 }

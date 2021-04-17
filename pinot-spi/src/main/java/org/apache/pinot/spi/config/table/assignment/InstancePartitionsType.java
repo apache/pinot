@@ -25,9 +25,9 @@ package org.apache.pinot.spi.config.table.assignment;
  *   {@code table_OFFLINE}, {@code table_CONSUMING}, {@code table_COMPLETED}.
  */
 public enum InstancePartitionsType {
-  OFFLINE,    // For (ONLINE) segments from offline table
-  CONSUMING,  // For consuming (CONSUMING) segments from LLC real-time table
-  COMPLETED;  // For completed (ONLINE) segments from LLC real-time table
+  OFFLINE, // For (ONLINE) segments from offline table
+  CONSUMING, // For consuming (CONSUMING) segments from LLC real-time table
+  COMPLETED; // For completed (ONLINE) segments from LLC real-time table
 
   public static final char TYPE_SUFFIX_SEPARATOR = '_';
 

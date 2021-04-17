@@ -566,8 +566,7 @@ public class DataFetcher {
     }
 
     @Override
-    public void close()
-        throws IOException {
+    public void close() throws IOException {
       if (_readerContext != null) {
         _readerContext.close();
       }

@@ -83,8 +83,7 @@ public class SegmentGenerationWithTimeColumnTest {
   }
 
   @Test
-  public void testSimpleDateSegmentGeneration()
-      throws Exception {
+  public void testSimpleDateSegmentGeneration() throws Exception {
     Schema schema = createSchema(true);
     File segmentDir = buildSegment(_tableConfig, schema, true, false);
     SegmentMetadataImpl metadata = SegmentDirectory.loadSegmentMetadata(segmentDir);
@@ -96,8 +95,7 @@ public class SegmentGenerationWithTimeColumnTest {
    * Tests using DateTimeFieldSpec as time column
    */
   @Test
-  public void testSimpleDateSegmentGenerationNew()
-      throws Exception {
+  public void testSimpleDateSegmentGenerationNew() throws Exception {
     Schema schema = createDateTimeFieldSpecSchema(true);
     File segmentDir = buildSegment(_tableConfig, schema, true, false);
     SegmentMetadataImpl metadata = SegmentDirectory.loadSegmentMetadata(segmentDir);
@@ -106,8 +104,7 @@ public class SegmentGenerationWithTimeColumnTest {
   }
 
   @Test
-  public void testEpochDateSegmentGeneration()
-      throws Exception {
+  public void testEpochDateSegmentGeneration() throws Exception {
     Schema schema = createSchema(false);
     File segmentDir = buildSegment(_tableConfig, schema, false, false);
     SegmentMetadataImpl metadata = SegmentDirectory.loadSegmentMetadata(segmentDir);
@@ -119,8 +116,7 @@ public class SegmentGenerationWithTimeColumnTest {
    * Tests using DateTimeFieldSpec as time column
    */
   @Test
-  public void testEpochDateSegmentGenerationNew()
-      throws Exception {
+  public void testEpochDateSegmentGenerationNew() throws Exception {
     Schema schema = createDateTimeFieldSpecSchema(false);
     File segmentDir = buildSegment(_tableConfig, schema, false, false);
     SegmentMetadataImpl metadata = SegmentDirectory.loadSegmentMetadata(segmentDir);
@@ -129,8 +125,7 @@ public class SegmentGenerationWithTimeColumnTest {
   }
 
   @Test(expectedExceptions = IllegalStateException.class)
-  public void testSegmentGenerationWithInvalidTime()
-      throws Exception {
+  public void testSegmentGenerationWithInvalidTime() throws Exception {
     Schema schema = createSchema(false);
     buildSegment(_tableConfig, schema, false, true);
   }
@@ -139,8 +134,7 @@ public class SegmentGenerationWithTimeColumnTest {
    * Tests using DateTimeFieldSpec as time column
    */
   @Test(expectedExceptions = IllegalStateException.class)
-  public void testSegmentGenerationWithInvalidTimeNew()
-      throws Exception {
+  public void testSegmentGenerationWithInvalidTimeNew() throws Exception {
     Schema schema = createDateTimeFieldSpecSchema(false);
     buildSegment(_tableConfig, schema, false, true);
   }
@@ -149,8 +143,10 @@ public class SegmentGenerationWithTimeColumnTest {
     Schema.SchemaBuilder builder =
         new Schema.SchemaBuilder().addSingleValueDimension(STRING_COL_NAME, FieldSpec.DataType.STRING);
     if (isSimpleDate) {
-      builder.addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS,
-          TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString() + ":" + TIME_COL_FORMAT, TIME_COL_NAME), null);
+      builder.addTime(
+          new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS,
+              TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString() + ":" + TIME_COL_FORMAT, TIME_COL_NAME),
+          null);
     } else {
       builder.addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COL_NAME), null);
     }
@@ -161,8 +157,8 @@ public class SegmentGenerationWithTimeColumnTest {
     Schema.SchemaBuilder builder =
         new Schema.SchemaBuilder().addSingleValueDimension(STRING_COL_NAME, FieldSpec.DataType.STRING);
     if (isSimpleDate) {
-      builder
-          .addDateTime(TIME_COL_NAME, FieldSpec.DataType.INT, "1:DAYS:SIMPLE_DATE_FORMAT:" + TIME_COL_FORMAT, "1:DAYS");
+      builder.addDateTime(TIME_COL_NAME, FieldSpec.DataType.INT, "1:DAYS:SIMPLE_DATE_FORMAT:" + TIME_COL_FORMAT,
+          "1:DAYS");
     } else {
       builder.addDateTime(TIME_COL_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS");
     }
@@ -175,8 +171,7 @@ public class SegmentGenerationWithTimeColumnTest {
   }
 
   private File buildSegment(final TableConfig tableConfig, final Schema schema, final boolean isSimpleDate,
-      final boolean isInvalidDate)
-      throws Exception {
+      final boolean isInvalidDate) throws Exception {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setRawIndexCreationColumns(schema.getDimensionNames());
     config.setOutDir(SEGMENT_DIR_NAME);

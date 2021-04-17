@@ -180,8 +180,7 @@ public class SegmentOp extends BaseOp {
    * @return File object of the TarGz compressed segment file.
    * @throws Exception while generating segment files and/or compressing to TarGz.
    */
-  private File generateSegment(File outputDir, String localReplacedInputDataFilePath)
-      throws Exception {
+  private File generateSegment(File outputDir, String localReplacedInputDataFilePath) throws Exception {
     TableConfig tableConfig = JsonUtils.fileToObject(new File(_tableConfigFileName), TableConfig.class);
     _tableName = tableConfig.getTableName();
     // if user does not specify segmentName, use tableName_generationNumber
@@ -218,8 +217,7 @@ public class SegmentOp extends BaseOp {
    * @param segmentTarFile TarGz Segment file
    * @throws Exception when upload segment fails.
    */
-  private void uploadSegment(File segmentTarFile)
-      throws Exception {
+  private void uploadSegment(File segmentTarFile) throws Exception {
     URI controllerURI = FileUploadDownloadClient.getUploadSegmentURI(new URI(ClusterDescriptor.CONTROLLER_URL));
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       fileUploadDownloadClient.uploadSegment(controllerURI, segmentTarFile.getName(), segmentTarFile, _tableName);
@@ -233,8 +231,7 @@ public class SegmentOp extends BaseOp {
    * @throws IOException
    * @throws InterruptedException
    */
-  private boolean verifySegmentInState(String state)
-      throws IOException, InterruptedException {
+  private boolean verifySegmentInState(String state) throws IOException, InterruptedException {
     long startTime = System.currentTimeMillis();
     long segmentCount;
     while ((segmentCount = getSegmentCountInState(state)) <= 0) {
@@ -257,16 +254,15 @@ public class SegmentOp extends BaseOp {
 
   // TODO: verify by getting the number of rows before adding the segment, and the number of rows after adding the
   //       segment, then make sure that it has increased by the number of rows in the segment.
-  private boolean verifyRoutingTableUpdated()
-      throws Exception {
+  private boolean verifyRoutingTableUpdated() throws Exception {
     String query = "SELECT count(*) FROM " + _tableName;
     JsonNode result = ClusterTest.postSqlQuery(query, ClusterDescriptor.BROKER_URL);
     long startTime = System.currentTimeMillis();
     while (SqlResultComparator.isEmpty(result)) {
       if ((System.currentTimeMillis() - startTime) > DEFAULT_MAX_SLEEP_TIME_MS) {
-        LOGGER
-            .error("Upload segment verification failed, routing table has not been updated after max wait time {} ms.",
-                DEFAULT_MAX_SLEEP_TIME_MS);
+        LOGGER.error(
+            "Upload segment verification failed, routing table has not been updated after max wait time {} ms.",
+            DEFAULT_MAX_SLEEP_TIME_MS);
         return false;
       }
       LOGGER.warn("Routing table has not been updated yet, will retry after {} ms.", DEFAULT_SLEEP_INTERVAL_MS);
@@ -305,8 +301,7 @@ public class SegmentOp extends BaseOp {
    * @throws IOException
    * @throws InterruptedException
    */
-  private boolean verifySegmentDeleted()
-      throws IOException, InterruptedException {
+  private boolean verifySegmentDeleted() throws IOException, InterruptedException {
     long startTime = System.currentTimeMillis();
     while (getCountForSegmentName() > 0) {
       if ((System.currentTimeMillis() - startTime) > DEFAULT_MAX_SLEEP_TIME_MS) {
@@ -327,10 +322,10 @@ public class SegmentOp extends BaseOp {
    * Retrieve external view for the given table name.
    * @return TableViews.TableView of OFFLINE and REALTIME segments.
    */
-  private TableViews.TableView getExternalViewForTable()
-      throws IOException {
-    return JsonUtils.stringToObject(ControllerTest.sendGetRequest(
-        ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forTableExternalView(_tableName)),
+  private TableViews.TableView getExternalViewForTable() throws IOException {
+    return JsonUtils.stringToObject(
+        ControllerTest.sendGetRequest(
+            ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forTableExternalView(_tableName)),
         TableViews.TableView.class);
   }
 
@@ -339,12 +334,11 @@ public class SegmentOp extends BaseOp {
    * @param state of the segment to be verified in the controller.
    * @return -1 in case of ERROR, 1 if all matches the state else 0.
    */
-  private long getSegmentCountInState(String state)
-      throws IOException {
-    final Set<String> segmentState =
-        getExternalViewForTable().offline != null ? getExternalViewForTable().offline.entrySet().stream()
-            .filter(k -> k.getKey().equals(_segmentName)).flatMap(x -> x.getValue().values().stream())
-            .collect(Collectors.toSet()) : Collections.emptySet();
+  private long getSegmentCountInState(String state) throws IOException {
+    final Set<String> segmentState = getExternalViewForTable().offline != null
+        ? getExternalViewForTable().offline.entrySet().stream().filter(k -> k.getKey().equals(_segmentName))
+            .flatMap(x -> x.getValue().values().stream()).collect(Collectors.toSet())
+        : Collections.emptySet();
 
     if (segmentState.contains(CommonConstants.Helix.StateModel.SegmentStateModel.ERROR)) {
       return -1;
@@ -357,9 +351,9 @@ public class SegmentOp extends BaseOp {
    * Retrieve the number of segments for both OFFLINE irrespective of the state.
    * @return count for OFFLINE segments.
    */
-  private long getCountForSegmentName()
-      throws IOException {
-    return getExternalViewForTable().offline != null ? getExternalViewForTable().offline.entrySet().stream()
-        .filter(k -> k.getKey().equals(_segmentName)).count() : 0;
+  private long getCountForSegmentName() throws IOException {
+    return getExternalViewForTable().offline != null
+        ? getExternalViewForTable().offline.entrySet().stream().filter(k -> k.getKey().equals(_segmentName)).count()
+        : 0;
   }
 }

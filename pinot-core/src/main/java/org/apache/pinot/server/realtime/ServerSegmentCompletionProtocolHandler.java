@@ -64,8 +64,8 @@ public class ServerSegmentCompletionProtocolHandler {
       _sslContext = new ClientSSLContextGenerator(httpsConfig.subset(CommonConstants.PREFIX_OF_SSL_SUBSET)).generate();
       _controllerHttpsPort = httpsConfig.getProperty(CONFIG_OF_CONTROLLER_HTTPS_PORT, Integer.class);
     }
-    _segmentUploadRequestTimeoutMs = uploaderConfig
-        .getProperty(CONFIG_OF_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS, DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS);
+    _segmentUploadRequestTimeoutMs = uploaderConfig.getProperty(CONFIG_OF_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS,
+        DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS);
     _authToken = uploaderConfig.getProperty(CONFIG_OF_SEGMENT_UPLOADER_AUTH_TOKEN);
   }
 
@@ -148,9 +148,8 @@ public class ServerSegmentCompletionProtocolHandler {
 
     Server2ControllerSegmentUploader segmentUploader = null;
     try {
-      segmentUploader =
-          new Server2ControllerSegmentUploader(LOGGER, _fileUploadDownloadClient, url, params.getSegmentName(),
-              _segmentUploadRequestTimeoutMs, _serverMetrics, _authToken);
+      segmentUploader = new Server2ControllerSegmentUploader(LOGGER, _fileUploadDownloadClient, url,
+          params.getSegmentName(), _segmentUploadRequestTimeoutMs, _serverMetrics, _authToken);
     } catch (URISyntaxException e) {
       LOGGER.error("Segment commit upload url error: ", e);
       return SegmentCompletionProtocol.RESP_NOT_SENT;
@@ -204,9 +203,8 @@ public class ServerSegmentCompletionProtocolHandler {
   private SegmentCompletionProtocol.Response sendRequest(String url) {
     SegmentCompletionProtocol.Response response;
     try {
-      String responseStr = _fileUploadDownloadClient
-          .sendSegmentCompletionProtocolRequest(new URI(url), FileUploadDownloadClient.makeAuthHeader(_authToken), null,
-              DEFAULT_OTHER_REQUESTS_TIMEOUT).getResponse();
+      String responseStr = _fileUploadDownloadClient.sendSegmentCompletionProtocolRequest(new URI(url),
+          FileUploadDownloadClient.makeAuthHeader(_authToken), null, DEFAULT_OTHER_REQUESTS_TIMEOUT).getResponse();
       response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       LOGGER.info("Controller response {} for {}", response.toJsonString(), url);
       if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {
@@ -228,9 +226,11 @@ public class ServerSegmentCompletionProtocolHandler {
       Map<String, File> metadataFiles) {
     SegmentCompletionProtocol.Response response;
     try {
-      String responseStr = _fileUploadDownloadClient
-          .uploadSegmentMetadataFiles(new URI(url), metadataFiles, FileUploadDownloadClient.makeAuthHeader(_authToken),
-              null, _segmentUploadRequestTimeoutMs).getResponse();
+      String responseStr =
+          _fileUploadDownloadClient
+              .uploadSegmentMetadataFiles(new URI(url), metadataFiles,
+                  FileUploadDownloadClient.makeAuthHeader(_authToken), null, _segmentUploadRequestTimeoutMs)
+              .getResponse();
       response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       LOGGER.info("Controller response {} for {}", response.toJsonString(), url);
       if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {

@@ -44,8 +44,7 @@ public class BenchmarkOffHeapDictionaryMemory {
   }
 
   @TearDown
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     _memoryManager.close();
   }
 
@@ -91,9 +90,8 @@ public class BenchmarkOffHeapDictionaryMemory {
       _totalMem[div] /= _nRuns;
       _nBufs[div] /= _nRuns;
       _overflowSize[div] /= _nRuns;
-      System.out.println(
-          "Div=" + div + ",TotalMem:" + _totalMem[div] / 1024 / 1024 + "MB,_nBufs=" + _nBufs[div] + ",numOverflows="
-              + _overflowSize[div]);
+      System.out.println("Div=" + div + ",TotalMem:" + _totalMem[div] / 1024 / 1024 + "MB,_nBufs=" + _nBufs[div]
+          + ",numOverflows=" + _overflowSize[div]);
     }
   }
 
@@ -105,8 +103,7 @@ public class BenchmarkOffHeapDictionaryMemory {
     }
   }
 
-  private void testMem(final int maxOverflowSize)
-      throws Exception {
+  private void testMem(final int maxOverflowSize) throws Exception {
     clearStats();
 
     for (int div = 1; div <= _nDivs; div++) {
@@ -122,8 +119,7 @@ public class BenchmarkOffHeapDictionaryMemory {
     printStats();
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     BenchmarkOffHeapDictionaryMemory benchmark = new BenchmarkOffHeapDictionaryMemory();
     System.out.println("Results with overflow:");
     benchmark.testMem(1000);

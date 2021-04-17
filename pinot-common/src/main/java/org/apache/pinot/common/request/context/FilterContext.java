@@ -30,7 +30,9 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
  */
 public class FilterContext {
   public enum Type {
-    AND, OR, PREDICATE
+    AND,
+    OR,
+    PREDICATE
   }
 
   private final Type _type;
@@ -81,8 +83,8 @@ public class FilterContext {
       return false;
     }
     FilterContext that = (FilterContext) o;
-    return _type == that._type && Objects.equals(_children, that._children) && Objects
-        .equals(_predicate, that._predicate);
+    return _type == that._type && Objects.equals(_children, that._children)
+        && Objects.equals(_predicate, that._predicate);
   }
 
   @Override

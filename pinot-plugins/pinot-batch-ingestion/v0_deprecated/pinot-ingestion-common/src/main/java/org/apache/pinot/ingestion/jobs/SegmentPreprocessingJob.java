@@ -72,8 +72,7 @@ public abstract class SegmentPreprocessingJob extends BaseSegmentJob {
     _logger.info("*********************************************************************");
   }
 
-  protected abstract void run()
-      throws Exception;
+  protected abstract void run() throws Exception;
 
   /**
    * Helper method that returns avro reader for the given avro file.
@@ -83,8 +82,7 @@ public abstract class SegmentPreprocessingJob extends BaseSegmentJob {
    * @return Avro reader for the file.
    * @throws IOException exception when accessing to IO
    */
-  protected DataFileStream<GenericRecord> getAvroReader(Path avroFile)
-      throws IOException {
+  protected DataFileStream<GenericRecord> getAvroReader(Path avroFile) throws IOException {
     FileSystem fs = FileSystem.get(new Configuration());
     if (avroFile.getName().endsWith("gz")) {
       return new DataFileStream<>(new GZIPInputStream(fs.open(avroFile)), new GenericDatumReader<>());
@@ -94,8 +92,7 @@ public abstract class SegmentPreprocessingJob extends BaseSegmentJob {
   }
 
   @Override
-  protected org.apache.pinot.spi.data.Schema getSchema()
-      throws IOException {
+  protected org.apache.pinot.spi.data.Schema getSchema() throws IOException {
     try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
       if (controllerRestApi != null) {
         return controllerRestApi.getSchema();

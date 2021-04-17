@@ -91,8 +91,7 @@ public class SegmentConverter {
     _skipTimeValueCheck = skipTimeValueCheck;
   }
 
-  public List<File> convertSegment()
-      throws Exception {
+  public List<File> convertSegment() throws Exception {
     List<File> resultFiles = new ArrayList<>();
     for (int currentPartition = 0; currentPartition < _totalNumPartition; currentPartition++) {
       // Mapping stage
@@ -102,18 +101,18 @@ public class SegmentConverter {
 
       try (MapperRecordReader mapperRecordReader = new MapperRecordReader(_inputIndexDirs, _recordTransformer,
           _recordPartitioner, _totalNumPartition, currentPartition)) {
-        buildSegment(mapperOutputPath, outputSegmentName, mapperRecordReader,
-            mapperRecordReader.getSchema(), _tableConfig);
+        buildSegment(mapperOutputPath, outputSegmentName, mapperRecordReader, mapperRecordReader.getSchema(),
+            _tableConfig);
       }
       File outputSegment = new File(mapperOutputPath + File.separator + outputSegmentName);
 
       // Sorting on group-by columns & Reduce stage
       if (_recordAggregator != null && _groupByColumns != null && _groupByColumns.size() > 0) {
         String reducerOutputPath = _workingDir.getPath() + File.separator + REDUCER_PREFIX + currentPartition;
-        try (ReducerRecordReader reducerRecordReader = new ReducerRecordReader(outputSegment, _recordAggregator,
-            _groupByColumns)) {
-          buildSegment(reducerOutputPath, outputSegmentName, reducerRecordReader,
-              reducerRecordReader.getSchema(), _tableConfig);
+        try (ReducerRecordReader reducerRecordReader =
+            new ReducerRecordReader(outputSegment, _recordAggregator, _groupByColumns)) {
+          buildSegment(reducerOutputPath, outputSegmentName, reducerRecordReader, reducerRecordReader.getSchema(),
+              _tableConfig);
         }
         outputSegment = new File(reducerOutputPath + File.separator + outputSegmentName);
       }
@@ -126,8 +125,8 @@ public class SegmentConverter {
       // Check if the table config has any index configured
       if (CollectionUtils.isNotEmpty(sortedColumn) || CollectionUtils.isNotEmpty(invertedIndexColumns)) {
         String indexGenerationOutputPath = _workingDir.getPath() + File.separator + INDEX_PREFIX + currentPartition;
-        try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(outputSegment, null,
-            sortedColumn)) {
+        try (PinotSegmentRecordReader pinotSegmentRecordReader =
+            new PinotSegmentRecordReader(outputSegment, null, sortedColumn)) {
           buildSegment(indexGenerationOutputPath, outputSegmentName, pinotSegmentRecordReader,
               pinotSegmentRecordReader.getSchema(), _tableConfig);
         }
@@ -144,9 +143,8 @@ public class SegmentConverter {
    *
    * TODO: Support all kinds of indexing (no dictionary)
    */
-  private void buildSegment(String outputPath, String segmentName, RecordReader recordReader,
-      Schema schema, TableConfig tableConfig)
-      throws Exception {
+  private void buildSegment(String outputPath, String segmentName, RecordReader recordReader, Schema schema,
+      TableConfig tableConfig) throws Exception {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setOutDir(outputPath);
     segmentGeneratorConfig.setSegmentName(segmentName);
@@ -230,8 +228,8 @@ public class SegmentConverter {
     public SegmentConverter build() {
       // Check that the group-by columns and record aggregator are configured together
       if (_groupByColumns != null && _groupByColumns.size() > 0) {
-        Preconditions
-            .checkNotNull(_recordAggregator, "If group-by columns are given, the record aggregator is required.");
+        Preconditions.checkNotNull(_recordAggregator,
+            "If group-by columns are given, the record aggregator is required.");
       } else {
         Preconditions.checkArgument(_recordAggregator == null,
             "If group-by columns are not given, the record aggregator has to be null.");

@@ -68,8 +68,8 @@ public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {
 
   @Override
   protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier() {
-    return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.REPLACE, Collections
-        .singletonMap(MinionConstants.PurgeTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX,
+    return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.REPLACE,
+        Collections.singletonMap(MinionConstants.PurgeTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX,
             String.valueOf(System.currentTimeMillis())));
   }
 }

@@ -52,8 +52,7 @@ public class AccessControlTest {
   protected WebTarget _webTarget;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
     Assert.assertTrue(INDEX_DIR.mkdirs());
 
@@ -65,8 +64,8 @@ public class AccessControlTest {
     _adminApiApplication.start(Collections.singletonList(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, "0.0.0.0",
         CommonConstants.Server.DEFAULT_ADMIN_API_PORT, CommonConstants.HTTP_PROTOCOL, new TlsConfig())));
 
-    _webTarget = ClientBuilder.newClient().target(String.format("http://%s:%d", NetUtils.getHostAddress(),
-        CommonConstants.Server.DEFAULT_ADMIN_API_PORT));
+    _webTarget = ClientBuilder.newClient().target(
+        String.format("http://%s:%d", NetUtils.getHostAddress(), CommonConstants.Server.DEFAULT_ADMIN_API_PORT));
   }
 
   @AfterClass

@@ -23,7 +23,8 @@ import java.util.Map;
 
 
 public enum MergeType {
-  CONCATENATE, ROLLUP;
+  CONCATENATE,
+  ROLLUP;
 
   private static final Map<String, MergeType> VALUE_MAP = new HashMap<>();
 

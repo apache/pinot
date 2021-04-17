@@ -44,14 +44,14 @@ public class KafkaHighLevelStreamConfig {
 
   static {
     defaultProps = new HashMap<>();
-    defaultProps
-        .put(KafkaStreamConfigProperties.HighLevelConsumer.ZK_SESSION_TIMEOUT_MS, DEFAULT_ZK_SESSION_TIMEOUT_MS);
-    defaultProps
-        .put(KafkaStreamConfigProperties.HighLevelConsumer.ZK_CONNECTION_TIMEOUT_MS, DEFAULT_ZK_CONNECTION_TIMEOUT_MS);
+    defaultProps.put(KafkaStreamConfigProperties.HighLevelConsumer.ZK_SESSION_TIMEOUT_MS,
+        DEFAULT_ZK_SESSION_TIMEOUT_MS);
+    defaultProps.put(KafkaStreamConfigProperties.HighLevelConsumer.ZK_CONNECTION_TIMEOUT_MS,
+        DEFAULT_ZK_CONNECTION_TIMEOUT_MS);
     defaultProps.put(KafkaStreamConfigProperties.HighLevelConsumer.ZK_SYNC_TIME_MS, DEFAULT_ZK_SYNC_TIME);
     // Rebalance retries will take up to 1 mins to fail.
-    defaultProps
-        .put(KafkaStreamConfigProperties.HighLevelConsumer.REBALANCE_MAX_RETRIES, DEFAULT_REBALANCE_MAX_RETRIES);
+    defaultProps.put(KafkaStreamConfigProperties.HighLevelConsumer.REBALANCE_MAX_RETRIES,
+        DEFAULT_REBALANCE_MAX_RETRIES);
     defaultProps.put(KafkaStreamConfigProperties.HighLevelConsumer.REBALANCE_BACKOFF_MS, DEFAULT_REBALANCE_BACKOFF_MS);
     defaultProps.put(KafkaStreamConfigProperties.HighLevelConsumer.AUTO_COMMIT_ENABLE, DEFAULT_AUTO_COMMIT_ENABLE);
   }
@@ -67,8 +67,7 @@ public class KafkaHighLevelStreamConfig {
    * @param tableName
    * @param groupId
    */
-  public KafkaHighLevelStreamConfig(StreamConfig streamConfig, String tableName,
-      String groupId) {
+  public KafkaHighLevelStreamConfig(StreamConfig streamConfig, String tableName, String groupId) {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
 
     _kafkaTopicName = streamConfig.getTopicName();
@@ -85,8 +84,8 @@ public class KafkaHighLevelStreamConfig {
         KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.KAFKA_CONSUMER_PROP_PREFIX);
     for (String key : streamConfigMap.keySet()) {
       if (key.startsWith(kafkaConsumerPropertyPrefix)) {
-        _kafkaConsumerProperties
-            .put(StreamConfigProperties.getPropertySuffix(key, kafkaConsumerPropertyPrefix), streamConfigMap.get(key));
+        _kafkaConsumerProperties.put(StreamConfigProperties.getPropertySuffix(key, kafkaConsumerPropertyPrefix),
+            streamConfigMap.get(key));
       }
     }
   }
@@ -145,9 +144,9 @@ public class KafkaHighLevelStreamConfig {
 
     KafkaHighLevelStreamConfig that = (KafkaHighLevelStreamConfig) o;
 
-    return EqualityUtils.isEqual(_kafkaTopicName, that._kafkaTopicName) && EqualityUtils
-        .isEqual(_groupId, that._groupId) && EqualityUtils.isEqual(_zkBrokerUrl, that._zkBrokerUrl) && EqualityUtils
-        .isEqual(_kafkaConsumerProperties, that._kafkaConsumerProperties);
+    return EqualityUtils.isEqual(_kafkaTopicName, that._kafkaTopicName)
+        && EqualityUtils.isEqual(_groupId, that._groupId) && EqualityUtils.isEqual(_zkBrokerUrl, that._zkBrokerUrl)
+        && EqualityUtils.isEqual(_kafkaConsumerProperties, that._kafkaConsumerProperties);
   }
 
   @Override

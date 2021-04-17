@@ -22,12 +22,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+
 /**
  * Simple shim so that jps -l shows StartServiceManager instead of PinotAdministrator
  */
 public class PinotServiceManagerStarter {
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     List<String> arguments = new ArrayList<>();
     arguments.add("StartServiceManager");
     arguments.addAll(Arrays.asList(args));

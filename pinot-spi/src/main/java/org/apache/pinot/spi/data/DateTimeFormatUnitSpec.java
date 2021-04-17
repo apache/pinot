@@ -137,8 +137,8 @@ public class DateTimeFormatUnitSpec {
 
     DateTimeFormatUnitSpec that = (DateTimeFormatUnitSpec) o;
 
-    return EqualityUtils.isEqual(_timeUnit, that._timeUnit) && EqualityUtils
-        .isEqual(_dateTimeTransformUnit, that._dateTimeTransformUnit);
+    return EqualityUtils.isEqual(_timeUnit, that._timeUnit)
+        && EqualityUtils.isEqual(_dateTimeTransformUnit, that._dateTimeTransformUnit);
   }
 
   @Override

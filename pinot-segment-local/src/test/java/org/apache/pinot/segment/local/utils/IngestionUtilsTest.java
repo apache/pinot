@@ -95,7 +95,8 @@ public class IngestionUtilsTest {
     // incoming and outgoing different column name
     schema = new Schema.SchemaBuilder()
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "in"),
-            new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "out")).build();
+            new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "out"))
+        .build();
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(null, schema));
     Assert.assertEquals(extract.size(), 2);
     Assert.assertTrue(extract.containsAll(Arrays.asList("in", "out")));

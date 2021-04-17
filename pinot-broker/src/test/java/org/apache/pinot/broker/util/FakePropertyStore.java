@@ -65,8 +65,7 @@ public class FakePropertyStore extends ZkHelixPropertyStore<ZNRecord> {
     }
   }
 
-  public void setContents(String path, ZNRecord contents)
-      throws Exception {
+  public void setContents(String path, ZNRecord contents) throws Exception {
     _contents.put(path, contents);
     if (_listener != null) {
       _listener.handleDataChange(path, contents);

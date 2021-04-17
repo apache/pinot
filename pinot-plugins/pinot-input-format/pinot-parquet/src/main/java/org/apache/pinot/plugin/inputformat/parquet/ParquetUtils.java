@@ -45,27 +45,24 @@ public class ParquetUtils {
   /**
    * Returns a ParquetReader with the given path.
    */
-  public static ParquetReader<GenericRecord> getParquetAvroReader(Path path)
-      throws IOException {
+  public static ParquetReader<GenericRecord> getParquetAvroReader(Path path) throws IOException {
     //noinspection unchecked
-    return AvroParquetReader.<GenericRecord>builder(path).disableCompatibility().withDataModel(GenericData.get())
+    return AvroParquetReader.<GenericRecord> builder(path).disableCompatibility().withDataModel(GenericData.get())
         .withConf(getParquetAvroReaderConfiguration()).build();
   }
 
   /**
    * Returns a ParquetWriter with the given path and schema.
    */
-  public static ParquetWriter<GenericRecord> getParquetAvroWriter(Path path, Schema schema)
-      throws IOException {
-    return AvroParquetWriter.<GenericRecord>builder(path).withSchema(schema)
+  public static ParquetWriter<GenericRecord> getParquetAvroWriter(Path path, Schema schema) throws IOException {
+    return AvroParquetWriter.<GenericRecord> builder(path).withSchema(schema)
         .withConf(getParquetAvroReaderConfiguration()).build();
   }
 
   /**
    * Returns the schema for the given Parquet file path.
    */
-  public static Schema getParquetAvroSchema(Path path)
-      throws IOException {
+  public static Schema getParquetAvroSchema(Path path) throws IOException {
     ParquetMetadata footer =
         ParquetFileReader.readFooter(getParquetAvroReaderConfiguration(), path, ParquetMetadataConverter.NO_FILTER);
     Map<String, String> metaData = footer.getFileMetaData().getKeyValueMetaData();

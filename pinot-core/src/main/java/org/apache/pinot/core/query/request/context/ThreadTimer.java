@@ -39,7 +39,7 @@ public class ThreadTimer {
   }
 
   public static void setThreadCpuTimeMeasurementEnabled(boolean enable) {
-      IS_THREAD_CPU_TIME_MEASUREMENT_ENABLED = enable && IS_CURRENT_THREAD_CPU_TIME_SUPPORTED;
+    IS_THREAD_CPU_TIME_MEASUREMENT_ENABLED = enable && IS_CURRENT_THREAD_CPU_TIME_SUPPORTED;
   }
 
   public void start() {

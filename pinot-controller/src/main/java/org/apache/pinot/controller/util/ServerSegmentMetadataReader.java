@@ -27,6 +27,7 @@ import org.apache.commons.httpclient.HttpConnectionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * This is a helper class that calls the server API endpoints to fetch server metadata and the segment reload status
  * Only the servers returning success are returned by the method. For servers returning errors (http error or otherwise),
@@ -49,18 +50,19 @@ public class ServerSegmentMetadataReader {
    * @return list of segments and their metadata as a JSON string
    */
   public List<String> getSegmentMetadataFromServer(String tableNameWithType,
-                                                   Map<String, List<String>> serversToSegmentsMap,
-                                                   BiMap<String, String> endpoints, int timeoutMs) {
+      Map<String, List<String>> serversToSegmentsMap, BiMap<String, String> endpoints, int timeoutMs) {
     LOGGER.debug("Reading segment metadata from servers for table {}.", tableNameWithType);
     List<String> serverURLs = new ArrayList<>();
     for (Map.Entry<String, List<String>> serverToSegments : serversToSegmentsMap.entrySet()) {
       List<String> segments = serverToSegments.getValue();
       for (String segment : segments) {
-        serverURLs.add(generateSegmentMetadataServerURL(tableNameWithType, segment, endpoints.get(serverToSegments.getKey())));
+        serverURLs.add(
+            generateSegmentMetadataServerURL(tableNameWithType, segment, endpoints.get(serverToSegments.getKey())));
       }
     }
     BiMap<String, String> endpointsToServers = endpoints.inverse();
-    CompletionServiceHelper completionServiceHelper = new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
+    CompletionServiceHelper completionServiceHelper =
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, timeoutMs);
     List<String> segmentsMetadata = new ArrayList<>();

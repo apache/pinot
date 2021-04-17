@@ -111,9 +111,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     for (Map.Entry<String, List<String>> entry : segmentToEnabledInstancesMap.entrySet()) {
       String segment = entry.getKey();
       if (segmentsToUpdate.contains(segment)) {
-        List<String> enabledInstancesForSegment =
-            calculateEnabledInstancesForSegment(segment, _segmentToOnlineInstancesMap.get(segment),
-                newUnavailableSegments);
+        List<String> enabledInstancesForSegment = calculateEnabledInstancesForSegment(segment,
+            _segmentToOnlineInstancesMap.get(segment), newUnavailableSegments);
         entry.setValue(enabledInstancesForSegment);
       } else {
         if (currentUnavailableSegments.contains(segment)) {

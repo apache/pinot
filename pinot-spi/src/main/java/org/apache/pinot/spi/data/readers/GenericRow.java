@@ -168,8 +168,8 @@ public class GenericRow implements Serializable {
     }
     if (obj instanceof GenericRow) {
       GenericRow that = (GenericRow) obj;
-      if (!_nullValueFields.containsAll(that._nullValueFields) || !that._nullValueFields
-          .containsAll(_nullValueFields)) {
+      if (!_nullValueFields.containsAll(that._nullValueFields)
+          || !that._nullValueFields.containsAll(_nullValueFields)) {
         return false;
       }
       return compareMap(_fieldToValueMap, that._fieldToValueMap);
@@ -259,8 +259,7 @@ public class GenericRow implements Serializable {
   }
 
   @Deprecated
-  public static GenericRow fromBytes(byte[] buffer)
-      throws IOException {
+  public static GenericRow fromBytes(byte[] buffer) throws IOException {
     Map<String, Object> fieldMap = JsonUtils.bytesToObject(buffer, Map.class);
     GenericRow genericRow = new GenericRow();
     genericRow.init(fieldMap);
@@ -268,8 +267,7 @@ public class GenericRow implements Serializable {
   }
 
   @Deprecated
-  public byte[] toBytes()
-      throws IOException {
+  public byte[] toBytes() throws IOException {
     return JsonUtils.objectToBytes(_fieldToValueMap);
   }
 

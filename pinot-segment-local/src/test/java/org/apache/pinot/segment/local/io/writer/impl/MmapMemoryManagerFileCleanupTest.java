@@ -46,8 +46,7 @@ public class MmapMemoryManagerFileCleanupTest {
 
   // Since this file leaves MmapUtils allocation contexts in place, it cannot be included in MmapMemoryManagerTest
   @Test
-  public void testFileDelete()
-      throws Exception {
+  public void testFileDelete() throws Exception {
     final String segmentName = "someSegment";
     final String someColumn = "column";
     final long firstAlloc = 20;

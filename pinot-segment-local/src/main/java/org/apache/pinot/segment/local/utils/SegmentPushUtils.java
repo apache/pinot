@@ -115,11 +115,10 @@ public class SegmentPushUtils implements Serializable {
         }
         RetryPolicies.exponentialBackoffRetryPolicy(attempts, retryWaitMs, 5).attempt(() -> {
           try (InputStream inputStream = fileSystem.open(tarFileURI)) {
-            SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT
-                .uploadSegment(FileUploadDownloadClient.getUploadSegmentURI(controllerURI), segmentName, inputStream,
-                    FileUploadDownloadClient.makeAuthHeader(spec.getAuthToken()),
-                    FileUploadDownloadClient.makeTableParam(tableName),
-                    FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+            SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT.uploadSegment(
+                FileUploadDownloadClient.getUploadSegmentURI(controllerURI), segmentName, inputStream,
+                FileUploadDownloadClient.makeAuthHeader(spec.getAuthToken()),
+                FileUploadDownloadClient.makeTableParam(tableName), FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
             LOGGER.info("Response for pushing table {} segment {} to location {} - {}: {}", tableName, segmentName,
                 controllerURI, response.getStatusCode(), response.getResponse());
             return true;
@@ -132,9 +131,8 @@ public class SegmentPushUtils implements Serializable {
               return false;
             } else {
               // Permanent exception
-              LOGGER
-                  .error("Caught permanent exception while pushing table: {} segment: {} to {}, won't retry", tableName,
-                      segmentName, controllerURI, e);
+              LOGGER.error("Caught permanent exception while pushing table: {} segment: {} to {}, won't retry",
+                  tableName, segmentName, controllerURI, e);
               throw e;
             }
           } finally {
@@ -174,11 +172,10 @@ public class SegmentPushUtils implements Serializable {
         }
         RetryPolicies.exponentialBackoffRetryPolicy(attempts, retryWaitMs, 5).attempt(() -> {
           try {
-            SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT
-                .sendSegmentUri(FileUploadDownloadClient.getUploadSegmentURI(controllerURI), segmentUri,
-                    FileUploadDownloadClient.makeAuthHeader(spec.getAuthToken()),
-                    FileUploadDownloadClient.makeTableParam(tableName),
-                    FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+            SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT.sendSegmentUri(
+                FileUploadDownloadClient.getUploadSegmentURI(controllerURI), segmentUri,
+                FileUploadDownloadClient.makeAuthHeader(spec.getAuthToken()),
+                FileUploadDownloadClient.makeTableParam(tableName), FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
             LOGGER.info("Response for pushing table {} segment uri {} to location {} - {}: {}", tableName, segmentUri,
                 controllerURI, response.getStatusCode(), response.getResponse());
             return true;
@@ -219,8 +216,7 @@ public class SegmentPushUtils implements Serializable {
    * @throws Exception
    */
   public static void sendSegmentUriAndMetadata(SegmentGenerationJobSpec spec, PinotFS fileSystem,
-      Map<String, String> segmentUriToTarPathMap)
-      throws Exception {
+      Map<String, String> segmentUriToTarPathMap) throws Exception {
     String tableName = spec.getTableSpec().getTableName();
     LOGGER.info("Start pushing segment metadata: {} to locations: {} for table {}", segmentUriToTarPathMap,
         Arrays.toString(spec.getPinotClusterSpecs()), tableName);
@@ -255,10 +251,10 @@ public class SegmentPushUtils implements Serializable {
                   FileUploadDownloadClient.FileUploadType.METADATA.toString()));
               headers.addAll(FileUploadDownloadClient.makeAuthHeader(spec.getAuthToken()));
 
-              SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT
-                  .uploadSegmentMetadata(FileUploadDownloadClient.getUploadSegmentURI(controllerURI), segmentName,
-                      segmentMetadataFile, headers, FileUploadDownloadClient.makeTableParam(tableName),
-                      FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+              SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT.uploadSegmentMetadata(
+                  FileUploadDownloadClient.getUploadSegmentURI(controllerURI), segmentName, segmentMetadataFile,
+                  headers, FileUploadDownloadClient.makeTableParam(tableName),
+                  FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
               LOGGER.info("Response for pushing table {} segment {} to location {} - {}: {}", tableName, segmentName,
                   controllerURI, response.getStatusCode(), response.getResponse());
               return true;
@@ -266,9 +262,8 @@ public class SegmentPushUtils implements Serializable {
               int statusCode = e.getStatusCode();
               if (statusCode >= 500) {
                 // Temporary exception
-                LOGGER
-                    .warn("Caught temporary exception while pushing table: {} segment: {} to {}, will retry", tableName,
-                        segmentName, controllerURI, e);
+                LOGGER.warn("Caught temporary exception while pushing table: {} segment: {} to {}, will retry",
+                    tableName, segmentName, controllerURI, e);
                 return false;
               } else {
                 // Permanent exception
@@ -308,8 +303,7 @@ public class SegmentPushUtils implements Serializable {
    * 3. Tar both files into a segment metadata file.
    *
    */
-  private static File generateSegmentMetadataFile(PinotFS fileSystem, URI tarFileURI)
-      throws Exception {
+  private static File generateSegmentMetadataFile(PinotFS fileSystem, URI tarFileURI) throws Exception {
     String uuid = UUID.randomUUID().toString();
     File tarFile =
         new File(FileUtils.getTempDirectory(), "segmentTar-" + uuid + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);

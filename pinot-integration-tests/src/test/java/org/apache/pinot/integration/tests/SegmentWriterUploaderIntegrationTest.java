@@ -64,8 +64,7 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
   private List<File> _avroFiles;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster
@@ -99,8 +98,7 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
    * Checks the number of segments created and total docs from the query
    */
   @Test
-  public void testFileBasedSegmentWriterAndDefaultUploader()
-      throws Exception {
+  public void testFileBasedSegmentWriterAndDefaultUploader() throws Exception {
 
     TableConfig offlineTableConfig = createOfflineTableConfig();
     addTableConfig(offlineTableConfig);
@@ -150,30 +148,26 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
     dropOfflineTable(_tableNameWithType);
   }
 
-  private int getNumSegments()
-      throws IOException {
-    String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.
-        forSegmentListAPIWithTableType(_tableNameWithType, TableType.OFFLINE.toString()));
+  private int getNumSegments() throws IOException {
+    String jsonOutputStr = sendGetRequest(
+        _controllerRequestURLBuilder.forSegmentListAPIWithTableType(_tableNameWithType, TableType.OFFLINE.toString()));
     JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
     return array.get(0).get("OFFLINE").size();
   }
 
-  private int getTotalDocsFromQuery()
-      throws Exception {
+  private int getTotalDocsFromQuery() throws Exception {
     JsonNode response = postSqlQuery(String.format("select count(*) from %s", _tableNameWithType), _brokerBaseApiUrl);
     return response.get("resultTable").get("rows").get(0).get(0).asInt();
   }
 
-  private int getNumDocsInLatestSegment()
-      throws IOException {
-    String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.
-        forSegmentListAPIWithTableType(_tableNameWithType, TableType.OFFLINE.toString()));
+  private int getNumDocsInLatestSegment() throws IOException {
+    String jsonOutputStr = sendGetRequest(
+        _controllerRequestURLBuilder.forSegmentListAPIWithTableType(_tableNameWithType, TableType.OFFLINE.toString()));
     JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
     JsonNode segments = array.get(0).get("OFFLINE");
     String segmentName = segments.get(segments.size() - 1).asText();
 
-    jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.
-        forSegmentMetadata(_tableNameWithType, segmentName));
+    jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(_tableNameWithType, segmentName));
     JsonNode metadata = JsonUtils.stringToJsonNode(jsonOutputStr);
     return metadata.get("segment.total.docs").asInt();
   }
@@ -209,8 +203,7 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     stopServer();
     stopBroker();
     stopController();

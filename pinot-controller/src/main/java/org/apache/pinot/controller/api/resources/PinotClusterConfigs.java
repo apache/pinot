@@ -63,7 +63,8 @@ public class PinotClusterConfigs {
   @Path("/cluster/info")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get cluster Info", notes = "Get cluster Info")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500,
+      message = "Internal server error")})
   public String getClusterInfo() {
     ObjectNode ret = JsonUtils.newObjectNode();
     ret.put("clusterName", pinotHelixResourceManager.getHelixClusterName());
@@ -74,7 +75,8 @@ public class PinotClusterConfigs {
   @Path("/cluster/configs")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List cluster configurations", notes = "List cluster level configurations")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500,
+      message = "Internal server error")})
   public String listClusterConfigs() {
     HelixAdmin helixAdmin = pinotHelixResourceManager.getHelixAdmin();
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
@@ -93,7 +95,8 @@ public class PinotClusterConfigs {
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Update cluster configuration")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Server error updating configuration")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500,
+      message = "Server error updating configuration")})
   public SuccessResponse updateClusterConfig(String body) {
     try {
       JsonNode jsonNode = JsonUtils.stringToJsonNode(body);
@@ -121,7 +124,8 @@ public class PinotClusterConfigs {
   @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Delete cluster configuration")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Server error deleting configuration")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500,
+      message = "Server error deleting configuration")})
   public SuccessResponse deleteClusterConfig(
       @ApiParam(value = "Name of the config to delete", required = true) @PathParam("configName") String configName) {
     try {

@@ -42,8 +42,7 @@ public class PinotSegmentUploadDownloadRestletResourceTest {
   private File _decryptedFile;
 
   @BeforeClass
-  public void setup()
-      throws Exception {
+  public void setup() throws Exception {
 
     // create temp files
     _encryptedFile = File.createTempFile("segment", ".enc");
@@ -66,8 +65,8 @@ public class PinotSegmentUploadDownloadRestletResourceTest {
     String crypterClassNameUsedInUploadedSegment = null;
 
     // act
-    Pair<String, File> encryptionInfo = _resource
-        .encryptSegmentIfNeeded(_decryptedFile, _encryptedFile, uploadedSegmentIsEncrypted,
+    Pair<String, File> encryptionInfo =
+        _resource.encryptSegmentIfNeeded(_decryptedFile, _encryptedFile, uploadedSegmentIsEncrypted,
             crypterClassNameUsedInUploadedSegment, crypterClassNameInTableConfig, SEGMENT_NAME, TABLE_NAME);
 
     // assert
@@ -84,8 +83,8 @@ public class PinotSegmentUploadDownloadRestletResourceTest {
     String crypterClassNameUsedInUploadedSegment = "NoOpPinotCrypter";
 
     // act
-    Pair<String, File> encryptionInfo = _resource
-        .encryptSegmentIfNeeded(_decryptedFile, _encryptedFile, uploadedSegmentIsEncrypted,
+    Pair<String, File> encryptionInfo =
+        _resource.encryptSegmentIfNeeded(_decryptedFile, _encryptedFile, uploadedSegmentIsEncrypted,
             crypterClassNameUsedInUploadedSegment, crypterClassNameInTableConfig, SEGMENT_NAME, TABLE_NAME);
 
     // assert
@@ -116,8 +115,8 @@ public class PinotSegmentUploadDownloadRestletResourceTest {
     String crypterClassNameUsedInUploadedSegment = null;
 
     // act
-    Pair<String, File> encryptionInfo = _resource
-        .encryptSegmentIfNeeded(_decryptedFile, _encryptedFile, uploadedSegmentIsEncrypted,
+    Pair<String, File> encryptionInfo =
+        _resource.encryptSegmentIfNeeded(_decryptedFile, _encryptedFile, uploadedSegmentIsEncrypted,
             crypterClassNameUsedInUploadedSegment, crypterClassNameInTableConfig, SEGMENT_NAME, TABLE_NAME);
 
     // assert

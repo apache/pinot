@@ -57,28 +57,23 @@ public class TestConfigEngine {
   InputManager _input;
   ObjectMapper objectMapper = new ObjectMapper();
 
-  void loadInput(String fName)
-      throws InvalidInputException, IOException {
+  void loadInput(String fName) throws InvalidInputException, IOException {
     _input = objectMapper.readValue(readInputToStr(fName), InputManager.class);
     _input.init();
   }
 
-  private String readInputToStr(String resourceName)
-      throws IOException {
+  private String readInputToStr(String resourceName) throws IOException {
     URL resourceUrl = getClass().getClassLoader().getResource(resourceName);
     File file = new File(resourceUrl.getFile());
     return FileUtils.readFileToString(file, StandardCharsets.UTF_8);
   }
 
   @Test
-  void testInputManager()
-      throws InvalidInputException, IOException {
+  void testInputManager() throws InvalidInputException, IOException {
     loadInput("recommenderInput/SortedInvertedIndexInput.json");
     assertEquals(_input.getSchema().getDimensionNames().toString(), "[a, b, c, d, e, f, g, h, i, j]");
-    assertEquals(_input.getOverWrittenConfigs().getIndexConfig().getInvertedIndexColumns().toString(),
-        "[a, b]");
-    assertEquals(_input.getBloomFilterRuleParams().getTHRESHOLD_MIN_PERCENT_EQ_BLOOMFILTER().toString(),
-        "0.51");
+    assertEquals(_input.getOverWrittenConfigs().getIndexConfig().getInvertedIndexColumns().toString(), "[a, b]");
+    assertEquals(_input.getBloomFilterRuleParams().getTHRESHOLD_MIN_PERCENT_EQ_BLOOMFILTER().toString(), "0.51");
     assertEquals(_input.getLatencySLA(), 500);
     assertEquals(_input.getColNameToIntMap().size(), 17);
     assertEquals(_input.getFieldType("h"), FieldSpec.DataType.BYTES);
@@ -89,18 +84,17 @@ public class TestConfigEngine {
     assertEquals(_input.getAverageDataLen("g"), 100);
     assertTrue(_input.isSingleValueColumn("j"));
     assertFalse(_input.isSingleValueColumn("i"));
-    assertEquals(_input.getPrimaryTimeCol(),"t");
+    assertEquals(_input.getPrimaryTimeCol(), "t");
   }
 
   @Test
-  void testDataSizeCalculation()
-      throws InvalidInputException, IOException {
+  void testDataSizeCalculation() throws InvalidInputException, IOException {
     loadInput("recommenderInput/DataSizeCalculationInput.json");
-    assertEquals(_input.getDictionaryEncodedForwardIndexSize("a"),1);
-    assertEquals(_input.getDictionaryEncodedForwardIndexSize("b"),2);
-    assertEquals(_input.getDictionaryEncodedForwardIndexSize("t"),2);
-    assertEquals(_input.getColRawSizePerDoc("a"),4);
-    assertEquals(_input.getColRawSizePerDoc("b"),8);
+    assertEquals(_input.getDictionaryEncodedForwardIndexSize("a"), 1);
+    assertEquals(_input.getDictionaryEncodedForwardIndexSize("b"), 2);
+    assertEquals(_input.getDictionaryEncodedForwardIndexSize("t"), 2);
+    assertEquals(_input.getColRawSizePerDoc("a"), 4);
+    assertEquals(_input.getColRawSizePerDoc("b"), 8);
     try {
       _input.getColRawSizePerDoc("c");
       Assert.fail("Getting raw size from MV column does not fail");
@@ -108,15 +102,14 @@ public class TestConfigEngine {
       // Expected 409 Conflict
       assertTrue(e.getMessage().startsWith("Column c is MV column should not have raw encoding"));
     }
-    assertEquals(_input.getDictionarySize("k"),65537*8);
-    assertEquals(_input.getDictionarySize("d"),1000*27*2);
+    assertEquals(_input.getDictionarySize("k"), 65537 * 8);
+    assertEquals(_input.getDictionarySize("d"), 1000 * 27 * 2);
     _input.estimateSizePerRecord();
-    assertEquals(_input.getSizePerRecord(),26);
+    assertEquals(_input.getSizePerRecord(), 26);
   }
 
   @Test
-  void testInvertedSortedIndexJointRule()
-      throws InvalidInputException, IOException {
+  void testInvertedSortedIndexJointRule() throws InvalidInputException, IOException {
     loadInput("recommenderInput/SortedInvertedIndexInput.json");
     ConfigManager output = new ConfigManager();
     AbstractRule abstractRule =
@@ -127,15 +120,13 @@ public class TestConfigEngine {
   }
 
   @Test
-  void testEngineEmptyQueries()
-      throws InvalidInputException, IOException {
+  void testEngineEmptyQueries() throws InvalidInputException, IOException {
     String input = readInputToStr("recommenderInput/EmptyQueriesInput.json");
     RecommenderDriver.run(input);
   }
 
   @Test
-  void testQueryInvertedSortedIndexRecommender()
-      throws InvalidInputException, IOException {
+  void testQueryInvertedSortedIndexRecommender() throws InvalidInputException, IOException {
     loadInput("recommenderInput/SortedInvertedIndexInput.json");
     QueryInvertedSortedIndexRecommender totalNESICounter =
         QueryInvertedSortedIndexRecommender.QueryInvertedSortedIndexRecommenderBuilder
@@ -144,55 +135,50 @@ public class TestConfigEngine {
             .setUseOverwrittenIndices(true) // nESI when not using any overwritten indices
             .build();
 
-    Set<String> results = new HashSet<String>() {{
-      add("[[PredicateParseResult{dims{[1]}, AND, BITMAP, nESI=1.568, selected=0.068, nESIWithIdx=0.618}, PredicateParseResult{dims{[0]}, AND, BITMAP, nESI=1.568, selected=0.068, nESIWithIdx=0.767}, PredicateParseResult{dims{[]}, AND, NESTED, nESI=1.568, selected=0.068, nESIWithIdx=1.568}]]");
-      add("[[PredicateParseResult{dims{[5]}, AND, BITMAP, nESI=0.150, selected=0.015, nESIWithIdx=0.058}, PredicateParseResult{dims{[]}, AND, NESTED, nESI=0.150, selected=0.015, nESIWithIdx=0.150}], [PredicateParseResult{dims{[3, 7]}, AND, BITMAP, nESI=12.000, selected=0.500, nESIWithIdx=4.000}, PredicateParseResult{dims{[]}, AND, NESTED, nESI=12.000, selected=0.500, nESIWithIdx=12.000}]]");
-      add("[[PredicateParseResult{dims{[0, 2]}, AND, BITMAP, nESI=7.250, selected=0.047, nESIWithIdx=1.122}, PredicateParseResult{dims{[]}, AND, NESTED, nESI=7.250, selected=0.047, nESIWithIdx=7.250}]]");
-    }};
+    Set<String> results = new HashSet<String>() {
+      {
+        add("[[PredicateParseResult{dims{[1]}, AND, BITMAP, nESI=1.568, selected=0.068, nESIWithIdx=0.618}, PredicateParseResult{dims{[0]}, AND, BITMAP, nESI=1.568, selected=0.068, nESIWithIdx=0.767}, PredicateParseResult{dims{[]}, AND, NESTED, nESI=1.568, selected=0.068, nESIWithIdx=1.568}]]");
+        add("[[PredicateParseResult{dims{[5]}, AND, BITMAP, nESI=0.150, selected=0.015, nESIWithIdx=0.058}, PredicateParseResult{dims{[]}, AND, NESTED, nESI=0.150, selected=0.015, nESIWithIdx=0.150}], [PredicateParseResult{dims{[3, 7]}, AND, BITMAP, nESI=12.000, selected=0.500, nESIWithIdx=4.000}, PredicateParseResult{dims{[]}, AND, NESTED, nESI=12.000, selected=0.500, nESIWithIdx=12.000}]]");
+        add("[[PredicateParseResult{dims{[0, 2]}, AND, BITMAP, nESI=7.250, selected=0.047, nESIWithIdx=1.122}, PredicateParseResult{dims{[]}, AND, NESTED, nESI=7.250, selected=0.047, nESIWithIdx=7.250}]]");
+      }
+    };
 
-    String q1 = "select i from tableName where b in (2,4) and ((a in (1,2,3) and e = 4) or c = 7) and d in ('#VALUES', 23) and t > 500";
-    String q2 = "select j from tableName where (a=3 and (h = 5 or f >34) and REGEXP_LIKE(i, 'as*')) or ((f = 3  or j in ('#VALUES', 4)) and REGEXP_LIKE(d, 'fl*'))";
-    String q3 = "select f from tableName where (a=0 or (b=1 and (e in ('#VALUES',2) or c=7))) and TEXT_MATCH(d, 'dasd') and MAX(MAX(h,i),j)=4 and t<3";
-    assertTrue(results.contains(totalNESICounter
-        .parseQuery(_input.getQueryContext(q1), _input.getQueryWeight(q1))
-        .toString()));
-    assertTrue(results.contains(totalNESICounter
-        .parseQuery(_input.getQueryContext(q2), _input.getQueryWeight(q2))
-            .toString()));
-    assertTrue(results.contains(totalNESICounter
-        .parseQuery(_input.getQueryContext(q3), _input.getQueryWeight(q3))
-        .toString()));
+    String q1 =
+        "select i from tableName where b in (2,4) and ((a in (1,2,3) and e = 4) or c = 7) and d in ('#VALUES', 23) and t > 500";
+    String q2 =
+        "select j from tableName where (a=3 and (h = 5 or f >34) and REGEXP_LIKE(i, 'as*')) or ((f = 3  or j in ('#VALUES', 4)) and REGEXP_LIKE(d, 'fl*'))";
+    String q3 =
+        "select f from tableName where (a=0 or (b=1 and (e in ('#VALUES',2) or c=7))) and TEXT_MATCH(d, 'dasd') and MAX(MAX(h,i),j)=4 and t<3";
+    assertTrue(results
+        .contains(totalNESICounter.parseQuery(_input.getQueryContext(q1), _input.getQueryWeight(q1)).toString()));
+    assertTrue(results
+        .contains(totalNESICounter.parseQuery(_input.getQueryContext(q2), _input.getQueryWeight(q2)).toString()));
+    assertTrue(results
+        .contains(totalNESICounter.parseQuery(_input.getQueryContext(q3), _input.getQueryWeight(q3)).toString()));
   }
 
-
   @Test(expectedExceptions = InvalidInputException.class)
-  void testInvalidInput1()
-      throws InvalidInputException, IOException {
+  void testInvalidInput1() throws InvalidInputException, IOException {
     loadInput("recommenderInput/InvalidInput1.json");
   }
 
   @Test(expectedExceptions = InvalidInputException.class)
-  void testInvalidInput2()
-      throws InvalidInputException, IOException {
+  void testInvalidInput2() throws InvalidInputException, IOException {
     loadInput("recommenderInput/InvalidInput2.json");
   }
 
-
   @Test
-  void testFlagQueryRule()
-      throws InvalidInputException, IOException {
+  void testFlagQueryRule() throws InvalidInputException, IOException {
     loadInput("recommenderInput/FlagQueryInput.json");
     ConfigManager output = _input.getOverWrittenConfigs();
-    AbstractRule abstractRule =
-        RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.FlagQueryRule, _input, output);
+    AbstractRule abstractRule = RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.FlagQueryRule, _input, output);
     abstractRule.run();
     assertEquals(output.getFlaggedQueries().getFlaggedQueries().toString(),
         "{select g from tableName LIMIT 1000000000=Warning: The size of LIMIT is longer than 100000 | Warning: No filtering in ths query, not a valid query=Error: query not able to parse, skipped, select f from tableName=Warning: No filtering in ths query, select f from tableName where a =3=Warning: No time column used in ths query}");
   }
 
   @Test
-  void testVariedLengthDictionaryRule()
-      throws InvalidInputException, IOException {
+  void testVariedLengthDictionaryRule() throws InvalidInputException, IOException {
     loadInput("recommenderInput/VariedLengthDictionaryInput.json");
     ConfigManager output = _input.getOverWrittenConfigs();
     AbstractRule abstractRule =
@@ -202,38 +188,33 @@ public class TestConfigEngine {
   }
 
   @Test
-  void testBloomFilterRule()
-      throws InvalidInputException, IOException {
+  void testBloomFilterRule() throws InvalidInputException, IOException {
     loadInput("recommenderInput/BloomFilterInput.json");
     ConfigManager output = new ConfigManager();
-    AbstractRule abstractRule =
-        RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.BloomFilterRule, _input, output);
+    AbstractRule abstractRule = RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.BloomFilterRule, _input, output);
     abstractRule.run();
     assertEquals(output.getIndexConfig().getBloomFilterColumns().toString(), "[c]");
   }
 
   @Test
-  void testNoDictionaryOnHeapDictionaryJointRule()
-      throws InvalidInputException, IOException {
+  void testNoDictionaryOnHeapDictionaryJointRule() throws InvalidInputException, IOException {
     loadInput("recommenderInput/NoDictionaryOnHeapDictionaryJointRuleInput.json");
     AbstractRule abstractRule = RulesToExecute.RuleFactory
-        .getRule(RulesToExecute.Rule.NoDictionaryOnHeapDictionaryJointRule, _input,
-            _input._overWrittenConfigs);
+        .getRule(RulesToExecute.Rule.NoDictionaryOnHeapDictionaryJointRule, _input, _input._overWrittenConfigs);
     abstractRule.run();
     assertEquals(_input._overWrittenConfigs.getIndexConfig().getNoDictionaryColumns().toString(),
         "[p, t, h, j, l, m, n, o]");
   }
 
   @Test
-  void testPinotTablePartitionRule()
-      throws InvalidInputException, IOException {
+  void testPinotTablePartitionRule() throws InvalidInputException, IOException {
     loadInput("recommenderInput/PinotTablePartitionRuleInput.json");
 
-    AbstractRule abstractRule = RulesToExecute.RuleFactory
-        .getRule(RulesToExecute.Rule.KafkaPartitionRule, _input, _input._overWrittenConfigs);
+    AbstractRule abstractRule =
+        RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.KafkaPartitionRule, _input, _input._overWrittenConfigs);
     abstractRule.run();
-    abstractRule = RulesToExecute.RuleFactory
-        .getRule(RulesToExecute.Rule.PinotTablePartitionRule, _input, _input._overWrittenConfigs);
+    abstractRule = RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.PinotTablePartitionRule, _input,
+        _input._overWrittenConfigs);
     abstractRule.run();
     ConfigManager output = _input._overWrittenConfigs;
     LOGGER.debug("{} {} {}", output.getPartitionConfig().getPartitionDimension(),
@@ -244,8 +225,7 @@ public class TestConfigEngine {
   }
 
   @Test
-  void testKafkaPartitionRule()
-      throws InvalidInputException, IOException {
+  void testKafkaPartitionRule() throws InvalidInputException, IOException {
     loadInput("recommenderInput/KafkaPartitionRuleInput.json");
     ConfigManager output = new ConfigManager();
     AbstractRule abstractRule =
@@ -255,8 +235,7 @@ public class TestConfigEngine {
   }
 
   @Test
-  void testKafkaPartitionRule2()
-      throws InvalidInputException, IOException {
+  void testKafkaPartitionRule2() throws InvalidInputException, IOException {
     loadInput("recommenderInput/KafkaPartitionRuleInput2.json");
     ConfigManager output = new ConfigManager();
     AbstractRule abstractRule =

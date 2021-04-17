@@ -51,26 +51,22 @@ public class IntermediateSegmentRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next()
-      throws IOException {
+  public GenericRow next() throws IOException {
     return next(new GenericRow());
   }
 
   @Override
-  public GenericRow next(GenericRow reuse)
-      throws IOException {
+  public GenericRow next(GenericRow reuse) throws IOException {
     return _intermediateSegment.getRecord(_nextDocId++, reuse);
   }
 
   @Override
-  public void rewind()
-      throws IOException {
+  public void rewind() throws IOException {
     _nextDocId = 0;
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _intermediateSegment.destroy();
   }
 

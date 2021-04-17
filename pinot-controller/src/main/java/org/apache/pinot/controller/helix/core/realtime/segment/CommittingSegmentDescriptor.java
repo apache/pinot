@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix.core.realtime.segment;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
 
+
 /**
  * Class to hold properties of the committing segment
  */
@@ -33,17 +34,15 @@ public class CommittingSegmentDescriptor {
 
   public static CommittingSegmentDescriptor fromSegmentCompletionReqParams(
       SegmentCompletionProtocol.Request.Params reqParams) {
-    CommittingSegmentDescriptor committingSegmentDescriptor =
-        new CommittingSegmentDescriptor(reqParams.getSegmentName(), reqParams.getStreamPartitionMsgOffset(),
-            reqParams.getSegmentSizeBytes());
+    CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(
+        reqParams.getSegmentName(), reqParams.getStreamPartitionMsgOffset(), reqParams.getSegmentSizeBytes());
     committingSegmentDescriptor.setSegmentLocation(reqParams.getSegmentLocation());
     return committingSegmentDescriptor;
   }
 
   public static CommittingSegmentDescriptor fromSegmentCompletionReqParamsAndMetadata(
-          SegmentCompletionProtocol.Request.Params reqParams, SegmentMetadataImpl metadata) {
-    CommittingSegmentDescriptor committingSegmentDescriptor =
-            fromSegmentCompletionReqParams(reqParams);
+      SegmentCompletionProtocol.Request.Params reqParams, SegmentMetadataImpl metadata) {
+    CommittingSegmentDescriptor committingSegmentDescriptor = fromSegmentCompletionReqParams(reqParams);
     committingSegmentDescriptor.setSegmentMetadata(metadata);
     return committingSegmentDescriptor;
   }

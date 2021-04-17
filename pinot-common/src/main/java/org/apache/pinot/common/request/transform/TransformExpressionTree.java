@@ -79,7 +79,9 @@ public class TransformExpressionTree {
 
   // Enum for expression represented by the tree.
   public enum ExpressionType {
-    FUNCTION, IDENTIFIER, LITERAL
+    FUNCTION,
+    IDENTIFIER,
+    LITERAL
   }
 
   private final ExpressionType _expressionType;
@@ -201,8 +203,8 @@ public class TransformExpressionTree {
     }
     if (obj instanceof TransformExpressionTree) {
       TransformExpressionTree that = (TransformExpressionTree) obj;
-      return _expressionType == that._expressionType && _value.equals(that._value) && Objects
-          .equals(_children, that._children);
+      return _expressionType == that._expressionType && _value.equals(that._value)
+          && Objects.equals(_children, that._children);
     }
     return false;
   }

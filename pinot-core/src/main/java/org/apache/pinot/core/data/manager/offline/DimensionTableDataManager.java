@@ -66,7 +66,8 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
   }
 
   @VisibleForTesting
-  public static DimensionTableDataManager registerDimensionTable(String tableNameWithType, DimensionTableDataManager instance) {
+  public static DimensionTableDataManager registerDimensionTable(String tableNameWithType,
+      DimensionTableDataManager instance) {
     return _instances.computeIfAbsent(tableNameWithType, k -> instance);
   }
 
@@ -97,8 +98,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
   }
 
   @Override
-  public void addSegment(File indexDir, IndexLoadingConfig indexLoadingConfig)
-      throws Exception {
+  public void addSegment(File indexDir, IndexLoadingConfig indexLoadingConfig) throws Exception {
     super.addSegment(indexDir, indexLoadingConfig);
     try {
       loadLookupTable();
@@ -115,17 +115,15 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
       loadLookupTable();
       _logger.info("Successfully removed segment {} and reloaded lookup table: {}", segmentName, getTableName());
     } catch (Exception e) {
-      throw new RuntimeException(String
-          .format("Error reloading lookup table after segment remove ({}) for table: {}", segmentName, getTableName()),
-          e);
+      throw new RuntimeException(String.format("Error reloading lookup table after segment remove ({}) for table: {}",
+          segmentName, getTableName()), e);
     }
   }
 
   /**
    * `loadLookupTable()` reads contents of the DimensionTable into _lookupTable HashMap for fast lookup.
    */
-  private void loadLookupTable()
-      throws Exception {
+  private void loadLookupTable() throws Exception {
     _lookupTableWriteLock.lock();
     try {
       _lookupTable.clear();
@@ -137,8 +135,8 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
       try {
         for (SegmentDataManager segmentManager : segmentManagers) {
           IndexSegment indexSegment = segmentManager.getSegment();
-          try (PinotSegmentRecordReader reader = new PinotSegmentRecordReader(
-              indexSegment.getSegmentMetadata().getIndexDir())) {
+          try (PinotSegmentRecordReader reader =
+              new PinotSegmentRecordReader(indexSegment.getSegmentMetadata().getIndexDir())) {
             while (reader.hasNext()) {
               GenericRow row = reader.next();
               _lookupTable.put(row.getPrimaryKey(_primaryKeyColumns), row);

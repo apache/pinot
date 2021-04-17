@@ -35,8 +35,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
  */
 public class SegmentZKMetadataCustomMapModifier {
   public enum ModifyMode {
-    REPLACE,  // Replace the current map
-    UPDATE    // Update the current map
+    REPLACE, // Replace the current map
+    UPDATE // Update the current map
   }
 
   private static final String MAP_MODIFY_MODE_KEY = "mapModifyMode";
@@ -54,8 +54,7 @@ public class SegmentZKMetadataCustomMapModifier {
     }
   }
 
-  public SegmentZKMetadataCustomMapModifier(@Nonnull String jsonString)
-      throws IOException {
+  public SegmentZKMetadataCustomMapModifier(@Nonnull String jsonString) throws IOException {
     JsonNode jsonNode = JsonUtils.stringToJsonNode(jsonString);
     _modifyMode = ModifyMode.valueOf(jsonNode.get(MAP_MODIFY_MODE_KEY).asText());
     JsonNode jsonMap = jsonNode.get(MAP_KEY);

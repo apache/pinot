@@ -139,8 +139,7 @@ public class ResultSetGroupTest {
     public String _resource;
 
     @Override
-    public BrokerResponse executeQuery(String brokerAddress, String query)
-        throws PinotClientException {
+    public BrokerResponse executeQuery(String brokerAddress, String query) throws PinotClientException {
       try {
         StringBuilder builder = new StringBuilder();
         InputStream stream = getClass().getResourceAsStream(_resource);
@@ -158,26 +157,22 @@ public class ResultSetGroupTest {
     }
 
     @Override
-    public Future<BrokerResponse> executeQueryAsync(String brokerAddress, String query)
-        throws PinotClientException {
+    public Future<BrokerResponse> executeQueryAsync(String brokerAddress, String query) throws PinotClientException {
       return null;
     }
 
     @Override
-    public BrokerResponse executeQuery(String brokerAddress, Request request)
-        throws PinotClientException {
+    public BrokerResponse executeQuery(String brokerAddress, Request request) throws PinotClientException {
       return executeQuery(brokerAddress, request.getQuery());
     }
 
     @Override
-    public Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
-        throws PinotClientException {
+    public Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request) throws PinotClientException {
       return null;
     }
 
     @Override
-    public void close()
-        throws PinotClientException {
+    public void close() throws PinotClientException {
 
     }
   }

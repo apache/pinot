@@ -96,8 +96,7 @@ public class VirtualColumnIndexContainer implements ColumnIndexContainer {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _forwardIndex.close();
     if (_invertedIndex != null) {
       _invertedIndex.close();

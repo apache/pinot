@@ -39,8 +39,8 @@ public class StreamingSelectionPlanNode implements PlanNode {
   private final TransformPlanNode _transformPlanNode;
 
   public StreamingSelectionPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
-    Preconditions
-        .checkState(queryContext.getOrderByExpressions() == null, "Selection order-by is not supported for streaming");
+    Preconditions.checkState(queryContext.getOrderByExpressions() == null,
+        "Selection order-by is not supported for streaming");
     _indexSegment = indexSegment;
     _queryContext = queryContext;
     _expressions = SelectionOperatorUtils.extractExpressions(queryContext, indexSegment);

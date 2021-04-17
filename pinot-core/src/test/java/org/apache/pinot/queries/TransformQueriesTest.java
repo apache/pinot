@@ -94,8 +94,7 @@ public class TransformQueriesTest extends BaseQueriesTest {
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     buildSegment();
@@ -104,8 +103,7 @@ public class TransformQueriesTest extends BaseQueriesTest {
     _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
   }
 
-  protected void buildSegment()
-      throws Exception {
+  protected void buildSegment() throws Exception {
     GenericRow row = new GenericRow();
     row.putValue(D1, "Pinot");
     row.putValue(M1, 1000);

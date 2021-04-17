@@ -92,8 +92,7 @@ public class VarLengthValueWriter implements Closeable {
   private final ByteBuffer _offsetBuffer;
   private final ByteBuffer _valueBuffer;
 
-  public VarLengthValueWriter(File outputFile, int numValues)
-      throws IOException {
+  public VarLengthValueWriter(File outputFile, int numValues) throws IOException {
     _fileChannel = new RandomAccessFile(outputFile, "rw").getChannel();
     _offsetBuffer = _fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, Integer.MAX_VALUE);
 
@@ -107,20 +106,17 @@ public class VarLengthValueWriter implements Closeable {
     _valueBuffer.position(HEADER_LENGTH + (numValues + 1) * Integer.BYTES);
   }
 
-  public void add(byte[] value)
-      throws IOException {
+  public void add(byte[] value) throws IOException {
     add(value, value.length);
   }
 
-  public void add(byte[] value, int length)
-      throws IOException {
+  public void add(byte[] value, int length) throws IOException {
     _offsetBuffer.putInt(_valueBuffer.position());
     _valueBuffer.put(value, 0, length);
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     int fileLength = _valueBuffer.position();
     _offsetBuffer.putInt(fileLength);
     _fileChannel.truncate(fileLength);

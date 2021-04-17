@@ -66,7 +66,8 @@ public class MultipleTreesBuilder implements Closeable {
   private final ImmutableSegment _segment;
 
   public enum BuildMode {
-    ON_HEAP, OFF_HEAP
+    ON_HEAP,
+    OFF_HEAP
   }
 
   /**
@@ -97,8 +98,7 @@ public class MultipleTreesBuilder implements Closeable {
    * @param buildMode Build mode (ON_HEAP or OFF_HEAP)
    */
   public MultipleTreesBuilder(@Nullable List<StarTreeIndexConfig> indexConfigs, boolean enableDefaultStarTree,
-      File indexDir, BuildMode buildMode)
-      throws Exception {
+      File indexDir, BuildMode buildMode) throws Exception {
     Preconditions.checkArgument(CollectionUtils.isNotEmpty(indexConfigs) || enableDefaultStarTree,
         "Must provide star-tree index configs or enable default star-tree");
     _buildMode = buildMode;
@@ -119,15 +119,14 @@ public class MultipleTreesBuilder implements Closeable {
   /**
    * Builds the star-trees.
    */
-  public void build()
-      throws Exception {
+  public void build() throws Exception {
     long startTime = System.currentTimeMillis();
     int numStarTrees = _builderConfigs.size();
     LOGGER.info("Starting building {} star-trees with configs: {} using {} builder", numStarTrees, _builderConfigs,
         _buildMode);
 
-    try (StarTreeIndexCombiner indexCombiner = new StarTreeIndexCombiner(
-        new File(_segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME))) {
+    try (StarTreeIndexCombiner indexCombiner =
+        new StarTreeIndexCombiner(new File(_segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME))) {
       File starTreeIndexDir = new File(_segmentDirectory, StarTreeV2Constants.STAR_TREE_TEMP_DIR);
       FileUtils.forceMkdir(starTreeIndexDir);
       _metadataProperties.addProperty(MetadataKey.STAR_TREE_COUNT, numStarTrees);
@@ -137,8 +136,8 @@ public class MultipleTreesBuilder implements Closeable {
       for (int i = 0; i < numStarTrees; i++) {
         StarTreeV2BuilderConfig builderConfig = _builderConfigs.get(i);
         Configuration metadataProperties = _metadataProperties.subset(MetadataKey.getStarTreePrefix(i));
-        try (SingleTreeBuilder singleTreeBuilder = getSingleTreeBuilder(builderConfig, starTreeIndexDir, _segment,
-            metadataProperties, _buildMode)) {
+        try (SingleTreeBuilder singleTreeBuilder =
+            getSingleTreeBuilder(builderConfig, starTreeIndexDir, _segment, metadataProperties, _buildMode)) {
           singleTreeBuilder.build();
         }
         indexMaps.add(indexCombiner.combine(builderConfig, starTreeIndexDir));
@@ -150,8 +149,8 @@ public class MultipleTreesBuilder implements Closeable {
       try (FileOutputStream fileOutputStream = new FileOutputStream(_metadataProperties.getFile())) {
         _metadataProperties.save(fileOutputStream);
       }
-      StarTreeIndexMapUtils
-          .storeToFile(indexMaps, new File(_segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME));
+      StarTreeIndexMapUtils.storeToFile(indexMaps,
+          new File(_segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME));
       FileUtils.forceDelete(starTreeIndexDir);
     }
 
@@ -159,8 +158,7 @@ public class MultipleTreesBuilder implements Closeable {
   }
 
   private static SingleTreeBuilder getSingleTreeBuilder(StarTreeV2BuilderConfig builderConfig, File outputDir,
-      ImmutableSegment segment, Configuration metadataProperties, BuildMode buildMode)
-      throws FileNotFoundException {
+      ImmutableSegment segment, Configuration metadataProperties, BuildMode buildMode) throws FileNotFoundException {
     if (buildMode == BuildMode.ON_HEAP) {
       return new OnHeapSingleTreeBuilder(builderConfig, outputDir, segment, metadataProperties);
     } else {

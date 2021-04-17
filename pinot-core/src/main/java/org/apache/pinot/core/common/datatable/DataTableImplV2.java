@@ -60,8 +60,7 @@ public class DataTableImplV2 extends BaseDataTable {
   /**
    * Construct data table from byte array. (broker side)
    */
-  public DataTableImplV2(ByteBuffer byteBuffer)
-      throws IOException {
+  public DataTableImplV2(ByteBuffer byteBuffer) throws IOException {
     // Read header.
     _numRows = byteBuffer.getInt();
     _numColumns = byteBuffer.getInt();
@@ -129,8 +128,7 @@ public class DataTableImplV2 extends BaseDataTable {
     }
   }
 
-  private Map<String, String> deserializeMetadata(byte[] bytes)
-      throws IOException {
+  private Map<String, String> deserializeMetadata(byte[] bytes) throws IOException {
     try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
         DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream)) {
       int numEntries = dataInputStream.readInt();
@@ -166,8 +164,7 @@ public class DataTableImplV2 extends BaseDataTable {
   }
 
   @Override
-  public byte[] toBytes()
-      throws IOException {
+  public byte[] toBytes() throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
     dataOutputStream.writeInt(DataTableBuilder.VERSION_2);
@@ -238,8 +235,7 @@ public class DataTableImplV2 extends BaseDataTable {
     return byteArrayOutputStream.toByteArray();
   }
 
-  private byte[] serializeMetadata()
-      throws IOException {
+  private byte[] serializeMetadata() throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
 

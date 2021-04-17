@@ -84,8 +84,8 @@ public class ClusterInfoAccessor {
    * @return List of segments' metadata
    */
   public List<OfflineSegmentZKMetadata> getOfflineSegmentsMetadata(String tableName) {
-    return ZKMetadataProvider
-        .getOfflineSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(), tableName);
+    return ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(),
+        tableName);
   }
 
   /**
@@ -95,8 +95,8 @@ public class ClusterInfoAccessor {
    * @return List of segments' metadata
    */
   public List<RealtimeSegmentZKMetadata> getRealtimeSegmentsMetadata(String tableName) {
-    return ZKMetadataProvider
-        .getRealtimeSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(), tableName);
+    return ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(),
+        tableName);
   }
 
   /**
@@ -106,8 +106,8 @@ public class ClusterInfoAccessor {
    * @return List of segment metadata
    */
   public List<LLCRealtimeSegmentZKMetadata> getLLCRealtimeSegmentsMetadata(String tableName) {
-    return ZKMetadataProvider
-        .getLLCRealtimeSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(), tableName);
+    return ZKMetadataProvider.getLLCRealtimeSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(),
+        tableName);
   }
 
   /**
@@ -116,9 +116,9 @@ public class ClusterInfoAccessor {
    */
   public RealtimeToOfflineSegmentsTaskMetadata getMinionRealtimeToOfflineSegmentsTaskMetadata(
       String tableNameWithType) {
-    return MinionTaskMetadataUtils
-        .getRealtimeToOfflineSegmentsTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
-            MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, tableNameWithType);
+    return MinionTaskMetadataUtils.getRealtimeToOfflineSegmentsTaskMetadata(
+        _pinotHelixResourceManager.getPropertyStore(), MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE,
+        tableNameWithType);
   }
 
   /**

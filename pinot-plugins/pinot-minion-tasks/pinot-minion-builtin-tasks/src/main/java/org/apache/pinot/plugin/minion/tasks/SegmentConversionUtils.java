@@ -71,9 +71,8 @@ public class SegmentConversionUtils {
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(sslContext)) {
       retryPolicy.attempt(() -> {
         try {
-          SimpleHttpResponse response = fileUploadDownloadClient
-              .uploadSegment(new URI(uploadURL), segmentName, fileToUpload, httpHeaders, parameters,
-                  FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+          SimpleHttpResponse response = fileUploadDownloadClient.uploadSegment(new URI(uploadURL), segmentName,
+              fileToUpload, httpHeaders, parameters, FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
           LOGGER.info("Got response {}: {} while uploading table: {}, segment: {} with uploadURL: {}",
               response.getStatusCode(), response.getResponse(), tableNameWithType, segmentName, uploadURL);
           return true;

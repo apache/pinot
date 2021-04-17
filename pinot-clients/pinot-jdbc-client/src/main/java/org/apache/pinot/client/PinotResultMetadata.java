@@ -30,7 +30,8 @@ public class PinotResultMetadata extends AbstractBaseResultSetMetadata {
   private Map<Integer, String> _columns = new HashMap<>();
   private Map<Integer, String> _columnDataTypes = new HashMap<>();
 
-  public PinotResultMetadata(int totalColumns, Map<String, Integer> columnsNameToIndex, Map<Integer, String> columnDataTypes) {
+  public PinotResultMetadata(int totalColumns, Map<String, Integer> columnsNameToIndex,
+      Map<Integer, String> columnDataTypes) {
     _totalColumns = totalColumns;
     _columnDataTypes = columnDataTypes;
     for (Map.Entry<String, Integer> entry : columnsNameToIndex.entrySet()) {
@@ -45,35 +46,30 @@ public class PinotResultMetadata extends AbstractBaseResultSetMetadata {
   }
 
   @Override
-  public int getColumnCount()
-      throws SQLException {
+  public int getColumnCount() throws SQLException {
     return _totalColumns;
   }
 
   @Override
-  public String getColumnName(int column)
-      throws SQLException {
+  public String getColumnName(int column) throws SQLException {
     validateState(column);
     return _columns.getOrDefault(column, "");
   }
 
   @Override
-  public String getColumnClassName(int column)
-      throws SQLException {
+  public String getColumnClassName(int column) throws SQLException {
     String columnTypeName = getColumnTypeName(column);
     return DriverUtils.getJavaClassName(columnTypeName);
   }
 
   @Override
-  public int getColumnType(int column)
-      throws SQLException {
+  public int getColumnType(int column) throws SQLException {
     String columnTypeName = getColumnTypeName(column);
     return DriverUtils.getSQLDataType(columnTypeName);
   }
 
   @Override
-  public String getColumnTypeName(int column)
-      throws SQLException {
+  public String getColumnTypeName(int column) throws SQLException {
     validateState(column);
     return _columnDataTypes.get(column);
   }

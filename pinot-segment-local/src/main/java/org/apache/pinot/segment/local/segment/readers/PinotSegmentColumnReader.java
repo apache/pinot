@@ -103,8 +103,7 @@ public class PinotSegmentColumnReader implements Closeable {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     if (_readerContext != null) {
       _readerContext.close();
     }

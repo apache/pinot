@@ -98,16 +98,14 @@ public class LuceneFSTIndexHandler {
     }
   }
 
-  public void createFSTIndexesOnSegmentLoad()
-      throws Exception {
+  public void createFSTIndexesOnSegmentLoad() throws Exception {
     for (ColumnMetadata columnMetadata : _fstIndexColumns) {
       checkUnsupportedOperationsForFSTIndex(columnMetadata);
       createFSTIndexForColumn(columnMetadata);
     }
   }
 
-  private void createFSTIndexForColumn(ColumnMetadata columnMetadata)
-      throws IOException {
+  private void createFSTIndexForColumn(ColumnMetadata columnMetadata) throws IOException {
     String column = columnMetadata.getColumnName();
     File inProgress = new File(_indexDir, column + ".fst.inprogress");
     File fstIndexFile = new File(_indexDir, column + FST_INDEX_FILE_EXTENSION);

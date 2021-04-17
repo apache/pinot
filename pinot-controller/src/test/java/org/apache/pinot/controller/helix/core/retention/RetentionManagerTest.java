@@ -72,7 +72,8 @@ public class RetentionManagerTest {
     for (int i = 0; i < numOlderSegments; ++i) {
       SegmentMetadata segmentMetadata = mockSegmentMetadata(pastTimeStamp, pastTimeStamp, timeUnit);
       OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
-      ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata, CommonConstants.Segment.SegmentType.OFFLINE);
+      ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata,
+          CommonConstants.Segment.SegmentType.OFFLINE);
       metadataList.add(offlineSegmentZKMetadata);
       removedSegments.add(offlineSegmentZKMetadata.getSegmentName());
     }
@@ -81,7 +82,8 @@ public class RetentionManagerTest {
       SegmentMetadata segmentMetadata =
           mockSegmentMetadata(dayAfterTomorrowTimeStamp, dayAfterTomorrowTimeStamp, timeUnit);
       OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
-      ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata, CommonConstants.Segment.SegmentType.OFFLINE);
+      ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata,
+          CommonConstants.Segment.SegmentType.OFFLINE);
       metadataList.add(offlineSegmentZKMetadata);
     }
     final TableConfig tableConfig = createOfflineTableConfig();
@@ -113,8 +115,7 @@ public class RetentionManagerTest {
   }
 
   @Test
-  public void testRetentionWithMinutes()
-      throws Exception {
+  public void testRetentionWithMinutes() throws Exception {
     final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     final long minutesSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60;
     final long pastMinutesSinceEpoch = 22383360L;
@@ -122,8 +123,7 @@ public class RetentionManagerTest {
   }
 
   @Test
-  public void testRetentionWithSeconds()
-      throws Exception {
+  public void testRetentionWithSeconds() throws Exception {
     final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     final long secondsSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60 * 60;
     final long pastSecondsSinceEpoch = 1343001600L;
@@ -131,8 +131,7 @@ public class RetentionManagerTest {
   }
 
   @Test
-  public void testRetentionWithMillis()
-      throws Exception {
+  public void testRetentionWithMillis() throws Exception {
     final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     final long millisSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60 * 60 * 1000;
     final long pastMillisSinceEpoch = 1343001600000L;
@@ -140,8 +139,7 @@ public class RetentionManagerTest {
   }
 
   @Test
-  public void testRetentionWithHours()
-      throws Exception {
+  public void testRetentionWithHours() throws Exception {
     final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     final long hoursSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24;
     final long pastHoursSinceEpoch = 373056L;
@@ -149,8 +147,7 @@ public class RetentionManagerTest {
   }
 
   @Test
-  public void testRetentionWithDays()
-      throws Exception {
+  public void testRetentionWithDays() throws Exception {
     final long daysSinceEpochTimeStamp = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     final long pastDaysSinceEpoch = 15544L;
     testDifferentTimeUnits(pastDaysSinceEpoch, TimeUnit.DAYS, daysSinceEpochTimeStamp);
@@ -176,8 +173,7 @@ public class RetentionManagerTest {
     // run of the retention manager
     doAnswer(new Answer() {
       @Override
-      public Void answer(InvocationOnMock invocationOnMock)
-          throws Throwable {
+      public Void answer(InvocationOnMock invocationOnMock) throws Throwable {
         return null;
       }
     }).when(deletionManager).removeAgedDeletedSegments(anyInt());
@@ -187,8 +183,7 @@ public class RetentionManagerTest {
     // are exactly the same as the ones we expect to be deleted.
     doAnswer(new Answer() {
       @Override
-      public Object answer(InvocationOnMock invocationOnMock)
-          throws Throwable {
+      public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
         Object[] args = invocationOnMock.getArguments();
         String tableNameArg = (String) args[0];
         Assert.assertEquals(tableNameArg, tableNameWithType);
@@ -204,8 +199,7 @@ public class RetentionManagerTest {
 
   // This test makes sure that we clean up the segments marked OFFLINE in realtime for more than 7 days
   @Test
-  public void testRealtimeLLCCleanup()
-      throws Exception {
+  public void testRealtimeLLCCleanup() throws Exception {
     final int initialNumSegments = 8;
     final long now = System.currentTimeMillis();
 

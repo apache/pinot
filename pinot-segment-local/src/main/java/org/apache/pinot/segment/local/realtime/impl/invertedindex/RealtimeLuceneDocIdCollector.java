@@ -26,6 +26,7 @@ import org.apache.lucene.search.Scorable;
 import org.apache.lucene.search.ScoreMode;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
+
 /**
  * DocID collector for Lucene search query. We have optimized
  * the lucene search on offline segments by maintaining

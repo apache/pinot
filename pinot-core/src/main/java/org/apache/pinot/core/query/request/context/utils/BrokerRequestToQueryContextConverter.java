@@ -68,8 +68,8 @@ public class BrokerRequestToQueryContextConverter {
     selectExpressions = new ArrayList<>(selectList.size());
     for (Expression thriftExpression : selectList) {
       ExpressionContext expression;
-      if (thriftExpression.getType() == ExpressionType.FUNCTION && thriftExpression.getFunctionCall().getOperator()
-          .equalsIgnoreCase("AS")) {
+      if (thriftExpression.getType() == ExpressionType.FUNCTION
+          && thriftExpression.getFunctionCall().getOperator().equalsIgnoreCase("AS")) {
         // Handle alias
         List<Expression> operands = thriftExpression.getFunctionCall().getOperands();
         expression = RequestContextUtils.getExpression(operands.get(0));

@@ -120,9 +120,8 @@ public class PartitionSegmentPruner implements SegmentPruner {
       return INVALID_PARTITION_INFO;
     }
 
-    return new PartitionInfo(PartitionFunctionFactory
-        .getPartitionFunction(columnPartitionMetadata.getFunctionName(), columnPartitionMetadata.getNumPartitions()),
-        columnPartitionMetadata.getPartitions());
+    return new PartitionInfo(PartitionFunctionFactory.getPartitionFunction(columnPartitionMetadata.getFunctionName(),
+        columnPartitionMetadata.getNumPartitions()), columnPartitionMetadata.getPartitions());
   }
 
   @Override
@@ -157,8 +156,8 @@ public class PartitionSegmentPruner implements SegmentPruner {
     Set<String> selectedSegments = new HashSet<>();
     for (String segment : segments) {
       PartitionInfo partitionInfo = _partitionInfoMap.get(segment);
-      if (partitionInfo == null || partitionInfo == INVALID_PARTITION_INFO || isPartitionMatch(filterQueryTree,
-          partitionInfo)) {
+      if (partitionInfo == null || partitionInfo == INVALID_PARTITION_INFO
+          || isPartitionMatch(filterQueryTree, partitionInfo)) {
         selectedSegments.add(segment);
       }
     }

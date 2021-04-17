@@ -59,9 +59,12 @@ public class PinotConfigUtils {
     Map<String, Object> properties = new HashMap<>();
     properties.put(ControllerConf.ZK_STR, zkAddress);
     properties.put(ControllerConf.HELIX_CLUSTER_NAME, clusterName);
-    properties.put(ControllerConf.CONTROLLER_HOST, !StringUtils.isEmpty(controllerHost) ? controllerHost : NetUtils.getHostAddress());
-    properties.put(ControllerConf.CONTROLLER_PORT, !StringUtils.isEmpty(controllerPort) ? controllerPort:getAvailablePort());
-    properties.put(ControllerConf.DATA_DIR, !StringUtils.isEmpty(dataDir) ? dataDir : TMP_DIR + String.format("Controller_%s_%s/controller/data", controllerHost, controllerPort));
+    properties.put(ControllerConf.CONTROLLER_HOST,
+        !StringUtils.isEmpty(controllerHost) ? controllerHost : NetUtils.getHostAddress());
+    properties.put(ControllerConf.CONTROLLER_PORT,
+        !StringUtils.isEmpty(controllerPort) ? controllerPort : getAvailablePort());
+    properties.put(ControllerConf.DATA_DIR, !StringUtils.isEmpty(dataDir) ? dataDir
+        : TMP_DIR + String.format("Controller_%s_%s/controller/data", controllerHost, controllerPort));
     properties.put(ControllerConf.CONTROLLER_VIP_HOST, controllerHost);
     properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, tenantIsolation);
     properties.put(ControllerPeriodicTasksConf.RETENTION_MANAGER_FREQUENCY_IN_SECONDS, 3600 * 6);
@@ -198,7 +201,7 @@ public class PinotConfigUtils {
   private static List<String> validateControllerAccessProtocols(ControllerConf conf) throws ConfigurationException {
     List<String> protocols = conf.getControllerAccessProtocols();
 
-    if(!protocols.isEmpty()) {
+    if (!protocols.isEmpty()) {
       Optional<String> invalidProtocol =
           protocols.stream().filter(protocol -> !protocol.equals("http") && !protocol.equals("https")).findFirst();
 

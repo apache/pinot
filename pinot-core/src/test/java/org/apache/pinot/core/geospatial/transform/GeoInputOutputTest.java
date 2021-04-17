@@ -25,8 +25,7 @@ import org.testng.annotations.Test;
 
 public class GeoInputOutputTest extends GeoFunctionTest {
   @Test
-  public void testInputOutput()
-      throws Exception {
+  public void testInputOutput() throws Exception {
     // empty geometries
     assertAsTextAndBinary("MULTIPOINT EMPTY");
     assertAsTextAndBinary("LINESTRING EMPTY");
@@ -50,8 +49,7 @@ public class GeoInputOutputTest extends GeoFunctionTest {
     assertAsTextAndBinary("LINESTRING (0 0, 0 1, 0 1, 1 1, 1 0, 0 0)");
   }
 
-  private void assertAsTextAndBinary(String wkt)
-      throws Exception {
+  private void assertAsTextAndBinary(String wkt) throws Exception {
     // assert geometry
     assertStringFunction(String.format("ST_AsText(ST_GeomFromWKB(ST_AsBinary(ST_GeomFromText(%s))))", STRING_SV_COLUMN),
         new String[]{wkt}, Arrays.asList(new Column(STRING_SV_COLUMN, FieldSpec.DataType.STRING, new String[]{wkt})));

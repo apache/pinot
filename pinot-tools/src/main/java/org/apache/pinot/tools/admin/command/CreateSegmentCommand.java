@@ -73,13 +73,15 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   @Option(name = "-readerConfigFile", metaVar = "<string>", usage = "Config file for record reader.")
   private String _readerConfigFile;
 
-  @Option(name = "-retry", metaVar = "<int>", usage = "Number of retries if encountered any segment creation failure, default is 0.")
+  @Option(name = "-retry", metaVar = "<int>",
+      usage = "Number of retries if encountered any segment creation failure, default is 0.")
   private int _retry = 0;
 
   @Option(name = "-failOnEmptySegment", usage = "Option to fail the segment creation if output is an empty segment.")
   private boolean _failOnEmptySegment = false;
 
-  @Option(name = "-postCreationVerification", usage = "Verify segment data file after segment creation. Please ensure you have enough local disk to hold data for verification")
+  @Option(name = "-postCreationVerification",
+      usage = "Verify segment data file after segment creation. Please ensure you have enough local disk to hold data for verification")
   private boolean _postCreationVerification = false;
 
   @Option(name = "-numThreads", metaVar = "<int>", usage = "Parallelism while generating segments, default is 1.")
@@ -168,8 +170,7 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   }
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
     LOGGER.info("Executing command: {}", toString());
 
     Preconditions.checkArgument(_dataDir != null, "'dataDir' must be specified");
@@ -179,9 +180,8 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
     // Filter out all input data files
     Preconditions.checkArgument(_format != null, "'format' must be specified");
     List<String> dataFiles = getDataFiles(dataDir);
-    Preconditions
-        .checkState(!dataFiles.isEmpty(), "Failed to find any data file of format: %s under directory: %s", _format,
-            dataDir);
+    Preconditions.checkState(!dataFiles.isEmpty(), "Failed to find any data file of format: %s under directory: %s",
+        _format, dataDir);
     LOGGER.info("Found data files: {} of format: {} under directory: {}", dataFiles, _format, dataDir);
 
     Preconditions.checkArgument(_outDir != null, "'outDir' must be specified");
@@ -218,9 +218,8 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
       try {
         recordReaderConfig = RecordReaderFactory.getRecordReaderConfig(_format, _readerConfigFile);
       } catch (Exception e) {
-        throw new IllegalStateException(String
-            .format("Caught exception while reading %s record reader config from file: %s", _format, _readerConfigFile),
-            e);
+        throw new IllegalStateException(String.format(
+            "Caught exception while reading %s record reader config from file: %s", _format, _readerConfigFile), e);
       }
       LOGGER.info("Using {} record reader config: {}", _format, recordReaderConfig);
     } else {

@@ -111,7 +111,7 @@ public class IntervalTree<Value> {
   }
 
   private int getRightChildIndex(int nodeIndex) {
-    return  nodeIndex * 2 + 2;
+    return nodeIndex * 2 + 2;
   }
 
   private long getMax(int index) {

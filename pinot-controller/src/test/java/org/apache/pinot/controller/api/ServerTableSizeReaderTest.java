@@ -66,8 +66,7 @@ public class ServerTableSizeReaderTest {
   private TableSizeInfo tableInfo2;
 
   @BeforeClass
-  public void setUp()
-      throws IOException {
+  public void setUp() throws IOException {
     for (int i = 0; i < serverCount; i++) {
       serverList.add("server_" + i);
       endpointList.add("http://localhost:" + (serverPortStart + i));
@@ -115,8 +114,7 @@ public class ServerTableSizeReaderTest {
   private HttpHandler createHandler(final int status, final TableSizeInfo tableSize, final int sleepTimeMs) {
     return new HttpHandler() {
       @Override
-      public void handle(HttpExchange httpExchange)
-          throws IOException {
+      public void handle(HttpExchange httpExchange) throws IOException {
         if (sleepTimeMs > 0) {
           try {
             Thread.sleep(sleepTimeMs);
@@ -133,8 +131,7 @@ public class ServerTableSizeReaderTest {
     };
   }
 
-  private HttpServer startServer(int port, HttpHandler handler)
-      throws IOException {
+  private HttpServer startServer(int port, HttpHandler handler) throws IOException {
     final HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
     server.createContext(URI_PATH, handler);
     new Thread(new Runnable() {

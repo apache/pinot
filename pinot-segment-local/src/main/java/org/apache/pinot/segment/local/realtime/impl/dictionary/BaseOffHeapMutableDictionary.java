@@ -211,8 +211,7 @@ public abstract class BaseOffHeapMutableDictionary implements MutableDictionary 
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     doClose();
   }
 
@@ -439,6 +438,5 @@ public abstract class BaseOffHeapMutableDictionary implements MutableDictionary 
 
   public abstract long getTotalOffHeapMemUsed();
 
-  protected abstract void doClose()
-      throws IOException;
+  protected abstract void doClose() throws IOException;
 }

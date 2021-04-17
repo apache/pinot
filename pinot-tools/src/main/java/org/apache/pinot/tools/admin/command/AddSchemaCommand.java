@@ -58,7 +58,8 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
   @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
   private String _authToken;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -128,8 +129,7 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
   }
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
     if (_controllerHost == null) {
       _controllerHost = NetUtils.getHostAddress();
     }
@@ -148,8 +148,9 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
 
     Schema schema = Schema.fromFile(schemaFile);
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      fileUploadDownloadClient.addSchema(FileUploadDownloadClient
-              .getUploadSchemaURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort)),
+      fileUploadDownloadClient.addSchema(
+          FileUploadDownloadClient.getUploadSchemaURI(_controllerProtocol, _controllerHost,
+              Integer.parseInt(_controllerPort)),
           schema.getSchemaName(), schemaFile, makeAuthHeader(makeAuthToken(_authToken, _user, _password)),
           Collections.emptyList());
     } catch (Exception e) {

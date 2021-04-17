@@ -96,8 +96,7 @@ public class SegmentGenerationWithBytesTypeTest {
    * @throws Exception
    */
   @BeforeClass
-  public void setup()
-      throws Exception {
+  public void setup() throws Exception {
 
     _schema = new Schema();
     _schema.addField(new DimensionFieldSpec(FIXED_BYTE_SORTED_COLUMN, FieldSpec.DataType.BYTES, true));
@@ -116,8 +115,7 @@ public class SegmentGenerationWithBytesTypeTest {
    * Clean up after test
    */
   @AfterClass
-  public void cleanup()
-      throws IOException {
+  public void cleanup() throws IOException {
     _recordReader.close();
     _segment.destroy();
     FileUtils.deleteQuietly(new File(SEGMENT_DIR_NAME));
@@ -125,8 +123,7 @@ public class SegmentGenerationWithBytesTypeTest {
   }
 
   @Test
-  public void test()
-      throws Exception {
+  public void test() throws Exception {
     PinotSegmentRecordReader pinotReader = new PinotSegmentRecordReader(new File(SEGMENT_DIR_NAME, SEGMENT_NAME));
 
     _recordReader.rewind();
@@ -164,8 +161,8 @@ public class SegmentGenerationWithBytesTypeTest {
     for (int i = 0; i < NUM_ROWS; i++) {
       int value = (i * NUM_SORTED_VALUES) / NUM_ROWS;
       // For sorted columns, values are written as 0, 0, 0.., 1, 1, 1...n, n, n
-      Assert
-          .assertEquals(dictionary.indexOf(BytesUtils.toHexString(Ints.toByteArray(value))), value % NUM_SORTED_VALUES);
+      Assert.assertEquals(dictionary.indexOf(BytesUtils.toHexString(Ints.toByteArray(value))),
+          value % NUM_SORTED_VALUES);
     }
 
     // Test value not in dictionary.
@@ -190,8 +187,7 @@ public class SegmentGenerationWithBytesTypeTest {
    * This test generates an avro with TDigest BYTES data, and tests segment generation.
    */
   @Test
-  public void testTDigestAvro()
-      throws Exception {
+  public void testTDigestAvro() throws Exception {
     Schema schema = new Schema();
     schema.addField(new MetricFieldSpec(FIXED_BYTES_UNSORTED_COLUMN, FieldSpec.DataType.BYTES));
     schema.addField(new MetricFieldSpec(VARIABLE_BYTES_COLUMN, FieldSpec.DataType.BYTES));
@@ -227,8 +223,7 @@ public class SegmentGenerationWithBytesTypeTest {
    * @throws Exception
    */
 
-  private RecordReader buildIndex(Schema schema)
-      throws Exception {
+  private RecordReader buildIndex(Schema schema) throws Exception {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, schema);
 
     config.setOutDir(SEGMENT_DIR_NAME);
@@ -279,8 +274,7 @@ public class SegmentGenerationWithBytesTypeTest {
    * @param _varExpected Serialized bytes of variable length column are populated here
    * @throws IOException
    */
-  private void buildAvro(Schema schema, List<byte[]> _fixedExpected, List<byte[]> _varExpected)
-      throws IOException {
+  private void buildAvro(Schema schema, List<byte[]> _fixedExpected, List<byte[]> _varExpected) throws IOException {
     org.apache.avro.Schema avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(schema);
 
     try (DataFileWriter<GenericData.Record> recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {

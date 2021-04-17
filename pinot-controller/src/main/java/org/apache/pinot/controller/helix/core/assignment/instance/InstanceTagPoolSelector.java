@@ -96,9 +96,8 @@ public class InstanceTagPoolSelector {
         int numPools = poolToInstanceConfigsMap.size();
         int numPoolsToSelect = _tagPoolConfig.getNumPools();
         if (numPoolsToSelect > 0) {
-          Preconditions
-              .checkState(numPoolsToSelect <= numPools, "Not enough instance pools (%s in the cluster, asked for %s)",
-                  numPools, numPoolsToSelect);
+          Preconditions.checkState(numPoolsToSelect <= numPools,
+              "Not enough instance pools (%s in the cluster, asked for %s)", numPools, numPoolsToSelect);
         } else {
           numPoolsToSelect = numPools;
         }

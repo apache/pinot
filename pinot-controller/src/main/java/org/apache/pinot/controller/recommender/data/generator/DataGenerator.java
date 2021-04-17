@@ -54,8 +54,7 @@ public class DataGenerator {
     generators = new HashMap<String, Generator>();
   }
 
-  public void init(DataGeneratorSpec spec)
-      throws IOException {
+  public void init(DataGeneratorSpec spec) throws IOException {
     genSpec = spec;
     outDir = new File(genSpec.getOutputDir());
     if (outDir.exists() && !genSpec.isOverrideOutDir()) {
@@ -74,15 +73,13 @@ public class DataGenerator {
 
       Generator generator;
       if (genSpec.getPatternMap().containsKey(column)) {
-         generator = GeneratorFactory
-            .getGeneratorFor(PatternType.valueOf(genSpec.getPatternMap().get(column).get("type").toString()),
-                genSpec.getPatternMap().get(column));
+        generator = GeneratorFactory.getGeneratorFor(
+            PatternType.valueOf(genSpec.getPatternMap().get(column).get("type").toString()),
+            genSpec.getPatternMap().get(column));
 
       } else if (genSpec.getCardinalityMap().containsKey(column)) {
-        generator = GeneratorFactory.getGeneratorFor(dataType,
-            genSpec.getCardinalityMap().get(column),
-            genSpec.getMvCountMap().get(column),
-            genSpec.getLengthMap().get(column),
+        generator = GeneratorFactory.getGeneratorFor(dataType, genSpec.getCardinalityMap().get(column),
+            genSpec.getMvCountMap().get(column), genSpec.getLengthMap().get(column),
             genSpec.getTimeUnitMap().get(column));
       } else if (genSpec.getRangeMap().containsKey(column)) {
         IntRange range = genSpec.getRangeMap().get(column);
@@ -96,8 +93,7 @@ public class DataGenerator {
     }
   }
 
-  public void generateAvro(long totalDocs, int numFiles)
-      throws IOException {
+  public void generateAvro(long totalDocs, int numFiles) throws IOException {
     final int numPerFiles = (int) (totalDocs / numFiles);
     for (int i = 0; i < numFiles; i++) {
       try (AvroWriter writer = new AvroWriter(outDir, i, generators, fetchSchema())) {
@@ -108,8 +104,7 @@ public class DataGenerator {
     }
   }
 
-  public void generateCsv(long totalDocs, int numFiles)
-      throws IOException {
+  public void generateCsv(long totalDocs, int numFiles) throws IOException {
     final int numPerFiles = (int) (totalDocs / numFiles);
     for (int i = 0; i < numFiles; i++) {
       try (FileWriter writer = new FileWriter(new File(outDir, String.format("output_%d.csv", i)))) {
@@ -171,8 +166,7 @@ public class DataGenerator {
     return spec;
   }
 
-  public static void main(String[] args)
-      throws IOException {
+  public static void main(String[] args) throws IOException {
 
     final Map<String, DataType> dataTypes = new HashMap<>();
     final Map<String, FieldType> fieldTypes = new HashMap<>();
@@ -234,10 +228,8 @@ public class DataGenerator {
     }
 
     String outputDir = Paths.get(System.getProperty("java.io.tmpdir"), "csv-data").toString();
-    final DataGeneratorSpec spec =
-        new DataGeneratorSpec(columnNames, cardinality, range, template, mvCountMap, lengthMap,
-            dataTypes, fieldTypes, timeUnits,
-            FileFormat.CSV, outputDir, true);
+    final DataGeneratorSpec spec = new DataGeneratorSpec(columnNames, cardinality, range, template, mvCountMap,
+        lengthMap, dataTypes, fieldTypes, timeUnits, FileFormat.CSV, outputDir, true);
 
     final DataGenerator gen = new DataGenerator();
     gen.init(spec);

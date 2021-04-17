@@ -66,8 +66,7 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     // Setup realtime table, and blank offline table
     super.setUp();
     addTableConfig(createOfflineTableConfig());
@@ -205,8 +204,7 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     stopMinion();
 
     super.tearDown();

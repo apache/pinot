@@ -48,8 +48,7 @@ public class MinionClientTest {
     };
   }
 
-  private HttpServer startServer(int port, String path, HttpHandler handler)
-      throws IOException {
+  private HttpServer startServer(int port, String path, HttpHandler handler) throws IOException {
     HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
     server.createContext(path, handler);
     new Thread(() -> server.start()).start();
@@ -57,11 +56,9 @@ public class MinionClientTest {
   }
 
   @Test
-  public void testTaskSchedule()
-      throws IOException {
-    HttpServer httpServer = startServer(14202, "/tasks/schedule",
-        createHandler(200, "{\"SegmentGenerationAndPushTask\":\"Task_SegmentGenerationAndPushTask_1607470525615\"}",
-            0));
+  public void testTaskSchedule() throws IOException {
+    HttpServer httpServer = startServer(14202, "/tasks/schedule", createHandler(200,
+        "{\"SegmentGenerationAndPushTask\":\"Task_SegmentGenerationAndPushTask_1607470525615\"}", 0));
     MinionClient minionClient = new MinionClient("localhost", "14202");
     Assert.assertEquals(minionClient.scheduleMinionTasks(null, null).get("SegmentGenerationAndPushTask"),
         "Task_SegmentGenerationAndPushTask_1607470525615");
@@ -69,8 +66,7 @@ public class MinionClientTest {
   }
 
   @Test
-  public void testTasksStates()
-      throws IOException {
+  public void testTasksStates() throws IOException {
     HttpServer httpServer = startServer(14203, "/tasks/SegmentGenerationAndPushTask/taskstates",
         createHandler(200, "{\"Task_SegmentGenerationAndPushTask_1607470525615\":\"IN_PROGRESS\"}", 0));
     MinionClient minionClient = new MinionClient("http", "localhost", "14203");
@@ -80,8 +76,7 @@ public class MinionClientTest {
   }
 
   @Test
-  public void testTaskState()
-      throws IOException {
+  public void testTaskState() throws IOException {
     HttpServer httpServer = startServer(14204, "/tasks/task/Task_SegmentGenerationAndPushTask_1607470525615/state",
         createHandler(200, "\"COMPLETED\"", 0));
     MinionClient minionClient = new MinionClient("http://localhost:14204");

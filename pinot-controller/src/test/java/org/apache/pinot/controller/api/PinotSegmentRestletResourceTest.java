@@ -89,7 +89,8 @@ public class PinotSegmentRestletResourceTest {
   }
 
   private void checkCrcRequest(Map<String, SegmentMetadata> metadataTable, int expectedSize) throws Exception {
-    String crcMapStr = ControllerTestUtils.sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder().forListAllCrcInformationForTable(TABLE_NAME));
+    String crcMapStr = ControllerTestUtils.sendGetRequest(
+        ControllerTestUtils.getControllerRequestURLBuilder().forListAllCrcInformationForTable(TABLE_NAME));
     Map<String, String> crcMap = JsonUtils.stringToObject(crcMapStr, Map.class);
     for (String segmentName : crcMap.keySet()) {
       SegmentMetadata metadata = metadataTable.get(segmentName);

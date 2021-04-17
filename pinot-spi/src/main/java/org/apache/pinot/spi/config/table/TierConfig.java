@@ -52,8 +52,8 @@ public class TierConfig extends BaseJsonConfig {
       @JsonProperty(value = "storageType", required = true) String storageType,
       @JsonProperty("serverTag") @Nullable String serverTag) {
     Preconditions.checkArgument(name != null, "Must provide non-null 'name' in tierConfig");
-    Preconditions
-        .checkArgument(segmentSelectorType != null, "Must provide non-null 'segmentSelectorType' in tierConfig");
+    Preconditions.checkArgument(segmentSelectorType != null,
+        "Must provide non-null 'segmentSelectorType' in tierConfig");
     Preconditions.checkArgument(storageType != null, "Must provide non-null 'storageType' in tierConfig");
     _name = name;
     _segmentSelectorType = segmentSelectorType;

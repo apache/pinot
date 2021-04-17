@@ -48,8 +48,7 @@ public class RealtimeSegmentSegmentCreationDataSource implements SegmentCreation
       throw new RuntimeException("Incompatible schemas used for conversion and extraction");
     }
 
-    return new RealtimeSegmentStatsContainer(
-            _realtimeSegment, _realtimeSegmentRecordReader);
+    return new RealtimeSegmentStatsContainer(_realtimeSegment, _realtimeSegmentRecordReader);
   }
 
   @Override

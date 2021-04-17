@@ -68,8 +68,9 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
 
   @Override
   public String getResultColumnName() {
-    return _version == 0 ? AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + (int) _percentile + "("
-        + _expression + ")"
+    return _version == 0
+        ? AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + (int) _percentile + "(" + _expression
+            + ")"
         : AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + "(" + _expression + ", " + _percentile
             + ")";
   }

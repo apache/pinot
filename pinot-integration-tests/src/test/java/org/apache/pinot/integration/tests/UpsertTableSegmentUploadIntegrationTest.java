@@ -60,8 +60,7 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
   private static final String TABLE_NAME_WITH_TYPE = "mytable_REALTIME";
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster
@@ -134,8 +133,8 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
   protected void startController() {
     Map<String, Object> controllerConfig = getDefaultControllerConfiguration();
     // Perform realtime segment validation every second with 1 second initial delay.
-    controllerConfig
-        .put(ControllerConf.ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS, 1);
+    controllerConfig.put(ControllerConf.ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS,
+        1);
     controllerConfig.put(ControllerConf.ControllerPeriodicTasksConf.SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS, 1);
     controllerConfig
         .put(ControllerConf.ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_INITIAL_DELAY_IN_SECONDS, 1);
@@ -143,8 +142,7 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
   }
 
   @Test
-  public void testSegmentAssignment()
-      throws Exception {
+  public void testSegmentAssignment() throws Exception {
     IdealState idealState = HelixHelper.getTableIdealState(_helixManager, TABLE_NAME_WITH_TYPE);
     Assert.assertEquals(getCurrentCountStarResult(), getCountStarResult());
     verifyTableIdealStates(idealState);
@@ -184,8 +182,7 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
     }
   }
 
-  private void uploadSegments(String tableName, TableType tableType, File tarDir)
-      throws Exception {
+  private void uploadSegments(String tableName, TableType tableType, File tarDir) throws Exception {
     File[] segmentTarFiles = tarDir.listFiles();
     assertNotNull(segmentTarFiles);
     int numSegments = segmentTarFiles.length;

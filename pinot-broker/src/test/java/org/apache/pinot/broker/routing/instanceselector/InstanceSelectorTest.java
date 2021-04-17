@@ -64,26 +64,26 @@ public class InstanceSelectorTest {
 
     // Replica-group instance selector should be returned
     when(routingConfig.getInstanceSelectorType()).thenReturn(RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE);
-    assertTrue(InstanceSelectorFactory
-        .getInstanceSelector(tableConfig, brokerMetrics) instanceof ReplicaGroupInstanceSelector);
+    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig,
+        brokerMetrics) instanceof ReplicaGroupInstanceSelector);
 
     // Strict replica-group instance selector should be returned
     when(routingConfig.getInstanceSelectorType()).thenReturn(RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE);
-    assertTrue(InstanceSelectorFactory
-        .getInstanceSelector(tableConfig, brokerMetrics) instanceof StrictReplicaGroupInstanceSelector);
+    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig,
+        brokerMetrics) instanceof StrictReplicaGroupInstanceSelector);
 
     // Should be backward-compatible with legacy config
     when(routingConfig.getInstanceSelectorType()).thenReturn(null);
     when(tableConfig.getTableType()).thenReturn(TableType.OFFLINE);
     when(routingConfig.getRoutingTableBuilderName())
         .thenReturn(InstanceSelectorFactory.LEGACY_REPLICA_GROUP_OFFLINE_ROUTING);
-    assertTrue(InstanceSelectorFactory
-        .getInstanceSelector(tableConfig, brokerMetrics) instanceof ReplicaGroupInstanceSelector);
+    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig,
+        brokerMetrics) instanceof ReplicaGroupInstanceSelector);
     when(tableConfig.getTableType()).thenReturn(TableType.REALTIME);
     when(routingConfig.getRoutingTableBuilderName())
         .thenReturn(InstanceSelectorFactory.LEGACY_REPLICA_GROUP_REALTIME_ROUTING);
-    assertTrue(InstanceSelectorFactory
-        .getInstanceSelector(tableConfig, brokerMetrics) instanceof ReplicaGroupInstanceSelector);
+    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig,
+        brokerMetrics) instanceof ReplicaGroupInstanceSelector);
   }
 
   @Test

@@ -109,11 +109,10 @@ public class SparkSegmentTarPushJobRunner implements IngestionJobRunner, Seriali
       // Prevent using lambda expression in Spark to avoid potential serialization exceptions, use inner function instead.
       pathRDD.foreach(new VoidFunction<String>() {
         @Override
-        public void call(String segmentTarPath)
-            throws Exception {
+        public void call(String segmentTarPath) throws Exception {
           for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
-            PinotFSFactory
-                .register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
+            PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(),
+                new PinotConfiguration(pinotFSSpec));
           }
           try {
             SegmentPushUtils.pushSegments(_spec, PinotFSFactory.create(finalOutputDirURI.getScheme()),

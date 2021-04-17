@@ -39,15 +39,13 @@ public class RealtimeProvisioningRuleParams {
       RecommenderConstants.RealtimeProvisioningRule.DEFAULT_REAL_TIME_TABLE_RETENTION_HOURS;
 
   // Available memory of the host
-  private String maxUsableHostMemory =
-      RecommenderConstants.RealtimeProvisioningRule.DEFAULT_MAX_USABLE_HOST_MEMORY;
+  private String maxUsableHostMemory = RecommenderConstants.RealtimeProvisioningRule.DEFAULT_MAX_USABLE_HOST_MEMORY;
 
   // Different values for `number of hosts` parameter
   private int[] numHosts = RecommenderConstants.RealtimeProvisioningRule.DEFAULT_NUM_HOSTS;
 
   // Acceptable values for `number of hours` parameter. NumHours represents consumption duration.
   private int[] numHours = RecommenderConstants.RealtimeProvisioningRule.DEFAULT_NUM_HOURS;
-
 
   // Getters & Setters
 

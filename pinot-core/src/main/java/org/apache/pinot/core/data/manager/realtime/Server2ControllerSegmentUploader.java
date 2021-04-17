@@ -43,8 +43,7 @@ public class Server2ControllerSegmentUploader implements SegmentUploader {
 
   public Server2ControllerSegmentUploader(Logger segmentLogger, FileUploadDownloadClient fileUploadDownloadClient,
       String controllerSegmentUploadCommitUrl, String segmentName, int segmentUploadRequestTimeoutMs,
-      ServerMetrics serverMetrics, String authToken)
-      throws URISyntaxException {
+      ServerMetrics serverMetrics, String authToken) throws URISyntaxException {
     _segmentLogger = segmentLogger;
     _fileUploadDownloadClient = fileUploadDownloadClient;
     _controllerSegmentUploadCommitUrl = new URI(controllerSegmentUploadCommitUrl);
@@ -70,9 +69,11 @@ public class Server2ControllerSegmentUploader implements SegmentUploader {
   public SegmentCompletionProtocol.Response uploadSegmentToController(File segmentFile) {
     SegmentCompletionProtocol.Response response;
     try {
-      String responseStr = _fileUploadDownloadClient
-          .uploadSegment(_controllerSegmentUploadCommitUrl, _segmentName, segmentFile,
-              FileUploadDownloadClient.makeAuthHeader(_authToken), null, _segmentUploadRequestTimeoutMs).getResponse();
+      String responseStr =
+          _fileUploadDownloadClient
+              .uploadSegment(_controllerSegmentUploadCommitUrl, _segmentName, segmentFile,
+                  FileUploadDownloadClient.makeAuthHeader(_authToken), null, _segmentUploadRequestTimeoutMs)
+              .getResponse();
       response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       _segmentLogger.info("Controller response {} for {}", response.toJsonString(), _controllerSegmentUploadCommitUrl);
       if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {

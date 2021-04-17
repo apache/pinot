@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashMap;
 import java.util.Map;
 
+
 /**
  * Simple POJO to hold query execution statistics for a request. These stats come in every
  * query that's executed and can be used for debugging Pinot slow queries.
@@ -57,68 +58,59 @@ class ExecutionStats {
 
   public int getNumServersQueried() {
     // Lazily load the field from the JsonNode to avoid reading the stats when not needed.
-    return brokerResponse.has(NUM_SERVERS_QUERIED) ?
-        brokerResponse.get(NUM_SERVERS_QUERIED).asInt() : -1;
+    return brokerResponse.has(NUM_SERVERS_QUERIED) ? brokerResponse.get(NUM_SERVERS_QUERIED).asInt() : -1;
   }
 
   public int getNumServersResponded() {
-    return brokerResponse.has(NUM_SERVERS_RESPONDED) ?
-        brokerResponse.get(NUM_SERVERS_RESPONDED).asInt() : -1;
+    return brokerResponse.has(NUM_SERVERS_RESPONDED) ? brokerResponse.get(NUM_SERVERS_RESPONDED).asInt() : -1;
   }
 
   public long getNumDocsScanned() {
-    return brokerResponse.has(NUM_DOCS_SCANNED) ?
-        brokerResponse.get(NUM_DOCS_SCANNED).asLong() : -1L;
+    return brokerResponse.has(NUM_DOCS_SCANNED) ? brokerResponse.get(NUM_DOCS_SCANNED).asLong() : -1L;
   }
 
   public long getNumEntriesScannedInFilter() {
-    return brokerResponse.has(NUM_ENTRIES_SCANNED_IN_FILTER) ?
-        brokerResponse.get(NUM_ENTRIES_SCANNED_IN_FILTER).asLong() : -1L;
+    return brokerResponse.has(NUM_ENTRIES_SCANNED_IN_FILTER)
+        ? brokerResponse.get(NUM_ENTRIES_SCANNED_IN_FILTER).asLong() : -1L;
   }
 
   public long getNumEntriesScannedPostFilter() {
-    return brokerResponse.has(NUM_ENTRIES_SCANNED_POST_FILTER) ?
-        brokerResponse.get(NUM_ENTRIES_SCANNED_POST_FILTER).asLong() : -1L;
+    return brokerResponse.has(NUM_ENTRIES_SCANNED_POST_FILTER)
+        ? brokerResponse.get(NUM_ENTRIES_SCANNED_POST_FILTER).asLong() : -1L;
   }
 
   public long getNumSegmentsQueried() {
-    return brokerResponse.has(NUM_SEGMENTS_QUERIED) ?
-        brokerResponse.get(NUM_SEGMENTS_QUERIED).asLong() : -1L;
+    return brokerResponse.has(NUM_SEGMENTS_QUERIED) ? brokerResponse.get(NUM_SEGMENTS_QUERIED).asLong() : -1L;
   }
 
   public long getNumSegmentsProcessed() {
-    return brokerResponse.has(NUM_SEGMENTS_PROCESSED) ?
-        brokerResponse.get(NUM_SEGMENTS_PROCESSED).asLong() : -1L;
+    return brokerResponse.has(NUM_SEGMENTS_PROCESSED) ? brokerResponse.get(NUM_SEGMENTS_PROCESSED).asLong() : -1L;
   }
 
   public long getNumSegmentsMatched() {
-    return brokerResponse.has(NUM_SEGMENTS_MATCHED) ?
-        brokerResponse.get(NUM_SEGMENTS_MATCHED).asLong() : -1L;
+    return brokerResponse.has(NUM_SEGMENTS_MATCHED) ? brokerResponse.get(NUM_SEGMENTS_MATCHED).asLong() : -1L;
   }
 
   public long getNumConsumingSegmentsQueried() {
-    return brokerResponse.has(NUM_CONSUMING_SEGMENTS_QUERIED) ?
-        brokerResponse.get(NUM_CONSUMING_SEGMENTS_QUERIED).asLong() : -1L;
+    return brokerResponse.has(NUM_CONSUMING_SEGMENTS_QUERIED)
+        ? brokerResponse.get(NUM_CONSUMING_SEGMENTS_QUERIED).asLong() : -1L;
   }
 
   public long getMinConsumingFreshnessTimeMs() {
-    return brokerResponse.has(MIN_CONSUMING_FRESHNESS_TIME_MS) ?
-        brokerResponse.get(MIN_CONSUMING_FRESHNESS_TIME_MS).asLong() : -1L;
+    return brokerResponse.has(MIN_CONSUMING_FRESHNESS_TIME_MS)
+        ? brokerResponse.get(MIN_CONSUMING_FRESHNESS_TIME_MS).asLong() : -1L;
   }
 
   public long getTotalDocs() {
-    return brokerResponse.has(TOTAL_DOCS) ?
-        brokerResponse.get(TOTAL_DOCS).asLong() : -1L;
+    return brokerResponse.has(TOTAL_DOCS) ? brokerResponse.get(TOTAL_DOCS).asLong() : -1L;
   }
 
   public boolean isNumGroupsLimitReached() {
-    return brokerResponse.has(NUM_GROUPS_LIMIT_REACHED)
-        && brokerResponse.get(NUM_GROUPS_LIMIT_REACHED).asBoolean();
+    return brokerResponse.has(NUM_GROUPS_LIMIT_REACHED) && brokerResponse.get(NUM_GROUPS_LIMIT_REACHED).asBoolean();
   }
 
   public long getTimeUsedMs() {
-    return brokerResponse.has(TIME_USED_MS) ?
-        brokerResponse.get(TIME_USED_MS).asLong() : -1L;
+    return brokerResponse.has(TIME_USED_MS) ? brokerResponse.get(TIME_USED_MS).asLong() : -1L;
   }
 
   @Override

@@ -52,28 +52,28 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
       switch (spec.getDataType()) {
         case BOOLEAN:
         case STRING:
-          columnStatsCollectorMap
-              .put(spec.getName(), new StringColumnPreIndexStatsCollector(column, _statsCollectorConfig));
+          columnStatsCollectorMap.put(spec.getName(),
+              new StringColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           break;
         case INT:
-          columnStatsCollectorMap
-              .put(spec.getName(), new IntColumnPreIndexStatsCollector(column, _statsCollectorConfig));
+          columnStatsCollectorMap.put(spec.getName(),
+              new IntColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           break;
         case LONG:
-          columnStatsCollectorMap
-              .put(spec.getName(), new LongColumnPreIndexStatsCollector(column, _statsCollectorConfig));
+          columnStatsCollectorMap.put(spec.getName(),
+              new LongColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           break;
         case FLOAT:
-          columnStatsCollectorMap
-              .put(spec.getName(), new FloatColumnPreIndexStatsCollector(column, _statsCollectorConfig));
+          columnStatsCollectorMap.put(spec.getName(),
+              new FloatColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           break;
         case DOUBLE:
-          columnStatsCollectorMap
-              .put(spec.getName(), new DoubleColumnPreIndexStatsCollector(column, _statsCollectorConfig));
+          columnStatsCollectorMap.put(spec.getName(),
+              new DoubleColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           break;
         case BYTES:
-          columnStatsCollectorMap
-              .put(spec.getName(), new BytesColumnPredIndexStatsCollector(column, _statsCollectorConfig));
+          columnStatsCollectorMap.put(spec.getName(),
+              new BytesColumnPredIndexStatsCollector(column, _statsCollectorConfig));
           break;
         default:
           break;

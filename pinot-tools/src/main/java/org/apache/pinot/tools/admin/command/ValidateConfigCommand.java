@@ -65,16 +65,19 @@ public class ValidateConfigCommand extends AbstractBaseCommand implements Comman
   @Option(name = "-tableConfig", required = false, usage = "Validate the table config")
   private boolean _validateTableConfig;
 
-  @Option(name = "-tableNames", required = false, metaVar = "<string>", usage = "Space separated table names to be validated (default to validate ALL)")
+  @Option(name = "-tableNames", required = false, metaVar = "<string>",
+      usage = "Space separated table names to be validated (default to validate ALL)")
   private String _tableNames;
 
   @Option(name = "-schema", required = false, usage = "Validate the schema")
   private boolean _validateSchema;
 
-  @Option(name = "-schemaNames", required = false, metaVar = "<string", usage = "Space separated schema names to be validated (default to validate ALL)")
+  @Option(name = "-schemaNames", required = false, metaVar = "<string",
+      usage = "Space separated schema names to be validated (default to validate ALL)")
   private String _schemaNames;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help;
 
   @Override
@@ -93,8 +96,7 @@ public class ValidateConfigCommand extends AbstractBaseCommand implements Comman
   }
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
     if (!_validateTableConfig && !_validateSchema) {
       throw new RuntimeException("Need to specify at least one of -schema and -tableConfig");
     }
@@ -115,8 +117,7 @@ public class ValidateConfigCommand extends AbstractBaseCommand implements Comman
     return true;
   }
 
-  private void validateTableConfig()
-      throws Exception {
+  private void validateTableConfig() throws Exception {
     List<String> tableNames = getTableNames();
     LOGGER.info("Validating table config for tables: " + tableNames);
     for (String tableName : tableNames) {
@@ -133,8 +134,7 @@ public class ValidateConfigCommand extends AbstractBaseCommand implements Comman
     }
   }
 
-  private void validateSchema()
-      throws Exception {
+  private void validateSchema() throws Exception {
     List<String> schemaNames = getSchemaNames();
     LOGGER.info("Validating schemas: " + schemaNames);
     for (String schemaName : schemaNames) {
@@ -149,8 +149,7 @@ public class ValidateConfigCommand extends AbstractBaseCommand implements Comman
     }
   }
 
-  private List<String> getTableNames()
-      throws Exception {
+  private List<String> getTableNames() throws Exception {
     if (_tableNames == null) {
       // Get all table names.
       return _helixPropertyStore.getChildNames(TABLE_CONFIG_PATH, 0);
@@ -169,8 +168,7 @@ public class ValidateConfigCommand extends AbstractBaseCommand implements Comman
     }
   }
 
-  private List<String> getSchemaNames()
-      throws Exception {
+  private List<String> getSchemaNames() throws Exception {
     if (_schemaNames == null) {
       // Get all schema names.
       return _helixPropertyStore.getChildNames(SCHEMA_PATH, 0);

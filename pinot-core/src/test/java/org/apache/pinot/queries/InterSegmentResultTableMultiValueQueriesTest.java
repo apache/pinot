@@ -437,9 +437,9 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
 
   @Test
   public void testPercentile50MV() {
-    List<String> queries = Arrays
-        .asList("SELECT PERCENTILE50MV(column6) FROM testTable", "SELECT PERCENTILEMV(column6, 50) FROM testTable",
-            "SELECT PERCENTILEMV(column6, '50') FROM testTable", "SELECT PERCENTILEMV(column6, \"50\") FROM testTable");
+    List<String> queries = Arrays.asList("SELECT PERCENTILE50MV(column6) FROM testTable",
+        "SELECT PERCENTILEMV(column6, 50) FROM testTable", "SELECT PERCENTILEMV(column6, '50') FROM testTable",
+        "SELECT PERCENTILEMV(column6, \"50\") FROM testTable");
 
     DataSchema dataSchema;
     List<Object[]> rows;
@@ -452,8 +452,9 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
 
       // Schema for first query is different from schema of the rest of the queries because the second query is using PERCENTILEEMV
       // function that works off decimal values.
-      dataSchema = i == 0 ? new DataSchema(new String[]{"percentile50mv(column6)"},
-          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE})
+      dataSchema = i == 0
+          ? new DataSchema(new String[]{"percentile50mv(column6)"},
+              new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE})
           : new DataSchema(new String[]{"percentilemv(column6, 50.0)"},
               new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE});
 
@@ -473,8 +474,9 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
 
       // Schema for first query is different from schema of the rest of the queries because the second query is using PERCENTILEEMV
       // function that works off decimal values.
-      dataSchema = i == 0 ? new DataSchema(new String[]{"column8", "percentile50mv(column6)"},
-          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE})
+      dataSchema = i == 0
+          ? new DataSchema(new String[]{"column8", "percentile50mv(column6)"},
+              new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE})
           : new DataSchema(new String[]{"column8", "percentilemv(column6, 50.0)"},
               new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
 
@@ -488,8 +490,9 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
 
       // Schema for first query is different from schema of the rest of the queries because the second query is using PERCENTILEEMV
       // function that works off decimal values.
-      dataSchema = i == 0 ? new DataSchema(new String[]{"column7", "percentile50mv(column6)"},
-          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE})
+      dataSchema = i == 0
+          ? new DataSchema(new String[]{"column7", "percentile50mv(column6)"},
+              new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE})
           : new DataSchema(new String[]{"column7", "percentilemv(column6, 50.0)"},
               new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
 
@@ -809,13 +812,9 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
 
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames().length, 10);
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames(),
-        new String[]{"column1", "column10", "column2", "column3", "column5", "column6", "column7", "column8", "column9",
-            "daysSinceEpoch"});
+        new String[]{"column1", "column10", "column2", "column3", "column5", "column6", "column7", "column8", "column9", "daysSinceEpoch"});
     Assert.assertEquals(resultTable.getDataSchema().getColumnDataTypes(),
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING,
-            DataSchema.ColumnDataType.INT_ARRAY, DataSchema.ColumnDataType.INT_ARRAY, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT});
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT_ARRAY, DataSchema.ColumnDataType.INT_ARRAY, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT});
     Assert.assertEquals(resultTable.getRows().size(), 10);
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames(), selectionResults.getColumns().toArray());
 
@@ -828,8 +827,7 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
     resultTable = brokerResponseSQL.getResultTable();
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames().length, 10);
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames(),
-        new String[]{"column1", "column10", "column2", "column3", "column5", "column6", "column7", "column8", "column9",
-            "daysSinceEpoch"});
+        new String[]{"column1", "column10", "column2", "column3", "column5", "column6", "column7", "column8", "column9", "daysSinceEpoch"});
     Assert.assertEquals(resultTable.getRows().size(), 50);
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames(), selectionResults.getColumns().toArray());
 
@@ -857,8 +855,7 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames().length, 3);
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames(), new String[]{"column1", "column6", "column7"});
     Assert.assertEquals(resultTable.getDataSchema().getColumnDataTypes(),
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT_ARRAY,
-            DataSchema.ColumnDataType.INT_ARRAY});
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT_ARRAY, DataSchema.ColumnDataType.INT_ARRAY});
     Assert.assertEquals(resultTable.getRows().size(), 10);
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames(), selectionResults.getColumns().toArray());
   }

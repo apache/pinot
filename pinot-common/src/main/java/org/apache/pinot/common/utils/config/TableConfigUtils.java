@@ -51,8 +51,7 @@ public class TableConfigUtils {
 
   private static final String FIELD_MISSING_MESSAGE_TEMPLATE = "Mandatory field '%s' is missing";
 
-  public static TableConfig fromZNRecord(ZNRecord znRecord)
-      throws IOException {
+  public static TableConfig fromZNRecord(ZNRecord znRecord) throws IOException {
     Map<String, String> simpleFields = znRecord.getSimpleFields();
 
     // Mandatory fields
@@ -63,8 +62,8 @@ public class TableConfigUtils {
     Preconditions.checkState(tableType != null, FIELD_MISSING_MESSAGE_TEMPLATE, TableConfig.TABLE_TYPE_KEY);
 
     String validationConfigString = simpleFields.get(TableConfig.VALIDATION_CONFIG_KEY);
-    Preconditions
-        .checkState(validationConfigString != null, FIELD_MISSING_MESSAGE_TEMPLATE, TableConfig.VALIDATION_CONFIG_KEY);
+    Preconditions.checkState(validationConfigString != null, FIELD_MISSING_MESSAGE_TEMPLATE,
+        TableConfig.VALIDATION_CONFIG_KEY);
     SegmentsValidationAndRetentionConfig validationConfig =
         JsonUtils.stringToObject(validationConfigString, SegmentsValidationAndRetentionConfig.class);
 
@@ -73,8 +72,8 @@ public class TableConfigUtils {
     TenantConfig tenantConfig = JsonUtils.stringToObject(tenantConfigString, TenantConfig.class);
 
     String indexingConfigString = simpleFields.get(TableConfig.INDEXING_CONFIG_KEY);
-    Preconditions
-        .checkState(indexingConfigString != null, FIELD_MISSING_MESSAGE_TEMPLATE, TableConfig.INDEXING_CONFIG_KEY);
+    Preconditions.checkState(indexingConfigString != null, FIELD_MISSING_MESSAGE_TEMPLATE,
+        TableConfig.INDEXING_CONFIG_KEY);
     IndexingConfig indexingConfig = JsonUtils.stringToObject(indexingConfigString, IndexingConfig.class);
 
     String customConfigString = simpleFields.get(TableConfig.CUSTOM_CONFIG_KEY);
@@ -151,8 +150,7 @@ public class TableConfigUtils {
         ingestionConfig, tierConfigList, isDimTable, tunerConfig);
   }
 
-  public static ZNRecord toZNRecord(TableConfig tableConfig)
-      throws JsonProcessingException {
+  public static ZNRecord toZNRecord(TableConfig tableConfig) throws JsonProcessingException {
     Map<String, String> simpleFields = new HashMap<>();
 
     // Mandatory fields
@@ -184,8 +182,8 @@ public class TableConfigUtils {
     Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap =
         tableConfig.getInstanceAssignmentConfigMap();
     if (instanceAssignmentConfigMap != null) {
-      simpleFields
-          .put(TableConfig.INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY, JsonUtils.objectToString(instanceAssignmentConfigMap));
+      simpleFields.put(TableConfig.INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY,
+          JsonUtils.objectToString(instanceAssignmentConfigMap));
     }
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     if (fieldConfigList != null) {

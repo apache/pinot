@@ -92,9 +92,6 @@ public class InputManager {
   // TODO: Set to dsiabled for now, will discuss this in the next PR
   public boolean _useCardinalityNormalization = DEFAULT_USE_CARDINALITY_NORMALIZATION;
 
-
-
-
   // The parameters of rules
   public PartitionRuleParams _partitionRuleParams = new PartitionRuleParams();
   public InvertedSortedIndexJointRuleParams _invertedSortedIndexJointRuleParams =
@@ -121,15 +118,17 @@ public class InputManager {
   String[] _intToColNameMap = null;
   Map<String, Triple<Double, BrokerRequest, QueryContext>> _parsedQueries = new HashMap<>();
 
-  Map<FieldSpec.DataType, Integer> _dataTypeSizeMap = new HashMap<FieldSpec.DataType, Integer>() {{
-    put(FieldSpec.DataType.INT, Integer.BYTES);
-    put(FieldSpec.DataType.LONG, Long.BYTES);
-    put(FieldSpec.DataType.FLOAT, Float.BYTES);
-    put(FieldSpec.DataType.DOUBLE, Double.BYTES);
-    put(FieldSpec.DataType.BYTES, Byte.BYTES);
-    put(FieldSpec.DataType.STRING, Character.BYTES);
-    put(null, DEFAULT_NULL_SIZE);
-  }};
+  Map<FieldSpec.DataType, Integer> _dataTypeSizeMap = new HashMap<FieldSpec.DataType, Integer>() {
+    {
+      put(FieldSpec.DataType.INT, Integer.BYTES);
+      put(FieldSpec.DataType.LONG, Long.BYTES);
+      put(FieldSpec.DataType.FLOAT, Float.BYTES);
+      put(FieldSpec.DataType.DOUBLE, Double.BYTES);
+      put(FieldSpec.DataType.BYTES, Byte.BYTES);
+      put(FieldSpec.DataType.STRING, Character.BYTES);
+      put(null, DEFAULT_NULL_SIZE);
+    }
+  };
   protected final BrokerRequestOptimizer _brokerRequestOptimizer = new BrokerRequestOptimizer();
 
   /**
@@ -137,22 +136,21 @@ public class InputManager {
    * E.g. we will subtract the dimensions with overwritten indices from _dimNames to get _dimNamesIndexApplicable
    * This ensures we do not recommend indices on those dimensions
    */
-  public void init()
-      throws InvalidInputException {
+  public void init() throws InvalidInputException {
     LOGGER.info("Preprocessing Input:");
     reorderDimsAndBuildMap();
     registerColNameFieldType();
     validateQueries();
-    if (_useCardinalityNormalization){
+    if (_useCardinalityNormalization) {
       regulateCardinalityForAll();
     }
   }
-  private void regulateCardinalityForAll(){
+
+  private void regulateCardinalityForAll() {
     double sampleSize;
-    if (getTableType().equalsIgnoreCase(REALTIME)){
+    if (getTableType().equalsIgnoreCase(REALTIME)) {
       sampleSize = getSegmentFlushTime() * getNumMessagesPerSecInKafkaTopic();
-    }
-    else{
+    } else {
       sampleSize = getNumRecordsPerPush();
     }
 
@@ -197,8 +195,7 @@ public class InputManager {
     }
   }
 
-  private void reorderDimsAndBuildMap()
-      throws InvalidInputException {
+  private void reorderDimsAndBuildMap() throws InvalidInputException {
 
     String sortedColumn = _overWrittenConfigs.getIndexConfig().getSortedColumn();
     Set<String> invertedIndexColumns = _overWrittenConfigs.getIndexConfig().getInvertedIndexColumns();
@@ -351,8 +348,7 @@ public class InputManager {
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
-  public void setSchema(JsonNode jsonNode)
-      throws IOException {
+  public void setSchema(JsonNode jsonNode) throws IOException {
     ObjectReader reader = new ObjectMapper().readerFor(Schema.class);
     this._schema = reader.readValue(jsonNode);
     reader = new ObjectMapper().readerFor(SchemaWithMetaData.class);
@@ -551,8 +547,8 @@ public class InputManager {
 
   public boolean isSingleValueColumn(String colName) {
     FieldMetadata fieldMetadata = _metaDataMap.getOrDefault(colName, new FieldMetadata());
-    return fieldMetadata.isSingleValueField() && (fieldMetadata.getNumValuesPerEntry()
-        < DEFAULT_AVERAGE_NUM_VALUES_PER_ENTRY + EPSILON);
+    return fieldMetadata.isSingleValueField()
+        && (fieldMetadata.getNumValuesPerEntry() < DEFAULT_AVERAGE_NUM_VALUES_PER_ENTRY + EPSILON);
   }
 
   /**
@@ -601,7 +597,7 @@ public class InputManager {
     // E(V1) = E(V2) = ... = E(V_cardinality) due to even distribution
     // therefore E(V1 + V2 + V3 + ... + V_cardinality) = cardinality * E(V1) = cardinality * 1 * P(V1)
     // Which is cardinality * (1 - p0^sampleSize) = cardinality * (1-((cardinality - 1) / cardinality)^(sampleSize))
-    return  cardinality * (1 - pow(((cardinality - 1) / cardinality), sampleSize));
+    return cardinality * (1 - pow(((cardinality - 1) / cardinality), sampleSize));
   }
 
   /**
@@ -631,11 +627,10 @@ public class InputManager {
   }
 
   public boolean isPrimaryDateTime(String colName) {
-    return colName!=null && colName.equalsIgnoreCase(getPrimaryTimeCol());
+    return colName != null && colName.equalsIgnoreCase(getPrimaryTimeCol());
   }
 
-  public void estimateSizePerRecord()
-      throws InvalidInputException {
+  public void estimateSizePerRecord() throws InvalidInputException {
     for (String colName : _colNameFieldTypeMap.keySet()) {
       _sizePerRecord += getColDataSizeWithDictionaryConfig(colName);
       LOGGER.debug("{} {}", colName, getColDataSizeWithDictionaryConfig(colName));
@@ -648,15 +643,13 @@ public class InputManager {
    * Not applicable to MV column right now because they are always dictionary encoded.
    * @return byte length
    */
-  public long getColRawSizePerDoc(String colName)
-      throws InvalidInputException {
+  public long getColRawSizePerDoc(String colName) throws InvalidInputException {
     FieldSpec.DataType dataType = getFieldType(colName);
     if (dataType == FieldSpec.DataType.STRUCT || dataType == FieldSpec.DataType.MAP
         || dataType == FieldSpec.DataType.LIST) {
       return 0; //TODO: implement this after the complex is supported
     } else if (!isSingleValueColumn(colName)) {
-      throw new InvalidInputException("Column {0} is MV column should not have raw encoding!",
-          colName); // currently unreachable
+      throw new InvalidInputException("Column {0} is MV column should not have raw encoding!", colName); // currently unreachable
       // TODO: currently raw encoding is only applicable for SV columns, change this after it's supported for MV
     } else {
       if (dataType == FieldSpec.DataType.BYTES || dataType == FieldSpec.DataType.STRING) {
@@ -667,15 +660,14 @@ public class InputManager {
     }
   }
 
-  public long getColDataSizeWithDictionaryConfig(String colName)
-      throws InvalidInputException {
+  public long getColDataSizeWithDictionaryConfig(String colName) throws InvalidInputException {
     FieldSpec.DataType dataType = getFieldType(colName);
     double numValuesPerEntry = getNumValuesPerEntry(colName);
     if (dataType == FieldSpec.DataType.STRUCT || dataType == FieldSpec.DataType.MAP
         || dataType == FieldSpec.DataType.LIST) {
       return 0; //TODO: implement this after the complex is supported
-    } else if (_overWrittenConfigs.getIndexConfig().getNoDictionaryColumns().contains(colName) && isSingleValueColumn(
-        colName)) { // no-dict column
+    } else if (_overWrittenConfigs.getIndexConfig().getNoDictionaryColumns().contains(colName)
+        && isSingleValueColumn(colName)) { // no-dict column
       return getColRawSizePerDoc(colName);
     } else {
       return (long) Math.ceil(getDictionaryEncodedForwardIndexSize(colName) * numValuesPerEntry);
@@ -694,9 +686,10 @@ public class InputManager {
       return 0;
     } else {
       if (dataType == FieldSpec.DataType.BYTES || dataType == FieldSpec.DataType.STRING) {
-        return (long) Math.ceil( getCardinality(colName) * (_dataTypeSizeMap.get(dataType) * getAverageDataLen(colName)));
+        return (long) Math
+            .ceil(getCardinality(colName) * (_dataTypeSizeMap.get(dataType) * getAverageDataLen(colName)));
       } else {
-        return (long) Math.ceil( getCardinality(colName) * (_dataTypeSizeMap.get(dataType)));
+        return (long) Math.ceil(getCardinality(colName) * (_dataTypeSizeMap.get(dataType)));
       }
     }
   }

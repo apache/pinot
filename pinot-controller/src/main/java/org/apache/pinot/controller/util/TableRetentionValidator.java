@@ -86,8 +86,7 @@ public class TableRetentionValidator {
     _durationInDaysThreshold = durationInDaysThreshold;
   }
 
-  public void run()
-      throws Exception {
+  public void run() throws Exception {
     // Get all resources in cluster
     List<String> resourcesInCluster = _helixAdmin.getResourcesInCluster(_clusterName);
 
@@ -180,8 +179,7 @@ public class TableRetentionValidator {
     }
   }
 
-  private TableConfig getTableConfig(String tableName)
-      throws Exception {
+  private TableConfig getTableConfig(String tableName) throws Exception {
     return TableConfigUtils.fromZNRecord(
         _propertyStore.get(ZKMetadataProvider.constructPropertyStorePathForResourceConfig(tableName), null, 0));
   }

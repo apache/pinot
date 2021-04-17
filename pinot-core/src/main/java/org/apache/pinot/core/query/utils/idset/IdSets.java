@@ -200,16 +200,14 @@ public class IdSets {
   /**
    * Deserializes the IdSet from a byte array.
    */
-  public static IdSet fromBytes(byte[] bytes)
-      throws IOException {
+  public static IdSet fromBytes(byte[] bytes) throws IOException {
     return fromByteBuffer(ByteBuffer.wrap(bytes));
   }
 
   /**
    * Deserializes the IdSet from a ByteBuffer.
    */
-  public static IdSet fromByteBuffer(ByteBuffer byteBuffer)
-      throws IOException {
+  public static IdSet fromByteBuffer(ByteBuffer byteBuffer) throws IOException {
     byte typeId = byteBuffer.get();
     switch (typeId) {
       case 0:
@@ -229,8 +227,7 @@ public class IdSets {
    * Deserializes the IdSet from a Base64 string.
    * <p>Use Base64 instead of Hex encoding for better compression.
    */
-  public static IdSet fromBase64String(String base64String)
-      throws IOException {
+  public static IdSet fromBase64String(String base64String) throws IOException {
     return fromBytes(Base64.getDecoder().decode(base64String));
   }
 }

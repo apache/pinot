@@ -49,8 +49,7 @@ public class MutableSegmentImplAggregateMetricsTest {
   private static final int NUM_ROWS = 10001;
 
   @Test
-  public void testAggregateMetrics()
-      throws Exception {
+  public void testAggregateMetrics() throws Exception {
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
         .addSingleValueDimension(DIMENSION_1, FieldSpec.DataType.INT)
         .addSingleValueDimension(DIMENSION_2, FieldSpec.DataType.STRING).addMetric(METRIC, FieldSpec.DataType.LONG)
@@ -64,10 +63,9 @@ public class MutableSegmentImplAggregateMetricsTest {
     MetricFieldSpec virtualMetricFieldSpec = new MetricFieldSpec("$virtualMetric", FieldSpec.DataType.INT);
     virtualMetricFieldSpec.setVirtualColumnProvider("provider.class");
     schema.addField(virtualMetricFieldSpec);
-    MutableSegmentImpl mutableSegmentImpl = MutableSegmentImplTestUtils
-        .createMutableSegmentImpl(schema, new HashSet<>(Arrays.asList(METRIC, METRIC_2)),
-            Collections.singleton(DIMENSION_2),
-            new HashSet<>(Arrays.asList(DIMENSION_1, DIMENSION_2, TIME_COLUMN1, TIME_COLUMN2)), true);
+    MutableSegmentImpl mutableSegmentImpl = MutableSegmentImplTestUtils.createMutableSegmentImpl(schema,
+        new HashSet<>(Arrays.asList(METRIC, METRIC_2)), Collections.singleton(DIMENSION_2),
+        new HashSet<>(Arrays.asList(DIMENSION_1, DIMENSION_2, TIME_COLUMN1, TIME_COLUMN2)), true);
     testAggregateMetrics(mutableSegmentImpl);
     mutableSegmentImpl.destroy();
 
@@ -80,16 +78,14 @@ public class MutableSegmentImplAggregateMetricsTest {
     // Add virtual columns, which should not be aggregated
     schema.addField(virtualDimensionFieldSpec);
     schema.addField(virtualMetricFieldSpec);
-    mutableSegmentImpl = MutableSegmentImplTestUtils
-        .createMutableSegmentImpl(schema, new HashSet<>(Arrays.asList(METRIC, METRIC_2)),
-            Collections.singleton(DIMENSION_2),
-            new HashSet<>(Arrays.asList(DIMENSION_1, DIMENSION_2, TIME_COLUMN1, TIME_COLUMN2)), true);
+    mutableSegmentImpl = MutableSegmentImplTestUtils.createMutableSegmentImpl(schema,
+        new HashSet<>(Arrays.asList(METRIC, METRIC_2)), Collections.singleton(DIMENSION_2),
+        new HashSet<>(Arrays.asList(DIMENSION_1, DIMENSION_2, TIME_COLUMN1, TIME_COLUMN2)), true);
     testAggregateMetrics(mutableSegmentImpl);
     mutableSegmentImpl.destroy();
   }
 
-  private void testAggregateMetrics(MutableSegmentImpl mutableSegmentImpl)
-      throws Exception {
+  private void testAggregateMetrics(MutableSegmentImpl mutableSegmentImpl) throws Exception {
     String[] stringValues = new String[10];
     Float[] floatValues = new Float[10];
     Random random = new Random();
@@ -139,7 +135,7 @@ public class MutableSegmentImplAggregateMetricsTest {
   }
 
   private String buildKey(GenericRow row) {
-    return row.getValue(DIMENSION_1) + KEY_SEPARATOR + row.getValue(DIMENSION_2) + KEY_SEPARATOR + row
-        .getValue(TIME_COLUMN1) + KEY_SEPARATOR + row.getValue(TIME_COLUMN2);
+    return row.getValue(DIMENSION_1) + KEY_SEPARATOR + row.getValue(DIMENSION_2) + KEY_SEPARATOR
+        + row.getValue(TIME_COLUMN1) + KEY_SEPARATOR + row.getValue(TIME_COLUMN2);
   }
 }

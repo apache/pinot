@@ -34,8 +34,7 @@ import org.testng.annotations.Test;
 public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
     // Start the Pinot cluster
@@ -118,22 +117,19 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
   }
 
   @Test
-  public void testTotalCount()
-      throws Exception {
+  public void testTotalCount() throws Exception {
     String query = "SELECT count(*) FROM " + getTableName();
     testQuery(query, Collections.singletonList(query));
   }
 
   @Test
-  public void testCountWithNullDescription()
-          throws Exception {
+  public void testCountWithNullDescription() throws Exception {
     String query = "SELECT count(*) FROM " + getTableName() + " where description IS NOT NULL";
     testQuery(query, Collections.singletonList(query));
   }
 
   @Test
-  public void testCountWithNullDescriptionAndSalary()
-          throws Exception {
+  public void testCountWithNullDescriptionAndSalary() throws Exception {
     String query = "SELECT count(*) FROM " + getTableName() + " where description IS NOT NULL AND salary IS NOT NULL";
     testQuery(query, Collections.singletonList(query));
   }

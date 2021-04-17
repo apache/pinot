@@ -40,8 +40,7 @@ public class SpeedTest {
   static MappedByteBuffer mmappedByteBuffer;
   static int[] readIndices;
 
-  static void init()
-      throws Exception {
+  static void init() throws Exception {
     // write a temp file
     FileOutputStream fout = new FileOutputStream(FILE_NAME);
     DataOutputStream out = new DataOutputStream(fout);
@@ -109,8 +108,7 @@ public class SpeedTest {
     return sum;
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     init();
 
     System.out.println(heap());

@@ -78,9 +78,8 @@ public class CalciteSqlParser {
   private static final Lex PINOT_LEX = Lex.MYSQL_ANSI;
 
   // BABEL is a very liberal conformance value that allows anything supported by any dialect
-  private static final SqlParser.Config PARSER_CONFIG =
-      SqlParser.configBuilder().setLex(PINOT_LEX).setConformance(SqlConformanceEnum.BABEL)
-          .setParserFactory(SqlBabelParserImpl.FACTORY).build();
+  private static final SqlParser.Config PARSER_CONFIG = SqlParser.configBuilder().setLex(PINOT_LEX)
+      .setConformance(SqlConformanceEnum.BABEL).setParserFactory(SqlBabelParserImpl.FACTORY).build();
 
   // To Keep the backward compatibility with 'OPTION' Functionality in PQL, which is used to
   // provide more hints for query processing.
@@ -95,8 +94,7 @@ public class CalciteSqlParser {
   private static final Pattern OPTIONS_REGEX_PATTEN =
       Pattern.compile("option\\s*\\(([^\\)]+)\\)", Pattern.CASE_INSENSITIVE);
 
-  public static PinotQuery compileToPinotQuery(String sql)
-      throws SqlCompilationException {
+  public static PinotQuery compileToPinotQuery(String sql) throws SqlCompilationException {
     // Extract OPTION statements from sql as Calcite Parser doesn't parse it.
     List<String> options = extractOptionsFromSql(sql);
     if (!options.isEmpty()) {
@@ -110,8 +108,7 @@ public class CalciteSqlParser {
     return pinotQuery;
   }
 
-  static void validate(Map<Identifier, Expression> aliasMap, PinotQuery pinotQuery)
-      throws SqlCompilationException {
+  static void validate(Map<Identifier, Expression> aliasMap, PinotQuery pinotQuery) throws SqlCompilationException {
     validateSelectionClause(aliasMap, pinotQuery);
     validateGroupByClause(pinotQuery);
   }
@@ -153,8 +150,7 @@ public class CalciteSqlParser {
     }
   }
 
-  private static void validateGroupByClause(PinotQuery pinotQuery)
-      throws SqlCompilationException {
+  private static void validateGroupByClause(PinotQuery pinotQuery) throws SqlCompilationException {
     if (pinotQuery.getGroupByList() == null) {
       return;
     }
@@ -250,8 +246,7 @@ public class CalciteSqlParser {
    *
    * @throws SqlParseException Throws parse exception if String is not a valid expression.
    */
-  public static Expression compileToExpression(String expression)
-      throws SqlParseException {
+  public static Expression compileToExpression(String expression) throws SqlParseException {
     SqlParser sqlParser = SqlParser.create(expression, PARSER_CONFIG);
     SqlNode sqlNode = sqlParser.parseExpression();
     return toExpression(sqlNode);
@@ -768,8 +763,8 @@ public class CalciteSqlParser {
     Expression functionExpression = RequestUtils.getFunctionExpression(functionName);
     for (SqlNode node : selectList) {
       Expression columnExpression = toExpression(node);
-      if (columnExpression.getType() == ExpressionType.IDENTIFIER && columnExpression.getIdentifier().getName()
-          .equals("*")) {
+      if (columnExpression.getType() == ExpressionType.IDENTIFIER
+          && columnExpression.getIdentifier().getName().equals("*")) {
         throw new SqlCompilationException(
             "Syntax error: Pinot currently does not support DISTINCT with *. Please specify each column name after DISTINCT keyword");
       } else if (columnExpression.getType() == ExpressionType.FUNCTION) {
@@ -928,8 +923,8 @@ public class CalciteSqlParser {
       throw new SqlCompilationException(
           "Expect 3 or 4 arguments for transform function: jsonExtractScalar(jsonFieldName, 'jsonPath', 'resultsType', ['defaultValue'])");
     }
-    if (!operands.get(1).isSetLiteral() || !operands.get(2).isSetLiteral() || (numOperands == 4 && !operands.get(3)
-        .isSetLiteral())) {
+    if (!operands.get(1).isSetLiteral() || !operands.get(2).isSetLiteral()
+        || (numOperands == 4 && !operands.get(3).isSetLiteral())) {
       throw new SqlCompilationException(
           "Expect the 2nd/3rd/4th argument of transform function: jsonExtractScalar(jsonFieldName, 'jsonPath', 'resultsType', ['defaultValue']) to be a single-quoted literal value.");
     }
@@ -1012,9 +1007,8 @@ public class CalciteSqlParser {
           Object result = invoker.invoke(arguments);
           return RequestUtils.getLiteralExpression(result);
         } catch (Exception e) {
-          throw new SqlCompilationException(new RuntimeException(
-              "Caught exception while invoking method: " + functionInfo.getMethod() + " with arguments: " + Arrays
-                  .toString(arguments), e));
+          throw new SqlCompilationException(new RuntimeException("Caught exception while invoking method: "
+              + functionInfo.getMethod() + " with arguments: " + Arrays.toString(arguments), e));
         }
       }
     }

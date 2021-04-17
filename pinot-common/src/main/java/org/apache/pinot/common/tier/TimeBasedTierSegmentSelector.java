@@ -54,21 +54,19 @@ public class TimeBasedTierSegmentSelector implements TierSegmentSelector {
 
     SegmentZKMetadata segmentZKMetadata;
     if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
-      segmentZKMetadata = ZKMetadataProvider
-          .getOfflineSegmentZKMetadata(_helixManager.getHelixPropertyStore(), tableNameWithType, segmentName);
+      segmentZKMetadata = ZKMetadataProvider.getOfflineSegmentZKMetadata(_helixManager.getHelixPropertyStore(),
+          tableNameWithType, segmentName);
     } else {
-      segmentZKMetadata = ZKMetadataProvider
-          .getRealtimeSegmentZKMetadata(_helixManager.getHelixPropertyStore(), tableNameWithType, segmentName);
+      segmentZKMetadata = ZKMetadataProvider.getRealtimeSegmentZKMetadata(_helixManager.getHelixPropertyStore(),
+          tableNameWithType, segmentName);
     }
-    Preconditions
-        .checkNotNull(segmentZKMetadata, "Could not find zk metadata for segment: {} of table: {}", segmentName,
-            tableNameWithType);
+    Preconditions.checkNotNull(segmentZKMetadata, "Could not find zk metadata for segment: {} of table: {}",
+        segmentName, tableNameWithType);
 
     // get segment end time to decide if segment gets selected
     long endTimeMs = segmentZKMetadata.getEndTimeMs();
-    Preconditions
-        .checkState(endTimeMs > 0, "Invalid endTimeMs: %s for segment: %s of table: %s", endTimeMs, segmentName,
-            tableNameWithType);
+    Preconditions.checkState(endTimeMs > 0, "Invalid endTimeMs: %s for segment: %s of table: %s", endTimeMs,
+        segmentName, tableNameWithType);
     long now = System.currentTimeMillis();
     return (now - endTimeMs) > _segmentAgeMillis;
   }

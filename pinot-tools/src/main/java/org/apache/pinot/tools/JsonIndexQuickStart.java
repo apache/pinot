@@ -32,8 +32,7 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
 
 public class JsonIndexQuickStart {
 
-  public void execute()
-      throws Exception {
+  public void execute() throws Exception {
     File quickstartTmpDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
     File baseDir = new File(quickstartTmpDir, "githubEvents");
     File dataDir = new File(quickstartTmpDir, "rawdata");
@@ -81,8 +80,7 @@ public class JsonIndexQuickStart {
     printStatus(Color.YELLOW, "***** Offline quickstart setup complete *****");
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     PluginManager.get().init();
     new JsonIndexQuickStart().execute();
   }

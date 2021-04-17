@@ -110,8 +110,7 @@ public class DistinctCountBitmapQueriesTest extends BaseQueriesTest {
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
 
     List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
@@ -142,8 +141,8 @@ public class DistinctCountBitmapQueriesTest extends BaseQueriesTest {
       record.putValue(BYTES_COLUMN, bytesValue);
       records.add(record);
     }
-    _expectedResults =
-        new int[]{_values.size(), longResultSet.size(), floatResultSet.size(), doubleResultSet.size(), stringResultSet.size(), _values.size()};
+    _expectedResults = new int[]{_values.size(), longResultSet.size(), floatResultSet.size(), doubleResultSet
+        .size(), stringResultSet.size(), _values.size()};
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
@@ -168,9 +167,8 @@ public class DistinctCountBitmapQueriesTest extends BaseQueriesTest {
     Operator operator = getOperatorForPqlQuery(query);
     assertTrue(operator instanceof AggregationOperator);
     IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, 6 * NUM_RECORDS,
-            NUM_RECORDS);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0,
+        6 * NUM_RECORDS, NUM_RECORDS);
     List<Object> aggregationResult = resultsBlock.getAggregationResult();
     assertNotNull(aggregationResult);
     for (int i = 0; i < 6; i++) {
@@ -183,9 +181,8 @@ public class DistinctCountBitmapQueriesTest extends BaseQueriesTest {
       expectedResults[i] = Integer.toString(_expectedResults[i]);
     }
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 4 * 6 * NUM_RECORDS, 4 * NUM_RECORDS,
-            expectedResults);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 4 * 6 * NUM_RECORDS,
+        4 * NUM_RECORDS, expectedResults);
   }
 
   @Test
@@ -197,9 +194,8 @@ public class DistinctCountBitmapQueriesTest extends BaseQueriesTest {
     Operator operator = getOperatorForPqlQuery(query);
     assertTrue(operator instanceof AggregationGroupByOperator);
     IntermediateResultsBlock resultsBlock = ((AggregationGroupByOperator) operator).nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, 6 * NUM_RECORDS,
-            NUM_RECORDS);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0,
+        6 * NUM_RECORDS, NUM_RECORDS);
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     assertNotNull(aggregationGroupByResult);
     int numGroups = 0;
@@ -241,8 +237,7 @@ public class DistinctCountBitmapQueriesTest extends BaseQueriesTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     _indexSegment.destroy();
     FileUtils.deleteDirectory(INDEX_DIR);
   }

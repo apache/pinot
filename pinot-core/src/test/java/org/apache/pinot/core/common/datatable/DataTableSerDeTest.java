@@ -65,7 +65,7 @@ public class DataTableSerDeTest {
   private static final double[][] DOUBLE_ARRAYS = new double[NUM_ROWS][];
   private static final String[][] STRING_ARRAYS = new String[NUM_ROWS][];
   private static final Map<String, String> EXPECTED_METADATA =
-      ImmutableMap.<String, String>builder().put(MetadataKey.NUM_DOCS_SCANNED.getName(), String.valueOf(20L))
+      ImmutableMap.<String, String> builder().put(MetadataKey.NUM_DOCS_SCANNED.getName(), String.valueOf(20L))
           .put(MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName(), String.valueOf(5L))
           .put(MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName(), String.valueOf(7L))
           .put(MetadataKey.NUM_SEGMENTS_QUERIED.getName(), String.valueOf(6))
@@ -75,23 +75,23 @@ public class DataTableSerDeTest {
           .put(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(), String.valueOf(100L))
           .put(MetadataKey.TOTAL_DOCS.getName(), String.valueOf(200L))
           .put(MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(), "true")
-          .put(MetadataKey.TIME_USED_MS.getName(), String.valueOf(20000L)).put(MetadataKey.TRACE_INFO.getName(),
-          "StudentException: Error finding students\n"
-              + "        at StudentManager.findStudents(StudentManager.java:13)\n"
-              + "        at StudentProgram.main(StudentProgram.java:9)\n"
-              + "Caused by: DAOException: Error querying students from database\n"
-              + "        at StudentDAO.list(StudentDAO.java:11)\n"
-              + "        at StudentManager.findStudents(StudentManager.java:11)\n" + "        ... 1 more\n"
-              + "Caused by: java.sql.SQLException: Syntax Error\n"
-              + "        at DatabaseUtils.executeQuery(DatabaseUtils.java:5)\n"
-              + "        at StudentDAO.list(StudentDAO.java:8)\n" + "        ... 2 more")
+          .put(MetadataKey.TIME_USED_MS.getName(), String.valueOf(20000L))
+          .put(MetadataKey.TRACE_INFO.getName(),
+              "StudentException: Error finding students\n"
+                  + "        at StudentManager.findStudents(StudentManager.java:13)\n"
+                  + "        at StudentProgram.main(StudentProgram.java:9)\n"
+                  + "Caused by: DAOException: Error querying students from database\n"
+                  + "        at StudentDAO.list(StudentDAO.java:11)\n"
+                  + "        at StudentManager.findStudents(StudentManager.java:11)\n" + "        ... 1 more\n"
+                  + "Caused by: java.sql.SQLException: Syntax Error\n"
+                  + "        at DatabaseUtils.executeQuery(DatabaseUtils.java:5)\n"
+                  + "        at StudentDAO.list(StudentDAO.java:8)\n" + "        ... 2 more")
           .put(MetadataKey.REQUEST_ID.getName(), String.valueOf(90181881818L))
           .put(MetadataKey.NUM_RESIZES.getName(), String.valueOf(900L))
           .put(MetadataKey.RESIZE_TIME_MS.getName(), String.valueOf(1919199L)).build();
 
   @Test
-  public void testException()
-      throws IOException {
+  public void testException() throws IOException {
     Exception exception = new UnsupportedOperationException("Caught exception.");
     ProcessingException processingException =
         QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, exception);
@@ -108,8 +108,7 @@ public class DataTableSerDeTest {
   }
 
   @Test
-  public void testEmptyStrings()
-      throws IOException {
+  public void testEmptyStrings() throws IOException {
     String emptyString = StringUtils.EMPTY;
     String[] emptyStringArray = {StringUtils.EMPTY};
 
@@ -135,8 +134,7 @@ public class DataTableSerDeTest {
   }
 
   @Test
-  public void testAllDataTypes()
-      throws IOException {
+  public void testAllDataTypes() throws IOException {
     DataSchema.ColumnDataType[] columnDataTypes = DataSchema.ColumnDataType.values();
     int numColumns = columnDataTypes.length;
     String[] columnNames = new String[numColumns];
@@ -156,8 +154,7 @@ public class DataTableSerDeTest {
   }
 
   @Test
-  public void testV2V3Compatibility()
-      throws IOException {
+  public void testV2V3Compatibility() throws IOException {
     DataSchema.ColumnDataType[] columnDataTypes = DataSchema.ColumnDataType.values();
     int numColumns = columnDataTypes.length;
     String[] columnNames = new String[numColumns];
@@ -173,8 +170,7 @@ public class DataTableSerDeTest {
     fillDataTableWithRandomData(dataTableBuilderV2WithDataOnly, columnDataTypes, numColumns);
 
     DataTable dataTableV2 = dataTableBuilderV2WithDataOnly.build(); // create a V2 data table
-    DataTable newDataTable =
-        DataTableFactory.getDataTable(dataTableV2.toBytes()); // Broker deserialize data table bytes as V2
+    DataTable newDataTable = DataTableFactory.getDataTable(dataTableV2.toBytes()); // Broker deserialize data table bytes as V2
     Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
     Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
     verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
@@ -240,8 +236,7 @@ public class DataTableSerDeTest {
   }
 
   @Test
-  public void testExecutionThreadCpuTimeNs()
-      throws IOException {
+  public void testExecutionThreadCpuTimeNs() throws IOException {
     DataSchema.ColumnDataType[] columnDataTypes = DataSchema.ColumnDataType.values();
     int numColumns = columnDataTypes.length;
     String[] columnNames = new String[numColumns];
@@ -266,8 +261,7 @@ public class DataTableSerDeTest {
   }
 
   @Test
-  public void testDataTableMetadataBytesLayout()
-      throws IOException {
+  public void testDataTableMetadataBytesLayout() throws IOException {
     DataSchema.ColumnDataType[] columnDataTypes = DataSchema.ColumnDataType.values();
     int numColumns = columnDataTypes.length;
     String[] columnNames = new String[numColumns];
@@ -338,8 +332,7 @@ public class DataTableSerDeTest {
   }
 
   private void fillDataTableWithRandomData(DataTableBuilder dataTableBuilder,
-      DataSchema.ColumnDataType[] columnDataTypes, int numColumns)
-      throws IOException {
+      DataSchema.ColumnDataType[] columnDataTypes, int numColumns) throws IOException {
     for (int rowId = 0; rowId < NUM_ROWS; rowId++) {
       dataTableBuilder.startRow();
       for (int colId = 0; colId < numColumns; colId++) {
@@ -453,8 +446,8 @@ public class DataTableSerDeTest {
             Assert.assertTrue(Arrays.equals(newDataTable.getIntArray(rowId, colId), INT_ARRAYS[rowId]), ERROR_MESSAGE);
             break;
           case LONG_ARRAY:
-            Assert
-                .assertTrue(Arrays.equals(newDataTable.getLongArray(rowId, colId), LONG_ARRAYS[rowId]), ERROR_MESSAGE);
+            Assert.assertTrue(Arrays.equals(newDataTable.getLongArray(rowId, colId), LONG_ARRAYS[rowId]),
+                ERROR_MESSAGE);
             break;
           case FLOAT_ARRAY:
             Assert.assertTrue(Arrays.equals(newDataTable.getFloatArray(rowId, colId), FLOAT_ARRAYS[rowId]),

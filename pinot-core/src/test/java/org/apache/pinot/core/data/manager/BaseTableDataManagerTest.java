@@ -74,8 +74,7 @@ public class BaseTableDataManagerTest {
   private volatile int _hi;
 
   @BeforeSuite
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     _tmpDir = File.createTempFile("OfflineTableDataManagerTest", null);
     _tmpDir.deleteOnExit();
   }
@@ -99,8 +98,7 @@ public class BaseTableDataManagerTest {
     _masterThread = null;
   }
 
-  private TableDataManager makeTestableManager()
-      throws Exception {
+  private TableDataManager makeTestableManager() throws Exception {
     TableDataManager tableDataManager = new OfflineTableDataManager();
     TableDataManagerConfig config;
     {
@@ -108,10 +106,8 @@ public class BaseTableDataManagerTest {
       when(config.getTableName()).thenReturn(TABLE_NAME);
       when(config.getDataDir()).thenReturn(_tmpDir.getAbsolutePath());
     }
-    tableDataManager
-        .init(config, "dummyInstance", mock(ZkHelixPropertyStore.class),
-            new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()),
-            mock(HelixManager.class));
+    tableDataManager.init(config, "dummyInstance", mock(ZkHelixPropertyStore.class),
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class));
     tableDataManager.start();
     Field segsMapField = BaseTableDataManager.class.getDeclaredField("_segmentDataManagerMap");
     segsMapField.setAccessible(true);
@@ -134,8 +130,7 @@ public class BaseTableDataManagerTest {
   }
 
   @Test
-  public void basicTest()
-      throws Exception {
+  public void basicTest() throws Exception {
     TableDataManager tableDataManager = makeTestableManager();
     Assert.assertEquals(tableDataManager.getNumSegments(), 0);
     final String segmentName = "TestSegment";
@@ -218,10 +213,9 @@ public class BaseTableDataManagerTest {
    */
 
   @Test
-  public void testReplace()
-      throws Exception {
+  public void testReplace() throws Exception {
     _lo = 0;
-    _hi = 30;   // Total number of segments we have in the server.
+    _hi = 30; // Total number of segments we have in the server.
     final int numQueryThreads = 10;
     final int runTimeSec = 20;
     // With the current parameters, 3k ops take about 15 seconds, create about 90 segments and drop about half of them
@@ -236,9 +230,9 @@ public class BaseTableDataManagerTest {
       _allSegManagers.add(_internalSegMap.get(segName));
     }
 
-    runStorageServer(numQueryThreads, runTimeSec, tableDataManager);  // replaces segments while online
+    runStorageServer(numQueryThreads, runTimeSec, tableDataManager); // replaces segments while online
 
-//    System.out.println("Nops = " + _numQueries + ",nDrops=" + _nDestroys + ",nCreates=" + _allSegments.size());
+    //    System.out.println("Nops = " + _numQueries + ",nDrops=" + _nDestroys + ",nCreates=" + _allSegments.size());
     tableDataManager.shutDown();
   }
 

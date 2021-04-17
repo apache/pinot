@@ -32,8 +32,7 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
 
 public class JoinQuickStart {
 
-  private void execute()
-      throws Exception {
+  private void execute() throws Exception {
     File quickstartTmpDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
 
     // Baseball stat table
@@ -72,8 +71,7 @@ public class JoinQuickStart {
 
     File tempDir = new File(quickstartTmpDir, "tmp");
     FileUtils.forceMkdir(tempDir);
-    QuickstartRunner runner =
-        new QuickstartRunner(Lists.newArrayList(request, dimTableRequest), 1, 1, 3, tempDir);
+    QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request, dimTableRequest), 1, 1, 3, tempDir);
 
     printStatus(Quickstart.Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");
     runner.startAll();
@@ -118,8 +116,7 @@ public class JoinQuickStart {
         "You can always go to http://localhost:9000 to play around in the query console");
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     PluginManager.get().init();
     new JoinQuickStart().execute();
   }

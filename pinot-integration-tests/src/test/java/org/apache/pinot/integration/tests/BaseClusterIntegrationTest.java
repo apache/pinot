@@ -264,8 +264,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   /**
    * Creates a new schema.
    */
-  protected Schema createSchema()
-      throws IOException {
+  protected Schema createSchema() throws IOException {
     URL resourceUrl = BaseClusterIntegrationTest.class.getClassLoader().getResource(getSchemaFileName());
     Assert.assertNotNull(resourceUrl);
     return Schema.fromFile(new File(resourceUrl.getFile()));
@@ -310,42 +309,43 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     boolean useLlc = useLlc();
     if (useLlc) {
       // LLC
-      streamConfigMap
-          .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-              StreamConfig.ConsumerType.LOWLEVEL.toString());
-      streamConfigMap.put(KafkaStreamConfigProperties
-              .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST),
-          KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
+      streamConfigMap.put(
+          StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+          StreamConfig.ConsumerType.LOWLEVEL.toString());
+      streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(
+          KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST), KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
       if (useKafkaTransaction()) {
-        streamConfigMap.put(KafkaStreamConfigProperties
+        streamConfigMap.put(
+            KafkaStreamConfigProperties
                 .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL),
             KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_COMMITTED);
       }
     } else {
       // HLC
-      streamConfigMap
-          .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-              StreamConfig.ConsumerType.HIGHLEVEL.toString());
-      streamConfigMap.put(KafkaStreamConfigProperties
+      streamConfigMap.put(
+          StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+          StreamConfig.ConsumerType.HIGHLEVEL.toString());
+      streamConfigMap.put(
+          KafkaStreamConfigProperties
               .constructStreamProperty(KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_ZK_CONNECTION_STRING),
           KafkaStarterUtils.DEFAULT_ZK_STR);
-      streamConfigMap.put(KafkaStreamConfigProperties
+      streamConfigMap.put(
+          KafkaStreamConfigProperties
               .constructStreamProperty(KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_BOOTSTRAP_SERVER),
           KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
     }
-    streamConfigMap.put(StreamConfigProperties
-            .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
-        getStreamConsumerFactoryClassName());
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
-            getKafkaTopic());
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
-            AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
-    streamConfigMap
-        .put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, Integer.toString(getRealtimeSegmentFlushSize()));
-    streamConfigMap.put(StreamConfigProperties
-        .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "smallest");
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
+        StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), getStreamConsumerFactoryClassName());
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
+        getKafkaTopic());
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
+        AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
+    streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS,
+        Integer.toString(getRealtimeSegmentFlushSize()));
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
+        StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "smallest");
     return streamConfigMap;
   }
 
@@ -373,11 +373,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Murmur", numPartitions));
 
     return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName()).setSchemaName(getSchemaName())
-        .setTimeColumnName(getTimeColumnName())
-        .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
-        .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setLLC(useLlc())
-        .setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled())
+        .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
+        .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
+        .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
+        .setLLC(useLlc()).setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled())
         .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
         .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
@@ -426,8 +425,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   /**
    * Sets up the H2 connection to a table with pre-loaded data.
    */
-  protected void setUpH2Connection(List<File> avroFiles)
-      throws Exception {
+  protected void setUpH2Connection(List<File> avroFiles) throws Exception {
     Assert.assertNull(_h2Connection);
     Class.forName("org.h2.Driver");
     _h2Connection = DriverManager.getConnection("jdbc:h2:mem:");
@@ -450,8 +448,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @return List of files unpacked.
    * @throws Exception
    */
-  protected List<File> unpackAvroData(File outputDir)
-      throws Exception {
+  protected List<File> unpackAvroData(File outputDir) throws Exception {
     URL resourceUrl = BaseClusterIntegrationTest.class.getClassLoader().getResource(getAvroTarFileName());
     Assert.assertNotNull(resourceUrl);
     return TarGzCompressionUtils.untar(new File(resourceUrl.getFile()), outputDir);
@@ -462,14 +459,12 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    *
    * @param avroFiles List of Avro files
    */
-  protected void pushAvroIntoKafka(List<File> avroFiles)
-      throws Exception {
+  protected void pushAvroIntoKafka(List<File> avroFiles) throws Exception {
     ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles, "localhost:" + getBaseKafkaPort(), getKafkaTopic(),
         getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
   }
 
-  protected List<File> getAllAvroFiles()
-      throws Exception {
+  protected List<File> getAllAvroFiles() throws Exception {
     // Unpack the Avro files
     int numSegments = unpackAvroData(_tempDir).size();
 
@@ -502,8 +497,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected void startKafka() {
     _kafkaStarters = KafkaStarterUtils.startServers(getNumKafkaBrokers(), getBaseKafkaPort(), getKafkaZKAddress(),
         KafkaStarterUtils.getDefaultKafkaConfiguration());
-    _kafkaStarters.get(0)
-        .createTopic(getKafkaTopic(), KafkaStarterUtils.getTopicCreationProps(getNumKafkaPartitions()));
+    _kafkaStarters.get(0).createTopic(getKafkaTopic(),
+        KafkaStarterUtils.getTopicCreationProps(getNumKafkaPartitions()));
   }
 
   protected void stopKafka() {
@@ -518,8 +513,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @return Current count start result
    * @throws Exception
    */
-  protected long getCurrentCountStarResult()
-      throws Exception {
+  protected long getCurrentCountStarResult() throws Exception {
     return getPinotConnection().execute(new Request("pql", "SELECT COUNT(*) FROM " + getTableName())).getResultSet(0)
         .getLong(0);
   }
@@ -530,8 +524,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @param timeoutMs Timeout in milliseconds
    * @throws Exception
    */
-  protected void waitForAllDocsLoaded(long timeoutMs)
-      throws Exception {
+  protected void waitForAllDocsLoaded(long timeoutMs) throws Exception {
     waitForDocsLoaded(timeoutMs, true);
   }
 
@@ -557,10 +550,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @param sqlQueries H2 query
    * @throws Exception
    */
-  protected void testQuery(String pqlQuery, @Nullable List<String> sqlQueries)
-      throws Exception {
-    ClusterIntegrationTestUtils
-        .testPqlQuery(pqlQuery, _brokerBaseApiUrl, getPinotConnection(), sqlQueries, getH2Connection());
+  protected void testQuery(String pqlQuery, @Nullable List<String> sqlQueries) throws Exception {
+    ClusterIntegrationTestUtils.testPqlQuery(pqlQuery, _brokerBaseApiUrl, getPinotConnection(), sqlQueries,
+        getH2Connection());
   }
 
   /**
@@ -570,9 +562,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @param sqlQueries H2 query
    * @throws Exception
    */
-  protected void testSqlQuery(String pinotQuery, @Nullable List<String> sqlQueries)
-      throws Exception {
-    ClusterIntegrationTestUtils
-        .testSqlQuery(pinotQuery, _brokerBaseApiUrl, getPinotConnection(), sqlQueries, getH2Connection());
+  protected void testSqlQuery(String pinotQuery, @Nullable List<String> sqlQueries) throws Exception {
+    ClusterIntegrationTestUtils.testSqlQuery(pinotQuery, _brokerBaseApiUrl, getPinotConnection(), sqlQueries,
+        getH2Connection());
   }
 }

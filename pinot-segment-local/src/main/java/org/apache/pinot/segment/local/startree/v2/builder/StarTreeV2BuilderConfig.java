@@ -185,14 +185,14 @@ public class StarTreeV2BuilderConfig {
     }
     StarTreeV2BuilderConfig that = (StarTreeV2BuilderConfig) o;
     return _maxLeafRecords == that._maxLeafRecords && Objects.equals(_dimensionsSplitOrder, that._dimensionsSplitOrder)
-        && Objects.equals(_skipStarNodeCreationForDimensions, that._skipStarNodeCreationForDimensions) && Objects
-        .equals(_functionColumnPairs, that._functionColumnPairs);
+        && Objects.equals(_skipStarNodeCreationForDimensions, that._skipStarNodeCreationForDimensions)
+        && Objects.equals(_functionColumnPairs, that._functionColumnPairs);
   }
 
   @Override
   public int hashCode() {
-    return Objects
-        .hash(_dimensionsSplitOrder, _skipStarNodeCreationForDimensions, _functionColumnPairs, _maxLeafRecords);
+    return Objects.hash(_dimensionsSplitOrder, _skipStarNodeCreationForDimensions, _functionColumnPairs,
+        _maxLeafRecords);
   }
 
   @Override

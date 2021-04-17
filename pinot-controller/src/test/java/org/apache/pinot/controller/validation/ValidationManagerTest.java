@@ -68,7 +68,8 @@ public class ValidationManagerTest {
   public void testPushTimePersistence() {
     SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
 
-    ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_TEST_TABLE_NAME, segmentMetadata, "downloadUrl");
+    ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_TEST_TABLE_NAME, segmentMetadata,
+        "downloadUrl");
     OfflineSegmentZKMetadata offlineSegmentZKMetadata =
         ControllerTestUtils.getHelixResourceManager().getOfflineSegmentZKMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
     long pushTime = offlineSegmentZKMetadata.getPushTime();
@@ -81,14 +82,13 @@ public class ValidationManagerTest {
     // NOTE: In order to send the refresh message, the segment need to be in the ExternalView
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(TEST_TABLE_NAME);
     TestUtils.waitForCondition(aVoid -> {
-      ExternalView externalView = ControllerTestUtils
-          .getHelixAdmin().getResourceExternalView(ControllerTestUtils.getHelixClusterName(), offlineTableName);
+      ExternalView externalView = ControllerTestUtils.getHelixAdmin()
+          .getResourceExternalView(ControllerTestUtils.getHelixClusterName(), offlineTableName);
       return externalView != null && externalView.getPartitionSet().contains(TEST_SEGMENT_NAME);
     }, 30_000L, "Failed to find the segment in the ExternalView");
     Mockito.when(segmentMetadata.getCrc()).thenReturn(Long.toString(System.nanoTime()));
-    ControllerTestUtils
-        .getHelixResourceManager().refreshSegment(offlineTableName, segmentMetadata, offlineSegmentZKMetadata, "downloadUrl",
-        null);
+    ControllerTestUtils.getHelixResourceManager().refreshSegment(offlineTableName, segmentMetadata,
+        offlineSegmentZKMetadata, "downloadUrl", null);
 
     offlineSegmentZKMetadata =
         ControllerTestUtils.getHelixResourceManager().getOfflineSegmentZKMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
@@ -109,15 +109,15 @@ public class ValidationManagerTest {
     String segmentName4 = new HLCSegmentName(group2, "0", "3").getSegmentName();
 
     List<RealtimeSegmentZKMetadata> segmentZKMetadataList = new ArrayList<>();
-    segmentZKMetadataList.add(
-        SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName1, 10));
-    segmentZKMetadataList.add(
-        SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName2, 20));
-    segmentZKMetadataList.add(
-        SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName3, 30));
+    segmentZKMetadataList
+        .add(SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName1, 10));
+    segmentZKMetadataList
+        .add(SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName2, 20));
+    segmentZKMetadataList
+        .add(SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName3, 30));
     // This should get ignored in the count as it belongs to a different group id
-    segmentZKMetadataList.add(
-        SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName4, 20));
+    segmentZKMetadataList
+        .add(SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName4, 20));
 
     assertEquals(RealtimeSegmentValidationManager.computeRealtimeTotalDocumentInSegments(segmentZKMetadataList, true),
         60);
@@ -125,8 +125,8 @@ public class ValidationManagerTest {
     // Now add some low level segment names
     String segmentName5 = new LLCSegmentName(TEST_TABLE_NAME, 1, 0, 1000).getSegmentName();
     String segmentName6 = new LLCSegmentName(TEST_TABLE_NAME, 2, 27, 10000).getSegmentName();
-    segmentZKMetadataList.add(
-        SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName5, 10));
+    segmentZKMetadataList
+        .add(SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName5, 10));
     segmentZKMetadataList.add(SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName6, 5));
 
     // Only the LLC segments should get counted.

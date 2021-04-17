@@ -50,8 +50,9 @@ public class PercentileTDigestMVAggregationFunction extends PercentileTDigestAgg
 
   @Override
   public String getResultColumnName() {
-    return _version == 0 ? AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + (int) _percentile + "mv("
-        + _expression + ")"
+    return _version == 0
+        ? AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + (int) _percentile + "mv(" + _expression
+            + ")"
         : AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + "mv(" + _expression + ", " + _percentile
             + ")";
   }

@@ -45,7 +45,8 @@ public class HelixHelperTest {
     idealState.setStateModelDefRef("OnlineOffline");
     idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
     idealState.setReplicas("0");
-    ControllerTestUtils.getHelixAdmin().addResource(ControllerTestUtils.getHelixClusterName(), RESOURCE_NAME, idealState);
+    ControllerTestUtils.getHelixAdmin().addResource(ControllerTestUtils.getHelixClusterName(), RESOURCE_NAME,
+        idealState);
   }
 
   /**
@@ -55,18 +56,20 @@ public class HelixHelperTest {
   public void testWriteLargeIdealState() {
     final int numSegments = 20000;
 
-    HelixHelper.updateIdealState(ControllerTestUtils.getHelixManager(), RESOURCE_NAME, new Function<IdealState, IdealState>() {
-      @Override
-      public IdealState apply(@Nullable IdealState idealState) {
-        Assert.assertNotNull(idealState);
-        for (int i = 0; i < numSegments; i++) {
-          idealState.setPartitionState("segment_" + i, INSTANCE_NAME, "ONLINE");
-        }
-        return idealState;
-      }
-    }, RetryPolicies.noDelayRetryPolicy(1));
+    HelixHelper.updateIdealState(ControllerTestUtils.getHelixManager(), RESOURCE_NAME,
+        new Function<IdealState, IdealState>() {
+          @Override
+          public IdealState apply(@Nullable IdealState idealState) {
+            Assert.assertNotNull(idealState);
+            for (int i = 0; i < numSegments; i++) {
+              idealState.setPartitionState("segment_" + i, INSTANCE_NAME, "ONLINE");
+            }
+            return idealState;
+          }
+        }, RetryPolicies.noDelayRetryPolicy(1));
 
-    IdealState resourceIdealState = ControllerTestUtils.getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(), RESOURCE_NAME);
+    IdealState resourceIdealState = ControllerTestUtils.getHelixAdmin()
+        .getResourceIdealState(ControllerTestUtils.getHelixClusterName(), RESOURCE_NAME);
     for (int i = 0; i < numSegments; i++) {
       Assert.assertEquals(resourceIdealState.getInstanceStateMap("segment_" + i).get(INSTANCE_NAME), "ONLINE");
     }
@@ -89,15 +92,16 @@ public class HelixHelperTest {
   }
 
   private void aMethodWhichThrowsExceptionInUpdater(String testSegment) {
-    HelixHelper.updateIdealState(ControllerTestUtils.getHelixManager(), RESOURCE_NAME, new Function<IdealState, IdealState>() {
-      @Override
-      public IdealState apply(@Nullable IdealState idealState) {
-        if (testSegment == null) {
-          throw new HelixHelper.PermanentUpdaterException("Throwing test exception for " + testSegment);
-        }
-        return idealState;
-      }
-    }, RetryPolicies.noDelayRetryPolicy(5));
+    HelixHelper.updateIdealState(ControllerTestUtils.getHelixManager(), RESOURCE_NAME,
+        new Function<IdealState, IdealState>() {
+          @Override
+          public IdealState apply(@Nullable IdealState idealState) {
+            if (testSegment == null) {
+              throw new HelixHelper.PermanentUpdaterException("Throwing test exception for " + testSegment);
+            }
+            return idealState;
+          }
+        }, RetryPolicies.noDelayRetryPolicy(5));
   }
 
   @AfterClass

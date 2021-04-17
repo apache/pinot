@@ -34,13 +34,15 @@ public class VerifyClusterStateCommand extends AbstractBaseAdminCommand implemen
   @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = "PinotCluster";
 
-  @Option(name = "-tableName", required = false, metaVar = "<String>", usage = "Table name to check the state (e.g. myTable_OFFLINE).")
+  @Option(name = "-tableName", required = false, metaVar = "<String>",
+      usage = "Table name to check the state (e.g. myTable_OFFLINE).")
   private String _tableName;
 
   @Option(name = "-timeoutSec", required = false, metaVar = "<long>", usage = "Maximum timeout in second.")
   private long _timeoutSec = 300L;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -49,8 +51,7 @@ public class VerifyClusterStateCommand extends AbstractBaseAdminCommand implemen
   }
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
     if (_timeoutSec <= 0) {
       String message = "Error: timeoutMs must be greater than 0";
       LOGGER.error(message);

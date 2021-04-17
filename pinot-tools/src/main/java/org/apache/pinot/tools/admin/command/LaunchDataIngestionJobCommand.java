@@ -41,13 +41,16 @@ import org.slf4j.LoggerFactory;
  */
 public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(LaunchDataIngestionJobCommand.class);
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
   @Option(name = "-jobSpecFile", required = true, metaVar = "<string>", usage = "Ingestion job spec file")
   private String _jobSpecFile;
-  @Option(name = "-values", required = false, metaVar = "<template context>", handler = StringArrayOptionHandler.class, usage = "Context values set to the job spec template")
+  @Option(name = "-values", required = false, metaVar = "<template context>", handler = StringArrayOptionHandler.class,
+      usage = "Context values set to the job spec template")
   private List<String> _values;
-  @Option(name = "-propertyFile", required = false, metaVar = "<template context file>", usage = "A property file contains context values to set the job spec template")
+  @Option(name = "-propertyFile", required = false, metaVar = "<template context file>",
+      usage = "A property file contains context values to set the job spec template")
   private String _propertyFile;
 
   public static void main(String[] args) {
@@ -109,8 +112,7 @@ public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand impl
   }
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
     String jobSpecFilePath = _jobSpecFile;
     String propertyFilePath = _propertyFile;
     SegmentGenerationJobSpec spec;

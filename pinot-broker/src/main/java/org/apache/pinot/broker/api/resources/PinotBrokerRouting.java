@@ -44,7 +44,8 @@ public class PinotBrokerRouting {
   @Produces(MediaType.TEXT_PLAIN)
   @Path("/routing/{tableName}")
   @ApiOperation(value = "Build/rebuild the routing for a table", notes = "Build/rebuild the routing for a table")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500,
+      message = "Internal server error")})
   public String buildRouting(
       @ApiParam(value = "Table name (with type)") @PathParam("tableName") String tableNameWithType) {
     _routingManager.buildRouting(tableNameWithType);
@@ -55,7 +56,8 @@ public class PinotBrokerRouting {
   @Produces(MediaType.TEXT_PLAIN)
   @Path("/routing/refresh/{tableName}/{segmentName}")
   @ApiOperation(value = "Refresh the routing for a segment", notes = "Refresh the routing for a segment")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500,
+      message = "Internal server error")})
   public String refreshRouting(
       @ApiParam(value = "Table name (with type)") @PathParam("tableName") String tableNameWithType,
       @ApiParam(value = "Segment name") @PathParam("segmentName") String segmentName) {
@@ -67,7 +69,8 @@ public class PinotBrokerRouting {
   @Produces(MediaType.TEXT_PLAIN)
   @Path("/routing/{tableName}")
   @ApiOperation(value = "Remove the routing for a table", notes = "Remove the routing for a table")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500,
+      message = "Internal server error")})
   public String removeRouting(
       @ApiParam(value = "Table name (with type)") @PathParam("tableName") String tableNameWithType) {
     _routingManager.removeRouting(tableNameWithType);

@@ -133,8 +133,8 @@ public class StarTreeQueryGenerator {
     Object value1 = valueArray.get(RANDOM.nextInt(valueArray.size()));
     Object value2 = valueArray.get(RANDOM.nextInt(valueArray.size()));
 
-    Preconditions.checkState((value1 instanceof String && value2 instanceof String) || (value1 instanceof Number
-        && value2 instanceof Number));
+    Preconditions.checkState((value1 instanceof String && value2 instanceof String)
+        || (value1 instanceof Number && value2 instanceof Number));
 
     if (value1 instanceof String) {
       if (((String) value1).compareTo((String) value2) < 0) {

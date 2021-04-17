@@ -39,7 +39,8 @@ import org.slf4j.LoggerFactory;
  */
 public class StartMinionCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartMinionCommand.class);
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
   @Option(name = "-minionHost", required = false, metaVar = "<String>", usage = "Host name for minion.")
   private String _minionHost;
@@ -49,7 +50,8 @@ public class StartMinionCommand extends AbstractBaseAdminCommand implements Comm
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
   @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = "PinotCluster";
-  @Option(name = "-configFileName", required = false, metaVar = "<Config File Name>", usage = "Minion Starter Config file.", forbids = {"-minionHost", "-minionPort"})
+  @Option(name = "-configFileName", required = false, metaVar = "<Config File Name>",
+      usage = "Minion Starter Config file.", forbids = {"-minionHost", "-minionPort"})
   private String _configFileName;
 
   private Map<String, Object> _configOverrides = new HashMap<>();
@@ -87,8 +89,7 @@ public class StartMinionCommand extends AbstractBaseAdminCommand implements Comm
   }
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
     try {
       LOGGER.info("Executing command: " + toString());
       StartServiceManagerCommand startServiceManagerCommand =
@@ -105,8 +106,7 @@ public class StartMinionCommand extends AbstractBaseAdminCommand implements Comm
     }
   }
 
-  private Map<String, Object> getMinionConf()
-      throws ConfigurationException, SocketException, UnknownHostException {
+  private Map<String, Object> getMinionConf() throws ConfigurationException, SocketException, UnknownHostException {
     Map<String, Object> properties = new HashMap<>();
     if (_configFileName != null) {
       properties.putAll(PinotConfigUtils.readConfigFromFile(_configFileName));

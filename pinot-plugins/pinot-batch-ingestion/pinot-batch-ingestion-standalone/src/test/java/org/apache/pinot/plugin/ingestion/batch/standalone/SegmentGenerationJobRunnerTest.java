@@ -41,8 +41,9 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+
 public class SegmentGenerationJobRunnerTest {
-  
+
   @Test
   public void testSegmentGeneration() throws Exception {
     // TODO use common resource definitions & code shared with Hadoop unit test.
@@ -51,12 +52,12 @@ public class SegmentGenerationJobRunnerTest {
     File testDir = Files.createTempDirectory("testSegmentGeneration-").toFile();
     testDir.delete();
     testDir.mkdirs();
-    
+
     File inputDir = new File(testDir, "input");
     inputDir.mkdirs();
     File inputFile = new File(inputDir, "input.csv");
     FileUtils.writeLines(inputFile, Lists.newArrayList("col1,col2", "value1,1", "value2,2"));
-    
+
     // Create an output directory, with two empty files in it. One we'll overwrite,
     // and one we'll leave alone.
     final String outputFilename = "myTable_OFFLINE_0.tar.gz";
@@ -64,57 +65,51 @@ public class SegmentGenerationJobRunnerTest {
     File outputDir = new File(testDir, "output");
     FileUtils.touch(new File(outputDir, outputFilename));
     FileUtils.touch(new File(outputDir, existingFilename));
-    
+
     // Set up schema file.
     final String schemaName = "mySchema";
     File schemaFile = new File(testDir, "schema");
-    Schema schema = new SchemaBuilder()
-      .setSchemaName(schemaName)
-      .addSingleValueDimension("col1", DataType.STRING)
-      .addMetric("col2", DataType.INT)
-      .build();
+    Schema schema = new SchemaBuilder().setSchemaName(schemaName).addSingleValueDimension("col1", DataType.STRING)
+        .addMetric("col2", DataType.INT).build();
     FileUtils.write(schemaFile, schema.toPrettyJsonString(), StandardCharsets.UTF_8);
-    
+
     // Set up table config file.
     File tableConfigFile = new File(testDir, "tableConfig");
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-      .setTableName("myTable")
-      .setSchemaName(schemaName)
-      .setNumReplicas(1)
-      .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable")
+        .setSchemaName(schemaName).setNumReplicas(1).build();
     FileUtils.write(tableConfigFile, tableConfig.toJsonString(), StandardCharsets.UTF_8);
-    
+
     SegmentGenerationJobSpec jobSpec = new SegmentGenerationJobSpec();
     jobSpec.setJobType("SegmentCreation");
     jobSpec.setInputDirURI(inputDir.toURI().toString());
     jobSpec.setOutputDirURI(outputDir.toURI().toString());
     jobSpec.setOverwriteOutput(false);
-    
+
     RecordReaderSpec recordReaderSpec = new RecordReaderSpec();
     recordReaderSpec.setDataFormat("csv");
     recordReaderSpec.setClassName(CSVRecordReader.class.getName());
     recordReaderSpec.setConfigClassName(CSVRecordReaderConfig.class.getName());
     jobSpec.setRecordReaderSpec(recordReaderSpec);
-    
+
     TableSpec tableSpec = new TableSpec();
     tableSpec.setTableName("myTable");
     tableSpec.setSchemaURI(schemaFile.toURI().toString());
     tableSpec.setTableConfigURI(tableConfigFile.toURI().toString());
     jobSpec.setTableSpec(tableSpec);
-    
+
     ExecutionFrameworkSpec efSpec = new ExecutionFrameworkSpec();
     efSpec.setName("standalone");
     efSpec.setSegmentGenerationJobRunnerClassName(SegmentGenerationJobRunner.class.getName());
     jobSpec.setExecutionFrameworkSpec(efSpec);
-    
+
     PinotFSSpec pfsSpec = new PinotFSSpec();
     pfsSpec.setScheme("file");
     pfsSpec.setClassName(LocalPinotFS.class.getName());
     jobSpec.setPinotFSSpecs(Collections.singletonList(pfsSpec));
-    
+
     SegmentGenerationJobRunner jobRunner = new SegmentGenerationJobRunner(jobSpec);
     jobRunner.run();
-    
+
     // The output directory should still have the original file in it.
     File oldSegmentFile = new File(outputDir, existingFilename);
     Assert.assertTrue(oldSegmentFile.exists());
@@ -124,7 +119,7 @@ public class SegmentGenerationJobRunnerTest {
     Assert.assertTrue(newSegmentFile.exists());
     Assert.assertTrue(newSegmentFile.isFile());
     Assert.assertTrue(newSegmentFile.length() == 0);
-    
+
     // Now run again, but this time with overwriting of output files, and confirm we got a valid segment file.
     jobSpec.setOverwriteOutput(true);
     jobRunner = new SegmentGenerationJobRunner(jobSpec);
@@ -138,5 +133,5 @@ public class SegmentGenerationJobRunnerTest {
     Assert.assertTrue(newSegmentFile.length() > 0);
 
     // FUTURE - validate contents of file?
-    }
+  }
 }

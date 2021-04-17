@@ -33,7 +33,10 @@ public class PartitionFunctionFactory {
   }
 
   public enum PartitionFunctionType {
-    Modulo, Murmur, HashCode, ByteArray;
+    Modulo,
+    Murmur,
+    HashCode,
+    ByteArray;
     // Add more functions here.
 
     private static final Map<String, PartitionFunctionType> VALUE_MAP = new HashMap<>();

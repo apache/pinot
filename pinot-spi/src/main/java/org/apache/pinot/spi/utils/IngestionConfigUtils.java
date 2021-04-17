@@ -168,8 +168,8 @@ public final class IngestionConfigUtils {
    * Extracts the segment name generator type from the batchConfigMap, or returns default value if not found
    */
   public static String getSegmentNameGeneratorType(Map<String, String> batchConfigMap) {
-    return batchConfigMap
-        .getOrDefault(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE, DEFAULT_SEGMENT_NAME_GENERATOR_TYPE);
+    return batchConfigMap.getOrDefault(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE,
+        DEFAULT_SEGMENT_NAME_GENERATOR_TYPE);
   }
 
   /**

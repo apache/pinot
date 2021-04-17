@@ -65,7 +65,8 @@ public abstract class PinotDataBuffer implements Closeable {
 
   private static class BufferContext {
     enum Type {
-      DIRECT, MMAP
+      DIRECT,
+      MMAP
     }
 
     final Type _type;
@@ -122,9 +123,8 @@ public abstract class PinotDataBuffer implements Closeable {
         }
       }
     } catch (Exception e) {
-      LOGGER
-          .error("Caught exception while allocating direct buffer of size: {} with description: {}", size, description,
-              e);
+      LOGGER.error("Caught exception while allocating direct buffer of size: {} with description: {}", size,
+          description, e);
       LOGGER.error("Buffer stats: {}", getBufferStats());
       ALLOCATION_FAILURE_COUNT.getAndIncrement();
       throw e;
@@ -141,8 +141,7 @@ public abstract class PinotDataBuffer implements Closeable {
    * Allocates a buffer using direct memory and loads a file into the buffer.
    */
   public static PinotDataBuffer loadFile(File file, long offset, long size, ByteOrder byteOrder,
-      @Nullable String description)
-      throws IOException {
+      @Nullable String description) throws IOException {
     PinotDataBuffer buffer;
     try {
       if (size <= Integer.MAX_VALUE) {
@@ -174,8 +173,7 @@ public abstract class PinotDataBuffer implements Closeable {
    * Allocates a buffer using direct memory and loads a big-endian file into the buffer.
    */
   @VisibleForTesting
-  public static PinotDataBuffer loadBigEndianFile(File file)
-      throws IOException {
+  public static PinotDataBuffer loadBigEndianFile(File file) throws IOException {
     return loadFile(file, 0, file.length(), ByteOrder.BIG_ENDIAN, null);
   }
 
@@ -184,8 +182,7 @@ public abstract class PinotDataBuffer implements Closeable {
    * <p>NOTE: If the file gets extended, the contents of the extended portion of the file are not defined.
    */
   public static PinotDataBuffer mapFile(File file, boolean readOnly, long offset, long size, ByteOrder byteOrder,
-      @Nullable String description)
-      throws IOException {
+      @Nullable String description) throws IOException {
     PinotDataBuffer buffer;
     try {
       if (size <= Integer.MAX_VALUE) {
@@ -207,8 +204,8 @@ public abstract class PinotDataBuffer implements Closeable {
     MMAP_BUFFER_COUNT.getAndIncrement();
     MMAP_BUFFER_USAGE.getAndAdd(size);
     synchronized (BUFFER_CONTEXT_MAP) {
-      BUFFER_CONTEXT_MAP
-          .put(buffer, new BufferContext(BufferContext.Type.MMAP, size, file.getAbsolutePath().intern(), description));
+      BUFFER_CONTEXT_MAP.put(buffer,
+          new BufferContext(BufferContext.Type.MMAP, size, file.getAbsolutePath().intern(), description));
     }
     return buffer;
   }
@@ -217,8 +214,7 @@ public abstract class PinotDataBuffer implements Closeable {
    * Memory maps a read-only big-endian file into a buffer.
    */
   @VisibleForTesting
-  public static PinotDataBuffer mapReadOnlyBigEndianFile(File file)
-      throws IOException {
+  public static PinotDataBuffer mapReadOnlyBigEndianFile(File file) throws IOException {
     return mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, null);
   }
 
@@ -253,9 +249,8 @@ public abstract class PinotDataBuffer implements Closeable {
   }
 
   private static String getBufferStats() {
-    return String
-        .format("Direct buffer count: %s, size: %s; Mmap buffer count: %s, size: %s", DIRECT_BUFFER_COUNT.get(),
-            DIRECT_BUFFER_USAGE.get(), MMAP_BUFFER_COUNT.get(), MMAP_BUFFER_USAGE.get());
+    return String.format("Direct buffer count: %s, size: %s; Mmap buffer count: %s, size: %s",
+        DIRECT_BUFFER_COUNT.get(), DIRECT_BUFFER_USAGE.get(), MMAP_BUFFER_COUNT.get(), MMAP_BUFFER_USAGE.get());
   }
 
   private boolean _closeable;
@@ -265,8 +260,7 @@ public abstract class PinotDataBuffer implements Closeable {
   }
 
   @Override
-  public synchronized void close()
-      throws IOException {
+  public synchronized void close() throws IOException {
     if (_closeable) {
       flush();
       release();
@@ -359,8 +353,7 @@ public abstract class PinotDataBuffer implements Closeable {
 
   public abstract void readFrom(long offset, ByteBuffer buffer);
 
-  public abstract void readFrom(long offset, File file, long srcOffset, long size)
-      throws IOException;
+  public abstract void readFrom(long offset, File file, long srcOffset, long size) throws IOException;
 
   public abstract long size();
 
@@ -388,6 +381,5 @@ public abstract class PinotDataBuffer implements Closeable {
 
   public abstract void flush();
 
-  protected abstract void release()
-      throws IOException;
+  protected abstract void release() throws IOException;
 }

@@ -54,15 +54,15 @@ public class ZKOperatorTest {
 
   @Test
   public void testCompleteSegmentOperations() throws Exception {
-    ZKOperator zkOperator =
-        new ZKOperator(ControllerTestUtils.getHelixResourceManager(), mock(ControllerConf.class), mock(ControllerMetrics.class));
+    ZKOperator zkOperator = new ZKOperator(ControllerTestUtils.getHelixResourceManager(), mock(ControllerConf.class),
+        mock(ControllerMetrics.class));
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentMetadata.getName()).thenReturn(SEGMENT_NAME);
     when(segmentMetadata.getCrc()).thenReturn("12345");
     when(segmentMetadata.getIndexCreationTime()).thenReturn(123L);
     HttpHeaders httpHeaders = mock(HttpHeaders.class);
-    zkOperator.completeSegmentOperations(TABLE_NAME_WITH_TYPE, segmentMetadata, null, null, false, httpHeaders, "downloadUrl",
-        false, "crypter");
+    zkOperator.completeSegmentOperations(TABLE_NAME_WITH_TYPE, segmentMetadata, null, null, false, httpHeaders,
+        "downloadUrl", false, "crypter");
 
     OfflineSegmentZKMetadata segmentZKMetadata =
         ControllerTestUtils.getHelixResourceManager().getOfflineSegmentZKMetadata(TABLE_NAME, SEGMENT_NAME);
@@ -90,8 +90,8 @@ public class ZKOperatorTest {
     when(segmentMetadata.getIndexCreationTime()).thenReturn(456L);
     zkOperator.completeSegmentOperations(TABLE_NAME_WITH_TYPE, segmentMetadata, null, null, false, httpHeaders,
         "otherDownloadUrl", false, "otherCrypter");
-    segmentZKMetadata = ControllerTestUtils
-        .getHelixResourceManager().getOfflineSegmentZKMetadata(TABLE_NAME, SEGMENT_NAME);
+    segmentZKMetadata =
+        ControllerTestUtils.getHelixResourceManager().getOfflineSegmentZKMetadata(TABLE_NAME, SEGMENT_NAME);
     assertEquals(segmentZKMetadata.getCrc(), 12345L);
     // Push time should not change
     assertEquals(segmentZKMetadata.getPushTime(), pushTime);
@@ -112,8 +112,8 @@ public class ZKOperatorTest {
     Thread.sleep(1000L);
     zkOperator.completeSegmentOperations(TABLE_NAME_WITH_TYPE, segmentMetadata, null, null, false, httpHeaders,
         "otherDownloadUrl", false, "otherCrypter");
-    segmentZKMetadata = ControllerTestUtils
-        .getHelixResourceManager().getOfflineSegmentZKMetadata(TABLE_NAME, SEGMENT_NAME);
+    segmentZKMetadata =
+        ControllerTestUtils.getHelixResourceManager().getOfflineSegmentZKMetadata(TABLE_NAME, SEGMENT_NAME);
     assertEquals(segmentZKMetadata.getCrc(), 23456L);
     // Push time should not change
     assertEquals(segmentZKMetadata.getPushTime(), pushTime);

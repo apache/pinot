@@ -27,8 +27,7 @@ import java.util.List;
  * Simple shim so that jps -l shows PinotController instead of PinotAdministrator
  */
 public class PinotController {
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     List<String> arguments = new ArrayList<>();
     arguments.add("StartController");
     arguments.addAll(Arrays.asList(args));

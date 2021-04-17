@@ -80,8 +80,7 @@ public class SelectionCombineOperatorTest {
   private List<IndexSegment> _indexSegments;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
     _indexSegments = new ArrayList<>(NUM_SEGMENTS);
     for (int i = 0; i < NUM_SEGMENTS; i++) {
@@ -89,8 +88,7 @@ public class SelectionCombineOperatorTest {
     }
   }
 
-  private IndexSegment createSegment(int index)
-      throws Exception {
+  private IndexSegment createSegment(int index) throws Exception {
     int baseValue = index * NUM_RECORDS_PER_SEGMENT / 2;
     List<GenericRow> records = new ArrayList<>(NUM_RECORDS_PER_SEGMENT);
     for (int i = 0; i < NUM_RECORDS_PER_SEGMENT; i++) {
@@ -230,14 +228,12 @@ public class SelectionCombineOperatorTest {
     }
     CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, EXECUTOR,
         System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS,
-        InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, null,
-        InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD);
+        InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, null, InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD);
     return combinePlanNode.run().nextBlock();
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     for (IndexSegment indexSegment : _indexSegments) {
       indexSegment.destroy();
     }

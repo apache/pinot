@@ -65,9 +65,8 @@ public class PartitionerTest {
     } catch (IllegalStateException e) {
       // expected
     }
-    partitionerConfig =
-        new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE)
-            .setColumnName("foo").build();
+    partitionerConfig = new PartitionerConfig.Builder()
+        .setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE).setColumnName("foo").build();
     Partitioner partitioner = PartitionerFactory.getPartitioner(partitionerConfig);
     assertEquals(partitioner.getClass(), ColumnValuePartitioner.class);
 
@@ -87,9 +86,8 @@ public class PartitionerTest {
     } catch (IllegalStateException e) {
       // expected
     }
-    partitionerConfig =
-        new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.ROUND_ROBIN)
-            .setNumPartitions(0).build();
+    partitionerConfig = new PartitionerConfig.Builder()
+        .setPartitionerType(PartitionerFactory.PartitionerType.ROUND_ROBIN).setNumPartitions(0).build();
     try {
       PartitionerFactory.getPartitioner(partitionerConfig);
       fail("Should not create ROUND_ROBIN Partitioner without num partitions <=0");
@@ -97,9 +95,8 @@ public class PartitionerTest {
       // expected
     }
     int numPartitions = 3;
-    partitionerConfig =
-        new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.ROUND_ROBIN)
-            .setNumPartitions(numPartitions).build();
+    partitionerConfig = new PartitionerConfig.Builder()
+        .setPartitionerType(PartitionerFactory.PartitionerType.ROUND_ROBIN).setNumPartitions(numPartitions).build();
     Partitioner partitioner = PartitionerFactory.getPartitioner(partitionerConfig);
     assertEquals(partitioner.getClass(), RoundRobinPartitioner.class);
 
@@ -115,18 +112,16 @@ public class PartitionerTest {
 
   @Test
   public void testTableColumnPartitionConfigPartitioner() {
-    PartitionerConfig partitionerConfig =
-        new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TABLE_PARTITION_CONFIG)
-            .build();
+    PartitionerConfig partitionerConfig = new PartitionerConfig.Builder()
+        .setPartitionerType(PartitionerFactory.PartitionerType.TABLE_PARTITION_CONFIG).build();
     try {
       PartitionerFactory.getPartitioner(partitionerConfig);
       fail("Should not create TABLE_PARTITION_CONFIG Partitioner without column name");
     } catch (IllegalStateException e) {
       // expected
     }
-    partitionerConfig =
-        new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TABLE_PARTITION_CONFIG)
-            .setColumnName("foo").build();
+    partitionerConfig = new PartitionerConfig.Builder()
+        .setPartitionerType(PartitionerFactory.PartitionerType.TABLE_PARTITION_CONFIG).setColumnName("foo").build();
     try {
       PartitionerFactory.getPartitioner(partitionerConfig);
       fail("Should not create TABLE_PARTITION_CONFIG Partitioner without columnPartitionConfig");
@@ -149,9 +144,8 @@ public class PartitionerTest {
 
   @Test
   public void testTransformFunctionPartitioner() {
-    PartitionerConfig partitionerConfig =
-        new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
-            .build();
+    PartitionerConfig partitionerConfig = new PartitionerConfig.Builder()
+        .setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION).build();
     try {
       PartitionerFactory.getPartitioner(partitionerConfig);
       fail("Should not create TRANSFORM_FUNCTION Partitioner without transform function");

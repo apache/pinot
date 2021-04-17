@@ -28,6 +28,7 @@ import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
+
 public class ExecutionStatsTest {
 
   private JsonNode mockBrokerResponse;

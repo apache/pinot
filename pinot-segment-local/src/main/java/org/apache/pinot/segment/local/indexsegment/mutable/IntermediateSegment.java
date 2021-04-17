@@ -110,8 +110,8 @@ public class IntermediateSegment implements MutableSegment {
       Map<String, ColumnPartitionConfig> segmentPartitionConfigColumnPartitionMap =
           segmentPartitionConfig.getColumnPartitionMap();
       _partitionColumn = segmentPartitionConfigColumnPartitionMap.keySet().iterator().next();
-      _partitionFunction = PartitionFunctionFactory
-          .getPartitionFunction(segmentPartitionConfig.getFunctionName(_partitionColumn),
+      _partitionFunction =
+          PartitionFunctionFactory.getPartitionFunction(segmentPartitionConfig.getFunctionName(_partitionColumn),
               segmentPartitionConfig.getNumPartitions(_partitionColumn));
     } else {
       _partitionColumn = null;
@@ -151,35 +151,30 @@ public class IntermediateSegment implements MutableSegment {
       int estimatedCardinality = (int) (DEFAULT_EST_CARDINALITY * 1.1);
       String dictionaryAllocationContext =
           buildAllocationContext(_segmentName, column, V1Constants.Dict.FILE_EXTENSION);
-      dictionary = MutableDictionaryFactory
-          .getMutableDictionary(dataType, true, _memoryManager, dictionaryColumnSize,
-              Math.min(estimatedCardinality, _capacity), dictionaryAllocationContext);
+      dictionary = MutableDictionaryFactory.getMutableDictionary(dataType, true, _memoryManager, dictionaryColumnSize,
+          Math.min(estimatedCardinality, _capacity), dictionaryAllocationContext);
 
       if (fieldSpec.isSingleValueField()) {
         // Single-value dictionary-encoded forward index
         String allocationContext =
             buildAllocationContext(_segmentName, column, V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
-        forwardIndex = new FixedByteSVMutableForwardIndex(true, INT, _capacity, _memoryManager,
-            allocationContext);
+        forwardIndex = new FixedByteSVMutableForwardIndex(true, INT, _capacity, _memoryManager, allocationContext);
       } else {
         // Multi-value dictionary-encoded forward index
         String allocationContext =
             buildAllocationContext(_segmentName, column, V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
         // TODO: Start with a smaller capacity on FixedByteMVForwardIndexReaderWriter and let it expand
-        forwardIndex =
-            new FixedByteMVMutableForwardIndex(MAX_MULTI_VALUES_PER_ROW, DEFAULT_AVG_MULTI_VALUE_COUNT, _capacity,
-                Integer.BYTES, _memoryManager, allocationContext);
+        forwardIndex = new FixedByteMVMutableForwardIndex(MAX_MULTI_VALUES_PER_ROW, DEFAULT_AVG_MULTI_VALUE_COUNT,
+            _capacity, Integer.BYTES, _memoryManager, allocationContext);
       }
 
-      _indexContainerMap.put(column,
-          new IntermediateIndexContainer(fieldSpec, partitionFunction, partitions, new NumValuesInfo(), forwardIndex,
-              dictionary));
+      _indexContainerMap.put(column, new IntermediateIndexContainer(fieldSpec, partitionFunction, partitions,
+          new NumValuesInfo(), forwardIndex, dictionary));
     }
   }
 
   @Override
-  public boolean index(GenericRow row, @Nullable RowMetadata rowMetadata)
-      throws IOException {
+  public boolean index(GenericRow row, @Nullable RowMetadata rowMetadata) throws IOException {
     updateDictionary(row);
     addNewRow(row);
     _numDocsIndexed++;
@@ -273,8 +268,7 @@ public class IntermediateSegment implements MutableSegment {
     }
   }
 
-  private void addNewRow(GenericRow row)
-      throws IOException {
+  private void addNewRow(GenericRow row) throws IOException {
     int docId = _numDocsIndexed;
     for (Map.Entry<String, IntermediateIndexContainer> entry : _indexContainerMap.entrySet()) {
       String column = entry.getKey();

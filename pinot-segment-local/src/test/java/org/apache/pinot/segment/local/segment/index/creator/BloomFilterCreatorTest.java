@@ -38,14 +38,12 @@ public class BloomFilterCreatorTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "BloomFilterCreatorTest");
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(TEMP_DIR);
   }
 
   @Test
-  public void testBloomFilterCreator()
-      throws Exception {
+  public void testBloomFilterCreator() throws Exception {
     // Create the bloom filter
     int cardinality = 10000;
     String columnName = "testColumn";
@@ -74,8 +72,7 @@ public class BloomFilterCreatorTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 }

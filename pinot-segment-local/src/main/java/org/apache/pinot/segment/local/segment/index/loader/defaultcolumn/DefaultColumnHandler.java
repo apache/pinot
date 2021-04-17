@@ -26,6 +26,5 @@ public interface DefaultColumnHandler {
    *
    * @throws Exception
    */
-  void updateDefaultColumns()
-      throws Exception;
+  void updateDefaultColumns() throws Exception;
 }

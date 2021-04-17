@@ -36,22 +36,19 @@ public interface SegmentWriter extends Closeable {
    * @param tableConfig The table config for the segment
    * @param schema The Pinot schema for the table
    */
-  void init(TableConfig tableConfig, Schema schema)
-      throws Exception;
+  void init(TableConfig tableConfig, Schema schema) throws Exception;
 
   /**
    * Collects a single {@link GenericRow} into a buffer.
    * This row is not available in the segment until a <code>flush()</code> is invoked.
    */
-  void collect(GenericRow row)
-      throws Exception;
+  void collect(GenericRow row) throws Exception;
 
   /**
    * Collects a batch of {@link GenericRow}s into a buffer.
    * These rows are not available in the segment until a <code>flush()</code> is invoked.
    */
-  default void collect(GenericRow[] rowBatch)
-      throws Exception {
+  default void collect(GenericRow[] rowBatch) throws Exception {
     for (GenericRow row : rowBatch) {
       collect(row);
     }
@@ -65,6 +62,5 @@ public interface SegmentWriter extends Closeable {
    *
    * @return URI of the generated segment
    */
-  URI flush()
-      throws Exception;
+  URI flush() throws Exception;
 }

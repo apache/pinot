@@ -57,8 +57,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
   // NOTE: this can convert segments in v1 and v2 format to v3.
   // we use variable names with v2 prefix for readability
   @Override
-  public void convert(File v2SegmentDirectory)
-      throws Exception {
+  public void convert(File v2SegmentDirectory) throws Exception {
     Preconditions.checkNotNull(v2SegmentDirectory, "Segment directory should not be null");
 
     Preconditions.checkState(v2SegmentDirectory.exists() && v2SegmentDirectory.isDirectory(),
@@ -91,8 +90,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     deleteV2Files(v2SegmentDirectory);
   }
 
-  private void deleteV2Files(File v2SegmentDirectory)
-      throws IOException {
+  private void deleteV2Files(File v2SegmentDirectory) throws IOException {
     LOGGER.info("Deleting files in v1 segment directory: {}", v2SegmentDirectory);
     File[] files = v2SegmentDirectory.listFiles();
     if (files == null) {
@@ -111,18 +109,15 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
   }
 
   @VisibleForTesting
-  public File v3ConversionTempDirectory(File v2SegmentDirectory)
-      throws IOException {
-    File v3TempDirectory =
-        Files.createTempDirectory(v2SegmentDirectory.toPath(), v2SegmentDirectory.getName() + V3_TEMP_DIR_SUFFIX)
-            .toFile();
+  public File v3ConversionTempDirectory(File v2SegmentDirectory) throws IOException {
+    File v3TempDirectory = Files
+        .createTempDirectory(v2SegmentDirectory.toPath(), v2SegmentDirectory.getName() + V3_TEMP_DIR_SUFFIX).toFile();
     return v3TempDirectory;
   }
 
-  private void setDirectoryPermissions(File v3Directory)
-      throws IOException {
-    EnumSet<PosixFilePermission> permissions = EnumSet
-        .of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE,
+  private void setDirectoryPermissions(File v3Directory) throws IOException {
+    EnumSet<PosixFilePermission> permissions =
+        EnumSet.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE,
             PosixFilePermission.GROUP_READ, PosixFilePermission.GROUP_WRITE, PosixFilePermission.GROUP_EXECUTE,
             PosixFilePermission.OTHERS_READ, PosixFilePermission.OTHERS_EXECUTE);
     try {
@@ -132,8 +127,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     }
   }
 
-  private void copyIndexData(File v2Directory, SegmentMetadataImpl v2Metadata, File v3Directory)
-      throws Exception {
+  private void copyIndexData(File v2Directory, SegmentMetadataImpl v2Metadata, File v3Directory) throws Exception {
     SegmentMetadataImpl v3Metadata = new SegmentMetadataImpl(v3Directory);
     try (SegmentDirectory v2Segment = SegmentDirectory.createFromLocalFS(v2Directory, v2Metadata, ReadMode.mmap);
         SegmentDirectory v3Segment = SegmentDirectory.createFromLocalFS(v3Directory, v3Metadata, ReadMode.mmap)) {
@@ -163,15 +157,13 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
   }
 
   private void copyIndexIfExists(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column,
-      ColumnIndexType indexType)
-      throws IOException {
+      ColumnIndexType indexType) throws IOException {
     if (reader.hasIndexFor(column, indexType)) {
       readCopyBuffers(reader, writer, column, indexType);
     }
   }
 
-  private void copyStarTreeV2(File src, File dest)
-      throws IOException {
+  private void copyStarTreeV2(File src, File dest) throws IOException {
     File indexFile = new File(src, StarTreeV2Constants.INDEX_FILE_NAME);
     if (indexFile.exists()) {
       FileUtils.copyFile(indexFile, new File(dest, StarTreeV2Constants.INDEX_FILE_NAME));
@@ -181,16 +173,14 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
   }
 
   private void readCopyBuffers(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column,
-      ColumnIndexType indexType)
-      throws IOException {
+      ColumnIndexType indexType) throws IOException {
     PinotDataBuffer oldBuffer = reader.getIndexFor(column, indexType);
     long oldBufferSize = oldBuffer.size();
     PinotDataBuffer newBuffer = writer.newIndexFor(column, indexType, oldBufferSize);
     oldBuffer.copyTo(0, newBuffer, 0, oldBufferSize);
   }
 
-  private void createMetadataFile(File currentDir, File v3Dir)
-      throws ConfigurationException {
+  private void createMetadataFile(File currentDir, File v3Dir) throws ConfigurationException {
     File v2MetadataFile = new File(currentDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
     File v3MetadataFile = new File(v3Dir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
 
@@ -200,8 +190,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     properties.save(v3MetadataFile);
   }
 
-  private void copyCreationMetadataIfExists(File currentDir, File v3Dir)
-      throws IOException {
+  private void copyCreationMetadataIfExists(File currentDir, File v3Dir) throws IOException {
     File v2CreationFile = new File(currentDir, V1Constants.SEGMENT_CREATION_META);
     if (v2CreationFile.exists()) {
       File v3CreationFile = new File(v3Dir, V1Constants.SEGMENT_CREATION_META);
@@ -209,8 +198,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     }
   }
 
-  private void copyLuceneTextIndexIfExists(File segmentDirectory, File v3Dir)
-      throws IOException {
+  private void copyLuceneTextIndexIfExists(File segmentDirectory, File v3Dir) throws IOException {
     // TODO: see if this can be done by reusing some existing methods
     String suffix = LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION;
     File[] textIndexFiles = segmentDirectory.listFiles(new FilenameFilter() {
@@ -261,8 +249,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     }
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     if (args.length < 1) {
       System.err.println("Usage: $0 <table directory with segments>");
       System.exit(1);

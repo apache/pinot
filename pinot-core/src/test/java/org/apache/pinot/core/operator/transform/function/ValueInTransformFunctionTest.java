@@ -70,8 +70,8 @@ public class ValueInTransformFunctionTest extends BaseTransformFunctionTest {
 
   @DataProvider(name = "testValueInTransformFunction")
   public Object[][] testValueInTransformFunction() {
-    return new Object[][]{new Object[]{String.format("valueIn(%s,1,2,9,5)", INT_MV_COLUMN)}, new Object[]{String.format(
-        "valueIn(valueIn(valueIn(%s,9,6,5,3,2,1),1,2,3,5,9),1,2,9,5)", INT_MV_COLUMN)}};
+    return new Object[][]{new Object[]{String.format("valueIn(%s,1,2,9,5)", INT_MV_COLUMN)}, new Object[]{String
+        .format("valueIn(valueIn(valueIn(%s,9,6,5,3,2,1),1,2,3,5,9),1,2,9,5)", INT_MV_COLUMN)}};
   }
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
@@ -83,7 +83,7 @@ public class ValueInTransformFunctionTest extends BaseTransformFunctionTest {
   @DataProvider(name = "testIllegalArguments")
   public Object[][] testIllegalArguments() {
     return new Object[][]{new Object[]{String.format("valueIn(%s)", INT_MV_COLUMN)}, new Object[]{String.format(
-        "valueIn(%s, 1)", INT_SV_COLUMN)}, new Object[]{String.format("valueIn(%s, %s)", INT_MV_COLUMN,
-        LONG_SV_COLUMN)}};
+        "valueIn(%s, 1)",
+        INT_SV_COLUMN)}, new Object[]{String.format("valueIn(%s, %s)", INT_MV_COLUMN, LONG_SV_COLUMN)}};
   }
 }

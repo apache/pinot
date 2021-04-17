@@ -53,26 +53,22 @@ public class ParquetRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next()
-      throws IOException {
+  public GenericRow next() throws IOException {
     return next(new GenericRow());
   }
 
   @Override
-  public GenericRow next(GenericRow reuse)
-      throws IOException {
+  public GenericRow next(GenericRow reuse) throws IOException {
     return _internalParquetRecordReader.next(reuse);
   }
 
   @Override
-  public void rewind()
-      throws IOException {
+  public void rewind() throws IOException {
     _internalParquetRecordReader.rewind();
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _internalParquetRecordReader.close();
   }
 

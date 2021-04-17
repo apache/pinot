@@ -30,6 +30,7 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.utils.JsonUtils;
 
+
 /**
  * This class acts as a bridge between the API call to controller and the internal API call made to the
  * server to get segment metadata.
@@ -43,7 +44,7 @@ public class TableMetadataReader {
   private final PinotHelixResourceManager _pinotHelixResourceManager;
 
   public TableMetadataReader(Executor executor, HttpConnectionManager connectionManager,
-                             PinotHelixResourceManager helixResourceManager) {
+      PinotHelixResourceManager helixResourceManager) {
     _executor = executor;
     _connectionManager = connectionManager;
     _pinotHelixResourceManager = helixResourceManager;
@@ -58,8 +59,10 @@ public class TableMetadataReader {
       throws InvalidConfigException, IOException {
     final Map<String, List<String>> serverToSegments =
         _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
-    BiMap<String, String> endpoints = _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
-    ServerSegmentMetadataReader serverSegmentMetadataReader = new ServerSegmentMetadataReader(_executor, _connectionManager);
+    BiMap<String, String> endpoints =
+        _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
+    ServerSegmentMetadataReader serverSegmentMetadataReader =
+        new ServerSegmentMetadataReader(_executor, _connectionManager);
 
     List<String> segmentsMetadata = serverSegmentMetadataReader.getSegmentMetadataFromServer(tableNameWithType,
         serverToSegments, endpoints, timeoutMs);

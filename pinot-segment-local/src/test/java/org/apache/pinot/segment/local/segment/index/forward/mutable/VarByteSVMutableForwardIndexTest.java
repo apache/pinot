@@ -41,14 +41,12 @@ public class VarByteSVMutableForwardIndexTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     _memoryManager.close();
   }
 
   @Test
-  public void testString()
-      throws IOException {
+  public void testString() throws IOException {
     // use arbitrary cardinality and avg string length
     // we will test with complete randomness
     int initialCapacity = 5;
@@ -73,8 +71,7 @@ public class VarByteSVMutableForwardIndexTest {
   }
 
   @Test
-  public void testBytes()
-      throws IOException {
+  public void testBytes() throws IOException {
     int initialCapacity = 5;
     int estimatedAvgStringLength = 30;
     try (VarByteSVMutableForwardIndex readerWriter = new VarByteSVMutableForwardIndex(DataType.STRING, _memoryManager,

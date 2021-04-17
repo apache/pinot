@@ -37,8 +37,8 @@ public class ReplicationUtils {
 
     TableType tableType = tableConfig.getTableType();
     if (tableType.equals(TableType.REALTIME)) {
-      StreamConfig streamConfig = new StreamConfig(tableConfig.getTableName(),
-          IngestionConfigUtils.getStreamConfigMap(tableConfig));
+      StreamConfig streamConfig =
+          new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
       return streamConfig.hasHighLevelConsumerType();
     }
     return true;
@@ -51,8 +51,8 @@ public class ReplicationUtils {
 
     TableType tableType = tableConfig.getTableType();
     if (tableType.equals(TableType.REALTIME)) {
-      StreamConfig streamConfig = new StreamConfig(tableConfig.getTableName(),
-          IngestionConfigUtils.getStreamConfigMap(tableConfig));
+      StreamConfig streamConfig =
+          new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
       return streamConfig.hasLowLevelConsumerType();
     }
     return false;

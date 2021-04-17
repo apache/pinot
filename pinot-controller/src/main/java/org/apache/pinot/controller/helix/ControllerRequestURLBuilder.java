@@ -211,6 +211,7 @@ public class ControllerRequestURLBuilder {
     }
     return url;
   }
+
   public String forTableSchemaGet(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "schema");
   }
@@ -297,9 +298,8 @@ public class ControllerRequestURLBuilder {
 
   public String forInstanceReplace(String tableName, @Nullable InstancePartitionsType instancePartitionsType,
       String oldInstanceId, String newInstanceId) {
-    String url =
-        StringUtil.join("/", _baseUrl, "tables", tableName, "replaceInstance") + "?oldInstanceId=" + oldInstanceId
-            + "&newInstanceId=" + newInstanceId;
+    String url = StringUtil.join("/", _baseUrl, "tables", tableName, "replaceInstance") + "?oldInstanceId="
+        + oldInstanceId + "&newInstanceId=" + newInstanceId;
     if (instancePartitionsType != null) {
       url += "&type=" + instancePartitionsType;
     }
@@ -308,16 +308,15 @@ public class ControllerRequestURLBuilder {
 
   public String forIngestFromFile(String tableNameWithType, String batchConfigMapStr)
       throws UnsupportedEncodingException {
-    return String
-        .format("%s?tableNameWithType=%s&batchConfigMapStr=%s", StringUtil.join("/", _baseUrl, "ingestFromFile"),
-            tableNameWithType, URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8.toString()));
+    return String.format("%s?tableNameWithType=%s&batchConfigMapStr=%s",
+        StringUtil.join("/", _baseUrl, "ingestFromFile"), tableNameWithType,
+        URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8.toString()));
   }
 
   public String forIngestFromFile(String tableNameWithType, Map<String, String> batchConfigMap)
       throws UnsupportedEncodingException {
-    String batchConfigMapStr =
-        batchConfigMap.entrySet().stream().map(e -> String.format("\"%s\":\"%s\"", e.getKey(), e.getValue()))
-            .collect(Collectors.joining(",", "{", "}"));
+    String batchConfigMapStr = batchConfigMap.entrySet().stream()
+        .map(e -> String.format("\"%s\":\"%s\"", e.getKey(), e.getValue())).collect(Collectors.joining(",", "{", "}"));
     return forIngestFromFile(tableNameWithType, batchConfigMapStr);
   }
 
@@ -331,9 +330,8 @@ public class ControllerRequestURLBuilder {
 
   public String forIngestFromURI(String tableNameWithType, Map<String, String> batchConfigMap, String sourceURIStr)
       throws UnsupportedEncodingException {
-    String batchConfigMapStr =
-        batchConfigMap.entrySet().stream().map(e -> String.format("\"%s\":\"%s\"", e.getKey(), e.getValue()))
-            .collect(Collectors.joining(",", "{", "}"));
+    String batchConfigMapStr = batchConfigMap.entrySet().stream()
+        .map(e -> String.format("\"%s\":\"%s\"", e.getKey(), e.getValue())).collect(Collectors.joining(",", "{", "}"));
     return forIngestFromURI(tableNameWithType, batchConfigMapStr, sourceURIStr);
   }
 

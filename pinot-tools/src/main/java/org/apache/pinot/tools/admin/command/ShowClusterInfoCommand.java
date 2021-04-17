@@ -62,12 +62,12 @@ public class ShowClusterInfoCommand extends AbstractBaseAdminCommand implements 
   @Option(name = "-tags", required = false, metaVar = "<String>", usage = "Commaa separated tag names.")
   private String _tags = "";
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
     Set<String> includeTableSet = new HashSet<>();
     String[] includeTables = _tables.split(",");
     for (String includeTable : includeTables) {

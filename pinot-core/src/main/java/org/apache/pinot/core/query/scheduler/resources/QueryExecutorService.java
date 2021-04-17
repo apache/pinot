@@ -82,14 +82,12 @@ public abstract class QueryExecutorService implements ExecutorService {
   }
 
   @Override
-  public boolean awaitTermination(long timeout, TimeUnit unit)
-      throws InterruptedException {
+  public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks)
-      throws InterruptedException {
+  public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks) throws InterruptedException {
     throw new UnsupportedOperationException();
   }
 
@@ -100,8 +98,7 @@ public abstract class QueryExecutorService implements ExecutorService {
   }
 
   @Override
-  public <T> T invokeAny(Collection<? extends Callable<T>> tasks)
-      throws InterruptedException, ExecutionException {
+  public <T> T invokeAny(Collection<? extends Callable<T>> tasks) throws InterruptedException, ExecutionException {
     throw new UnsupportedOperationException();
   }
 

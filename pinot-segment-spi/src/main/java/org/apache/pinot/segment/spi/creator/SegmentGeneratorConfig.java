@@ -62,7 +62,8 @@ import org.slf4j.LoggerFactory;
  */
 public class SegmentGeneratorConfig implements Serializable {
   public enum TimeColumnType {
-    EPOCH, SIMPLE_DATE
+    EPOCH,
+    SIMPLE_DATE
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGeneratorConfig.class);
@@ -152,9 +153,8 @@ public class SegmentGeneratorConfig implements Serializable {
         this.setRawIndexCreationColumns(noDictionaryColumns);
 
         if (noDictionaryColumnMap != null) {
-          Map<String, ChunkCompressionType> serializedNoDictionaryColumnMap =
-              noDictionaryColumnMap.entrySet().stream().collect(Collectors
-                  .toMap(Map.Entry::getKey, e -> ChunkCompressionType.valueOf(e.getValue())));
+          Map<String, ChunkCompressionType> serializedNoDictionaryColumnMap = noDictionaryColumnMap.entrySet().stream()
+              .collect(Collectors.toMap(Map.Entry::getKey, e -> ChunkCompressionType.valueOf(e.getValue())));
           this.setRawIndexCompressionType(serializedNoDictionaryColumnMap);
         }
       }

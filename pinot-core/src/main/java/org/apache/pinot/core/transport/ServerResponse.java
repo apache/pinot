@@ -68,8 +68,8 @@ public class ServerResponse {
 
   @Override
   public String toString() {
-    return String
-        .format("%d,%d,%d,%d", getSubmitDelayMs(), getResponseDelayMs(), getResponseSize(), getDeserializationTimeMs());
+    return String.format("%d,%d,%d,%d", getSubmitDelayMs(), getResponseDelayMs(), getResponseSize(),
+        getDeserializationTimeMs());
   }
 
   void markRequestSubmitted() {

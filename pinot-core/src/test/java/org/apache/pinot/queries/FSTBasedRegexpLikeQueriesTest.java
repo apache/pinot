@@ -90,8 +90,7 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     buildSegment();
@@ -124,15 +123,13 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
   }
 
   private List<String> getDomainNames() {
-    return Arrays
-        .asList("www.domain1.com", "www.domain1.co.ab", "www.domain1.co.bc", "www.domain1.co.cd", "www.sd.domain1.com",
-            "www.sd.domain1.co.ab", "www.sd.domain1.co.bc", "www.sd.domain1.co.cd", "www.domain2.com",
-            "www.domain2.co.ab", "www.domain2.co.bc", "www.domain2.co.cd", "www.sd.domain2.com", "www.sd.domain2.co.ab",
-            "www.sd.domain2.co.bc", "www.sd.domain2.co.cd");
+    return Arrays.asList("www.domain1.com", "www.domain1.co.ab", "www.domain1.co.bc", "www.domain1.co.cd",
+        "www.sd.domain1.com", "www.sd.domain1.co.ab", "www.sd.domain1.co.bc", "www.sd.domain1.co.cd", "www.domain2.com",
+        "www.domain2.co.ab", "www.domain2.co.bc", "www.domain2.co.cd", "www.sd.domain2.com", "www.sd.domain2.co.ab",
+        "www.sd.domain2.co.bc", "www.sd.domain2.co.cd");
   }
 
-  private List<GenericRow> createTestData(int numRows)
-      throws Exception {
+  private List<GenericRow> createTestData(int numRows) throws Exception {
     List<GenericRow> rows = new ArrayList<>();
     List<String> domainNames = getDomainNames();
     List<String> urlSufficies = getURLSufficies();
@@ -151,8 +148,7 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
     return rows;
   }
 
-  private void buildSegment()
-      throws Exception {
+  private void buildSegment() throws Exception {
     List<GenericRow> rows = createTestData(NUM_ROWS);
     List<FieldConfig> fieldConfigs = new ArrayList<>();
     fieldConfigs
@@ -239,8 +235,7 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
     }
   }
 
-  private AggregationGroupByResult getGroupByResults(String query)
-      throws Exception {
+  private AggregationGroupByResult getGroupByResults(String query) throws Exception {
     AggregationGroupByOperator operator = getOperatorForPqlQuery(query);
     IntermediateResultsBlock resultsBlock = operator.nextBlock();
     return resultsBlock.getAggregationGroupByResult();
@@ -281,8 +276,7 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testFSTBasedRegexLike()
-      throws Exception {
+  public void testFSTBasedRegexLike() throws Exception {
     // Select queries on col with FST + inverted index.
     String query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') LIMIT 50000";
     testSelectionResults(query, 256, null);
@@ -345,8 +339,7 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testFSTBasedRegexpLikeWithOtherFilters()
-      throws Exception {
+  public void testFSTBasedRegexpLikeWithOtherFilters() throws Exception {
     String query;
 
     // Select queries on columns with combination of FST Index , (FST + Inverted Index), No index and other constraints.
@@ -384,8 +377,7 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testGroupByOnFSTBasedRegexpLike()
-      throws Exception {
+  public void testGroupByOnFSTBasedRegexpLike() throws Exception {
     String query;
     query =
         "SELECT DOMAIN_NAMES, count(*) FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') group by DOMAIN_NAMES LIMIT 50000";

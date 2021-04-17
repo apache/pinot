@@ -111,8 +111,7 @@ public class IdSetTest {
   }
 
   @Test
-  public void testSerDe()
-      throws IOException {
+  public void testSerDe() throws IOException {
     assertEquals(IdSets.fromBytes(IdSets.emptyIdSet().toBytes()), IdSets.emptyIdSet());
     assertEquals(IdSets.fromBase64String(IdSets.emptyIdSet().toBase64String()), IdSets.emptyIdSet());
 
@@ -130,8 +129,7 @@ public class IdSetTest {
   }
 
   @Test
-  public void testMerge()
-      throws IOException {
+  public void testMerge() throws IOException {
     // Merge with empty IdSet
     assertSame(IdSets.merge(IdSets.emptyIdSet(), IdSets.emptyIdSet()), IdSets.emptyIdSet());
     assertSame(IdSets.merge(_intIdSet, IdSets.emptyIdSet()), _intIdSet);
@@ -153,13 +151,13 @@ public class IdSetTest {
       assertEquals(mergedIdSet, _longIdSet);
     }
     {
-      IdSet mergedIdSet = IdSets
-          .merge(IdSets.fromBytes(_intBloomFilterIdSet.toBytes()), IdSets.fromBytes(_intBloomFilterIdSet.toBytes()));
+      IdSet mergedIdSet = IdSets.merge(IdSets.fromBytes(_intBloomFilterIdSet.toBytes()),
+          IdSets.fromBytes(_intBloomFilterIdSet.toBytes()));
       assertEquals(mergedIdSet, _intBloomFilterIdSet);
     }
     {
-      IdSet mergedIdSet = IdSets
-          .merge(IdSets.fromBytes(_longBloomFilterIdSet.toBytes()), IdSets.fromBytes(_longBloomFilterIdSet.toBytes()));
+      IdSet mergedIdSet = IdSets.merge(IdSets.fromBytes(_longBloomFilterIdSet.toBytes()),
+          IdSets.fromBytes(_longBloomFilterIdSet.toBytes()));
       assertEquals(mergedIdSet, _longBloomFilterIdSet);
     }
 
@@ -187,15 +185,13 @@ public class IdSetTest {
 
     // Convert to BloomFilterIdSet
     {
-      IdSet mergedIdSet = IdSets
-          .merge(IdSets.fromBytes(_intIdSet.toBytes()), IdSets.fromBytes(_intIdSet.toBytes()), 1, NUM_VALUES,
-              IdSets.DEFAULT_FPP);
+      IdSet mergedIdSet = IdSets.merge(IdSets.fromBytes(_intIdSet.toBytes()), IdSets.fromBytes(_intIdSet.toBytes()), 1,
+          NUM_VALUES, IdSets.DEFAULT_FPP);
       assertEquals(mergedIdSet, _intBloomFilterIdSet);
     }
     {
-      IdSet mergedIdSet = IdSets
-          .merge(IdSets.fromBytes(_longIdSet.toBytes()), IdSets.fromBytes(_longIdSet.toBytes()), 1, NUM_VALUES,
-              IdSets.DEFAULT_FPP);
+      IdSet mergedIdSet = IdSets.merge(IdSets.fromBytes(_longIdSet.toBytes()), IdSets.fromBytes(_longIdSet.toBytes()),
+          1, NUM_VALUES, IdSets.DEFAULT_FPP);
       assertEquals(mergedIdSet, _longBloomFilterIdSet);
     }
   }

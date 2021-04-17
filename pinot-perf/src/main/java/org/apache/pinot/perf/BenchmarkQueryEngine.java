@@ -81,8 +81,7 @@ public class BenchmarkQueryEngine {
   boolean ranOnce = false;
 
   @Setup
-  public void startPinot()
-      throws Exception {
+  public void startPinot() throws Exception {
     System.out.println("Using table name " + TABLE_NAME);
     System.out.println("Using data directory " + DATA_DIRECTORY);
     System.out.println("Starting pinot");
@@ -141,13 +140,11 @@ public class BenchmarkQueryEngine {
   @Benchmark
   @BenchmarkMode({Mode.SampleTime})
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public int sendQueryToPinot()
-      throws Exception {
+  public int sendQueryToPinot() throws Exception {
     return _perfBenchmarkDriver.postQuery(QUERY_PATTERNS[queryPattern], optimizationFlags).get("totalDocs").asInt();
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     ChainedOptionsBuilder opt =
         new OptionsBuilder().include(BenchmarkQueryEngine.class.getSimpleName()).warmupTime(TimeValue.seconds(30))
             .warmupIterations(4).measurementTime(TimeValue.seconds(30)).measurementIterations(20);

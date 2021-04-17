@@ -81,7 +81,6 @@ class ResultTableResultSet extends AbstractResultSet {
     return columns;
   }
 
-
   public List<String> getAllColumnsDataTypes() {
     List<String> columnDataTypes = new ArrayList<>();
     if (_columnDataTypesArray == null) {

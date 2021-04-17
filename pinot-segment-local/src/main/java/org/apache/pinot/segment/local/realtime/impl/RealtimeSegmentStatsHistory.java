@@ -50,13 +50,13 @@ import org.slf4j.LoggerFactory;
  */
 public class RealtimeSegmentStatsHistory implements Serializable {
   public static Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentStatsHistory.class);
-  private static final long serialVersionUID = 1L;  // Change this if a new field is added to this class
+  private static final long serialVersionUID = 1L; // Change this if a new field is added to this class
   private static final int DEFAULT_ROWS_TO_INDEX = 100000;
 
   private static final String OLD_PACKAGE_FOR_CLASS = "org.apache.pinot.core.realtime.impl";
 
   // XXX MAX_NUM_ENTRIES should be a final variable, but we need to modify it for testing.
-  private static int MAX_NUM_ENTRIES = 16;  // Max number of past segments for which stats are kept
+  private static int MAX_NUM_ENTRIES = 16; // Max number of past segments for which stats are kept
 
   // Fields to be serialzied.
   private int _cursor = 0;
@@ -96,11 +96,11 @@ public class RealtimeSegmentStatsHistory implements Serializable {
 
   public static class SegmentStats implements Serializable {
     private static final long serialVersionUID = 1L;
-    private int _numRowsConsumed;   // Number of rows consumed
+    private int _numRowsConsumed; // Number of rows consumed
     private int _numRowsIndexed = DEFAULT_ROWS_TO_INDEX;
     // numRowsIndexed can be <= numRowsConsumed when aggregateMetrics is true.
-    private int _numSeconds;        // Number of seconds taken to consume them
-    private long _memUsedBytes;          // Memory used for consumption (bytes)
+    private int _numSeconds; // Number of seconds taken to consume them
+    private long _memUsedBytes; // Memory used for consumption (bytes)
     private Map<String, ColumnStats> _colNameToStats = new HashMap();
 
     public int getNumRowsConsumed() {
@@ -158,10 +158,10 @@ public class RealtimeSegmentStatsHistory implements Serializable {
   }
 
   public static class ColumnStats implements Serializable {
-    private static final long serialVersionUID = 1L;  // Change this if a new field is added to this class
+    private static final long serialVersionUID = 1L; // Change this if a new field is added to this class
 
-    private int _avgColumnSize;     // Used only for string columns when building dictionary
-    private int _cardinality;       // Used for all dictionary columns
+    private int _avgColumnSize; // Used only for string columns when building dictionary
+    private int _cardinality; // Used for all dictionary columns
 
     public int getCardinality() {
       return _cardinality;
@@ -404,15 +404,13 @@ public class RealtimeSegmentStatsHistory implements Serializable {
    */
   private static class CustomObjectInputStream extends ObjectInputStream {
 
-    public CustomObjectInputStream(InputStream in)
-        throws IOException {
+    public CustomObjectInputStream(InputStream in) throws IOException {
       super(in);
       enableResolveObject(true);
     }
 
     @Override
-    protected ObjectStreamClass readClassDescriptor()
-        throws SecurityException, IOException, ClassNotFoundException {
+    protected ObjectStreamClass readClassDescriptor() throws SecurityException, IOException, ClassNotFoundException {
       ObjectStreamClass objectStreamClass = super.readClassDescriptor();
 
       // If we are deserializing from file written by class before the move, then replace the package name.

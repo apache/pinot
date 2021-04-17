@@ -106,8 +106,8 @@ public class TableResizer {
       return new GroupByExpressionExtractor(groupByExpressionIndex);
     }
     FunctionContext function = expression.getFunction();
-    Preconditions
-        .checkState(function != null, "Failed to find ORDER-BY expression: %s in the GROUP-BY clause", expression);
+    Preconditions.checkState(function != null, "Failed to find ORDER-BY expression: %s in the GROUP-BY clause",
+        expression);
     if (function.getType() == FunctionContext.Type.AGGREGATION) {
       // Aggregation function
       return new AggregationFunctionExtractor(_aggregationFunctionIndexMap.get(function));
@@ -203,7 +203,8 @@ public class TableResizer {
     }
     int numRecordsToRetain = Math.min(numRecords, trimToSize);
     // make PQ of sorted records to retain
-    PriorityQueue<IntermediateRecord> priorityQueue = convertToIntermediateRecordsPQ(recordsMap, numRecordsToRetain, _intermediateRecordComparator.reversed());
+    PriorityQueue<IntermediateRecord> priorityQueue =
+        convertToIntermediateRecordsPQ(recordsMap, numRecordsToRetain, _intermediateRecordComparator.reversed());
     Record[] sortedArray = new Record[numRecordsToRetain];
     while (!priorityQueue.isEmpty()) {
       IntermediateRecord intermediateRecord = priorityQueue.poll();

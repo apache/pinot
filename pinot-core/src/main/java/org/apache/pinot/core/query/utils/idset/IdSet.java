@@ -29,7 +29,10 @@ public interface IdSet {
 
   enum Type {
     // DO NOT change the ids as the ser/de relies on them
-    EMPTY((byte) 0), ROARING_BITMAP((byte) 1), ROARING_64_NAVIGABLE_MAP((byte) 2), BLOOM_FILTER((byte) 3);
+    EMPTY((byte) 0),
+    ROARING_BITMAP((byte) 1),
+    ROARING_64_NAVIGABLE_MAP((byte) 2),
+    BLOOM_FILTER((byte) 3);
 
     private final byte _id;
 
@@ -139,15 +142,13 @@ public interface IdSet {
   /**
    * Serializes the IdSet into a byte array.
    */
-  byte[] toBytes()
-      throws IOException;
+  byte[] toBytes() throws IOException;
 
   /**
    * Serializes the IdSet into a Base64 string.
    * <p>Use Base64 instead of Hex encoding for better compression.
    */
-  default String toBase64String()
-      throws IOException {
+  default String toBase64String() throws IOException {
     return Base64.getEncoder().encodeToString(toBytes());
   }
 }

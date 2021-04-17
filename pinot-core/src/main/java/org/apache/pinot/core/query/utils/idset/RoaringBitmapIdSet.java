@@ -75,8 +75,7 @@ public class RoaringBitmapIdSet implements IdSet {
    * Deserializes the RoaringBitmapIdSet from a ByteBuffer.
    * <p>NOTE: The ByteBuffer does not include the IdSet.Type byte.
    */
-  static RoaringBitmapIdSet fromByteBuffer(ByteBuffer byteBuffer)
-      throws IOException {
+  static RoaringBitmapIdSet fromByteBuffer(ByteBuffer byteBuffer) throws IOException {
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     roaringBitmap.deserialize(byteBuffer);
     return new RoaringBitmapIdSet(roaringBitmap);

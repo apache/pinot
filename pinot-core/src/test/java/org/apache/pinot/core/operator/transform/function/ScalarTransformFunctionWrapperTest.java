@@ -94,8 +94,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        RequestContextUtils.getExpression(String.format("substr(%s, '2', '-1')", STRING_ALPHANUM_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("substr(%s, '2', '-1')", STRING_ALPHANUM_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "substr");
@@ -200,8 +199,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
 
   @Test
   public void testSha256TransformFunction() {
-    ExpressionContext expression =
-        RequestContextUtils.getExpression(String.format("sha256(%s)", BYTES_SV_COLUMN));
+    ExpressionContext expression = RequestContextUtils.getExpression(String.format("sha256(%s)", BYTES_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "sha256");
@@ -214,8 +212,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
 
   @Test
   public void testSha512TransformFunction() {
-    ExpressionContext expression =
-        RequestContextUtils.getExpression(String.format("sha512(%s)", BYTES_SV_COLUMN));
+    ExpressionContext expression = RequestContextUtils.getExpression(String.format("sha512(%s)", BYTES_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "sha512");
@@ -314,8 +311,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        RequestContextUtils.getExpression(String.format("str_r_pos(%s, 'A')", STRING_ALPHANUM_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("str_r_pos(%s, 'A')", STRING_ALPHANUM_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "strrpos");
@@ -325,8 +321,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        RequestContextUtils.getExpression(String.format("str_r_pos(%s, 'A', 1)", STRING_ALPHANUM_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("str_r_pos(%s, 'A', 1)", STRING_ALPHANUM_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "strrpos");
@@ -350,8 +345,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        RequestContextUtils.getExpression(String.format("normalize(%s, 'NFC')", STRING_ALPHANUM_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("normalize(%s, 'NFC')", STRING_ALPHANUM_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "normalize");
@@ -633,8 +627,8 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
 
   @Test
   public void testArrayUnionIntTransformFunction() {
-    ExpressionContext expression = RequestContextUtils
-        .getExpression(String.format("array_union_int(%s, %s)", INT_MV_COLUMN, INT_MV_COLUMN));
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("array_union_int(%s, %s)", INT_MV_COLUMN, INT_MV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "arrayUnionInt");
@@ -665,8 +659,8 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
 
   @Test
   public void testArrayConcatIntTransformFunction() {
-    ExpressionContext expression = RequestContextUtils
-        .getExpression(String.format("array_concat_int(%s, %s)", INT_MV_COLUMN, INT_MV_COLUMN));
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("array_concat_int(%s, %s)", INT_MV_COLUMN, INT_MV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "arrayConcatInt");

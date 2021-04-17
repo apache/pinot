@@ -55,9 +55,8 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
     _retryDelayScaleFactor = config.getProperty(RETRY_DELAY_SCALE_FACTOR_CONFIG_KEY, DEFAULT_RETRY_DELAY_SCALE_FACTOR);
     _authToken = config.getProperty(AUTH_TOKEN);
     doInit(config);
-    _logger
-        .info("Initialized with retryCount: {}, retryWaitMs: {}, retryDelayScaleFactor: {}", _retryCount, _retryWaitMs,
-            _retryDelayScaleFactor);
+    _logger.info("Initialized with retryCount: {}, retryWaitMs: {}, retryDelayScaleFactor: {}", _retryCount,
+        _retryWaitMs, _retryDelayScaleFactor);
   }
 
   /**
@@ -67,8 +66,7 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
   }
 
   @Override
-  public void fetchSegmentToLocal(URI uri, File dest)
-      throws Exception {
+  public void fetchSegmentToLocal(URI uri, File dest) throws Exception {
     RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
       try {
         fetchSegmentToLocalWithoutRetry(uri, dest);
@@ -82,8 +80,7 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
   }
 
   @Override
-  public void fetchSegmentToLocal(List<URI> uris, File dest)
-      throws Exception {
+  public void fetchSegmentToLocal(List<URI> uris, File dest) throws Exception {
     if (uris == null) {
       throw new IllegalArgumentException("The input uri list is empty");
     }
@@ -105,8 +102,7 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
    * Fetches a segment from URI location to local without retry. Sub-class should override this or
    * {@link #fetchSegmentToLocal(URI, File)}.
    */
-  protected void fetchSegmentToLocalWithoutRetry(URI uri, File dest)
-      throws Exception {
+  protected void fetchSegmentToLocalWithoutRetry(URI uri, File dest) throws Exception {
     throw new UnsupportedOperationException();
   }
 }

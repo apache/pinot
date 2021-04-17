@@ -30,8 +30,7 @@ import org.xerial.snappy.Snappy;
 public class SnappyCompressor implements ChunkCompressor {
 
   @Override
-  public int compress(ByteBuffer inDecompressed, ByteBuffer outCompressed)
-      throws IOException {
+  public int compress(ByteBuffer inDecompressed, ByteBuffer outCompressed) throws IOException {
     return Snappy.compress(inDecompressed, outCompressed);
   }
 }

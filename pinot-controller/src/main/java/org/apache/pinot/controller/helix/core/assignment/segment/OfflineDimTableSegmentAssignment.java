@@ -72,8 +72,7 @@ public class OfflineDimTableSegmentAssignment implements SegmentAssignment {
     Set<String> instances = HelixHelper.getServerInstancesForTenant(_helixManager, serverTag);
     int numInstances = instances.size();
     Preconditions.checkState(numInstances > 0, "No instance found with tag: %s or %s",
-        TagNameUtils.getOfflineTagForTenant(serverTag),
-        TagNameUtils.getRealtimeTagForTenant(serverTag));
+        TagNameUtils.getOfflineTagForTenant(serverTag), TagNameUtils.getRealtimeTagForTenant(serverTag));
     return new ArrayList<>(instances);
   }
 
@@ -85,8 +84,8 @@ public class OfflineDimTableSegmentAssignment implements SegmentAssignment {
     Set<String> instances = HelixHelper.getServerInstancesForTenant(_helixManager, serverTag);
     Map<String, Map<String, String>> newAssignment = new TreeMap<>();
     for (String segment : currentAssignment.keySet()) {
-      newAssignment.put(segment, SegmentAssignmentUtils
-          .getInstanceStateMap(instances, CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE));
+      newAssignment.put(segment, SegmentAssignmentUtils.getInstanceStateMap(instances,
+          CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE));
     }
     return newAssignment;
   }

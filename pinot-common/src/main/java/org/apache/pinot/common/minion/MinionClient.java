@@ -73,37 +73,35 @@ public class MinionClient {
     int statusCode = response.getStatusLine().getStatusCode();
     final String responseString = IOUtils.toString(response.getEntity().getContent());
     if (statusCode >= 400) {
-      throw new HttpException(String
-          .format("Unable to schedule minion tasks. Error code %d, Error message: %s", statusCode, responseString));
+      throw new HttpException(String.format("Unable to schedule minion tasks. Error code %d, Error message: %s",
+          statusCode, responseString));
     }
     return JsonUtils.stringToObject(responseString, new TypeReference<Map<String, String>>() {
     });
   }
 
-  public Map<String, String> getTasksStates(String taskType)
-      throws IOException {
+  public Map<String, String> getTasksStates(String taskType) throws IOException {
     HttpGet httpGet =
         createHttpGetRequest(MinionRequestURLBuilder.baseUrl(getControllerUrl()).forTasksStates(taskType));
     HttpResponse response = HTTP_CLIENT.execute(httpGet);
     int statusCode = response.getStatusLine().getStatusCode();
     final String responseString = IOUtils.toString(response.getEntity().getContent());
     if (statusCode >= 400) {
-      throw new HttpException(String
-          .format("Unable to get tasks states map. Error code %d, Error message: %s", statusCode, responseString));
+      throw new HttpException(String.format("Unable to get tasks states map. Error code %d, Error message: %s",
+          statusCode, responseString));
     }
     return JsonUtils.stringToObject(responseString, new TypeReference<Map<String, String>>() {
     });
   }
 
-  public String getTaskState(String taskName)
-      throws IOException {
+  public String getTaskState(String taskName) throws IOException {
     HttpGet httpGet = createHttpGetRequest(MinionRequestURLBuilder.baseUrl(getControllerUrl()).forTaskState(taskName));
     HttpResponse response = HTTP_CLIENT.execute(httpGet);
     int statusCode = response.getStatusLine().getStatusCode();
     String responseString = IOUtils.toString(response.getEntity().getContent());
     if (statusCode >= 400) {
-      throw new HttpException(
-          String.format("Unable to get state for task: %s. Error code %d, Error message: %s", taskName, statusCode, responseString));
+      throw new HttpException(String.format("Unable to get state for task: %s. Error code %d, Error message: %s",
+          taskName, statusCode, responseString));
     }
     return responseString;
   }

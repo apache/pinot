@@ -26,8 +26,7 @@ import org.apache.pinot.spi.filesystem.PinotFSFactory;
 public class PinotFSSegmentFetcher extends BaseSegmentFetcher {
 
   @Override
-  protected void fetchSegmentToLocalWithoutRetry(URI uri, File dest)
-      throws Exception {
+  protected void fetchSegmentToLocalWithoutRetry(URI uri, File dest) throws Exception {
     PinotFSFactory.create(uri.getScheme()).copyToLocalFile(uri, dest);
   }
 }

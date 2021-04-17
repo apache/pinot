@@ -48,8 +48,7 @@ public class PinotTaskManagerTest extends ControllerTest {
   private static final String RAW_TABLE_NAME = "myTable";
 
   @BeforeClass
-  public void setup()
-      throws Exception {
+  public void setup() throws Exception {
     startZk();
   }
 
@@ -62,8 +61,7 @@ public class PinotTaskManagerTest extends ControllerTest {
   }
 
   @Test
-  public void testPinotTaskManagerSchedulerWithUpdate()
-      throws Exception {
+  public void testPinotTaskManagerSchedulerWithUpdate() throws Exception {
     Map<String, Object> properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
     startController(properties);
@@ -79,9 +77,11 @@ public class PinotTaskManagerTest extends ControllerTest {
     Assert.assertNotNull(scheduler);
 
     // 1. Add Table
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTaskConfig(
-        new TableTaskConfig(
-            ImmutableMap.of("SegmentGenerationAndPushTask", ImmutableMap.of("schedule", "0 */10 * ? * * *")))).build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+            .setTaskConfig(new TableTaskConfig(
+                ImmutableMap.of("SegmentGenerationAndPushTask", ImmutableMap.of("schedule", "0 */10 * ? * * *"))))
+            .build();
     addTableConfig(tableConfig);
     Thread.sleep(2000);
     List<String> jobGroupNames = scheduler.getJobGroupNames();
@@ -106,9 +106,11 @@ public class PinotTaskManagerTest extends ControllerTest {
     }
 
     // 2. Update table to new schedule
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTaskConfig(
-        new TableTaskConfig(
-            ImmutableMap.of("SegmentGenerationAndPushTask", ImmutableMap.of("schedule", "0 */20 * ? * * *")))).build();
+    tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+            .setTaskConfig(new TableTaskConfig(
+                ImmutableMap.of("SegmentGenerationAndPushTask", ImmutableMap.of("schedule", "0 */20 * ? * * *"))))
+            .build();
     updateTableConfig(tableConfig);
     Thread.sleep(2000);
     jobGroupNames = scheduler.getJobGroupNames();

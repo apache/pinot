@@ -85,8 +85,7 @@ public abstract class BaseDataTable implements DataTable {
   /**
    * Helper method to serialize dictionary map.
    */
-  protected byte[] serializeDictionaryMap()
-      throws IOException {
+  protected byte[] serializeDictionaryMap() throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
 
@@ -113,8 +112,7 @@ public abstract class BaseDataTable implements DataTable {
   /**
    * Helper method to deserialize dictionary map.
    */
-  protected Map<String, Map<Integer, String>> deserializeDictionaryMap(byte[] bytes)
-      throws IOException {
+  protected Map<String, Map<Integer, String>> deserializeDictionaryMap(byte[] bytes) throws IOException {
     try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
         DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream)) {
       int numDictionaries = dataInputStream.readInt();

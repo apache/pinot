@@ -44,9 +44,8 @@ public class SegmentDirectoryPaths {
       case v3:
         return new File(indexDir, V3_SUBDIRECTORY_NAME);
       default:
-        throw new UnsupportedOperationException(
-            "Unsupported segment version: " + segmentVersion + " while trying to get segment directory from: "
-                + indexDir);
+        throw new UnsupportedOperationException("Unsupported segment version: " + segmentVersion
+            + " while trying to get segment directory from: " + indexDir);
     }
   }
 
@@ -91,7 +90,6 @@ public class SegmentDirectoryPaths {
     String luceneIndexDirectory = column + V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
     return findFormatFile(indexDir, luceneIndexDirectory);
   }
-
 
   @Nullable
   @VisibleForTesting

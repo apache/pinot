@@ -59,9 +59,8 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
   private static final String OPERATOR_NAME = "MinMaxValueBasedSelectionOrderByCombineOperator";
   // For min/max value based combine, when a thread detects that no more segments need to be processed, it inserts this
   // special IntermediateResultsBlock into the BlockingQueue to awake the main thread
-  private static final IntermediateResultsBlock LAST_RESULTS_BLOCK =
-      new IntermediateResultsBlock(new DataSchema(new String[0], new DataSchema.ColumnDataType[0]),
-          Collections.emptyList());
+  private static final IntermediateResultsBlock LAST_RESULTS_BLOCK = new IntermediateResultsBlock(
+      new DataSchema(new String[0], new DataSchema.ColumnDataType[0]), Collections.emptyList());
 
   // Use an AtomicInteger to track the number of operators skipped (no result inserted into the BlockingQueue)
   private final AtomicInteger _numOperatorsSkipped = new AtomicInteger();
@@ -238,8 +237,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
    * </ul>
    */
   @Override
-  protected IntermediateResultsBlock mergeResults()
-      throws Exception {
+  protected IntermediateResultsBlock mergeResults() throws Exception {
     IntermediateResultsBlock mergedBlock = null;
     int numBlocksMerged = 0;
     while (numBlocksMerged + _numOperatorsSkipped.get() < _numOperators) {
@@ -284,8 +282,8 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
     DataSchema dataSchemaToMerge = blockToMerge.getDataSchema();
     assert mergedDataSchema != null && dataSchemaToMerge != null;
     if (!mergedDataSchema.equals(dataSchemaToMerge)) {
-      String errorMessage = String
-          .format("Data schema mismatch between merged block: %s and block to merge: %s, drop block to merge",
+      String errorMessage =
+          String.format("Data schema mismatch between merged block: %s and block to merge: %s, drop block to merge",
               mergedDataSchema, dataSchemaToMerge);
       // NOTE: This is segment level log, so log at debug level to prevent flooding the log.
       LOGGER.debug(errorMessage);

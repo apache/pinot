@@ -61,10 +61,12 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
   private static final String DEFAULT_MERGE_TYPE = "CONCATENATE";
   private static final int DEFAULT_SEQUENCE_ID = 0;
 
-  @Option(name = "-inputPaths", required = true, metaVar = "<String>", usage = "Comma separated input segment files or directories that contains input segments to be merged")
+  @Option(name = "-inputPaths", required = true, metaVar = "<String>",
+      usage = "Comma separated input segment files or directories that contains input segments to be merged")
   private String _inputSegmentPaths;
 
-  @Option(name = "-outputPath", required = true, metaVar = "<String>", usage = "Output segment path. This should be different from working directory.")
+  @Option(name = "-outputPath", required = true, metaVar = "<String>",
+      usage = "Output segment path. This should be different from working directory.")
   private String _outputPath;
 
   @Option(name = "-tableConfigFilePath", required = true, metaVar = "<String>", usage = "Table config file path.")
@@ -73,20 +75,25 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
   @Option(name = "-schemaFilePath", required = true, metaVar = "<String>", usage = "Schema file path")
   private String _schemaFilePath;
 
-  @Option(name = "-tarOutputSegment", required = true, metaVar = "<String>", usage = "Indicate whether to tar output segment (true, false)")
+  @Option(name = "-tarOutputSegment", required = true, metaVar = "<String>",
+      usage = "Indicate whether to tar output segment (true, false)")
   private String _tarOutputSegment;
 
-  @Option(name = "-outputSegmentName", required = false, metaVar = "<String>", usage = "The name of output segment file")
+  @Option(name = "-outputSegmentName", required = false, metaVar = "<String>",
+      usage = "The name of output segment file")
   private String _outputSegmentName;
 
   // TODO: once rollup mode is supported, make this field required
-  @Option(name = "-mergeType", required = false, metaVar = "<String>", usage = "Merge type (\"CONCATENATE\" or \"ROLLUP\"). Currently, only \"CONCATENATE\" type is supported.")
+  @Option(name = "-mergeType", required = false, metaVar = "<String>",
+      usage = "Merge type (\"CONCATENATE\" or \"ROLLUP\"). Currently, only \"CONCATENATE\" type is supported.")
   private String _mergeType = DEFAULT_MERGE_TYPE;
 
-  @Option(name = "-workingDirectory", required = false, metaVar = "<String>", usage = "Path for working directory. This directory gets cleaned up after the job")
+  @Option(name = "-workingDirectory", required = false, metaVar = "<String>",
+      usage = "Path for working directory. This directory gets cleaned up after the job")
   private String _workingDirectory;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   public boolean getHelp() {
@@ -99,8 +106,7 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
   }
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
     LOGGER.info("Running segment merge command...");
 
     // Check merge type
@@ -268,8 +274,7 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
     }
   }
 
-  private void addFilePath(List<String> inputPaths, String path)
-      throws Exception {
+  private void addFilePath(List<String> inputPaths, String path) throws Exception {
     File pathFile = new File(path);
 
     if (!pathFile.exists()) {

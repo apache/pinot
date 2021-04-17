@@ -108,7 +108,7 @@ public class OfflineDimTableSegmentAssignmentTest {
   @Test
   public void testSegmentAssignmentToRealtimeHosts() {
     List<HelixProperty> instanceConfigList = new ArrayList<>();
-    for (String instance: INSTANCES) {
+    for (String instance : INSTANCES) {
       ZNRecord znRecord = new ZNRecord(instance);
       znRecord.setListField(TAG_LIST.name(), ImmutableList.of(REALTIME_SERVER_TAG));
       instanceConfigList.add(new InstanceConfig(znRecord));

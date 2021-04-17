@@ -229,8 +229,7 @@ public class DoubleOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
   }
 
   @Override
-  public void doClose()
-      throws IOException {
+  public void doClose() throws IOException {
     _dictIdToValue.close();
   }
 

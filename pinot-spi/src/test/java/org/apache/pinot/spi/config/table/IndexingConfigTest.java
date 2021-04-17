@@ -33,8 +33,7 @@ import static org.testng.Assert.assertTrue;
 public class IndexingConfigTest {
 
   @Test
-  public void testSerDe()
-      throws IOException {
+  public void testSerDe() throws IOException {
     IndexingConfig indexingConfig = new IndexingConfig();
     indexingConfig.setLoadMode("MMAP");
     indexingConfig.setAggregateMetrics(true);
@@ -66,8 +65,7 @@ public class IndexingConfigTest {
   }
 
   @Test
-  public void testSegmentPartitionConfig()
-      throws IOException {
+  public void testSegmentPartitionConfig() throws IOException {
     int numColumns = 5;
     Map<String, ColumnPartitionConfig> expectedColumnPartitionMap = new HashMap<>(5);
     for (int i = 0; i < numColumns; i++) {

@@ -32,15 +32,13 @@ public class LoaderUtilsTest {
   private static final File TEST_DIR = new File(FileUtils.getTempDirectory(), LoaderUtils.class.getName());
 
   @BeforeClass
-  public void setUp()
-      throws IOException {
+  public void setUp() throws IOException {
     FileUtils.deleteDirectory(TEST_DIR);
     Assert.assertTrue(TEST_DIR.mkdirs());
   }
 
   @Test
-  public void testReloadFailureRecovery()
-      throws IOException {
+  public void testReloadFailureRecovery() throws IOException {
     String segmentName = "dummySegment";
     String indexFileName = "dummyIndex";
     File indexDir = new File(TEST_DIR, segmentName);
@@ -91,8 +89,7 @@ public class LoaderUtilsTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     FileUtils.deleteDirectory(TEST_DIR);
   }
 }

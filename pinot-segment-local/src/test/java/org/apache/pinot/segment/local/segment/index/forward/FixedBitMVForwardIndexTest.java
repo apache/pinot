@@ -42,14 +42,12 @@ public class FixedBitMVForwardIndexTest {
   private static final Random RANDOM = new Random();
 
   @BeforeClass
-  public void setUp()
-      throws IOException {
+  public void setUp() throws IOException {
     FileUtils.forceMkdir(TEMP_DIR);
   }
 
   @Test
-  public void testFixedBitMVForwardIndex()
-      throws Exception {
+  public void testFixedBitMVForwardIndex() throws Exception {
     for (int numBitsPerValue = 1; numBitsPerValue <= 31; numBitsPerValue++) {
       // Generate random values
       int[][] valuesArray = new int[NUM_DOCS][];
@@ -66,8 +64,8 @@ public class FixedBitMVForwardIndexTest {
       }
 
       // Create the forward index
-      try (FixedBitMVForwardIndexWriter writer = new FixedBitMVForwardIndexWriter(INDEX_FILE, NUM_DOCS, totalNumValues,
-          numBitsPerValue)) {
+      try (FixedBitMVForwardIndexWriter writer =
+          new FixedBitMVForwardIndexWriter(INDEX_FILE, NUM_DOCS, totalNumValues, numBitsPerValue)) {
         for (int[] values : valuesArray) {
           writer.putDictIds(values);
         }
@@ -75,8 +73,9 @@ public class FixedBitMVForwardIndexTest {
 
       // Read the forward index
       try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(INDEX_FILE);
-          FixedBitMVForwardIndexReader reader = new FixedBitMVForwardIndexReader(dataBuffer, NUM_DOCS, totalNumValues,
-              numBitsPerValue); FixedBitMVForwardIndexReader.Context readerContext = reader.createContext()) {
+          FixedBitMVForwardIndexReader reader =
+              new FixedBitMVForwardIndexReader(dataBuffer, NUM_DOCS, totalNumValues, numBitsPerValue);
+          FixedBitMVForwardIndexReader.Context readerContext = reader.createContext()) {
         int[] valueBuffer = new int[MAX_NUM_VALUES_PER_MV_ENTRY];
         for (int i = 0; i < NUM_DOCS; i++) {
           int numValues = reader.getDictIdMV(i, valueBuffer, readerContext);
@@ -91,8 +90,7 @@ public class FixedBitMVForwardIndexTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 }

@@ -84,13 +84,12 @@ public class BenchmarkOffHeapMutableBytesStore {
     for (byte[] value : _values) {
       _mutableOffHeapByteArrayStore.add(value);
     }
-    System.out.println("\nBytes allocated for MutableOffHeapByteArrayStore: " + _mutableOffHeapByteArrayStore
-        .getTotalOffHeapMemUsed());
+    System.out.println("\nBytes allocated for MutableOffHeapByteArrayStore: "
+        + _mutableOffHeapByteArrayStore.getTotalOffHeapMemUsed());
   }
 
   @TearDown
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     _mutableOffHeapByteArrayStore.close();
     _offHeapMutableBytesStore.close();
     _memoryManager.close();
@@ -115,8 +114,7 @@ public class BenchmarkOffHeapMutableBytesStore {
   }
 
   @Benchmark
-  public int offHeapMutableBytesStoreWrite()
-      throws IOException {
+  public int offHeapMutableBytesStoreWrite() throws IOException {
     int sum = 0;
     try (OffHeapMutableBytesStore offHeapMutableBytesStore = new OffHeapMutableBytesStore(_memoryManager, null)) {
       for (byte[] value : _values) {
@@ -127,11 +125,10 @@ public class BenchmarkOffHeapMutableBytesStore {
   }
 
   @Benchmark
-  public int mutableOffHeapByteArrayStoreWrite()
-      throws IOException {
+  public int mutableOffHeapByteArrayStoreWrite() throws IOException {
     int sum = 0;
-    try (MutableOffHeapByteArrayStore mutableOffHeapByteArrayStore = new MutableOffHeapByteArrayStore(_memoryManager,
-        null, NUM_VALUES, _maxValueLength / 2)) {
+    try (MutableOffHeapByteArrayStore mutableOffHeapByteArrayStore =
+        new MutableOffHeapByteArrayStore(_memoryManager, null, NUM_VALUES, _maxValueLength / 2)) {
       for (byte[] value : _values) {
         sum += mutableOffHeapByteArrayStore.add(value);
       }
@@ -139,8 +136,7 @@ public class BenchmarkOffHeapMutableBytesStore {
     return sum;
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     ChainedOptionsBuilder opt = new OptionsBuilder().include(BenchmarkOffHeapMutableBytesStore.class.getSimpleName());
     new Runner(opt.build()).run();
   }

@@ -42,8 +42,7 @@ public class SchemaTest {
   public static final Logger LOGGER = LoggerFactory.getLogger(SchemaTest.class);
 
   @Test
-  public void testValidation()
-      throws Exception {
+  public void testValidation() throws Exception {
     Schema schemaToValidate;
 
     schemaToValidate = Schema.fromString(makeSchema(FieldSpec.DataType.LONG, FieldSpec.DataType.STRING, true));
@@ -241,8 +240,7 @@ public class SchemaTest {
   }
 
   @Test
-  public void testSerializeDeserialize()
-      throws Exception {
+  public void testSerializeDeserialize() throws Exception {
     URL resourceUrl = getClass().getClassLoader().getResource("schemaTest.schema");
     Assert.assertNotNull(resourceUrl);
     Schema schema = Schema.fromFile(new File(resourceUrl.getFile()));
@@ -267,14 +265,11 @@ public class SchemaTest {
   }
 
   @Test
-  public void testSimpleDateFormat()
-      throws Exception {
-    TimeGranularitySpec incomingTimeGranularitySpec =
-        new TimeGranularitySpec(FieldSpec.DataType.STRING, 1, TimeUnit.DAYS,
-            TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "Date");
-    TimeGranularitySpec outgoingTimeGranularitySpec =
-        new TimeGranularitySpec(FieldSpec.DataType.STRING, 1, TimeUnit.DAYS,
-            TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "Date");
+  public void testSimpleDateFormat() throws Exception {
+    TimeGranularitySpec incomingTimeGranularitySpec = new TimeGranularitySpec(FieldSpec.DataType.STRING, 1,
+        TimeUnit.DAYS, TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "Date");
+    TimeGranularitySpec outgoingTimeGranularitySpec = new TimeGranularitySpec(FieldSpec.DataType.STRING, 1,
+        TimeUnit.DAYS, TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "Date");
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
         .addTime(incomingTimeGranularitySpec, outgoingTimeGranularitySpec).build();
     String jsonSchema = schema.toSingleLineJsonString();
@@ -284,8 +279,7 @@ public class SchemaTest {
   }
 
   @Test
-  public void testByteType()
-      throws Exception {
+  public void testByteType() throws Exception {
     Schema expectedSchema = new Schema();
     byte[] expectedEmptyDefault = new byte[0];
     byte[] expectedNonEmptyDefault = BytesUtils.toBytes("abcd1234");
@@ -331,7 +325,7 @@ public class SchemaTest {
 
     // change column type
     Schema schema2 = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
-        .addSingleValueDimension("svDimensionWithDefault", FieldSpec.DataType.LONG, 10)  // INT -> LONG
+        .addSingleValueDimension("svDimensionWithDefault", FieldSpec.DataType.LONG, 10) // INT -> LONG
         .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
         .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default")
         .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
@@ -356,7 +350,7 @@ public class SchemaTest {
         .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default")
         .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
-        .addDateTime("dateTime", FieldSpec.DataType.LONG, "2:HOURS:EPOCH", "1:HOURS").build();  // timeUnit 1 -> 2
+        .addDateTime("dateTime", FieldSpec.DataType.LONG, "2:HOURS:EPOCH", "1:HOURS").build(); // timeUnit 1 -> 2
     Assert.assertFalse(schema4.isBackwardCompatibleWith(oldSchema));
 
     // change default value

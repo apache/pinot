@@ -38,8 +38,7 @@ public class PinotSparkJobLauncher {
     System.err.println(SUPPORT_JOB_TYPES);
   }
 
-  private static void kickOffPinotSparkJob(PinotIngestionJobType jobType, Properties jobConf)
-      throws Exception {
+  private static void kickOffPinotSparkJob(PinotIngestionJobType jobType, Properties jobConf) throws Exception {
     switch (jobType) {
       case SegmentCreation:
         new SparkSegmentCreationJob(jobConf).run();
@@ -63,8 +62,7 @@ public class PinotSparkJobLauncher {
     }
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     if (args.length != 2) {
       usage();
       System.exit(1);

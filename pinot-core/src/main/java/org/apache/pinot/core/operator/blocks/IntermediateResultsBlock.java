@@ -271,8 +271,7 @@ public class IntermediateResultsBlock implements Block {
     _numGroupsLimitReached = numGroupsLimitReached;
   }
 
-  public DataTable getDataTable()
-      throws Exception {
+  public DataTable getDataTable() throws Exception {
 
     if (_table != null) {
       return getResultDataTable();
@@ -294,8 +293,7 @@ public class IntermediateResultsBlock implements Block {
     return getMetadataDataTable();
   }
 
-  private DataTable getResultDataTable()
-      throws IOException {
+  private DataTable getResultDataTable() throws IOException {
     DataTableBuilder dataTableBuilder = new DataTableBuilder(_dataSchema);
 
     Iterator<Record> iterator = _table.iterator();
@@ -315,8 +313,7 @@ public class IntermediateResultsBlock implements Block {
   }
 
   private void setDataTableColumn(ColumnDataType columnDataType, DataTableBuilder dataTableBuilder, int columnIndex,
-      Object value)
-      throws IOException {
+      Object value) throws IOException {
     switch (columnDataType) {
       case INT:
         dataTableBuilder.setColumn(columnIndex, (int) value);
@@ -359,13 +356,11 @@ public class IntermediateResultsBlock implements Block {
     }
   }
 
-  private DataTable getSelectionResultDataTable()
-      throws Exception {
+  private DataTable getSelectionResultDataTable() throws Exception {
     return attachMetadataToDataTable(SelectionOperatorUtils.getDataTableFromRows(_selectionResult, _dataSchema));
   }
 
-  private DataTable getAggregationResultDataTable()
-      throws Exception {
+  private DataTable getAggregationResultDataTable() throws Exception {
     // Extract result column name and type from each aggregation function
     int numAggregationFunctions = _aggregationFunctions.length;
     String[] columnNames = new String[numAggregationFunctions];
@@ -401,8 +396,7 @@ public class IntermediateResultsBlock implements Block {
     return attachMetadataToDataTable(dataTable);
   }
 
-  private DataTable getAggregationGroupByResultDataTable()
-      throws Exception {
+  private DataTable getAggregationGroupByResultDataTable() throws Exception {
     String[] columnNames = new String[]{"functionName", "GroupByResultMap"};
     ColumnDataType[] columnDataTypes = new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.OBJECT};
 
@@ -427,10 +421,10 @@ public class IntermediateResultsBlock implements Block {
 
   private DataTable attachMetadataToDataTable(DataTable dataTable) {
     dataTable.getMetadata().put(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, String.valueOf(_numDocsScanned));
-    dataTable.getMetadata()
-        .put(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, String.valueOf(_numEntriesScannedInFilter));
-    dataTable.getMetadata()
-        .put(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, String.valueOf(_numEntriesScannedPostFilter));
+    dataTable.getMetadata().put(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY,
+        String.valueOf(_numEntriesScannedInFilter));
+    dataTable.getMetadata().put(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY,
+        String.valueOf(_numEntriesScannedPostFilter));
     dataTable.getMetadata().put(DataTable.NUM_SEGMENTS_PROCESSED, String.valueOf(_numSegmentsProcessed));
     dataTable.getMetadata().put(DataTable.NUM_SEGMENTS_MATCHED, String.valueOf(_numSegmentsMatched));
     dataTable.getMetadata().put(DataTable.NUM_RESIZES_METADATA_KEY, String.valueOf(_numResizes));

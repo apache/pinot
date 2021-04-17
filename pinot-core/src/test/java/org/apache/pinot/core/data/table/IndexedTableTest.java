@@ -47,8 +47,7 @@ public class IndexedTableTest {
   private static final int TRIM_THRESHOLD = 20;
 
   @Test
-  public void testConcurrentIndexedTable()
-      throws InterruptedException, TimeoutException, ExecutionException {
+  public void testConcurrentIndexedTable() throws InterruptedException, TimeoutException, ExecutionException {
     QueryContext queryContext = QueryContextConverterUtils
         .getQueryContextFromSQL("SELECT SUM(m1), MAX(m2) FROM testTable GROUP BY d1, d2, d3 ORDER BY SUM(m1)");
     DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)"},

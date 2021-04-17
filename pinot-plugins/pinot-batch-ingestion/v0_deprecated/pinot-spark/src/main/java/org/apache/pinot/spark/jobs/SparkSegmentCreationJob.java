@@ -60,8 +60,7 @@ public class SparkSegmentCreationJob extends SegmentCreationJob {
       Path hdfsInputFile, int sequenceId) {
   }
 
-  public void run()
-      throws Exception {
+  public void run() throws Exception {
     _logger.info("Starting {}", getClass().getSimpleName());
 
     Path inputPattern = new Path(_inputPattern);
@@ -92,8 +91,8 @@ public class SparkSegmentCreationJob extends SegmentCreationJob {
       _logger.info("Creating segments with data files: {}", dataFilePaths);
       for (int i = 0; i < numDataFiles; i++) {
         Path dataFilePath = dataFilePaths.get(i);
-        try (DataOutputStream dataOutputStream = outputDirFileSystem
-            .create(new Path(stagingInputDir, Integer.toString(i)))) {
+        try (DataOutputStream dataOutputStream =
+            outputDirFileSystem.create(new Path(stagingInputDir, Integer.toString(i)))) {
           dataOutputStream.write(StringUtil.encodeUtf8(dataFilePath.toString() + " " + i));
           dataOutputStream.flush();
         }
@@ -162,13 +161,11 @@ public class SparkSegmentCreationJob extends SegmentCreationJob {
     }
   }
 
-  protected void addDepsJarToDistributedCache(JavaSparkContext sparkContext)
-      throws IOException {
+  protected void addDepsJarToDistributedCache(JavaSparkContext sparkContext) throws IOException {
     if (_depsJarDir != null) {
       Path depsJarPath = new Path(_depsJarDir);
-      PinotSparkJobPreparationHelper
-          .addDepsJarToDistributedCacheHelper(FileSystem.get(depsJarPath.toUri(), new Configuration()), sparkContext,
-              depsJarPath);
+      PinotSparkJobPreparationHelper.addDepsJarToDistributedCacheHelper(
+          FileSystem.get(depsJarPath.toUri(), new Configuration()), sparkContext, depsJarPath);
     }
   }
 

@@ -43,8 +43,7 @@ public class TokenSchedulerGroupTest {
   }
 
   @Test
-  public void testIncrementThreads()
-      throws Exception {
+  public void testIncrementThreads() throws Exception {
     // set test time first
     timeMillis = 100;
     TestTokenSchedulerGroup group = new TestTokenSchedulerGroup();

@@ -81,15 +81,14 @@ public class FileBasedSegmentWriter implements SegmentWriter {
   private GenericData.Record _reusableRecord;
 
   @Override
-  public void init(TableConfig tableConfig, Schema schema)
-      throws Exception {
+  public void init(TableConfig tableConfig, Schema schema) throws Exception {
     _tableConfig = tableConfig;
     _tableNameWithType = _tableConfig.getTableName();
 
     Preconditions.checkState(
         _tableConfig.getIngestionConfig() != null && _tableConfig.getIngestionConfig().getBatchIngestionConfig() != null
             && CollectionUtils
-            .isNotEmpty(_tableConfig.getIngestionConfig().getBatchIngestionConfig().getBatchConfigMaps()),
+                .isNotEmpty(_tableConfig.getIngestionConfig().getBatchIngestionConfig().getBatchConfigMaps()),
         "Must provide ingestionConfig->batchIngestionConfig->batchConfigMaps in tableConfig for table: %s",
         _tableNameWithType);
     _batchIngestionConfig = _tableConfig.getIngestionConfig().getBatchIngestionConfig();
@@ -121,16 +120,14 @@ public class FileBasedSegmentWriter implements SegmentWriter {
     LOGGER.info("Initialized {} for table: {}", FileBasedSegmentWriter.class.getName(), _tableNameWithType);
   }
 
-  private void resetBuffer()
-      throws IOException {
+  private void resetBuffer() throws IOException {
     FileUtils.deleteQuietly(_bufferFile);
     _recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema));
     _recordWriter.create(_avroSchema, _bufferFile);
   }
 
   @Override
-  public void collect(GenericRow row)
-      throws IOException {
+  public void collect(GenericRow row) throws IOException {
     GenericRow transform = _recordTransformer.transform(row);
     SegmentProcessorAvroUtils.convertGenericRowToAvroRecord(transform, _reusableRecord, _fieldsToRead);
     _recordWriter.append(_reusableRecord);
@@ -154,8 +151,7 @@ public class FileBasedSegmentWriter implements SegmentWriter {
    * @throws IOException
    */
   @Override
-  public URI flush()
-      throws IOException {
+  public URI flush() throws IOException {
 
     LOGGER.info("Beginning flush for table: {}", _tableNameWithType);
     _recordWriter.close();
@@ -196,17 +192,17 @@ public class FileBasedSegmentWriter implements SegmentWriter {
       resetBuffer();
       return segmentTarFile.toURI();
     } catch (Exception e) {
-      throw new RuntimeException(String
-          .format("Caught exception while generating segment from buffer file: %s for table:%s",
-              _bufferFile.getAbsolutePath(), _tableNameWithType), e);
+      throw new RuntimeException(
+          String.format("Caught exception while generating segment from buffer file: %s for table:%s",
+              _bufferFile.getAbsolutePath(), _tableNameWithType),
+          e);
     } finally {
       FileUtils.deleteQuietly(flushDir);
     }
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     LOGGER.info("Closing {} for table: {}", FileBasedSegmentWriter.class.getName(), _tableNameWithType);
     _recordWriter.close();
     FileUtils.deleteQuietly(_stagingDir);

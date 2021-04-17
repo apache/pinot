@@ -41,8 +41,7 @@ public class SegmentDirectoryPathsTest {
   }
 
   @Test
-  public void testFindMetadataFile()
-      throws Exception {
+  public void testFindMetadataFile() throws Exception {
     File indexDir = new File(SegmentDirectoryPaths.class.toString());
     FileUtils.deleteQuietly(indexDir);
     try {

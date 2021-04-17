@@ -59,8 +59,7 @@ public final class OnHeapBitmapInvertedIndexCreator implements DictionaryBasedIn
   }
 
   @Override
-  public void seal()
-      throws IOException {
+  public void seal() throws IOException {
     try (BitmapInvertedIndexWriter writer = new BitmapInvertedIndexWriter(_invertedIndexFile, _bitmapWriters.length)) {
       for (RoaringBitmapWriter<RoaringBitmap> bitmapWriter : _bitmapWriters) {
         writer.add(bitmapWriter.get());

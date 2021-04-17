@@ -50,113 +50,97 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
   }
 
   @Override
-  protected void validateState()
-      throws SQLException {
+  protected void validateState() throws SQLException {
     if (isClosed()) {
       throw new SQLException("Connection is already closed!");
     }
   }
 
   @Override
-  public void setNull(int parameterIndex, int sqlType)
-      throws SQLException {
+  public void setNull(int parameterIndex, int sqlType) throws SQLException {
     validateState();
     _preparedStatement.setString(parameterIndex - 1, "NULL");
   }
 
   @Override
-  public void setBoolean(int parameterIndex, boolean x)
-      throws SQLException {
+  public void setBoolean(int parameterIndex, boolean x) throws SQLException {
     validateState();
     _preparedStatement.setString(parameterIndex - 1, String.valueOf(x));
   }
 
   @Override
-  public void setShort(int parameterIndex, short x)
-      throws SQLException {
+  public void setShort(int parameterIndex, short x) throws SQLException {
     validateState();
     _preparedStatement.setInt(parameterIndex - 1, x);
   }
 
   @Override
-  public void setInt(int parameterIndex, int x)
-      throws SQLException {
+  public void setInt(int parameterIndex, int x) throws SQLException {
     validateState();
     _preparedStatement.setInt(parameterIndex - 1, x);
   }
 
   @Override
-  public void setLong(int parameterIndex, long x)
-      throws SQLException {
+  public void setLong(int parameterIndex, long x) throws SQLException {
     validateState();
     _preparedStatement.setLong(parameterIndex - 1, x);
   }
 
   @Override
-  public void setFloat(int parameterIndex, float x)
-      throws SQLException {
+  public void setFloat(int parameterIndex, float x) throws SQLException {
     validateState();
     _preparedStatement.setFloat(parameterIndex - 1, x);
   }
 
   @Override
-  public void setDouble(int parameterIndex, double x)
-      throws SQLException {
+  public void setDouble(int parameterIndex, double x) throws SQLException {
     validateState();
     _preparedStatement.setDouble(parameterIndex - 1, x);
   }
 
   @Override
-  public void setString(int parameterIndex, String x)
-      throws SQLException {
+  public void setString(int parameterIndex, String x) throws SQLException {
     validateState();
     _preparedStatement.setString(parameterIndex - 1, x);
   }
 
   @Override
-  public void setBytes(int parameterIndex, byte[] x)
-      throws SQLException {
+  public void setBytes(int parameterIndex, byte[] x) throws SQLException {
     validateState();
     _preparedStatement.setString(parameterIndex - 1, Hex.encodeHexString(x));
   }
 
   @Override
-  public void setDate(int parameterIndex, Date x)
-      throws SQLException {
+  public void setDate(int parameterIndex, Date x) throws SQLException {
     _preparedStatement.setString(parameterIndex - 1, DateTimeUtils.dateToString(x));
   }
 
   @Override
-  public void setTime(int parameterIndex, Time x)
-      throws SQLException {
+  public void setTime(int parameterIndex, Time x) throws SQLException {
     validateState();
     _preparedStatement.setString(parameterIndex - 1, DateTimeUtils.timeToString(x));
   }
 
   @Override
-  public void setTimestamp(int parameterIndex, Timestamp x)
-      throws SQLException {
+  public void setTimestamp(int parameterIndex, Timestamp x) throws SQLException {
     validateState();
     _preparedStatement.setString(parameterIndex - 1, DateTimeUtils.timeStampToString(x));
   }
 
   @Override
-  public void setBigDecimal(int parameterIndex, BigDecimal x)
-      throws SQLException {
+  public void setBigDecimal(int parameterIndex, BigDecimal x) throws SQLException {
     validateState();
     _preparedStatement.setString(parameterIndex - 1, x.toString());
   }
 
   @Override
-  public void clearParameters()
-      throws SQLException {
+  public void clearParameters() throws SQLException {
     validateState();
     _preparedStatement = new PreparedStatement(_session, new Request(QUERY_FORMAT, _query));
   }
 
   @Override
-  public boolean execute()
-      throws SQLException {
+  public boolean execute() throws SQLException {
     _resultSet = executeQuery();
     if (_resultSet.next()) {
       _resultSet.beforeFirst();
@@ -168,8 +152,7 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
   }
 
   @Override
-  public ResultSet executeQuery(String sql)
-      throws SQLException {
+  public ResultSet executeQuery(String sql) throws SQLException {
     validateState();
     try {
       Request request = new Request(QUERY_FORMAT, sql);
@@ -186,8 +169,7 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
   }
 
   @Override
-  public ResultSet executeQuery()
-      throws SQLException {
+  public ResultSet executeQuery() throws SQLException {
     validateState();
     try {
       _resultSetGroup = _preparedStatement.execute();
@@ -204,8 +186,7 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
   }
 
   @Override
-  public boolean execute(String sql)
-      throws SQLException {
+  public boolean execute(String sql) throws SQLException {
     _resultSet = executeQuery(sql);
     if (_resultSet.next()) {
       _resultSet.beforeFirst();
@@ -217,33 +198,27 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
   }
 
   @Override
-  public boolean execute(String sql, int autoGeneratedKeys)
-      throws SQLException {
+  public boolean execute(String sql, int autoGeneratedKeys) throws SQLException {
     return execute(sql);
   }
 
   @Override
-  public boolean execute(String sql, int[] columnIndexes)
-      throws SQLException {
+  public boolean execute(String sql, int[] columnIndexes) throws SQLException {
     return execute(sql);
   }
 
   @Override
-  public boolean execute(String sql, String[] columnNames)
-      throws SQLException {
+  public boolean execute(String sql, String[] columnNames) throws SQLException {
     return execute(sql);
   }
 
-
   @Override
-  public ResultSet getResultSet()
-      throws SQLException {
+  public ResultSet getResultSet() throws SQLException {
     return _resultSet;
   }
 
   @Override
-  public void close()
-      throws SQLException {
+  public void close() throws SQLException {
     _preparedStatement = null;
     _connection = null;
     _session = null;
@@ -251,15 +226,13 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
   }
 
   @Override
-  public Connection getConnection()
-      throws SQLException {
+  public Connection getConnection() throws SQLException {
     validateState();
     return _connection;
   }
 
   @Override
-  public boolean isClosed()
-      throws SQLException {
+  public boolean isClosed() throws SQLException {
     return _closed;
   }
 }

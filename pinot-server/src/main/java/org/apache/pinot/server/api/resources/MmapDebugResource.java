@@ -54,7 +54,8 @@ public class MmapDebugResource {
 
   @GET
   @Path("memory/offheap")
-  @ApiOperation(value = "View current off-heap allocations", notes = "Lists all off-heap allocations and their associated sizes")
+  @ApiOperation(value = "View current off-heap allocations",
+      notes = "Lists all off-heap allocations and their associated sizes")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success")})
   @Produces(MediaType.APPLICATION_JSON)
   public List<String> getOffHeapSizes() {
@@ -64,8 +65,10 @@ public class MmapDebugResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/memory/offheap/table/{tableName}")
-  @ApiOperation(value = "Show off heap memory consumed by latest mutable segment", notes = "Returns off heap memory consumed by latest consuming segment of realtime table")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"), @ApiResponse(code = 404, message = "Table not found")})
+  @ApiOperation(value = "Show off heap memory consumed by latest mutable segment",
+      notes = "Returns off heap memory consumed by latest consuming segment of realtime table")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500,
+      message = "Internal server error"), @ApiResponse(code = 404, message = "Table not found")})
   public String getTableSize(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName)
       throws WebApplicationException {

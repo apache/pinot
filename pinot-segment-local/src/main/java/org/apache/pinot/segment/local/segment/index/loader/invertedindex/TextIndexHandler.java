@@ -106,8 +106,7 @@ public class TextIndexHandler {
     }
   }
 
-  public void createTextIndexesOnSegmentLoad()
-      throws Exception {
+  public void createTextIndexesOnSegmentLoad() throws Exception {
     for (ColumnMetadata columnMetadata : _textIndexColumns) {
       checkUnsupportedOperationsForTextIndex(columnMetadata);
       createTextIndexForColumn(columnMetadata);
@@ -131,8 +130,7 @@ public class TextIndexHandler {
     }
   }
 
-  private void createTextIndexForColumn(ColumnMetadata columnMetadata)
-      throws Exception {
+  private void createTextIndexForColumn(ColumnMetadata columnMetadata) throws Exception {
     String column = columnMetadata.getColumnName();
     if (_segmentWriter.hasIndexFor(column, ColumnIndexType.TEXT_INDEX)) {
       // Skip creating text index if already exists.
@@ -155,8 +153,8 @@ public class TextIndexHandler {
       if (!hasDictionary) {
         // text index on raw column, just read the raw forward index
         VarByteChunkSVForwardIndexReader rawIndexReader = (VarByteChunkSVForwardIndexReader) forwardIndexReader;
-        BaseChunkSVForwardIndexReader.ChunkReaderContext
-            chunkReaderContext = (BaseChunkSVForwardIndexReader.ChunkReaderContext) readerContext;
+        BaseChunkSVForwardIndexReader.ChunkReaderContext chunkReaderContext =
+            (BaseChunkSVForwardIndexReader.ChunkReaderContext) readerContext;
         for (int docId = 0; docId < numDocs; docId++) {
           textIndexCreator.add(rawIndexReader.getString(docId, chunkReaderContext));
         }

@@ -90,10 +90,9 @@ public class QueryServer {
                 attachSSLHandler(ch);
               }
 
-              ch.pipeline()
-                  .addLast(new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, Integer.BYTES, 0, Integer.BYTES),
-                      new LengthFieldPrepender(Integer.BYTES),
-                      new InstanceRequestHandler(_queryScheduler, _serverMetrics));
+              ch.pipeline().addLast(
+                  new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, Integer.BYTES, 0, Integer.BYTES),
+                  new LengthFieldPrepender(Integer.BYTES), new InstanceRequestHandler(_queryScheduler, _serverMetrics));
             }
           }).bind(_port).sync().channel();
     } catch (Exception e) {

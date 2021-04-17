@@ -86,8 +86,7 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
   }
 
   @Override
-  public void put(@Nonnull SchedulerQueryContext query)
-      throws OutOfCapacityException {
+  public void put(@Nonnull SchedulerQueryContext query) throws OutOfCapacityException {
     Preconditions.checkNotNull(query);
     queueLock.lock();
     String groupName = groupSelector.getSchedulerGroupName(query);
@@ -207,10 +206,9 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
     return query;
   }
 
-  private void checkGroupHasCapacity(SchedulerGroup groupContext)
-      throws OutOfCapacityException {
-    if (groupContext.numPending() >= maxPendingPerGroup && groupContext.totalReservedThreads() >= resourceManager
-        .getTableThreadsHardLimit()) {
+  private void checkGroupHasCapacity(SchedulerGroup groupContext) throws OutOfCapacityException {
+    if (groupContext.numPending() >= maxPendingPerGroup
+        && groupContext.totalReservedThreads() >= resourceManager.getTableThreadsHardLimit()) {
       throw new OutOfCapacityException(String.format(
           "SchedulerGroup %s is out of capacity. numPending: %d, maxPending: %d, reservedThreads: %d threadsHardLimit: %d",
           groupContext.name(), groupContext.numPending(), maxPendingPerGroup, groupContext.totalReservedThreads(),

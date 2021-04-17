@@ -33,8 +33,7 @@ import org.testng.annotations.Test;
 public class FixedByteWidthRowColDataFileReaderTest {
 
   @Test
-  void testSingleCol()
-      throws Exception {
+  void testSingleCol() throws Exception {
     String fileName = "test_single_col.dat";
     File f = new File(fileName);
 
@@ -50,11 +49,11 @@ public class FixedByteWidthRowColDataFileReaderTest {
     dos.flush();
     dos.close();
     RandomAccessFile raf = new RandomAccessFile(f, "rw");
-//    System.out.println("file size: " + raf.getChannel().size());
+    //    System.out.println("file size: " + raf.getChannel().size());
     raf.close();
 
-    try (FixedByteSingleValueMultiColReader heapReader = new FixedByteSingleValueMultiColReader(
-        PinotDataBuffer.loadBigEndianFile(f), data.length, new int[]{4})) {
+    try (FixedByteSingleValueMultiColReader heapReader =
+        new FixedByteSingleValueMultiColReader(PinotDataBuffer.loadBigEndianFile(f), data.length, new int[]{4})) {
       heapReader.open();
       for (int i = 0; i < data.length; i++) {
         Assert.assertEquals(heapReader.getInt(i, 0), data[i]);
@@ -65,8 +64,7 @@ public class FixedByteWidthRowColDataFileReaderTest {
   }
 
   @Test
-  void testMultiCol()
-      throws Exception {
+  void testMultiCol() throws Exception {
     String fileName = "test_single_col.dat";
     File f = new File(fileName);
     f.delete();
@@ -87,11 +85,11 @@ public class FixedByteWidthRowColDataFileReaderTest {
     dos.flush();
     dos.close();
     RandomAccessFile raf = new RandomAccessFile(f, "rw");
-//    System.out.println("file size: " + raf.getChannel().size());
+    //    System.out.println("file size: " + raf.getChannel().size());
     raf.close();
 
-    try (FixedByteSingleValueMultiColReader heapReader = new FixedByteSingleValueMultiColReader(
-        PinotDataBuffer.loadBigEndianFile(f), numRows, new int[]{4, 4})) {
+    try (FixedByteSingleValueMultiColReader heapReader =
+        new FixedByteSingleValueMultiColReader(PinotDataBuffer.loadBigEndianFile(f), numRows, new int[]{4, 4})) {
       heapReader.open();
       for (int i = 0; i < numRows; i++) {
         for (int j = 0; j < numCols; j++) {

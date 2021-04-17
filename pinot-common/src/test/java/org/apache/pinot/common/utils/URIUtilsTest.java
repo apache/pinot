@@ -86,8 +86,8 @@ public class URIUtilsTest {
     params.put("stringParam", "aString");
     params.put("stringParamNeedsEncoding", "{\"format\":\"JSON\",\"timeout\":1000}");
     uri = URIUtils.buildURI("http", "foo", "bar", params);
-    Assert.assertEquals(uri.toString(), "http://foo/bar?stringParam=aString&stringParamNeedsEncoding=" + URIUtils
-        .encode("{\"format\":\"JSON\",\"timeout\":1000}"));
+    Assert.assertEquals(uri.toString(), "http://foo/bar?stringParam=aString&stringParamNeedsEncoding="
+        + URIUtils.encode("{\"format\":\"JSON\",\"timeout\":1000}"));
 
     // test that path gets encoded
     uri = URIUtils.buildURI("http", "foo", "bar%moo{}", Collections.emptyMap());

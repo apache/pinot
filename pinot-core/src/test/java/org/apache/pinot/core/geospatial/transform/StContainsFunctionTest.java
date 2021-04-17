@@ -23,8 +23,7 @@ import org.testng.annotations.Test;
 
 public class StContainsFunctionTest extends GeoFunctionTest {
   @Test
-  public void testContains()
-      throws Exception {
+  public void testContains() throws Exception {
     assertRelation("ST_Contains", "POINT (20 20)", "POINT (25 25)", false);
     assertRelation("ST_Contains", "MULTIPOINT (20 20, 25 25)", "POINT (25 25)", true);
     assertRelation("ST_Contains", "LINESTRING (20 20, 30 30)", "POINT (25 25)", true);

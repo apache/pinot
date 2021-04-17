@@ -41,15 +41,15 @@ public class ConfigUtils {
     try {
       jsonNode = applyConfigWithEnvVariables(config.toJsonNode());
     } catch (RuntimeException e) {
-      throw new RuntimeException(String
-          .format("Unable to apply environment variables on json config class [%s].", config.getClass().getName()), e);
+      throw new RuntimeException(String.format("Unable to apply environment variables on json config class [%s].",
+          config.getClass().getName()), e);
     }
     try {
       return (T) JsonUtils.jsonNodeToObject(jsonNode, config.getClass());
     } catch (IOException e) {
-      throw new RuntimeException(String
-          .format("Unable to read JsonConfig to class [%s] after applying environment variables, jsonConfig is: '%s'.",
-              config.getClass().getName(), jsonNode.toString()), e);
+      throw new RuntimeException(String.format(
+          "Unable to read JsonConfig to class [%s] after applying environment variables, jsonConfig is: '%s'.",
+          config.getClass().getName(), jsonNode.toString()), e);
     }
   }
 

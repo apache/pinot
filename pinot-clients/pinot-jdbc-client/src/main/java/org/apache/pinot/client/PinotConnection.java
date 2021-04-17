@@ -67,16 +67,14 @@ public class PinotConnection extends AbstractBaseConnection {
   }
 
   @Override
-  protected void validateState()
-      throws SQLException {
+  protected void validateState() throws SQLException {
     if (isClosed()) {
       throw new SQLException("Connection is already closed!");
     }
   }
 
   @Override
-  public void close()
-      throws SQLException {
+  public void close() throws SQLException {
     if (!isClosed()) {
       _session.close();
       _controllerTransport.close();
@@ -87,28 +85,24 @@ public class PinotConnection extends AbstractBaseConnection {
   }
 
   @Override
-  public Statement createStatement()
-      throws SQLException {
+  public Statement createStatement() throws SQLException {
     validateState();
     return new PinotStatement(this);
   }
 
   @Override
-  public PreparedStatement prepareStatement(String sql)
-      throws SQLException {
+  public PreparedStatement prepareStatement(String sql) throws SQLException {
     validateState();
     return new PinotPreparedStatement(this, sql);
   }
 
   @Override
-  public boolean isClosed()
-      throws SQLException {
+  public boolean isClosed() throws SQLException {
     return _closed;
   }
 
   @Override
-  public DatabaseMetaData getMetaData()
-      throws SQLException {
+  public DatabaseMetaData getMetaData() throws SQLException {
     return new PinotConnectionMetaData(this, _controllerURL, _controllerTransport);
   }
 }

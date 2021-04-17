@@ -123,9 +123,9 @@ public class LLCRealtimeSegmentZKMetadata extends RealtimeSegmentZKMetadata {
     }
 
     LLCRealtimeSegmentZKMetadata metadata = (LLCRealtimeSegmentZKMetadata) segmentMetadata;
-    return super.equals(metadata) && isEqual(_startOffset, metadata._startOffset) && isEqual(_endOffset,
-        metadata._endOffset) && isEqual(_downloadUrl, metadata._downloadUrl) && isEqual(_numReplicas,
-        metadata._numReplicas);
+    return super.equals(metadata) && isEqual(_startOffset, metadata._startOffset)
+        && isEqual(_endOffset, metadata._endOffset) && isEqual(_downloadUrl, metadata._downloadUrl)
+        && isEqual(_numReplicas, metadata._numReplicas);
   }
 
   @Override

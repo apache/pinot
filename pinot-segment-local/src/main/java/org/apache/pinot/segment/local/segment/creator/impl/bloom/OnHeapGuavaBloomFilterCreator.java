@@ -68,8 +68,7 @@ public class OnHeapGuavaBloomFilterCreator implements BloomFilterCreator {
   }
 
   @Override
-  public void seal()
-      throws IOException {
+  public void seal() throws IOException {
     try (DataOutputStream out = new DataOutputStream(new FileOutputStream(_bloomFilterFile))) {
       out.writeInt(TYPE_VALUE);
       out.writeInt(VERSION);

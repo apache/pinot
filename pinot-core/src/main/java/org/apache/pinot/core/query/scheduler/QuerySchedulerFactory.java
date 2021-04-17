@@ -53,9 +53,8 @@ public class QuerySchedulerFactory {
    * @param queryExecutor QueryExecutor to use
    * @return returns an instance of query scheduler
    */
-  public static @Nonnull
-  QueryScheduler create(@Nonnull PinotConfiguration schedulerConfig, @Nonnull QueryExecutor queryExecutor,
-      ServerMetrics serverMetrics, @Nonnull LongAccumulator latestQueryTime) {
+  public static @Nonnull QueryScheduler create(@Nonnull PinotConfiguration schedulerConfig,
+      @Nonnull QueryExecutor queryExecutor, ServerMetrics serverMetrics, @Nonnull LongAccumulator latestQueryTime) {
     Preconditions.checkNotNull(schedulerConfig);
     Preconditions.checkNotNull(queryExecutor);
 
@@ -86,9 +85,8 @@ public class QuerySchedulerFactory {
     return new FCFSQueryScheduler(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
   }
 
-  private static @Nullable
-  QueryScheduler getQuerySchedulerByClassName(String className, PinotConfiguration schedulerConfig,
-      QueryExecutor queryExecutor) {
+  private static @Nullable QueryScheduler getQuerySchedulerByClassName(String className,
+      PinotConfiguration schedulerConfig, QueryExecutor queryExecutor) {
     try {
       Constructor<?> constructor =
           Class.forName(className).getDeclaredConstructor(Configuration.class, QueryExecutor.class);

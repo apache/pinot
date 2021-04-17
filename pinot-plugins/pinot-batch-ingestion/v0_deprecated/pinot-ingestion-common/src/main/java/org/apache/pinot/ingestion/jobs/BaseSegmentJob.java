@@ -78,8 +78,7 @@ public abstract class BaseSegmentJob extends Configured implements Serializable 
   }
 
   @Nullable
-  protected TableConfig getTableConfig()
-      throws IOException {
+  protected TableConfig getTableConfig() throws IOException {
     try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
       return controllerRestApi != null ? controllerRestApi.getTableConfig() : null;
     }
@@ -93,8 +92,7 @@ public abstract class BaseSegmentJob extends Configured implements Serializable 
    * of mandating that a schema is pushed to the controller.
    */
   @Nullable
-  protected Schema getSchema()
-      throws IOException {
+  protected Schema getSchema() throws IOException {
     return null;
   }
 
@@ -118,13 +116,11 @@ public abstract class BaseSegmentJob extends Configured implements Serializable 
     return value != null ? new Path(value) : null;
   }
 
-  protected List<Path> getDataFilePaths(String pathPattern)
-      throws IOException {
+  protected List<Path> getDataFilePaths(String pathPattern) throws IOException {
     return getDataFilePaths(new Path(pathPattern));
   }
 
-  protected List<Path> getDataFilePaths(Path pathPattern)
-      throws IOException {
+  protected List<Path> getDataFilePaths(Path pathPattern) throws IOException {
     List<Path> tarFilePaths = new ArrayList<>();
     FileSystem fileSystem = FileSystem.get(pathPattern.toUri(), getConf());
     _logger.info("Using filesystem: {}", fileSystem);

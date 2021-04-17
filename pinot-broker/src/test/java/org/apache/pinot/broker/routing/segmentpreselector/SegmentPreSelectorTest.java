@@ -87,9 +87,8 @@ public class SegmentPreSelectorTest {
 
     // Lineage entry gets updated to "COMPLETED"
     LineageEntry lineageEntry = segmentLineage.getLineageEntry(lineageEntryId);
-    segmentLineage.updateLineageEntry(lineageEntryId,
-        new LineageEntry(lineageEntry.getSegmentsFrom(), lineageEntry.getSegmentsTo(), LineageEntryState.COMPLETED,
-            System.currentTimeMillis()));
+    segmentLineage.updateLineageEntry(lineageEntryId, new LineageEntry(lineageEntry.getSegmentsFrom(),
+        lineageEntry.getSegmentsTo(), LineageEntryState.COMPLETED, System.currentTimeMillis()));
     SegmentLineageAccessHelper.writeSegmentLineage(propertyStore, segmentLineage, -1);
 
     Assert.assertEquals(segmentPreSelector.preSelect(new HashSet<>(onlineSegments)),

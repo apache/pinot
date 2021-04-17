@@ -114,8 +114,8 @@ public class InstanceReplicaGroupPartitionSelector {
         // [i0, i1, i2, i3, i4, i5, i6, i7, i8, i9]
         //  r0  r1  r0  r1  r0  r1
         int instanceIdInPool = 0;
-        for (int instanceIdInReplicaGroup = 0; instanceIdInReplicaGroup < numInstancesPerReplicaGroup;
-            instanceIdInReplicaGroup++) {
+        for (int instanceIdInReplicaGroup =
+            0; instanceIdInReplicaGroup < numInstancesPerReplicaGroup; instanceIdInReplicaGroup++) {
           for (int replicaGroupId : replicaGroupIdsInPool) {
             replicaGroupIdToInstancesMap[replicaGroupId][instanceIdInReplicaGroup] =
                 instanceConfigsInPool.get(instanceIdInPool++).getInstanceName();
@@ -149,15 +149,14 @@ public class InstanceReplicaGroupPartitionSelector {
         int instanceIdInReplicaGroup = 0;
         for (int partitionId = 0; partitionId < numPartitions; partitionId++) {
           List<String> instancesInPartition = new ArrayList<>(numInstancesPerPartition);
-          for (int instanceIdInPartition = 0; instanceIdInPartition < numInstancesPerPartition;
-              instanceIdInPartition++) {
+          for (int instanceIdInPartition =
+              0; instanceIdInPartition < numInstancesPerPartition; instanceIdInPartition++) {
             instancesInPartition.add(replicaGroupIdToInstancesMap[replicaGroupId][instanceIdInReplicaGroup]);
             instanceIdInReplicaGroup = (instanceIdInReplicaGroup + 1) % numInstancesPerReplicaGroup;
           }
           instancesInPartition.sort(null);
-          LOGGER
-              .info("Selecting instances: {} for replica-group: {}, partition: {} for table: {}", instancesInPartition,
-                  replicaGroupId, partitionId, _tableNameWithType);
+          LOGGER.info("Selecting instances: {} for replica-group: {}, partition: {} for table: {}",
+              instancesInPartition, replicaGroupId, partitionId, _tableNameWithType);
           instancePartitions.setInstances(partitionId, replicaGroupId, instancesInPartition);
         }
       }

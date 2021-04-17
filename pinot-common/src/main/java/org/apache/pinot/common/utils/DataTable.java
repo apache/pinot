@@ -51,8 +51,7 @@ public interface DataTable {
 
   Map<Integer, String> getExceptions();
 
-  byte[] toBytes()
-      throws IOException;
+  byte[] toBytes() throws IOException;
 
   Map<String, String> getMetadata();
 
@@ -85,7 +84,9 @@ public interface DataTable {
   String[] getStringArray(int rowId, int colId);
 
   enum MetadataValueType {
-    INT, LONG, STRING
+    INT,
+    LONG,
+    STRING
   }
 
   /* The MetadataKey is used in V3, where we present metadata as Map<MetadataKey, String>

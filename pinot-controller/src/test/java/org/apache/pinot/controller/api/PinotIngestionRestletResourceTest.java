@@ -56,8 +56,7 @@ public class PinotIngestionRestletResourceTest extends ControllerTest {
   private File _inputFile;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     startZk();
     startController();
     addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
@@ -82,8 +81,7 @@ public class PinotIngestionRestletResourceTest extends ControllerTest {
   }
 
   @Test
-  public void testIngestEndpoint()
-      throws Exception {
+  public void testIngestEndpoint() throws Exception {
 
     List<String> segments = _helixResourceManager.getSegmentsFor(TABLE_NAME_WITH_TYPE);
     Assert.assertEquals(segments.size(), 0);
@@ -103,8 +101,7 @@ public class PinotIngestionRestletResourceTest extends ControllerTest {
     Assert.assertEquals(segments.size(), 2);
   }
 
-  private void sendHttpPost(String uri)
-      throws IOException {
+  private void sendHttpPost(String uri) throws IOException {
     HttpClient httpClient = HttpClientBuilder.create().build();
     HttpPost httpPost = new HttpPost(uri);
     HttpEntity reqEntity =

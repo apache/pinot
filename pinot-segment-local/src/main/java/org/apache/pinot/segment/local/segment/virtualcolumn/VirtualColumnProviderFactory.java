@@ -35,8 +35,8 @@ public class VirtualColumnProviderFactory {
     String virtualColumnProvider = virtualColumnContext.getFieldSpec().getVirtualColumnProvider();
     try {
       // Use the preset virtualColumnProvider if available
-      if (virtualColumnProvider != null && !virtualColumnProvider
-          .equals(DefaultNullValueVirtualColumnProvider.class.getName())) {
+      if (virtualColumnProvider != null
+          && !virtualColumnProvider.equals(DefaultNullValueVirtualColumnProvider.class.getName())) {
         return PluginManager.get().createInstance(virtualColumnProvider);
       }
       // Create the columnProvider that returns default null values based on the virtualColumnContext

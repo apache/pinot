@@ -138,8 +138,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster
@@ -185,12 +184,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   private void registerCallbackHandlers() {
     List<String> instances = _helixAdmin.getInstancesInCluster(getHelixClusterName());
-    instances.removeIf(instance -> (!instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE) && !instance
-        .startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)));
+    instances.removeIf(instance -> (!instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)
+        && !instance.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)));
     List<String> resourcesInCluster = _helixAdmin.getResourcesInCluster(getHelixClusterName());
-    resourcesInCluster.removeIf(
-        resource -> (!TableNameBuilder.isTableResource(resource) && !CommonConstants.Helix.BROKER_RESOURCE_INSTANCE
-            .equals(resource)));
+    resourcesInCluster.removeIf(resource -> (!TableNameBuilder.isTableResource(resource)
+        && !CommonConstants.Helix.BROKER_RESOURCE_INSTANCE.equals(resource)));
     for (String instance : instances) {
       List<String> resourcesToMonitor = new ArrayList<>();
       for (String resourceName : resourcesInCluster) {
@@ -202,11 +200,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
           }
         }
       }
-      _serviceStatusCallbacks.add(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList
-          .of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager,
-                  getHelixClusterName(), instance, resourcesToMonitor, 100.0),
-              new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager,
-                  getHelixClusterName(), instance, resourcesToMonitor, 100.0))));
+      _serviceStatusCallbacks.add(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(
+          new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, getHelixClusterName(),
+              instance, resourcesToMonitor, 100.0),
+          new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, getHelixClusterName(),
+              instance, resourcesToMonitor, 100.0))));
     }
   }
 
@@ -234,8 +232,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testRefreshTableConfigAndQueryTimeout()
-      throws Exception {
+  public void testRefreshTableConfigAndQueryTimeout() throws Exception {
     // Set timeout as 5ms so that query will timeout
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.setQueryConfig(new QueryConfig(5L));
@@ -285,8 +282,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testUploadSameSegments()
-      throws Exception {
+  public void testUploadSameSegments() throws Exception {
     OfflineSegmentZKMetadata segmentZKMetadata = _helixResourceManager.getOfflineSegmentMetadata(getTableName()).get(0);
     String segmentName = segmentZKMetadata.getSegmentName();
     long crc = segmentZKMetadata.getCrc();
@@ -313,8 +309,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testInvertedIndexTriggering()
-      throws Exception {
+  public void testInvertedIndexTriggering() throws Exception {
     long numTotalDocs = getCountStarResult();
 
     JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
@@ -339,8 +334,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testTimeFunc()
-      throws Exception {
+  public void testTimeFunc() throws Exception {
     String sqlQuery = "SELECT toDateTime(now(), 'yyyy-MM-dd z') FROM mytable";
     JsonNode response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
     String todayStr = response.get("resultTable").get("rows").get(0).get(0).asText();
@@ -350,8 +344,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testLiteralOnlyFunc()
-      throws Exception {
+  public void testLiteralOnlyFunc() throws Exception {
     long currentTsMin = System.currentTimeMillis();
     String sqlQuery = "SELECT 1, now() as currentTs, 'abc', toDateTime(now(), 'yyyy-MM-dd z') as today, now()";
     JsonNode response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
@@ -387,8 +380,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testRangeIndexTriggering()
-      throws Exception {
+  public void testRangeIndexTriggering() throws Exception {
     long numTotalDocs = getCountStarResult();
 
     JsonNode queryResponse = postQuery(TEST_UPDATED_RANGE_INDEX_QUERY);
@@ -413,8 +405,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testBloomFilterTriggering()
-      throws Exception {
+  public void testBloomFilterTriggering() throws Exception {
     long numTotalDocs = getCountStarResult();
 
     JsonNode queryResponse = postQuery(TEST_UPDATED_BLOOM_FILTER_QUERY);
@@ -440,8 +431,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   /** Check if server returns error response quickly without timing out Broker. */
   @Test
-  public void testServerErrorWithBrokerTimeout()
-      throws Exception {
+  public void testServerErrorWithBrokerTimeout() throws Exception {
     // Set query timeout
     long queryTimeout = 5000;
     TableConfig tableConfig = getOfflineTableConfig();
@@ -462,8 +452,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testStarTreeTriggering()
-      throws Exception {
+  public void testStarTreeTriggering() throws Exception {
     long numTotalDocs = getCountStarResult();
 
     // Test the first query
@@ -610,8 +599,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
    * </ul>
    */
   @Test
-  public void testDefaultColumns()
-      throws Exception {
+  public void testDefaultColumns() throws Exception {
     long numTotalDocs = getCountStarResult();
 
     reloadWithExtraColumns();
@@ -632,16 +620,15 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(queryResponse.get("selectionResults").get("columns").size(), 79);
   }
 
-  private void reloadWithExtraColumns()
-      throws Exception {
+  private void reloadWithExtraColumns() throws Exception {
     long numTotalDocs = getCountStarResult();
 
     // Add columns to the schema first to pass the validation of the table config
     _schemaFileName = SCHEMA_FILE_NAME_WITH_EXTRA_COLUMNS;
     addSchema(createSchema());
     TableConfig tableConfig = getOfflineTableConfig();
-    tableConfig.setIngestionConfig(new IngestionConfig(null, null, null, Arrays
-        .asList(new TransformConfig("NewAddedDerivedHoursSinceEpoch", "times(DaysSinceEpoch, 24)"),
+    tableConfig.setIngestionConfig(new IngestionConfig(null, null, null,
+        Arrays.asList(new TransformConfig("NewAddedDerivedHoursSinceEpoch", "times(DaysSinceEpoch, 24)"),
             new TransformConfig("NewAddedDerivedSecondsSinceEpoch", "times(times(DaysSinceEpoch, 24), 3600)"))));
     updateTableConfig(tableConfig);
 
@@ -661,8 +648,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }, 600_000L, "Failed to add default columns");
   }
 
-  private void reloadWithMissingColumns()
-      throws Exception {
+  private void reloadWithMissingColumns() throws Exception {
     long numTotalDocs = getCountStarResult();
 
     // Remove columns from the table config first to pass the validation of the table config
@@ -688,8 +674,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }, 600_000L, "Failed to skip missing columns");
   }
 
-  private void reloadWithRegularColumns()
-      throws Exception {
+  private void reloadWithRegularColumns() throws Exception {
     long numTotalDocs = getCountStarResult();
 
     _schemaFileName = DEFAULT_SCHEMA_FILE_NAME;
@@ -711,8 +696,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }, 600_000L, "Failed to reload regular columns");
   }
 
-  private void testNewAddedColumns()
-      throws Exception {
+  private void testNewAddedColumns() throws Exception {
     long numTotalDocs = getCountStarResult();
     double numTotalDocsInDouble = (double) numTotalDocs;
 
@@ -823,14 +807,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   @Test
   @Override
-  public void testBrokerResponseMetadata()
-      throws Exception {
+  public void testBrokerResponseMetadata() throws Exception {
     super.testBrokerResponseMetadata();
   }
 
   @Test
-  public void testGroupByUDF()
-      throws Exception {
+  public void testGroupByUDF() throws Exception {
     String pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY timeConvert(DaysSinceEpoch,'DAYS','SECONDS')";
     JsonNode response = postQuery(pqlQuery);
     JsonNode groupByResult = response.get("aggregationResults").get(0);
@@ -925,8 +907,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testAggregationUDF()
-      throws Exception {
+  public void testAggregationUDF() throws Exception {
 
     String pqlQuery = "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable";
     JsonNode response = postQuery(pqlQuery);
@@ -942,8 +923,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testSelectionUDF()
-      throws Exception {
+  public void testSelectionUDF() throws Exception {
     String pqlQuery = "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable";
     JsonNode response = postQuery(pqlQuery);
     ArrayNode selectionResults = (ArrayNode) response.get("selectionResults").get("results");
@@ -987,8 +967,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testFilterUDF()
-      throws Exception {
+  public void testFilterUDF() throws Exception {
     int daysSinceEpoch = 16138;
     long secondsSinceEpoch = 16138 * 24 * 60 * 60;
 
@@ -1011,23 +990,21 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "SELECT count(*) FROM mytable WHERE DIV(timeConvert(DaysSinceEpoch,'DAYS','SECONDS'),1) = " + secondsSinceEpoch;
     assertEquals(postQuery(pqlQuery).get("aggregationResults").get(0).get("value").asLong(), expectedResult);
 
-    pqlQuery = String
-        .format("SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') IN (%d, %d)",
+    pqlQuery =
+        String.format("SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') IN (%d, %d)",
             secondsSinceEpoch - 100, secondsSinceEpoch);
     assertEquals(postQuery(pqlQuery).get("aggregationResults").get(0).get("value").asLong(), expectedResult);
 
-    pqlQuery = String
-        .format("SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') BETWEEN %d AND %d",
-            secondsSinceEpoch - 100, secondsSinceEpoch);
+    pqlQuery = String.format(
+        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') BETWEEN %d AND %d",
+        secondsSinceEpoch - 100, secondsSinceEpoch);
     assertEquals(postQuery(pqlQuery).get("aggregationResults").get(0).get("value").asLong(), expectedResult);
   }
 
   @Test
-  public void testCaseStatementInSelection()
-      throws Exception {
-    List<String> origins = Arrays
-        .asList("ATL", "ORD", "DFW", "DEN", "LAX", "IAH", "SFO", "PHX", "LAS", "EWR", "MCO", "BOS", "SLC", "SEA", "MSP",
-            "CLT", "LGA", "DTW", "JFK", "BWI");
+  public void testCaseStatementInSelection() throws Exception {
+    List<String> origins = Arrays.asList("ATL", "ORD", "DFW", "DEN", "LAX", "IAH", "SFO", "PHX", "LAS", "EWR", "MCO",
+        "BOS", "SLC", "SEA", "MSP", "CLT", "LGA", "DTW", "JFK", "BWI");
     StringBuilder caseStatementBuilder = new StringBuilder("CASE ");
     for (int i = 0; i < origins.size(); i++) {
       // WHEN origin = 'ATL' THEN 1
@@ -1053,8 +1030,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testCaseStatementInSelectionWithTransformFunctionInThen()
-      throws Exception {
+  public void testCaseStatementInSelectionWithTransformFunctionInThen() throws Exception {
     String sqlQuery =
         "SELECT ArrDelay, CASE WHEN ArrDelay > 0 THEN ArrDelay WHEN ArrDelay < 0 THEN ArrDelay * -1 ELSE 0 END AS ArrTimeDiff FROM mytable LIMIT 1000";
     JsonNode response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
@@ -1072,8 +1048,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testCaseStatementWithLogicalTransformFunction()
-      throws Exception {
+  public void testCaseStatementWithLogicalTransformFunction() throws Exception {
     String sqlQuery = "SELECT ArrDelay" + ", CASE WHEN ArrDelay > 50 OR ArrDelay < 10 THEN 10 ELSE 0 END"
         + ", CASE WHEN ArrDelay < 50 AND ArrDelay >= 10 THEN 10 ELSE 0 END" + " FROM mytable LIMIT 1000";
     JsonNode response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
@@ -1097,8 +1072,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testCaseStatementWithInAggregation()
-      throws Exception {
+  public void testCaseStatementWithInAggregation() throws Exception {
     testCountVsCaseQuery("origin = 'ATL'");
     testCountVsCaseQuery("origin <> 'ATL'");
 
@@ -1110,8 +1084,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testCountVsCaseQuery("DaysSinceEpoch <> 16312");
   }
 
-  private void testCountVsCaseQuery(String predicate)
-      throws Exception {
+  private void testCountVsCaseQuery(String predicate) throws Exception {
     String sqlQuery = String.format("SELECT COUNT(*) FROM mytable WHERE %s", predicate);
     JsonNode response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
     long countValue = response.get("resultTable").get("rows").get(0).get(0).asLong();
@@ -1122,8 +1095,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testFilterWithInvertedIndexUDF()
-      throws Exception {
+  public void testFilterWithInvertedIndexUDF() throws Exception {
     int daysSinceEpoch = 16138;
     long secondsSinceEpoch = 16138 * 24 * 60 * 60;
 
@@ -1144,8 +1116,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testQueryWithRepeatedColumns()
-      throws Exception {
+  public void testQueryWithRepeatedColumns() throws Exception {
     //test repeated columns in selection query
     String query = "SELECT ArrTime, ArrTime FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'";
     testQuery(query, Collections.singletonList(query));
@@ -1168,8 +1139,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testQueryWithOrderby()
-      throws Exception {
+  public void testQueryWithOrderby() throws Exception {
     //test repeated columns in selection query
     String query = "SELECT ArrTime, Carrier, DaysSinceEpoch FROM mytable ORDER BY DaysSinceEpoch DESC";
     testQuery(query, Collections.singletonList(query));
@@ -1184,8 +1154,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testQueryWithSameAlias()
-      throws Exception {
+  public void testQueryWithSameAlias() throws Exception {
     //test repeated columns in selection query
     String query =
         "SELECT ArrTime AS ArrTime, Carrier AS Carrier, DaysSinceEpoch AS DaysSinceEpoch FROM mytable ORDER BY DaysSinceEpoch DESC";
@@ -1203,8 +1172,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     // Test instance decommission before tearing down
     testInstanceDecommission();
 
@@ -1214,8 +1182,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     FileUtils.deleteDirectory(_tempDir);
   }
 
-  private void testInstanceDecommission()
-      throws Exception {
+  private void testInstanceDecommission() throws Exception {
     // Fetch all instances
     JsonNode response = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
     JsonNode instanceList = response.get("instances");
@@ -1301,8 +1268,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
    * @throws Exception
    */
   @Test
-  public void testDistinctQuery()
-      throws Exception {
+  public void testDistinctQuery() throws Exception {
     // by default 10 rows will be returned, so use high limit
     String pql = "SELECT DISTINCT(Carrier) FROM mytable LIMIT 1000000";
     String sql = "SELECT DISTINCT Carrier FROM mytable";
@@ -1330,8 +1296,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testNonAggregationGroupByQuery()
-      throws Exception {
+  public void testNonAggregationGroupByQuery() throws Exception {
     // by default 10 rows will be returned, so use high limit
     String pql = "SELECT Carrier FROM mytable GROUP BY Carrier LIMIT 1000000";
     String sql = "SELECT Carrier FROM mytable GROUP BY Carrier";
@@ -1461,8 +1426,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testQuerySourceWithDatabaseName()
-      throws Exception {
+  public void testQuerySourceWithDatabaseName() throws Exception {
     // by default 10 rows will be returned, so use high limit
     String pql = "SELECT DISTINCT(Carrier) FROM mytable LIMIT 1000000";
     String sql = "SELECT DISTINCT Carrier FROM mytable";
@@ -1472,8 +1436,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testDistinctCountHll()
-      throws Exception {
+  public void testDistinctCountHll() throws Exception {
     String query;
 
     // The Accurate value is 6538.
@@ -1500,8 +1463,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testAggregationFunctionsWithUnderscore()
-      throws Exception {
+  public void testAggregationFunctionsWithUnderscore() throws Exception {
     String query;
 
     // The Accurate value is 6538.
@@ -1516,8 +1478,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testGrpcQueryServer()
-      throws Exception {
+  public void testGrpcQueryServer() throws Exception {
     GrpcQueryClient queryClient = new GrpcQueryClient("localhost", CommonConstants.Server.DEFAULT_GRPC_PORT);
     String sql = "SELECT * FROM mytable_OFFLINE LIMIT 1000000";
     BrokerRequest brokerRequest = new Pql2Compiler().compileToBrokerRequest(sql);
@@ -1532,8 +1493,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testStreamingRequest(queryClient.submit(requestBuilder.setBrokerRequest(brokerRequest).build()));
   }
 
-  private void testNonStreamingRequest(Iterator<Server.ServerResponse> nonStreamingResponses)
-      throws Exception {
+  private void testNonStreamingRequest(Iterator<Server.ServerResponse> nonStreamingResponses) throws Exception {
     int expectedNumDocs = (int) getCountStarResult();
     assertTrue(nonStreamingResponses.hasNext());
     Server.ServerResponse nonStreamingResponse = nonStreamingResponses.next();
@@ -1546,8 +1506,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(metadata.get(DataTable.NUM_DOCS_SCANNED_METADATA_KEY), Integer.toString(expectedNumDocs));
   }
 
-  private void testStreamingRequest(Iterator<Server.ServerResponse> streamingResponses)
-      throws Exception {
+  private void testStreamingRequest(Iterator<Server.ServerResponse> streamingResponses) throws Exception {
     int expectedNumDocs = (int) getCountStarResult();
     int numTotalDocs = 0;
     while (streamingResponses.hasNext()) {
@@ -1575,8 +1534,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   @Test
   @Override
-  public void testHardcodedServerPartitionedSqlQueries()
-      throws Exception {
+  public void testHardcodedServerPartitionedSqlQueries() throws Exception {
     super.testHardcodedServerPartitionedSqlQueries();
   }
 }

@@ -42,20 +42,20 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     String query = "SELECT COUNT(*) FROM testTable";
 
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 0L, 120000L, new String[]{"120000"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 0L, 120000L,
+        new String[]{"120000"});
 
     brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 0L, 120000L, new String[]{"24516"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 0L, 120000L,
+        new String[]{"24516"});
 
     brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 120000L, 120000L, new String[]{"64420"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 120000L, 120000L,
+        new String[]{"64420"});
 
     brokerResponse = getBrokerResponseForPqlQueryWithFilter(query + GROUP_BY);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 24516L, 120000L, new String[]{"17080"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 24516L, 120000L,
+        new String[]{"17080"});
   }
 
   @Test
@@ -219,24 +219,20 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
         .valueOf(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String) value)).cardinality());
 
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L, cardinalityExtractor,
-            new String[]{"5977", "23825"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L,
+        cardinalityExtractor, new String[]{"5977", "23825"});
 
     brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, cardinalityExtractor,
-            new String[]{"1886", "4492"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
+        cardinalityExtractor, new String[]{"1886", "4492"});
 
     brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L, cardinalityExtractor,
-            new String[]{"3592", "11889"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L,
+        cardinalityExtractor, new String[]{"3592", "11889"});
 
     brokerResponse = getBrokerResponseForPqlQueryWithFilter(query + GROUP_BY);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, cardinalityExtractor,
-            new String[]{"1324", "3197"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L,
+        cardinalityExtractor, new String[]{"1324", "3197"});
   }
 
   @Test

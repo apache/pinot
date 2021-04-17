@@ -48,8 +48,7 @@ public class H3IndexTest {
   private static final Random RANDOM = new Random();
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     if (TEMP_DIR.exists()) {
       FileUtils.forceDelete(TEMP_DIR);
     }
@@ -57,14 +56,12 @@ public class H3IndexTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 
   @Test
-  public void testH3Index()
-      throws Exception {
+  public void testH3Index() throws Exception {
     int numUniqueH3Ids = 123_456;
     Map<Long, Integer> expectedCardinalities = new HashMap<>();
     String onHeapColumnName = "onHeap";
@@ -73,10 +70,11 @@ public class H3IndexTest {
     H3IndexResolution h3IndexResolution = new H3IndexResolution(Collections.singletonList(resolution));
 
     try (MutableH3Index mutableH3Index = new MutableH3Index(h3IndexResolution)) {
-      try (GeoSpatialIndexCreator onHeapCreator = new OnHeapH3IndexCreator(TEMP_DIR, onHeapColumnName,
-          h3IndexResolution);
-          GeoSpatialIndexCreator offHeapCreator = new OffHeapH3IndexCreator(TEMP_DIR, offHeapColumnName,
-              h3IndexResolution)) {
+      try (
+          GeoSpatialIndexCreator onHeapCreator =
+              new OnHeapH3IndexCreator(TEMP_DIR, onHeapColumnName, h3IndexResolution);
+          GeoSpatialIndexCreator offHeapCreator =
+              new OffHeapH3IndexCreator(TEMP_DIR, offHeapColumnName, h3IndexResolution)) {
         while (expectedCardinalities.size() < numUniqueH3Ids) {
           double longitude = RANDOM.nextDouble() * 360 - 180;
           double latitude = RANDOM.nextDouble() * 180 - 90;

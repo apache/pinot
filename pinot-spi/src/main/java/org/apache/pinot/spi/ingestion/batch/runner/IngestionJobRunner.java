@@ -45,6 +45,5 @@ public interface IngestionJobRunner {
    *
    * @throws Exception
    */
-  void run()
-      throws Exception;
+  void run() throws Exception;
 }

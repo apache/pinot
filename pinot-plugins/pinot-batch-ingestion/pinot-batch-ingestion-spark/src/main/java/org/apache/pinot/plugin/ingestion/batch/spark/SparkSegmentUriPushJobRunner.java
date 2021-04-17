@@ -91,9 +91,8 @@ public class SparkSegmentUriPushJobRunner implements IngestionJobRunner, Seriali
     for (String file : files) {
       URI uri = URI.create(file);
       if (uri.getPath().endsWith(Constants.TAR_GZ_FILE_EXT)) {
-        URI updatedURI = SegmentPushUtils
-            .generateSegmentTarURI(outputDirURI, uri, _spec.getPushJobSpec().getSegmentUriPrefix(),
-                _spec.getPushJobSpec().getSegmentUriSuffix());
+        URI updatedURI = SegmentPushUtils.generateSegmentTarURI(outputDirURI, uri,
+            _spec.getPushJobSpec().getSegmentUriPrefix(), _spec.getPushJobSpec().getSegmentUriSuffix());
         segmentUris.add(updatedURI.toString());
       }
     }
@@ -115,8 +114,7 @@ public class SparkSegmentUriPushJobRunner implements IngestionJobRunner, Seriali
       // Prevent using lambda expression in Spark to avoid potential serialization exceptions, use inner function instead.
       pathRDD.foreach(new VoidFunction<String>() {
         @Override
-        public void call(String segmentUri)
-            throws Exception {
+        public void call(String segmentUri) throws Exception {
           try {
             SegmentPushUtils.sendSegmentUris(_spec, Arrays.asList(segmentUri));
           } catch (RetriableOperationException | AttemptsExceededException e) {

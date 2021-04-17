@@ -148,8 +148,7 @@ public class FixedByteSingleValueMultiColumnReaderWriter implements Closeable {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     for (FixedByteSingleValueMultiColWriter writer : _writers) {
       writer.close();
     }

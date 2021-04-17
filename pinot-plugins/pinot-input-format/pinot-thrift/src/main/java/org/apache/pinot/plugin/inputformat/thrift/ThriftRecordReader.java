@@ -77,15 +77,13 @@ public class ThriftRecordReader implements RecordReader {
     init();
   }
 
-  private void init()
-      throws IOException {
+  private void init() throws IOException {
     _inputStream = RecordReaderUtils.getBufferedInputStream(_dataFile);
     _tProtocol = new TBinaryProtocol(new TIOStreamTransport(_inputStream));
     _hasNext = hasMoreToRead();
   }
 
-  private boolean hasMoreToRead()
-      throws IOException {
+  private boolean hasMoreToRead() throws IOException {
     _inputStream.mark(1);
     int nextByte = _inputStream.read();
     _inputStream.reset();
@@ -98,14 +96,12 @@ public class ThriftRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next()
-      throws IOException {
+  public GenericRow next() throws IOException {
     return next(new GenericRow());
   }
 
   @Override
-  public GenericRow next(GenericRow reuse)
-      throws IOException {
+  public GenericRow next(GenericRow reuse) throws IOException {
     TBase tObject;
     try {
       tObject = (TBase) _thriftClass.newInstance();
@@ -119,15 +115,13 @@ public class ThriftRecordReader implements RecordReader {
   }
 
   @Override
-  public void rewind()
-      throws IOException {
+  public void rewind() throws IOException {
     _inputStream.close();
     init();
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _inputStream.close();
   }
 }

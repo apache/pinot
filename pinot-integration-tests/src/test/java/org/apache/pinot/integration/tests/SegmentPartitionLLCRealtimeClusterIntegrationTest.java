@@ -65,8 +65,7 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
   private long _countStarResult;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
     // Start the Pinot cluster
@@ -176,8 +175,7 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
   }
 
   @Test(dependsOnMethods = "testPartitionMetadata")
-  public void testPartitionRouting()
-      throws Exception {
+  public void testPartitionRouting() throws Exception {
     // Query partition 0
     {
       String query = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
@@ -212,8 +210,7 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
   }
 
   @Test(dependsOnMethods = "testPartitionRouting")
-  public void testNonPartitionedStream()
-      throws Exception {
+  public void testNonPartitionedStream() throws Exception {
     // Push the second Avro file into Kafka without partitioning
     _partitionColumn = null;
     pushAvroIntoKafka(Collections.singletonList(_avroFiles.get(1)));
@@ -377,8 +374,7 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     dropRealtimeTable(getTableName());
     stopServer();
     stopBroker();

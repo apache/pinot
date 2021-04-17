@@ -77,8 +77,8 @@ public class ConsumingSegmentInfoReader {
     for (Map.Entry<String, List<SegmentConsumerInfo>> entry : serverToSegmentConsumerInfoMap.entrySet()) {
       String serverName = entry.getKey();
       for (SegmentConsumerInfo info : entry.getValue()) {
-        consumingSegmentInfoMap.computeIfAbsent(info.getSegmentName(), k -> new ArrayList<>()).add(
-            new ConsumingSegmentInfo(serverName, info.getConsumerState(), info.getLastConsumedTimestamp(),
+        consumingSegmentInfoMap.computeIfAbsent(info.getSegmentName(), k -> new ArrayList<>())
+            .add(new ConsumingSegmentInfo(serverName, info.getConsumerState(), info.getLastConsumedTimestamp(),
                 info.getPartitionToOffsetMap()));
       }
     }

@@ -79,8 +79,8 @@ public class ORCRecordReader implements RecordReader {
     Reader orcReader = OrcFile.createReader(new Path(dataFile.getAbsolutePath()),
         OrcFile.readerOptions(configuration).filesystem(FileSystem.getLocal(configuration)));
     TypeDescription orcSchema = orcReader.getSchema();
-    Preconditions
-        .checkState(orcSchema.getCategory() == TypeDescription.Category.STRUCT, "ORC schema must be of type: STRUCT");
+    Preconditions.checkState(orcSchema.getCategory() == TypeDescription.Category.STRUCT,
+        "ORC schema must be of type: STRUCT");
     _orcFields = orcSchema.getFieldNames();
     _orcFieldTypes = orcSchema.getChildren();
 
@@ -127,8 +127,8 @@ public class ORCRecordReader implements RecordReader {
       // Maps always have two child columns for its keys and values
       List<TypeDescription> children = fieldType.getChildren();
       TypeDescription.Category keyCategory = children.get(0).getCategory();
-      Preconditions.checkState(isSupportedSingleValueType(keyCategory),
-          "Illegal map key field type: %s (field %s)", keyCategory, field);
+      Preconditions.checkState(isSupportedSingleValueType(keyCategory), "Illegal map key field type: %s (field %s)",
+          keyCategory, field);
       initFieldsToRead(orcReaderInclude, children.get(1), field);
     } else if (category == TypeDescription.Category.STRUCT) {
       List<String> childrenFieldNames = fieldType.getFieldNames();
@@ -139,8 +139,8 @@ public class ORCRecordReader implements RecordReader {
       }
     } else {
       // Single-value field
-      Preconditions
-          .checkState(isSupportedSingleValueType(category), "Illegal single-value field type: %s (field %s)", category, field);
+      Preconditions.checkState(isSupportedSingleValueType(category), "Illegal single-value field type: %s (field %s)",
+          category, field);
     }
   }
 
@@ -171,14 +171,12 @@ public class ORCRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next()
-      throws IOException {
+  public GenericRow next() throws IOException {
     return next(new GenericRow());
   }
 
   @Override
-  public GenericRow next(GenericRow reuse)
-      throws IOException {
+  public GenericRow next(GenericRow reuse) throws IOException {
     int numFields = _orcFields.size();
     for (int i = 0; i < numFields; i++) {
       if (!_includeOrcFields[i]) {
@@ -220,7 +218,7 @@ public class ORCRecordReader implements RecordReader {
         int length = (int) listColumnVector.lengths[rowId];
         List<Object> values = new ArrayList<>(length);
         for (int j = 0; j < length; j++) {
-          Object value = extractValue(field, listColumnVector.child, childType,offset + j);
+          Object value = extractValue(field, listColumnVector.child, childType, offset + j);
           // NOTE: Only keep non-null values
           if (value != null) {
             values.add(value);
@@ -281,9 +279,9 @@ public class ORCRecordReader implements RecordReader {
     }
   }
 
-
   @Nullable
-  private static Object extractSingleValue(String field, ColumnVector columnVector, int rowId, TypeDescription.Category category) {
+  private static Object extractSingleValue(String field, ColumnVector columnVector, int rowId,
+      TypeDescription.Category category) {
     if (columnVector.isRepeating) {
       rowId = 0;
     }
@@ -368,16 +366,14 @@ public class ORCRecordReader implements RecordReader {
   }
 
   @Override
-  public void rewind()
-      throws IOException {
+  public void rewind() throws IOException {
     _orcRecordReader.seekToRow(0);
     _hasNext = _orcRecordReader.nextBatch(_rowBatch);
     _nextRowId = 0;
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _orcRecordReader.close();
   }
 }

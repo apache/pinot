@@ -22,16 +22,16 @@
 package org.apache.pinot.plugin.inputformat.protobuf;
 
 public final class ComplexTypes {
-  private ComplexTypes() {}
-  public static void registerAllExtensions(
-      com.google.protobuf.ExtensionRegistryLite registry) {
+  private ComplexTypes() {
   }
 
-  public static void registerAllExtensions(
-      com.google.protobuf.ExtensionRegistry registry) {
-    registerAllExtensions(
-        (com.google.protobuf.ExtensionRegistryLite) registry);
+  public static void registerAllExtensions(com.google.protobuf.ExtensionRegistryLite registry) {
   }
+
+  public static void registerAllExtensions(com.google.protobuf.ExtensionRegistry registry) {
+    registerAllExtensions((com.google.protobuf.ExtensionRegistryLite) registry);
+  }
+
   public interface TestMessageOrBuilder extends
       // @@protoc_insertion_point(interface_extends:org.apache.pinot.plugin.inputformat.protobuf.TestMessage)
       com.google.protobuf.MessageOrBuilder {
@@ -41,12 +41,12 @@ public final class ComplexTypes {
      * @return The stringField.
      */
     java.lang.String getStringField();
+
     /**
      * <code>string string_field = 1;</code>
      * @return The bytes for stringField.
      */
-    com.google.protobuf.ByteString
-        getStringFieldBytes();
+    com.google.protobuf.ByteString getStringFieldBytes();
 
     /**
      * <code>int32 int_field = 2;</code>
@@ -88,37 +88,40 @@ public final class ComplexTypes {
      * <code>repeated string repeated_strings = 8;</code>
      * @return A list containing the repeatedStrings.
      */
-    java.util.List<java.lang.String>
-        getRepeatedStringsList();
+    java.util.List<java.lang.String> getRepeatedStringsList();
+
     /**
      * <code>repeated string repeated_strings = 8;</code>
      * @return The count of repeatedStrings.
      */
     int getRepeatedStringsCount();
+
     /**
      * <code>repeated string repeated_strings = 8;</code>
      * @param index The index of the element to return.
      * @return The repeatedStrings at the given index.
      */
     java.lang.String getRepeatedStrings(int index);
+
     /**
      * <code>repeated string repeated_strings = 8;</code>
      * @param index The index of the value to return.
      * @return The bytes of the repeatedStrings at the given index.
      */
-    com.google.protobuf.ByteString
-        getRepeatedStringsBytes(int index);
+    com.google.protobuf.ByteString getRepeatedStringsBytes(int index);
 
     /**
      * <code>.org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage nested_message = 9;</code>
      * @return Whether the nestedMessage field is set.
      */
     boolean hasNestedMessage();
+
     /**
      * <code>.org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage nested_message = 9;</code>
      * @return The nestedMessage.
      */
     org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage getNestedMessage();
+
     /**
      * <code>.org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage nested_message = 9;</code>
      */
@@ -127,21 +130,24 @@ public final class ComplexTypes {
     /**
      * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
      */
-    java.util.List<org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> 
-        getRepeatedNestedMessagesList();
+    java.util.List<org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> getRepeatedNestedMessagesList();
+
     /**
      * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
      */
-    org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage getRepeatedNestedMessages(int index);
+    org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage getRepeatedNestedMessages(
+        int index);
+
     /**
      * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
      */
     int getRepeatedNestedMessagesCount();
+
     /**
      * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
      */
-    java.util.List<? extends org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessageOrBuilder> 
-        getRepeatedNestedMessagesOrBuilderList();
+    java.util.List<? extends org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessageOrBuilder> getRepeatedNestedMessagesOrBuilderList();
+
     /**
      * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
      */
@@ -152,22 +158,23 @@ public final class ComplexTypes {
      * <code>map&lt;string, .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage&gt; complex_map = 11;</code>
      */
     int getComplexMapCount();
+
     /**
      * <code>map&lt;string, .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage&gt; complex_map = 11;</code>
      */
-    boolean containsComplexMap(
-        java.lang.String key);
+    boolean containsComplexMap(java.lang.String key);
+
     /**
      * Use {@link #getComplexMapMap()} instead.
      */
     @java.lang.Deprecated
-    java.util.Map<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage>
-    getComplexMap();
+    java.util.Map<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> getComplexMap();
+
     /**
      * <code>map&lt;string, .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage&gt; complex_map = 11;</code>
      */
-    java.util.Map<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage>
-    getComplexMapMap();
+    java.util.Map<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> getComplexMapMap();
+
     /**
      * <code>map&lt;string, .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage&gt; complex_map = 11;</code>
      */
@@ -175,6 +182,7 @@ public final class ComplexTypes {
     org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage getComplexMapOrDefault(
         java.lang.String key,
         org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage defaultValue);
+
     /**
      * <code>map&lt;string, .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage&gt; complex_map = 11;</code>
      */
@@ -186,59 +194,61 @@ public final class ComplexTypes {
      * <code>map&lt;string, int32&gt; simple_map = 12;</code>
      */
     int getSimpleMapCount();
+
     /**
      * <code>map&lt;string, int32&gt; simple_map = 12;</code>
      */
-    boolean containsSimpleMap(
-        java.lang.String key);
+    boolean containsSimpleMap(java.lang.String key);
+
     /**
      * Use {@link #getSimpleMapMap()} instead.
      */
     @java.lang.Deprecated
-    java.util.Map<java.lang.String, java.lang.Integer>
-    getSimpleMap();
+    java.util.Map<java.lang.String, java.lang.Integer> getSimpleMap();
+
     /**
      * <code>map&lt;string, int32&gt; simple_map = 12;</code>
      */
-    java.util.Map<java.lang.String, java.lang.Integer>
-    getSimpleMapMap();
+    java.util.Map<java.lang.String, java.lang.Integer> getSimpleMapMap();
+
     /**
      * <code>map&lt;string, int32&gt; simple_map = 12;</code>
      */
 
-    int getSimpleMapOrDefault(
-        java.lang.String key,
-        int defaultValue);
+    int getSimpleMapOrDefault(java.lang.String key, int defaultValue);
+
     /**
      * <code>map&lt;string, int32&gt; simple_map = 12;</code>
      */
 
-    int getSimpleMapOrThrow(
-        java.lang.String key);
+    int getSimpleMapOrThrow(java.lang.String key);
 
     /**
      * <code>.org.apache.pinot.plugin.inputformat.protobuf.TestMessage.TestEnum enum_field = 15;</code>
      * @return The enum numeric value on the wire for enumField.
      */
     int getEnumFieldValue();
+
     /**
      * <code>.org.apache.pinot.plugin.inputformat.protobuf.TestMessage.TestEnum enum_field = 15;</code>
      * @return The enumField.
      */
     org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.TestEnum getEnumField();
   }
+
   /**
    * Protobuf type {@code org.apache.pinot.plugin.inputformat.protobuf.TestMessage}
    */
-  public static final class TestMessage extends
-      com.google.protobuf.GeneratedMessageV3 implements
+  public static final class TestMessage extends com.google.protobuf.GeneratedMessageV3 implements
       // @@protoc_insertion_point(message_implements:org.apache.pinot.plugin.inputformat.protobuf.TestMessage)
       TestMessageOrBuilder {
-  private static final long serialVersionUID = 0L;
+    private static final long serialVersionUID = 0L;
+
     // Use TestMessage.newBuilder() to construct.
     private TestMessage(com.google.protobuf.GeneratedMessageV3.Builder<?> builder) {
       super(builder);
     }
+
     private TestMessage() {
       stringField_ = "";
       bytesField_ = com.google.protobuf.ByteString.EMPTY;
@@ -249,18 +259,16 @@ public final class ComplexTypes {
 
     @java.lang.Override
     @SuppressWarnings({"unused"})
-    protected java.lang.Object newInstance(
-        UnusedPrivateParameter unused) {
+    protected java.lang.Object newInstance(UnusedPrivateParameter unused) {
       return new TestMessage();
     }
 
     @java.lang.Override
-    public final com.google.protobuf.UnknownFieldSet
-    getUnknownFields() {
+    public final com.google.protobuf.UnknownFieldSet getUnknownFields() {
       return this.unknownFields;
     }
-    private TestMessage(
-        com.google.protobuf.CodedInputStream input,
+
+    private TestMessage(com.google.protobuf.CodedInputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws com.google.protobuf.InvalidProtocolBufferException {
       this();
@@ -268,8 +276,7 @@ public final class ComplexTypes {
         throw new java.lang.NullPointerException();
       }
       int mutable_bitField0_ = 0;
-      com.google.protobuf.UnknownFieldSet.Builder unknownFields =
-          com.google.protobuf.UnknownFieldSet.newBuilder();
+      com.google.protobuf.UnknownFieldSet.Builder unknownFields = com.google.protobuf.UnknownFieldSet.newBuilder();
       try {
         boolean done = false;
         while (!done) {
@@ -324,11 +331,14 @@ public final class ComplexTypes {
               break;
             }
             case 74: {
-              org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.Builder subBuilder = null;
+              org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.Builder subBuilder =
+                  null;
               if (nestedMessage_ != null) {
                 subBuilder = nestedMessage_.toBuilder();
               }
-              nestedMessage_ = input.readMessage(org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.parser(), extensionRegistry);
+              nestedMessage_ = input.readMessage(
+                  org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.parser(),
+                  extensionRegistry);
               if (subBuilder != null) {
                 subBuilder.mergeFrom(nestedMessage_);
                 nestedMessage_ = subBuilder.buildPartial();
@@ -338,37 +348,33 @@ public final class ComplexTypes {
             }
             case 82: {
               if (!((mutable_bitField0_ & 0x00000002) != 0)) {
-                repeatedNestedMessages_ = new java.util.ArrayList<org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage>();
+                repeatedNestedMessages_ =
+                    new java.util.ArrayList<org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage>();
                 mutable_bitField0_ |= 0x00000002;
               }
-              repeatedNestedMessages_.add(
-                  input.readMessage(org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.parser(), extensionRegistry));
+              repeatedNestedMessages_.add(input.readMessage(
+                  org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.parser(),
+                  extensionRegistry));
               break;
             }
             case 90: {
               if (!((mutable_bitField0_ & 0x00000004) != 0)) {
-                complexMap_ = com.google.protobuf.MapField.newMapField(
-                    ComplexMapDefaultEntryHolder.defaultEntry);
+                complexMap_ = com.google.protobuf.MapField.newMapField(ComplexMapDefaultEntryHolder.defaultEntry);
                 mutable_bitField0_ |= 0x00000004;
               }
-              com.google.protobuf.MapEntry<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage>
-              complexMap__ = input.readMessage(
-                  ComplexMapDefaultEntryHolder.defaultEntry.getParserForType(), extensionRegistry);
-              complexMap_.getMutableMap().put(
-                  complexMap__.getKey(), complexMap__.getValue());
+              com.google.protobuf.MapEntry<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> complexMap__ =
+                  input.readMessage(ComplexMapDefaultEntryHolder.defaultEntry.getParserForType(), extensionRegistry);
+              complexMap_.getMutableMap().put(complexMap__.getKey(), complexMap__.getValue());
               break;
             }
             case 98: {
               if (!((mutable_bitField0_ & 0x00000008) != 0)) {
-                simpleMap_ = com.google.protobuf.MapField.newMapField(
-                    SimpleMapDefaultEntryHolder.defaultEntry);
+                simpleMap_ = com.google.protobuf.MapField.newMapField(SimpleMapDefaultEntryHolder.defaultEntry);
                 mutable_bitField0_ |= 0x00000008;
               }
-              com.google.protobuf.MapEntry<java.lang.String, java.lang.Integer>
-              simpleMap__ = input.readMessage(
-                  SimpleMapDefaultEntryHolder.defaultEntry.getParserForType(), extensionRegistry);
-              simpleMap_.getMutableMap().put(
-                  simpleMap__.getKey(), simpleMap__.getValue());
+              com.google.protobuf.MapEntry<java.lang.String, java.lang.Integer> simpleMap__ =
+                  input.readMessage(SimpleMapDefaultEntryHolder.defaultEntry.getParserForType(), extensionRegistry);
+              simpleMap_.getMutableMap().put(simpleMap__.getKey(), simpleMap__.getValue());
               break;
             }
             case 120: {
@@ -378,8 +384,7 @@ public final class ComplexTypes {
               break;
             }
             default: {
-              if (!parseUnknownField(
-                  input, unknownFields, extensionRegistry, tag)) {
+              if (!parseUnknownField(input, unknownFields, extensionRegistry, tag)) {
                 done = true;
               }
               break;
@@ -389,8 +394,7 @@ public final class ComplexTypes {
       } catch (com.google.protobuf.InvalidProtocolBufferException e) {
         throw e.setUnfinishedMessage(this);
       } catch (java.io.IOException e) {
-        throw new com.google.protobuf.InvalidProtocolBufferException(
-            e).setUnfinishedMessage(this);
+        throw new com.google.protobuf.InvalidProtocolBufferException(e).setUnfinishedMessage(this);
       } finally {
         if (((mutable_bitField0_ & 0x00000001) != 0)) {
           repeatedStrings_ = repeatedStrings_.getUnmodifiableView();
@@ -402,38 +406,35 @@ public final class ComplexTypes {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
-        getDescriptor() {
+
+    public static final com.google.protobuf.Descriptors.Descriptor getDescriptor() {
       return org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_descriptor;
     }
 
     @SuppressWarnings({"rawtypes"})
     @java.lang.Override
-    protected com.google.protobuf.MapField internalGetMapField(
-        int number) {
+    protected com.google.protobuf.MapField internalGetMapField(int number) {
       switch (number) {
         case 11:
           return internalGetComplexMap();
         case 12:
           return internalGetSimpleMap();
         default:
-          throw new RuntimeException(
-              "Invalid map field number: " + number);
+          throw new RuntimeException("Invalid map field number: " + number);
       }
     }
+
     @java.lang.Override
-    protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
-        internalGetFieldAccessorTable() {
+    protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable internalGetFieldAccessorTable() {
       return org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_fieldAccessorTable
-          .ensureFieldAccessorsInitialized(
-              org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.class, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.Builder.class);
+          .ensureFieldAccessorsInitialized(org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.class,
+              org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.Builder.class);
     }
 
     /**
      * Protobuf enum {@code org.apache.pinot.plugin.inputformat.protobuf.TestMessage.TestEnum}
      */
-    public enum TestEnum
-        implements com.google.protobuf.ProtocolMessageEnum {
+    public enum TestEnum implements com.google.protobuf.ProtocolMessageEnum {
       /**
        * <code>ALPHA = 0;</code>
        */
@@ -450,8 +451,7 @@ public final class ComplexTypes {
        * <code>DELTA = 3;</code>
        */
       DELTA(3),
-      UNRECOGNIZED(-1),
-      ;
+      UNRECOGNIZED(-1),;
 
       /**
        * <code>ALPHA = 0;</code>
@@ -470,11 +470,9 @@ public final class ComplexTypes {
        */
       public static final int DELTA_VALUE = 3;
 
-
       public final int getNumber() {
         if (this == UNRECOGNIZED) {
-          throw new java.lang.IllegalArgumentException(
-              "Can't get the number of an unknown enum value.");
+          throw new java.lang.IllegalArgumentException("Can't get the number of an unknown enum value.");
         }
         return value;
       }
@@ -495,50 +493,50 @@ public final class ComplexTypes {
        */
       public static TestEnum forNumber(int value) {
         switch (value) {
-          case 0: return ALPHA;
-          case 1: return BETA;
-          case 2: return GAMMA;
-          case 3: return DELTA;
-          default: return null;
+          case 0:
+            return ALPHA;
+          case 1:
+            return BETA;
+          case 2:
+            return GAMMA;
+          case 3:
+            return DELTA;
+          default:
+            return null;
         }
       }
 
-      public static com.google.protobuf.Internal.EnumLiteMap<TestEnum>
-          internalGetValueMap() {
+      public static com.google.protobuf.Internal.EnumLiteMap<TestEnum> internalGetValueMap() {
         return internalValueMap;
       }
-      private static final com.google.protobuf.Internal.EnumLiteMap<
-          TestEnum> internalValueMap =
-            new com.google.protobuf.Internal.EnumLiteMap<TestEnum>() {
-              public TestEnum findValueByNumber(int number) {
-                return TestEnum.forNumber(number);
-              }
-            };
+      private static final com.google.protobuf.Internal.EnumLiteMap<TestEnum> internalValueMap =
+          new com.google.protobuf.Internal.EnumLiteMap<TestEnum>() {
+            public TestEnum findValueByNumber(int number) {
+              return TestEnum.forNumber(number);
+            }
+          };
 
-      public final com.google.protobuf.Descriptors.EnumValueDescriptor
-          getValueDescriptor() {
+      public final com.google.protobuf.Descriptors.EnumValueDescriptor getValueDescriptor() {
         if (this == UNRECOGNIZED) {
-          throw new java.lang.IllegalStateException(
-              "Can't get the descriptor of an unrecognized enum value.");
+          throw new java.lang.IllegalStateException("Can't get the descriptor of an unrecognized enum value.");
         }
         return getDescriptor().getValues().get(ordinal());
       }
-      public final com.google.protobuf.Descriptors.EnumDescriptor
-          getDescriptorForType() {
+
+      public final com.google.protobuf.Descriptors.EnumDescriptor getDescriptorForType() {
         return getDescriptor();
       }
-      public static final com.google.protobuf.Descriptors.EnumDescriptor
-          getDescriptor() {
-        return org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.getDescriptor().getEnumTypes().get(0);
+
+      public static final com.google.protobuf.Descriptors.EnumDescriptor getDescriptor() {
+        return org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.getDescriptor().getEnumTypes()
+            .get(0);
       }
 
       private static final TestEnum[] VALUES = values();
 
-      public static TestEnum valueOf(
-          com.google.protobuf.Descriptors.EnumValueDescriptor desc) {
+      public static TestEnum valueOf(com.google.protobuf.Descriptors.EnumValueDescriptor desc) {
         if (desc.getType() != getDescriptor()) {
-          throw new java.lang.IllegalArgumentException(
-            "EnumValueDescriptor is not for this type.");
+          throw new java.lang.IllegalArgumentException("EnumValueDescriptor is not for this type.");
         }
         if (desc.getIndex() == -1) {
           return UNRECOGNIZED;
@@ -564,12 +562,12 @@ public final class ComplexTypes {
        * @return The nestedStringField.
        */
       java.lang.String getNestedStringField();
+
       /**
        * <code>string nested_string_field = 1;</code>
        * @return The bytes for nestedStringField.
        */
-      com.google.protobuf.ByteString
-          getNestedStringFieldBytes();
+      com.google.protobuf.ByteString getNestedStringFieldBytes();
 
       /**
        * <code>int32 nested_int_field = 2;</code>
@@ -577,44 +575,43 @@ public final class ComplexTypes {
        */
       int getNestedIntField();
     }
+
     /**
      * Protobuf type {@code org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage}
      */
-    public static final class NestedMessage extends
-        com.google.protobuf.GeneratedMessageV3 implements
+    public static final class NestedMessage extends com.google.protobuf.GeneratedMessageV3 implements
         // @@protoc_insertion_point(message_implements:org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage)
         NestedMessageOrBuilder {
-    private static final long serialVersionUID = 0L;
+      private static final long serialVersionUID = 0L;
+
       // Use NestedMessage.newBuilder() to construct.
       private NestedMessage(com.google.protobuf.GeneratedMessageV3.Builder<?> builder) {
         super(builder);
       }
+
       private NestedMessage() {
         nestedStringField_ = "";
       }
 
       @java.lang.Override
       @SuppressWarnings({"unused"})
-      protected java.lang.Object newInstance(
-          UnusedPrivateParameter unused) {
+      protected java.lang.Object newInstance(UnusedPrivateParameter unused) {
         return new NestedMessage();
       }
 
       @java.lang.Override
-      public final com.google.protobuf.UnknownFieldSet
-      getUnknownFields() {
+      public final com.google.protobuf.UnknownFieldSet getUnknownFields() {
         return this.unknownFields;
       }
-      private NestedMessage(
-          com.google.protobuf.CodedInputStream input,
+
+      private NestedMessage(com.google.protobuf.CodedInputStream input,
           com.google.protobuf.ExtensionRegistryLite extensionRegistry)
           throws com.google.protobuf.InvalidProtocolBufferException {
         this();
         if (extensionRegistry == null) {
           throw new java.lang.NullPointerException();
         }
-        com.google.protobuf.UnknownFieldSet.Builder unknownFields =
-            com.google.protobuf.UnknownFieldSet.newBuilder();
+        com.google.protobuf.UnknownFieldSet.Builder unknownFields = com.google.protobuf.UnknownFieldSet.newBuilder();
         try {
           boolean done = false;
           while (!done) {
@@ -635,8 +632,7 @@ public final class ComplexTypes {
                 break;
               }
               default: {
-                if (!parseUnknownField(
-                    input, unknownFields, extensionRegistry, tag)) {
+                if (!parseUnknownField(input, unknownFields, extensionRegistry, tag)) {
                   done = true;
                 }
                 break;
@@ -646,28 +642,28 @@ public final class ComplexTypes {
         } catch (com.google.protobuf.InvalidProtocolBufferException e) {
           throw e.setUnfinishedMessage(this);
         } catch (java.io.IOException e) {
-          throw new com.google.protobuf.InvalidProtocolBufferException(
-              e).setUnfinishedMessage(this);
+          throw new com.google.protobuf.InvalidProtocolBufferException(e).setUnfinishedMessage(this);
         } finally {
           this.unknownFields = unknownFields.build();
           makeExtensionsImmutable();
         }
       }
-      public static final com.google.protobuf.Descriptors.Descriptor
-          getDescriptor() {
+
+      public static final com.google.protobuf.Descriptors.Descriptor getDescriptor() {
         return org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_NestedMessage_descriptor;
       }
 
       @java.lang.Override
-      protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
-          internalGetFieldAccessorTable() {
+      protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable internalGetFieldAccessorTable() {
         return org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_NestedMessage_fieldAccessorTable
             .ensureFieldAccessorsInitialized(
-                org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.class, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.Builder.class);
+                org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.class,
+                org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.Builder.class);
       }
 
       public static final int NESTED_STRING_FIELD_FIELD_NUMBER = 1;
       private volatile java.lang.Object nestedStringField_;
+
       /**
        * <code>string nested_string_field = 1;</code>
        * @return The nestedStringField.
@@ -678,25 +674,22 @@ public final class ComplexTypes {
         if (ref instanceof java.lang.String) {
           return (java.lang.String) ref;
         } else {
-          com.google.protobuf.ByteString bs = 
-              (com.google.protobuf.ByteString) ref;
+          com.google.protobuf.ByteString bs = (com.google.protobuf.ByteString) ref;
           java.lang.String s = bs.toStringUtf8();
           nestedStringField_ = s;
           return s;
         }
       }
+
       /**
        * <code>string nested_string_field = 1;</code>
        * @return The bytes for nestedStringField.
        */
       @java.lang.Override
-      public com.google.protobuf.ByteString
-          getNestedStringFieldBytes() {
+      public com.google.protobuf.ByteString getNestedStringFieldBytes() {
         java.lang.Object ref = nestedStringField_;
         if (ref instanceof java.lang.String) {
-          com.google.protobuf.ByteString b = 
-              com.google.protobuf.ByteString.copyFromUtf8(
-                  (java.lang.String) ref);
+          com.google.protobuf.ByteString b = com.google.protobuf.ByteString.copyFromUtf8((java.lang.String) ref);
           nestedStringField_ = b;
           return b;
         } else {
@@ -706,6 +699,7 @@ public final class ComplexTypes {
 
       public static final int NESTED_INT_FIELD_FIELD_NUMBER = 2;
       private int nestedIntField_;
+
       /**
        * <code>int32 nested_int_field = 2;</code>
        * @return The nestedIntField.
@@ -716,19 +710,21 @@ public final class ComplexTypes {
       }
 
       private byte memoizedIsInitialized = -1;
+
       @java.lang.Override
       public final boolean isInitialized() {
         byte isInitialized = memoizedIsInitialized;
-        if (isInitialized == 1) return true;
-        if (isInitialized == 0) return false;
+        if (isInitialized == 1)
+          return true;
+        if (isInitialized == 0)
+          return false;
 
         memoizedIsInitialized = 1;
         return true;
       }
 
       @java.lang.Override
-      public void writeTo(com.google.protobuf.CodedOutputStream output)
-                          throws java.io.IOException {
+      public void writeTo(com.google.protobuf.CodedOutputStream output) throws java.io.IOException {
         if (!getNestedStringFieldBytes().isEmpty()) {
           com.google.protobuf.GeneratedMessageV3.writeString(output, 1, nestedStringField_);
         }
@@ -741,15 +737,15 @@ public final class ComplexTypes {
       @java.lang.Override
       public int getSerializedSize() {
         int size = memoizedSize;
-        if (size != -1) return size;
+        if (size != -1)
+          return size;
 
         size = 0;
         if (!getNestedStringFieldBytes().isEmpty()) {
           size += com.google.protobuf.GeneratedMessageV3.computeStringSize(1, nestedStringField_);
         }
         if (nestedIntField_ != 0) {
-          size += com.google.protobuf.CodedOutputStream
-            .computeInt32Size(2, nestedIntField_);
+          size += com.google.protobuf.CodedOutputStream.computeInt32Size(2, nestedIntField_);
         }
         size += unknownFields.getSerializedSize();
         memoizedSize = size;
@@ -759,18 +755,20 @@ public final class ComplexTypes {
       @java.lang.Override
       public boolean equals(final java.lang.Object obj) {
         if (obj == this) {
-         return true;
+          return true;
         }
         if (!(obj instanceof org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage)) {
           return super.equals(obj);
         }
-        org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage other = (org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage) obj;
+        org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage other =
+            (org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage) obj;
 
-        if (!getNestedStringField()
-            .equals(other.getNestedStringField())) return false;
-        if (getNestedIntField()
-            != other.getNestedIntField()) return false;
-        if (!unknownFields.equals(other.unknownFields)) return false;
+        if (!getNestedStringField().equals(other.getNestedStringField()))
+          return false;
+        if (getNestedIntField() != other.getNestedIntField())
+          return false;
+        if (!unknownFields.equals(other.unknownFields))
+          return false;
         return true;
       }
 
@@ -791,113 +789,112 @@ public final class ComplexTypes {
       }
 
       public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage parseFrom(
-          java.nio.ByteBuffer data)
-          throws com.google.protobuf.InvalidProtocolBufferException {
+          java.nio.ByteBuffer data) throws com.google.protobuf.InvalidProtocolBufferException {
         return PARSER.parseFrom(data);
       }
+
       public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage parseFrom(
-          java.nio.ByteBuffer data,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          java.nio.ByteBuffer data, com.google.protobuf.ExtensionRegistryLite extensionRegistry)
           throws com.google.protobuf.InvalidProtocolBufferException {
         return PARSER.parseFrom(data, extensionRegistry);
       }
+
       public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage parseFrom(
-          com.google.protobuf.ByteString data)
-          throws com.google.protobuf.InvalidProtocolBufferException {
+          com.google.protobuf.ByteString data) throws com.google.protobuf.InvalidProtocolBufferException {
         return PARSER.parseFrom(data);
       }
+
       public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage parseFrom(
-          com.google.protobuf.ByteString data,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          com.google.protobuf.ByteString data, com.google.protobuf.ExtensionRegistryLite extensionRegistry)
           throws com.google.protobuf.InvalidProtocolBufferException {
         return PARSER.parseFrom(data, extensionRegistry);
       }
-      public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage parseFrom(byte[] data)
-          throws com.google.protobuf.InvalidProtocolBufferException {
+
+      public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage parseFrom(
+          byte[] data) throws com.google.protobuf.InvalidProtocolBufferException {
         return PARSER.parseFrom(data);
       }
+
       public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage parseFrom(
-          byte[] data,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          byte[] data, com.google.protobuf.ExtensionRegistryLite extensionRegistry)
           throws com.google.protobuf.InvalidProtocolBufferException {
         return PARSER.parseFrom(data, extensionRegistry);
       }
-      public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage parseFrom(java.io.InputStream input)
-          throws java.io.IOException {
-        return com.google.protobuf.GeneratedMessageV3
-            .parseWithIOException(PARSER, input);
-      }
+
       public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage parseFrom(
-          java.io.InputStream input,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws java.io.IOException {
-        return com.google.protobuf.GeneratedMessageV3
-            .parseWithIOException(PARSER, input, extensionRegistry);
+          java.io.InputStream input) throws java.io.IOException {
+        return com.google.protobuf.GeneratedMessageV3.parseWithIOException(PARSER, input);
       }
-      public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage parseDelimitedFrom(java.io.InputStream input)
+
+      public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage parseFrom(
+          java.io.InputStream input, com.google.protobuf.ExtensionRegistryLite extensionRegistry)
           throws java.io.IOException {
-        return com.google.protobuf.GeneratedMessageV3
-            .parseDelimitedWithIOException(PARSER, input);
+        return com.google.protobuf.GeneratedMessageV3.parseWithIOException(PARSER, input, extensionRegistry);
       }
+
       public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage parseDelimitedFrom(
-          java.io.InputStream input,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws java.io.IOException {
-        return com.google.protobuf.GeneratedMessageV3
-            .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
+          java.io.InputStream input) throws java.io.IOException {
+        return com.google.protobuf.GeneratedMessageV3.parseDelimitedWithIOException(PARSER, input);
       }
-      public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage parseFrom(
-          com.google.protobuf.CodedInputStream input)
+
+      public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage parseDelimitedFrom(
+          java.io.InputStream input, com.google.protobuf.ExtensionRegistryLite extensionRegistry)
           throws java.io.IOException {
-        return com.google.protobuf.GeneratedMessageV3
-            .parseWithIOException(PARSER, input);
+        return com.google.protobuf.GeneratedMessageV3.parseDelimitedWithIOException(PARSER, input, extensionRegistry);
       }
+
       public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage parseFrom(
-          com.google.protobuf.CodedInputStream input,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          com.google.protobuf.CodedInputStream input) throws java.io.IOException {
+        return com.google.protobuf.GeneratedMessageV3.parseWithIOException(PARSER, input);
+      }
+
+      public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage parseFrom(
+          com.google.protobuf.CodedInputStream input, com.google.protobuf.ExtensionRegistryLite extensionRegistry)
           throws java.io.IOException {
-        return com.google.protobuf.GeneratedMessageV3
-            .parseWithIOException(PARSER, input, extensionRegistry);
+        return com.google.protobuf.GeneratedMessageV3.parseWithIOException(PARSER, input, extensionRegistry);
       }
 
       @java.lang.Override
-      public Builder newBuilderForType() { return newBuilder(); }
+      public Builder newBuilderForType() {
+        return newBuilder();
+      }
+
       public static Builder newBuilder() {
         return DEFAULT_INSTANCE.toBuilder();
       }
-      public static Builder newBuilder(org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage prototype) {
+
+      public static Builder newBuilder(
+          org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage prototype) {
         return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
-      }
-      @java.lang.Override
-      public Builder toBuilder() {
-        return this == DEFAULT_INSTANCE
-            ? new Builder() : new Builder().mergeFrom(this);
       }
 
       @java.lang.Override
-      protected Builder newBuilderForType(
-          com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
+      public Builder toBuilder() {
+        return this == DEFAULT_INSTANCE ? new Builder() : new Builder().mergeFrom(this);
+      }
+
+      @java.lang.Override
+      protected Builder newBuilderForType(com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
         Builder builder = new Builder(parent);
         return builder;
       }
+
       /**
        * Protobuf type {@code org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage}
        */
-      public static final class Builder extends
-          com.google.protobuf.GeneratedMessageV3.Builder<Builder> implements
+      public static final class Builder extends com.google.protobuf.GeneratedMessageV3.Builder<Builder> implements
           // @@protoc_insertion_point(builder_implements:org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage)
           org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessageOrBuilder {
-        public static final com.google.protobuf.Descriptors.Descriptor
-            getDescriptor() {
+        public static final com.google.protobuf.Descriptors.Descriptor getDescriptor() {
           return org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_NestedMessage_descriptor;
         }
 
         @java.lang.Override
-        protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
-            internalGetFieldAccessorTable() {
+        protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable internalGetFieldAccessorTable() {
           return org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_NestedMessage_fieldAccessorTable
               .ensureFieldAccessorsInitialized(
-                  org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.class, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.Builder.class);
+                  org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.class,
+                  org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.Builder.class);
         }
 
         // Construct using org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.newBuilder()
@@ -905,16 +902,16 @@ public final class ComplexTypes {
           maybeForceBuilderInitialization();
         }
 
-        private Builder(
-            com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
+        private Builder(com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
           super(parent);
           maybeForceBuilderInitialization();
         }
+
         private void maybeForceBuilderInitialization() {
-          if (com.google.protobuf.GeneratedMessageV3
-                  .alwaysUseFieldBuilders) {
+          if (com.google.protobuf.GeneratedMessageV3.alwaysUseFieldBuilders) {
           }
         }
+
         @java.lang.Override
         public Builder clear() {
           super.clear();
@@ -926,14 +923,14 @@ public final class ComplexTypes {
         }
 
         @java.lang.Override
-        public com.google.protobuf.Descriptors.Descriptor
-            getDescriptorForType() {
+        public com.google.protobuf.Descriptors.Descriptor getDescriptorForType() {
           return org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_NestedMessage_descriptor;
         }
 
         @java.lang.Override
         public org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage getDefaultInstanceForType() {
-          return org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.getDefaultInstance();
+          return org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage
+              .getDefaultInstance();
         }
 
         @java.lang.Override
@@ -947,7 +944,8 @@ public final class ComplexTypes {
 
         @java.lang.Override
         public org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage buildPartial() {
-          org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage result = new org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage(this);
+          org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage result =
+              new org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage(this);
           result.nestedStringField_ = nestedStringField_;
           result.nestedIntField_ = nestedIntField_;
           onBuilt();
@@ -958,46 +956,49 @@ public final class ComplexTypes {
         public Builder clone() {
           return super.clone();
         }
+
         @java.lang.Override
-        public Builder setField(
-            com.google.protobuf.Descriptors.FieldDescriptor field,
-            java.lang.Object value) {
+        public Builder setField(com.google.protobuf.Descriptors.FieldDescriptor field, java.lang.Object value) {
           return super.setField(field, value);
         }
+
         @java.lang.Override
-        public Builder clearField(
-            com.google.protobuf.Descriptors.FieldDescriptor field) {
+        public Builder clearField(com.google.protobuf.Descriptors.FieldDescriptor field) {
           return super.clearField(field);
         }
+
         @java.lang.Override
-        public Builder clearOneof(
-            com.google.protobuf.Descriptors.OneofDescriptor oneof) {
+        public Builder clearOneof(com.google.protobuf.Descriptors.OneofDescriptor oneof) {
           return super.clearOneof(oneof);
         }
+
         @java.lang.Override
-        public Builder setRepeatedField(
-            com.google.protobuf.Descriptors.FieldDescriptor field,
-            int index, java.lang.Object value) {
+        public Builder setRepeatedField(com.google.protobuf.Descriptors.FieldDescriptor field, int index,
+            java.lang.Object value) {
           return super.setRepeatedField(field, index, value);
         }
+
         @java.lang.Override
-        public Builder addRepeatedField(
-            com.google.protobuf.Descriptors.FieldDescriptor field,
-            java.lang.Object value) {
+        public Builder addRepeatedField(com.google.protobuf.Descriptors.FieldDescriptor field, java.lang.Object value) {
           return super.addRepeatedField(field, value);
         }
+
         @java.lang.Override
         public Builder mergeFrom(com.google.protobuf.Message other) {
           if (other instanceof org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage) {
-            return mergeFrom((org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage)other);
+            return mergeFrom(
+                (org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage) other);
           } else {
             super.mergeFrom(other);
             return this;
           }
         }
 
-        public Builder mergeFrom(org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage other) {
-          if (other == org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.getDefaultInstance()) return this;
+        public Builder mergeFrom(
+            org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage other) {
+          if (other == org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage
+              .getDefaultInstance())
+            return this;
           if (!other.getNestedStringField().isEmpty()) {
             nestedStringField_ = other.nestedStringField_;
             onChanged();
@@ -1016,15 +1017,14 @@ public final class ComplexTypes {
         }
 
         @java.lang.Override
-        public Builder mergeFrom(
-            com.google.protobuf.CodedInputStream input,
-            com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-            throws java.io.IOException {
+        public Builder mergeFrom(com.google.protobuf.CodedInputStream input,
+            com.google.protobuf.ExtensionRegistryLite extensionRegistry) throws java.io.IOException {
           org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage parsedMessage = null;
           try {
             parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
           } catch (com.google.protobuf.InvalidProtocolBufferException e) {
-            parsedMessage = (org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage) e.getUnfinishedMessage();
+            parsedMessage = (org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage) e
+                .getUnfinishedMessage();
             throw e.unwrapIOException();
           } finally {
             if (parsedMessage != null) {
@@ -1035,6 +1035,7 @@ public final class ComplexTypes {
         }
 
         private java.lang.Object nestedStringField_ = "";
+
         /**
          * <code>string nested_string_field = 1;</code>
          * @return The nestedStringField.
@@ -1042,8 +1043,7 @@ public final class ComplexTypes {
         public java.lang.String getNestedStringField() {
           java.lang.Object ref = nestedStringField_;
           if (!(ref instanceof java.lang.String)) {
-            com.google.protobuf.ByteString bs =
-                (com.google.protobuf.ByteString) ref;
+            com.google.protobuf.ByteString bs = (com.google.protobuf.ByteString) ref;
             java.lang.String s = bs.toStringUtf8();
             nestedStringField_ = s;
             return s;
@@ -1051,66 +1051,66 @@ public final class ComplexTypes {
             return (java.lang.String) ref;
           }
         }
+
         /**
          * <code>string nested_string_field = 1;</code>
          * @return The bytes for nestedStringField.
          */
-        public com.google.protobuf.ByteString
-            getNestedStringFieldBytes() {
+        public com.google.protobuf.ByteString getNestedStringFieldBytes() {
           java.lang.Object ref = nestedStringField_;
           if (ref instanceof String) {
-            com.google.protobuf.ByteString b = 
-                com.google.protobuf.ByteString.copyFromUtf8(
-                    (java.lang.String) ref);
+            com.google.protobuf.ByteString b = com.google.protobuf.ByteString.copyFromUtf8((java.lang.String) ref);
             nestedStringField_ = b;
             return b;
           } else {
             return (com.google.protobuf.ByteString) ref;
           }
         }
+
         /**
          * <code>string nested_string_field = 1;</code>
          * @param value The nestedStringField to set.
          * @return This builder for chaining.
          */
-        public Builder setNestedStringField(
-            java.lang.String value) {
+        public Builder setNestedStringField(java.lang.String value) {
           if (value == null) {
-    throw new NullPointerException();
-  }
-  
-          nestedStringField_ = value;
-          onChanged();
-          return this;
-        }
-        /**
-         * <code>string nested_string_field = 1;</code>
-         * @return This builder for chaining.
-         */
-        public Builder clearNestedStringField() {
-          
-          nestedStringField_ = getDefaultInstance().getNestedStringField();
-          onChanged();
-          return this;
-        }
-        /**
-         * <code>string nested_string_field = 1;</code>
-         * @param value The bytes for nestedStringField to set.
-         * @return This builder for chaining.
-         */
-        public Builder setNestedStringFieldBytes(
-            com.google.protobuf.ByteString value) {
-          if (value == null) {
-    throw new NullPointerException();
-  }
-  checkByteStringIsUtf8(value);
-          
+            throw new NullPointerException();
+          }
+
           nestedStringField_ = value;
           onChanged();
           return this;
         }
 
-        private int nestedIntField_ ;
+        /**
+         * <code>string nested_string_field = 1;</code>
+         * @return This builder for chaining.
+         */
+        public Builder clearNestedStringField() {
+
+          nestedStringField_ = getDefaultInstance().getNestedStringField();
+          onChanged();
+          return this;
+        }
+
+        /**
+         * <code>string nested_string_field = 1;</code>
+         * @param value The bytes for nestedStringField to set.
+         * @return This builder for chaining.
+         */
+        public Builder setNestedStringFieldBytes(com.google.protobuf.ByteString value) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          checkByteStringIsUtf8(value);
+
+          nestedStringField_ = value;
+          onChanged();
+          return this;
+        }
+
+        private int nestedIntField_;
+
         /**
          * <code>int32 nested_int_field = 2;</code>
          * @return The nestedIntField.
@@ -1119,39 +1119,39 @@ public final class ComplexTypes {
         public int getNestedIntField() {
           return nestedIntField_;
         }
+
         /**
          * <code>int32 nested_int_field = 2;</code>
          * @param value The nestedIntField to set.
          * @return This builder for chaining.
          */
         public Builder setNestedIntField(int value) {
-          
+
           nestedIntField_ = value;
           onChanged();
           return this;
         }
+
         /**
          * <code>int32 nested_int_field = 2;</code>
          * @return This builder for chaining.
          */
         public Builder clearNestedIntField() {
-          
+
           nestedIntField_ = 0;
           onChanged();
           return this;
         }
+
         @java.lang.Override
-        public final Builder setUnknownFields(
-            final com.google.protobuf.UnknownFieldSet unknownFields) {
+        public final Builder setUnknownFields(final com.google.protobuf.UnknownFieldSet unknownFields) {
           return super.setUnknownFields(unknownFields);
         }
 
         @java.lang.Override
-        public final Builder mergeUnknownFields(
-            final com.google.protobuf.UnknownFieldSet unknownFields) {
+        public final Builder mergeUnknownFields(final com.google.protobuf.UnknownFieldSet unknownFields) {
           return super.mergeUnknownFields(unknownFields);
         }
-
 
         // @@protoc_insertion_point(builder_scope:org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage)
       }
@@ -1166,16 +1166,15 @@ public final class ComplexTypes {
         return DEFAULT_INSTANCE;
       }
 
-      private static final com.google.protobuf.Parser<NestedMessage>
-          PARSER = new com.google.protobuf.AbstractParser<NestedMessage>() {
-        @java.lang.Override
-        public NestedMessage parsePartialFrom(
-            com.google.protobuf.CodedInputStream input,
-            com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-            throws com.google.protobuf.InvalidProtocolBufferException {
-          return new NestedMessage(input, extensionRegistry);
-        }
-      };
+      private static final com.google.protobuf.Parser<NestedMessage> PARSER =
+          new com.google.protobuf.AbstractParser<NestedMessage>() {
+            @java.lang.Override
+            public NestedMessage parsePartialFrom(com.google.protobuf.CodedInputStream input,
+                com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                throws com.google.protobuf.InvalidProtocolBufferException {
+              return new NestedMessage(input, extensionRegistry);
+            }
+          };
 
       public static com.google.protobuf.Parser<NestedMessage> parser() {
         return PARSER;
@@ -1195,6 +1194,7 @@ public final class ComplexTypes {
 
     public static final int STRING_FIELD_FIELD_NUMBER = 1;
     private volatile java.lang.Object stringField_;
+
     /**
      * <code>string string_field = 1;</code>
      * @return The stringField.
@@ -1205,25 +1205,22 @@ public final class ComplexTypes {
       if (ref instanceof java.lang.String) {
         return (java.lang.String) ref;
       } else {
-        com.google.protobuf.ByteString bs = 
-            (com.google.protobuf.ByteString) ref;
+        com.google.protobuf.ByteString bs = (com.google.protobuf.ByteString) ref;
         java.lang.String s = bs.toStringUtf8();
         stringField_ = s;
         return s;
       }
     }
+
     /**
      * <code>string string_field = 1;</code>
      * @return The bytes for stringField.
      */
     @java.lang.Override
-    public com.google.protobuf.ByteString
-        getStringFieldBytes() {
+    public com.google.protobuf.ByteString getStringFieldBytes() {
       java.lang.Object ref = stringField_;
       if (ref instanceof java.lang.String) {
-        com.google.protobuf.ByteString b = 
-            com.google.protobuf.ByteString.copyFromUtf8(
-                (java.lang.String) ref);
+        com.google.protobuf.ByteString b = com.google.protobuf.ByteString.copyFromUtf8((java.lang.String) ref);
         stringField_ = b;
         return b;
       } else {
@@ -1233,6 +1230,7 @@ public final class ComplexTypes {
 
     public static final int INT_FIELD_FIELD_NUMBER = 2;
     private int intField_;
+
     /**
      * <code>int32 int_field = 2;</code>
      * @return The intField.
@@ -1244,6 +1242,7 @@ public final class ComplexTypes {
 
     public static final int LONG_FIELD_FIELD_NUMBER = 3;
     private long longField_;
+
     /**
      * <code>int64 long_field = 3;</code>
      * @return The longField.
@@ -1255,6 +1254,7 @@ public final class ComplexTypes {
 
     public static final int DOUBLE_FIELD_FIELD_NUMBER = 4;
     private double doubleField_;
+
     /**
      * <code>double double_field = 4;</code>
      * @return The doubleField.
@@ -1266,6 +1266,7 @@ public final class ComplexTypes {
 
     public static final int FLOAT_FIELD_FIELD_NUMBER = 5;
     private float floatField_;
+
     /**
      * <code>float float_field = 5;</code>
      * @return The floatField.
@@ -1277,6 +1278,7 @@ public final class ComplexTypes {
 
     public static final int BOOL_FIELD_FIELD_NUMBER = 6;
     private boolean boolField_;
+
     /**
      * <code>bool bool_field = 6;</code>
      * @return The boolField.
@@ -1288,6 +1290,7 @@ public final class ComplexTypes {
 
     public static final int BYTES_FIELD_FIELD_NUMBER = 7;
     private com.google.protobuf.ByteString bytesField_;
+
     /**
      * <code>bytes bytes_field = 7;</code>
      * @return The bytesField.
@@ -1299,14 +1302,15 @@ public final class ComplexTypes {
 
     public static final int REPEATED_STRINGS_FIELD_NUMBER = 8;
     private com.google.protobuf.LazyStringList repeatedStrings_;
+
     /**
      * <code>repeated string repeated_strings = 8;</code>
      * @return A list containing the repeatedStrings.
      */
-    public com.google.protobuf.ProtocolStringList
-        getRepeatedStringsList() {
+    public com.google.protobuf.ProtocolStringList getRepeatedStringsList() {
       return repeatedStrings_;
     }
+
     /**
      * <code>repeated string repeated_strings = 8;</code>
      * @return The count of repeatedStrings.
@@ -1314,6 +1318,7 @@ public final class ComplexTypes {
     public int getRepeatedStringsCount() {
       return repeatedStrings_.size();
     }
+
     /**
      * <code>repeated string repeated_strings = 8;</code>
      * @param index The index of the element to return.
@@ -1322,18 +1327,19 @@ public final class ComplexTypes {
     public java.lang.String getRepeatedStrings(int index) {
       return repeatedStrings_.get(index);
     }
+
     /**
      * <code>repeated string repeated_strings = 8;</code>
      * @param index The index of the value to return.
      * @return The bytes of the repeatedStrings at the given index.
      */
-    public com.google.protobuf.ByteString
-        getRepeatedStringsBytes(int index) {
+    public com.google.protobuf.ByteString getRepeatedStringsBytes(int index) {
       return repeatedStrings_.getByteString(index);
     }
 
     public static final int NESTED_MESSAGE_FIELD_NUMBER = 9;
     private org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage nestedMessage_;
+
     /**
      * <code>.org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage nested_message = 9;</code>
      * @return Whether the nestedMessage field is set.
@@ -1342,14 +1348,18 @@ public final class ComplexTypes {
     public boolean hasNestedMessage() {
       return nestedMessage_ != null;
     }
+
     /**
      * <code>.org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage nested_message = 9;</code>
      * @return The nestedMessage.
      */
     @java.lang.Override
     public org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage getNestedMessage() {
-      return nestedMessage_ == null ? org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.getDefaultInstance() : nestedMessage_;
+      return nestedMessage_ == null
+          ? org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.getDefaultInstance()
+          : nestedMessage_;
     }
+
     /**
      * <code>.org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage nested_message = 9;</code>
      */
@@ -1360,6 +1370,7 @@ public final class ComplexTypes {
 
     public static final int REPEATED_NESTED_MESSAGES_FIELD_NUMBER = 10;
     private java.util.List<org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> repeatedNestedMessages_;
+
     /**
      * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
      */
@@ -1367,14 +1378,15 @@ public final class ComplexTypes {
     public java.util.List<org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> getRepeatedNestedMessagesList() {
       return repeatedNestedMessages_;
     }
+
     /**
      * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
      */
     @java.lang.Override
-    public java.util.List<? extends org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessageOrBuilder> 
-        getRepeatedNestedMessagesOrBuilderList() {
+    public java.util.List<? extends org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessageOrBuilder> getRepeatedNestedMessagesOrBuilderList() {
       return repeatedNestedMessages_;
     }
+
     /**
      * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
      */
@@ -1382,13 +1394,16 @@ public final class ComplexTypes {
     public int getRepeatedNestedMessagesCount() {
       return repeatedNestedMessages_.size();
     }
+
     /**
      * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
      */
     @java.lang.Override
-    public org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage getRepeatedNestedMessages(int index) {
+    public org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage getRepeatedNestedMessages(
+        int index) {
       return repeatedNestedMessages_.get(index);
     }
+
     /**
      * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
      */
@@ -1399,24 +1414,19 @@ public final class ComplexTypes {
     }
 
     public static final int COMPLEX_MAP_FIELD_NUMBER = 11;
+
     private static final class ComplexMapDefaultEntryHolder {
-      static final com.google.protobuf.MapEntry<
-          java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> defaultEntry =
-              com.google.protobuf.MapEntry
-              .<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage>newDefaultInstance(
-                  org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_ComplexMapEntry_descriptor, 
-                  com.google.protobuf.WireFormat.FieldType.STRING,
-                  "",
-                  com.google.protobuf.WireFormat.FieldType.MESSAGE,
-                  org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.getDefaultInstance());
+      static final com.google.protobuf.MapEntry<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> defaultEntry =
+          com.google.protobuf.MapEntry.<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> newDefaultInstance(
+              org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_ComplexMapEntry_descriptor,
+              com.google.protobuf.WireFormat.FieldType.STRING, "", com.google.protobuf.WireFormat.FieldType.MESSAGE,
+              org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.getDefaultInstance());
     }
-    private com.google.protobuf.MapField<
-        java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> complexMap_;
-    private com.google.protobuf.MapField<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage>
-    internalGetComplexMap() {
+    private com.google.protobuf.MapField<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> complexMap_;
+
+    private com.google.protobuf.MapField<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> internalGetComplexMap() {
       if (complexMap_ == null) {
-        return com.google.protobuf.MapField.emptyMapField(
-            ComplexMapDefaultEntryHolder.defaultEntry);
+        return com.google.protobuf.MapField.emptyMapField(ComplexMapDefaultEntryHolder.defaultEntry);
       }
       return complexMap_;
     }
@@ -1424,16 +1434,19 @@ public final class ComplexTypes {
     public int getComplexMapCount() {
       return internalGetComplexMap().getMap().size();
     }
+
     /**
      * <code>map&lt;string, .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage&gt; complex_map = 11;</code>
      */
 
     @java.lang.Override
-    public boolean containsComplexMap(
-        java.lang.String key) {
-      if (key == null) { throw new java.lang.NullPointerException(); }
+    public boolean containsComplexMap(java.lang.String key) {
+      if (key == null) {
+        throw new java.lang.NullPointerException();
+      }
       return internalGetComplexMap().getMap().containsKey(key);
     }
+
     /**
      * Use {@link #getComplexMapMap()} instead.
      */
@@ -1442,6 +1455,7 @@ public final class ComplexTypes {
     public java.util.Map<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> getComplexMap() {
       return getComplexMapMap();
     }
+
     /**
      * <code>map&lt;string, .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage&gt; complex_map = 11;</code>
      */
@@ -1450,6 +1464,7 @@ public final class ComplexTypes {
     public java.util.Map<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> getComplexMapMap() {
       return internalGetComplexMap().getMap();
     }
+
     /**
      * <code>map&lt;string, .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage&gt; complex_map = 11;</code>
      */
@@ -1458,11 +1473,14 @@ public final class ComplexTypes {
     public org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage getComplexMapOrDefault(
         java.lang.String key,
         org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage defaultValue) {
-      if (key == null) { throw new java.lang.NullPointerException(); }
+      if (key == null) {
+        throw new java.lang.NullPointerException();
+      }
       java.util.Map<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> map =
           internalGetComplexMap().getMap();
       return map.containsKey(key) ? map.get(key) : defaultValue;
     }
+
     /**
      * <code>map&lt;string, .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage&gt; complex_map = 11;</code>
      */
@@ -1470,7 +1488,9 @@ public final class ComplexTypes {
 
     public org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage getComplexMapOrThrow(
         java.lang.String key) {
-      if (key == null) { throw new java.lang.NullPointerException(); }
+      if (key == null) {
+        throw new java.lang.NullPointerException();
+      }
       java.util.Map<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> map =
           internalGetComplexMap().getMap();
       if (!map.containsKey(key)) {
@@ -1480,24 +1500,18 @@ public final class ComplexTypes {
     }
 
     public static final int SIMPLE_MAP_FIELD_NUMBER = 12;
+
     private static final class SimpleMapDefaultEntryHolder {
-      static final com.google.protobuf.MapEntry<
-          java.lang.String, java.lang.Integer> defaultEntry =
-              com.google.protobuf.MapEntry
-              .<java.lang.String, java.lang.Integer>newDefaultInstance(
-                  org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_SimpleMapEntry_descriptor, 
-                  com.google.protobuf.WireFormat.FieldType.STRING,
-                  "",
-                  com.google.protobuf.WireFormat.FieldType.INT32,
-                  0);
+      static final com.google.protobuf.MapEntry<java.lang.String, java.lang.Integer> defaultEntry =
+          com.google.protobuf.MapEntry.<java.lang.String, java.lang.Integer> newDefaultInstance(
+              org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_SimpleMapEntry_descriptor,
+              com.google.protobuf.WireFormat.FieldType.STRING, "", com.google.protobuf.WireFormat.FieldType.INT32, 0);
     }
-    private com.google.protobuf.MapField<
-        java.lang.String, java.lang.Integer> simpleMap_;
-    private com.google.protobuf.MapField<java.lang.String, java.lang.Integer>
-    internalGetSimpleMap() {
+    private com.google.protobuf.MapField<java.lang.String, java.lang.Integer> simpleMap_;
+
+    private com.google.protobuf.MapField<java.lang.String, java.lang.Integer> internalGetSimpleMap() {
       if (simpleMap_ == null) {
-        return com.google.protobuf.MapField.emptyMapField(
-            SimpleMapDefaultEntryHolder.defaultEntry);
+        return com.google.protobuf.MapField.emptyMapField(SimpleMapDefaultEntryHolder.defaultEntry);
       }
       return simpleMap_;
     }
@@ -1505,16 +1519,19 @@ public final class ComplexTypes {
     public int getSimpleMapCount() {
       return internalGetSimpleMap().getMap().size();
     }
+
     /**
      * <code>map&lt;string, int32&gt; simple_map = 12;</code>
      */
 
     @java.lang.Override
-    public boolean containsSimpleMap(
-        java.lang.String key) {
-      if (key == null) { throw new java.lang.NullPointerException(); }
+    public boolean containsSimpleMap(java.lang.String key) {
+      if (key == null) {
+        throw new java.lang.NullPointerException();
+      }
       return internalGetSimpleMap().getMap().containsKey(key);
     }
+
     /**
      * Use {@link #getSimpleMapMap()} instead.
      */
@@ -1523,6 +1540,7 @@ public final class ComplexTypes {
     public java.util.Map<java.lang.String, java.lang.Integer> getSimpleMap() {
       return getSimpleMapMap();
     }
+
     /**
      * <code>map&lt;string, int32&gt; simple_map = 12;</code>
      */
@@ -1531,29 +1549,30 @@ public final class ComplexTypes {
     public java.util.Map<java.lang.String, java.lang.Integer> getSimpleMapMap() {
       return internalGetSimpleMap().getMap();
     }
+
     /**
      * <code>map&lt;string, int32&gt; simple_map = 12;</code>
      */
     @java.lang.Override
 
-    public int getSimpleMapOrDefault(
-        java.lang.String key,
-        int defaultValue) {
-      if (key == null) { throw new java.lang.NullPointerException(); }
-      java.util.Map<java.lang.String, java.lang.Integer> map =
-          internalGetSimpleMap().getMap();
+    public int getSimpleMapOrDefault(java.lang.String key, int defaultValue) {
+      if (key == null) {
+        throw new java.lang.NullPointerException();
+      }
+      java.util.Map<java.lang.String, java.lang.Integer> map = internalGetSimpleMap().getMap();
       return map.containsKey(key) ? map.get(key) : defaultValue;
     }
+
     /**
      * <code>map&lt;string, int32&gt; simple_map = 12;</code>
      */
     @java.lang.Override
 
-    public int getSimpleMapOrThrow(
-        java.lang.String key) {
-      if (key == null) { throw new java.lang.NullPointerException(); }
-      java.util.Map<java.lang.String, java.lang.Integer> map =
-          internalGetSimpleMap().getMap();
+    public int getSimpleMapOrThrow(java.lang.String key) {
+      if (key == null) {
+        throw new java.lang.NullPointerException();
+      }
+      java.util.Map<java.lang.String, java.lang.Integer> map = internalGetSimpleMap().getMap();
       if (!map.containsKey(key)) {
         throw new java.lang.IllegalArgumentException();
       }
@@ -1562,37 +1581,45 @@ public final class ComplexTypes {
 
     public static final int ENUM_FIELD_FIELD_NUMBER = 15;
     private int enumField_;
+
     /**
      * <code>.org.apache.pinot.plugin.inputformat.protobuf.TestMessage.TestEnum enum_field = 15;</code>
      * @return The enum numeric value on the wire for enumField.
      */
-    @java.lang.Override public int getEnumFieldValue() {
+    @java.lang.Override
+    public int getEnumFieldValue() {
       return enumField_;
     }
+
     /**
      * <code>.org.apache.pinot.plugin.inputformat.protobuf.TestMessage.TestEnum enum_field = 15;</code>
      * @return The enumField.
      */
-    @java.lang.Override public org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.TestEnum getEnumField() {
+    @java.lang.Override
+    public org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.TestEnum getEnumField() {
       @SuppressWarnings("deprecation")
-      org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.TestEnum result = org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.TestEnum.valueOf(enumField_);
-      return result == null ? org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.TestEnum.UNRECOGNIZED : result;
+      org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.TestEnum result =
+          org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.TestEnum.valueOf(enumField_);
+      return result == null
+          ? org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.TestEnum.UNRECOGNIZED : result;
     }
 
     private byte memoizedIsInitialized = -1;
+
     @java.lang.Override
     public final boolean isInitialized() {
       byte isInitialized = memoizedIsInitialized;
-      if (isInitialized == 1) return true;
-      if (isInitialized == 0) return false;
+      if (isInitialized == 1)
+        return true;
+      if (isInitialized == 0)
+        return false;
 
       memoizedIsInitialized = 1;
       return true;
     }
 
     @java.lang.Override
-    public void writeTo(com.google.protobuf.CodedOutputStream output)
-                        throws java.io.IOException {
+    public void writeTo(com.google.protobuf.CodedOutputStream output) throws java.io.IOException {
       if (!getStringFieldBytes().isEmpty()) {
         com.google.protobuf.GeneratedMessageV3.writeString(output, 1, stringField_);
       }
@@ -1623,19 +1650,12 @@ public final class ComplexTypes {
       for (int i = 0; i < repeatedNestedMessages_.size(); i++) {
         output.writeMessage(10, repeatedNestedMessages_.get(i));
       }
-      com.google.protobuf.GeneratedMessageV3
-        .serializeStringMapTo(
-          output,
-          internalGetComplexMap(),
-          ComplexMapDefaultEntryHolder.defaultEntry,
-          11);
-      com.google.protobuf.GeneratedMessageV3
-        .serializeStringMapTo(
-          output,
-          internalGetSimpleMap(),
-          SimpleMapDefaultEntryHolder.defaultEntry,
-          12);
-      if (enumField_ != org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.TestEnum.ALPHA.getNumber()) {
+      com.google.protobuf.GeneratedMessageV3.serializeStringMapTo(output, internalGetComplexMap(),
+          ComplexMapDefaultEntryHolder.defaultEntry, 11);
+      com.google.protobuf.GeneratedMessageV3.serializeStringMapTo(output, internalGetSimpleMap(),
+          SimpleMapDefaultEntryHolder.defaultEntry, 12);
+      if (enumField_ != org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.TestEnum.ALPHA
+          .getNumber()) {
         output.writeEnum(15, enumField_);
       }
       unknownFields.writeTo(output);
@@ -1644,35 +1664,30 @@ public final class ComplexTypes {
     @java.lang.Override
     public int getSerializedSize() {
       int size = memoizedSize;
-      if (size != -1) return size;
+      if (size != -1)
+        return size;
 
       size = 0;
       if (!getStringFieldBytes().isEmpty()) {
         size += com.google.protobuf.GeneratedMessageV3.computeStringSize(1, stringField_);
       }
       if (intField_ != 0) {
-        size += com.google.protobuf.CodedOutputStream
-          .computeInt32Size(2, intField_);
+        size += com.google.protobuf.CodedOutputStream.computeInt32Size(2, intField_);
       }
       if (longField_ != 0L) {
-        size += com.google.protobuf.CodedOutputStream
-          .computeInt64Size(3, longField_);
+        size += com.google.protobuf.CodedOutputStream.computeInt64Size(3, longField_);
       }
       if (doubleField_ != 0D) {
-        size += com.google.protobuf.CodedOutputStream
-          .computeDoubleSize(4, doubleField_);
+        size += com.google.protobuf.CodedOutputStream.computeDoubleSize(4, doubleField_);
       }
       if (floatField_ != 0F) {
-        size += com.google.protobuf.CodedOutputStream
-          .computeFloatSize(5, floatField_);
+        size += com.google.protobuf.CodedOutputStream.computeFloatSize(5, floatField_);
       }
       if (boolField_ != false) {
-        size += com.google.protobuf.CodedOutputStream
-          .computeBoolSize(6, boolField_);
+        size += com.google.protobuf.CodedOutputStream.computeBoolSize(6, boolField_);
       }
       if (!bytesField_.isEmpty()) {
-        size += com.google.protobuf.CodedOutputStream
-          .computeBytesSize(7, bytesField_);
+        size += com.google.protobuf.CodedOutputStream.computeBytesSize(7, bytesField_);
       }
       {
         int dataSize = 0;
@@ -1683,36 +1698,28 @@ public final class ComplexTypes {
         size += 1 * getRepeatedStringsList().size();
       }
       if (nestedMessage_ != null) {
-        size += com.google.protobuf.CodedOutputStream
-          .computeMessageSize(9, getNestedMessage());
+        size += com.google.protobuf.CodedOutputStream.computeMessageSize(9, getNestedMessage());
       }
       for (int i = 0; i < repeatedNestedMessages_.size(); i++) {
-        size += com.google.protobuf.CodedOutputStream
-          .computeMessageSize(10, repeatedNestedMessages_.get(i));
+        size += com.google.protobuf.CodedOutputStream.computeMessageSize(10, repeatedNestedMessages_.get(i));
       }
-      for (java.util.Map.Entry<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> entry
-           : internalGetComplexMap().getMap().entrySet()) {
-        com.google.protobuf.MapEntry<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage>
-        complexMap__ = ComplexMapDefaultEntryHolder.defaultEntry.newBuilderForType()
-            .setKey(entry.getKey())
-            .setValue(entry.getValue())
-            .build();
-        size += com.google.protobuf.CodedOutputStream
-            .computeMessageSize(11, complexMap__);
+      for (java.util.Map.Entry<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> entry : internalGetComplexMap()
+          .getMap().entrySet()) {
+        com.google.protobuf.MapEntry<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> complexMap__ =
+            ComplexMapDefaultEntryHolder.defaultEntry.newBuilderForType().setKey(entry.getKey())
+                .setValue(entry.getValue()).build();
+        size += com.google.protobuf.CodedOutputStream.computeMessageSize(11, complexMap__);
       }
-      for (java.util.Map.Entry<java.lang.String, java.lang.Integer> entry
-           : internalGetSimpleMap().getMap().entrySet()) {
-        com.google.protobuf.MapEntry<java.lang.String, java.lang.Integer>
-        simpleMap__ = SimpleMapDefaultEntryHolder.defaultEntry.newBuilderForType()
-            .setKey(entry.getKey())
-            .setValue(entry.getValue())
-            .build();
-        size += com.google.protobuf.CodedOutputStream
-            .computeMessageSize(12, simpleMap__);
+      for (java.util.Map.Entry<java.lang.String, java.lang.Integer> entry : internalGetSimpleMap().getMap()
+          .entrySet()) {
+        com.google.protobuf.MapEntry<java.lang.String, java.lang.Integer> simpleMap__ =
+            SimpleMapDefaultEntryHolder.defaultEntry.newBuilderForType().setKey(entry.getKey())
+                .setValue(entry.getValue()).build();
+        size += com.google.protobuf.CodedOutputStream.computeMessageSize(12, simpleMap__);
       }
-      if (enumField_ != org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.TestEnum.ALPHA.getNumber()) {
-        size += com.google.protobuf.CodedOutputStream
-          .computeEnumSize(15, enumField_);
+      if (enumField_ != org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.TestEnum.ALPHA
+          .getNumber()) {
+        size += com.google.protobuf.CodedOutputStream.computeEnumSize(15, enumField_);
       }
       size += unknownFields.getSerializedSize();
       memoizedSize = size;
@@ -1722,44 +1729,47 @@ public final class ComplexTypes {
     @java.lang.Override
     public boolean equals(final java.lang.Object obj) {
       if (obj == this) {
-       return true;
+        return true;
       }
       if (!(obj instanceof org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage)) {
         return super.equals(obj);
       }
-      org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage other = (org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage) obj;
+      org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage other =
+          (org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage) obj;
 
-      if (!getStringField()
-          .equals(other.getStringField())) return false;
-      if (getIntField()
-          != other.getIntField()) return false;
-      if (getLongField()
-          != other.getLongField()) return false;
-      if (java.lang.Double.doubleToLongBits(getDoubleField())
-          != java.lang.Double.doubleToLongBits(
-              other.getDoubleField())) return false;
-      if (java.lang.Float.floatToIntBits(getFloatField())
-          != java.lang.Float.floatToIntBits(
-              other.getFloatField())) return false;
-      if (getBoolField()
-          != other.getBoolField()) return false;
-      if (!getBytesField()
-          .equals(other.getBytesField())) return false;
-      if (!getRepeatedStringsList()
-          .equals(other.getRepeatedStringsList())) return false;
-      if (hasNestedMessage() != other.hasNestedMessage()) return false;
+      if (!getStringField().equals(other.getStringField()))
+        return false;
+      if (getIntField() != other.getIntField())
+        return false;
+      if (getLongField() != other.getLongField())
+        return false;
+      if (java.lang.Double.doubleToLongBits(getDoubleField()) != java.lang.Double
+          .doubleToLongBits(other.getDoubleField()))
+        return false;
+      if (java.lang.Float.floatToIntBits(getFloatField()) != java.lang.Float.floatToIntBits(other.getFloatField()))
+        return false;
+      if (getBoolField() != other.getBoolField())
+        return false;
+      if (!getBytesField().equals(other.getBytesField()))
+        return false;
+      if (!getRepeatedStringsList().equals(other.getRepeatedStringsList()))
+        return false;
+      if (hasNestedMessage() != other.hasNestedMessage())
+        return false;
       if (hasNestedMessage()) {
-        if (!getNestedMessage()
-            .equals(other.getNestedMessage())) return false;
+        if (!getNestedMessage().equals(other.getNestedMessage()))
+          return false;
       }
-      if (!getRepeatedNestedMessagesList()
-          .equals(other.getRepeatedNestedMessagesList())) return false;
-      if (!internalGetComplexMap().equals(
-          other.internalGetComplexMap())) return false;
-      if (!internalGetSimpleMap().equals(
-          other.internalGetSimpleMap())) return false;
-      if (enumField_ != other.enumField_) return false;
-      if (!unknownFields.equals(other.unknownFields)) return false;
+      if (!getRepeatedNestedMessagesList().equals(other.getRepeatedNestedMessagesList()))
+        return false;
+      if (!internalGetComplexMap().equals(other.internalGetComplexMap()))
+        return false;
+      if (!internalGetSimpleMap().equals(other.internalGetSimpleMap()))
+        return false;
+      if (enumField_ != other.enumField_)
+        return false;
+      if (!unknownFields.equals(other.unknownFields))
+        return false;
       return true;
     }
 
@@ -1775,17 +1785,13 @@ public final class ComplexTypes {
       hash = (37 * hash) + INT_FIELD_FIELD_NUMBER;
       hash = (53 * hash) + getIntField();
       hash = (37 * hash) + LONG_FIELD_FIELD_NUMBER;
-      hash = (53 * hash) + com.google.protobuf.Internal.hashLong(
-          getLongField());
+      hash = (53 * hash) + com.google.protobuf.Internal.hashLong(getLongField());
       hash = (37 * hash) + DOUBLE_FIELD_FIELD_NUMBER;
-      hash = (53 * hash) + com.google.protobuf.Internal.hashLong(
-          java.lang.Double.doubleToLongBits(getDoubleField()));
+      hash = (53 * hash) + com.google.protobuf.Internal.hashLong(java.lang.Double.doubleToLongBits(getDoubleField()));
       hash = (37 * hash) + FLOAT_FIELD_FIELD_NUMBER;
-      hash = (53 * hash) + java.lang.Float.floatToIntBits(
-          getFloatField());
+      hash = (53 * hash) + java.lang.Float.floatToIntBits(getFloatField());
       hash = (37 * hash) + BOOL_FIELD_FIELD_NUMBER;
-      hash = (53 * hash) + com.google.protobuf.Internal.hashBoolean(
-          getBoolField());
+      hash = (53 * hash) + com.google.protobuf.Internal.hashBoolean(getBoolField());
       hash = (37 * hash) + BYTES_FIELD_FIELD_NUMBER;
       hash = (53 * hash) + getBytesField().hashCode();
       if (getRepeatedStringsCount() > 0) {
@@ -1816,139 +1822,135 @@ public final class ComplexTypes {
     }
 
     public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage parseFrom(
-        java.nio.ByteBuffer data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
+        java.nio.ByteBuffer data) throws com.google.protobuf.InvalidProtocolBufferException {
       return PARSER.parseFrom(data);
     }
+
     public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage parseFrom(
-        java.nio.ByteBuffer data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        java.nio.ByteBuffer data, com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return PARSER.parseFrom(data, extensionRegistry);
     }
+
     public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage parseFrom(
-        com.google.protobuf.ByteString data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
+        com.google.protobuf.ByteString data) throws com.google.protobuf.InvalidProtocolBufferException {
       return PARSER.parseFrom(data);
     }
+
     public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage parseFrom(
-        com.google.protobuf.ByteString data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        com.google.protobuf.ByteString data, com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return PARSER.parseFrom(data, extensionRegistry);
     }
+
     public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage parseFrom(byte[] data)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return PARSER.parseFrom(data);
     }
-    public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage parseFrom(
-        byte[] data,
+
+    public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage parseFrom(byte[] data,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return PARSER.parseFrom(data, extensionRegistry);
     }
-    public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage parseFrom(java.io.InputStream input)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageV3
-          .parseWithIOException(PARSER, input);
-    }
+
     public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage parseFrom(
-        java.io.InputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageV3
-          .parseWithIOException(PARSER, input, extensionRegistry);
+        java.io.InputStream input) throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3.parseWithIOException(PARSER, input);
     }
-    public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage parseDelimitedFrom(java.io.InputStream input)
+
+    public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage parseFrom(
+        java.io.InputStream input, com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageV3
-          .parseDelimitedWithIOException(PARSER, input);
+      return com.google.protobuf.GeneratedMessageV3.parseWithIOException(PARSER, input, extensionRegistry);
     }
+
     public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage parseDelimitedFrom(
-        java.io.InputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageV3
-          .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
+        java.io.InputStream input) throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3.parseDelimitedWithIOException(PARSER, input);
     }
-    public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage parseFrom(
-        com.google.protobuf.CodedInputStream input)
+
+    public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage parseDelimitedFrom(
+        java.io.InputStream input, com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageV3
-          .parseWithIOException(PARSER, input);
+      return com.google.protobuf.GeneratedMessageV3.parseDelimitedWithIOException(PARSER, input, extensionRegistry);
     }
+
     public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage parseFrom(
-        com.google.protobuf.CodedInputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        com.google.protobuf.CodedInputStream input) throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3.parseWithIOException(PARSER, input);
+    }
+
+    public static org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage parseFrom(
+        com.google.protobuf.CodedInputStream input, com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageV3
-          .parseWithIOException(PARSER, input, extensionRegistry);
+      return com.google.protobuf.GeneratedMessageV3.parseWithIOException(PARSER, input, extensionRegistry);
     }
 
     @java.lang.Override
-    public Builder newBuilderForType() { return newBuilder(); }
+    public Builder newBuilderForType() {
+      return newBuilder();
+    }
+
     public static Builder newBuilder() {
       return DEFAULT_INSTANCE.toBuilder();
     }
+
     public static Builder newBuilder(org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage prototype) {
       return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
     }
+
     @java.lang.Override
     public Builder toBuilder() {
-      return this == DEFAULT_INSTANCE
-          ? new Builder() : new Builder().mergeFrom(this);
+      return this == DEFAULT_INSTANCE ? new Builder() : new Builder().mergeFrom(this);
     }
 
     @java.lang.Override
-    protected Builder newBuilderForType(
-        com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
+    protected Builder newBuilderForType(com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
       Builder builder = new Builder(parent);
       return builder;
     }
+
     /**
      * Protobuf type {@code org.apache.pinot.plugin.inputformat.protobuf.TestMessage}
      */
-    public static final class Builder extends
-        com.google.protobuf.GeneratedMessageV3.Builder<Builder> implements
+    public static final class Builder extends com.google.protobuf.GeneratedMessageV3.Builder<Builder> implements
         // @@protoc_insertion_point(builder_implements:org.apache.pinot.plugin.inputformat.protobuf.TestMessage)
         org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessageOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
-          getDescriptor() {
+      public static final com.google.protobuf.Descriptors.Descriptor getDescriptor() {
         return org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_descriptor;
       }
 
       @SuppressWarnings({"rawtypes"})
-      protected com.google.protobuf.MapField internalGetMapField(
-          int number) {
+      protected com.google.protobuf.MapField internalGetMapField(int number) {
         switch (number) {
           case 11:
             return internalGetComplexMap();
           case 12:
             return internalGetSimpleMap();
           default:
-            throw new RuntimeException(
-                "Invalid map field number: " + number);
+            throw new RuntimeException("Invalid map field number: " + number);
         }
       }
+
       @SuppressWarnings({"rawtypes"})
-      protected com.google.protobuf.MapField internalGetMutableMapField(
-          int number) {
+      protected com.google.protobuf.MapField internalGetMutableMapField(int number) {
         switch (number) {
           case 11:
             return internalGetMutableComplexMap();
           case 12:
             return internalGetMutableSimpleMap();
           default:
-            throw new RuntimeException(
-                "Invalid map field number: " + number);
+            throw new RuntimeException("Invalid map field number: " + number);
         }
       }
+
       @java.lang.Override
-      protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
-          internalGetFieldAccessorTable() {
+      protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable internalGetFieldAccessorTable() {
         return org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_fieldAccessorTable
             .ensureFieldAccessorsInitialized(
-                org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.class, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.Builder.class);
+                org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.class,
+                org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.Builder.class);
       }
 
       // Construct using org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.newBuilder()
@@ -1956,17 +1958,17 @@ public final class ComplexTypes {
         maybeForceBuilderInitialization();
       }
 
-      private Builder(
-          com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
+      private Builder(com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
         super(parent);
         maybeForceBuilderInitialization();
       }
+
       private void maybeForceBuilderInitialization() {
-        if (com.google.protobuf.GeneratedMessageV3
-                .alwaysUseFieldBuilders) {
+        if (com.google.protobuf.GeneratedMessageV3.alwaysUseFieldBuilders) {
           getRepeatedNestedMessagesFieldBuilder();
         }
       }
+
       @java.lang.Override
       public Builder clear() {
         super.clear();
@@ -2006,8 +2008,7 @@ public final class ComplexTypes {
       }
 
       @java.lang.Override
-      public com.google.protobuf.Descriptors.Descriptor
-          getDescriptorForType() {
+      public com.google.protobuf.Descriptors.Descriptor getDescriptorForType() {
         return org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_descriptor;
       }
 
@@ -2027,7 +2028,8 @@ public final class ComplexTypes {
 
       @java.lang.Override
       public org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage buildPartial() {
-        org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage result = new org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage(this);
+        org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage result =
+            new org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage(this);
         int from_bitField0_ = bitField0_;
         result.stringField_ = stringField_;
         result.intField_ = intField_;
@@ -2068,38 +2070,37 @@ public final class ComplexTypes {
       public Builder clone() {
         return super.clone();
       }
+
       @java.lang.Override
-      public Builder setField(
-          com.google.protobuf.Descriptors.FieldDescriptor field,
-          java.lang.Object value) {
+      public Builder setField(com.google.protobuf.Descriptors.FieldDescriptor field, java.lang.Object value) {
         return super.setField(field, value);
       }
+
       @java.lang.Override
-      public Builder clearField(
-          com.google.protobuf.Descriptors.FieldDescriptor field) {
+      public Builder clearField(com.google.protobuf.Descriptors.FieldDescriptor field) {
         return super.clearField(field);
       }
+
       @java.lang.Override
-      public Builder clearOneof(
-          com.google.protobuf.Descriptors.OneofDescriptor oneof) {
+      public Builder clearOneof(com.google.protobuf.Descriptors.OneofDescriptor oneof) {
         return super.clearOneof(oneof);
       }
+
       @java.lang.Override
-      public Builder setRepeatedField(
-          com.google.protobuf.Descriptors.FieldDescriptor field,
-          int index, java.lang.Object value) {
+      public Builder setRepeatedField(com.google.protobuf.Descriptors.FieldDescriptor field, int index,
+          java.lang.Object value) {
         return super.setRepeatedField(field, index, value);
       }
+
       @java.lang.Override
-      public Builder addRepeatedField(
-          com.google.protobuf.Descriptors.FieldDescriptor field,
-          java.lang.Object value) {
+      public Builder addRepeatedField(com.google.protobuf.Descriptors.FieldDescriptor field, java.lang.Object value) {
         return super.addRepeatedField(field, value);
       }
+
       @java.lang.Override
       public Builder mergeFrom(com.google.protobuf.Message other) {
         if (other instanceof org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage) {
-          return mergeFrom((org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage)other);
+          return mergeFrom((org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage) other);
         } else {
           super.mergeFrom(other);
           return this;
@@ -2107,7 +2108,8 @@ public final class ComplexTypes {
       }
 
       public Builder mergeFrom(org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage other) {
-        if (other == org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.getDefaultInstance()) return this;
+        if (other == org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.getDefaultInstance())
+          return this;
         if (!other.getStringField().isEmpty()) {
           stringField_ = other.stringField_;
           onChanged();
@@ -2161,18 +2163,15 @@ public final class ComplexTypes {
               repeatedNestedMessagesBuilder_ = null;
               repeatedNestedMessages_ = other.repeatedNestedMessages_;
               bitField0_ = (bitField0_ & ~0x00000002);
-              repeatedNestedMessagesBuilder_ = 
-                com.google.protobuf.GeneratedMessageV3.alwaysUseFieldBuilders ?
-                   getRepeatedNestedMessagesFieldBuilder() : null;
+              repeatedNestedMessagesBuilder_ = com.google.protobuf.GeneratedMessageV3.alwaysUseFieldBuilders
+                  ? getRepeatedNestedMessagesFieldBuilder() : null;
             } else {
               repeatedNestedMessagesBuilder_.addAllMessages(other.repeatedNestedMessages_);
             }
           }
         }
-        internalGetMutableComplexMap().mergeFrom(
-            other.internalGetComplexMap());
-        internalGetMutableSimpleMap().mergeFrom(
-            other.internalGetSimpleMap());
+        internalGetMutableComplexMap().mergeFrom(other.internalGetComplexMap());
+        internalGetMutableSimpleMap().mergeFrom(other.internalGetSimpleMap());
         if (other.enumField_ != 0) {
           setEnumFieldValue(other.getEnumFieldValue());
         }
@@ -2187,15 +2186,14 @@ public final class ComplexTypes {
       }
 
       @java.lang.Override
-      public Builder mergeFrom(
-          com.google.protobuf.CodedInputStream input,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws java.io.IOException {
+      public Builder mergeFrom(com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry) throws java.io.IOException {
         org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage parsedMessage = null;
         try {
           parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
         } catch (com.google.protobuf.InvalidProtocolBufferException e) {
-          parsedMessage = (org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage) e.getUnfinishedMessage();
+          parsedMessage =
+              (org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage) e.getUnfinishedMessage();
           throw e.unwrapIOException();
         } finally {
           if (parsedMessage != null) {
@@ -2207,6 +2205,7 @@ public final class ComplexTypes {
       private int bitField0_;
 
       private java.lang.Object stringField_ = "";
+
       /**
        * <code>string string_field = 1;</code>
        * @return The stringField.
@@ -2214,8 +2213,7 @@ public final class ComplexTypes {
       public java.lang.String getStringField() {
         java.lang.Object ref = stringField_;
         if (!(ref instanceof java.lang.String)) {
-          com.google.protobuf.ByteString bs =
-              (com.google.protobuf.ByteString) ref;
+          com.google.protobuf.ByteString bs = (com.google.protobuf.ByteString) ref;
           java.lang.String s = bs.toStringUtf8();
           stringField_ = s;
           return s;
@@ -2223,66 +2221,66 @@ public final class ComplexTypes {
           return (java.lang.String) ref;
         }
       }
+
       /**
        * <code>string string_field = 1;</code>
        * @return The bytes for stringField.
        */
-      public com.google.protobuf.ByteString
-          getStringFieldBytes() {
+      public com.google.protobuf.ByteString getStringFieldBytes() {
         java.lang.Object ref = stringField_;
         if (ref instanceof String) {
-          com.google.protobuf.ByteString b = 
-              com.google.protobuf.ByteString.copyFromUtf8(
-                  (java.lang.String) ref);
+          com.google.protobuf.ByteString b = com.google.protobuf.ByteString.copyFromUtf8((java.lang.String) ref);
           stringField_ = b;
           return b;
         } else {
           return (com.google.protobuf.ByteString) ref;
         }
       }
+
       /**
        * <code>string string_field = 1;</code>
        * @param value The stringField to set.
        * @return This builder for chaining.
        */
-      public Builder setStringField(
-          java.lang.String value) {
+      public Builder setStringField(java.lang.String value) {
         if (value == null) {
-    throw new NullPointerException();
-  }
-  
-        stringField_ = value;
-        onChanged();
-        return this;
-      }
-      /**
-       * <code>string string_field = 1;</code>
-       * @return This builder for chaining.
-       */
-      public Builder clearStringField() {
-        
-        stringField_ = getDefaultInstance().getStringField();
-        onChanged();
-        return this;
-      }
-      /**
-       * <code>string string_field = 1;</code>
-       * @param value The bytes for stringField to set.
-       * @return This builder for chaining.
-       */
-      public Builder setStringFieldBytes(
-          com.google.protobuf.ByteString value) {
-        if (value == null) {
-    throw new NullPointerException();
-  }
-  checkByteStringIsUtf8(value);
-        
+          throw new NullPointerException();
+        }
+
         stringField_ = value;
         onChanged();
         return this;
       }
 
-      private int intField_ ;
+      /**
+       * <code>string string_field = 1;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearStringField() {
+
+        stringField_ = getDefaultInstance().getStringField();
+        onChanged();
+        return this;
+      }
+
+      /**
+       * <code>string string_field = 1;</code>
+       * @param value The bytes for stringField to set.
+       * @return This builder for chaining.
+       */
+      public Builder setStringFieldBytes(com.google.protobuf.ByteString value) {
+        if (value == null) {
+          throw new NullPointerException();
+        }
+        checkByteStringIsUtf8(value);
+
+        stringField_ = value;
+        onChanged();
+        return this;
+      }
+
+      private int intField_;
+
       /**
        * <code>int32 int_field = 2;</code>
        * @return The intField.
@@ -2291,29 +2289,32 @@ public final class ComplexTypes {
       public int getIntField() {
         return intField_;
       }
+
       /**
        * <code>int32 int_field = 2;</code>
        * @param value The intField to set.
        * @return This builder for chaining.
        */
       public Builder setIntField(int value) {
-        
+
         intField_ = value;
         onChanged();
         return this;
       }
+
       /**
        * <code>int32 int_field = 2;</code>
        * @return This builder for chaining.
        */
       public Builder clearIntField() {
-        
+
         intField_ = 0;
         onChanged();
         return this;
       }
 
-      private long longField_ ;
+      private long longField_;
+
       /**
        * <code>int64 long_field = 3;</code>
        * @return The longField.
@@ -2322,29 +2323,32 @@ public final class ComplexTypes {
       public long getLongField() {
         return longField_;
       }
+
       /**
        * <code>int64 long_field = 3;</code>
        * @param value The longField to set.
        * @return This builder for chaining.
        */
       public Builder setLongField(long value) {
-        
+
         longField_ = value;
         onChanged();
         return this;
       }
+
       /**
        * <code>int64 long_field = 3;</code>
        * @return This builder for chaining.
        */
       public Builder clearLongField() {
-        
+
         longField_ = 0L;
         onChanged();
         return this;
       }
 
-      private double doubleField_ ;
+      private double doubleField_;
+
       /**
        * <code>double double_field = 4;</code>
        * @return The doubleField.
@@ -2353,29 +2357,32 @@ public final class ComplexTypes {
       public double getDoubleField() {
         return doubleField_;
       }
+
       /**
        * <code>double double_field = 4;</code>
        * @param value The doubleField to set.
        * @return This builder for chaining.
        */
       public Builder setDoubleField(double value) {
-        
+
         doubleField_ = value;
         onChanged();
         return this;
       }
+
       /**
        * <code>double double_field = 4;</code>
        * @return This builder for chaining.
        */
       public Builder clearDoubleField() {
-        
+
         doubleField_ = 0D;
         onChanged();
         return this;
       }
 
-      private float floatField_ ;
+      private float floatField_;
+
       /**
        * <code>float float_field = 5;</code>
        * @return The floatField.
@@ -2384,29 +2391,32 @@ public final class ComplexTypes {
       public float getFloatField() {
         return floatField_;
       }
+
       /**
        * <code>float float_field = 5;</code>
        * @param value The floatField to set.
        * @return This builder for chaining.
        */
       public Builder setFloatField(float value) {
-        
+
         floatField_ = value;
         onChanged();
         return this;
       }
+
       /**
        * <code>float float_field = 5;</code>
        * @return This builder for chaining.
        */
       public Builder clearFloatField() {
-        
+
         floatField_ = 0F;
         onChanged();
         return this;
       }
 
-      private boolean boolField_ ;
+      private boolean boolField_;
+
       /**
        * <code>bool bool_field = 6;</code>
        * @return The boolField.
@@ -2415,29 +2425,32 @@ public final class ComplexTypes {
       public boolean getBoolField() {
         return boolField_;
       }
+
       /**
        * <code>bool bool_field = 6;</code>
        * @param value The boolField to set.
        * @return This builder for chaining.
        */
       public Builder setBoolField(boolean value) {
-        
+
         boolField_ = value;
         onChanged();
         return this;
       }
+
       /**
        * <code>bool bool_field = 6;</code>
        * @return This builder for chaining.
        */
       public Builder clearBoolField() {
-        
+
         boolField_ = false;
         onChanged();
         return this;
       }
 
       private com.google.protobuf.ByteString bytesField_ = com.google.protobuf.ByteString.EMPTY;
+
       /**
        * <code>bytes bytes_field = 7;</code>
        * @return The bytesField.
@@ -2446,6 +2459,7 @@ public final class ComplexTypes {
       public com.google.protobuf.ByteString getBytesField() {
         return bytesField_;
       }
+
       /**
        * <code>bytes bytes_field = 7;</code>
        * @param value The bytesField to set.
@@ -2453,39 +2467,42 @@ public final class ComplexTypes {
        */
       public Builder setBytesField(com.google.protobuf.ByteString value) {
         if (value == null) {
-    throw new NullPointerException();
-  }
-  
+          throw new NullPointerException();
+        }
+
         bytesField_ = value;
         onChanged();
         return this;
       }
+
       /**
        * <code>bytes bytes_field = 7;</code>
        * @return This builder for chaining.
        */
       public Builder clearBytesField() {
-        
+
         bytesField_ = getDefaultInstance().getBytesField();
         onChanged();
         return this;
       }
 
       private com.google.protobuf.LazyStringList repeatedStrings_ = com.google.protobuf.LazyStringArrayList.EMPTY;
+
       private void ensureRepeatedStringsIsMutable() {
         if (!((bitField0_ & 0x00000001) != 0)) {
           repeatedStrings_ = new com.google.protobuf.LazyStringArrayList(repeatedStrings_);
           bitField0_ |= 0x00000001;
-         }
+        }
       }
+
       /**
        * <code>repeated string repeated_strings = 8;</code>
        * @return A list containing the repeatedStrings.
        */
-      public com.google.protobuf.ProtocolStringList
-          getRepeatedStringsList() {
+      public com.google.protobuf.ProtocolStringList getRepeatedStringsList() {
         return repeatedStrings_.getUnmodifiableView();
       }
+
       /**
        * <code>repeated string repeated_strings = 8;</code>
        * @return The count of repeatedStrings.
@@ -2493,6 +2510,7 @@ public final class ComplexTypes {
       public int getRepeatedStringsCount() {
         return repeatedStrings_.size();
       }
+
       /**
        * <code>repeated string repeated_strings = 8;</code>
        * @param index The index of the element to return.
@@ -2501,59 +2519,59 @@ public final class ComplexTypes {
       public java.lang.String getRepeatedStrings(int index) {
         return repeatedStrings_.get(index);
       }
+
       /**
        * <code>repeated string repeated_strings = 8;</code>
        * @param index The index of the value to return.
        * @return The bytes of the repeatedStrings at the given index.
        */
-      public com.google.protobuf.ByteString
-          getRepeatedStringsBytes(int index) {
+      public com.google.protobuf.ByteString getRepeatedStringsBytes(int index) {
         return repeatedStrings_.getByteString(index);
       }
+
       /**
        * <code>repeated string repeated_strings = 8;</code>
        * @param index The index to set the value at.
        * @param value The repeatedStrings to set.
        * @return This builder for chaining.
        */
-      public Builder setRepeatedStrings(
-          int index, java.lang.String value) {
+      public Builder setRepeatedStrings(int index, java.lang.String value) {
         if (value == null) {
-    throw new NullPointerException();
-  }
-  ensureRepeatedStringsIsMutable();
+          throw new NullPointerException();
+        }
+        ensureRepeatedStringsIsMutable();
         repeatedStrings_.set(index, value);
         onChanged();
         return this;
       }
+
       /**
        * <code>repeated string repeated_strings = 8;</code>
        * @param value The repeatedStrings to add.
        * @return This builder for chaining.
        */
-      public Builder addRepeatedStrings(
-          java.lang.String value) {
+      public Builder addRepeatedStrings(java.lang.String value) {
         if (value == null) {
-    throw new NullPointerException();
-  }
-  ensureRepeatedStringsIsMutable();
+          throw new NullPointerException();
+        }
+        ensureRepeatedStringsIsMutable();
         repeatedStrings_.add(value);
         onChanged();
         return this;
       }
+
       /**
        * <code>repeated string repeated_strings = 8;</code>
        * @param values The repeatedStrings to add.
        * @return This builder for chaining.
        */
-      public Builder addAllRepeatedStrings(
-          java.lang.Iterable<java.lang.String> values) {
+      public Builder addAllRepeatedStrings(java.lang.Iterable<java.lang.String> values) {
         ensureRepeatedStringsIsMutable();
-        com.google.protobuf.AbstractMessageLite.Builder.addAll(
-            values, repeatedStrings_);
+        com.google.protobuf.AbstractMessageLite.Builder.addAll(values, repeatedStrings_);
         onChanged();
         return this;
       }
+
       /**
        * <code>repeated string repeated_strings = 8;</code>
        * @return This builder for chaining.
@@ -2564,17 +2582,17 @@ public final class ComplexTypes {
         onChanged();
         return this;
       }
+
       /**
        * <code>repeated string repeated_strings = 8;</code>
        * @param value The bytes of the repeatedStrings to add.
        * @return This builder for chaining.
        */
-      public Builder addRepeatedStringsBytes(
-          com.google.protobuf.ByteString value) {
+      public Builder addRepeatedStringsBytes(com.google.protobuf.ByteString value) {
         if (value == null) {
-    throw new NullPointerException();
-  }
-  checkByteStringIsUtf8(value);
+          throw new NullPointerException();
+        }
+        checkByteStringIsUtf8(value);
         ensureRepeatedStringsIsMutable();
         repeatedStrings_.add(value);
         onChanged();
@@ -2582,8 +2600,8 @@ public final class ComplexTypes {
       }
 
       private org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage nestedMessage_;
-      private com.google.protobuf.SingleFieldBuilderV3<
-          org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.Builder, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessageOrBuilder> nestedMessageBuilder_;
+      private com.google.protobuf.SingleFieldBuilderV3<org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.Builder, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessageOrBuilder> nestedMessageBuilder_;
+
       /**
        * <code>.org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage nested_message = 9;</code>
        * @return Whether the nestedMessage field is set.
@@ -2591,21 +2609,26 @@ public final class ComplexTypes {
       public boolean hasNestedMessage() {
         return nestedMessageBuilder_ != null || nestedMessage_ != null;
       }
+
       /**
        * <code>.org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage nested_message = 9;</code>
        * @return The nestedMessage.
        */
       public org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage getNestedMessage() {
         if (nestedMessageBuilder_ == null) {
-          return nestedMessage_ == null ? org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.getDefaultInstance() : nestedMessage_;
+          return nestedMessage_ == null
+              ? org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.getDefaultInstance()
+              : nestedMessage_;
         } else {
           return nestedMessageBuilder_.getMessage();
         }
       }
+
       /**
        * <code>.org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage nested_message = 9;</code>
        */
-      public Builder setNestedMessage(org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage value) {
+      public Builder setNestedMessage(
+          org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage value) {
         if (nestedMessageBuilder_ == null) {
           if (value == null) {
             throw new NullPointerException();
@@ -2618,6 +2641,7 @@ public final class ComplexTypes {
 
         return this;
       }
+
       /**
        * <code>.org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage nested_message = 9;</code>
        */
@@ -2632,14 +2656,16 @@ public final class ComplexTypes {
 
         return this;
       }
+
       /**
        * <code>.org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage nested_message = 9;</code>
        */
-      public Builder mergeNestedMessage(org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage value) {
+      public Builder mergeNestedMessage(
+          org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage value) {
         if (nestedMessageBuilder_ == null) {
           if (nestedMessage_ != null) {
-            nestedMessage_ =
-              org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.newBuilder(nestedMessage_).mergeFrom(value).buildPartial();
+            nestedMessage_ = org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage
+                .newBuilder(nestedMessage_).mergeFrom(value).buildPartial();
           } else {
             nestedMessage_ = value;
           }
@@ -2650,6 +2676,7 @@ public final class ComplexTypes {
 
         return this;
       }
+
       /**
        * <code>.org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage nested_message = 9;</code>
        */
@@ -2664,14 +2691,16 @@ public final class ComplexTypes {
 
         return this;
       }
+
       /**
        * <code>.org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage nested_message = 9;</code>
        */
       public org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.Builder getNestedMessageBuilder() {
-        
+
         onChanged();
         return getNestedMessageFieldBuilder().getBuilder();
       }
+
       /**
        * <code>.org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage nested_message = 9;</code>
        */
@@ -2679,38 +2708,38 @@ public final class ComplexTypes {
         if (nestedMessageBuilder_ != null) {
           return nestedMessageBuilder_.getMessageOrBuilder();
         } else {
-          return nestedMessage_ == null ?
-              org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.getDefaultInstance() : nestedMessage_;
+          return nestedMessage_ == null
+              ? org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.getDefaultInstance()
+              : nestedMessage_;
         }
       }
+
       /**
        * <code>.org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage nested_message = 9;</code>
        */
-      private com.google.protobuf.SingleFieldBuilderV3<
-          org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.Builder, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessageOrBuilder> 
-          getNestedMessageFieldBuilder() {
+      private com.google.protobuf.SingleFieldBuilderV3<org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.Builder, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessageOrBuilder> getNestedMessageFieldBuilder() {
         if (nestedMessageBuilder_ == null) {
-          nestedMessageBuilder_ = new com.google.protobuf.SingleFieldBuilderV3<
-              org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.Builder, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessageOrBuilder>(
-                  getNestedMessage(),
-                  getParentForChildren(),
-                  isClean());
+          nestedMessageBuilder_ =
+              new com.google.protobuf.SingleFieldBuilderV3<org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.Builder, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessageOrBuilder>(
+                  getNestedMessage(), getParentForChildren(), isClean());
           nestedMessage_ = null;
         }
         return nestedMessageBuilder_;
       }
 
       private java.util.List<org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> repeatedNestedMessages_ =
-        java.util.Collections.emptyList();
+          java.util.Collections.emptyList();
+
       private void ensureRepeatedNestedMessagesIsMutable() {
         if (!((bitField0_ & 0x00000002) != 0)) {
-          repeatedNestedMessages_ = new java.util.ArrayList<org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage>(repeatedNestedMessages_);
+          repeatedNestedMessages_ =
+              new java.util.ArrayList<org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage>(
+                  repeatedNestedMessages_);
           bitField0_ |= 0x00000002;
-         }
+        }
       }
 
-      private com.google.protobuf.RepeatedFieldBuilderV3<
-          org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.Builder, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessageOrBuilder> repeatedNestedMessagesBuilder_;
+      private com.google.protobuf.RepeatedFieldBuilderV3<org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.Builder, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessageOrBuilder> repeatedNestedMessagesBuilder_;
 
       /**
        * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
@@ -2722,6 +2751,7 @@ public final class ComplexTypes {
           return repeatedNestedMessagesBuilder_.getMessageList();
         }
       }
+
       /**
        * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
        */
@@ -2732,21 +2762,24 @@ public final class ComplexTypes {
           return repeatedNestedMessagesBuilder_.getCount();
         }
       }
+
       /**
        * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
        */
-      public org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage getRepeatedNestedMessages(int index) {
+      public org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage getRepeatedNestedMessages(
+          int index) {
         if (repeatedNestedMessagesBuilder_ == null) {
           return repeatedNestedMessages_.get(index);
         } else {
           return repeatedNestedMessagesBuilder_.getMessage(index);
         }
       }
+
       /**
        * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
        */
-      public Builder setRepeatedNestedMessages(
-          int index, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage value) {
+      public Builder setRepeatedNestedMessages(int index,
+          org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage value) {
         if (repeatedNestedMessagesBuilder_ == null) {
           if (value == null) {
             throw new NullPointerException();
@@ -2759,11 +2792,12 @@ public final class ComplexTypes {
         }
         return this;
       }
+
       /**
        * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
        */
-      public Builder setRepeatedNestedMessages(
-          int index, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.Builder builderForValue) {
+      public Builder setRepeatedNestedMessages(int index,
+          org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.Builder builderForValue) {
         if (repeatedNestedMessagesBuilder_ == null) {
           ensureRepeatedNestedMessagesIsMutable();
           repeatedNestedMessages_.set(index, builderForValue.build());
@@ -2773,10 +2807,12 @@ public final class ComplexTypes {
         }
         return this;
       }
+
       /**
        * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
        */
-      public Builder addRepeatedNestedMessages(org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage value) {
+      public Builder addRepeatedNestedMessages(
+          org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage value) {
         if (repeatedNestedMessagesBuilder_ == null) {
           if (value == null) {
             throw new NullPointerException();
@@ -2789,11 +2825,12 @@ public final class ComplexTypes {
         }
         return this;
       }
+
       /**
        * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
        */
-      public Builder addRepeatedNestedMessages(
-          int index, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage value) {
+      public Builder addRepeatedNestedMessages(int index,
+          org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage value) {
         if (repeatedNestedMessagesBuilder_ == null) {
           if (value == null) {
             throw new NullPointerException();
@@ -2806,6 +2843,7 @@ public final class ComplexTypes {
         }
         return this;
       }
+
       /**
        * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
        */
@@ -2820,11 +2858,12 @@ public final class ComplexTypes {
         }
         return this;
       }
+
       /**
        * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
        */
-      public Builder addRepeatedNestedMessages(
-          int index, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.Builder builderForValue) {
+      public Builder addRepeatedNestedMessages(int index,
+          org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.Builder builderForValue) {
         if (repeatedNestedMessagesBuilder_ == null) {
           ensureRepeatedNestedMessagesIsMutable();
           repeatedNestedMessages_.add(index, builderForValue.build());
@@ -2834,6 +2873,7 @@ public final class ComplexTypes {
         }
         return this;
       }
+
       /**
        * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
        */
@@ -2841,14 +2881,14 @@ public final class ComplexTypes {
           java.lang.Iterable<? extends org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> values) {
         if (repeatedNestedMessagesBuilder_ == null) {
           ensureRepeatedNestedMessagesIsMutable();
-          com.google.protobuf.AbstractMessageLite.Builder.addAll(
-              values, repeatedNestedMessages_);
+          com.google.protobuf.AbstractMessageLite.Builder.addAll(values, repeatedNestedMessages_);
           onChanged();
         } else {
           repeatedNestedMessagesBuilder_.addAllMessages(values);
         }
         return this;
       }
+
       /**
        * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
        */
@@ -2862,6 +2902,7 @@ public final class ComplexTypes {
         }
         return this;
       }
+
       /**
        * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
        */
@@ -2875,6 +2916,7 @@ public final class ComplexTypes {
         }
         return this;
       }
+
       /**
        * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
        */
@@ -2882,27 +2924,30 @@ public final class ComplexTypes {
           int index) {
         return getRepeatedNestedMessagesFieldBuilder().getBuilder(index);
       }
+
       /**
        * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
        */
       public org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessageOrBuilder getRepeatedNestedMessagesOrBuilder(
           int index) {
         if (repeatedNestedMessagesBuilder_ == null) {
-          return repeatedNestedMessages_.get(index);  } else {
+          return repeatedNestedMessages_.get(index);
+        } else {
           return repeatedNestedMessagesBuilder_.getMessageOrBuilder(index);
         }
       }
+
       /**
        * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
        */
-      public java.util.List<? extends org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessageOrBuilder> 
-           getRepeatedNestedMessagesOrBuilderList() {
+      public java.util.List<? extends org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessageOrBuilder> getRepeatedNestedMessagesOrBuilderList() {
         if (repeatedNestedMessagesBuilder_ != null) {
           return repeatedNestedMessagesBuilder_.getMessageOrBuilderList();
         } else {
           return java.util.Collections.unmodifiableList(repeatedNestedMessages_);
         }
       }
+
       /**
        * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
        */
@@ -2910,52 +2955,47 @@ public final class ComplexTypes {
         return getRepeatedNestedMessagesFieldBuilder().addBuilder(
             org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.getDefaultInstance());
       }
+
       /**
        * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
        */
       public org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.Builder addRepeatedNestedMessagesBuilder(
           int index) {
-        return getRepeatedNestedMessagesFieldBuilder().addBuilder(
-            index, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.getDefaultInstance());
+        return getRepeatedNestedMessagesFieldBuilder().addBuilder(index,
+            org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.getDefaultInstance());
       }
+
       /**
        * <code>repeated .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage repeated_nested_messages = 10;</code>
        */
-      public java.util.List<org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.Builder> 
-           getRepeatedNestedMessagesBuilderList() {
+      public java.util.List<org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.Builder> getRepeatedNestedMessagesBuilderList() {
         return getRepeatedNestedMessagesFieldBuilder().getBuilderList();
       }
-      private com.google.protobuf.RepeatedFieldBuilderV3<
-          org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.Builder, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessageOrBuilder> 
-          getRepeatedNestedMessagesFieldBuilder() {
+
+      private com.google.protobuf.RepeatedFieldBuilderV3<org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.Builder, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessageOrBuilder> getRepeatedNestedMessagesFieldBuilder() {
         if (repeatedNestedMessagesBuilder_ == null) {
-          repeatedNestedMessagesBuilder_ = new com.google.protobuf.RepeatedFieldBuilderV3<
-              org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.Builder, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessageOrBuilder>(
-                  repeatedNestedMessages_,
-                  ((bitField0_ & 0x00000002) != 0),
-                  getParentForChildren(),
-                  isClean());
+          repeatedNestedMessagesBuilder_ =
+              new com.google.protobuf.RepeatedFieldBuilderV3<org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage.Builder, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessageOrBuilder>(
+                  repeatedNestedMessages_, ((bitField0_ & 0x00000002) != 0), getParentForChildren(), isClean());
           repeatedNestedMessages_ = null;
         }
         return repeatedNestedMessagesBuilder_;
       }
 
-      private com.google.protobuf.MapField<
-          java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> complexMap_;
-      private com.google.protobuf.MapField<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage>
-      internalGetComplexMap() {
+      private com.google.protobuf.MapField<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> complexMap_;
+
+      private com.google.protobuf.MapField<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> internalGetComplexMap() {
         if (complexMap_ == null) {
-          return com.google.protobuf.MapField.emptyMapField(
-              ComplexMapDefaultEntryHolder.defaultEntry);
+          return com.google.protobuf.MapField.emptyMapField(ComplexMapDefaultEntryHolder.defaultEntry);
         }
         return complexMap_;
       }
-      private com.google.protobuf.MapField<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage>
-      internalGetMutableComplexMap() {
-        onChanged();;
+
+      private com.google.protobuf.MapField<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> internalGetMutableComplexMap() {
+        onChanged();
+        ;
         if (complexMap_ == null) {
-          complexMap_ = com.google.protobuf.MapField.newMapField(
-              ComplexMapDefaultEntryHolder.defaultEntry);
+          complexMap_ = com.google.protobuf.MapField.newMapField(ComplexMapDefaultEntryHolder.defaultEntry);
         }
         if (!complexMap_.isMutable()) {
           complexMap_ = complexMap_.copy();
@@ -2966,16 +3006,19 @@ public final class ComplexTypes {
       public int getComplexMapCount() {
         return internalGetComplexMap().getMap().size();
       }
+
       /**
        * <code>map&lt;string, .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage&gt; complex_map = 11;</code>
        */
 
       @java.lang.Override
-      public boolean containsComplexMap(
-          java.lang.String key) {
-        if (key == null) { throw new java.lang.NullPointerException(); }
+      public boolean containsComplexMap(java.lang.String key) {
+        if (key == null) {
+          throw new java.lang.NullPointerException();
+        }
         return internalGetComplexMap().getMap().containsKey(key);
       }
+
       /**
        * Use {@link #getComplexMapMap()} instead.
        */
@@ -2984,6 +3027,7 @@ public final class ComplexTypes {
       public java.util.Map<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> getComplexMap() {
         return getComplexMapMap();
       }
+
       /**
        * <code>map&lt;string, .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage&gt; complex_map = 11;</code>
        */
@@ -2992,6 +3036,7 @@ public final class ComplexTypes {
       public java.util.Map<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> getComplexMapMap() {
         return internalGetComplexMap().getMap();
       }
+
       /**
        * <code>map&lt;string, .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage&gt; complex_map = 11;</code>
        */
@@ -3000,11 +3045,14 @@ public final class ComplexTypes {
       public org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage getComplexMapOrDefault(
           java.lang.String key,
           org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage defaultValue) {
-        if (key == null) { throw new java.lang.NullPointerException(); }
+        if (key == null) {
+          throw new java.lang.NullPointerException();
+        }
         java.util.Map<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> map =
             internalGetComplexMap().getMap();
         return map.containsKey(key) ? map.get(key) : defaultValue;
       }
+
       /**
        * <code>map&lt;string, .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage&gt; complex_map = 11;</code>
        */
@@ -3012,7 +3060,9 @@ public final class ComplexTypes {
 
       public org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage getComplexMapOrThrow(
           java.lang.String key) {
-        if (key == null) { throw new java.lang.NullPointerException(); }
+        if (key == null) {
+          throw new java.lang.NullPointerException();
+        }
         java.util.Map<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> map =
             internalGetComplexMap().getMap();
         if (!map.containsKey(key)) {
@@ -3022,68 +3072,69 @@ public final class ComplexTypes {
       }
 
       public Builder clearComplexMap() {
-        internalGetMutableComplexMap().getMutableMap()
-            .clear();
+        internalGetMutableComplexMap().getMutableMap().clear();
         return this;
       }
+
       /**
        * <code>map&lt;string, .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage&gt; complex_map = 11;</code>
        */
 
-      public Builder removeComplexMap(
-          java.lang.String key) {
-        if (key == null) { throw new java.lang.NullPointerException(); }
-        internalGetMutableComplexMap().getMutableMap()
-            .remove(key);
+      public Builder removeComplexMap(java.lang.String key) {
+        if (key == null) {
+          throw new java.lang.NullPointerException();
+        }
+        internalGetMutableComplexMap().getMutableMap().remove(key);
         return this;
       }
+
       /**
        * Use alternate mutation accessors instead.
        */
       @java.lang.Deprecated
-      public java.util.Map<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage>
-      getMutableComplexMap() {
+      public java.util.Map<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> getMutableComplexMap() {
         return internalGetMutableComplexMap().getMutableMap();
       }
+
       /**
        * <code>map&lt;string, .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage&gt; complex_map = 11;</code>
        */
-      public Builder putComplexMap(
-          java.lang.String key,
+      public Builder putComplexMap(java.lang.String key,
           org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage value) {
-        if (key == null) { throw new java.lang.NullPointerException(); }
-        if (value == null) { throw new java.lang.NullPointerException(); }
-        internalGetMutableComplexMap().getMutableMap()
-            .put(key, value);
+        if (key == null) {
+          throw new java.lang.NullPointerException();
+        }
+        if (value == null) {
+          throw new java.lang.NullPointerException();
+        }
+        internalGetMutableComplexMap().getMutableMap().put(key, value);
         return this;
       }
+
       /**
        * <code>map&lt;string, .org.apache.pinot.plugin.inputformat.protobuf.TestMessage.NestedMessage&gt; complex_map = 11;</code>
        */
 
       public Builder putAllComplexMap(
           java.util.Map<java.lang.String, org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage> values) {
-        internalGetMutableComplexMap().getMutableMap()
-            .putAll(values);
+        internalGetMutableComplexMap().getMutableMap().putAll(values);
         return this;
       }
 
-      private com.google.protobuf.MapField<
-          java.lang.String, java.lang.Integer> simpleMap_;
-      private com.google.protobuf.MapField<java.lang.String, java.lang.Integer>
-      internalGetSimpleMap() {
+      private com.google.protobuf.MapField<java.lang.String, java.lang.Integer> simpleMap_;
+
+      private com.google.protobuf.MapField<java.lang.String, java.lang.Integer> internalGetSimpleMap() {
         if (simpleMap_ == null) {
-          return com.google.protobuf.MapField.emptyMapField(
-              SimpleMapDefaultEntryHolder.defaultEntry);
+          return com.google.protobuf.MapField.emptyMapField(SimpleMapDefaultEntryHolder.defaultEntry);
         }
         return simpleMap_;
       }
-      private com.google.protobuf.MapField<java.lang.String, java.lang.Integer>
-      internalGetMutableSimpleMap() {
-        onChanged();;
+
+      private com.google.protobuf.MapField<java.lang.String, java.lang.Integer> internalGetMutableSimpleMap() {
+        onChanged();
+        ;
         if (simpleMap_ == null) {
-          simpleMap_ = com.google.protobuf.MapField.newMapField(
-              SimpleMapDefaultEntryHolder.defaultEntry);
+          simpleMap_ = com.google.protobuf.MapField.newMapField(SimpleMapDefaultEntryHolder.defaultEntry);
         }
         if (!simpleMap_.isMutable()) {
           simpleMap_ = simpleMap_.copy();
@@ -3094,16 +3145,19 @@ public final class ComplexTypes {
       public int getSimpleMapCount() {
         return internalGetSimpleMap().getMap().size();
       }
+
       /**
        * <code>map&lt;string, int32&gt; simple_map = 12;</code>
        */
 
       @java.lang.Override
-      public boolean containsSimpleMap(
-          java.lang.String key) {
-        if (key == null) { throw new java.lang.NullPointerException(); }
+      public boolean containsSimpleMap(java.lang.String key) {
+        if (key == null) {
+          throw new java.lang.NullPointerException();
+        }
         return internalGetSimpleMap().getMap().containsKey(key);
       }
+
       /**
        * Use {@link #getSimpleMapMap()} instead.
        */
@@ -3112,6 +3166,7 @@ public final class ComplexTypes {
       public java.util.Map<java.lang.String, java.lang.Integer> getSimpleMap() {
         return getSimpleMapMap();
       }
+
       /**
        * <code>map&lt;string, int32&gt; simple_map = 12;</code>
        */
@@ -3120,29 +3175,30 @@ public final class ComplexTypes {
       public java.util.Map<java.lang.String, java.lang.Integer> getSimpleMapMap() {
         return internalGetSimpleMap().getMap();
       }
+
       /**
        * <code>map&lt;string, int32&gt; simple_map = 12;</code>
        */
       @java.lang.Override
 
-      public int getSimpleMapOrDefault(
-          java.lang.String key,
-          int defaultValue) {
-        if (key == null) { throw new java.lang.NullPointerException(); }
-        java.util.Map<java.lang.String, java.lang.Integer> map =
-            internalGetSimpleMap().getMap();
+      public int getSimpleMapOrDefault(java.lang.String key, int defaultValue) {
+        if (key == null) {
+          throw new java.lang.NullPointerException();
+        }
+        java.util.Map<java.lang.String, java.lang.Integer> map = internalGetSimpleMap().getMap();
         return map.containsKey(key) ? map.get(key) : defaultValue;
       }
+
       /**
        * <code>map&lt;string, int32&gt; simple_map = 12;</code>
        */
       @java.lang.Override
 
-      public int getSimpleMapOrThrow(
-          java.lang.String key) {
-        if (key == null) { throw new java.lang.NullPointerException(); }
-        java.util.Map<java.lang.String, java.lang.Integer> map =
-            internalGetSimpleMap().getMap();
+      public int getSimpleMapOrThrow(java.lang.String key) {
+        if (key == null) {
+          throw new java.lang.NullPointerException();
+        }
+        java.util.Map<java.lang.String, java.lang.Integer> map = internalGetSimpleMap().getMap();
         if (!map.containsKey(key)) {
           throw new java.lang.IllegalArgumentException();
         }
@@ -3150,71 +3206,74 @@ public final class ComplexTypes {
       }
 
       public Builder clearSimpleMap() {
-        internalGetMutableSimpleMap().getMutableMap()
-            .clear();
+        internalGetMutableSimpleMap().getMutableMap().clear();
         return this;
       }
+
       /**
        * <code>map&lt;string, int32&gt; simple_map = 12;</code>
        */
 
-      public Builder removeSimpleMap(
-          java.lang.String key) {
-        if (key == null) { throw new java.lang.NullPointerException(); }
-        internalGetMutableSimpleMap().getMutableMap()
-            .remove(key);
+      public Builder removeSimpleMap(java.lang.String key) {
+        if (key == null) {
+          throw new java.lang.NullPointerException();
+        }
+        internalGetMutableSimpleMap().getMutableMap().remove(key);
         return this;
       }
+
       /**
        * Use alternate mutation accessors instead.
        */
       @java.lang.Deprecated
-      public java.util.Map<java.lang.String, java.lang.Integer>
-      getMutableSimpleMap() {
+      public java.util.Map<java.lang.String, java.lang.Integer> getMutableSimpleMap() {
         return internalGetMutableSimpleMap().getMutableMap();
       }
+
       /**
        * <code>map&lt;string, int32&gt; simple_map = 12;</code>
        */
-      public Builder putSimpleMap(
-          java.lang.String key,
-          int value) {
-        if (key == null) { throw new java.lang.NullPointerException(); }
-        
-        internalGetMutableSimpleMap().getMutableMap()
-            .put(key, value);
+      public Builder putSimpleMap(java.lang.String key, int value) {
+        if (key == null) {
+          throw new java.lang.NullPointerException();
+        }
+
+        internalGetMutableSimpleMap().getMutableMap().put(key, value);
         return this;
       }
+
       /**
        * <code>map&lt;string, int32&gt; simple_map = 12;</code>
        */
 
-      public Builder putAllSimpleMap(
-          java.util.Map<java.lang.String, java.lang.Integer> values) {
-        internalGetMutableSimpleMap().getMutableMap()
-            .putAll(values);
+      public Builder putAllSimpleMap(java.util.Map<java.lang.String, java.lang.Integer> values) {
+        internalGetMutableSimpleMap().getMutableMap().putAll(values);
         return this;
       }
 
       private int enumField_ = 0;
+
       /**
        * <code>.org.apache.pinot.plugin.inputformat.protobuf.TestMessage.TestEnum enum_field = 15;</code>
        * @return The enum numeric value on the wire for enumField.
        */
-      @java.lang.Override public int getEnumFieldValue() {
+      @java.lang.Override
+      public int getEnumFieldValue() {
         return enumField_;
       }
+
       /**
        * <code>.org.apache.pinot.plugin.inputformat.protobuf.TestMessage.TestEnum enum_field = 15;</code>
        * @param value The enum numeric value on the wire for enumField to set.
        * @return This builder for chaining.
        */
       public Builder setEnumFieldValue(int value) {
-        
+
         enumField_ = value;
         onChanged();
         return this;
       }
+
       /**
        * <code>.org.apache.pinot.plugin.inputformat.protobuf.TestMessage.TestEnum enum_field = 15;</code>
        * @return The enumField.
@@ -3222,45 +3281,48 @@ public final class ComplexTypes {
       @java.lang.Override
       public org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.TestEnum getEnumField() {
         @SuppressWarnings("deprecation")
-        org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.TestEnum result = org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.TestEnum.valueOf(enumField_);
-        return result == null ? org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.TestEnum.UNRECOGNIZED : result;
+        org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.TestEnum result =
+            org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.TestEnum.valueOf(enumField_);
+        return result == null
+            ? org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.TestEnum.UNRECOGNIZED : result;
       }
+
       /**
        * <code>.org.apache.pinot.plugin.inputformat.protobuf.TestMessage.TestEnum enum_field = 15;</code>
        * @param value The enumField to set.
        * @return This builder for chaining.
        */
-      public Builder setEnumField(org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.TestEnum value) {
+      public Builder setEnumField(
+          org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.TestEnum value) {
         if (value == null) {
           throw new NullPointerException();
         }
-        
+
         enumField_ = value.getNumber();
         onChanged();
         return this;
       }
+
       /**
        * <code>.org.apache.pinot.plugin.inputformat.protobuf.TestMessage.TestEnum enum_field = 15;</code>
        * @return This builder for chaining.
        */
       public Builder clearEnumField() {
-        
+
         enumField_ = 0;
         onChanged();
         return this;
       }
+
       @java.lang.Override
-      public final Builder setUnknownFields(
-          final com.google.protobuf.UnknownFieldSet unknownFields) {
+      public final Builder setUnknownFields(final com.google.protobuf.UnknownFieldSet unknownFields) {
         return super.setUnknownFields(unknownFields);
       }
 
       @java.lang.Override
-      public final Builder mergeUnknownFields(
-          final com.google.protobuf.UnknownFieldSet unknownFields) {
+      public final Builder mergeUnknownFields(final com.google.protobuf.UnknownFieldSet unknownFields) {
         return super.mergeUnknownFields(unknownFields);
       }
-
 
       // @@protoc_insertion_point(builder_scope:org.apache.pinot.plugin.inputformat.protobuf.TestMessage)
     }
@@ -3275,16 +3337,15 @@ public final class ComplexTypes {
       return DEFAULT_INSTANCE;
     }
 
-    private static final com.google.protobuf.Parser<TestMessage>
-        PARSER = new com.google.protobuf.AbstractParser<TestMessage>() {
-      @java.lang.Override
-      public TestMessage parsePartialFrom(
-          com.google.protobuf.CodedInputStream input,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return new TestMessage(input, extensionRegistry);
-      }
-    };
+    private static final com.google.protobuf.Parser<TestMessage> PARSER =
+        new com.google.protobuf.AbstractParser<TestMessage>() {
+          @java.lang.Override
+          public TestMessage parsePartialFrom(com.google.protobuf.CodedInputStream input,
+              com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+              throws com.google.protobuf.InvalidProtocolBufferException {
+            return new TestMessage(input, extensionRegistry);
+          }
+        };
 
     public static com.google.protobuf.Parser<TestMessage> parser() {
       return PARSER;
@@ -3302,91 +3363,65 @@ public final class ComplexTypes {
 
   }
 
-  private static final com.google.protobuf.Descriptors.Descriptor
-    internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_descriptor;
-  private static final 
-    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
-      internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_fieldAccessorTable;
-  private static final com.google.protobuf.Descriptors.Descriptor
-    internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_NestedMessage_descriptor;
-  private static final 
-    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
-      internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_NestedMessage_fieldAccessorTable;
-  private static final com.google.protobuf.Descriptors.Descriptor
-    internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_ComplexMapEntry_descriptor;
-  private static final 
-    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
-      internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_ComplexMapEntry_fieldAccessorTable;
-  private static final com.google.protobuf.Descriptors.Descriptor
-    internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_SimpleMapEntry_descriptor;
-  private static final 
-    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
-      internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_SimpleMapEntry_fieldAccessorTable;
+  private static final com.google.protobuf.Descriptors.Descriptor internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_descriptor;
+  private static final com.google.protobuf.GeneratedMessageV3.FieldAccessorTable internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_fieldAccessorTable;
+  private static final com.google.protobuf.Descriptors.Descriptor internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_NestedMessage_descriptor;
+  private static final com.google.protobuf.GeneratedMessageV3.FieldAccessorTable internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_NestedMessage_fieldAccessorTable;
+  private static final com.google.protobuf.Descriptors.Descriptor internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_ComplexMapEntry_descriptor;
+  private static final com.google.protobuf.GeneratedMessageV3.FieldAccessorTable internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_ComplexMapEntry_fieldAccessorTable;
+  private static final com.google.protobuf.Descriptors.Descriptor internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_SimpleMapEntry_descriptor;
+  private static final com.google.protobuf.GeneratedMessageV3.FieldAccessorTable internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_SimpleMapEntry_fieldAccessorTable;
 
-  public static com.google.protobuf.Descriptors.FileDescriptor
-      getDescriptor() {
+  public static com.google.protobuf.Descriptors.FileDescriptor getDescriptor() {
     return descriptor;
   }
-  private static  com.google.protobuf.Descriptors.FileDescriptor
-      descriptor;
+  private static com.google.protobuf.Descriptors.FileDescriptor descriptor;
   static {
-    java.lang.String[] descriptorData = {
-      "\n\023complex_types.proto\022,org.apache.pinot." +
-      "plugin.inputformat.protobuf\"\307\007\n\013TestMess" +
-      "age\022\024\n\014string_field\030\001 \001(\t\022\021\n\tint_field\030\002" +
-      " \001(\005\022\022\n\nlong_field\030\003 \001(\003\022\024\n\014double_field" +
-      "\030\004 \001(\001\022\023\n\013float_field\030\005 \001(\002\022\022\n\nbool_fiel" +
-      "d\030\006 \001(\010\022\023\n\013bytes_field\030\007 \001(\014\022\030\n\020repeated" +
-      "_strings\030\010 \003(\t\022_\n\016nested_message\030\t \001(\0132G" +
-      ".org.apache.pinot.plugin.inputformat.pro" +
-      "tobuf.TestMessage.NestedMessage\022i\n\030repea" +
-      "ted_nested_messages\030\n \003(\0132G.org.apache.p" +
-      "inot.plugin.inputformat.protobuf.TestMes" +
-      "sage.NestedMessage\022^\n\013complex_map\030\013 \003(\0132" +
-      "I.org.apache.pinot.plugin.inputformat.pr" +
-      "otobuf.TestMessage.ComplexMapEntry\022\\\n\nsi" +
-      "mple_map\030\014 \003(\0132H.org.apache.pinot.plugin" +
-      ".inputformat.protobuf.TestMessage.Simple" +
-      "MapEntry\022V\n\nenum_field\030\017 \001(\0162B.org.apach" +
-      "e.pinot.plugin.inputformat.protobuf.Test" +
-      "Message.TestEnum\032F\n\rNestedMessage\022\033\n\023nes" +
-      "ted_string_field\030\001 \001(\t\022\030\n\020nested_int_fie" +
-      "ld\030\002 \001(\005\032z\n\017ComplexMapEntry\022\013\n\003key\030\001 \001(\t" +
-      "\022V\n\005value\030\002 \001(\0132G.org.apache.pinot.plugi" +
-      "n.inputformat.protobuf.TestMessage.Neste" +
-      "dMessage:\0028\001\0320\n\016SimpleMapEntry\022\013\n\003key\030\001 " +
-      "\001(\t\022\r\n\005value\030\002 \001(\005:\0028\001\"5\n\010TestEnum\022\t\n\005AL" +
-      "PHA\020\000\022\010\n\004BETA\020\001\022\t\n\005GAMMA\020\002\022\t\n\005DELTA\020\003b\006p" +
-      "roto3"
-    };
-    descriptor = com.google.protobuf.Descriptors.FileDescriptor
-      .internalBuildGeneratedFileFrom(descriptorData,
-        new com.google.protobuf.Descriptors.FileDescriptor[] {
-        });
+    java.lang.String[] descriptorData = {"\n\023complex_types.proto\022,org.apache.pinot."
+        + "plugin.inputformat.protobuf\"\307\007\n\013TestMess"
+        + "age\022\024\n\014string_field\030\001 \001(\t\022\021\n\tint_field\030\002"
+        + " \001(\005\022\022\n\nlong_field\030\003 \001(\003\022\024\n\014double_field"
+        + "\030\004 \001(\001\022\023\n\013float_field\030\005 \001(\002\022\022\n\nbool_fiel"
+        + "d\030\006 \001(\010\022\023\n\013bytes_field\030\007 \001(\014\022\030\n\020repeated"
+        + "_strings\030\010 \003(\t\022_\n\016nested_message\030\t \001(\0132G"
+        + ".org.apache.pinot.plugin.inputformat.pro" + "tobuf.TestMessage.NestedMessage\022i\n\030repea"
+        + "ted_nested_messages\030\n \003(\0132G.org.apache.p" + "inot.plugin.inputformat.protobuf.TestMes"
+        + "sage.NestedMessage\022^\n\013complex_map\030\013 \003(\0132" + "I.org.apache.pinot.plugin.inputformat.pr"
+        + "otobuf.TestMessage.ComplexMapEntry\022\\\n\nsi" + "mple_map\030\014 \003(\0132H.org.apache.pinot.plugin"
+        + ".inputformat.protobuf.TestMessage.Simple" + "MapEntry\022V\n\nenum_field\030\017 \001(\0162B.org.apach"
+        + "e.pinot.plugin.inputformat.protobuf.Test" + "Message.TestEnum\032F\n\rNestedMessage\022\033\n\023nes"
+        + "ted_string_field\030\001 \001(\t\022\030\n\020nested_int_fie"
+        + "ld\030\002 \001(\005\032z\n\017ComplexMapEntry\022\013\n\003key\030\001 \001(\t"
+        + "\022V\n\005value\030\002 \001(\0132G.org.apache.pinot.plugi" + "n.inputformat.protobuf.TestMessage.Neste"
+        + "dMessage:\0028\001\0320\n\016SimpleMapEntry\022\013\n\003key\030\001 "
+        + "\001(\t\022\r\n\005value\030\002 \001(\005:\0028\001\"5\n\010TestEnum\022\t\n\005AL"
+        + "PHA\020\000\022\010\n\004BETA\020\001\022\t\n\005GAMMA\020\002\022\t\n\005DELTA\020\003b\006p" + "roto3"};
+    descriptor = com.google.protobuf.Descriptors.FileDescriptor.internalBuildGeneratedFileFrom(descriptorData,
+        new com.google.protobuf.Descriptors.FileDescriptor[]{});
     internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_descriptor =
-      getDescriptor().getMessageTypes().get(0);
-    internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_fieldAccessorTable = new
-      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-        internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_descriptor,
-        new java.lang.String[] { "StringField", "IntField", "LongField", "DoubleField", "FloatField", "BoolField", "BytesField", "RepeatedStrings", "NestedMessage", "RepeatedNestedMessages", "ComplexMap", "SimpleMap", "EnumField", });
+        getDescriptor().getMessageTypes().get(0);
+    internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_fieldAccessorTable =
+        new com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+            internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_descriptor,
+            new java.lang.String[]{"StringField", "IntField", "LongField", "DoubleField", "FloatField", "BoolField", "BytesField", "RepeatedStrings", "NestedMessage", "RepeatedNestedMessages", "ComplexMap", "SimpleMap", "EnumField",});
     internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_NestedMessage_descriptor =
-      internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_descriptor.getNestedTypes().get(0);
-    internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_NestedMessage_fieldAccessorTable = new
-      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-        internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_NestedMessage_descriptor,
-        new java.lang.String[] { "NestedStringField", "NestedIntField", });
+        internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_descriptor.getNestedTypes().get(0);
+    internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_NestedMessage_fieldAccessorTable =
+        new com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+            internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_NestedMessage_descriptor,
+            new java.lang.String[]{"NestedStringField", "NestedIntField",});
     internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_ComplexMapEntry_descriptor =
-      internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_descriptor.getNestedTypes().get(1);
-    internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_ComplexMapEntry_fieldAccessorTable = new
-      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-        internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_ComplexMapEntry_descriptor,
-        new java.lang.String[] { "Key", "Value", });
+        internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_descriptor.getNestedTypes().get(1);
+    internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_ComplexMapEntry_fieldAccessorTable =
+        new com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+            internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_ComplexMapEntry_descriptor,
+            new java.lang.String[]{"Key", "Value",});
     internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_SimpleMapEntry_descriptor =
-      internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_descriptor.getNestedTypes().get(2);
-    internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_SimpleMapEntry_fieldAccessorTable = new
-      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-        internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_SimpleMapEntry_descriptor,
-        new java.lang.String[] { "Key", "Value", });
+        internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_descriptor.getNestedTypes().get(2);
+    internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_SimpleMapEntry_fieldAccessorTable =
+        new com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+            internal_static_org_apache_pinot_plugin_inputformat_protobuf_TestMessage_SimpleMapEntry_descriptor,
+            new java.lang.String[]{"Key", "Value",});
   }
 
   // @@protoc_insertion_point(outer_class_scope)

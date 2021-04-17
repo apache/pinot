@@ -41,15 +41,15 @@ public abstract class LogicalOperatorTransformFunction extends BaseTransformFunc
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     _arguments = arguments;
-    Preconditions.checkState(arguments.size() > 1, String
-        .format("Expect more than 1 argument for logical operator [%s], args [%s].", getName(),
+    Preconditions.checkState(arguments.size() > 1,
+        String.format("Expect more than 1 argument for logical operator [%s], args [%s].", getName(),
             Arrays.toString(arguments.toArray())));
     for (TransformFunction argument : arguments) {
       Preconditions.checkState(
-          argument.getResultMetadata().getDataType().isNumeric() && argument.getResultMetadata().isSingleValue(), String
-              .format(
-                  "Unsupported data type for logical operator [%s] arguments, only supports single-valued number. Invalid argument: expression [%s], result type [%s]",
-                  getName(), argument.getName(), argument.getResultMetadata()));
+          argument.getResultMetadata().getDataType().isNumeric() && argument.getResultMetadata().isSingleValue(),
+          String.format(
+              "Unsupported data type for logical operator [%s] arguments, only supports single-valued number. Invalid argument: expression [%s], result type [%s]",
+              getName(), argument.getName(), argument.getResultMetadata()));
     }
   }
 

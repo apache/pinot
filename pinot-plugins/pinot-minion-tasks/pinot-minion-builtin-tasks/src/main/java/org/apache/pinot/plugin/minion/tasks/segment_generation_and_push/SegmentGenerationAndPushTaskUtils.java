@@ -33,8 +33,7 @@ public class SegmentGenerationAndPushTaskUtils {
 
   private static final PinotFS LOCAL_PINOT_FS = new LocalPinotFS();
 
-  static PinotFS getInputPinotFS(Map<String, String> taskConfigs, URI fileURI)
-      throws Exception {
+  static PinotFS getInputPinotFS(Map<String, String> taskConfigs, URI fileURI) throws Exception {
     String fileURIScheme = fileURI.getScheme();
     if (fileURIScheme == null) {
       return LOCAL_PINOT_FS;
@@ -51,8 +50,7 @@ public class SegmentGenerationAndPushTaskUtils {
     return PinotFSFactory.create(fileURIScheme);
   }
 
-  static PinotFS getOutputPinotFS(Map<String, String> taskConfigs, URI fileURI)
-      throws Exception {
+  static PinotFS getOutputPinotFS(Map<String, String> taskConfigs, URI fileURI) throws Exception {
     String fileURIScheme = (fileURI == null) ? null : fileURI.getScheme();
     if (fileURIScheme == null) {
       return LOCAL_PINOT_FS;

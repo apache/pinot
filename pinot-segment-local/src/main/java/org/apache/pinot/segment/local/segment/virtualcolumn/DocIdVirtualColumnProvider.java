@@ -77,8 +77,7 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
     }
 
     @Override
-    public void close()
-        throws IOException {
+    public void close() throws IOException {
     }
   }
 }

@@ -56,29 +56,25 @@ public class AvroRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next()
-      throws IOException {
+  public GenericRow next() throws IOException {
     return next(new GenericRow());
   }
 
   @Override
-  public GenericRow next(GenericRow reuse)
-      throws IOException {
+  public GenericRow next(GenericRow reuse) throws IOException {
     _reusableAvroRecord = _avroReader.next(_reusableAvroRecord);
     _recordExtractor.extract(_reusableAvroRecord, reuse);
     return reuse;
   }
 
   @Override
-  public void rewind()
-      throws IOException {
+  public void rewind() throws IOException {
     _avroReader.close();
     _avroReader = AvroUtils.getAvroReader(_dataFile);
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _avroReader.close();
   }
 }

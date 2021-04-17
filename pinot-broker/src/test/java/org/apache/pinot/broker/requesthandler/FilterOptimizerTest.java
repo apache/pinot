@@ -34,8 +34,7 @@ public class FilterOptimizerTest {
 
   // Testing positive cases of flattening the query tree.
   @Test
-  public void testPositive()
-      throws Exception {
+  public void testPositive() throws Exception {
 
     Pql2Compiler pql2Compiler = new Pql2Compiler();
     BrokerRequest req;
@@ -133,8 +132,7 @@ public class FilterOptimizerTest {
 
   // Tests cases where we should not do any flattening.
   @Test
-  public void testNegative()
-      throws Exception {
+  public void testNegative() throws Exception {
     Pql2Compiler pql2Compiler = new Pql2Compiler();
     BrokerRequest req;
     FilterQueryTree tree;

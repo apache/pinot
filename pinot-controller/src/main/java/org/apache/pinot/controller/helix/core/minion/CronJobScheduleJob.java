@@ -36,13 +36,11 @@ public class CronJobScheduleJob implements Job {
   }
 
   @Override
-  public void execute(JobExecutionContext jobExecutionContext)
-      throws JobExecutionException {
+  public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
     PinotTaskManager pinotTaskManager = (PinotTaskManager) jobExecutionContext.getJobDetail().getJobDataMap()
         .get(PinotTaskManager.PINOT_TASK_MANAGER_KEY);
-    LeadControllerManager leadControllerManager =
-        (LeadControllerManager) jobExecutionContext.getJobDetail().getJobDataMap()
-            .get(PinotTaskManager.LEAD_CONTROLLER_MANAGER_KEY);
+    LeadControllerManager leadControllerManager = (LeadControllerManager) jobExecutionContext.getJobDetail()
+        .getJobDataMap().get(PinotTaskManager.LEAD_CONTROLLER_MANAGER_KEY);
     String table = jobExecutionContext.getJobDetail().getKey().getName();
     String taskType = jobExecutionContext.getJobDetail().getKey().getGroup();
     pinotTaskManager.getControllerMetrics().addMeteredTableValue(PinotTaskManager.getCronJobName(table, taskType),

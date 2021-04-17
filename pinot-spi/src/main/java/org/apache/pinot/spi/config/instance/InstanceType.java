@@ -19,5 +19,8 @@
 package org.apache.pinot.spi.config.instance;
 
 public enum InstanceType {
-  CONTROLLER, BROKER, SERVER, MINION
+  CONTROLLER,
+  BROKER,
+  SERVER,
+  MINION
 }

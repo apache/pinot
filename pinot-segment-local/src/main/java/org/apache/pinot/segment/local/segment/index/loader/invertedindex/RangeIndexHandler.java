@@ -65,15 +65,13 @@ public class RangeIndexHandler {
     }
   }
 
-  public void createRangeIndices()
-      throws IOException {
+  public void createRangeIndices() throws IOException {
     for (ColumnMetadata columnMetadata : _rangeIndexColumns) {
       createRangeIndexForColumn(columnMetadata);
     }
   }
 
-  private void createRangeIndexForColumn(ColumnMetadata columnMetadata)
-      throws IOException {
+  private void createRangeIndexForColumn(ColumnMetadata columnMetadata) throws IOException {
     String column = columnMetadata.getColumnName();
     File inProgress = new File(_indexDir, column + ".range.inprogress");
     File rangeIndexFile = new File(_indexDir, column + V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION);
@@ -116,8 +114,7 @@ public class RangeIndexHandler {
     LOGGER.info("Created range index for segment: {}, column: {}", _segmentName, column);
   }
 
-  private void handleDictionaryBasedColumn(ColumnMetadata columnMetadata)
-      throws IOException {
+  private void handleDictionaryBasedColumn(ColumnMetadata columnMetadata) throws IOException {
     int numDocs = columnMetadata.getTotalDocs();
     try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
@@ -140,8 +137,7 @@ public class RangeIndexHandler {
     }
   }
 
-  private void handleNonDictionaryBasedColumn(ColumnMetadata columnMetadata)
-      throws IOException {
+  private void handleNonDictionaryBasedColumn(ColumnMetadata columnMetadata) throws IOException {
     int numDocs = columnMetadata.getTotalDocs();
     try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();

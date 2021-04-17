@@ -58,32 +58,27 @@ public class PinotConnectionMetaData extends AbstractBaseConnectionMetaData {
   }
 
   @Override
-  public String getURL()
-      throws SQLException {
+  public String getURL() throws SQLException {
     return DriverUtils.getURIFromBrokers(_connection.getSession().getBrokerList());
   }
 
   @Override
-  public String getDatabaseProductName()
-      throws SQLException {
+  public String getDatabaseProductName() throws SQLException {
     return PRODUCT_NAME;
   }
 
   @Override
-  public String getDatabaseProductVersion()
-      throws SQLException {
+  public String getDatabaseProductVersion() throws SQLException {
     return PINOT_VERSION;
   }
 
   @Override
-  public String getDriverName()
-      throws SQLException {
+  public String getDriverName() throws SQLException {
     return DRIVER_NAME;
   }
 
   @Override
-  public String getDriverVersion()
-      throws SQLException {
+  public String getDriverVersion() throws SQLException {
     return DRIVER_VERSION;
   }
 
@@ -122,20 +117,17 @@ public class PinotConnectionMetaData extends AbstractBaseConnectionMetaData {
   }
 
   @Override
-  public ResultSet getSchemas()
-      throws SQLException {
+  public ResultSet getSchemas() throws SQLException {
     return PinotResultSet.empty();
   }
 
   @Override
-  public ResultSet getCatalogs()
-      throws SQLException {
+  public ResultSet getCatalogs() throws SQLException {
     return PinotResultSet.empty();
   }
 
   @Override
-  public ResultSet getTableTypes()
-      throws SQLException {
+  public ResultSet getTableTypes() throws SQLException {
     PinotMeta pinotMeta = new PinotMeta();
     pinotMeta.setColumnNames(TABLE_TYPES_COLUMNS);
     pinotMeta.setColumnDataTypes(TABLE_TYPES_COLUMNS_DTYPES);
@@ -189,8 +181,7 @@ public class PinotConnectionMetaData extends AbstractBaseConnectionMetaData {
   }
 
   @Override
-  public Connection getConnection()
-      throws SQLException {
+  public Connection getConnection() throws SQLException {
     return _connection;
   }
 }

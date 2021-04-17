@@ -50,20 +50,18 @@ public class MutableSegmentImplNullValueVectorTest {
   private static List<String> _finalNullColumns;
 
   @BeforeClass
-  public void setup()
-      throws Exception {
+  public void setup() throws Exception {
     URL schemaResourceUrl = this.getClass().getClassLoader().getResource(PINOT_SCHEMA_FILE_PATH);
     URL dataResourceUrl = this.getClass().getClassLoader().getResource(DATA_FILE);
     _schema = Schema.fromFile(new File(schemaResourceUrl.getFile()));
     _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
     _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
     File jsonFile = new File(dataResourceUrl.getFile());
-    _mutableSegmentImpl = MutableSegmentImplTestUtils
-        .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
-            false, true);
+    _mutableSegmentImpl = MutableSegmentImplTestUtils.createMutableSegmentImpl(_schema, Collections.emptySet(),
+        Collections.emptySet(), Collections.emptySet(), false, true);
     GenericRow reuse = new GenericRow();
-    try (RecordReader recordReader = RecordReaderFactory
-        .getRecordReader(FileFormat.JSON, jsonFile, _schema.getColumnNames(), null)) {
+    try (RecordReader recordReader =
+        RecordReaderFactory.getRecordReader(FileFormat.JSON, jsonFile, _schema.getColumnNames(), null)) {
       while (recordReader.hasNext()) {
         recordReader.next(reuse);
         GenericRow transformedRow = _recordTransformer.transform(reuse);
@@ -75,8 +73,7 @@ public class MutableSegmentImplNullValueVectorTest {
   }
 
   @Test
-  public void testNullValueVector()
-      throws Exception {
+  public void testNullValueVector() throws Exception {
     DataSource cityIdDataSource = _mutableSegmentImpl.getDataSource("cityid");
     DataSource descriptionDataSource = _mutableSegmentImpl.getDataSource("description");
     NullValueVectorReader cityIdNullValueVector = cityIdDataSource.getNullValueVector();

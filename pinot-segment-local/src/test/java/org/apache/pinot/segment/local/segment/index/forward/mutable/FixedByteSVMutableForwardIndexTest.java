@@ -40,14 +40,12 @@ public class FixedByteSVMutableForwardIndexTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     _memoryManager.close();
   }
 
   @Test
-  public void testDictId()
-      throws IOException {
+  public void testDictId() throws IOException {
     Random r = new Random();
     final long seed = r.nextLong();
     r = new Random(seed);
@@ -62,8 +60,7 @@ public class FixedByteSVMutableForwardIndexTest {
     }
   }
 
-  private void testDictId(final Random random, final int rows, final int div)
-      throws IOException {
+  private void testDictId(final Random random, final int rows, final int div) throws IOException {
     FixedByteSVMutableForwardIndex readerWriter;
     readerWriter = new FixedByteSVMutableForwardIndex(true, DataType.INT, rows / div, _memoryManager, "Int");
     int[] data = new int[rows];
@@ -114,8 +111,7 @@ public class FixedByteSVMutableForwardIndexTest {
   }
 
   @Test
-  public void testLong()
-      throws IOException {
+  public void testLong() throws IOException {
     int rows = 10;
     Random r = new Random();
     final long seed = r.nextLong();
@@ -125,8 +121,7 @@ public class FixedByteSVMutableForwardIndexTest {
     }
   }
 
-  private void testLong(final Random random, final int rows, final int div)
-      throws IOException {
+  private void testLong(final Random random, final int rows, final int div) throws IOException {
     FixedByteSVMutableForwardIndex readerWriter;
     readerWriter = new FixedByteSVMutableForwardIndex(false, DataType.LONG, rows / div, _memoryManager, "Long");
     long[] data = new long[rows];

@@ -102,14 +102,12 @@ public class HelixBrokerStarter implements ServiceStartable {
   // Participant Helix manager handles Helix functionality such as state transitions and messages
   private HelixManager _participantHelixManager;
 
-  public HelixBrokerStarter(PinotConfiguration brokerConf, String clusterName, String zkServer)
-      throws Exception {
+  public HelixBrokerStarter(PinotConfiguration brokerConf, String clusterName, String zkServer) throws Exception {
     this(brokerConf, clusterName, zkServer, null);
   }
 
   public HelixBrokerStarter(PinotConfiguration brokerConf, String clusterName, String zkServer,
-      @Nullable String brokerHost)
-      throws Exception {
+      @Nullable String brokerHost) throws Exception {
     _brokerConf = brokerConf;
     _listenerConfigs = ListenerConfigUtil.buildBrokerConfigs(brokerConf);
     setupHelixSystemProperties();
@@ -120,14 +118,27 @@ public class HelixBrokerStarter implements ServiceStartable {
     _zkServers = zkServer.replaceAll("\\s+", "");
 
     if (brokerHost == null) {
-      brokerHost = _brokerConf.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils
-          .getHostnameOrAddress() : NetUtils.getHostAddress();
+      brokerHost = _brokerConf.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false)
+          ? NetUtils.getHostnameOrAddress() : NetUtils.getHostAddress();
     }
 
     _brokerId = _brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY,
         Helix.PREFIX_OF_BROKER_INSTANCE + brokerHost + "_" + _listenerConfigs.get(0).getPort());
 
     _brokerConf.addProperty(Broker.CONFIG_OF_BROKER_ID, _brokerId);
+  }
+
+  public static HelixBrokerStarter getDefault() throws Exception {
+    Map<String, Object> properties = new HashMap<>();
+
+    properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, 5001);
+    properties.put(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
+
+    return new HelixBrokerStarter(new PinotConfiguration(properties), "quickstart", "localhost:2122");
+  }
+
+  public static void main(String[] args) throws Exception {
+    getDefault().start();
   }
 
   private void setupHelixSystemProperties() {
@@ -181,8 +192,7 @@ public class HelixBrokerStarter implements ServiceStartable {
   }
 
   @Override
-  public void start()
-      throws Exception {
+  public void start() throws Exception {
     LOGGER.info("Starting Pinot broker");
     Utils.logVersions();
 
@@ -197,13 +207,13 @@ public class HelixBrokerStarter implements ServiceStartable {
     // Fetch cluster level config from ZK
     HelixConfigScope helixConfigScope =
         new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(_clusterName).build();
-    Map<String, String> configMap = _helixAdmin.getConfig(helixConfigScope, Arrays
-        .asList(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY,
+    Map<String, String> configMap = _helixAdmin.getConfig(helixConfigScope,
+        Arrays.asList(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY,
             Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
             Helix.ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY));
 
-    boolean caseInsensitive = Boolean.parseBoolean(configMap.get(Helix.ENABLE_CASE_INSENSITIVE_KEY)) || Boolean
-        .parseBoolean(configMap.get(Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY));
+    boolean caseInsensitive = Boolean.parseBoolean(configMap.get(Helix.ENABLE_CASE_INSENSITIVE_KEY))
+        || Boolean.parseBoolean(configMap.get(Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY));
 
     String log2mStr = configMap.get(Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY);
     if (log2mStr != null) {
@@ -291,18 +301,18 @@ public class HelixBrokerStarter implements ServiceStartable {
     _participantHelixManager =
         HelixManagerFactory.getZKHelixManager(_clusterName, _brokerId, InstanceType.PARTICIPANT, _zkServers);
     // Register state model factory
-    _participantHelixManager.getStateMachineEngine()
-        .registerStateModelFactory(BrokerResourceOnlineOfflineStateModelFactory.getStateModelDef(),
-            new BrokerResourceOnlineOfflineStateModelFactory(_propertyStore, _helixDataAccessor, _routingManager,
-                queryQuotaManager));
+    _participantHelixManager.getStateMachineEngine().registerStateModelFactory(
+        BrokerResourceOnlineOfflineStateModelFactory.getStateModelDef(),
+        new BrokerResourceOnlineOfflineStateModelFactory(_propertyStore, _helixDataAccessor, _routingManager,
+            queryQuotaManager));
     // Register user-define message handler factory
-    _participantHelixManager.getMessagingService()
-        .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(),
-            new BrokerUserDefinedMessageHandlerFactory(_routingManager, queryQuotaManager));
+    _participantHelixManager.getMessagingService().registerMessageHandlerFactory(
+        Message.MessageType.USER_DEFINE_MSG.toString(),
+        new BrokerUserDefinedMessageHandlerFactory(_routingManager, queryQuotaManager));
     _participantHelixManager.connect();
     addInstanceTagIfNeeded();
-    _brokerMetrics
-        .addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME, () -> _participantHelixManager.isConnected() ? 1L : 0L);
+    _brokerMetrics.addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME,
+        () -> _participantHelixManager.isConnected() ? 1L : 0L);
     _participantHelixManager
         .addPreConnectCallback(() -> _brokerMetrics.addMeteredGlobalValue(BrokerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
 
@@ -328,13 +338,13 @@ public class HelixBrokerStarter implements ServiceStartable {
       }
     }
 
-    double minResourcePercentForStartup = _brokerConf
-        .getProperty(Broker.CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START,
-            Broker.DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START);
+    double minResourcePercentForStartup = _brokerConf.getProperty(
+        Broker.CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START, Broker.DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START);
 
     LOGGER.info("Registering service status handler");
-    ServiceStatus.setServiceStatusCallback(_brokerId, new ServiceStatus.MultipleCallbackServiceStatusCallback(
-        ImmutableList.of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_participantHelixManager,
+    ServiceStatus.setServiceStatusCallback(_brokerId,
+        new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(
+            new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_participantHelixManager,
                 _clusterName, _brokerId, resourcesToMonitor, minResourcePercentForStartup),
             new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_participantHelixManager,
                 _clusterName, _brokerId, resourcesToMonitor, minResourcePercentForStartup))));
@@ -367,8 +377,8 @@ public class HelixBrokerStarter implements ServiceStartable {
     // been disconnected, so instance should disappear from ExternalView soon and stop getting new queries.
     long delayShutdownTimeMs =
         _brokerConf.getProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, Broker.DEFAULT_DELAY_SHUTDOWN_TIME_MS);
-    LOGGER
-        .info("Wait for {}ms before shutting down request handler to finish the pending queries", delayShutdownTimeMs);
+    LOGGER.info("Wait for {}ms before shutting down request handler to finish the pending queries",
+        delayShutdownTimeMs);
     try {
       Thread.sleep(delayShutdownTimeMs);
     } catch (Exception e) {
@@ -411,20 +421,5 @@ public class HelixBrokerStarter implements ServiceStartable {
 
   public BrokerRequestHandler getBrokerRequestHandler() {
     return _brokerRequestHandler;
-  }
-
-  public static HelixBrokerStarter getDefault()
-      throws Exception {
-    Map<String, Object> properties = new HashMap<>();
-
-    properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, 5001);
-    properties.put(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
-
-    return new HelixBrokerStarter(new PinotConfiguration(properties), "quickstart", "localhost:2122");
-  }
-
-  public static void main(String[] args)
-      throws Exception {
-    getDefault().start();
   }
 }

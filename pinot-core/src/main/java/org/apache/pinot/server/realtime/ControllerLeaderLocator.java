@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
 // Helix keeps the old controller around for 30s before electing a new one, so we will keep getting
 // the old controller as leader, and it will keep returning NOT_LEADER.
 
+
 // Singleton class.
 public class ControllerLeaderLocator {
   private static ControllerLeaderLocator _instance = null;

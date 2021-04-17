@@ -20,6 +20,7 @@ package org.apache.pinot.broker.queryquota;
 
 import com.google.common.annotations.VisibleForTesting;
 
+
 /**
  * A stateful version of hit counter. Similar to the default hit counter, it maintains a list of buckets.
  * Whereas it maintains an extra variable called _lastAccessTimestamp which tracks the last access time.

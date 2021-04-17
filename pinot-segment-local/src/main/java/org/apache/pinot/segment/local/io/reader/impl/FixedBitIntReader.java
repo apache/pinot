@@ -1429,9 +1429,8 @@ public abstract class FixedBitIntReader {
       long bitOffset = (long) index * 19;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
-      int valueInFirst3Bytes =
-          ((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) & (0xffffff
-              >>> bitOffsetInFirstByte);
+      int valueInFirst3Bytes = ((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff))
+          & (0xffffff >>> bitOffsetInFirstByte);
       int numBitsLeft = bitOffsetInFirstByte - 5;
       if (numBitsLeft <= 0) {
         return valueInFirst3Bytes >>> -numBitsLeft;
@@ -1599,9 +1598,8 @@ public abstract class FixedBitIntReader {
       long bitOffset = (long) index * 21;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
-      int valueInFirst3Bytes =
-          ((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) & (0xffffff
-              >>> bitOffsetInFirstByte);
+      int valueInFirst3Bytes = ((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff))
+          & (0xffffff >>> bitOffsetInFirstByte);
       int numBitsLeft = bitOffsetInFirstByte - 3;
       if (numBitsLeft <= 0) {
         return valueInFirst3Bytes >>> -numBitsLeft;
@@ -1689,9 +1687,8 @@ public abstract class FixedBitIntReader {
       long bitOffset = (long) index * 22;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
-      int valueInFirst3Bytes =
-          ((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) & (0xffffff
-              >>> bitOffsetInFirstByte);
+      int valueInFirst3Bytes = ((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff))
+          & (0xffffff >>> bitOffsetInFirstByte);
       int numBitsLeft = bitOffsetInFirstByte - 2;
       if (numBitsLeft <= 0) {
         return valueInFirst3Bytes >>> -numBitsLeft;
@@ -1780,9 +1777,8 @@ public abstract class FixedBitIntReader {
       long bitOffset = (long) index * 23;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
-      int valueInFirst3Bytes =
-          ((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) & (0xffffff
-              >>> bitOffsetInFirstByte);
+      int valueInFirst3Bytes = ((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff))
+          & (0xffffff >>> bitOffsetInFirstByte);
       int numBitsLeft = bitOffsetInFirstByte - 1;
       if (numBitsLeft <= 0) {
         return valueInFirst3Bytes >>> -numBitsLeft;

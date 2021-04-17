@@ -65,8 +65,8 @@ public class PercentileEstAggregationFunction extends BaseSingleInputAggregation
 
   @Override
   public String getResultColumnName() {
-    return _version == 0 ? AggregationFunctionType.PERCENTILEEST.getName().toLowerCase() + (int) _percentile + "("
-        + _expression + ")"
+    return _version == 0
+        ? AggregationFunctionType.PERCENTILEEST.getName().toLowerCase() + (int) _percentile + "(" + _expression + ")"
         : AggregationFunctionType.PERCENTILEEST.getName().toLowerCase() + "(" + _expression + ", " + _percentile + ")";
   }
 
@@ -156,8 +156,8 @@ public class PercentileEstAggregationFunction extends BaseSingleInputAggregation
             quantileDigest.merge(value);
           } else {
             // Create a new QuantileDigest for the group
-            groupByResultHolder
-                .setValueForKey(groupKey, ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]));
+            groupByResultHolder.setValueForKey(groupKey,
+                ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]));
           }
         }
       }

@@ -27,8 +27,7 @@ import java.util.List;
  * Simple shim so that jps -l shows PinotBroker instead of PinotAdministrator
  */
 public class PinotBroker {
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     List<String> arguments = new ArrayList<>();
     arguments.add("StartBroker");
     arguments.addAll(Arrays.asList(args));

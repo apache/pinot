@@ -82,49 +82,41 @@ public class PinotFSFactoryTest {
     }
 
     @Override
-    public boolean delete(URI segmentUri, boolean forceDelete)
-        throws IOException {
+    public boolean delete(URI segmentUri, boolean forceDelete) throws IOException {
       return true;
     }
 
     @Override
-    public boolean doMove(URI srcUri, URI dstUri)
-        throws IOException {
+    public boolean doMove(URI srcUri, URI dstUri) throws IOException {
       return true;
     }
 
     @Override
-    public boolean copy(URI srcUri, URI dstUri)
-        throws IOException {
+    public boolean copy(URI srcUri, URI dstUri) throws IOException {
       return true;
     }
 
     @Override
-    public boolean exists(URI fileUri)
-        throws IOException {
+    public boolean exists(URI fileUri) throws IOException {
       return true;
     }
 
     @Override
-    public long length(URI fileUri)
-        throws IOException {
+    public long length(URI fileUri) throws IOException {
       return 0L;
     }
 
     @Override
-    public String[] listFiles(URI fileUri, boolean recursive)
-        throws IOException {
+    public String[] listFiles(URI fileUri, boolean recursive) throws IOException {
       return null;
     }
 
     @Override
-    public void copyToLocalFile(URI srcUri, File dstFile)
-        throws Exception {
+    public void copyToLocalFile(URI srcUri, File dstFile) throws Exception {
     }
 
     @Override
-    public void copyFromLocalFile(File srcFile, URI dstUri)
-        throws Exception {
+    public void copyFromLocalFile(File srcFile, URI dstUri) throws Exception {
     }
 
     @Override
@@ -138,14 +130,12 @@ public class PinotFSFactoryTest {
     }
 
     @Override
-    public boolean touch(URI uri)
-        throws IOException {
+    public boolean touch(URI uri) throws IOException {
       return true;
     }
 
     @Override
-    public InputStream open(URI uri)
-        throws IOException {
+    public InputStream open(URI uri) throws IOException {
       return null;
     }
   }

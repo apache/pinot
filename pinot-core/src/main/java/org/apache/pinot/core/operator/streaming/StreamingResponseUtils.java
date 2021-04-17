@@ -29,23 +29,19 @@ public class StreamingResponseUtils {
   private StreamingResponseUtils() {
   }
 
-  public static Server.ServerResponse getDataResponse(DataTable dataTable)
-      throws IOException {
+  public static Server.ServerResponse getDataResponse(DataTable dataTable) throws IOException {
     return getResponse(dataTable, Response.ResponseType.DATA);
   }
 
-  public static Server.ServerResponse getMetadataResponse(DataTable dataTable)
-      throws IOException {
+  public static Server.ServerResponse getMetadataResponse(DataTable dataTable) throws IOException {
     return getResponse(dataTable, Response.ResponseType.METADATA);
   }
 
-  public static Server.ServerResponse getNonStreamingResponse(DataTable dataTable)
-      throws IOException {
+  public static Server.ServerResponse getNonStreamingResponse(DataTable dataTable) throws IOException {
     return getResponse(dataTable, Response.ResponseType.NON_STREAMING);
   }
 
-  private static Server.ServerResponse getResponse(DataTable dataTable, String responseType)
-      throws IOException {
+  private static Server.ServerResponse getResponse(DataTable dataTable, String responseType) throws IOException {
     return Server.ServerResponse.newBuilder().putMetadata(Response.MetadataKeys.RESPONSE_TYPE, responseType)
         .setPayload(ByteString.copyFrom(dataTable.toBytes())).build();
   }

@@ -40,8 +40,7 @@ public class FixedByteMVMutableForwardIndexTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     _memoryManager.close();
   }
 
@@ -66,15 +65,13 @@ public class FixedByteMVMutableForwardIndexTest {
     }
   }
 
-  public void testIntArray(final long seed)
-      throws IOException {
+  public void testIntArray(final long seed) throws IOException {
     FixedByteMVMutableForwardIndex readerWriter;
     int rows = 1000;
     int columnSizeInBytes = Integer.BYTES;
     int maxNumberOfMultiValuesPerRow = 2000;
-    readerWriter =
-        new FixedByteMVMutableForwardIndex(maxNumberOfMultiValuesPerRow, 2, rows / 2, columnSizeInBytes, _memoryManager,
-            "IntArray");
+    readerWriter = new FixedByteMVMutableForwardIndex(maxNumberOfMultiValuesPerRow, 2, rows / 2, columnSizeInBytes,
+        _memoryManager, "IntArray");
 
     Random r = new Random(seed);
     int[][] data = new int[rows][];
@@ -94,8 +91,7 @@ public class FixedByteMVMutableForwardIndexTest {
     readerWriter.close();
   }
 
-  public void testIntArrayFixedSize(int multiValuesPerRow, long seed)
-      throws IOException {
+  public void testIntArrayFixedSize(int multiValuesPerRow, long seed) throws IOException {
     FixedByteMVMutableForwardIndex readerWriter;
     int rows = 1000;
     int columnSizeInBytes = Integer.BYTES;
@@ -122,16 +118,14 @@ public class FixedByteMVMutableForwardIndexTest {
     readerWriter.close();
   }
 
-  public void testWithZeroSize(long seed)
-      throws IOException {
+  public void testWithZeroSize(long seed) throws IOException {
     FixedByteMVMutableForwardIndex readerWriter;
     final int maxNumberOfMultiValuesPerRow = 5;
     int rows = 1000;
     int columnSizeInBytes = Integer.BYTES;
     Random r = new Random(seed);
-    readerWriter =
-        new FixedByteMVMutableForwardIndex(maxNumberOfMultiValuesPerRow, 3, r.nextInt(rows) + 1, columnSizeInBytes,
-            _memoryManager, "ZeroSize");
+    readerWriter = new FixedByteMVMutableForwardIndex(maxNumberOfMultiValuesPerRow, 3, r.nextInt(rows) + 1,
+        columnSizeInBytes, _memoryManager, "ZeroSize");
 
     int[][] data = new int[rows][];
     for (int i = 0; i < rows; i++) {
@@ -170,8 +164,7 @@ public class FixedByteMVMutableForwardIndexTest {
   }
 
   @Test
-  public void testLongArray()
-      throws IOException {
+  public void testLongArray() throws IOException {
     final long seed = generateSeed();
     Random r = new Random(seed);
     int rows = 1000;
@@ -202,8 +195,7 @@ public class FixedByteMVMutableForwardIndexTest {
   }
 
   @Test
-  public void testFloatArray()
-      throws IOException {
+  public void testFloatArray() throws IOException {
     final long seed = generateSeed();
     Random r = new Random(seed);
     int rows = 1000;
@@ -234,8 +226,7 @@ public class FixedByteMVMutableForwardIndexTest {
   }
 
   @Test
-  public void testDoubleArray()
-      throws IOException {
+  public void testDoubleArray() throws IOException {
     final long seed = generateSeed();
     Random r = new Random(seed);
     int rows = 1000;

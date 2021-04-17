@@ -23,5 +23,8 @@ package org.apache.pinot.controller.api.access;
  * Different access types used in access control of the rest endpoints
  */
 public enum AccessType {
-  CREATE, READ, UPDATE, DELETE
+  CREATE,
+  READ,
+  UPDATE,
+  DELETE
 }

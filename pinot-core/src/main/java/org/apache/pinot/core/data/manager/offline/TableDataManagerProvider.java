@@ -54,8 +54,7 @@ public class TableDataManagerProvider {
     switch (TableType.valueOf(tableDataManagerConfig.getTableDataManagerType())) {
       case OFFLINE:
         if (tableDataManagerConfig.isDimTable()) {
-          tableDataManager =
-              DimensionTableDataManager.createInstanceByTableName(tableDataManagerConfig.getTableName());
+          tableDataManager = DimensionTableDataManager.createInstanceByTableName(tableDataManagerConfig.getTableName());
         } else {
           tableDataManager = new OfflineTableDataManager();
         }

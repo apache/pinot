@@ -36,8 +36,7 @@ public class FixedBitSVForwardIndexWriter implements Closeable {
 
   private int _nextDocId = 0;
 
-  public FixedBitSVForwardIndexWriter(File file, int numDocs, int numBitsPerValue)
-      throws Exception {
+  public FixedBitSVForwardIndexWriter(File file, int numDocs, int numBitsPerValue) throws Exception {
     // Convert to long in order to avoid int overflow
     long length = ((long) numDocs * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE;
     // Backward-compatible: index file is always big-endian
@@ -50,8 +49,7 @@ public class FixedBitSVForwardIndexWriter implements Closeable {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _intReaderWriter.close();
     _dataBuffer.close();
   }

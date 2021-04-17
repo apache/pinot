@@ -47,8 +47,7 @@ public class KafkaStreamLevelStreamConfig {
    * @param tableName
    * @param groupId
    */
-  public KafkaStreamLevelStreamConfig(StreamConfig streamConfig, String tableName,
-      String groupId) {
+  public KafkaStreamLevelStreamConfig(StreamConfig streamConfig, String tableName, String groupId) {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
 
     _kafkaTopicName = streamConfig.getTopicName();
@@ -64,8 +63,8 @@ public class KafkaStreamLevelStreamConfig {
         KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.KAFKA_CONSUMER_PROP_PREFIX);
     for (String key : streamConfigMap.keySet()) {
       if (key.startsWith(kafkaConsumerPropertyPrefix)) {
-        _kafkaConsumerProperties
-            .put(StreamConfigProperties.getPropertySuffix(key, kafkaConsumerPropertyPrefix), streamConfigMap.get(key));
+        _kafkaConsumerProperties.put(StreamConfigProperties.getPropertySuffix(key, kafkaConsumerPropertyPrefix),
+            streamConfigMap.get(key));
       }
     }
   }
@@ -110,8 +109,9 @@ public class KafkaStreamLevelStreamConfig {
 
     KafkaStreamLevelStreamConfig that = (KafkaStreamLevelStreamConfig) o;
 
-    return EqualityUtils.isEqual(_kafkaTopicName, that._kafkaTopicName) && EqualityUtils
-        .isEqual(_groupId, that._groupId) && EqualityUtils.isEqual(_bootstrapServers, that._bootstrapServers)
+    return EqualityUtils.isEqual(_kafkaTopicName, that._kafkaTopicName)
+        && EqualityUtils.isEqual(_groupId, that._groupId)
+        && EqualityUtils.isEqual(_bootstrapServers, that._bootstrapServers)
         && EqualityUtils.isEqual(_kafkaConsumerProperties, that._kafkaConsumerProperties);
   }
 

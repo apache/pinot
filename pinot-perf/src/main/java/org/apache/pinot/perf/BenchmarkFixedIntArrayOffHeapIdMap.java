@@ -55,9 +55,8 @@ public class BenchmarkFixedIntArrayOffHeapIdMap {
 
     FixedIntArray[] uniqueValues = new FixedIntArray[CARDINALITY];
     for (int i = 0; i < uniqueValues.length; i++) {
-      uniqueValues[i] = new FixedIntArray(
-          new int[]{random.nextInt(COLUMN_CARDINALITY), random.nextInt(COLUMN_CARDINALITY), random.nextInt(
-              COLUMN_CARDINALITY)});
+      uniqueValues[i] = new FixedIntArray(new int[]{random.nextInt(COLUMN_CARDINALITY), random
+          .nextInt(COLUMN_CARDINALITY), random.nextInt(COLUMN_CARDINALITY)});
     }
 
     _values = new FixedIntArray[ROW_COUNT];
@@ -67,16 +66,14 @@ public class BenchmarkFixedIntArrayOffHeapIdMap {
   }
 
   @TearDown
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
   }
 
   // Start with mid size, with overflow
   @Benchmark
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public IdMap<FixedIntArray> benchmarkOffHeapWithResizeWithCache()
-      throws IOException {
+  public IdMap<FixedIntArray> benchmarkOffHeapWithResizeWithCache() throws IOException {
     PinotDataBufferMemoryManager memoryManager = new DirectMemoryManager("perfTest");
 
     IdMap<FixedIntArray> idMap =
@@ -93,8 +90,7 @@ public class BenchmarkFixedIntArrayOffHeapIdMap {
   // Start with max size, no cache
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public IdMap<FixedIntArray> benchmarkOffHeapWithReSizeWithoutCache()
-      throws IOException {
+  public IdMap<FixedIntArray> benchmarkOffHeapWithReSizeWithoutCache() throws IOException {
     PinotDataBufferMemoryManager memoryManager = new DirectMemoryManager("perfTest");
 
     IdMap<FixedIntArray> idMap =
@@ -110,8 +106,7 @@ public class BenchmarkFixedIntArrayOffHeapIdMap {
 
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public IdMap<FixedIntArray> benchmarkOffHeapPreSizeWithCache()
-      throws IOException {
+  public IdMap<FixedIntArray> benchmarkOffHeapPreSizeWithCache() throws IOException {
     PinotDataBufferMemoryManager memoryManager = new DirectMemoryManager("perfTest");
 
     IdMap<FixedIntArray> idMap =
@@ -128,8 +123,7 @@ public class BenchmarkFixedIntArrayOffHeapIdMap {
   // Start with max size, no cache
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public IdMap<FixedIntArray> benchmarkOffHeapPreSizeWithoutCache()
-      throws IOException {
+  public IdMap<FixedIntArray> benchmarkOffHeapPreSizeWithoutCache() throws IOException {
     PinotDataBufferMemoryManager memoryManager = new DirectMemoryManager("perfTest");
 
     IdMap<FixedIntArray> idMap =
@@ -143,8 +137,7 @@ public class BenchmarkFixedIntArrayOffHeapIdMap {
     return idMap;
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     ChainedOptionsBuilder opt = new OptionsBuilder().include(BenchmarkFixedIntArrayOffHeapIdMap.class.getSimpleName())
         .warmupTime(TimeValue.seconds(10)).warmupIterations(2).measurementTime(TimeValue.seconds(30))
         .measurementIterations(5).forks(1);

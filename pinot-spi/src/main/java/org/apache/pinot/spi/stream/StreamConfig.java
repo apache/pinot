@@ -41,7 +41,8 @@ public class StreamConfig {
    * The type of the stream consumer either HIGHLEVEL or LOWLEVEL. For backward compatibility, adding SIMPLE which is equivalent to LOWLEVEL
    */
   public enum ConsumerType {
-    HIGHLEVEL, LOWLEVEL
+    HIGHLEVEL,
+    LOWLEVEL
   }
 
   public static final int DEFAULT_FLUSH_THRESHOLD_ROWS = 5_000_000;
@@ -97,8 +98,7 @@ public class StreamConfig {
     String consumerTypes = streamConfigMap.get(consumerTypesKey);
     Preconditions.checkNotNull(consumerTypes, "Must specify at least one consumer type " + consumerTypesKey);
     for (String consumerType : consumerTypes.split(",")) {
-      if (consumerType.equals(
-          SIMPLE_CONSUMER_TYPE_STRING)) { //For backward compatibility of stream configs which referred to lowlevel as simple
+      if (consumerType.equals(SIMPLE_CONSUMER_TYPE_STRING)) { //For backward compatibility of stream configs which referred to lowlevel as simple
         consumerType = ConsumerType.LOWLEVEL.toString();
       }
       _consumerTypes.add(ConsumerType.valueOf(consumerType.toUpperCase()));
@@ -128,8 +128,8 @@ public class StreamConfig {
         StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.DECODER_PROPS_PREFIX);
     for (String key : streamConfigMap.keySet()) {
       if (key.startsWith(streamDecoderPropPrefix)) {
-        _decoderProperties
-            .put(StreamConfigProperties.getPropertySuffix(key, streamDecoderPropPrefix), streamConfigMap.get(key));
+        _decoderProperties.put(StreamConfigProperties.getPropertySuffix(key, streamDecoderPropPrefix),
+            streamConfigMap.get(key));
       }
     }
 
@@ -224,8 +224,8 @@ public class StreamConfig {
         Preconditions.checkState(flushThresholdRows >= 0);
         return flushThresholdRows;
       } catch (Exception e) {
-        LOGGER
-            .warn("Invalid config {}: {}, defaulting to: {}", key, flushThresholdRowsStr, DEFAULT_FLUSH_THRESHOLD_ROWS);
+        LOGGER.warn("Invalid config {}: {}, defaulting to: {}", key, flushThresholdRowsStr,
+            DEFAULT_FLUSH_THRESHOLD_ROWS);
         return DEFAULT_FLUSH_THRESHOLD_ROWS;
       }
     } else {
@@ -349,18 +349,20 @@ public class StreamConfig {
 
     StreamConfig that = (StreamConfig) o;
 
-    return EqualityUtils.isEqual(_connectionTimeoutMillis, that._connectionTimeoutMillis) && EqualityUtils
-        .isEqual(_fetchTimeoutMillis, that._fetchTimeoutMillis) && EqualityUtils
-        .isEqual(_flushThresholdRows, that._flushThresholdRows) && EqualityUtils
-        .isEqual(_flushThresholdTimeMillis, that._flushThresholdTimeMillis) && EqualityUtils
-        .isEqual(_flushThresholdSegmentSizeBytes, that._flushThresholdSegmentSizeBytes) && EqualityUtils
-        .isEqual(_flushAutotuneInitialRows, that._flushAutotuneInitialRows) && EqualityUtils.isEqual(_type, that._type)
-        && EqualityUtils.isEqual(_topicName, that._topicName) && EqualityUtils
-        .isEqual(_consumerTypes, that._consumerTypes) && EqualityUtils
-        .isEqual(_consumerFactoryClassName, that._consumerFactoryClassName) && EqualityUtils
-        .isEqual(_offsetCriteria, that._offsetCriteria) && EqualityUtils.isEqual(_decoderClass, that._decoderClass)
-        && EqualityUtils.isEqual(_decoderProperties, that._decoderProperties) && EqualityUtils
-        .isEqual(_groupId, that._groupId) && EqualityUtils.isEqual(_tableNameWithType, that._tableNameWithType)
+    return EqualityUtils.isEqual(_connectionTimeoutMillis, that._connectionTimeoutMillis)
+        && EqualityUtils.isEqual(_fetchTimeoutMillis, that._fetchTimeoutMillis)
+        && EqualityUtils.isEqual(_flushThresholdRows, that._flushThresholdRows)
+        && EqualityUtils.isEqual(_flushThresholdTimeMillis, that._flushThresholdTimeMillis)
+        && EqualityUtils.isEqual(_flushThresholdSegmentSizeBytes, that._flushThresholdSegmentSizeBytes)
+        && EqualityUtils.isEqual(_flushAutotuneInitialRows, that._flushAutotuneInitialRows)
+        && EqualityUtils.isEqual(_type, that._type) && EqualityUtils.isEqual(_topicName, that._topicName)
+        && EqualityUtils.isEqual(_consumerTypes, that._consumerTypes)
+        && EqualityUtils.isEqual(_consumerFactoryClassName, that._consumerFactoryClassName)
+        && EqualityUtils.isEqual(_offsetCriteria, that._offsetCriteria)
+        && EqualityUtils.isEqual(_decoderClass, that._decoderClass)
+        && EqualityUtils.isEqual(_decoderProperties, that._decoderProperties)
+        && EqualityUtils.isEqual(_groupId, that._groupId)
+        && EqualityUtils.isEqual(_tableNameWithType, that._tableNameWithType)
         && EqualityUtils.isEqual(_streamConfigMap, that._streamConfigMap);
   }
 

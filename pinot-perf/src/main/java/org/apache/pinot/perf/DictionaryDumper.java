@@ -30,8 +30,7 @@ import org.apache.pinot.spi.utils.ReadMode;
 
 public class DictionaryDumper {
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     if (args.length != 3) {
       System.err.println("Usage: DictionaryDumper <segmentDirectory> <dimensionName> <comma-separated dictionaryIds>");
       System.exit(1);

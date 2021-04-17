@@ -51,15 +51,13 @@ public class SingleFileIndexDirectoryTest {
   }
 
   @BeforeMethod
-  public void setUp()
-      throws IOException {
+  public void setUp() throws IOException {
     TestUtils.ensureDirectoriesExistAndEmpty(TEMP_DIR);
     writeMetadata();
   }
 
   @AfterMethod
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 
@@ -70,8 +68,7 @@ public class SingleFileIndexDirectoryTest {
   }
 
   @Test
-  public void testWithEmptyDir()
-      throws Exception {
+  public void testWithEmptyDir() throws Exception {
     // segmentDir does not have anything to begin with
     Assert.assertEquals(TEMP_DIR.list().length, 0);
     SingleFileIndexDirectory columnDirectory = new SingleFileIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap);
@@ -85,8 +82,10 @@ public class SingleFileIndexDirectoryTest {
     writtenBuffer.close();
 
     Mockito.when(segmentMetadata.getAllColumns()).thenReturn(new HashSet<String>(Arrays.asList("foo")));
-    try (SingleFileIndexDirectory directoryReader = new SingleFileIndexDirectory(TEMP_DIR, segmentMetadata,
-        ReadMode.mmap); PinotDataBuffer readBuffer = directoryReader.getBuffer("foo", ColumnIndexType.DICTIONARY)) {
+    try (
+        SingleFileIndexDirectory directoryReader =
+            new SingleFileIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap);
+        PinotDataBuffer readBuffer = directoryReader.getBuffer("foo", ColumnIndexType.DICTIONARY)) {
       Assert.assertEquals(1024, readBuffer.size());
       int length = dataBytes.length;
       for (int i = 0; i < length; i++) {
@@ -97,20 +96,17 @@ public class SingleFileIndexDirectoryTest {
   }
 
   @Test
-  public void testMmapLargeBuffer()
-      throws Exception {
+  public void testMmapLargeBuffer() throws Exception {
     testMultipleRW(ReadMode.mmap, 6, 4L * ONE_MB);
   }
 
   @Test
-  public void testLargeRWDirectBuffer()
-      throws Exception {
+  public void testLargeRWDirectBuffer() throws Exception {
     testMultipleRW(ReadMode.heap, 6, 3L * ONE_MB);
   }
 
   @Test
-  public void testModeChange()
-      throws Exception {
+  public void testModeChange() throws Exception {
     // first verify it all works for one mode
     long size = 2L * ONE_MB;
     testMultipleRW(ReadMode.heap, 6, size);
@@ -120,8 +116,7 @@ public class SingleFileIndexDirectoryTest {
     }
   }
 
-  private void testMultipleRW(ReadMode readMode, int numIter, long size)
-      throws Exception {
+  private void testMultipleRW(ReadMode readMode, int numIter, long size) throws Exception {
     try (SingleFileIndexDirectory columnDirectory = new SingleFileIndexDirectory(TEMP_DIR, segmentMetadata, readMode)) {
       ColumnIndexDirectoryTestHelper.performMultipleWrites(columnDirectory, "foo", size, numIter);
     }
@@ -133,30 +128,27 @@ public class SingleFileIndexDirectoryTest {
   }
 
   @Test(expectedExceptions = RuntimeException.class)
-  public void testWriteExisting()
-      throws Exception {
-    try (SingleFileIndexDirectory columnDirectory = new SingleFileIndexDirectory(TEMP_DIR, segmentMetadata,
-        ReadMode.mmap)) {
+  public void testWriteExisting() throws Exception {
+    try (SingleFileIndexDirectory columnDirectory =
+        new SingleFileIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
       columnDirectory.newBuffer("column1", ColumnIndexType.DICTIONARY, 1024);
     }
-    try (SingleFileIndexDirectory columnDirectory = new SingleFileIndexDirectory(TEMP_DIR, segmentMetadata,
-        ReadMode.mmap)) {
+    try (SingleFileIndexDirectory columnDirectory =
+        new SingleFileIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
       columnDirectory.newBuffer("column1", ColumnIndexType.DICTIONARY, 1024);
     }
   }
 
   @Test(expectedExceptions = RuntimeException.class)
-  public void testMissingIndex()
-      throws IOException, ConfigurationException {
-    try (SingleFileIndexDirectory columnDirectory = new SingleFileIndexDirectory(TEMP_DIR, segmentMetadata,
-        ReadMode.mmap)) {
+  public void testMissingIndex() throws IOException, ConfigurationException {
+    try (SingleFileIndexDirectory columnDirectory =
+        new SingleFileIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
       columnDirectory.getBuffer("column1", ColumnIndexType.DICTIONARY);
     }
   }
 
   @Test(expectedExceptions = UnsupportedOperationException.class)
-  public void testRemoveIndex()
-      throws IOException, ConfigurationException {
+  public void testRemoveIndex() throws IOException, ConfigurationException {
     try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
       sfd.newBuffer("col1", ColumnIndexType.DICTIONARY, 1024);
       Assert.assertFalse(sfd.isIndexRemovalSupported());

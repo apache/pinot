@@ -34,8 +34,7 @@ public class EmbeddedZooKeeper implements Closeable {
   private final NIOServerCnxnFactory _factory;
   private final String _zkAddress;
 
-  EmbeddedZooKeeper()
-      throws IOException, InterruptedException {
+  EmbeddedZooKeeper() throws IOException, InterruptedException {
     _factory = new NIOServerCnxnFactory();
     ZooKeeperServer zkServer = new ZooKeeperServer(new File(TEMP_DIR, "data"), new File(TEMP_DIR, "log"), TICK_TIME);
     _factory.configure(new InetSocketAddress("localhost", 0), 0);
@@ -48,8 +47,7 @@ public class EmbeddedZooKeeper implements Closeable {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _factory.shutdown();
     FileUtils.deleteDirectory(TEMP_DIR);
   }

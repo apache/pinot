@@ -70,9 +70,8 @@ public class RealtimeLuceneTextIndexReader implements TextIndexReader {
       // as it is already part of the offline segment after the conversion.
       // This is why "commitOnClose" is set to false when creating the lucene index writer
       // for realtime
-      _indexCreator =
-          new LuceneTextIndexCreator(column, new File(segmentIndexDir.getAbsolutePath() + "/" + segmentName),
-              false /* commitOnClose */);
+      _indexCreator = new LuceneTextIndexCreator(column,
+          new File(segmentIndexDir.getAbsolutePath() + "/" + segmentName), false /* commitOnClose */);
       IndexWriter indexWriter = _indexCreator.getIndexWriter();
       _searcherManager = new SearcherManager(indexWriter, false, false, null);
     } catch (Exception e) {
@@ -107,9 +106,8 @@ public class RealtimeLuceneTextIndexReader implements TextIndexReader {
       indexSearcher.search(query, docIDCollector);
       return getPinotDocIds(indexSearcher, docIDs);
     } catch (Exception e) {
-      LOGGER
-          .error("Failed while searching the realtime text index for column {}, search query {}, exception {}", _column,
-              searchQuery, e.getMessage());
+      LOGGER.error("Failed while searching the realtime text index for column {}, search query {}, exception {}",
+          _column, searchQuery, e.getMessage());
       throw new RuntimeException(e);
     } finally {
       try {

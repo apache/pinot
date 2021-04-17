@@ -49,15 +49,14 @@ public class TableConfigCache {
           @Override
           public TableConfig load(@Nonnull String tableNameWithType) {
             TableConfig tableConfig = ZKMetadataProvider.getTableConfig(propertyStore, tableNameWithType);
-            Preconditions
-                .checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
+            Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s",
+                tableNameWithType);
             return tableConfig;
           }
         });
   }
 
-  public TableConfig getTableConfig(String tableNameWithType)
-      throws ExecutionException {
+  public TableConfig getTableConfig(String tableNameWithType) throws ExecutionException {
     return _tableConfigCache.get(tableNameWithType);
   }
 }

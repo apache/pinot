@@ -241,8 +241,7 @@ public class FieldSpecTest {
    * Test different order of fields in serialized JSON string to deserialize {@link FieldSpec}.
    */
   @Test
-  public void testOrderOfFields()
-      throws Exception {
+  public void testOrderOfFields() throws Exception {
     // Metric field with default null value.
     String[] metricFields = {"\"name\":\"metric\"", "\"dataType\":\"INT\"", "\"defaultNullValue\":-1"};
     MetricFieldSpec metricFieldSpec1 =
@@ -280,8 +279,7 @@ public class FieldSpecTest {
    * Test {@link FieldSpec} serialize deserialize.
    */
   @Test
-  public void testSerializeDeserialize()
-      throws Exception {
+  public void testSerializeDeserialize() throws Exception {
     FieldSpec first;
     FieldSpec second;
 

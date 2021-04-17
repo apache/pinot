@@ -39,8 +39,7 @@ public class PinotHadoopJobLauncher {
     System.err.println(SUPPORT_JOB_TYPES);
   }
 
-  private static void kickOffPinotHadoopJob(PinotIngestionJobType jobType, Properties jobConf)
-      throws Exception {
+  private static void kickOffPinotHadoopJob(PinotIngestionJobType jobType, Properties jobConf) throws Exception {
     switch (jobType) {
       case SegmentCreation:
         new HadoopSegmentCreationJob(jobConf).run();
@@ -67,8 +66,7 @@ public class PinotHadoopJobLauncher {
     }
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     if (args.length != 2) {
       usage();
       System.exit(1);

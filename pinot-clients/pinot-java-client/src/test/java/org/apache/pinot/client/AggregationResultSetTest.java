@@ -26,6 +26,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
 
+
 public class AggregationResultSetTest {
 
   private JsonNode mockJsonObject;

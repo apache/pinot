@@ -118,23 +118,21 @@ public abstract class SegmentCreationJob extends BaseSegmentJob {
     if (_properties.getProperty(JobConfigConstants.RECORD_READER_PATH) != null) {
       return true;
     }
-    return fileName.endsWith(".avro") || fileName.endsWith(".csv") || fileName.endsWith(".json") || fileName
-        .endsWith(".thrift");
+    return fileName.endsWith(".avro") || fileName.endsWith(".csv") || fileName.endsWith(".json")
+        || fileName.endsWith(".thrift");
   }
 
-  protected abstract void run()
-      throws Exception;
+  protected abstract void run() throws Exception;
 
   @Override
-  protected Schema getSchema()
-      throws IOException {
+  protected Schema getSchema() throws IOException {
     try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
       if (controllerRestApi != null) {
         return controllerRestApi.getSchema();
       } else {
         // Schema file could be stored local or remotely.
-        try (InputStream inputStream = FileSystem.get(new Path(_schemaFile).toUri(), getConf())
-            .open(new Path(_schemaFile))) {
+        try (InputStream inputStream =
+            FileSystem.get(new Path(_schemaFile).toUri(), getConf()).open(new Path(_schemaFile))) {
           return Schema.fromInputSteam(inputStream);
         }
       }

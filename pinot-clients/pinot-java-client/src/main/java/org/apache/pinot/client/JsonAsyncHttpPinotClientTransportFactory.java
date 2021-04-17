@@ -20,6 +20,7 @@ package org.apache.pinot.client;
 
 import java.util.Map;
 
+
 /**
  * Pinot client transport factory for JSON encoded BrokerResults through HTTP.
  */

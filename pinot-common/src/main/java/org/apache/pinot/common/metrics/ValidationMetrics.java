@@ -233,7 +233,7 @@ public class ValidationMetrics {
 
   @VisibleForTesting
   public long getValueOfGauge(final String fullGaugeName) {
-    Long value  = _gaugeValues.get(fullGaugeName);
+    Long value = _gaugeValues.get(fullGaugeName);
     if (value == null) {
       return 0;
     }

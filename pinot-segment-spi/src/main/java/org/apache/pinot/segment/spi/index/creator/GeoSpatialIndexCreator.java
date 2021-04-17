@@ -31,12 +31,10 @@ public interface GeoSpatialIndexCreator extends Closeable {
   /**
    * Adds the next geospatial value.
    */
-  void add(Geometry geometry)
-      throws IOException;
+  void add(Geometry geometry) throws IOException;
 
   /**
    * Seals the index and flushes it to disk.
    */
-  void seal()
-      throws IOException;
+  void seal() throws IOException;
 }

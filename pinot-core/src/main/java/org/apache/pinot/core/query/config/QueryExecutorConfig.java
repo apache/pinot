@@ -51,8 +51,7 @@ public class QueryExecutorConfig {
     _timeOutMs = _queryExecutorConfig.getProperty(TIME_OUT, -1);
   }
 
-  private void checkRequiredKeys()
-      throws ConfigurationException {
+  private void checkRequiredKeys() throws ConfigurationException {
     for (String keyString : REQUIRED_KEYS) {
       if (!_queryExecutorConfig.containsKey(keyString)) {
         throw new ConfigurationException("Cannot find required key : " + keyString);

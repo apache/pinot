@@ -55,7 +55,8 @@ public class StopProcessCommand extends AbstractBaseAdminCommand implements Comm
   @Option(name = "-kafka", required = false, usage = "Stop the Kafka process.")
   private boolean _kafka = false;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Stop the PinotServer.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Stop the PinotServer.")
   private boolean _help = false;
 
   public StopProcessCommand() {
@@ -91,8 +92,7 @@ public class StopProcessCommand extends AbstractBaseAdminCommand implements Comm
   }
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
     LOGGER.info("Executing command: " + toString());
 
     Map<String, String> processes = new HashMap<String, String>();
@@ -212,8 +212,7 @@ public class StopProcessCommand extends AbstractBaseAdminCommand implements Comm
 
   }
 
-  private boolean stopProcess(String fileName)
-      throws IOException {
+  private boolean stopProcess(String fileName) throws IOException {
     File file = new File(fileName);
     FileReader reader = new FileReader(file);
     int pid = reader.read();

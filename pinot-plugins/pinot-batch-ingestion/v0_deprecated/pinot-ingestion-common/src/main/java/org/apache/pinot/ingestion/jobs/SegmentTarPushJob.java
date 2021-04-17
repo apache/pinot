@@ -45,8 +45,8 @@ public class SegmentTarPushJob extends BaseSegmentJob {
     super(properties);
     _segmentPattern = Preconditions.checkNotNull(properties.getProperty(JobConfigConstants.PATH_TO_OUTPUT),
         String.format("Config: %s is missing in job property file.", JobConfigConstants.PATH_TO_OUTPUT));
-    String[] hosts = StringUtils.split(Preconditions
-        .checkNotNull(properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS),
+    String[] hosts =
+        StringUtils.split(Preconditions.checkNotNull(properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS),
             String.format("Config: %s is missing in job property file.", JobConfigConstants.PUSH_TO_HOSTS)), ',');
     int port = Integer.parseInt(Preconditions.checkNotNull(properties.getProperty(JobConfigConstants.PUSH_TO_PORT),
         String.format("Config: %s is missing in job property file.", JobConfigConstants.PUSH_TO_PORT)));
@@ -61,8 +61,7 @@ public class SegmentTarPushJob extends BaseSegmentJob {
     return fileName.endsWith(JobConfigConstants.TAR_GZ_FILE_EXT);
   }
 
-  public void run()
-      throws Exception {
+  public void run() throws Exception {
     FileSystem fileSystem = FileSystem.get(new Path(_segmentPattern).toUri(), getConf());
     List<Path> segmentsToPush = getDataFilePaths(_segmentPattern);
     try (ControllerRestApi controllerRestApi = getControllerRestApi()) {

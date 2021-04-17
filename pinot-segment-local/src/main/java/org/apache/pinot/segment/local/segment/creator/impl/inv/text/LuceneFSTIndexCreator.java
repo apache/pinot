@@ -53,8 +53,7 @@ public class LuceneFSTIndexCreator implements TextIndexCreator {
    * @param sortedEntries Sorted entries of the unique values of the column.
    * @throws IOException
    */
-  public LuceneFSTIndexCreator(File indexDir, String columnName, String[] sortedEntries)
-      throws IOException {
+  public LuceneFSTIndexCreator(File indexDir, String columnName, String[] sortedEntries) throws IOException {
     _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.FST_INDEX_FILE_EXTENSION);
 
     _fstBuilder = new FSTBuilder();
@@ -78,8 +77,7 @@ public class LuceneFSTIndexCreator implements TextIndexCreator {
   }
 
   @Override
-  public void seal()
-      throws IOException {
+  public void seal() throws IOException {
     LOGGER.info("Sealing FST index: " + _fstIndexFile.getAbsolutePath());
     FileOutputStream fileOutputStream = null;
     try {
@@ -95,7 +93,6 @@ public class LuceneFSTIndexCreator implements TextIndexCreator {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
   }
 }

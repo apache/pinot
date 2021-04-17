@@ -76,8 +76,7 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     // The parent setUp() sets up Zookeeper, Kafka, controller, broker and servers
     super.setUp();
 
@@ -87,8 +86,7 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
   }
 
   @Test
-  public void testConvertToRawIndexTask()
-      throws Exception {
+  public void testConvertToRawIndexTask() throws Exception {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
 
     File testDataDir = new File(CommonConstants.Server.DEFAULT_INSTANCE_DATA_DIR + "-0", offlineTableName);
@@ -132,8 +130,8 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
       for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : _helixResourceManager
           .getOfflineSegmentMetadata(offlineTableName)) {
         Map<String, String> customMap = offlineSegmentZKMetadata.getCustomMap();
-        if (customMap == null || customMap.size() != 1 || !customMap
-            .containsKey(ConvertToRawIndexTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX)) {
+        if (customMap == null || customMap.size() != 1
+            || !customMap.containsKey(ConvertToRawIndexTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX)) {
           return false;
         }
       }
@@ -195,8 +193,7 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     stopMinion();
 
     super.tearDown();

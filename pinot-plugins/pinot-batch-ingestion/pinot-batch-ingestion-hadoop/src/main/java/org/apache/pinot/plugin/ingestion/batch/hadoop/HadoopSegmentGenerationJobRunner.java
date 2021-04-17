@@ -115,8 +115,8 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
         throw new RuntimeException("Missing property 'schemaURI' in 'tableSpec'");
       }
       PinotClusterSpec pinotClusterSpec = _spec.getPinotClusterSpecs()[0];
-      String schemaURI = SegmentGenerationUtils
-          .generateSchemaURI(pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
+      String schemaURI = SegmentGenerationUtils.generateSchemaURI(pinotClusterSpec.getControllerURI(),
+          _spec.getTableSpec().getTableName());
       _spec.getTableSpec().setSchemaURI(schemaURI);
     }
     if (_spec.getTableSpec().getTableConfigURI() == null) {
@@ -124,8 +124,8 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
         throw new RuntimeException("Missing property 'tableConfigURI' in 'tableSpec'");
       }
       PinotClusterSpec pinotClusterSpec = _spec.getPinotClusterSpecs()[0];
-      String tableConfigURI = SegmentGenerationUtils
-          .generateTableConfigURI(pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
+      String tableConfigURI = SegmentGenerationUtils.generateTableConfigURI(pinotClusterSpec.getControllerURI(),
+          _spec.getTableSpec().getTableName());
       _spec.getTableSpec().setTableConfigURI(tableConfigURI);
     }
     if (_spec.getExecutionFrameworkSpec().getExtraConfigs() == null) {
@@ -134,8 +134,7 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
   }
 
   @Override
-  public void run()
-      throws Exception {
+  public void run() throws Exception {
     //init all file systems
     List<PinotFSSpec> pinotFSSpecs = _spec.getPinotFSSpecs();
     for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
@@ -165,8 +164,8 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
       stagingDirURI = new File(stagingDir).toURI();
     }
     if (!outputDirURI.getScheme().equals(stagingDirURI.getScheme())) {
-      throw new RuntimeException(String
-          .format("The scheme of staging directory URI [%s] and output directory URI [%s] has to be same.",
+      throw new RuntimeException(
+          String.format("The scheme of staging directory URI [%s] and output directory URI [%s] has to be same.",
               stagingDirURI, outputDirURI));
     }
     if (outputDirFS.exists(stagingDirURI)) {
@@ -212,8 +211,8 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
 
     int numDataFiles = filteredFiles.size();
     if (numDataFiles == 0) {
-      String errorMessage = String
-          .format("No data file founded in [%s], with include file pattern: [%s] and exclude file  pattern [%s]",
+      String errorMessage =
+          String.format("No data file founded in [%s], with include file pattern: [%s] and exclude file  pattern [%s]",
               _spec.getInputDirURI(), _spec.getIncludeFileNamePattern(), _spec.getExcludeFileNamePattern());
       LOGGER.error(errorMessage);
       throw new RuntimeException(errorMessage);
@@ -232,8 +231,8 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
           List<String> siblingFiles = localDirIndex.get(parentPath);
           Collections.sort(siblingFiles);
           for (int i = 0; i < siblingFiles.size(); i++) {
-            URI inputFileURI = SegmentGenerationUtils
-                .getFileURI(siblingFiles.get(i), SegmentGenerationUtils.getDirectoryURI(parentPath));
+            URI inputFileURI = SegmentGenerationUtils.getFileURI(siblingFiles.get(i),
+                SegmentGenerationUtils.getDirectoryURI(parentPath));
             createInputFileUriAndSeqIdFile(inputFileURI, outputDirFS, stagingInputDir, i);
           }
         }
@@ -381,8 +380,7 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
    * @param stagingDirURI
    * @throws Exception
    */
-  protected void addMapperJarToDistributedCache(Job job, PinotFS outputDirFS, URI stagingDirURI)
-      throws Exception {
+  protected void addMapperJarToDistributedCache(Job job, PinotFS outputDirFS, URI stagingDirURI) throws Exception {
     File ourJar = new File(getClass().getProtectionDomain().getCodeSource().getLocation().toURI());
     Path distributedCacheJar = new Path(stagingDirURI.toString(), ourJar.getName());
     outputDirFS.copyFromLocalFile(ourJar, distributedCacheJar.toUri());

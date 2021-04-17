@@ -75,8 +75,7 @@ public class OnHeapDictionariesTest {
   private IndexSegment _onHeapSegment;
 
   @BeforeClass
-  public void setup()
-      throws Exception {
+  public void setup() throws Exception {
     Schema schema = buildSchema();
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
@@ -94,8 +93,7 @@ public class OnHeapDictionariesTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     FileUtils.deleteDirectory(new File(SEGMENT_DIR_NAME));
   }
 

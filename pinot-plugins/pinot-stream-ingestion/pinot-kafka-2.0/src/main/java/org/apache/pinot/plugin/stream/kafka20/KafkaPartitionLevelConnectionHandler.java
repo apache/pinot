@@ -64,8 +64,7 @@ public abstract class KafkaPartitionLevelConnectionHandler {
     _consumer.assign(Collections.singletonList(_topicPartition));
   }
 
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _consumer.close();
   }
 

@@ -188,13 +188,11 @@ public class FilterPlanNode implements PlanNode {
               // similar to that of FSTBasedEvaluator, else use regular flow of getting predicate evaluator.
               PredicateEvaluator evaluator;
               if (dataSource.getFSTIndex() != null) {
-                evaluator = FSTBasedRegexpPredicateEvaluatorFactory
-                    .newFSTBasedEvaluator(dataSource.getFSTIndex(), dataSource.getDictionary(),
-                        ((RegexpLikePredicate) predicate).getValue());
+                evaluator = FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator(dataSource.getFSTIndex(),
+                    dataSource.getDictionary(), ((RegexpLikePredicate) predicate).getValue());
               } else if (dataSource instanceof MutableDataSource && ((MutableDataSource) dataSource).isFSTEnabled()) {
-                evaluator = FSTBasedRegexpPredicateEvaluatorFactory
-                    .newAutomatonBasedEvaluator(dataSource.getDictionary(),
-                        ((RegexpLikePredicate) predicate).getValue());
+                evaluator = FSTBasedRegexpPredicateEvaluatorFactory.newAutomatonBasedEvaluator(
+                    dataSource.getDictionary(), ((RegexpLikePredicate) predicate).getValue());
               } else {
                 evaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
                     dataSource.getDataSourceMetadata().getDataType());
@@ -202,8 +200,8 @@ public class FilterPlanNode implements PlanNode {
               return FilterOperatorUtils.getLeafFilterOperator(evaluator, dataSource, _numDocs);
             case JSON_MATCH:
               JsonIndexReader jsonIndex = dataSource.getJsonIndex();
-              Preconditions
-                  .checkState(jsonIndex != null, "Cannot apply JSON_MATCH on column: %s without json index", column);
+              Preconditions.checkState(jsonIndex != null, "Cannot apply JSON_MATCH on column: %s without json index",
+                  column);
               return new JsonMatchFilterOperator(jsonIndex, ((JsonMatchPredicate) predicate).getValue(), _numDocs);
             case IS_NULL:
               NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
@@ -220,9 +218,8 @@ public class FilterPlanNode implements PlanNode {
                 return new MatchAllFilterOperator(_numDocs);
               }
             default:
-              PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider
-                  .getPredicateEvaluator(predicate, dataSource.getDictionary(),
-                      dataSource.getDataSourceMetadata().getDataType());
+              PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate,
+                  dataSource.getDictionary(), dataSource.getDataSourceMetadata().getDataType());
               return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, _numDocs);
           }
         }

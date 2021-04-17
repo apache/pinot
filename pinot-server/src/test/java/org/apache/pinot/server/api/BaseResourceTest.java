@@ -85,8 +85,7 @@ public abstract class BaseResourceTest {
 
   @SuppressWarnings("SuspiciousMethodCalls")
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
     Assert.assertTrue(INDEX_DIR.mkdirs());
     URL resourceUrl = getClass().getClassLoader().getResource(AVRO_DATA_PATH);
@@ -123,12 +122,11 @@ public abstract class BaseResourceTest {
     setUpSegment(offlineTableName, null, "default", _offlineIndexSegments);
 
     _adminApiApplication = new AdminApiApplication(serverInstance, new AllowAllAccessFactory());
-    _adminApiApplication.start(Collections.singletonList(
-        new ListenerConfig(CommonConstants.HTTP_PROTOCOL, "0.0.0.0", CommonConstants.Server.DEFAULT_ADMIN_API_PORT,
-            CommonConstants.HTTP_PROTOCOL, new TlsConfig())));
+    _adminApiApplication.start(Collections.singletonList(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, "0.0.0.0",
+        CommonConstants.Server.DEFAULT_ADMIN_API_PORT, CommonConstants.HTTP_PROTOCOL, new TlsConfig())));
 
-    _webTarget = ClientBuilder.newClient()
-        .target(String.format("http://%s:%d", NetUtils.getHostAddress(), CommonConstants.Server.DEFAULT_ADMIN_API_PORT));
+    _webTarget = ClientBuilder.newClient().target(
+        String.format("http://%s:%d", NetUtils.getHostAddress(), CommonConstants.Server.DEFAULT_ADMIN_API_PORT));
   }
 
   @AfterClass
@@ -144,8 +142,7 @@ public abstract class BaseResourceTest {
   }
 
   protected List<ImmutableSegment> setUpSegments(String tableNameWithType, int numSegments,
-      List<ImmutableSegment> segments)
-      throws Exception {
+      List<ImmutableSegment> segments) throws Exception {
     List<ImmutableSegment> immutableSegments = new ArrayList<>();
     for (int i = 0; i < numSegments; i++) {
       immutableSegments
@@ -155,8 +152,7 @@ public abstract class BaseResourceTest {
   }
 
   protected ImmutableSegment setUpSegment(String tableNameWithType, String segmentName, String segmentNamePostfix,
-      List<ImmutableSegment> segments)
-      throws Exception {
+      List<ImmutableSegment> segments) throws Exception {
     SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(_avroFile, INDEX_DIR, tableNameWithType);
     config.setSegmentName(segmentName);
@@ -179,9 +175,8 @@ public abstract class BaseResourceTest {
     // NOTE: Use OfflineTableDataManager for both OFFLINE and REALTIME table because RealtimeTableDataManager requires
     //       table config.
     TableDataManager tableDataManager = new OfflineTableDataManager();
-    tableDataManager
-        .init(tableDataManagerConfig, "testInstance", mock(ZkHelixPropertyStore.class), mock(ServerMetrics.class),
-            mock(HelixManager.class));
+    tableDataManager.init(tableDataManagerConfig, "testInstance", mock(ZkHelixPropertyStore.class),
+        mock(ServerMetrics.class), mock(HelixManager.class));
     tableDataManager.start();
     _tableDataManagerMap.put(tableNameWithType, tableDataManager);
   }

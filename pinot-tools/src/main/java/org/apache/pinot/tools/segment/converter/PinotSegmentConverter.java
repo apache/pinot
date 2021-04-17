@@ -25,6 +25,5 @@ public interface PinotSegmentConverter {
    *
    * @throws Exception
    */
-  void convert()
-      throws Exception;
+  void convert() throws Exception;
 }

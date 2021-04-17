@@ -188,7 +188,7 @@ public class BrokerRequestComparisonUtils {
       }
     }
     return true;
-}
+  }
 
   private static boolean validateGroupBy(GroupBy groupBy1, GroupBy groupBy2) {
     if (groupBy1.getTopN() != groupBy2.getTopN()) {
@@ -225,15 +225,15 @@ public class BrokerRequestComparisonUtils {
       for (int i = 0; i < s1.getSelectionSortSequence().size(); i++) {
         if (!s1.getSelectionSortSequence().get(i).getColumn()
             .equals(s2.getSelectionSortSequence().get(i).getColumn())) {
-          LOGGER
-              .error("Failed to validate Selections: SelectionSortSequence Column at idx {} doesn't match.\n\t{}\n\t{}",
-                  i, s1, s2);
+          LOGGER.error(
+              "Failed to validate Selections: SelectionSortSequence Column at idx {} doesn't match.\n\t{}\n\t{}", i, s1,
+              s2);
           return false;
         }
         if (s1.getSelectionSortSequence().get(i).isIsAsc() != s2.getSelectionSortSequence().get(i).isIsAsc()) {
-          LOGGER
-              .error("Failed to validate Selections: SelectionSortSequence isAsc at idx {} doesn't match.\n\t{}\n\t{}",
-                  i, s1, s2);
+          LOGGER.error(
+              "Failed to validate Selections: SelectionSortSequence isAsc at idx {} doesn't match.\n\t{}\n\t{}", i, s1,
+              s2);
           return false;
         }
       }

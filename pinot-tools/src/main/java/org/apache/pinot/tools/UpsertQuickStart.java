@@ -39,14 +39,12 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
 public class UpsertQuickStart {
   private StreamDataServerStartable _kafkaStarter;
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     PluginManager.get().init();
     new UpsertQuickStart().execute();
   }
 
-  public void execute()
-      throws Exception {
+  public void execute() throws Exception {
     File quickstartTmpDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
     File bootstrapTableDir = new File(quickstartTmpDir, "meetupRsvp");
     File dataDir = new File(bootstrapTableDir, "data");

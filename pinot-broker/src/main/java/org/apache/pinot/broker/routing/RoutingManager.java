@@ -157,15 +157,15 @@ public class RoutingManager implements ClusterChangeHandler {
             }
             IdealState idealState = getIdealState(tableNameWithType);
             if (idealState == null) {
-              LOGGER
-                  .warn("Failed to find ideal state for table: {}, skipping updating routing entry", tableNameWithType);
+              LOGGER.warn("Failed to find ideal state for table: {}, skipping updating routing entry",
+                  tableNameWithType);
               continue;
             }
             routingEntry.onExternalViewChange(externalView, idealState);
           } catch (Exception e) {
-            LOGGER
-                .error("Caught unexpected exception while updating routing entry on external view change for table: {}",
-                    tableNameWithType, e);
+            LOGGER.error(
+                "Caught unexpected exception while updating routing entry on external view change for table: {}",
+                tableNameWithType, e);
           }
         }
       }
@@ -206,9 +206,9 @@ public class RoutingManager implements ClusterChangeHandler {
     LOGGER.info("Processing instance config change");
     long startTimeMs = System.currentTimeMillis();
 
-    List<ZNRecord> instanceConfigZNRecords = _zkDataAccessor
-        .getChildren(_instanceConfigsPath, null, AccessOption.PERSISTENT, CommonConstants.Helix.ZkClient.RETRY_COUNT,
-            CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
+    List<ZNRecord> instanceConfigZNRecords =
+        _zkDataAccessor.getChildren(_instanceConfigsPath, null, AccessOption.PERSISTENT,
+            CommonConstants.Helix.ZkClient.RETRY_COUNT, CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
     long fetchInstanceConfigsEndTimeMs = System.currentTimeMillis();
 
     // Calculate new enabled and disabled instances
@@ -271,8 +271,8 @@ public class RoutingManager implements ClusterChangeHandler {
   }
 
   private static boolean isInstanceEnabled(ZNRecord instanceConfigZNRecord) {
-    if ("false"
-        .equalsIgnoreCase(instanceConfigZNRecord.getSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_ENABLED.name()))) {
+    if ("false".equalsIgnoreCase(
+        instanceConfigZNRecord.getSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_ENABLED.name()))) {
       return false;
     }
     if ("true".equalsIgnoreCase(instanceConfigZNRecord.getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS))) {
@@ -343,16 +343,16 @@ public class RoutingManager implements ClusterChangeHandler {
         // NOTE: Add time boundary manager to the offline part before adding the routing for the real-time part to
         // ensure no overlapping data getting queried
         TableConfig offlineTableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, offlineTableName);
-        Preconditions
-            .checkState(offlineTableConfig != null, "Failed to find table config for table: %s", offlineTableName);
+        Preconditions.checkState(offlineTableConfig != null, "Failed to find table config for table: %s",
+            offlineTableName);
         // NOTE: External view might be null for new created tables. In such case, create an empty one.
         ExternalView offlineTableExternalView = getExternalView(offlineTableName);
         if (offlineTableExternalView == null) {
           offlineTableExternalView = new ExternalView(offlineTableName);
         }
         IdealState offlineTableIdealState = getIdealState(offlineTableName);
-        Preconditions
-            .checkState(offlineTableIdealState != null, "Failed to find ideal state for table: %s", offlineTableName);
+        Preconditions.checkState(offlineTableIdealState != null, "Failed to find ideal state for table: %s",
+            offlineTableName);
         Set<String> offlineTableOnlineSegments = getOnlineSegments(offlineTableIdealState);
         SegmentPreSelector offlineTableSegmentPreSelector =
             SegmentPreSelectorFactory.getSegmentPreSelector(offlineTableConfig, _propertyStore);
@@ -360,8 +360,8 @@ public class RoutingManager implements ClusterChangeHandler {
             offlineTableSegmentPreSelector.preSelect(offlineTableOnlineSegments);
         TimeBoundaryManager offlineTableTimeBoundaryManager =
             new TimeBoundaryManager(offlineTableConfig, _propertyStore);
-        offlineTableTimeBoundaryManager
-            .init(offlineTableExternalView, offlineTableIdealState, offlineTablePreSelectedOnlineSegments);
+        offlineTableTimeBoundaryManager.init(offlineTableExternalView, offlineTableIdealState,
+            offlineTablePreSelectedOnlineSegments);
         offlineTableRoutingEntry.setTimeBoundaryManager(offlineTableTimeBoundaryManager);
       }
     }
@@ -369,9 +369,8 @@ public class RoutingManager implements ClusterChangeHandler {
     QueryConfig queryConfig = tableConfig.getQueryConfig();
     Long queryTimeoutMs = queryConfig != null ? queryConfig.getTimeoutMs() : null;
 
-    RoutingEntry routingEntry =
-        new RoutingEntry(tableNameWithType, segmentPreSelector, segmentSelector, segmentPruners, instanceSelector,
-            externalViewVersion, timeBoundaryManager, queryTimeoutMs);
+    RoutingEntry routingEntry = new RoutingEntry(tableNameWithType, segmentPreSelector, segmentSelector, segmentPruners,
+        instanceSelector, externalViewVersion, timeBoundaryManager, queryTimeoutMs);
     if (_routingEntryMap.put(tableNameWithType, routingEntry) == null) {
       LOGGER.info("Built routing for table: {}", tableNameWithType);
     } else {
@@ -387,8 +386,8 @@ public class RoutingManager implements ClusterChangeHandler {
     Set<String> onlineSegments = new HashSet<>(HashUtil.getHashMapCapacity(segmentAssignment.size()));
     for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
       Map<String, String> instanceStateMap = entry.getValue();
-      if (instanceStateMap.containsValue(SegmentStateModel.ONLINE) || instanceStateMap
-          .containsValue(SegmentStateModel.CONSUMING)) {
+      if (instanceStateMap.containsValue(SegmentStateModel.ONLINE)
+          || instanceStateMap.containsValue(SegmentStateModel.CONSUMING)) {
         onlineSegments.add(entry.getKey());
       }
     }

@@ -61,9 +61,8 @@ public class NormalizedDateSegmentNameGeneratorTest {
 
   @Test
   public void testWithUntrimmedSegmentNamePrefix() {
-    SegmentNameGenerator segmentNameGenerator =
-        new NormalizedDateSegmentNameGenerator(TABLE_NAME, SEGMENT_NAME_PREFIX + "  ", false, REFRESH_PUSH_TYPE, null,
-            null);
+    SegmentNameGenerator segmentNameGenerator = new NormalizedDateSegmentNameGenerator(TABLE_NAME,
+        SEGMENT_NAME_PREFIX + "  ", false, REFRESH_PUSH_TYPE, null, null);
     assertEquals(segmentNameGenerator.toString(),
         "NormalizedDateSegmentNameGenerator: segmentNamePrefix=myTable_daily, appendPushType=false");
     assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null), "myTable_daily");
@@ -92,9 +91,8 @@ public class NormalizedDateSegmentNameGeneratorTest {
 
   @Test
   public void testAppend() {
-    SegmentNameGenerator segmentNameGenerator =
-        new NormalizedDateSegmentNameGenerator(TABLE_NAME, null, false, APPEND_PUSH_TYPE, DAILY_PUSH_FREQUENCY,
-            new DateTimeFormatSpec(1, TimeUnit.DAYS.toString(), EPOCH_TIME_FORMAT));
+    SegmentNameGenerator segmentNameGenerator = new NormalizedDateSegmentNameGenerator(TABLE_NAME, null, false,
+        APPEND_PUSH_TYPE, DAILY_PUSH_FREQUENCY, new DateTimeFormatSpec(1, TimeUnit.DAYS.toString(), EPOCH_TIME_FORMAT));
     assertEquals(segmentNameGenerator.toString(),
         "NormalizedDateSegmentNameGenerator: segmentNamePrefix=myTable, appendPushType=true, outputSDF=yyyy-MM-dd, inputTimeUnit=DAYS");
     assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, 1L, 3L),

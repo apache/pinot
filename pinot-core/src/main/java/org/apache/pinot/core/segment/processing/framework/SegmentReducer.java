@@ -75,15 +75,13 @@ public class SegmentReducer {
    * Reads the avro files in the input directory.
    * Performs configured operations and outputs to other avro file(s) in the reducer output directory.
    */
-  public void reduce()
-      throws Exception {
+  public void reduce() throws Exception {
 
     int part = 0;
     for (File inputFile : _reducerInputDir.listFiles()) {
 
-      RecordReader avroRecordReader = RecordReaderFactory
-          .getRecordReaderByClass("org.apache.pinot.plugin.inputformat.avro.AvroRecordReader", inputFile,
-              _pinotSchema.getColumnNames(), null);
+      RecordReader avroRecordReader = RecordReaderFactory.getRecordReaderByClass(
+          "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader", inputFile, _pinotSchema.getColumnNames(), null);
 
       while (avroRecordReader.hasNext()) {
         GenericRow next = avroRecordReader.next();
@@ -108,8 +106,7 @@ public class SegmentReducer {
   /**
    * Flushes all records from the collector into a part files in the reducer output directory
    */
-  private void flushRecords(Collector collector, String fileName)
-      throws IOException {
+  private void flushRecords(Collector collector, String fileName) throws IOException {
     GenericData.Record reusableRecord = new GenericData.Record(_avroSchema);
     Iterator<GenericRow> collectionIt = collector.iterator();
     DataFileWriter<GenericData.Record> recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema));

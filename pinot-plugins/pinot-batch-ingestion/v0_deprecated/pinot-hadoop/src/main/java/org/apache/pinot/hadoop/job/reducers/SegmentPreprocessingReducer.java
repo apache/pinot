@@ -33,7 +33,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class SegmentPreprocessingReducer<T> extends Reducer<T, AvroValue<GenericRecord>, AvroKey<GenericRecord>, NullWritable> {
+public class SegmentPreprocessingReducer<T>
+    extends Reducer<T, AvroValue<GenericRecord>, AvroKey<GenericRecord>, NullWritable> {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPreprocessingReducer.class);
 
   private AvroMultipleOutputs _multipleOutputs;
@@ -64,8 +65,7 @@ public class SegmentPreprocessingReducer<T> extends Reducer<T, AvroValue<Generic
   }
 
   @Override
-  public void cleanup(Context context)
-      throws IOException, InterruptedException {
+  public void cleanup(Context context) throws IOException, InterruptedException {
     LOGGER.info("Clean up reducer.");
     if (_multipleOutputs != null) {
       _multipleOutputs.close();

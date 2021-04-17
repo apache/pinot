@@ -114,8 +114,7 @@ public class StUnionQueriesTest extends BaseQueriesTest {
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
     int hashMapCapacity = HashUtil.getHashMapCapacity(MAX_VALUE);
     _values = new HashMap<>(hashMapCapacity);
@@ -171,9 +170,8 @@ public class StUnionQueriesTest extends BaseQueriesTest {
     String[] expectedResults = new String[1];
     expectedResults[0] = BytesUtils.toHexString(_expectedResults);
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 4 * NUM_RECORDS, 4 * NUM_RECORDS,
-            expectedResults);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 4 * NUM_RECORDS,
+        4 * NUM_RECORDS, expectedResults);
   }
 
   @Test
@@ -203,10 +201,11 @@ public class StUnionQueriesTest extends BaseQueriesTest {
     assertEquals(resultTable.getDataSchema(), expectedDataSchema);
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 1);
-    assertEquals(rows.get(0), new Object[]{ScalarFunctions.stAsText(_expectedResults), BytesUtils.toHexString(
-        ScalarFunctions.toGeometry(_expectedResults)), BytesUtils.toHexString(
-        ScalarFunctions.toSphericalGeography(_expectedResults)), ScalarFunctions.stAsText(
-        ScalarFunctions.toSphericalGeography(_expectedResults))});
+    assertEquals(rows.get(0),
+        new Object[]{ScalarFunctions.stAsText(_expectedResults), BytesUtils
+            .toHexString(ScalarFunctions.toGeometry(_expectedResults)), BytesUtils
+                .toHexString(ScalarFunctions.toSphericalGeography(_expectedResults)), ScalarFunctions
+                    .stAsText(ScalarFunctions.toSphericalGeography(_expectedResults))});
   }
 
   @Test
@@ -238,9 +237,8 @@ public class StUnionQueriesTest extends BaseQueriesTest {
     Operator operator = getOperatorForPqlQuery(query);
     assertTrue(operator instanceof AggregationGroupByOperator);
     IntermediateResultsBlock resultsBlock = ((AggregationGroupByOperator) operator).nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, 2 * NUM_RECORDS,
-            NUM_RECORDS);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0,
+        2 * NUM_RECORDS, NUM_RECORDS);
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     assertNotNull(aggregationGroupByResult);
     int numGroups = 0;
@@ -280,8 +278,7 @@ public class StUnionQueriesTest extends BaseQueriesTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     FileUtils.deleteDirectory(INDEX_DIR);
     _indexSegment.destroy();
   }

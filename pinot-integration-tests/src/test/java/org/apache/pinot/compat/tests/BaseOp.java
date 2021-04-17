@@ -22,16 +22,10 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 
-@JsonTypeInfo(
-    use = JsonTypeInfo.Id.NAME,
-    include = JsonTypeInfo.As.PROPERTY,
-    property = "type")
-@JsonSubTypes({
-    @JsonSubTypes.Type(value = SegmentOp.class, name = "segmentOp"),
-    @JsonSubTypes.Type(value = TableOp.class, name = "tableOp"),
-    @JsonSubTypes.Type(value = QueryOp.class, name = "queryOp"),
-    @JsonSubTypes.Type(value = StreamOp.class, name = "streamOp")
-})
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
+@JsonSubTypes({@JsonSubTypes.Type(value = SegmentOp.class, name = "segmentOp"), @JsonSubTypes.Type(
+    value = TableOp.class, name = "tableOp"), @JsonSubTypes.Type(value = QueryOp.class,
+        name = "queryOp"), @JsonSubTypes.Type(value = StreamOp.class, name = "streamOp")})
 public abstract class BaseOp {
   enum OpType {
     TABLE_OP,
@@ -65,7 +59,7 @@ public abstract class BaseOp {
     return _description;
   }
 
-  public  boolean run(int generationNumber) {
+  public boolean run(int generationNumber) {
     System.out.println("Running OpType " + _opType.toString() + ": " + getDescription());
     return runOp(generationNumber);
   }

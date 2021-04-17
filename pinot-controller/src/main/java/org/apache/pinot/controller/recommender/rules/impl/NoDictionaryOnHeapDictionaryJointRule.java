@@ -86,8 +86,7 @@ public class NoDictionaryOnHeapDictionaryJointRule extends AbstractRule {
     // Exclude cols already having index
     noDictCols.removeAll(_output.getIndexConfig().getInvertedIndexColumns());
     noDictCols.remove(_output.getIndexConfig().getSortedColumn());
-    noDictCols.removeAll(_output.getIndexConfig()
-        .getRangeIndexColumns()); // TODO: Remove this after range index is implemented for no-dictionary
+    noDictCols.removeAll(_output.getIndexConfig().getRangeIndexColumns()); // TODO: Remove this after range index is implemented for no-dictionary
     LOGGER.debug("noDictCols {}", noDictCols);
 
     // Exclude MV cols TODO: currently no index column is only applicable for SV columns, change this after it's supported for MV
@@ -99,8 +98,7 @@ public class NoDictionaryOnHeapDictionaryJointRule extends AbstractRule {
     // does not match with any value in the dictionary]
     noDictCols.removeIf(colName -> {
       double filterGroupByFreq = filterGroupByWeights.getOrDefault(colName, 0d) / totalWeight.get();
-      return filterGroupByFreq
-          > _params.THRESHOLD_MIN_FILTER_FREQ_DICTIONARY; // THRESHOLD_MIN_FILTER_FREQ_DICTIONARY is default to 0
+      return filterGroupByFreq > _params.THRESHOLD_MIN_FILTER_FREQ_DICTIONARY; // THRESHOLD_MIN_FILTER_FREQ_DICTIONARY is default to 0
     });
 
     LOGGER.debug("filterGroupByWeights {}, selectionWeights{}, totalWeight{} ", filterGroupByWeights, selectionWeights,
@@ -145,7 +143,8 @@ public class NoDictionaryOnHeapDictionaryJointRule extends AbstractRule {
       }
 
       noDictSize = numRecordsPerPush * svColRawSizePerDoc;
-      withDictSize = numRecordsPerPush * dictionaryEncodedForwardIndexSize + dictionarySize * _params.DICTIONARY_COEFFICIENT;
+      withDictSize =
+          numRecordsPerPush * dictionaryEncodedForwardIndexSize + dictionarySize * _params.DICTIONARY_COEFFICIENT;
 
       double storageSaved = (noDictSize - withDictSize) / noDictSize;
       LOGGER.debug("colName {}, noDictSize {}, withDictSize{}, storageSaved{}", colName, noDictSize, withDictSize,
@@ -164,7 +163,7 @@ public class NoDictionaryOnHeapDictionaryJointRule extends AbstractRule {
         {
           long dictionarySize = _input.getDictionarySize(colName);
           double filterGroupByFreq = filterGroupByWeights.getOrDefault(colName, 0d) / totalWeight.get();
-          if (filterGroupByFreq > _params.THRESHOLD_MIN_FILTER_FREQ_ON_HEAP  //frequently used in filter/group by
+          if (filterGroupByFreq > _params.THRESHOLD_MIN_FILTER_FREQ_ON_HEAP //frequently used in filter/group by
               && dictionarySize < _params.THRESHOLD_MAX_DICTIONARY_SIZE_ON_HEAP) { // memory foot print < threshold
             _output.getIndexConfig().getOnHeapDictionaryColumns().add(colName);
           }

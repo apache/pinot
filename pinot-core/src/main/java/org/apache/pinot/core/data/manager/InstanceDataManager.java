@@ -62,33 +62,28 @@ public interface InstanceDataManager {
   /**
    * Adds a segment from local disk into an OFFLINE table.
    */
-  void addOfflineSegment(String offlineTableName, String segmentName, File indexDir)
-      throws Exception;
+  void addOfflineSegment(String offlineTableName, String segmentName, File indexDir) throws Exception;
 
   /**
    * Adds a segment into an REALTIME table.
    * <p>The segment might be committed or under consuming.
    */
-  void addRealtimeSegment(String realtimeTableName, String segmentName)
-      throws Exception;
+  void addRealtimeSegment(String realtimeTableName, String segmentName) throws Exception;
 
   /**
    * Removes a segment from a table.
    */
-  void removeSegment(String tableNameWithType, String segmentName)
-      throws Exception;
+  void removeSegment(String tableNameWithType, String segmentName) throws Exception;
 
   /**
    * Reloads a segment in a table.
    */
-  void reloadSegment(String tableNameWithType, String segmentName)
-      throws Exception;
+  void reloadSegment(String tableNameWithType, String segmentName) throws Exception;
 
   /**
    * Reloads all segment in a table.
    */
-  void reloadAllSegments(String tableNameWithType)
-      throws Exception;
+  void reloadAllSegments(String tableNameWithType) throws Exception;
 
   /**
    * Returns all tables served by the instance.

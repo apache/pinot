@@ -117,9 +117,9 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
     properties.put(ControllerConf.CONTROLLER_PORT, DEFAULT_CONTROLLER_PORT + 1);
     ControllerStarter secondDualModeController = getControllerStarter(new ControllerConf(properties));
     secondDualModeController.start();
-    TestUtils
-        .waitForCondition(aVoid -> secondDualModeController.getHelixResourceManager().getHelixZkManager().isConnected(),
-            TIMEOUT_IN_MS, "Failed to start the second dual-mode controller");
+    TestUtils.waitForCondition(
+        aVoid -> secondDualModeController.getHelixResourceManager().getHelixZkManager().isConnected(), TIMEOUT_IN_MS,
+        "Failed to start the second dual-mode controller");
     // There should still be only one MASTER instance for each partition
     checkInstanceState(_helixAdmin);
 
@@ -129,10 +129,10 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
     // Either one of the controllers is the only leader for a given table name.
     TestUtils.waitForCondition(aVoid -> {
       boolean result;
-      result = firstLeadControllerManager.isLeaderForTable(firstTableName) ^ secondLeadControllerManager
-          .isLeaderForTable(firstTableName);
-      result &= firstLeadControllerManager.isLeaderForTable(secondTableName) ^ secondLeadControllerManager
-          .isLeaderForTable(secondTableName);
+      result = firstLeadControllerManager.isLeaderForTable(firstTableName)
+          ^ secondLeadControllerManager.isLeaderForTable(firstTableName);
+      result &= firstLeadControllerManager.isLeaderForTable(secondTableName)
+          ^ secondLeadControllerManager.isLeaderForTable(secondTableName);
       return result;
     }, TIMEOUT_IN_MS, "Either one of the controllers is the only leader for a given table");
 
@@ -154,9 +154,8 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
     }, TIMEOUT_IN_MS, "No one should be the partition leader for tables");
 
     ZkClient zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR);
-    TestUtils
-        .waitForCondition(aVoid -> !zkClient.exists("/" + getHelixClusterName() + "/CONTROLLER/LEADER"), TIMEOUT_IN_MS,
-            "No cluster leader should be shown in Helix cluster");
+    TestUtils.waitForCondition(aVoid -> !zkClient.exists("/" + getHelixClusterName() + "/CONTROLLER/LEADER"),
+        TIMEOUT_IN_MS, "No cluster leader should be shown in Helix cluster");
     zkClient.close();
 
     properties = getDefaultControllerConfiguration();
@@ -168,9 +167,9 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
     PinotHelixResourceManager pinotHelixResourceManager = thirdDualModeController.getHelixResourceManager();
     _helixManager = pinotHelixResourceManager.getHelixZkManager();
     _helixAdmin = _helixManager.getClusterManagmentTool();
-    TestUtils
-        .waitForCondition(aVoid -> thirdDualModeController.getHelixResourceManager().getHelixZkManager().isConnected(),
-            TIMEOUT_IN_MS, "Failed to start the 3rd dual-mode controller");
+    TestUtils.waitForCondition(
+        aVoid -> thirdDualModeController.getHelixResourceManager().getHelixZkManager().isConnected(), TIMEOUT_IN_MS,
+        "Failed to start the 3rd dual-mode controller");
     // There should still be only one MASTER instance for each partition
     checkInstanceState(_helixAdmin);
 
@@ -189,9 +188,9 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
 
     // After disabling lead controller resource, helix leader should be the leader for both tables.
     TestUtils.waitForCondition(
-        aVoid -> thirdLeadControllerManager.isLeaderForTable(firstTableName) && thirdLeadControllerManager
-            .isLeaderForTable(secondTableName), TIMEOUT_IN_MS,
-        "The 3rd controller should be the leader for both tables, which is the Helix leader.");
+        aVoid -> thirdLeadControllerManager.isLeaderForTable(firstTableName)
+            && thirdLeadControllerManager.isLeaderForTable(secondTableName),
+        TIMEOUT_IN_MS, "The 3rd controller should be the leader for both tables, which is the Helix leader.");
 
     // Stop the 3rd controller
     thirdDualModeController.stop();

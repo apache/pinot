@@ -134,8 +134,7 @@ public class DictionaryToRawIndexConverter {
    * @return True if successful, False otherwise
    * @throws Exception
    */
-  public boolean convert()
-      throws Exception {
+  public boolean convert() throws Exception {
     if (_help) {
       printUsage();
       return true;
@@ -248,8 +247,8 @@ public class DictionaryToRawIndexConverter {
     PropertiesConfiguration properties = new PropertiesConfiguration(metadataFile);
 
     if (tableName != null) {
-      properties
-          .setProperty(V1Constants.MetadataKeys.Segment.TABLE_NAME, TableNameBuilder.extractRawTableName(tableName));
+      properties.setProperty(V1Constants.MetadataKeys.Segment.TABLE_NAME,
+          TableNameBuilder.extractRawTableName(tableName));
     }
 
     for (String column : columns) {
@@ -285,8 +284,7 @@ public class DictionaryToRawIndexConverter {
    * @param newSegment Directory where raw index to be written
    * @throws IOException
    */
-  private void convertOneColumn(IndexSegment segment, String column, File newSegment)
-      throws IOException {
+  private void convertOneColumn(IndexSegment segment, String column, File newSegment) throws IOException {
     DataSource dataSource = segment.getDataSource(column);
     ForwardIndexReader reader = dataSource.getForwardIndex();
     Dictionary dictionary = dataSource.getDictionary();
@@ -307,9 +305,10 @@ public class DictionaryToRawIndexConverter {
     int numDocs = segment.getSegmentMetadata().getTotalDocs();
     int lengthOfLongestEntry = (dataType == FieldSpec.DataType.STRING) ? getLengthOfLongestEntry(dictionary) : -1;
 
-    try (ForwardIndexCreator rawIndexCreator = SegmentColumnarIndexCreator
-        .getRawIndexCreatorForColumn(newSegment, compressionType, column, dataType, numDocs, lengthOfLongestEntry,
-            false, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
+    try (
+        ForwardIndexCreator rawIndexCreator =
+            SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(newSegment, compressionType, column, dataType,
+                numDocs, lengthOfLongestEntry, false, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
         ForwardIndexReaderContext readerContext = reader.createContext()) {
       switch (dataType) {
         case INT:
@@ -390,8 +389,7 @@ public class DictionaryToRawIndexConverter {
    * @param args Arguments for the converter
    * @throws Exception
    */
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     DictionaryToRawIndexConverter converter = new DictionaryToRawIndexConverter();
     CmdLineParser parser = new CmdLineParser(converter);
     parser.parseArgument(args);

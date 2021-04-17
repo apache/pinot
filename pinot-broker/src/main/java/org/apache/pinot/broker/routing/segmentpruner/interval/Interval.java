@@ -50,8 +50,8 @@ public class Interval implements Comparable<Interval> {
       return -1;
     } else if (_max > o._max) {
       return 1;
-    }
-    else return 0;
+    } else
+      return 0;
   }
 
   @Override

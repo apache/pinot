@@ -70,7 +70,8 @@ public class PinotServiceManagerInstanceResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/instances")
   @ApiOperation(value = "Get Pinot Instances Status")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Instance Status"), @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Instance Status"), @ApiResponse(code = 500,
+      message = "Internal server error")})
   public Map<String, PinotInstanceStatus> getPinotAllInstancesStatus() {
     Map<String, PinotInstanceStatus> results = new HashMap<>();
     for (String instanceId : _pinotServiceManager.getRunningInstanceIds()) {
@@ -83,7 +84,8 @@ public class PinotServiceManagerInstanceResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/instances/{instanceName}")
   @ApiOperation(value = "Get Pinot Instance Status")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Instance Status"), @ApiResponse(code = 404, message = "Instance Not Found"), @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Instance Status"), @ApiResponse(code = 404,
+      message = "Instance Not Found"), @ApiResponse(code = 500, message = "Internal server error")})
   public PinotInstanceStatus getPinotInstanceStatus(
       @ApiParam(value = "Name of the instance") @PathParam("instanceName") String instanceName) {
     List<String> instanceIds = _pinotServiceManager.getRunningInstanceIds();
@@ -98,7 +100,8 @@ public class PinotServiceManagerInstanceResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/instances/{instanceName}")
   @ApiOperation(value = "Stop a Pinot Instance")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Pinot Instance is Stopped"), @ApiResponse(code = 404, message = "Instance Not Found"), @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Pinot Instance is Stopped"), @ApiResponse(code = 404,
+      message = "Instance Not Found"), @ApiResponse(code = 500, message = "Internal server error")})
   public Response stopPinotInstance(
       @ApiParam(value = "Name of the instance") @PathParam("instanceName") String instanceName) {
     List<String> instanceIds = _pinotServiceManager.getRunningInstanceIds();
@@ -118,9 +121,12 @@ public class PinotServiceManagerInstanceResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/instances/{role}")
   @ApiOperation(value = "Start a Pinot instance")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Pinot instance is started"), @ApiResponse(code = 400, message = "Bad Request"), @ApiResponse(code = 404, message = "Pinot Role Not Found"), @ApiResponse(code = 500, message = "Internal Server Error")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Pinot instance is started"), @ApiResponse(code = 400,
+      message = "Bad Request"), @ApiResponse(code = 404,
+          message = "Pinot Role Not Found"), @ApiResponse(code = 500, message = "Internal Server Error")})
   public PinotInstanceStatus startPinotInstance(
-      @ApiParam(value = "A Role of Pinot Instance to start: CONTROLLER/BROKER/SERVER/MINION") @PathParam("role") String role,
+      @ApiParam(
+          value = "A Role of Pinot Instance to start: CONTROLLER/BROKER/SERVER/MINION") @PathParam("role") String role,
       @ApiParam(value = "true|false") @QueryParam("autoMode") boolean autoMode, String confStr) {
     ServiceRole serviceRole;
     try {

@@ -55,8 +55,7 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
   private static final String JOB_FILE = "ingestionJobSpec.yaml";
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     startZk();
     startController();
     startBroker();
@@ -65,8 +64,7 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
   }
 
   @AfterClass(alwaysRun = true)
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     stopMinion();
     stopServer();
     stopBroker();
@@ -95,8 +93,7 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
   }
 
   @Test
-  public void testBrokerNoAuth()
-      throws Exception {
+  public void testBrokerNoAuth() throws Exception {
     JsonNode response =
         JsonUtils.stringToJsonNode(sendPostRequest("http://localhost:18099/query/sql", "{\"sql\":\"SELECT now()\"}"));
     Assert.assertFalse(response.has("resultTable"), "must not return result table");
@@ -104,8 +101,7 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
   }
 
   @Test
-  public void testBroker()
-      throws Exception {
+  public void testBroker() throws Exception {
     JsonNode response = JsonUtils.stringToJsonNode(
         sendPostRequest("http://localhost:18099/query/sql", "{\"sql\":\"SELECT now()\"}", AUTH_HEADER));
     Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "LONG",
@@ -114,15 +110,13 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
   }
 
   @Test
-  public void testControllerGetTables()
-      throws Exception {
+  public void testControllerGetTables() throws Exception {
     JsonNode response = JsonUtils.stringToJsonNode(sendGetRequest("http://localhost:18998/tables", AUTH_HEADER));
     Assert.assertTrue(response.get("tables").isArray(), "must return table array");
   }
 
   @Test
-  public void testControllerGetTablesNoAuth()
-      throws Exception {
+  public void testControllerGetTablesNoAuth() throws Exception {
     try {
       // NOTE: the endpoint is protected implicitly (without annotation) by BasicAuthAccessControlFactory
       sendGetRequest("http://localhost:18998/tables");
@@ -133,8 +127,7 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
   }
 
   @Test
-  public void testIngestionBatch()
-      throws Exception {
+  public void testIngestionBatch() throws Exception {
     File quickstartTmpDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
     FileUtils.forceDeleteOnExit(quickstartTmpDir);
 
@@ -162,9 +155,8 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
     Thread.sleep(5000);
 
     // admin with full access
-    JsonNode response = JsonUtils.stringToJsonNode(
-        sendPostRequest("http://localhost:18099/query/sql", "{\"sql\":\"SELECT count(*) FROM baseballStats\"}",
-            AUTH_HEADER));
+    JsonNode response = JsonUtils.stringToJsonNode(sendPostRequest("http://localhost:18099/query/sql",
+        "{\"sql\":\"SELECT count(*) FROM baseballStats\"}", AUTH_HEADER));
     Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "LONG",
         "must return result with LONG value");
     Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "count(*)",
@@ -174,9 +166,8 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
     Assert.assertTrue(response.get("exceptions").isEmpty(), "must not return exception");
 
     // user with valid auth but no table access
-    JsonNode responseUser = JsonUtils.stringToJsonNode(
-        sendPostRequest("http://localhost:18099/query/sql", "{\"sql\":\"SELECT count(*) FROM baseballStats\"}",
-            AUTH_HEADER_USER));
+    JsonNode responseUser = JsonUtils.stringToJsonNode(sendPostRequest("http://localhost:18099/query/sql",
+        "{\"sql\":\"SELECT count(*) FROM baseballStats\"}", AUTH_HEADER_USER));
     Assert.assertFalse(responseUser.has("resultTable"), "must not return result table");
     Assert.assertTrue(responseUser.get("exceptions").get(0).get("errorCode").asInt() != 0, "must return error code");
   }

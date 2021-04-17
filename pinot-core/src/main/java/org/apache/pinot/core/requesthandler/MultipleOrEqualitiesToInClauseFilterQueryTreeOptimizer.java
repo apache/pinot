@@ -162,7 +162,7 @@ public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer extends Filt
    *
    * a = 1 OR b = 2 OR c > 20 -- two equality and one other operator
    * nothing needs to be rewritten
-
+  
    * a IN (1) OR b IN (2) OR c > 20 -- two IN operators and one other operators
    * both IN operators can be rewritten to EQUALITY and other operator need not
    * be rewritten
@@ -192,7 +192,8 @@ public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer extends Filt
 
     // Collect all equality/in operators and non-equality operators
     // these are the immediate children of root OR operator
-    boolean rewriteINEQChildrenOfORRootOperator = collectChildOperatorsOfRootOROperator(filterQueryTree, columnToInEqPredicateValues, nonEqInOperators);
+    boolean rewriteINEQChildrenOfORRootOperator =
+        collectChildOperatorsOfRootOROperator(filterQueryTree, columnToInEqPredicateValues, nonEqInOperators);
 
     if (columnToInEqPredicateValues.size() == 1 && nonEqInOperators.isEmpty()) {
       // We can eliminate the OR root node if there is exactly one unique column with one or more
@@ -314,7 +315,8 @@ public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer extends Filt
   private FilterQueryTree rebuildFilterPredicate(Map<String, Set<String>> columnToInEqPredicateValues) {
     ArrayList<FilterQueryTree> newChildren = new ArrayList<>();
     for (Map.Entry<String, Set<String>> columnAndPredicate : columnToInEqPredicateValues.entrySet()) {
-      newChildren.add(buildFilterQueryTreeForColumnAndPredicateInfo(columnAndPredicate.getKey(), columnAndPredicate.getValue()));
+      newChildren.add(
+          buildFilterQueryTreeForColumnAndPredicateInfo(columnAndPredicate.getKey(), columnAndPredicate.getValue()));
     }
     return new FilterQueryTree(null, null, FilterOperator.OR, newChildren);
   }

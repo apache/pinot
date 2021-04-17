@@ -114,9 +114,9 @@ public class RangePredicate implements Predicate {
       return false;
     }
     RangePredicate that = (RangePredicate) o;
-    return _lowerInclusive == that._lowerInclusive && _upperInclusive == that._upperInclusive && Objects
-        .equals(_lhs, that._lhs) && Objects.equals(_lowerBound, that._lowerBound) && Objects
-        .equals(_upperBound, that._upperBound);
+    return _lowerInclusive == that._lowerInclusive && _upperInclusive == that._upperInclusive
+        && Objects.equals(_lhs, that._lhs) && Objects.equals(_lowerBound, that._lowerBound)
+        && Objects.equals(_upperBound, that._upperBound);
   }
 
   @Override
@@ -135,7 +135,7 @@ public class RangePredicate implements Predicate {
     if (_lowerInclusive && _upperInclusive) {
       return _lhs + " BETWEEN '" + _lowerBound + "' AND '" + _upperBound + '\'';
     }
-    return "(" + _lhs + (_lowerInclusive ? " >= '" : " > '") + _lowerBound + "' AND " + _lhs + (_upperInclusive
-        ? " <= '" : " < '") + _upperBound + "')";
+    return "(" + _lhs + (_lowerInclusive ? " >= '" : " > '") + _lowerBound + "' AND " + _lhs
+        + (_upperInclusive ? " <= '" : " < '") + _upperBound + "')";
   }
 }

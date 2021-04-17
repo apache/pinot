@@ -63,7 +63,8 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
   @Option(name = "-schemaFile", required = true, metaVar = "<string>", usage = "File containing schema for data.")
   private String _schemaFile = null;
 
-  @Option(name = "-schemaAnnotationFile", required = false, metaVar = "<string>", usage = "File containing dim/metrics for columns.")
+  @Option(name = "-schemaAnnotationFile", required = false, metaVar = "<string>",
+      usage = "File containing dim/metrics for columns.")
   private String _schemaAnnFile;
 
   @Option(name = "-outDir", required = true, metaVar = "<string>", usage = "Directory where data would be generated.")
@@ -72,7 +73,8 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
   @Option(name = "-overwrite", required = false, usage = "Overwrite, if directory exists")
   boolean _overwrite;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   @Option(name = "-format", required = false, help = true, usage = "Output format ('avro' or 'csv').")
@@ -113,8 +115,7 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
   }
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
     LOGGER.info("Executing command: " + toString());
 
     if ((_numRecords < 0) || (_numFiles < 0)) {
@@ -136,9 +137,8 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
 
     buildCardinalityRangeMaps(_schemaAnnFile, cardinality, range, pattern);
 
-    final DataGeneratorSpec spec =
-        buildDataGeneratorSpec(schema, columns, dataTypes, fieldTypes, timeUnits, cardinality, range, pattern,
-            mvCountMap, lengthMap);
+    final DataGeneratorSpec spec = buildDataGeneratorSpec(schema, columns, dataTypes, fieldTypes, timeUnits,
+        cardinality, range, pattern, mvCountMap, lengthMap);
 
     final DataGenerator gen = new DataGenerator();
     gen.init(spec);
@@ -155,8 +155,7 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
   }
 
   private void buildCardinalityRangeMaps(String file, HashMap<String, Integer> cardinality,
-      HashMap<String, IntRange> range, Map<String, Map<String, Object>> pattern)
-      throws IOException {
+      HashMap<String, IntRange> range, Map<String, Map<String, Object>> pattern) throws IOException {
     if (file == null) {
       return; // Nothing to do here.
     }
@@ -178,8 +177,8 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
 
   private DataGeneratorSpec buildDataGeneratorSpec(Schema schema, List<String> columns,
       HashMap<String, DataType> dataTypes, HashMap<String, FieldType> fieldTypes, HashMap<String, TimeUnit> timeUnits,
-      HashMap<String, Integer> cardinality, HashMap<String, IntRange> range, HashMap<String,
-      Map<String, Object>> pattern, Map<String, Double> mvCountMap, Map<String, Integer> lengthMap) {
+      HashMap<String, Integer> cardinality, HashMap<String, IntRange> range,
+      HashMap<String, Map<String, Object>> pattern, Map<String, Double> mvCountMap, Map<String, Integer> lengthMap) {
     for (final FieldSpec fs : schema.getAllFieldSpecs()) {
       String col = fs.getName();
 
@@ -218,12 +217,11 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
       }
     }
 
-    return new DataGeneratorSpec(columns, cardinality, range, pattern, mvCountMap, lengthMap, dataTypes, fieldTypes, timeUnits, FileFormat.AVRO,
-        _outDir, _overwrite);
+    return new DataGeneratorSpec(columns, cardinality, range, pattern, mvCountMap, lengthMap, dataTypes, fieldTypes,
+        timeUnits, FileFormat.AVRO, _outDir, _overwrite);
   }
 
-  public static void main(String[] args)
-      throws IOException {
+  public static void main(String[] args) throws IOException {
     SchemaBuilder schemaBuilder = new SchemaBuilder();
 
     schemaBuilder.addSingleValueDimension("name", DataType.STRING);

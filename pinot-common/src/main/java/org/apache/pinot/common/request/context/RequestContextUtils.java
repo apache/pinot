@@ -111,9 +111,8 @@ public class RequestContextUtils {
       return new FunctionContext(FunctionContext.Type.AGGREGATION, AggregationFunctionType.COUNT.getName(),
           Collections.singletonList(ExpressionContext.forIdentifier("*")));
     }
-    FunctionContext.Type functionType =
-        FunctionDefinitionRegistry.isAggFunc(functionName) ? FunctionContext.Type.AGGREGATION
-            : FunctionContext.Type.TRANSFORM;
+    FunctionContext.Type functionType = FunctionDefinitionRegistry.isAggFunc(functionName)
+        ? FunctionContext.Type.AGGREGATION : FunctionContext.Type.TRANSFORM;
     List<Expression> operands = thriftFunction.getOperands();
     if (operands != null) {
       List<ExpressionContext> arguments = new ArrayList<>(operands.size());
@@ -136,9 +135,8 @@ public class RequestContextUtils {
       return new FunctionContext(FunctionContext.Type.AGGREGATION, AggregationFunctionType.COUNT.getName(),
           Collections.singletonList(ExpressionContext.forIdentifier("*")));
     }
-    FunctionContext.Type functionType =
-        FunctionDefinitionRegistry.isAggFunc(functionName) ? FunctionContext.Type.AGGREGATION
-            : FunctionContext.Type.TRANSFORM;
+    FunctionContext.Type functionType = FunctionDefinitionRegistry.isAggFunc(functionName)
+        ? FunctionContext.Type.AGGREGATION : FunctionContext.Type.TRANSFORM;
     List<? extends AstNode> children = astNode.getChildren();
     if (children != null) {
       List<ExpressionContext> arguments = new ArrayList<>(children.size());
@@ -195,25 +193,20 @@ public class RequestContextUtils {
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new NotInPredicate(getExpression(operands.get(0)), values));
       case GREATER_THAN:
-        return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new RangePredicate(getExpression(operands.get(0)), false, getStringValue(operands.get(1)), false,
-                RangePredicate.UNBOUNDED));
+        return new FilterContext(FilterContext.Type.PREDICATE, null, new RangePredicate(getExpression(operands.get(0)),
+            false, getStringValue(operands.get(1)), false, RangePredicate.UNBOUNDED));
       case GREATER_THAN_OR_EQUAL:
-        return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new RangePredicate(getExpression(operands.get(0)), true, getStringValue(operands.get(1)), false,
-                RangePredicate.UNBOUNDED));
+        return new FilterContext(FilterContext.Type.PREDICATE, null, new RangePredicate(getExpression(operands.get(0)),
+            true, getStringValue(operands.get(1)), false, RangePredicate.UNBOUNDED));
       case LESS_THAN:
-        return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new RangePredicate(getExpression(operands.get(0)), false, RangePredicate.UNBOUNDED, false,
-                getStringValue(operands.get(1))));
+        return new FilterContext(FilterContext.Type.PREDICATE, null, new RangePredicate(getExpression(operands.get(0)),
+            false, RangePredicate.UNBOUNDED, false, getStringValue(operands.get(1))));
       case LESS_THAN_OR_EQUAL:
-        return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new RangePredicate(getExpression(operands.get(0)), false, RangePredicate.UNBOUNDED, true,
-                getStringValue(operands.get(1))));
+        return new FilterContext(FilterContext.Type.PREDICATE, null, new RangePredicate(getExpression(operands.get(0)),
+            false, RangePredicate.UNBOUNDED, true, getStringValue(operands.get(1))));
       case BETWEEN:
-        return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new RangePredicate(getExpression(operands.get(0)), true, getStringValue(operands.get(1)), true,
-                getStringValue(operands.get(2))));
+        return new FilterContext(FilterContext.Type.PREDICATE, null, new RangePredicate(getExpression(operands.get(0)),
+            true, getStringValue(operands.get(1)), true, getStringValue(operands.get(2))));
       case RANGE:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new RangePredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));

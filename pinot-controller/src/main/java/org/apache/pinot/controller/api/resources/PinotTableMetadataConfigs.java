@@ -54,7 +54,8 @@ public class PinotTableMetadataConfigs {
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update table metadata", notes = "Updates table configuration")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"), @ApiResponse(code = 404, message = "Table not found")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500,
+      message = "Internal server error"), @ApiResponse(code = 404, message = "Table not found")})
   public SuccessResponse updateTableMetadata(@PathParam("tableName") String tableName, String tableConfigString) {
     TableConfig tableConfig;
     try {

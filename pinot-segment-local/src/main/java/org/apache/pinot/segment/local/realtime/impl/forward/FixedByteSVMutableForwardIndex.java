@@ -192,8 +192,7 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     for (WriterWithOffset writer : _writers) {
       writer.close();
     }
@@ -206,9 +205,8 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
     LOGGER.info("Allocating {} bytes for: {}", _chunkSizeInBytes, _allocationContext);
     // NOTE: PinotDataBuffer is tracked in the PinotDataBufferMemoryManager. No need to track it inside the class.
     PinotDataBuffer buffer = _memoryManager.allocate(_chunkSizeInBytes, _allocationContext);
-    _writers.add(
-        new WriterWithOffset(new FixedByteSingleValueMultiColWriter(buffer, /*cols=*/1, new int[]{_valueSizeInBytes}),
-            _capacityInRows));
+    _writers.add(new WriterWithOffset(
+        new FixedByteSingleValueMultiColWriter(buffer, /*cols=*/1, new int[]{_valueSizeInBytes}), _capacityInRows));
     _readers.add(new ReaderWithOffset(
         new FixedByteSingleValueMultiColReader(buffer, _numRowsPerChunk, new int[]{_valueSizeInBytes}),
         _capacityInRows));
@@ -239,8 +237,7 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
     }
 
     @Override
-    public void close()
-        throws IOException {
+    public void close() throws IOException {
       _writer.close();
     }
 
@@ -274,8 +271,7 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
     }
 
     @Override
-    public void close()
-        throws IOException {
+    public void close() throws IOException {
       _reader.close();
     }
 

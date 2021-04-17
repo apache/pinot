@@ -119,8 +119,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    *
    * @throws Exception
    */
-  public void testHardcodedQueries()
-      throws Exception {
+  public void testHardcodedQueries() throws Exception {
     // Here are some sample queries.
     String query;
     query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16312 AND Carrier = 'DL'";
@@ -162,8 +161,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    * TODO: Selection queries, Aggregation Group By queries, Order By, Distinct
    *  This list is very basic right now (aggregations only) and needs to be enriched
    */
-  public void testHardcodedSqlQueries()
-      throws Exception {
+  public void testHardcodedSqlQueries() throws Exception {
     String query;
     List<String> h2queries;
     query = "SELECT COUNT(*) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
@@ -286,7 +284,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     }
 
     // Escape quotes
-    query = "SELECT DistanceGroup FROM mytable WHERE DATE_TIME_CONVERT(DaysSinceEpoch, '1:DAYS:EPOCH', '1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd''T''HH:mm:ss.SSS''Z''', '1:DAYS') = '2014-09-05T00:00:00.000Z'";
+    query =
+        "SELECT DistanceGroup FROM mytable WHERE DATE_TIME_CONVERT(DaysSinceEpoch, '1:DAYS:EPOCH', '1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd''T''HH:mm:ss.SSS''Z''', '1:DAYS') = '2014-09-05T00:00:00.000Z'";
     h2queries = Collections.singletonList("SELECT DistanceGroup FROM mytable WHERE DaysSinceEpoch = 16318 LIMIT 10000");
     testSqlQuery(query, h2queries);
   }
@@ -294,8 +293,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   /**
    * Test hardcoded queries on server partitioned data (all the segments for a partition is served by a single server).
    */
-  public void testHardcodedServerPartitionedSqlQueries()
-      throws Exception {
+  public void testHardcodedServerPartitionedSqlQueries() throws Exception {
     // IN_PARTITIONED_SUBQUERY
     {
       String inPartitionedSubqueryQuery =
@@ -317,8 +315,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    *
    * @throws Exception
    */
-  public void testBrokerResponseMetadata()
-      throws Exception {
+  public void testBrokerResponseMetadata() throws Exception {
     String[] pqlQueries = new String[]{ //
         "SELECT count(*) FROM mytable", // matching query
         "SELECT count(*) FROM mytable where non_existing_column='non_existing_value", // query that does not match any row
@@ -357,8 +354,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    *
    * @throws Exception
    */
-  public void testQueriesFromQueryFile()
-      throws Exception {
+  public void testQueriesFromQueryFile() throws Exception {
     URL resourceUrl = BaseClusterIntegrationTestSet.class.getClassLoader().getResource(getQueryFileName());
     assertNotNull(resourceUrl);
     File queryFile = new File(resourceUrl.getFile());
@@ -388,8 +384,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   /**
    * Test random SQL queries from the query file.
    */
-  public void testSqlQueriesFromQueryFile()
-      throws Exception {
+  public void testSqlQueriesFromQueryFile() throws Exception {
     URL resourceUrl = BaseClusterIntegrationTestSet.class.getClassLoader().getResource(getSqlQueryFileName());
     assertNotNull(resourceUrl);
     File queryFile = new File(resourceUrl.getFile());
@@ -430,8 +425,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    *
    * @throws Exception
    */
-  public void testGeneratedQueriesWithoutMultiValues()
-      throws Exception {
+  public void testGeneratedQueriesWithoutMultiValues() throws Exception {
     testGeneratedQueries(false);
   }
 
@@ -440,13 +434,11 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    *
    * @throws Exception
    */
-  public void testGeneratedQueriesWithMultiValues()
-      throws Exception {
+  public void testGeneratedQueriesWithMultiValues() throws Exception {
     testGeneratedQueries(true);
   }
 
-  private void testGeneratedQueries(boolean withMultiValues)
-      throws Exception {
+  private void testGeneratedQueries(boolean withMultiValues) throws Exception {
     QueryGenerator queryGenerator = getQueryGenerator();
     queryGenerator.setSkipMultiValuePredicates(!withMultiValues);
     int numQueriesToGenerate = getNumQueriesToGenerate();
@@ -461,16 +453,14 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    *
    * @throws Exception
    */
-  public void testQueryExceptions()
-      throws Exception {
+  public void testQueryExceptions() throws Exception {
     testQueryException("POTATO");
     testQueryException("SELECT COUNT(*) FROM potato");
     testQueryException("SELECT POTATO(ArrTime) FROM mytable");
     testQueryException("SELECT COUNT(*) FROM mytable where ArrTime = 'potato'");
   }
 
-  private void testQueryException(String query)
-      throws Exception {
+  private void testQueryException(String query) throws Exception {
     JsonNode jsonObject = postQuery(query);
     assertTrue(jsonObject.get("exceptions").size() > 0);
   }
@@ -480,8 +470,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    *
    * @throws Exception
    */
-  public void testInstanceShutdown()
-      throws Exception {
+  public void testInstanceShutdown() throws Exception {
     List<String> instances = _helixAdmin.getInstancesInCluster(getHelixClusterName());
     assertFalse(instances.isEmpty(), "List of instances should not be empty");
 
@@ -579,8 +568,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    * TODO: Support removing new added columns for MutableSegment and remove the new added columns before running the
    *       next test. Use this to replace {@link OfflineClusterIntegrationTest#testDefaultColumns()}.
    */
-  public void testReload(boolean includeOfflineTable)
-      throws Exception {
+  public void testReload(boolean includeOfflineTable) throws Exception {
     String rawTableName = getTableName();
     Schema schema = getSchema();
 

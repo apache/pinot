@@ -128,9 +128,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     try {
       _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
     } catch (IOException | ClassNotFoundException e) {
-      _logger
-          .error("Error reading history object for table {} from {}", _tableNameWithType, statsFile.getAbsolutePath(),
-              e);
+      _logger.error("Error reading history object for table {} from {}", _tableNameWithType,
+          statsFile.getAbsolutePath(), e);
       File savedFile = new File(_tableDataDir, STATS_FILE_NAME + "." + UUID.randomUUID());
       try {
         FileUtils.moveFile(statsFile, savedFile);
@@ -300,11 +299,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       // The segment is uploaded to an upsert enabled realtime table. Download the segment and load.
       Preconditions.checkArgument(realtimeSegmentZKMetadata instanceof LLCRealtimeSegmentZKMetadata,
           "Upload segment is not LLC segment");
-      String downURL = ((LLCRealtimeSegmentZKMetadata)realtimeSegmentZKMetadata).getDownloadUrl();
+      String downURL = ((LLCRealtimeSegmentZKMetadata) realtimeSegmentZKMetadata).getDownloadUrl();
       Preconditions.checkNotNull(downURL, "Upload segment metadata has no download url");
       downloadSegmentFromDeepStore(segmentName, indexLoadingConfig, downURL);
-      _logger.info("Downloaded, untarred and add segment {} of table {} from {}", segmentName, tableConfig.getTableName(),
-          downURL);
+      _logger.info("Downloaded, untarred and add segment {} of table {} from {}", segmentName,
+          tableConfig.getTableName(), downURL);
       return;
     }
 
@@ -327,17 +326,15 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
       int partitionGroupId = llcSegmentName.getPartitionGroupId();
       Semaphore semaphore = _partitionGroupIdToSemaphoreMap.computeIfAbsent(partitionGroupId, k -> new Semaphore(1));
-      PartitionUpsertMetadataManager partitionUpsertMetadataManager =
-          _tableUpsertMetadataManager != null ? _tableUpsertMetadataManager
-              .getOrCreatePartitionManager(partitionGroupId) : null;
+      PartitionUpsertMetadataManager partitionUpsertMetadataManager = _tableUpsertMetadataManager != null
+          ? _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionGroupId) : null;
       segmentDataManager =
           new LLRealtimeSegmentDataManager(realtimeSegmentZKMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
               indexLoadingConfig, schema, llcSegmentName, semaphore, _serverMetrics, partitionUpsertMetadataManager);
     } else {
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(_propertyStore, _instanceId);
-      segmentDataManager =
-          new HLRealtimeSegmentDataManager(realtimeSegmentZKMetadata, tableConfig, instanceZKMetadata, this,
-              _indexDir.getAbsolutePath(), indexLoadingConfig, schema, _serverMetrics);
+      segmentDataManager = new HLRealtimeSegmentDataManager(realtimeSegmentZKMetadata, tableConfig, instanceZKMetadata,
+          this, _indexDir.getAbsolutePath(), indexLoadingConfig, schema, _serverMetrics);
     }
 
     _logger.info("Initialized RealtimeSegmentDataManager - " + segmentName);
@@ -361,8 +358,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     columnToReaderMap.put(_timeColumnName, new PinotSegmentColumnReader(immutableSegment, _timeColumnName));
     int numTotalDocs = immutableSegment.getSegmentMetadata().getTotalDocs();
     String segmentName = immutableSegment.getSegmentName();
-    int partitionGroupId = SegmentUtils
-        .getRealtimeSegmentPartitionId(segmentName, this.getTableName(), _helixManager, _primaryKeyColumns.get(0));
+    int partitionGroupId = SegmentUtils.getRealtimeSegmentPartitionId(segmentName, this.getTableName(), _helixManager,
+        _primaryKeyColumns.get(0));
     PartitionUpsertMetadataManager partitionUpsertMetadataManager =
         _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionGroupId);
     int numPrimaryKeyColumns = _primaryKeyColumns.size();
@@ -460,9 +457,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   private boolean isPeerSegmentDownloadEnabled(TableConfig tableConfig) {
-    return
-        CommonConstants.HTTP_PROTOCOL.equalsIgnoreCase(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme())
-            || CommonConstants.HTTPS_PROTOCOL
+    return CommonConstants.HTTP_PROTOCOL
+        .equalsIgnoreCase(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme())
+        || CommonConstants.HTTPS_PROTOCOL
             .equalsIgnoreCase(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme());
   }
 

@@ -57,10 +57,12 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
   @Option(name = "-config", metaVar = "<string>", usage = "Cluster config to operate.")
   private String _config;
 
-  @Option(name = "-operation", required = true, metaVar = "<string>", usage = "Operation to take for Cluster config, currently support GET/ADD/UPDATE/DELETE.")
+  @Option(name = "-operation", required = true, metaVar = "<string>",
+      usage = "Operation to take for Cluster config, currently support GET/ADD/UPDATE/DELETE.")
   private String _operation;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -75,9 +77,8 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
 
   @Override
   public String toString() {
-    String toString =
-        "Operate ClusterConfig -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
-            + " -controllerPort " + _controllerPort + " -operation " + _operation;
+    String toString = "Operate ClusterConfig -controllerProtocol " + _controllerProtocol + " -controllerHost "
+        + _controllerHost + " -controllerPort " + _controllerPort + " -operation " + _operation;
     if (_config != null) {
       toString += " -config " + _config;
     }
@@ -134,8 +135,7 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
     return this;
   }
 
-  public String run()
-      throws Exception {
+  public String run() throws Exception {
     if (_controllerHost == null) {
       _controllerHost = NetUtils.getHostAddress();
     }
@@ -175,8 +175,7 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
   }
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
     String result = run();
     LOGGER.info(result);
     return true;

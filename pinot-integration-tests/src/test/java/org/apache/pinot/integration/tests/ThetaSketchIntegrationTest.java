@@ -58,8 +58,7 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
   private static final String THETA_SKETCH = "thetaSketchCol";
 
   @BeforeClass
-  public void setup()
-      throws Exception {
+  public void setup() throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster
@@ -90,7 +89,7 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
   protected long getCountStarResult() {
     /*
     Uploaded table content:
-
+    
     row#  dimName  dimValue  shardId  thetaSketchCol
     ----  =======  ========  =======  ==============
     1     Course   Math      1        ...
@@ -108,11 +107,10 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Test
-  public void testThetaSketchQuery()
-      throws Exception {
+  public void testThetaSketchQuery() throws Exception {
     /*
     Original data:
-
+    
     Gender    Course   Shard#1  Shard#2
     --------  -------  -------  -------
     Female    Math     50       110
@@ -217,8 +215,7 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
     }
   }
 
-  private void runAndAssert(String query, int expected)
-      throws Exception {
+  private void runAndAssert(String query, int expected) throws Exception {
 
     // pql
     JsonNode jsonNode = postQuery(query);
@@ -231,8 +228,7 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
     assertEquals(actual, expected);
   }
 
-  private void runAndAssert(String query, Map<String, Integer> expectedGroupToValueMap)
-      throws Exception {
+  private void runAndAssert(String query, Map<String, Integer> expectedGroupToValueMap) throws Exception {
 
     // pql
     Map<String, Integer> actualGroupToValueMap = new HashMap<>();
@@ -254,8 +250,7 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
     assertEquals(actualGroupToValueMap, expectedGroupToValueMap);
   }
 
-  private File createAvroFile()
-      throws IOException {
+  private File createAvroFile() throws IOException {
 
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
@@ -338,8 +333,7 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     dropOfflineTable(DEFAULT_TABLE_NAME);
 
     stopServer();

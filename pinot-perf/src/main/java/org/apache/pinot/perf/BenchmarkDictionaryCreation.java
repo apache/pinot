@@ -57,8 +57,7 @@ public class BenchmarkDictionaryCreation {
   private final String[] _sortedStrings = new String[CARDINALITY];
 
   @Setup
-  public void setUp()
-      throws IOException {
+  public void setUp() throws IOException {
     FileUtils.forceMkdir(INDEX_DIR);
     for (int i = 0; i < CARDINALITY; i++) {
       _sortedInts[i] = i;
@@ -73,8 +72,7 @@ public class BenchmarkDictionaryCreation {
   @Benchmark
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public int benchmarkIntDictionaryCreation()
-      throws IOException {
+  public int benchmarkIntDictionaryCreation() throws IOException {
     try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_sortedInts, INT_FIELD, INDEX_DIR)) {
       dictionaryCreator.build();
       return dictionaryCreator.indexOfSV(0);
@@ -84,10 +82,9 @@ public class BenchmarkDictionaryCreation {
   @Benchmark
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public int benchmarkLongDictionaryCreation()
-      throws IOException {
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_sortedLongs, LONG_FIELD,
-        INDEX_DIR)) {
+  public int benchmarkLongDictionaryCreation() throws IOException {
+    try (SegmentDictionaryCreator dictionaryCreator =
+        new SegmentDictionaryCreator(_sortedLongs, LONG_FIELD, INDEX_DIR)) {
       dictionaryCreator.build();
       return dictionaryCreator.indexOfSV(0L);
     }
@@ -96,10 +93,9 @@ public class BenchmarkDictionaryCreation {
   @Benchmark
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public int benchmarkFloatDictionaryCreation()
-      throws IOException {
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_sortedFloats, FLOAT_FIELD,
-        INDEX_DIR)) {
+  public int benchmarkFloatDictionaryCreation() throws IOException {
+    try (SegmentDictionaryCreator dictionaryCreator =
+        new SegmentDictionaryCreator(_sortedFloats, FLOAT_FIELD, INDEX_DIR)) {
       dictionaryCreator.build();
       return dictionaryCreator.indexOfSV(0f);
     }
@@ -108,10 +104,9 @@ public class BenchmarkDictionaryCreation {
   @Benchmark
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public int benchmarkDoubleDictionaryCreation()
-      throws IOException {
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_sortedDoubles, DOUBLE_FIELD,
-        INDEX_DIR)) {
+  public int benchmarkDoubleDictionaryCreation() throws IOException {
+    try (SegmentDictionaryCreator dictionaryCreator =
+        new SegmentDictionaryCreator(_sortedDoubles, DOUBLE_FIELD, INDEX_DIR)) {
       dictionaryCreator.build();
       return dictionaryCreator.indexOfSV(0d);
     }
@@ -120,10 +115,9 @@ public class BenchmarkDictionaryCreation {
   @Benchmark
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public int benchmarkStringDictionaryCreation()
-      throws IOException {
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_sortedStrings, STRING_FIELD,
-        INDEX_DIR)) {
+  public int benchmarkStringDictionaryCreation() throws IOException {
+    try (SegmentDictionaryCreator dictionaryCreator =
+        new SegmentDictionaryCreator(_sortedStrings, STRING_FIELD, INDEX_DIR)) {
       dictionaryCreator.build();
       return dictionaryCreator.indexOfSV("0");
     }
@@ -132,8 +126,7 @@ public class BenchmarkDictionaryCreation {
   @Benchmark
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public int benchmarkVarLengthStringDictionaryCreation()
-      throws IOException {
+  public int benchmarkVarLengthStringDictionaryCreation() throws IOException {
     try (SegmentDictionaryCreator dictionaryCreator =
         new SegmentDictionaryCreator(_sortedStrings, STRING_FIELD, INDEX_DIR, true)) {
       dictionaryCreator.build();
@@ -142,13 +135,11 @@ public class BenchmarkDictionaryCreation {
   }
 
   @TearDown
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     FileUtils.forceDelete(INDEX_DIR);
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     Options opt =
         new OptionsBuilder().include(BenchmarkDictionaryCreation.class.getSimpleName()).warmupTime(TimeValue.seconds(5))
             .warmupIterations(2).measurementTime(TimeValue.seconds(5)).measurementIterations(3).forks(1).build();

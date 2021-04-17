@@ -25,24 +25,40 @@
 package org.apache.pinot.plugin.inputformat.thrift;
 
 @SuppressWarnings({"cast", "rawtypes", "serial", "unchecked", "unused"})
-public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, ComplexTypes._Fields>, java.io.Serializable, Cloneable, Comparable<ComplexTypes> {
-  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("ComplexTypes");
+public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, ComplexTypes._Fields>, java.io.Serializable,
+    Cloneable, Comparable<ComplexTypes> {
+  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC =
+      new org.apache.thrift.protocol.TStruct("ComplexTypes");
 
-  private static final org.apache.thrift.protocol.TField INT_FIELD_FIELD_DESC = new org.apache.thrift.protocol.TField("intField", org.apache.thrift.protocol.TType.I32, (short)1);
-  private static final org.apache.thrift.protocol.TField LONG_FIELD_FIELD_DESC = new org.apache.thrift.protocol.TField("longField", org.apache.thrift.protocol.TType.I64, (short)2);
-  private static final org.apache.thrift.protocol.TField BOOLEAN_FIELD_FIELD_DESC = new org.apache.thrift.protocol.TField("booleanField", org.apache.thrift.protocol.TType.BOOL, (short)3);
-  private static final org.apache.thrift.protocol.TField DOUBLE_FIELD_FIELD_DESC = new org.apache.thrift.protocol.TField("doubleField", org.apache.thrift.protocol.TType.DOUBLE, (short)4);
-  private static final org.apache.thrift.protocol.TField STRING_FIELD_FIELD_DESC = new org.apache.thrift.protocol.TField("stringField", org.apache.thrift.protocol.TType.STRING, (short)5);
-  private static final org.apache.thrift.protocol.TField ENUM_FIELD_FIELD_DESC = new org.apache.thrift.protocol.TField("enumField", org.apache.thrift.protocol.TType.I32, (short)6);
-  private static final org.apache.thrift.protocol.TField OPTIONAL_STRING_FIELD_FIELD_DESC = new org.apache.thrift.protocol.TField("optionalStringField", org.apache.thrift.protocol.TType.STRING, (short)7);
-  private static final org.apache.thrift.protocol.TField NESTED_STRUCT_FIELD_FIELD_DESC = new org.apache.thrift.protocol.TField("nestedStructField", org.apache.thrift.protocol.TType.STRUCT, (short)8);
-  private static final org.apache.thrift.protocol.TField SIMPLE_LIST_FIELD_FIELD_DESC = new org.apache.thrift.protocol.TField("simpleListField", org.apache.thrift.protocol.TType.LIST, (short)9);
-  private static final org.apache.thrift.protocol.TField COMPLEX_LIST_FIELD_FIELD_DESC = new org.apache.thrift.protocol.TField("complexListField", org.apache.thrift.protocol.TType.LIST, (short)10);
-  private static final org.apache.thrift.protocol.TField SIMPLE_MAP_FIELD_FIELD_DESC = new org.apache.thrift.protocol.TField("simpleMapField", org.apache.thrift.protocol.TType.MAP, (short)15);
-  private static final org.apache.thrift.protocol.TField COMPLEX_MAP_FIELD_FIELD_DESC = new org.apache.thrift.protocol.TField("complexMapField", org.apache.thrift.protocol.TType.MAP, (short)16);
+  private static final org.apache.thrift.protocol.TField INT_FIELD_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("intField", org.apache.thrift.protocol.TType.I32, (short) 1);
+  private static final org.apache.thrift.protocol.TField LONG_FIELD_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("longField", org.apache.thrift.protocol.TType.I64, (short) 2);
+  private static final org.apache.thrift.protocol.TField BOOLEAN_FIELD_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("booleanField", org.apache.thrift.protocol.TType.BOOL, (short) 3);
+  private static final org.apache.thrift.protocol.TField DOUBLE_FIELD_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("doubleField", org.apache.thrift.protocol.TType.DOUBLE, (short) 4);
+  private static final org.apache.thrift.protocol.TField STRING_FIELD_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("stringField", org.apache.thrift.protocol.TType.STRING, (short) 5);
+  private static final org.apache.thrift.protocol.TField ENUM_FIELD_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("enumField", org.apache.thrift.protocol.TType.I32, (short) 6);
+  private static final org.apache.thrift.protocol.TField OPTIONAL_STRING_FIELD_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("optionalStringField", org.apache.thrift.protocol.TType.STRING, (short) 7);
+  private static final org.apache.thrift.protocol.TField NESTED_STRUCT_FIELD_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("nestedStructField", org.apache.thrift.protocol.TType.STRUCT, (short) 8);
+  private static final org.apache.thrift.protocol.TField SIMPLE_LIST_FIELD_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("simpleListField", org.apache.thrift.protocol.TType.LIST, (short) 9);
+  private static final org.apache.thrift.protocol.TField COMPLEX_LIST_FIELD_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("complexListField", org.apache.thrift.protocol.TType.LIST, (short) 10);
+  private static final org.apache.thrift.protocol.TField SIMPLE_MAP_FIELD_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("simpleMapField", org.apache.thrift.protocol.TType.MAP, (short) 15);
+  private static final org.apache.thrift.protocol.TField COMPLEX_MAP_FIELD_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("complexMapField", org.apache.thrift.protocol.TType.MAP, (short) 16);
 
-  private static final org.apache.thrift.scheme.SchemeFactory STANDARD_SCHEME_FACTORY = new ComplexTypesStandardSchemeFactory();
-  private static final org.apache.thrift.scheme.SchemeFactory TUPLE_SCHEME_FACTORY = new ComplexTypesTupleSchemeFactory();
+  private static final org.apache.thrift.scheme.SchemeFactory STANDARD_SCHEME_FACTORY =
+      new ComplexTypesStandardSchemeFactory();
+  private static final org.apache.thrift.scheme.SchemeFactory TUPLE_SCHEME_FACTORY =
+      new ComplexTypesTupleSchemeFactory();
 
   public int intField; // required
   public long longField; // required
@@ -54,25 +70,26 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
   public @org.apache.thrift.annotation.Nullable NestedType nestedStructField; // required
   public @org.apache.thrift.annotation.Nullable java.util.List<java.lang.String> simpleListField; // required
   public @org.apache.thrift.annotation.Nullable java.util.List<NestedType> complexListField; // required
-  public @org.apache.thrift.annotation.Nullable java.util.Map<java.lang.String,java.lang.Integer> simpleMapField; // required
-  public @org.apache.thrift.annotation.Nullable java.util.Map<java.lang.String,NestedType> complexMapField; // required
+  public @org.apache.thrift.annotation.Nullable java.util.Map<java.lang.String, java.lang.Integer> simpleMapField; // required
+  public @org.apache.thrift.annotation.Nullable java.util.Map<java.lang.String, NestedType> complexMapField; // required
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
-    INT_FIELD((short)1, "intField"),
-    LONG_FIELD((short)2, "longField"),
-    BOOLEAN_FIELD((short)3, "booleanField"),
-    DOUBLE_FIELD((short)4, "doubleField"),
-    STRING_FIELD((short)5, "stringField"),
-    ENUM_FIELD((short)6, "enumField"),
-    OPTIONAL_STRING_FIELD((short)7, "optionalStringField"),
-    NESTED_STRUCT_FIELD((short)8, "nestedStructField"),
-    SIMPLE_LIST_FIELD((short)9, "simpleListField"),
-    COMPLEX_LIST_FIELD((short)10, "complexListField"),
-    SIMPLE_MAP_FIELD((short)15, "simpleMapField"),
-    COMPLEX_MAP_FIELD((short)16, "complexMapField");
+    INT_FIELD((short) 1, "intField"),
+    LONG_FIELD((short) 2, "longField"),
+    BOOLEAN_FIELD((short) 3, "booleanField"),
+    DOUBLE_FIELD((short) 4, "doubleField"),
+    STRING_FIELD((short) 5, "stringField"),
+    ENUM_FIELD((short) 6, "enumField"),
+    OPTIONAL_STRING_FIELD((short) 7, "optionalStringField"),
+    NESTED_STRUCT_FIELD((short) 8, "nestedStructField"),
+    SIMPLE_LIST_FIELD((short) 9, "simpleListField"),
+    COMPLEX_LIST_FIELD((short) 10, "complexListField"),
+    SIMPLE_MAP_FIELD((short) 15, "simpleMapField"),
+    COMPLEX_MAP_FIELD((short) 16, "complexMapField");
 
-    private static final java.util.Map<java.lang.String, _Fields> byName = new java.util.HashMap<java.lang.String, _Fields>();
+    private static final java.util.Map<java.lang.String, _Fields> byName =
+        new java.util.HashMap<java.lang.String, _Fields>();
 
     static {
       for (_Fields field : java.util.EnumSet.allOf(_Fields.class)) {
@@ -85,7 +102,7 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
      */
     @org.apache.thrift.annotation.Nullable
     public static _Fields findByThriftId(int fieldId) {
-      switch(fieldId) {
+      switch (fieldId) {
         case 1: // INT_FIELD
           return INT_FIELD;
         case 2: // LONG_FIELD
@@ -121,7 +138,8 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
      */
     public static _Fields findByThriftIdOrThrow(int fieldId) {
       _Fields fields = findByThriftId(fieldId);
-      if (fields == null) throw new java.lang.IllegalArgumentException("Field " + fieldId + " doesn't exist!");
+      if (fields == null)
+        throw new java.lang.IllegalArgumentException("Field " + fieldId + " doesn't exist!");
       return fields;
     }
 
@@ -159,37 +177,57 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
   private static final _Fields optionals[] = {_Fields.OPTIONAL_STRING_FIELD};
   public static final java.util.Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
-    java.util.Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new java.util.EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.INT_FIELD, new org.apache.thrift.meta_data.FieldMetaData("intField", org.apache.thrift.TFieldRequirementType.REQUIRED,
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32)));
-    tmpMap.put(_Fields.LONG_FIELD, new org.apache.thrift.meta_data.FieldMetaData("longField", org.apache.thrift.TFieldRequirementType.REQUIRED,
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
-    tmpMap.put(_Fields.BOOLEAN_FIELD, new org.apache.thrift.meta_data.FieldMetaData("booleanField", org.apache.thrift.TFieldRequirementType.REQUIRED,
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.BOOL)));
-    tmpMap.put(_Fields.DOUBLE_FIELD, new org.apache.thrift.meta_data.FieldMetaData("doubleField", org.apache.thrift.TFieldRequirementType.REQUIRED,
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.DOUBLE)));
-    tmpMap.put(_Fields.STRING_FIELD, new org.apache.thrift.meta_data.FieldMetaData("stringField", org.apache.thrift.TFieldRequirementType.REQUIRED,
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
-    tmpMap.put(_Fields.ENUM_FIELD, new org.apache.thrift.meta_data.FieldMetaData("enumField", org.apache.thrift.TFieldRequirementType.REQUIRED,
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.ENUM        , "TestEnum")));
-    tmpMap.put(_Fields.OPTIONAL_STRING_FIELD, new org.apache.thrift.meta_data.FieldMetaData("optionalStringField", org.apache.thrift.TFieldRequirementType.OPTIONAL,
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
-    tmpMap.put(_Fields.NESTED_STRUCT_FIELD, new org.apache.thrift.meta_data.FieldMetaData("nestedStructField", org.apache.thrift.TFieldRequirementType.REQUIRED,
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRUCT        , "NestedType")));
-    tmpMap.put(_Fields.SIMPLE_LIST_FIELD, new org.apache.thrift.meta_data.FieldMetaData("simpleListField", org.apache.thrift.TFieldRequirementType.REQUIRED,
-        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST,
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING))));
-    tmpMap.put(_Fields.COMPLEX_LIST_FIELD, new org.apache.thrift.meta_data.FieldMetaData("complexListField", org.apache.thrift.TFieldRequirementType.REQUIRED,
-        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST,
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRUCT            , "NestedType"))));
-    tmpMap.put(_Fields.SIMPLE_MAP_FIELD, new org.apache.thrift.meta_data.FieldMetaData("simpleMapField", org.apache.thrift.TFieldRequirementType.DEFAULT,
-        new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP,
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING),
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32))));
-    tmpMap.put(_Fields.COMPLEX_MAP_FIELD, new org.apache.thrift.meta_data.FieldMetaData("complexMapField", org.apache.thrift.TFieldRequirementType.DEFAULT,
-        new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP,
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING),
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRUCT            , "NestedType"))));
+    java.util.Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap =
+        new java.util.EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
+    tmpMap.put(_Fields.INT_FIELD,
+        new org.apache.thrift.meta_data.FieldMetaData("intField", org.apache.thrift.TFieldRequirementType.REQUIRED,
+            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32)));
+    tmpMap.put(_Fields.LONG_FIELD,
+        new org.apache.thrift.meta_data.FieldMetaData("longField", org.apache.thrift.TFieldRequirementType.REQUIRED,
+            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
+    tmpMap.put(_Fields.BOOLEAN_FIELD,
+        new org.apache.thrift.meta_data.FieldMetaData("booleanField", org.apache.thrift.TFieldRequirementType.REQUIRED,
+            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.BOOL)));
+    tmpMap.put(_Fields.DOUBLE_FIELD,
+        new org.apache.thrift.meta_data.FieldMetaData("doubleField", org.apache.thrift.TFieldRequirementType.REQUIRED,
+            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.DOUBLE)));
+    tmpMap.put(_Fields.STRING_FIELD,
+        new org.apache.thrift.meta_data.FieldMetaData("stringField", org.apache.thrift.TFieldRequirementType.REQUIRED,
+            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
+    tmpMap.put(_Fields.ENUM_FIELD,
+        new org.apache.thrift.meta_data.FieldMetaData("enumField", org.apache.thrift.TFieldRequirementType.REQUIRED,
+            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.ENUM, "TestEnum")));
+    tmpMap.put(_Fields.OPTIONAL_STRING_FIELD,
+        new org.apache.thrift.meta_data.FieldMetaData("optionalStringField",
+            org.apache.thrift.TFieldRequirementType.OPTIONAL,
+            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
+    tmpMap.put(_Fields.NESTED_STRUCT_FIELD,
+        new org.apache.thrift.meta_data.FieldMetaData("nestedStructField",
+            org.apache.thrift.TFieldRequirementType.REQUIRED,
+            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRUCT, "NestedType")));
+    tmpMap.put(_Fields.SIMPLE_LIST_FIELD,
+        new org.apache.thrift.meta_data.FieldMetaData("simpleListField",
+            org.apache.thrift.TFieldRequirementType.REQUIRED,
+            new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST,
+                new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING))));
+    tmpMap.put(_Fields.COMPLEX_LIST_FIELD,
+        new org.apache.thrift.meta_data.FieldMetaData("complexListField",
+            org.apache.thrift.TFieldRequirementType.REQUIRED,
+            new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST,
+                new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRUCT,
+                    "NestedType"))));
+    tmpMap.put(_Fields.SIMPLE_MAP_FIELD,
+        new org.apache.thrift.meta_data.FieldMetaData("simpleMapField", org.apache.thrift.TFieldRequirementType.DEFAULT,
+            new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP,
+                new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING),
+                new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32))));
+    tmpMap.put(_Fields.COMPLEX_MAP_FIELD,
+        new org.apache.thrift.meta_data.FieldMetaData("complexMapField",
+            org.apache.thrift.TFieldRequirementType.DEFAULT,
+            new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP,
+                new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING),
+                new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRUCT,
+                    "NestedType"))));
     metaDataMap = java.util.Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(ComplexTypes.class, metaDataMap);
   }
@@ -197,19 +235,11 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
   public ComplexTypes() {
   }
 
-  public ComplexTypes(
-    int intField,
-    long longField,
-    boolean booleanField,
-    double doubleField,
-    java.lang.String stringField,
-    TestEnum enumField,
-    NestedType nestedStructField,
-    java.util.List<java.lang.String> simpleListField,
-    java.util.List<NestedType> complexListField,
-    java.util.Map<java.lang.String,java.lang.Integer> simpleMapField,
-    java.util.Map<java.lang.String,NestedType> complexMapField)
-  {
+  public ComplexTypes(int intField, long longField, boolean booleanField, double doubleField,
+      java.lang.String stringField, TestEnum enumField, NestedType nestedStructField,
+      java.util.List<java.lang.String> simpleListField, java.util.List<NestedType> complexListField,
+      java.util.Map<java.lang.String, java.lang.Integer> simpleMapField,
+      java.util.Map<java.lang.String, NestedType> complexMapField) {
     this();
     this.intField = intField;
     setIntFieldIsSet(true);
@@ -250,22 +280,26 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
       this.nestedStructField = new NestedType(other.nestedStructField);
     }
     if (other.isSetSimpleListField()) {
-      java.util.List<java.lang.String> __this__simpleListField = new java.util.ArrayList<java.lang.String>(other.simpleListField);
+      java.util.List<java.lang.String> __this__simpleListField =
+          new java.util.ArrayList<java.lang.String>(other.simpleListField);
       this.simpleListField = __this__simpleListField;
     }
     if (other.isSetComplexListField()) {
-      java.util.List<NestedType> __this__complexListField = new java.util.ArrayList<NestedType>(other.complexListField.size());
+      java.util.List<NestedType> __this__complexListField =
+          new java.util.ArrayList<NestedType>(other.complexListField.size());
       for (NestedType other_element : other.complexListField) {
         __this__complexListField.add(new NestedType(other_element));
       }
       this.complexListField = __this__complexListField;
     }
     if (other.isSetSimpleMapField()) {
-      java.util.Map<java.lang.String,java.lang.Integer> __this__simpleMapField = new java.util.HashMap<java.lang.String,java.lang.Integer>(other.simpleMapField);
+      java.util.Map<java.lang.String, java.lang.Integer> __this__simpleMapField =
+          new java.util.HashMap<java.lang.String, java.lang.Integer>(other.simpleMapField);
       this.simpleMapField = __this__simpleMapField;
     }
     if (other.isSetComplexMapField()) {
-      java.util.Map<java.lang.String,NestedType> __this__complexMapField = new java.util.HashMap<java.lang.String,NestedType>(other.complexMapField.size());
+      java.util.Map<java.lang.String, NestedType> __this__complexMapField =
+          new java.util.HashMap<java.lang.String, NestedType>(other.complexMapField.size());
       for (java.util.Map.Entry<java.lang.String, NestedType> other_element : other.complexMapField.entrySet()) {
 
         java.lang.String other_element_key = other_element.getKey();
@@ -452,7 +486,8 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
     return this.optionalStringField;
   }
 
-  public ComplexTypes setOptionalStringField(@org.apache.thrift.annotation.Nullable java.lang.String optionalStringField) {
+  public ComplexTypes setOptionalStringField(
+      @org.apache.thrift.annotation.Nullable java.lang.String optionalStringField) {
     this.optionalStringField = optionalStringField;
     return this;
   }
@@ -518,7 +553,8 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
     return this.simpleListField;
   }
 
-  public ComplexTypes setSimpleListField(@org.apache.thrift.annotation.Nullable java.util.List<java.lang.String> simpleListField) {
+  public ComplexTypes setSimpleListField(
+      @org.apache.thrift.annotation.Nullable java.util.List<java.lang.String> simpleListField) {
     this.simpleListField = simpleListField;
     return this;
   }
@@ -559,7 +595,8 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
     return this.complexListField;
   }
 
-  public ComplexTypes setComplexListField(@org.apache.thrift.annotation.Nullable java.util.List<NestedType> complexListField) {
+  public ComplexTypes setComplexListField(
+      @org.apache.thrift.annotation.Nullable java.util.List<NestedType> complexListField) {
     this.complexListField = complexListField;
     return this;
   }
@@ -585,17 +622,18 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
 
   public void putToSimpleMapField(java.lang.String key, int val) {
     if (this.simpleMapField == null) {
-      this.simpleMapField = new java.util.HashMap<java.lang.String,java.lang.Integer>();
+      this.simpleMapField = new java.util.HashMap<java.lang.String, java.lang.Integer>();
     }
     this.simpleMapField.put(key, val);
   }
 
   @org.apache.thrift.annotation.Nullable
-  public java.util.Map<java.lang.String,java.lang.Integer> getSimpleMapField() {
+  public java.util.Map<java.lang.String, java.lang.Integer> getSimpleMapField() {
     return this.simpleMapField;
   }
 
-  public ComplexTypes setSimpleMapField(@org.apache.thrift.annotation.Nullable java.util.Map<java.lang.String,java.lang.Integer> simpleMapField) {
+  public ComplexTypes setSimpleMapField(
+      @org.apache.thrift.annotation.Nullable java.util.Map<java.lang.String, java.lang.Integer> simpleMapField) {
     this.simpleMapField = simpleMapField;
     return this;
   }
@@ -621,17 +659,18 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
 
   public void putToComplexMapField(java.lang.String key, NestedType val) {
     if (this.complexMapField == null) {
-      this.complexMapField = new java.util.HashMap<java.lang.String,NestedType>();
+      this.complexMapField = new java.util.HashMap<java.lang.String, NestedType>();
     }
     this.complexMapField.put(key, val);
   }
 
   @org.apache.thrift.annotation.Nullable
-  public java.util.Map<java.lang.String,NestedType> getComplexMapField() {
+  public java.util.Map<java.lang.String, NestedType> getComplexMapField() {
     return this.complexMapField;
   }
 
-  public ComplexTypes setComplexMapField(@org.apache.thrift.annotation.Nullable java.util.Map<java.lang.String,NestedType> complexMapField) {
+  public ComplexTypes setComplexMapField(
+      @org.apache.thrift.annotation.Nullable java.util.Map<java.lang.String, NestedType> complexMapField) {
     this.complexMapField = complexMapField;
     return this;
   }
@@ -653,101 +692,101 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
 
   public void setFieldValue(_Fields field, @org.apache.thrift.annotation.Nullable java.lang.Object value) {
     switch (field) {
-    case INT_FIELD:
-      if (value == null) {
-        unsetIntField();
-      } else {
-        setIntField((java.lang.Integer)value);
-      }
-      break;
+      case INT_FIELD:
+        if (value == null) {
+          unsetIntField();
+        } else {
+          setIntField((java.lang.Integer) value);
+        }
+        break;
 
-    case LONG_FIELD:
-      if (value == null) {
-        unsetLongField();
-      } else {
-        setLongField((java.lang.Long)value);
-      }
-      break;
+      case LONG_FIELD:
+        if (value == null) {
+          unsetLongField();
+        } else {
+          setLongField((java.lang.Long) value);
+        }
+        break;
 
-    case BOOLEAN_FIELD:
-      if (value == null) {
-        unsetBooleanField();
-      } else {
-        setBooleanField((java.lang.Boolean)value);
-      }
-      break;
+      case BOOLEAN_FIELD:
+        if (value == null) {
+          unsetBooleanField();
+        } else {
+          setBooleanField((java.lang.Boolean) value);
+        }
+        break;
 
-    case DOUBLE_FIELD:
-      if (value == null) {
-        unsetDoubleField();
-      } else {
-        setDoubleField((java.lang.Double)value);
-      }
-      break;
+      case DOUBLE_FIELD:
+        if (value == null) {
+          unsetDoubleField();
+        } else {
+          setDoubleField((java.lang.Double) value);
+        }
+        break;
 
-    case STRING_FIELD:
-      if (value == null) {
-        unsetStringField();
-      } else {
-        setStringField((java.lang.String)value);
-      }
-      break;
+      case STRING_FIELD:
+        if (value == null) {
+          unsetStringField();
+        } else {
+          setStringField((java.lang.String) value);
+        }
+        break;
 
-    case ENUM_FIELD:
-      if (value == null) {
-        unsetEnumField();
-      } else {
-        setEnumField((TestEnum)value);
-      }
-      break;
+      case ENUM_FIELD:
+        if (value == null) {
+          unsetEnumField();
+        } else {
+          setEnumField((TestEnum) value);
+        }
+        break;
 
-    case OPTIONAL_STRING_FIELD:
-      if (value == null) {
-        unsetOptionalStringField();
-      } else {
-        setOptionalStringField((java.lang.String)value);
-      }
-      break;
+      case OPTIONAL_STRING_FIELD:
+        if (value == null) {
+          unsetOptionalStringField();
+        } else {
+          setOptionalStringField((java.lang.String) value);
+        }
+        break;
 
-    case NESTED_STRUCT_FIELD:
-      if (value == null) {
-        unsetNestedStructField();
-      } else {
-        setNestedStructField((NestedType)value);
-      }
-      break;
+      case NESTED_STRUCT_FIELD:
+        if (value == null) {
+          unsetNestedStructField();
+        } else {
+          setNestedStructField((NestedType) value);
+        }
+        break;
 
-    case SIMPLE_LIST_FIELD:
-      if (value == null) {
-        unsetSimpleListField();
-      } else {
-        setSimpleListField((java.util.List<java.lang.String>)value);
-      }
-      break;
+      case SIMPLE_LIST_FIELD:
+        if (value == null) {
+          unsetSimpleListField();
+        } else {
+          setSimpleListField((java.util.List<java.lang.String>) value);
+        }
+        break;
 
-    case COMPLEX_LIST_FIELD:
-      if (value == null) {
-        unsetComplexListField();
-      } else {
-        setComplexListField((java.util.List<NestedType>)value);
-      }
-      break;
+      case COMPLEX_LIST_FIELD:
+        if (value == null) {
+          unsetComplexListField();
+        } else {
+          setComplexListField((java.util.List<NestedType>) value);
+        }
+        break;
 
-    case SIMPLE_MAP_FIELD:
-      if (value == null) {
-        unsetSimpleMapField();
-      } else {
-        setSimpleMapField((java.util.Map<java.lang.String,java.lang.Integer>)value);
-      }
-      break;
+      case SIMPLE_MAP_FIELD:
+        if (value == null) {
+          unsetSimpleMapField();
+        } else {
+          setSimpleMapField((java.util.Map<java.lang.String, java.lang.Integer>) value);
+        }
+        break;
 
-    case COMPLEX_MAP_FIELD:
-      if (value == null) {
-        unsetComplexMapField();
-      } else {
-        setComplexMapField((java.util.Map<java.lang.String,NestedType>)value);
-      }
-      break;
+      case COMPLEX_MAP_FIELD:
+        if (value == null) {
+          unsetComplexMapField();
+        } else {
+          setComplexMapField((java.util.Map<java.lang.String, NestedType>) value);
+        }
+        break;
 
     }
   }
@@ -755,41 +794,41 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
   @org.apache.thrift.annotation.Nullable
   public java.lang.Object getFieldValue(_Fields field) {
     switch (field) {
-    case INT_FIELD:
-      return getIntField();
+      case INT_FIELD:
+        return getIntField();
 
-    case LONG_FIELD:
-      return getLongField();
+      case LONG_FIELD:
+        return getLongField();
 
-    case BOOLEAN_FIELD:
-      return isBooleanField();
+      case BOOLEAN_FIELD:
+        return isBooleanField();
 
-    case DOUBLE_FIELD:
-      return getDoubleField();
+      case DOUBLE_FIELD:
+        return getDoubleField();
 
-    case STRING_FIELD:
-      return getStringField();
+      case STRING_FIELD:
+        return getStringField();
 
-    case ENUM_FIELD:
-      return getEnumField();
+      case ENUM_FIELD:
+        return getEnumField();
 
-    case OPTIONAL_STRING_FIELD:
-      return getOptionalStringField();
+      case OPTIONAL_STRING_FIELD:
+        return getOptionalStringField();
 
-    case NESTED_STRUCT_FIELD:
-      return getNestedStructField();
+      case NESTED_STRUCT_FIELD:
+        return getNestedStructField();
 
-    case SIMPLE_LIST_FIELD:
-      return getSimpleListField();
+      case SIMPLE_LIST_FIELD:
+        return getSimpleListField();
 
-    case COMPLEX_LIST_FIELD:
-      return getComplexListField();
+      case COMPLEX_LIST_FIELD:
+        return getComplexListField();
 
-    case SIMPLE_MAP_FIELD:
-      return getSimpleMapField();
+      case SIMPLE_MAP_FIELD:
+        return getSimpleMapField();
 
-    case COMPLEX_MAP_FIELD:
-      return getComplexMapField();
+      case COMPLEX_MAP_FIELD:
+        return getComplexMapField();
 
     }
     throw new java.lang.IllegalStateException();
@@ -802,30 +841,30 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
     }
 
     switch (field) {
-    case INT_FIELD:
-      return isSetIntField();
-    case LONG_FIELD:
-      return isSetLongField();
-    case BOOLEAN_FIELD:
-      return isSetBooleanField();
-    case DOUBLE_FIELD:
-      return isSetDoubleField();
-    case STRING_FIELD:
-      return isSetStringField();
-    case ENUM_FIELD:
-      return isSetEnumField();
-    case OPTIONAL_STRING_FIELD:
-      return isSetOptionalStringField();
-    case NESTED_STRUCT_FIELD:
-      return isSetNestedStructField();
-    case SIMPLE_LIST_FIELD:
-      return isSetSimpleListField();
-    case COMPLEX_LIST_FIELD:
-      return isSetComplexListField();
-    case SIMPLE_MAP_FIELD:
-      return isSetSimpleMapField();
-    case COMPLEX_MAP_FIELD:
-      return isSetComplexMapField();
+      case INT_FIELD:
+        return isSetIntField();
+      case LONG_FIELD:
+        return isSetLongField();
+      case BOOLEAN_FIELD:
+        return isSetBooleanField();
+      case DOUBLE_FIELD:
+        return isSetDoubleField();
+      case STRING_FIELD:
+        return isSetStringField();
+      case ENUM_FIELD:
+        return isSetEnumField();
+      case OPTIONAL_STRING_FIELD:
+        return isSetOptionalStringField();
+      case NESTED_STRUCT_FIELD:
+        return isSetNestedStructField();
+      case SIMPLE_LIST_FIELD:
+        return isSetSimpleListField();
+      case COMPLEX_LIST_FIELD:
+        return isSetComplexListField();
+      case SIMPLE_MAP_FIELD:
+        return isSetSimpleMapField();
+      case COMPLEX_MAP_FIELD:
+        return isSetComplexMapField();
     }
     throw new java.lang.IllegalStateException();
   }
@@ -835,7 +874,7 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
     if (that == null)
       return false;
     if (that instanceof ComplexTypes)
-      return this.equals((ComplexTypes)that);
+      return this.equals((ComplexTypes) that);
     return false;
   }
 
@@ -1155,19 +1194,23 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
     sb.append("intField:");
     sb.append(this.intField);
     first = false;
-    if (!first) sb.append(", ");
+    if (!first)
+      sb.append(", ");
     sb.append("longField:");
     sb.append(this.longField);
     first = false;
-    if (!first) sb.append(", ");
+    if (!first)
+      sb.append(", ");
     sb.append("booleanField:");
     sb.append(this.booleanField);
     first = false;
-    if (!first) sb.append(", ");
+    if (!first)
+      sb.append(", ");
     sb.append("doubleField:");
     sb.append(this.doubleField);
     first = false;
-    if (!first) sb.append(", ");
+    if (!first)
+      sb.append(", ");
     sb.append("stringField:");
     if (this.stringField == null) {
       sb.append("null");
@@ -1175,7 +1218,8 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
       sb.append(this.stringField);
     }
     first = false;
-    if (!first) sb.append(", ");
+    if (!first)
+      sb.append(", ");
     sb.append("enumField:");
     if (this.enumField == null) {
       sb.append("null");
@@ -1184,7 +1228,8 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
     }
     first = false;
     if (isSetOptionalStringField()) {
-      if (!first) sb.append(", ");
+      if (!first)
+        sb.append(", ");
       sb.append("optionalStringField:");
       if (this.optionalStringField == null) {
         sb.append("null");
@@ -1193,7 +1238,8 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
       }
       first = false;
     }
-    if (!first) sb.append(", ");
+    if (!first)
+      sb.append(", ");
     sb.append("nestedStructField:");
     if (this.nestedStructField == null) {
       sb.append("null");
@@ -1201,7 +1247,8 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
       sb.append(this.nestedStructField);
     }
     first = false;
-    if (!first) sb.append(", ");
+    if (!first)
+      sb.append(", ");
     sb.append("simpleListField:");
     if (this.simpleListField == null) {
       sb.append("null");
@@ -1209,7 +1256,8 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
       sb.append(this.simpleListField);
     }
     first = false;
-    if (!first) sb.append(", ");
+    if (!first)
+      sb.append(", ");
     sb.append("complexListField:");
     if (this.complexListField == null) {
       sb.append("null");
@@ -1217,7 +1265,8 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
       sb.append(this.complexListField);
     }
     first = false;
-    if (!first) sb.append(", ");
+    if (!first)
+      sb.append(", ");
     sb.append("simpleMapField:");
     if (this.simpleMapField == null) {
       sb.append("null");
@@ -1225,7 +1274,8 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
       sb.append(this.simpleMapField);
     }
     first = false;
-    if (!first) sb.append(", ");
+    if (!first)
+      sb.append(", ");
     sb.append("complexMapField:");
     if (this.complexMapField == null) {
       sb.append("null");
@@ -1244,19 +1294,24 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
     // alas, we cannot check 'booleanField' because it's a primitive and you chose the non-beans generator.
     // alas, we cannot check 'doubleField' because it's a primitive and you chose the non-beans generator.
     if (stringField == null) {
-      throw new org.apache.thrift.protocol.TProtocolException("Required field 'stringField' was not present! Struct: " + toString());
+      throw new org.apache.thrift.protocol.TProtocolException(
+          "Required field 'stringField' was not present! Struct: " + toString());
     }
     if (enumField == null) {
-      throw new org.apache.thrift.protocol.TProtocolException("Required field 'enumField' was not present! Struct: " + toString());
+      throw new org.apache.thrift.protocol.TProtocolException(
+          "Required field 'enumField' was not present! Struct: " + toString());
     }
     if (nestedStructField == null) {
-      throw new org.apache.thrift.protocol.TProtocolException("Required field 'nestedStructField' was not present! Struct: " + toString());
+      throw new org.apache.thrift.protocol.TProtocolException(
+          "Required field 'nestedStructField' was not present! Struct: " + toString());
     }
     if (simpleListField == null) {
-      throw new org.apache.thrift.protocol.TProtocolException("Required field 'simpleListField' was not present! Struct: " + toString());
+      throw new org.apache.thrift.protocol.TProtocolException(
+          "Required field 'simpleListField' was not present! Struct: " + toString());
     }
     if (complexListField == null) {
-      throw new org.apache.thrift.protocol.TProtocolException("Required field 'complexListField' was not present! Struct: " + toString());
+      throw new org.apache.thrift.protocol.TProtocolException(
+          "Required field 'complexListField' was not present! Struct: " + toString());
     }
     // check for sub-struct validity
   }
@@ -1287,11 +1342,11 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
 
   private static class ComplexTypesStandardScheme extends org.apache.thrift.scheme.StandardScheme<ComplexTypes> {
 
-    public void read(org.apache.thrift.protocol.TProtocol iprot, ComplexTypes struct) throws org.apache.thrift.TException {
+    public void read(org.apache.thrift.protocol.TProtocol iprot, ComplexTypes struct)
+        throws org.apache.thrift.TException {
       org.apache.thrift.protocol.TField schemeField;
       iprot.readStructBegin();
-      while (true)
-      {
+      while (true) {
         schemeField = iprot.readFieldBegin();
         if (schemeField.type == org.apache.thrift.protocol.TType.STOP) {
           break;
@@ -1367,9 +1422,9 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
               {
                 org.apache.thrift.protocol.TList _list0 = iprot.readListBegin();
                 struct.simpleListField = new java.util.ArrayList<java.lang.String>(_list0.size);
-                @org.apache.thrift.annotation.Nullable java.lang.String _elem1;
-                for (int _i2 = 0; _i2 < _list0.size; ++_i2)
-                {
+                @org.apache.thrift.annotation.Nullable
+                java.lang.String _elem1;
+                for (int _i2 = 0; _i2 < _list0.size; ++_i2) {
                   _elem1 = iprot.readString();
                   struct.simpleListField.add(_elem1);
                 }
@@ -1385,9 +1440,9 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
               {
                 org.apache.thrift.protocol.TList _list3 = iprot.readListBegin();
                 struct.complexListField = new java.util.ArrayList<NestedType>(_list3.size);
-                @org.apache.thrift.annotation.Nullable NestedType _elem4;
-                for (int _i5 = 0; _i5 < _list3.size; ++_i5)
-                {
+                @org.apache.thrift.annotation.Nullable
+                NestedType _elem4;
+                for (int _i5 = 0; _i5 < _list3.size; ++_i5) {
                   _elem4 = new NestedType();
                   _elem4.read(iprot);
                   struct.complexListField.add(_elem4);
@@ -1403,11 +1458,11 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
             if (schemeField.type == org.apache.thrift.protocol.TType.MAP) {
               {
                 org.apache.thrift.protocol.TMap _map6 = iprot.readMapBegin();
-                struct.simpleMapField = new java.util.HashMap<java.lang.String,java.lang.Integer>(2*_map6.size);
-                @org.apache.thrift.annotation.Nullable java.lang.String _key7;
+                struct.simpleMapField = new java.util.HashMap<java.lang.String, java.lang.Integer>(2 * _map6.size);
+                @org.apache.thrift.annotation.Nullable
+                java.lang.String _key7;
                 int _val8;
-                for (int _i9 = 0; _i9 < _map6.size; ++_i9)
-                {
+                for (int _i9 = 0; _i9 < _map6.size; ++_i9) {
                   _key7 = iprot.readString();
                   _val8 = iprot.readI32();
                   struct.simpleMapField.put(_key7, _val8);
@@ -1423,11 +1478,12 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
             if (schemeField.type == org.apache.thrift.protocol.TType.MAP) {
               {
                 org.apache.thrift.protocol.TMap _map10 = iprot.readMapBegin();
-                struct.complexMapField = new java.util.HashMap<java.lang.String,NestedType>(2*_map10.size);
-                @org.apache.thrift.annotation.Nullable java.lang.String _key11;
-                @org.apache.thrift.annotation.Nullable NestedType _val12;
-                for (int _i13 = 0; _i13 < _map10.size; ++_i13)
-                {
+                struct.complexMapField = new java.util.HashMap<java.lang.String, NestedType>(2 * _map10.size);
+                @org.apache.thrift.annotation.Nullable
+                java.lang.String _key11;
+                @org.apache.thrift.annotation.Nullable
+                NestedType _val12;
+                for (int _i13 = 0; _i13 < _map10.size; ++_i13) {
                   _key11 = iprot.readString();
                   _val12 = new NestedType();
                   _val12.read(iprot);
@@ -1449,21 +1505,26 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
 
       // check for required fields of primitive type, which can't be checked in the validate method
       if (!struct.isSetIntField()) {
-        throw new org.apache.thrift.protocol.TProtocolException("Required field 'intField' was not found in serialized data! Struct: " + toString());
+        throw new org.apache.thrift.protocol.TProtocolException(
+            "Required field 'intField' was not found in serialized data! Struct: " + toString());
       }
       if (!struct.isSetLongField()) {
-        throw new org.apache.thrift.protocol.TProtocolException("Required field 'longField' was not found in serialized data! Struct: " + toString());
+        throw new org.apache.thrift.protocol.TProtocolException(
+            "Required field 'longField' was not found in serialized data! Struct: " + toString());
       }
       if (!struct.isSetBooleanField()) {
-        throw new org.apache.thrift.protocol.TProtocolException("Required field 'booleanField' was not found in serialized data! Struct: " + toString());
+        throw new org.apache.thrift.protocol.TProtocolException(
+            "Required field 'booleanField' was not found in serialized data! Struct: " + toString());
       }
       if (!struct.isSetDoubleField()) {
-        throw new org.apache.thrift.protocol.TProtocolException("Required field 'doubleField' was not found in serialized data! Struct: " + toString());
+        throw new org.apache.thrift.protocol.TProtocolException(
+            "Required field 'doubleField' was not found in serialized data! Struct: " + toString());
       }
       struct.validate();
     }
 
-    public void write(org.apache.thrift.protocol.TProtocol oprot, ComplexTypes struct) throws org.apache.thrift.TException {
+    public void write(org.apache.thrift.protocol.TProtocol oprot, ComplexTypes struct)
+        throws org.apache.thrift.TException {
       struct.validate();
 
       oprot.writeStructBegin(STRUCT_DESC);
@@ -1504,9 +1565,9 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
       if (struct.simpleListField != null) {
         oprot.writeFieldBegin(SIMPLE_LIST_FIELD_FIELD_DESC);
         {
-          oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, struct.simpleListField.size()));
-          for (java.lang.String _iter14 : struct.simpleListField)
-          {
+          oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING,
+              struct.simpleListField.size()));
+          for (java.lang.String _iter14 : struct.simpleListField) {
             oprot.writeString(_iter14);
           }
           oprot.writeListEnd();
@@ -1516,9 +1577,9 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
       if (struct.complexListField != null) {
         oprot.writeFieldBegin(COMPLEX_LIST_FIELD_FIELD_DESC);
         {
-          oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, struct.complexListField.size()));
-          for (NestedType _iter15 : struct.complexListField)
-          {
+          oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT,
+              struct.complexListField.size()));
+          for (NestedType _iter15 : struct.complexListField) {
             _iter15.write(oprot);
           }
           oprot.writeListEnd();
@@ -1528,9 +1589,9 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
       if (struct.simpleMapField != null) {
         oprot.writeFieldBegin(SIMPLE_MAP_FIELD_FIELD_DESC);
         {
-          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.I32, struct.simpleMapField.size()));
-          for (java.util.Map.Entry<java.lang.String, java.lang.Integer> _iter16 : struct.simpleMapField.entrySet())
-          {
+          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING,
+              org.apache.thrift.protocol.TType.I32, struct.simpleMapField.size()));
+          for (java.util.Map.Entry<java.lang.String, java.lang.Integer> _iter16 : struct.simpleMapField.entrySet()) {
             oprot.writeString(_iter16.getKey());
             oprot.writeI32(_iter16.getValue());
           }
@@ -1541,9 +1602,9 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
       if (struct.complexMapField != null) {
         oprot.writeFieldBegin(COMPLEX_MAP_FIELD_FIELD_DESC);
         {
-          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRUCT, struct.complexMapField.size()));
-          for (java.util.Map.Entry<java.lang.String, NestedType> _iter17 : struct.complexMapField.entrySet())
-          {
+          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING,
+              org.apache.thrift.protocol.TType.STRUCT, struct.complexMapField.size()));
+          for (java.util.Map.Entry<java.lang.String, NestedType> _iter17 : struct.complexMapField.entrySet()) {
             oprot.writeString(_iter17.getKey());
             _iter17.getValue().write(oprot);
           }
@@ -1566,7 +1627,8 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
   private static class ComplexTypesTupleScheme extends org.apache.thrift.scheme.TupleScheme<ComplexTypes> {
 
     @Override
-    public void write(org.apache.thrift.protocol.TProtocol prot, ComplexTypes struct) throws org.apache.thrift.TException {
+    public void write(org.apache.thrift.protocol.TProtocol prot, ComplexTypes struct)
+        throws org.apache.thrift.TException {
       org.apache.thrift.protocol.TTupleProtocol oprot = (org.apache.thrift.protocol.TTupleProtocol) prot;
       oprot.writeI32(struct.intField);
       oprot.writeI64(struct.longField);
@@ -1577,15 +1639,13 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
       struct.nestedStructField.write(oprot);
       {
         oprot.writeI32(struct.simpleListField.size());
-        for (java.lang.String _iter18 : struct.simpleListField)
-        {
+        for (java.lang.String _iter18 : struct.simpleListField) {
           oprot.writeString(_iter18);
         }
       }
       {
         oprot.writeI32(struct.complexListField.size());
-        for (NestedType _iter19 : struct.complexListField)
-        {
+        for (NestedType _iter19 : struct.complexListField) {
           _iter19.write(oprot);
         }
       }
@@ -1606,8 +1666,7 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
       if (struct.isSetSimpleMapField()) {
         {
           oprot.writeI32(struct.simpleMapField.size());
-          for (java.util.Map.Entry<java.lang.String, java.lang.Integer> _iter20 : struct.simpleMapField.entrySet())
-          {
+          for (java.util.Map.Entry<java.lang.String, java.lang.Integer> _iter20 : struct.simpleMapField.entrySet()) {
             oprot.writeString(_iter20.getKey());
             oprot.writeI32(_iter20.getValue());
           }
@@ -1616,8 +1675,7 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
       if (struct.isSetComplexMapField()) {
         {
           oprot.writeI32(struct.complexMapField.size());
-          for (java.util.Map.Entry<java.lang.String, NestedType> _iter21 : struct.complexMapField.entrySet())
-          {
+          for (java.util.Map.Entry<java.lang.String, NestedType> _iter21 : struct.complexMapField.entrySet()) {
             oprot.writeString(_iter21.getKey());
             _iter21.getValue().write(oprot);
           }
@@ -1626,7 +1684,8 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
     }
 
     @Override
-    public void read(org.apache.thrift.protocol.TProtocol prot, ComplexTypes struct) throws org.apache.thrift.TException {
+    public void read(org.apache.thrift.protocol.TProtocol prot, ComplexTypes struct)
+        throws org.apache.thrift.TException {
       org.apache.thrift.protocol.TTupleProtocol iprot = (org.apache.thrift.protocol.TTupleProtocol) prot;
       struct.intField = iprot.readI32();
       struct.setIntFieldIsSet(true);
@@ -1644,22 +1703,24 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
       struct.nestedStructField.read(iprot);
       struct.setNestedStructFieldIsSet(true);
       {
-        org.apache.thrift.protocol.TList _list22 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, iprot.readI32());
+        org.apache.thrift.protocol.TList _list22 =
+            new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, iprot.readI32());
         struct.simpleListField = new java.util.ArrayList<java.lang.String>(_list22.size);
-        @org.apache.thrift.annotation.Nullable java.lang.String _elem23;
-        for (int _i24 = 0; _i24 < _list22.size; ++_i24)
-        {
+        @org.apache.thrift.annotation.Nullable
+        java.lang.String _elem23;
+        for (int _i24 = 0; _i24 < _list22.size; ++_i24) {
           _elem23 = iprot.readString();
           struct.simpleListField.add(_elem23);
         }
       }
       struct.setSimpleListFieldIsSet(true);
       {
-        org.apache.thrift.protocol.TList _list25 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
+        org.apache.thrift.protocol.TList _list25 =
+            new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
         struct.complexListField = new java.util.ArrayList<NestedType>(_list25.size);
-        @org.apache.thrift.annotation.Nullable NestedType _elem26;
-        for (int _i27 = 0; _i27 < _list25.size; ++_i27)
-        {
+        @org.apache.thrift.annotation.Nullable
+        NestedType _elem26;
+        for (int _i27 = 0; _i27 < _list25.size; ++_i27) {
           _elem26 = new NestedType();
           _elem26.read(iprot);
           struct.complexListField.add(_elem26);
@@ -1673,12 +1734,13 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
       }
       if (incoming.get(1)) {
         {
-          org.apache.thrift.protocol.TMap _map28 = new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.I32, iprot.readI32());
-          struct.simpleMapField = new java.util.HashMap<java.lang.String,java.lang.Integer>(2*_map28.size);
-          @org.apache.thrift.annotation.Nullable java.lang.String _key29;
+          org.apache.thrift.protocol.TMap _map28 = new org.apache.thrift.protocol.TMap(
+              org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.I32, iprot.readI32());
+          struct.simpleMapField = new java.util.HashMap<java.lang.String, java.lang.Integer>(2 * _map28.size);
+          @org.apache.thrift.annotation.Nullable
+          java.lang.String _key29;
           int _val30;
-          for (int _i31 = 0; _i31 < _map28.size; ++_i31)
-          {
+          for (int _i31 = 0; _i31 < _map28.size; ++_i31) {
             _key29 = iprot.readString();
             _val30 = iprot.readI32();
             struct.simpleMapField.put(_key29, _val30);
@@ -1688,12 +1750,14 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
       }
       if (incoming.get(2)) {
         {
-          org.apache.thrift.protocol.TMap _map32 = new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
-          struct.complexMapField = new java.util.HashMap<java.lang.String,NestedType>(2*_map32.size);
-          @org.apache.thrift.annotation.Nullable java.lang.String _key33;
-          @org.apache.thrift.annotation.Nullable NestedType _val34;
-          for (int _i35 = 0; _i35 < _map32.size; ++_i35)
-          {
+          org.apache.thrift.protocol.TMap _map32 = new org.apache.thrift.protocol.TMap(
+              org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
+          struct.complexMapField = new java.util.HashMap<java.lang.String, NestedType>(2 * _map32.size);
+          @org.apache.thrift.annotation.Nullable
+          java.lang.String _key33;
+          @org.apache.thrift.annotation.Nullable
+          NestedType _val34;
+          for (int _i35 = 0; _i35 < _map32.size; ++_i35) {
             _key33 = iprot.readString();
             _val34 = new NestedType();
             _val34.read(iprot);
@@ -1706,6 +1770,7 @@ public class ComplexTypes implements org.apache.thrift.TBase<ComplexTypes, Compl
   }
 
   private static <S extends org.apache.thrift.scheme.IScheme> S scheme(org.apache.thrift.protocol.TProtocol proto) {
-    return (org.apache.thrift.scheme.StandardScheme.class.equals(proto.getScheme()) ? STANDARD_SCHEME_FACTORY : TUPLE_SCHEME_FACTORY).getScheme();
+    return (org.apache.thrift.scheme.StandardScheme.class.equals(proto.getScheme()) ? STANDARD_SCHEME_FACTORY
+        : TUPLE_SCHEME_FACTORY).getScheme();
   }
 }

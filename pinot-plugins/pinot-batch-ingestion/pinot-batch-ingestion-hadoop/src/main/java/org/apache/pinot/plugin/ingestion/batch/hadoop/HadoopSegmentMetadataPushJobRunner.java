@@ -93,11 +93,11 @@ public class HadoopSegmentMetadataPushJobRunner implements IngestionJobRunner, S
     // Push from driver
 
     try {
-      Map<String, String> segmentUriToTarPathMap = SegmentPushUtils
-          .getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec().getSegmentUriPrefix(),
+      Map<String, String> segmentUriToTarPathMap =
+          SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec().getSegmentUriPrefix(),
               _spec.getPushJobSpec().getSegmentUriSuffix(), segmentsToPush.toArray(new String[0]));
-      SegmentPushUtils
-          .sendSegmentUriAndMetadata(_spec, PinotFSFactory.create(outputDirURI.getScheme()), segmentUriToTarPathMap);
+      SegmentPushUtils.sendSegmentUriAndMetadata(_spec, PinotFSFactory.create(outputDirURI.getScheme()),
+          segmentUriToTarPathMap);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

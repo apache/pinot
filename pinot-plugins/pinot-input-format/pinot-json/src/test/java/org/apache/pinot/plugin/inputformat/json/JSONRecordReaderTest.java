@@ -36,16 +36,14 @@ public class JSONRecordReaderTest extends AbstractRecordReaderTest {
   private final File _dateFile = new File(_tempDir, "data.json");
 
   @Override
-  protected RecordReader createRecordReader()
-      throws Exception {
+  protected RecordReader createRecordReader() throws Exception {
     JSONRecordReader recordReader = new JSONRecordReader();
     recordReader.init(_dateFile, _sourceFields, null);
     return recordReader;
   }
 
   @Override
-  protected void writeRecordsToFile(List<Map<String, Object>> recordsToWrite)
-      throws Exception {
+  protected void writeRecordsToFile(List<Map<String, Object>> recordsToWrite) throws Exception {
     try (FileWriter fileWriter = new FileWriter(_dateFile)) {
       for (Map<String, Object> r : recordsToWrite) {
         ObjectNode jsonRecord = JsonUtils.newObjectNode();
@@ -59,8 +57,7 @@ public class JSONRecordReaderTest extends AbstractRecordReaderTest {
 
   @Override
   protected void checkValue(RecordReader recordReader, List<Map<String, Object>> expectedRecordsMap,
-      List<Object[]> expectedPrimaryKeys)
-      throws Exception {
+      List<Object[]> expectedPrimaryKeys) throws Exception {
     for (int i = 0; i < expectedRecordsMap.size(); i++) {
       Map<String, Object> expectedRecord = expectedRecordsMap.get(i);
       GenericRow actualRecord = recordReader.next();

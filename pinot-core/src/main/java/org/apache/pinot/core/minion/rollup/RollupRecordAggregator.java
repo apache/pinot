@@ -53,7 +53,8 @@ public class RollupRecordAggregator implements RecordAggregator {
       if (!fieldSpec.isVirtualColumn() && fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC) {
         String metricName = fieldSpec.getName();
         String aggregateType = aggregateTypes.getOrDefault(metricName, DEFAULT_VALUE_AGGREGATOR_TYPE);
-        ValueAggregator valueAggregator = ValueAggregatorFactory.getValueAggregator(aggregateType, fieldSpec.getDataType());
+        ValueAggregator valueAggregator =
+            ValueAggregatorFactory.getValueAggregator(aggregateType, fieldSpec.getDataType());
         _valueAggregatorMap.put(metricName, valueAggregator);
       }
     }

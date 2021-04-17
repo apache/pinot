@@ -160,8 +160,8 @@ public class KafkaStreamMetadataProvider extends KafkaConnectionHandler implemen
    * @return An offset
    */
   @Override
-  public synchronized StreamPartitionMsgOffset fetchStreamPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)
-      throws java.util.concurrent.TimeoutException {
+  public synchronized StreamPartitionMsgOffset fetchStreamPartitionOffset(@Nonnull OffsetCriteria offsetCriteria,
+      long timeoutMillis) throws java.util.concurrent.TimeoutException {
     Preconditions.checkState(isPartitionProvided,
         "Cannot fetch partition offset. StreamMetadataProvider created without partition information");
     Preconditions.checkNotNull(offsetCriteria);
@@ -193,8 +193,10 @@ public class KafkaStreamMetadataProvider extends KafkaConnectionHandler implemen
       }
 
       // Send the offset request to Kafka
-      OffsetRequest request = new OffsetRequest(Collections.singletonMap(new TopicAndPartition(_topic, _partition),
-          new PartitionOffsetRequestInfo(offsetRequestTime, 1)), kafka.api.OffsetRequest.CurrentVersion(), _clientId);
+      OffsetRequest request = new OffsetRequest(
+          Collections.singletonMap(new TopicAndPartition(_topic, _partition),
+              new PartitionOffsetRequestInfo(offsetRequestTime, 1)),
+          kafka.api.OffsetRequest.CurrentVersion(), _clientId);
       OffsetResponse offsetResponse;
       try {
         offsetResponse = _simpleConsumer.getOffsetsBefore(request);
@@ -231,8 +233,7 @@ public class KafkaStreamMetadataProvider extends KafkaConnectionHandler implemen
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     super.close();
   }
 }

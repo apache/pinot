@@ -54,9 +54,8 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
     }
 
     _transformFunction = TransformFunctionFactory.get(lhs, _dataSourceMap);
-    _predicateEvaluator = PredicateEvaluatorProvider
-        .getPredicateEvaluator(predicate, _transformFunction.getDictionary(),
-            _transformFunction.getResultMetadata().getDataType());
+    _predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate,
+        _transformFunction.getDictionary(), _transformFunction.getResultMetadata().getDataType());
   }
 
   @Override

@@ -63,8 +63,7 @@ public class PinotOutputFormat<T> extends FileOutputFormat<NullWritable, T> {
     job.getConfiguration().set(PinotOutputFormat.TABLE_CONFIG, tableConfig.toJsonString());
   }
 
-  public static TableConfig getTableConfig(JobContext job)
-      throws IOException {
+  public static TableConfig getTableConfig(JobContext job) throws IOException {
     return JsonUtils.stringToObject(job.getConfiguration().get(PinotOutputFormat.TABLE_CONFIG), TableConfig.class);
   }
 
@@ -72,13 +71,11 @@ public class PinotOutputFormat<T> extends FileOutputFormat<NullWritable, T> {
     job.getConfiguration().set(PinotOutputFormat.SCHEMA, schema.toSingleLineJsonString());
   }
 
-  public static Schema getSchema(JobContext job)
-      throws IOException {
+  public static Schema getSchema(JobContext job) throws IOException {
     return JsonUtils.stringToObject(job.getConfiguration().get(PinotOutputFormat.SCHEMA), Schema.class);
   }
 
-  public static SegmentGeneratorConfig getSegmentGeneratorConfig(JobContext job)
-      throws IOException {
+  public static SegmentGeneratorConfig getSegmentGeneratorConfig(JobContext job) throws IOException {
     TableConfig tableConfig = getTableConfig(job);
     Schema schema = getSchema(job);
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
@@ -103,20 +100,17 @@ public class PinotOutputFormat<T> extends FileOutputFormat<NullWritable, T> {
     }
   }
 
-  public static <T> PinotRecordWriter<T> getPinotRecordWriter(TaskAttemptContext job)
-      throws IOException {
+  public static <T> PinotRecordWriter<T> getPinotRecordWriter(TaskAttemptContext job) throws IOException {
     SegmentGeneratorConfig segmentGeneratorConfig = getSegmentGeneratorConfig(job);
     FieldExtractor<T> fieldExtractor = getFieldExtractor(job);
-    Set<String> fieldsToRead = IngestionUtils
-        .getFieldsForRecordExtractor(segmentGeneratorConfig.getTableConfig().getIngestionConfig(),
-            segmentGeneratorConfig.getSchema());
+    Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(
+        segmentGeneratorConfig.getTableConfig().getIngestionConfig(), segmentGeneratorConfig.getSchema());
     fieldExtractor.init(job.getConfiguration(), fieldsToRead);
     return new PinotRecordWriter<>(job, segmentGeneratorConfig, fieldExtractor);
   }
 
   @Override
-  public PinotRecordWriter<T> getRecordWriter(TaskAttemptContext job)
-      throws IOException {
+  public PinotRecordWriter<T> getRecordWriter(TaskAttemptContext job) throws IOException {
     return getPinotRecordWriter(job);
   }
 }

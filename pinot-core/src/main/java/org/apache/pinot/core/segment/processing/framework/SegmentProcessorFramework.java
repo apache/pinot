@@ -87,24 +87,20 @@ public class SegmentProcessorFramework {
     FileUtils.deleteQuietly(_baseDir);
     Preconditions.checkState(_baseDir.mkdirs(), "Failed to create base directory: %s for SegmentProcessor", _baseDir);
     _mapperInputDir = new File(_baseDir, "mapper_input");
-    Preconditions
-        .checkState(_mapperInputDir.mkdirs(), "Failed to create mapper input directory: %s for SegmentProcessor",
-            _mapperInputDir);
+    Preconditions.checkState(_mapperInputDir.mkdirs(),
+        "Failed to create mapper input directory: %s for SegmentProcessor", _mapperInputDir);
     _mapperOutputDir = new File(_baseDir, "mapper_output");
-    Preconditions
-        .checkState(_mapperOutputDir.mkdirs(), "Failed to create mapper output directory: %s for SegmentProcessor",
-            _mapperOutputDir);
+    Preconditions.checkState(_mapperOutputDir.mkdirs(),
+        "Failed to create mapper output directory: %s for SegmentProcessor", _mapperOutputDir);
     _reducerOutputDir = new File(_baseDir, "reducer_output");
-    Preconditions
-        .checkState(_reducerOutputDir.mkdirs(), "Failed to create reducer output directory: %s for SegmentProcessor",
-            _reducerOutputDir);
+    Preconditions.checkState(_reducerOutputDir.mkdirs(),
+        "Failed to create reducer output directory: %s for SegmentProcessor", _reducerOutputDir);
   }
 
   /**
    * Processes segments from the input directory as per the provided configs, then puts resulting segments into the output directory
    */
-  public void processSegments()
-      throws Exception {
+  public void processSegments() throws Exception {
 
     // Check for input segments
     File[] segmentFiles = _inputSegmentsDir.listFiles();
@@ -162,9 +158,8 @@ public class SegmentProcessorFramework {
     // Check for reducer output files
     File[] reducerOutputFiles = _reducerOutputDir.listFiles();
     if (reducerOutputFiles.length == 0) {
-      throw new IllegalStateException(
-          "No files found in reducer output directory: " + _reducerOutputDir.getAbsolutePath()
-              + ". Exiting SegmentProcessorFramework.");
+      throw new IllegalStateException("No files found in reducer output directory: "
+          + _reducerOutputDir.getAbsolutePath() + ". Exiting SegmentProcessorFramework.");
     }
 
     // Segment generation phase.
@@ -177,7 +172,7 @@ public class SegmentProcessorFramework {
       segmentGeneratorConfig.setOutDir(_outputSegmentsDir.getAbsolutePath());
       segmentGeneratorConfig.setInputFilePath(resultFile.getAbsolutePath());
       segmentGeneratorConfig.setFormat(FileFormat.AVRO);
-      segmentGeneratorConfig.setSequenceId(segmentNum ++);
+      segmentGeneratorConfig.setSequenceId(segmentNum++);
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       driver.init(segmentGeneratorConfig);
       driver.build();

@@ -32,8 +32,7 @@ public class FixedByteSingleValueMultiColWriter implements Closeable {
   private final PinotDataBuffer _dataBuffer;
   private final boolean _shouldCloseDataBuffer;
 
-  public FixedByteSingleValueMultiColWriter(File file, int rows, int cols, int[] columnSizes)
-      throws IOException {
+  public FixedByteSingleValueMultiColWriter(File file, int rows, int cols, int[] columnSizes) throws IOException {
     _columnOffsets = new int[cols];
     int rowSizeInBytes = 0;
     for (int i = 0; i < cols; i++) {
@@ -63,8 +62,7 @@ public class FixedByteSingleValueMultiColWriter implements Closeable {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     if (_shouldCloseDataBuffer) {
       _dataBuffer.close();
     }

@@ -56,8 +56,7 @@ public class MultiGetRequestTest {
   final int TIMEOUT_MS = 5000;
 
   @BeforeTest
-  public void setUpTest()
-      throws IOException {
+  public void setUpTest() throws IOException {
 
     startServer(portStart, createHandler(SUCCESS_CODE, SUCCESS_MSG, 0));
     startServer(portStart + 1, createHandler(ERROR_CODE, ERROR_MSG, 0));
@@ -74,8 +73,7 @@ public class MultiGetRequestTest {
   private HttpHandler createHandler(final int status, final String msg, final int sleepTimeMs) {
     return new HttpHandler() {
       @Override
-      public void handle(HttpExchange httpExchange)
-          throws IOException {
+      public void handle(HttpExchange httpExchange) throws IOException {
         if (sleepTimeMs > 0) {
           try {
             Thread.sleep(sleepTimeMs);
@@ -91,8 +89,7 @@ public class MultiGetRequestTest {
     };
   }
 
-  private HttpServer startServer(int port, HttpHandler handler)
-      throws IOException {
+  private HttpServer startServer(int port, HttpHandler handler) throws IOException {
     final HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
     server.createContext(URI_PATH, handler);
     new Thread(new Runnable() {

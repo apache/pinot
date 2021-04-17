@@ -68,16 +68,14 @@ public class OffHeapJsonIndexCreator extends BaseJsonIndexCreator {
   private int _numPostingListsInLastChunk;
   private int _numPostingLists;
 
-  public OffHeapJsonIndexCreator(File indexDir, String columnName)
-      throws IOException {
+  public OffHeapJsonIndexCreator(File indexDir, String columnName) throws IOException {
     super(indexDir, columnName);
     _postingListFile = new File(_tempDir, POSTING_LIST_FILE_NAME);
     _postingListOutputStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(_postingListFile)));
   }
 
   @Override
-  void addFlattenedRecords(List<Map<String, String>> records)
-      throws IOException {
+  void addFlattenedRecords(List<Map<String, String>> records) throws IOException {
     super.addFlattenedRecords(records);
     _nextDocId++;
     if (_nextDocId % FLUSH_THRESHOLD == 0) {
@@ -88,8 +86,7 @@ public class OffHeapJsonIndexCreator extends BaseJsonIndexCreator {
   /**
    * Flushes the current posting list map into the file.
    */
-  private void flush()
-      throws IOException {
+  private void flush() throws IOException {
     long length = 0;
     for (Map.Entry<String, RoaringBitmapWriter<RoaringBitmap>> entry : _postingListMap.entrySet()) {
       byte[] valueBytes = StringUtils.encodeUtf8(entry.getKey());
@@ -113,8 +110,7 @@ public class OffHeapJsonIndexCreator extends BaseJsonIndexCreator {
   }
 
   @Override
-  public void seal()
-      throws IOException {
+  public void seal() throws IOException {
     if (_nextDocId % FLUSH_THRESHOLD != 0) {
       flush();
     }
@@ -132,12 +128,12 @@ public class OffHeapJsonIndexCreator extends BaseJsonIndexCreator {
     }
 
     // Read the final posting list file and create the dictionary and inverted index file
-    try (PinotDataBuffer finalPostingListBuffer = PinotDataBuffer
-        .mapFile(finalPostingListFile, true, 0, finalPostingListFile.length(), ByteOrder.BIG_ENDIAN,
-            "Json index final posting list");
+    try (
+        PinotDataBuffer finalPostingListBuffer = PinotDataBuffer.mapFile(finalPostingListFile, true, 0,
+            finalPostingListFile.length(), ByteOrder.BIG_ENDIAN, "Json index final posting list");
         VarLengthValueWriter dictionaryWriter = new VarLengthValueWriter(_dictionaryFile, _numPostingLists);
-        BitmapInvertedIndexWriter invertedIndexWriter = new BitmapInvertedIndexWriter(_invertedIndexFile,
-            _numPostingLists)) {
+        BitmapInvertedIndexWriter invertedIndexWriter =
+            new BitmapInvertedIndexWriter(_invertedIndexFile, _numPostingLists)) {
       byte[] bitmapBytesBuffer = new byte[_maxBitmapSize];
       long offset = 0;
       for (int i = 0; i < _numPostingLists; i++) {
@@ -158,12 +154,10 @@ public class OffHeapJsonIndexCreator extends BaseJsonIndexCreator {
     generateIndexFile();
   }
 
-  private File createFinalPostingListFile(byte[] valueBytesBuffer)
-      throws IOException {
+  private File createFinalPostingListFile(byte[] valueBytesBuffer) throws IOException {
     File finalPostingListFile = new File(_tempDir, FINAL_POSTING_LIST_FILE_NAME);
-    try (PinotDataBuffer postingListBuffer = PinotDataBuffer
-        .mapFile(_postingListFile, true, 0, _postingListFile.length(), ByteOrder.BIG_ENDIAN,
-            "Json index posting list")) {
+    try (PinotDataBuffer postingListBuffer = PinotDataBuffer.mapFile(_postingListFile, true, 0,
+        _postingListFile.length(), ByteOrder.BIG_ENDIAN, "Json index posting list")) {
       // Create chunk iterators from the posting list file
       int numChunks = _postingListChunkEndOffsets.size();
       List<ChunkIterator> chunkIterators = new ArrayList<>(numChunks);
@@ -176,8 +170,8 @@ public class OffHeapJsonIndexCreator extends BaseJsonIndexCreator {
       }
 
       // Merge posting lists from the chunk iterators
-      try (DataOutputStream finalPostingListOutputStream = new DataOutputStream(
-          new BufferedOutputStream(new FileOutputStream(finalPostingListFile)))) {
+      try (DataOutputStream finalPostingListOutputStream =
+          new DataOutputStream(new BufferedOutputStream(new FileOutputStream(finalPostingListFile)))) {
         PriorityQueue<PostingListEntry> priorityQueue = new PriorityQueue<>(numChunks);
         for (ChunkIterator chunkIterator : chunkIterators) {
           if (chunkIterator.hasNext()) {
@@ -213,8 +207,7 @@ public class OffHeapJsonIndexCreator extends BaseJsonIndexCreator {
   }
 
   private void writeToFinalPostingList(DataOutputStream finalPostingListOutputStream, String value,
-      MutableRoaringBitmap docIds)
-      throws IOException {
+      MutableRoaringBitmap docIds) throws IOException {
     byte[] valueBytes = StringUtils.encodeUtf8(value);
     finalPostingListOutputStream.writeInt(valueBytes.length);
     finalPostingListOutputStream.write(valueBytes);

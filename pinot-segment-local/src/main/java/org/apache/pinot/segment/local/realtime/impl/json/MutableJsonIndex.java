@@ -71,8 +71,7 @@ public class MutableJsonIndex implements JsonIndexReader {
   /**
    * Adds the next json value.
    */
-  public void add(String jsonString)
-      throws IOException {
+  public void add(String jsonString) throws IOException {
     List<Map<String, String>> flattenedRecords = JsonUtils.flatten(JsonUtils.stringToJsonNode(jsonString));
     _writeLock.lock();
     try {
@@ -87,8 +86,8 @@ public class MutableJsonIndex implements JsonIndexReader {
    */
   private void addFlattenedRecords(List<Map<String, String>> records) {
     int numRecords = records.size();
-    Preconditions
-        .checkState(_nextFlattenedDocId + numRecords > 0, "Got more than %s flattened records", Integer.MAX_VALUE);
+    Preconditions.checkState(_nextFlattenedDocId + numRecords > 0, "Got more than %s flattened records",
+        Integer.MAX_VALUE);
     for (int i = 0; i < numRecords; i++) {
       _docIdMapping.add(_nextDocId);
     }
@@ -170,8 +169,8 @@ public class MutableJsonIndex implements JsonIndexReader {
       }
       case PREDICATE: {
         Predicate predicate = filter.getPredicate();
-        Preconditions
-            .checkState(!isExclusive(predicate.getType()), "Exclusive predicate: %s cannot be nested", predicate);
+        Preconditions.checkState(!isExclusive(predicate.getType()), "Exclusive predicate: %s cannot be nested",
+            predicate);
         return getMatchingFlattenedDocIds(predicate);
       }
       default:
@@ -209,9 +208,8 @@ public class MutableJsonIndex implements JsonIndexReader {
       String rightPart = key.substring(rightBracketIndex + 1);
 
       // foo[1].bar -> foo.$index=1
-      String searchKey =
-          leftPart + JsonUtils.KEY_SEPARATOR + JsonUtils.ARRAY_INDEX_KEY + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR
-              + arrayIndex;
+      String searchKey = leftPart + JsonUtils.KEY_SEPARATOR + JsonUtils.ARRAY_INDEX_KEY
+          + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + arrayIndex;
       RoaringBitmap docIds = _postingListMap.get(searchKey);
       if (docIds != null) {
         if (matchingDocIds == null) {

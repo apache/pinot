@@ -73,9 +73,8 @@ public class AccessControlUtils {
   public void validatePermission(Optional<String> tableNameOpt, AccessType accessType, HttpHeaders httpHeaders,
       String endpointUrl, AccessControl accessControl) {
     boolean hasPermission;
-    String accessTypeToEndpointMsg =
-        String.format("access type '%s' to the endpoint '%s'", accessType, endpointUrl) + tableNameOpt
-            .map(name -> String.format(" for table '%s'", name)).orElse("");
+    String accessTypeToEndpointMsg = String.format("access type '%s' to the endpoint '%s'", accessType, endpointUrl)
+        + tableNameOpt.map(name -> String.format(" for table '%s'", name)).orElse("");
     try {
       if (tableNameOpt.isPresent()) {
         String rawTableName = TableNameBuilder.extractRawTableName(tableNameOpt.get());

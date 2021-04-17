@@ -62,8 +62,7 @@ public class ServerQueryRequest {
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
   }
 
-  public ServerQueryRequest(Server.ServerRequest serverRequest, ServerMetrics serverMetrics)
-      throws Exception {
+  public ServerQueryRequest(Server.ServerRequest serverRequest, ServerMetrics serverMetrics) throws Exception {
     long queryArrivalTimeMs = System.currentTimeMillis();
 
     Map<String, String> metadata = serverRequest.getMetadataMap();
@@ -80,8 +79,8 @@ public class ServerQueryRequest {
       brokerRequest = SQL_COMPILER.compileToBrokerRequest(serverRequest.getSql());
     } else if (payloadType.equalsIgnoreCase(Request.PayloadType.BROKER_REQUEST)) {
       brokerRequest = new BrokerRequest();
-      new TDeserializer(new TCompactProtocol.Factory())
-          .deserialize(brokerRequest, serverRequest.getPayload().toByteArray());
+      new TDeserializer(new TCompactProtocol.Factory()).deserialize(brokerRequest,
+          serverRequest.getPayload().toByteArray());
     } else {
       throw new UnsupportedOperationException("Unsupported payloadType: " + payloadType);
     }

@@ -316,10 +316,11 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
 
     FieldSpec that = (FieldSpec) o;
-    return EqualityUtils.isEqual(_name, that._name) && EqualityUtils.isEqual(_dataType, that._dataType) && EqualityUtils
-        .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils
-        .isEqual(getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils
-        .isEqual(_maxLength, that._maxLength) && EqualityUtils.isEqual(_transformFunction, that._transformFunction);
+    return EqualityUtils.isEqual(_name, that._name) && EqualityUtils.isEqual(_dataType, that._dataType)
+        && EqualityUtils.isEqual(_isSingleValueField, that._isSingleValueField)
+        && EqualityUtils.isEqual(getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue))
+        && EqualityUtils.isEqual(_maxLength, that._maxLength)
+        && EqualityUtils.isEqual(_transformFunction, that._transformFunction);
   }
 
   @Override
@@ -342,7 +343,11 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
    * segments, otherwise treated the same as <code>DIMENSION</code> field.
    */
   public enum FieldType {
-    DIMENSION, METRIC, TIME, DATE_TIME, COMPLEX
+    DIMENSION,
+    METRIC,
+    TIME,
+    DATE_TIME,
+    COMPLEX
   }
 
   /**
@@ -352,7 +357,16 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public enum DataType {
     // LIST is for complex lists which is different from multi-value column of primitives
     // STRUCT, MAP and LIST are composable to form a COMPLEX field
-    INT, LONG, FLOAT, DOUBLE, BOOLEAN/* Stored as STRING */, STRING, BYTES, STRUCT, MAP, LIST;
+    INT,
+    LONG,
+    FLOAT,
+    DOUBLE,
+    BOOLEAN/* Stored as STRING */,
+    STRING,
+    BYTES,
+    STRUCT,
+    MAP,
+    LIST;
 
     /**
      * Returns the data type stored in Pinot.

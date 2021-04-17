@@ -34,8 +34,7 @@ public class TableTaskSchedulerUpdater implements IZkDataListener {
   }
 
   @Override
-  public void handleDataChange(String dataPath, Object data)
-      throws Exception {
+  public void handleDataChange(String dataPath, Object data) throws Exception {
     try {
       _pinotTaskManager.updateCronTaskScheduler(_tableWithType);
     } catch (Exception e) {
@@ -45,8 +44,7 @@ public class TableTaskSchedulerUpdater implements IZkDataListener {
   }
 
   @Override
-  public void handleDataDeleted(String dataPath)
-      throws Exception {
+  public void handleDataDeleted(String dataPath) throws Exception {
     try {
       _pinotTaskManager.cleanUpCronTaskSchedulerForTable(_tableWithType);
     } catch (Exception e) {

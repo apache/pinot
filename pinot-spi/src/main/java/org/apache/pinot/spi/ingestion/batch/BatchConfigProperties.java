@@ -62,7 +62,8 @@ public class BatchConfigProperties {
   public static final String OUTPUT_SEGMENT_DIR_URI = "output.segment.dir.uri";
 
   public enum SegmentIngestionType {
-    APPEND, REPLACE
+    APPEND,
+    REPLACE
   }
 
   public static class SegmentNameGeneratorType {
@@ -72,6 +73,8 @@ public class BatchConfigProperties {
   }
 
   public enum SegmentPushType {
-    TAR, URI, METADATA
+    TAR,
+    URI,
+    METADATA
   }
 }

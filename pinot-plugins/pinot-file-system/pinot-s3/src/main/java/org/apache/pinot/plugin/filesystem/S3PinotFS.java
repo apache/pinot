@@ -100,8 +100,8 @@ public class S3PinotFS extends PinotFS {
       try {
         _serverSideEncryption = ServerSideEncryption.valueOf(serverSideEncryption);
       } catch (Exception e) {
-        throw new UnsupportedOperationException(String
-            .format("Unknown value '%s' for S3PinotFS config: 'serverSideEncryption'. Supported values are: %s",
+        throw new UnsupportedOperationException(
+            String.format("Unknown value '%s' for S3PinotFS config: 'serverSideEncryption'. Supported values are: %s",
                 serverSideEncryption, Arrays.toString(ServerSideEncryption.knownValues().toArray())));
       }
       switch (_serverSideEncryption) {
@@ -155,8 +155,7 @@ public class S3PinotFS extends PinotFS {
     return target == null || "".equals(target);
   }
 
-  private HeadObjectResponse getS3ObjectMetadata(URI uri)
-      throws IOException {
+  private HeadObjectResponse getS3ObjectMetadata(URI uri) throws IOException {
     URI base = getBase(uri);
     String path = sanitizePath(base.relativize(uri).getPath());
     HeadObjectRequest headObjectRequest = HeadObjectRequest.builder().bucket(uri.getHost()).key(path).build();
@@ -168,8 +167,7 @@ public class S3PinotFS extends PinotFS {
     return uri.getPath().endsWith(DELIMITER);
   }
 
-  private String normalizeToDirectoryPrefix(URI uri)
-      throws IOException {
+  private String normalizeToDirectoryPrefix(URI uri) throws IOException {
     Preconditions.checkNotNull(uri, "uri is null");
     URI strippedUri = getBase(uri).relativize(uri);
     if (isPathTerminatedByDelimiter(strippedUri)) {
@@ -178,8 +176,7 @@ public class S3PinotFS extends PinotFS {
     return sanitizePath(strippedUri.getPath() + DELIMITER);
   }
 
-  private URI normalizeToDirectoryUri(URI uri)
-      throws IOException {
+  private URI normalizeToDirectoryUri(URI uri) throws IOException {
     if (isPathTerminatedByDelimiter(uri)) {
       return uri;
     }
@@ -198,8 +195,7 @@ public class S3PinotFS extends PinotFS {
     return path;
   }
 
-  private URI getBase(URI uri)
-      throws IOException {
+  private URI getBase(URI uri) throws IOException {
     try {
       return new URI(uri.getScheme(), uri.getHost(), null, null);
     } catch (URISyntaxException e) {
@@ -213,8 +209,7 @@ public class S3PinotFS extends PinotFS {
    * @return {@code true} if the file exists in the path
    *         {@code false} otherwise
    */
-  private boolean existsFile(URI uri)
-      throws IOException {
+  private boolean existsFile(URI uri) throws IOException {
     try {
       URI base = getBase(uri);
       String path = sanitizePath(base.relativize(uri).getPath());
@@ -235,8 +230,7 @@ public class S3PinotFS extends PinotFS {
    * @return {@code true} if the path is a non-empty directory,
    *         {@code false} otherwise
    */
-  private boolean isEmptyDirectory(URI uri)
-      throws IOException {
+  private boolean isEmptyDirectory(URI uri) throws IOException {
     if (!isDirectory(uri)) {
       return false;
     }
@@ -270,8 +264,7 @@ public class S3PinotFS extends PinotFS {
    * @return {@code true} if the copy operation succeeds, i.e., response code is 200
    *         {@code false} otherwise
    */
-  private boolean copyFile(URI srcUri, URI dstUri)
-      throws IOException {
+  private boolean copyFile(URI srcUri, URI dstUri) throws IOException {
     try {
       String encodedUrl = null;
       try {
@@ -290,8 +283,7 @@ public class S3PinotFS extends PinotFS {
   }
 
   @Override
-  public boolean mkdir(URI uri)
-      throws IOException {
+  public boolean mkdir(URI uri) throws IOException {
     LOGGER.info("mkdir {}", uri);
     try {
       Preconditions.checkNotNull(uri, "uri is null");
@@ -310,15 +302,13 @@ public class S3PinotFS extends PinotFS {
   }
 
   @Override
-  public boolean delete(URI segmentUri, boolean forceDelete)
-      throws IOException {
+  public boolean delete(URI segmentUri, boolean forceDelete) throws IOException {
     LOGGER.info("Deleting uri {} force {}", segmentUri, forceDelete);
     try {
       if (isDirectory(segmentUri)) {
         if (!forceDelete) {
-          Preconditions
-              .checkState(isEmptyDirectory(segmentUri), "ForceDelete flag is not set and directory '%s' is not empty",
-                  segmentUri);
+          Preconditions.checkState(isEmptyDirectory(segmentUri),
+              "ForceDelete flag is not set and directory '%s' is not empty", segmentUri);
         }
         String prefix = normalizeToDirectoryPrefix(segmentUri);
         ListObjectsV2Response listObjectsV2Response;
@@ -361,8 +351,7 @@ public class S3PinotFS extends PinotFS {
   }
 
   @Override
-  public boolean doMove(URI srcUri, URI dstUri)
-      throws IOException {
+  public boolean doMove(URI srcUri, URI dstUri) throws IOException {
     if (copy(srcUri, dstUri)) {
       return delete(srcUri, true);
     }
@@ -370,8 +359,7 @@ public class S3PinotFS extends PinotFS {
   }
 
   @Override
-  public boolean copy(URI srcUri, URI dstUri)
-      throws IOException {
+  public boolean copy(URI srcUri, URI dstUri) throws IOException {
     LOGGER.info("Copying uri {} to uri {}", srcUri, dstUri);
     Preconditions.checkState(exists(srcUri), "Source URI '%s' does not exist", srcUri);
     if (srcUri.equals(dstUri)) {
@@ -401,8 +389,7 @@ public class S3PinotFS extends PinotFS {
   }
 
   @Override
-  public boolean exists(URI fileUri)
-      throws IOException {
+  public boolean exists(URI fileUri) throws IOException {
     try {
       if (isDirectory(fileUri)) {
         return true;
@@ -417,8 +404,7 @@ public class S3PinotFS extends PinotFS {
   }
 
   @Override
-  public long length(URI fileUri)
-      throws IOException {
+  public long length(URI fileUri) throws IOException {
     try {
       Preconditions.checkState(!isPathTerminatedByDelimiter(fileUri), "URI is a directory");
       HeadObjectResponse s3ObjectMetadata = getS3ObjectMetadata(fileUri);
@@ -433,8 +419,7 @@ public class S3PinotFS extends PinotFS {
   }
 
   @Override
-  public String[] listFiles(URI fileUri, boolean recursive)
-      throws IOException {
+  public String[] listFiles(URI fileUri, boolean recursive) throws IOException {
     try {
       ImmutableList.Builder<String> builder = ImmutableList.builder();
       String continuationToken = null;
@@ -479,8 +464,7 @@ public class S3PinotFS extends PinotFS {
   }
 
   @Override
-  public void copyToLocalFile(URI srcUri, File dstFile)
-      throws Exception {
+  public void copyToLocalFile(URI srcUri, File dstFile) throws Exception {
     LOGGER.info("Copy {} to local {}", srcUri, dstFile.getAbsolutePath());
     URI base = getBase(srcUri);
     FileUtils.forceMkdir(dstFile.getParentFile());
@@ -491,8 +475,7 @@ public class S3PinotFS extends PinotFS {
   }
 
   @Override
-  public void copyFromLocalFile(File srcFile, URI dstUri)
-      throws Exception {
+  public void copyFromLocalFile(File srcFile, URI dstUri) throws Exception {
     LOGGER.info("Copy {} from local to {}", srcFile.getAbsolutePath(), dstUri);
     URI base = getBase(dstUri);
     String prefix = sanitizePath(base.relativize(dstUri).getPath());
@@ -501,8 +484,7 @@ public class S3PinotFS extends PinotFS {
   }
 
   @Override
-  public boolean isDirectory(URI uri)
-      throws IOException {
+  public boolean isDirectory(URI uri) throws IOException {
     try {
       String prefix = normalizeToDirectoryPrefix(uri);
       if (prefix.equals(DELIMITER)) {
@@ -520,14 +502,12 @@ public class S3PinotFS extends PinotFS {
   }
 
   @Override
-  public long lastModified(URI uri)
-      throws IOException {
+  public long lastModified(URI uri) throws IOException {
     return getS3ObjectMetadata(uri).lastModified().toEpochMilli();
   }
 
   @Override
-  public boolean touch(URI uri)
-      throws IOException {
+  public boolean touch(URI uri) throws IOException {
     try {
       HeadObjectResponse s3ObjectMetadata = getS3ObjectMetadata(uri);
       String encodedUrl = null;
@@ -589,8 +569,7 @@ public class S3PinotFS extends PinotFS {
   }
 
   @Override
-  public InputStream open(URI uri)
-      throws IOException {
+  public InputStream open(URI uri) throws IOException {
     try {
       String path = sanitizePath(uri.getPath());
       GetObjectRequest getObjectRequest = GetObjectRequest.builder().bucket(uri.getHost()).key(path).build();
@@ -602,8 +581,7 @@ public class S3PinotFS extends PinotFS {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     super.close();
   }
 }

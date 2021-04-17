@@ -80,8 +80,7 @@ public class GenericQuickstart {
     _kafkaStarter.createTopic("pullRequestMergedEvents", KafkaStarterUtils.getTopicCreationProps(2));
   }
 
-  public void execute()
-      throws Exception {
+  public void execute() throws Exception {
 
     File tempDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
     Preconditions.checkState(tempDir.mkdirs());
@@ -137,8 +136,7 @@ public class GenericQuickstart {
     printStatus(Color.GREEN, "You can always go to http://localhost:9000 to play around in the query console");
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     ClassLoader classLoader = GenericQuickstart.class.getClassLoader();
     URL resource = classLoader.getResource("examples/batch/starbucksStores");
     String tableDirectoryPath = resource.getPath();

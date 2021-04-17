@@ -50,8 +50,7 @@ public class SegmentV1V2ToV3FormatConverterTest {
   private IndexLoadingConfig _v3IndexLoadingConfig;
 
   @BeforeMethod
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
 
     _indexDir = Files.createTempDirectory(SegmentV1V2ToV3FormatConverter.class.getName() + "_segmentDir").toFile();
 
@@ -59,9 +58,8 @@ public class SegmentV1V2ToV3FormatConverterTest {
         TestUtils.getFileFromResourceUrl(SegmentV1V2ToV3FormatConverter.class.getClassLoader().getResource(AVRO_DATA));
 
     // intentionally changed this to TimeUnit.Hours to make it non-default for testing
-    final SegmentGeneratorConfig config = SegmentTestUtils
-        .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), _indexDir, "daysSinceEpoch", TimeUnit.HOURS,
-            "testTable");
+    final SegmentGeneratorConfig config = SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(
+        new File(filePath), _indexDir, "daysSinceEpoch", TimeUnit.HOURS, "testTable");
     config.setSegmentNamePostfix("1");
     // The segment generation code in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable
@@ -80,16 +78,14 @@ public class SegmentV1V2ToV3FormatConverterTest {
   }
 
   @AfterMethod
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     if (_indexDir != null) {
       FileUtils.deleteQuietly(_indexDir);
     }
   }
 
   @Test
-  public void testConvert()
-      throws Exception {
+  public void testConvert() throws Exception {
 
     SegmentMetadataImpl beforeConversionMeta = new SegmentMetadataImpl(_segmentDirectory);
 

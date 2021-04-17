@@ -51,8 +51,7 @@ import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER;
 
 public class BasicAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
     startZk();
@@ -76,8 +75,7 @@ public class BasicAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest
   }
 
   @AfterClass(alwaysRun = true)
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     dropRealtimeTable(getTableName());
     stopMinion();
     stopServer();
@@ -123,17 +121,14 @@ public class BasicAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest
   }
 
   @Override
-  protected void addSchema(Schema schema)
-      throws IOException {
-    PostMethod response =
-        sendMultipartPostRequest(_controllerRequestURLBuilder.forSchemaCreate(), schema.toSingleLineJsonString(),
-            AUTH_HEADER);
+  protected void addSchema(Schema schema) throws IOException {
+    PostMethod response = sendMultipartPostRequest(_controllerRequestURLBuilder.forSchemaCreate(),
+        schema.toSingleLineJsonString(), AUTH_HEADER);
     Assert.assertEquals(response.getStatusCode(), 200);
   }
 
   @Override
-  protected void addTableConfig(TableConfig tableConfig)
-      throws IOException {
+  protected void addTableConfig(TableConfig tableConfig) throws IOException {
     sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString(), AUTH_HEADER);
   }
 
@@ -147,16 +142,14 @@ public class BasicAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest
   }
 
   @Override
-  protected void dropRealtimeTable(String tableName)
-      throws IOException {
+  protected void dropRealtimeTable(String tableName) throws IOException {
     sendDeleteRequest(
         _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType(tableName)),
         AUTH_HEADER);
   }
 
   @Test
-  public void testSegmentUploadDownload()
-      throws Exception {
+  public void testSegmentUploadDownload() throws Exception {
     final Request query = new Request("sql", "SELECT count(*) FROM " + getTableName());
 
     ResultSetGroup resultBeforeOffline = getPinotConnection().execute(query);
@@ -174,9 +167,8 @@ public class BasicAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest
     // list offline segments
     JsonNode segmentSets = JsonUtils
         .stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(getTableName()), AUTH_HEADER));
-    JsonNode offlineSegments =
-        new IntRange(0, segmentSets.size()).stream().map(segmentSets::get).filter(s -> s.has("OFFLINE"))
-            .map(s -> s.get("OFFLINE")).findFirst().get();
+    JsonNode offlineSegments = new IntRange(0, segmentSets.size()).stream().map(segmentSets::get)
+        .filter(s -> s.has("OFFLINE")).map(s -> s.get("OFFLINE")).findFirst().get();
     Assert.assertFalse(offlineSegments.isEmpty());
 
     // download and sanity-check size of offline segment(s)
@@ -184,7 +176,7 @@ public class BasicAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest
       String segment = offlineSegments.get(i).asText();
       Assert.assertTrue(sendGetRequest(_controllerRequestURLBuilder
           .forSegmentDownload(TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), segment), AUTH_HEADER)
-          .length() > 200000); // download segment
+              .length() > 200000); // download segment
     }
   }
 }

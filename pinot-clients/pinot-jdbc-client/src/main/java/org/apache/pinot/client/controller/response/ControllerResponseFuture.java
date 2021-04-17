@@ -53,16 +53,13 @@ abstract class ControllerResponseFuture<T> implements Future<T> {
   }
 
   @Override
-  public T get()
-      throws ExecutionException {
+  public T get() throws ExecutionException {
     return get(1000L, TimeUnit.DAYS);
   }
 
-  abstract public T get(long timeout, TimeUnit unit)
-      throws ExecutionException;
+  abstract public T get(long timeout, TimeUnit unit) throws ExecutionException;
 
-  public String getStringResponse(long timeout, TimeUnit unit)
-      throws ExecutionException {
+  public String getStringResponse(long timeout, TimeUnit unit) throws ExecutionException {
     try {
       LOGGER.debug("Sending request to {}", _url);
 

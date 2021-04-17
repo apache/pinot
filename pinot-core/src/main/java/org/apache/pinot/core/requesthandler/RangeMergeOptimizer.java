@@ -139,9 +139,8 @@ public class RangeMergeOptimizer extends FilterQueryTreeOptimizer {
             .append(predicate1.isLowerInclusive() ? RangePredicate.LOWER_INCLUSIVE : RangePredicate.LOWER_EXCLUSIVE)
             .append(lowerBound1);
       } else {
-        stringBuilder.append(
-            predicate1.isLowerInclusive() && predicate2.isLowerInclusive() ? RangePredicate.LOWER_INCLUSIVE
-                : RangePredicate.LOWER_EXCLUSIVE).append(lowerBound1);
+        stringBuilder.append(predicate1.isLowerInclusive() && predicate2.isLowerInclusive()
+            ? RangePredicate.LOWER_INCLUSIVE : RangePredicate.LOWER_EXCLUSIVE).append(lowerBound1);
       }
     }
 
@@ -165,9 +164,8 @@ public class RangeMergeOptimizer extends FilterQueryTreeOptimizer {
         stringBuilder.append(upperBound2)
             .append(predicate2.isUpperInclusive() ? RangePredicate.UPPER_INCLUSIVE : RangePredicate.UPPER_EXCLUSIVE);
       } else {
-        stringBuilder.append(upperBound1).append(
-            predicate1.isUpperInclusive() && predicate2.isUpperInclusive() ? RangePredicate.UPPER_INCLUSIVE
-                : RangePredicate.UPPER_EXCLUSIVE);
+        stringBuilder.append(upperBound1).append(predicate1.isUpperInclusive() && predicate2.isUpperInclusive()
+            ? RangePredicate.UPPER_INCLUSIVE : RangePredicate.UPPER_EXCLUSIVE);
       }
     }
 

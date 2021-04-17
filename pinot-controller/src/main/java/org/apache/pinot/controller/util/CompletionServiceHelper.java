@@ -32,6 +32,7 @@ import org.apache.pinot.common.http.MultiGetRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * This is a helper class that can be used to make HttpGet (MultiGet) calls and get the responses back.
  * The responses are returned as a string.
@@ -47,7 +48,7 @@ public class CompletionServiceHelper {
   private final BiMap<String, String> _endpointsToServers;
 
   public CompletionServiceHelper(Executor executor, HttpConnectionManager httpConnectionManager,
-                                 BiMap<String, String> endpointsToServers) {
+      BiMap<String, String> endpointsToServers) {
     _executor = executor;
     _httpConnectionManager = httpConnectionManager;
     _endpointsToServers = endpointsToServers;
@@ -64,8 +65,8 @@ public class CompletionServiceHelper {
       try {
         getMethod = completionService.take().get();
         URI uri = getMethod.getURI();
-        String instance = _endpointsToServers.get(
-            String.format("%s://%s:%d", uri.getScheme(), uri.getHost(), uri.getPort()));
+        String instance =
+            _endpointsToServers.get(String.format("%s://%s:%d", uri.getScheme(), uri.getHost(), uri.getPort()));
         if (getMethod.getStatusCode() >= 300) {
           LOGGER.error("Server: {} returned error: {}", instance, getMethod.getStatusCode());
           completionServiceResponse._failedResponseCount++;

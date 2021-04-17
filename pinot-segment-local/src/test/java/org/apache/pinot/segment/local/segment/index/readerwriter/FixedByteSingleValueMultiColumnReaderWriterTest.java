@@ -49,15 +49,13 @@ public class FixedByteSingleValueMultiColumnReaderWriterTest {
   @BeforeClass
   public void setup() {
     _memoryManager = new DirectMemoryManager(FixedByteSingleValueMultiColumnReaderWriterTest.class.getName());
-    _readerWriter =
-        new FixedByteSingleValueMultiColumnReaderWriter(NUM_ROWS_PER_CHUNK, COLUMN_SIZES_IN_BYTES, _memoryManager,
-            "test");
+    _readerWriter = new FixedByteSingleValueMultiColumnReaderWriter(NUM_ROWS_PER_CHUNK, COLUMN_SIZES_IN_BYTES,
+        _memoryManager, "test");
     _random = new Random(System.nanoTime());
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     _readerWriter.close();
     _memoryManager.close();
   }

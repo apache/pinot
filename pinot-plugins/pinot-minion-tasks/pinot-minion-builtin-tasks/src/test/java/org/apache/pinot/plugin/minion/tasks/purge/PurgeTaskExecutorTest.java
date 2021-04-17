@@ -65,8 +65,7 @@ public class PurgeTaskExecutorTest {
   private File _originalIndexDir;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
@@ -115,8 +114,7 @@ public class PurgeTaskExecutorTest {
   }
 
   @Test
-  public void testConvert()
-      throws Exception {
+  public void testConvert() throws Exception {
     PurgeTaskExecutor purgeTaskExecutor = new PurgeTaskExecutor();
     PinotTaskConfig pinotTaskConfig = new PinotTaskConfig(MinionConstants.PurgeTask.TASK_TYPE, Collections
         .singletonMap(MinionConstants.TABLE_NAME_KEY, TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME)));
@@ -141,8 +139,7 @@ public class PurgeTaskExecutorTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 }

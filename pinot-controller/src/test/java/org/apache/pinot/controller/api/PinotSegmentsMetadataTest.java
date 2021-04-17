@@ -51,6 +51,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+
 public class PinotSegmentsMetadataTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentsMetadataTest.class);
   private final Executor executor = Executors.newFixedThreadPool(1);
@@ -69,8 +70,7 @@ public class PinotSegmentsMetadataTest {
   }
 
   @BeforeClass
-  public void setUp()
-          throws IOException {
+  public void setUp() throws IOException {
     helix = mock(PinotHelixResourceManager.class);
     when(helix.hasOfflineTable(anyString())).thenAnswer((Answer) invocationOnMock -> {
       String table = (String) invocationOnMock.getArguments()[0];
@@ -116,7 +116,8 @@ public class PinotSegmentsMetadataTest {
     }
   }
 
-  private HttpHandler createSegmentMetadataHandler(final int status, final String segmentMetadata, final int sleepTimeMs) {
+  private HttpHandler createSegmentMetadataHandler(final int status, final String segmentMetadata,
+      final int sleepTimeMs) {
     return httpExchange -> {
       if (sleepTimeMs > 0) {
         try {
@@ -135,7 +136,7 @@ public class PinotSegmentsMetadataTest {
   }
 
   private List<String> testMetadataResponse(String table, Map<String, List<String>> serverToSegmentsMap,
-                                            BiMap<String, String> endpoints) {
+      BiMap<String, String> endpoints) {
     ServerSegmentMetadataReader metadataReader = new ServerSegmentMetadataReader(executor, connectionManager);
     return metadataReader.getSegmentMetadataFromServer(table, serverToSegmentsMap, endpoints, timeoutMsec);
   }
@@ -194,8 +195,7 @@ public class PinotSegmentsMetadataTest {
       segmentMetadata = JsonUtils.objectToString(objectNode);
     }
 
-    private void start(String path, HttpHandler handler)
-            throws IOException {
+    private void start(String path, HttpHandler handler) throws IOException {
       httpServer = HttpServer.create(socket, 0);
       httpServer.createContext(path, handler);
       new Thread(() -> httpServer.start()).start();
@@ -204,27 +204,15 @@ public class PinotSegmentsMetadataTest {
   }
 
   public static class MetadataConstants {
-    public static final List<String> SEGMENT_SERVERS = Arrays.asList("server1", "server2", "server3", "server4", "server5");
-    public static final String SEGMENT_METADATA_STR = "{\n" +
-            "  \"segmentName\" : \"testTable_OFFLINE_default_s1\",\n" +
-            "  \"schemaName\" : null,\n" +
-            "  \"crc\" : 1804064321,\n" +
-            "  \"creationTimeMillis\" : 1595127594768,\n" +
-            "  \"creationTimeReadable\" : \"2020-07-19T02:59:54:768 UTC\",\n" +
-            "  \"timeGranularitySec\" : null,\n" +
-            "  \"startTimeMillis\" : null,\n" +
-            "  \"startTimeReadable\" : null,\n" +
-            "  \"endTimeMillis\" : null,\n" +
-            "  \"endTimeReadable\" : null,\n" +
-            "  \"pushTimeMillis\" : -9223372036854775808,\n" +
-            "  \"pushTimeReadable\" : null,\n" +
-            "  \"refreshTimeMillis\" : -9223372036854775808,\n" +
-            "  \"refreshTimeReadable\" : null,\n" +
-            "  \"segmentVersion\" : \"v3\",\n" +
-            "  \"creatorName\" : null,\n" +
-            "  \"paddingCharacter\" : \"\\u0000\",\n" +
-            "  \"columns\" : [ ],\n" +
-            "  \"indexes\" : [ { } ]\n" +
-            "}";
+    public static final List<String> SEGMENT_SERVERS =
+        Arrays.asList("server1", "server2", "server3", "server4", "server5");
+    public static final String SEGMENT_METADATA_STR = "{\n" + "  \"segmentName\" : \"testTable_OFFLINE_default_s1\",\n"
+        + "  \"schemaName\" : null,\n" + "  \"crc\" : 1804064321,\n" + "  \"creationTimeMillis\" : 1595127594768,\n"
+        + "  \"creationTimeReadable\" : \"2020-07-19T02:59:54:768 UTC\",\n" + "  \"timeGranularitySec\" : null,\n"
+        + "  \"startTimeMillis\" : null,\n" + "  \"startTimeReadable\" : null,\n" + "  \"endTimeMillis\" : null,\n"
+        + "  \"endTimeReadable\" : null,\n" + "  \"pushTimeMillis\" : -9223372036854775808,\n"
+        + "  \"pushTimeReadable\" : null,\n" + "  \"refreshTimeMillis\" : -9223372036854775808,\n"
+        + "  \"refreshTimeReadable\" : null,\n" + "  \"segmentVersion\" : \"v3\",\n" + "  \"creatorName\" : null,\n"
+        + "  \"paddingCharacter\" : \"\\u0000\",\n" + "  \"columns\" : [ ],\n" + "  \"indexes\" : [ { } ]\n" + "}";
   }
 }

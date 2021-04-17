@@ -45,8 +45,7 @@ public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   private RecordExtractor<Map<String, Object>> _jsonRecordExtractor;
 
   @Override
-  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
-      throws Exception {
+  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName) throws Exception {
     String recordExtractorClass = null;
     if (props != null) {
       recordExtractorClass = props.get(RECORD_EXTRACTOR_CONFIG_KEY);

@@ -39,23 +39,21 @@ public class PinotToolLauncher {
 
   // @formatter:off
   @Argument(handler = SubCommandHandler.class, metaVar = "<subCommand>")
-  @SubCommands({
-      @SubCommand(name = "UpdateSegmentState", impl = UpdateSegmentState.class),
-      @SubCommand(name = "AutoAddInvertedIndex", impl = AutoAddInvertedIndexTool.class),
-      @SubCommand(name = "ValidateTableRetention", impl = ValidateTableRetention.class),
-      @SubCommand(name = "PerfBenchmarkRunner", impl = PerfBenchmarkRunner.class),
-      @SubCommand(name = "QueryRunner", impl = QueryRunner.class),
-      @SubCommand(name = "PinotFSBenchmarkRunner", impl = PinotFSBenchmarkRunner.class),
-      @SubCommand(name = "SegmentDump", impl = SegmentDumpTool.class)
-  })
+  @SubCommands({@SubCommand(name = "UpdateSegmentState", impl = UpdateSegmentState.class), @SubCommand(
+      name = "AutoAddInvertedIndex", impl = AutoAddInvertedIndexTool.class), @SubCommand(
+          name = "ValidateTableRetention", impl = ValidateTableRetention.class), @SubCommand(
+              name = "PerfBenchmarkRunner", impl = PerfBenchmarkRunner.class), @SubCommand(name = "QueryRunner",
+                  impl = QueryRunner.class), @SubCommand(name = "PinotFSBenchmarkRunner",
+                      impl = PinotFSBenchmarkRunner.class), @SubCommand(name = "SegmentDump",
+                          impl = SegmentDumpTool.class)})
   Command _subCommand;
   // @formatter:on
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   boolean _help = false;
 
-  public void execute(String[] args)
-      throws Exception {
+  public void execute(String[] args) throws Exception {
     try {
       CmdLineParser parser = new CmdLineParser(this);
       parser.parseArgument(args);
@@ -74,8 +72,7 @@ public class PinotToolLauncher {
     }
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     PluginManager.get().init();
     new PinotToolLauncher().execute(args);
   }

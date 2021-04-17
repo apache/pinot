@@ -57,8 +57,7 @@ public class PinotSegmentRecordReader implements RecordReader {
    * Read records using the segment schema
    * @param indexDir input path for the segment index
    */
-  public PinotSegmentRecordReader(File indexDir)
-      throws Exception {
+  public PinotSegmentRecordReader(File indexDir) throws Exception {
     this(indexDir, null, null);
   }
 
@@ -161,8 +160,7 @@ public class PinotSegmentRecordReader implements RecordReader {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     for (PinotSegmentColumnReader columnReader : _columnReaderMap.values()) {
       columnReader.close();
     }

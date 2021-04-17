@@ -75,7 +75,7 @@ public class KafkaPartitionLevelStreamConfig {
       Preconditions.checkArgument(
           _kafkaIsolationLevel.equals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_COMMITTED)
               || _kafkaIsolationLevel
-              .equals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_UNCOMMITTED),
+                  .equals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_UNCOMMITTED),
           String.format("Unrecognized Kafka isolation level: %s", _kafkaIsolationLevel));
     }
 
@@ -143,12 +143,12 @@ public class KafkaPartitionLevelStreamConfig {
 
     KafkaPartitionLevelStreamConfig that = (KafkaPartitionLevelStreamConfig) o;
 
-    return EqualityUtils.isEqual(_kafkaTopicName, that._kafkaTopicName) && EqualityUtils
-        .isEqual(_bootstrapHosts, that._bootstrapHosts) && EqualityUtils
-        .isEqual(_kafkaBufferSize, that._kafkaBufferSize) && EqualityUtils
-        .isEqual(_kafkaSocketTimeout, that._kafkaSocketTimeout) && EqualityUtils
-        .isEqual(_kafkaFetcherSizeBytes, that._kafkaFetcherSizeBytes) && EqualityUtils
-        .isEqual(_kafkaFetcherMinBytes, that._kafkaFetcherMinBytes);
+    return EqualityUtils.isEqual(_kafkaTopicName, that._kafkaTopicName)
+        && EqualityUtils.isEqual(_bootstrapHosts, that._bootstrapHosts)
+        && EqualityUtils.isEqual(_kafkaBufferSize, that._kafkaBufferSize)
+        && EqualityUtils.isEqual(_kafkaSocketTimeout, that._kafkaSocketTimeout)
+        && EqualityUtils.isEqual(_kafkaFetcherSizeBytes, that._kafkaFetcherSizeBytes)
+        && EqualityUtils.isEqual(_kafkaFetcherMinBytes, that._kafkaFetcherMinBytes);
   }
 
   @Override

@@ -71,8 +71,8 @@ public class KafkaStreamLevelConsumerManager {
 
   public static KafkaConsumer acquireKafkaConsumerForConfig(KafkaStreamLevelStreamConfig kafkaStreamLevelStreamConfig) {
     final ImmutableTriple<String, String, String> configKey =
-        new ImmutableTriple<>(kafkaStreamLevelStreamConfig.getKafkaTopicName(), kafkaStreamLevelStreamConfig.getGroupId(),
-            kafkaStreamLevelStreamConfig.getBootstrapServers());
+        new ImmutableTriple<>(kafkaStreamLevelStreamConfig.getKafkaTopicName(),
+            kafkaStreamLevelStreamConfig.getGroupId(), kafkaStreamLevelStreamConfig.getBootstrapServers());
 
     synchronized (KafkaStreamLevelConsumerManager.class) {
       // If we have the consumer and it's not already acquired, return it, otherwise error out if it's already acquired
@@ -98,8 +98,8 @@ public class KafkaStreamLevelConsumerManager {
       consumerProp.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
       consumerProp.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, BytesDeserializer.class.getName());
 
-      if (consumerProp.containsKey(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG) && consumerProp
-          .getProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG).equals("smallest")) {
+      if (consumerProp.containsKey(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG)
+          && consumerProp.getProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG).equals("smallest")) {
         consumerProp.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
       }
       KafkaConsumer consumer = new KafkaConsumer<>(consumerProp);
@@ -109,7 +109,8 @@ public class KafkaStreamLevelConsumerManager {
       CONSUMER_FOR_CONFIG_KEY.put(configKey, consumer);
       CONSUMER_RELEASE_TIME.put(consumer, IN_USE);
 
-      LOGGER.info("Created consumer with id {} for topic {}", consumer, kafkaStreamLevelStreamConfig.getKafkaTopicName());
+      LOGGER.info("Created consumer with id {} for topic {}", consumer,
+          kafkaStreamLevelStreamConfig.getKafkaTopicName());
 
       return consumer;
     }

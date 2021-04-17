@@ -110,8 +110,8 @@ public class FakePartitionLevelConsumer implements PartitionLevelConsumer {
     if (endOffset == null || endOffset.compareTo(FakeStreamConfigUtils.getLargestOffset()) > 0) {
       endOffset = FakeStreamConfigUtils.getLargestOffset();
     }
-    int startOffsetInt = (int) ((LongMsgOffset)startOffset).getOffset();
-    int endOffsetInt = (int) ((LongMsgOffset)endOffset).getOffset();
+    int startOffsetInt = (int) ((LongMsgOffset) startOffset).getOffset();
+    int endOffsetInt = (int) ((LongMsgOffset) endOffset).getOffset();
     return new FakeStreamMessageBatch(messageOffsets.subList(startOffsetInt, endOffsetInt),
         messageBytes.subList(startOffsetInt, endOffsetInt));
   }

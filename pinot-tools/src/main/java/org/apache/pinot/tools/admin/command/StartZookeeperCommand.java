@@ -42,7 +42,8 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
   @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Directory for zookeper data.")
   private String _dataDir = TMP_DIR + "PinotAdmin/zkData";
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -87,8 +88,7 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
   }
 
   @Override
-  public boolean execute()
-      throws IOException {
+  public boolean execute() throws IOException {
     LOGGER.info("Executing command: " + toString());
 
     IDefaultNameSpace _defaultNameSpace = new IDefaultNameSpace() {
@@ -111,8 +111,7 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
     return true;
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     StartZookeeperCommand zkc = new StartZookeeperCommand();
     zkc.execute();
   }

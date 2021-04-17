@@ -33,6 +33,7 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.FlagQueryRuleParams.WARNING_NO_TIME_COL;
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.FlagQueryRuleParams.WARNING_TOO_LONG_LIMIT;
 
+
 /**
  * Flag the queries that are not valid:
  *    Flag the queries with LIMIT value higher than a threshold.
@@ -46,12 +47,12 @@ public class FlagQueryRule extends AbstractRule {
 
   public FlagQueryRule(InputManager input, ConfigManager output) {
     super(input, output);
-    _params=input.getFlagQueryRuleParams();
+    _params = input.getFlagQueryRuleParams();
   }
 
   @Override
   public void run() {
-    for (String query : _input.getParsedQueries()){
+    for (String query : _input.getParsedQueries()) {
       LOGGER.debug("Parsing query: {}", query);
       QueryContext queryContext = _input.getQueryContext(query);
       if (queryContext.getLimit() > _params.THRESHOLD_MAX_LIMIT_SIZE) {
@@ -62,11 +63,10 @@ public class FlagQueryRule extends AbstractRule {
       if (queryContext.getFilter() == null) {
         //Flag the queries that are not using any filters.
         _output.getFlaggedQueries().add(query, WARNING_NO_FILTERING);
-      }
-      else { //Flag the queries that are not using any filters.
+      } else { //Flag the queries that are not using any filters.
         Set<String> usedCols = new HashSet<>();
         queryContext.getFilter().getColumns(usedCols);
-        if (!usedCols.contains(_input.getPrimaryTimeCol())){
+        if (!usedCols.contains(_input.getPrimaryTimeCol())) {
           _output.getFlaggedQueries().add(query, WARNING_NO_TIME_COL);
         }
       }

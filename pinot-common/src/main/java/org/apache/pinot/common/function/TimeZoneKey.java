@@ -29,6 +29,7 @@ import static java.lang.Math.max;
 import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
 
+
 /**
  * Copied from the presto TimeZoneKey. It basically caches the Joda Chronologies corresponding to each of the timezones listed in the zone-index.properties
  * The zone-index.properties is kept in sync with the presto zone index properties.
@@ -43,7 +44,8 @@ public final class TimeZoneKey {
 
   private static final short OFFSET_TIME_ZONE_MIN = -14 * 60;
   private static final short OFFSET_TIME_ZONE_MAX = 14 * 60;
-  private static final TimeZoneKey[] OFFSET_TIME_ZONE_KEYS = new TimeZoneKey[OFFSET_TIME_ZONE_MAX - OFFSET_TIME_ZONE_MIN + 1];
+  private static final TimeZoneKey[] OFFSET_TIME_ZONE_KEYS =
+      new TimeZoneKey[OFFSET_TIME_ZONE_MAX - OFFSET_TIME_ZONE_MIN + 1];
 
   static {
     try (InputStream in = TimeZoneKey.class.getClassLoader().getResourceAsStream("zone-index.properties")) {
@@ -242,16 +244,9 @@ public final class TimeZoneKey {
   }
 
   private static boolean isUtcEquivalentName(String zoneId) {
-    return zoneId.equals("utc") ||
-            zoneId.equals("z") ||
-            zoneId.equals("ut") ||
-            zoneId.equals("uct") ||
-            zoneId.equals("ut") ||
-            zoneId.equals("gmt") ||
-            zoneId.equals("gmt0") ||
-            zoneId.equals("greenwich") ||
-            zoneId.equals("universal") ||
-            zoneId.equals("zulu");
+    return zoneId.equals("utc") || zoneId.equals("z") || zoneId.equals("ut") || zoneId.equals("uct")
+        || zoneId.equals("ut") || zoneId.equals("gmt") || zoneId.equals("gmt0") || zoneId.equals("greenwich")
+        || zoneId.equals("universal") || zoneId.equals("zulu");
   }
 
   private static String zoneIdForOffset(long offset) {

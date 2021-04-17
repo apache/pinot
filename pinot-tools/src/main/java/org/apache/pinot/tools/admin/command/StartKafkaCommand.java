@@ -39,7 +39,8 @@ public class StartKafkaCommand extends AbstractBaseAdminCommand implements Comma
   @Option(name = "-port", required = false, metaVar = "<int>", usage = "Port to start Kafka server on.")
   private int _port = KafkaStarterUtils.DEFAULT_KAFKA_PORT;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   @Option(name = "-brokerId", required = false, metaVar = "<int>", usage = "Kafka broker ID.")
@@ -70,15 +71,14 @@ public class StartKafkaCommand extends AbstractBaseAdminCommand implements Comma
   }
 
   @Override
-  public boolean execute()
-      throws IOException {
+  public boolean execute() throws IOException {
     Properties kafkaConfiguration = KafkaStarterUtils.getDefaultKafkaConfiguration();
     kafkaConfiguration.put(KafkaStarterUtils.BROKER_ID, _brokerId);
     kafkaConfiguration.put(KafkaStarterUtils.PORT, _port);
     kafkaConfiguration.put(KafkaStarterUtils.ZOOKEEPER_CONNECT, _zkAddress);
     try {
-      _kafkaStarter = StreamDataProvider
-          .getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, kafkaConfiguration);
+      _kafkaStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME,
+          kafkaConfiguration);
     } catch (Exception e) {
       throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
     }

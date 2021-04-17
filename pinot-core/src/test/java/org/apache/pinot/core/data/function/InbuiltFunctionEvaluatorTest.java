@@ -90,8 +90,7 @@ public class InbuiltFunctionEvaluatorTest {
   }
 
   @Test
-  public void testStateSharedBetweenRowsForExecution()
-      throws Exception {
+  public void testStateSharedBetweenRowsForExecution() throws Exception {
     MyFunc myFunc = new MyFunc();
     FunctionRegistry.registerFunction(myFunc.getClass().getDeclaredMethod("appendToStringAndReturn", String.class));
     String expression = "appendToStringAndReturn('test ')";

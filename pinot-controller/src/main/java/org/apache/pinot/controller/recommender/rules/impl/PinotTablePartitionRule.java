@@ -67,28 +67,23 @@ public class PinotTablePartitionRule extends AbstractRule {
   }
 
   @Override
-  public void run()
-      throws InvalidInputException {
+  public void run() throws InvalidInputException {
     //**********Calculate size per record***************/
     _input.estimateSizePerRecord();
     //**************************************************/
 
     LOGGER.info("Recommending partition configurations");
 
-    if (_input.getQps()
-        < _params.THRESHOLD_MIN_QPS_PARTITION) { //For a table whose QPS < Q (say 200 or 300) NO partitioning is needed.
+    if (_input.getQps() < _params.THRESHOLD_MIN_QPS_PARTITION) { //For a table whose QPS < Q (say 200 or 300) NO partitioning is needed.
       LOGGER.info("*Input QPS {} < threshold {}, no partition needed", _input.getQps(),
           _params.THRESHOLD_MIN_QPS_PARTITION);
       return;
     }
-    if (_input.getLatencySLA()
-        > _params.THRESHOLD_MAX_LATENCY_SLA_PARTITION) { //For a table whose latency SLA > L (say 1000ms) NO partitioning is needed.
+    if (_input.getLatencySLA() > _params.THRESHOLD_MAX_LATENCY_SLA_PARTITION) { //For a table whose latency SLA > L (say 1000ms) NO partitioning is needed.
       LOGGER.info("*Input SLA {} > threshold {}, no partition needed", _input.getLatencySLA(),
           _params.THRESHOLD_MAX_LATENCY_SLA_PARTITION);
       return;
     }
-
-
 
     /*For realtime/hybrid, the number of partitions on realtime Pinot table side is same as number of kafka partitions.
     This is generally the case unless there is a reason for them to be different. We saw only one outlier. So generally on
@@ -128,7 +123,7 @@ public class PinotTablePartitionRule extends AbstractRule {
       }
     }
 
-    if (_input.getOverWrittenConfigs().getPartitionConfig().isPartitionDimensionOverwritten()){
+    if (_input.getOverWrittenConfigs().getPartitionConfig().isPartitionDimensionOverwritten()) {
       return;
     }
 
@@ -223,8 +218,8 @@ public class PinotTablePartitionRule extends AbstractRule {
         List<String> values = inPredicate.getValues();
         if (values.size() == 1) {
           numValuesSelected = 1;
-        } else if (values.get(FIRST).equals(IN_PREDICATE_ESTIMATE_LEN_FLAG) || (isFirst =
-            values.get(SECOND).equals(IN_PREDICATE_ESTIMATE_LEN_FLAG))) {
+        } else if (values.get(FIRST).equals(IN_PREDICATE_ESTIMATE_LEN_FLAG)
+            || (isFirst = values.get(SECOND).equals(IN_PREDICATE_ESTIMATE_LEN_FLAG))) {
           numValuesSelected = Integer.parseInt(values.get(isFirst ? FIRST : SECOND));
         } else {
           numValuesSelected = values.size();

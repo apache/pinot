@@ -56,8 +56,7 @@ public class DataSchemaTest {
   }
 
   @Test
-  public void testSerDe()
-      throws Exception {
+  public void testSerDe() throws Exception {
     DataSchema dataSchema = new DataSchema(COLUMN_NAMES, COLUMN_DATA_TYPES);
     DataSchema dataSchemaAfterSerDe = DataSchema.fromBytes(dataSchema.toBytes());
     Assert.assertEquals(dataSchema, dataSchemaAfterSerDe);

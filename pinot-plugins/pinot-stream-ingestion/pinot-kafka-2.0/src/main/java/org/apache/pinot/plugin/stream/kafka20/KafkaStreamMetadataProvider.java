@@ -31,7 +31,8 @@ import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 
-public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHandler implements StreamMetadataProvider {
+public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHandler
+    implements StreamMetadataProvider {
 
   public KafkaStreamMetadataProvider(String clientId, StreamConfig streamConfig) {
     this(clientId, streamConfig, Integer.MIN_VALUE);
@@ -57,10 +58,10 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     Preconditions.checkNotNull(offsetCriteria);
     long offset = -1;
     if (offsetCriteria.isLargest()) {
-      offset =  _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
+      offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
           .get(_topicPartition);
     } else if (offsetCriteria.isSmallest()) {
-      offset =  _consumer.beginningOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
+      offset = _consumer.beginningOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
           .get(_topicPartition);
     } else {
       throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria.toString());
@@ -69,8 +70,7 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     super.close();
   }
 }

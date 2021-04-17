@@ -63,8 +63,8 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
       "On_Time_On_Time_Performance_2014_100k_subset_nonulls_single_value_columns.schema";
   private static final int NUM_STAR_TREE_DIMENSIONS = 5;
   private static final int NUM_STAR_TREE_METRICS = 5;
-  private static final List<AggregationFunctionType> AGGREGATION_FUNCTION_TYPES = Arrays
-      .asList(AggregationFunctionType.COUNT, AggregationFunctionType.MIN, AggregationFunctionType.MAX,
+  private static final List<AggregationFunctionType> AGGREGATION_FUNCTION_TYPES =
+      Arrays.asList(AggregationFunctionType.COUNT, AggregationFunctionType.MIN, AggregationFunctionType.MAX,
           AggregationFunctionType.SUM, AggregationFunctionType.AVG, AggregationFunctionType.MINMAXRANGE,
           AggregationFunctionType.DISTINCTCOUNTBITMAP);
   private static final int NUM_QUERIES_TO_GENERATE = 100;
@@ -90,8 +90,7 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     File defaultTableSegmentDir = new File(_segmentDir, DEFAULT_TABLE_NAME);
     File defaultTableTarDir = new File(_tarDir, DEFAULT_TABLE_NAME);
     File starTreeTableSegmentDir = new File(_segmentDir, STAR_TREE_TABLE_NAME);
@@ -131,8 +130,8 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
     _currentTable = STAR_TREE_TABLE_NAME;
     TableConfig starTreeTableConfig = createOfflineTableConfig();
-    starTreeTableConfig.getIndexingConfig().setStarTreeIndexConfigs(Arrays
-        .asList(getStarTreeIndexConfig(starTree1Dimensions, starTree1Metrics),
+    starTreeTableConfig.getIndexingConfig()
+        .setStarTreeIndexConfigs(Arrays.asList(getStarTreeIndexConfig(starTree1Dimensions, starTree1Metrics),
             getStarTreeIndexConfig(starTree2Dimensions, starTree2Metrics)));
     addTableConfig(starTreeTableConfig);
 
@@ -140,11 +139,11 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     List<File> avroFiles = unpackAvroData(_tempDir);
 
     // Create and upload segments
-    ClusterIntegrationTestUtils
-        .buildSegmentsFromAvro(avroFiles, defaultTableConfig, schema, 0, defaultTableSegmentDir, defaultTableTarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, defaultTableConfig, schema, 0, defaultTableSegmentDir,
+        defaultTableTarDir);
     uploadSegments(DEFAULT_TABLE_NAME, defaultTableTarDir);
-    ClusterIntegrationTestUtils
-        .buildSegmentsFromAvro(avroFiles, starTreeTableConfig, schema, 0, starTreeTableSegmentDir, starTreeTableTarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, starTreeTableConfig, schema, 0,
+        starTreeTableSegmentDir, starTreeTableTarDir);
     uploadSegments(STAR_TREE_TABLE_NAME, starTreeTableTarDir);
 
     // Set up the query generators
@@ -176,8 +175,7 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Test
-  public void testGeneratedQueries()
-      throws Exception {
+  public void testGeneratedQueries() throws Exception {
     for (int i = 0; i < NUM_QUERIES_TO_GENERATE; i += 2) {
       testStarQuery(_starTree1QueryGenerator.nextQuery());
       testStarQuery(_starTree2QueryGenerator.nextQuery());
@@ -185,8 +183,7 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Test
-  public void testPredicateOnMetrics()
-      throws Exception {
+  public void testPredicateOnMetrics() throws Exception {
     String starQuery;
 
     // Query containing predicate on one metric only
@@ -205,8 +202,7 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     testStarQuery(starQuery);
   }
 
-  private void testStarQuery(String starQuery)
-      throws Exception {
+  private void testStarQuery(String starQuery) throws Exception {
     String referenceQuery = starQuery.replace(STAR_TREE_TABLE_NAME, DEFAULT_TABLE_NAME) + " TOP 10000";
     JsonNode starResponse = postQuery(starQuery);
     JsonNode referenceResponse = postQuery(referenceQuery);
@@ -225,8 +221,7 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     dropOfflineTable(DEFAULT_TABLE_NAME);
     dropOfflineTable(STAR_TREE_TABLE_NAME);
 

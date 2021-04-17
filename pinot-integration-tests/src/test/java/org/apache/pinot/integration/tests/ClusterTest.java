@@ -94,23 +94,19 @@ public abstract class ClusterTest extends ControllerTest {
     return new PinotConfiguration();
   }
 
-  protected void startBroker()
-      throws Exception {
+  protected void startBroker() throws Exception {
     startBrokers(1);
   }
 
-  protected void startBroker(int port, String zkStr)
-      throws Exception {
+  protected void startBroker(int port, String zkStr) throws Exception {
     startBrokers(1, port, zkStr);
   }
 
-  protected void startBrokers(int numBrokers)
-      throws Exception {
+  protected void startBrokers(int numBrokers) throws Exception {
     startBrokers(numBrokers, DEFAULT_BROKER_PORT, ZkStarter.DEFAULT_ZK_STR);
   }
 
-  protected void startBrokers(int numBrokers, int basePort, String zkStr)
-      throws Exception {
+  protected void startBrokers(int numBrokers, int basePort, String zkStr) throws Exception {
     _brokerBaseApiUrl = "http://localhost:" + basePort;
     _brokerStarters = new ArrayList<>(numBrokers);
     for (int i = 0; i < numBrokers; i++) {
@@ -164,8 +160,8 @@ public abstract class ClusterTest extends ControllerTest {
     try {
       for (int i = 0; i < numServers; i++) {
         configuration.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, Server.DEFAULT_INSTANCE_DATA_DIR + "-" + i);
-        configuration
-            .setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
+        configuration.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
+            Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
         configuration.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, baseAdminApiPort - i);
         configuration.setProperty(Server.CONFIG_OF_NETTY_PORT, baseNettyPort + i);
         // Thread time measurement is disabled by default, enable it in integration tests.
@@ -190,7 +186,8 @@ public abstract class ClusterTest extends ControllerTest {
       @Nullable List<MinionEventObserverFactory> eventObserverFactories) {
     FileUtils.deleteQuietly(new File(Minion.DEFAULT_INSTANCE_BASE_DIR));
     try {
-      _minionStarter = new MinionStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, getDefaultMinionConfiguration());
+      _minionStarter =
+          new MinionStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, getDefaultMinionConfiguration());
       // Register task executor factories
       if (taskExecutorFactories != null) {
         for (PinotTaskExecutorFactory taskExecutorFactory : taskExecutorFactories) {
@@ -258,8 +255,7 @@ public abstract class ClusterTest extends ControllerTest {
    *
    * @param tarDir Segment directory
    */
-  protected void uploadSegments(String tableName, File tarDir)
-      throws Exception {
+  protected void uploadSegments(String tableName, File tarDir) throws Exception {
     File[] segmentTarFiles = tarDir.listFiles();
     assertNotNull(segmentTarFiles);
     int numSegments = segmentTarFiles.length;
@@ -271,7 +267,7 @@ public abstract class ClusterTest extends ControllerTest {
         File segmentTarFile = segmentTarFiles[0];
         if (System.currentTimeMillis() % 2 == 0) {
           assertEquals(fileUploadDownloadClient
-                  .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, tableName).getStatusCode(),
+              .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, tableName).getStatusCode(),
               HttpStatus.SC_OK);
         } else {
           assertEquals(
@@ -305,18 +301,18 @@ public abstract class ClusterTest extends ControllerTest {
   private int uploadSegmentWithOnlyMetadata(String tableName, URI uploadSegmentHttpURI,
       FileUploadDownloadClient fileUploadDownloadClient, File segmentTarFile)
       throws IOException, HttpErrorStatusException {
-    List<Header> headers = ImmutableList.of(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI,
-            "file://" + segmentTarFile.getParentFile().getAbsolutePath() + "/" + URLEncoder
-                .encode(segmentTarFile.getName(), StandardCharsets.UTF_8.toString())),
+    List<Header> headers = ImmutableList.of(
+        new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI,
+            "file://" + segmentTarFile.getParentFile().getAbsolutePath() + "/"
+                + URLEncoder.encode(segmentTarFile.getName(), StandardCharsets.UTF_8.toString())),
         new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
             FileUploadDownloadClient.FileUploadType.METADATA.toString()));
     // Add table name as a request parameter
     NameValuePair tableNameValuePair =
         new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME, tableName);
     List<NameValuePair> parameters = Arrays.asList(tableNameValuePair);
-    return fileUploadDownloadClient
-        .uploadSegmentMetadata(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, headers, parameters,
-            fileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS).getStatusCode();
+    return fileUploadDownloadClient.uploadSegmentMetadata(uploadSegmentHttpURI, segmentTarFile.getName(),
+        segmentTarFile, headers, parameters, fileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS).getStatusCode();
   }
 
   public static class AvroFileSchemaKafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
@@ -328,8 +324,7 @@ public abstract class ClusterTest extends ControllerTest {
     private DatumReader<GenericData.Record> _reader;
 
     @Override
-    public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
-        throws Exception {
+    public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName) throws Exception {
       // Load Avro schema
       try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
         _avroSchema = reader.getSchema();
@@ -357,24 +352,21 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  protected JsonNode getDebugInfo(final String uri)
-      throws Exception {
+  protected JsonNode getDebugInfo(final String uri) throws Exception {
     return JsonUtils.stringToJsonNode(sendGetRequest(_brokerBaseApiUrl + "/" + uri));
   }
 
   /**
    * Queries the broker's pql query endpoint (/query)
    */
-  protected JsonNode postQuery(String query)
-      throws Exception {
+  protected JsonNode postQuery(String query) throws Exception {
     return postQuery(new PinotQueryRequest("pql", query), _brokerBaseApiUrl);
   }
 
   /**
    * Queries the broker's pql query endpoint (/query)
    */
-  public static JsonNode postQuery(PinotQueryRequest r, String brokerBaseApiUrl)
-      throws Exception {
+  public static JsonNode postQuery(PinotQueryRequest r, String brokerBaseApiUrl) throws Exception {
     return postQuery(r.getQuery(), brokerBaseApiUrl, false, r.getQueryFormat(), null);
   }
 
@@ -397,8 +389,8 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Queries the broker's pql query endpoint (/query)
    */
-  public static JsonNode postQuery(String query, String brokerBaseApiUrl, boolean enableTrace, String queryType, Map<String, String> headers)
-      throws Exception {
+  public static JsonNode postQuery(String query, String brokerBaseApiUrl, boolean enableTrace, String queryType,
+      Map<String, String> headers) throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put(queryType, query);
     payload.put("trace", enableTrace);
@@ -409,16 +401,14 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Queries the broker's sql query endpoint (/query/sql)
    */
-  protected JsonNode postSqlQuery(String query)
-      throws Exception {
+  protected JsonNode postSqlQuery(String query) throws Exception {
     return postSqlQuery(query, _brokerBaseApiUrl);
   }
 
   /**
    * Queries the broker's sql query endpoint (/sql)
    */
-  public static JsonNode postSqlQuery(String query, String brokerBaseApiUrl)
-      throws Exception {
+  public static JsonNode postSqlQuery(String query, String brokerBaseApiUrl) throws Exception {
     return postSqlQuery(query, brokerBaseApiUrl, null);
   }
 

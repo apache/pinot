@@ -25,11 +25,9 @@ public interface SegmentPreIndexStatsCollector extends SegmentPreIndexStatsConta
 
   void init();
 
-  void build()
-      throws Exception;
+  void build() throws Exception;
 
-  void collectRow(GenericRow row)
-      throws Exception;
+  void collectRow(GenericRow row) throws Exception;
 
   void logStats();
 }

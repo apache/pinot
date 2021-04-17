@@ -34,7 +34,8 @@ public class PinotStatementTest {
 
   @Test
   public void testExecuteQuery() throws Exception {
-    PinotConnection connection = new PinotConnection("dummy", _dummyPinotClientTransport, "dummy" ,_dummyPinotControllerTransport);
+    PinotConnection connection =
+        new PinotConnection("dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
     Statement statement = new PinotStatement(connection);
     ResultSet resultSet = statement.executeQuery("select * from dummy");
     Assert.assertNotNull(resultSet);

@@ -110,8 +110,8 @@ public class PostAggregationHandler {
       }
     }
     FunctionContext function = expression.getFunction();
-    Preconditions
-        .checkState(function != null, "Failed to find SELECT expression: %s in the GROUP-BY clause", expression);
+    Preconditions.checkState(function != null, "Failed to find SELECT expression: %s in the GROUP-BY clause",
+        expression);
     if (function.getType() == FunctionContext.Type.AGGREGATION) {
       // Aggregation function
       return new ColumnValueExtractor(_aggregationFunctionIndexMap.get(function) + _numGroupByExpressions);

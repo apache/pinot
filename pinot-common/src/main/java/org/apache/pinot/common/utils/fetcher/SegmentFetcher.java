@@ -34,12 +34,10 @@ public interface SegmentFetcher {
   /**
    * Fetches a segment from URI location to local.
    */
-  void fetchSegmentToLocal(URI uri, File dest)
-      throws Exception;
+  void fetchSegmentToLocal(URI uri, File dest) throws Exception;
 
   /**
    * Fetches a segment to local from any uri in the given list.
    */
-  void fetchSegmentToLocal(List<URI> uri, File dest)
-      throws Exception;
+  void fetchSegmentToLocal(List<URI> uri, File dest) throws Exception;
 }

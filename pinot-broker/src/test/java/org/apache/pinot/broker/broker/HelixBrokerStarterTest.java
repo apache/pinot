@@ -70,14 +70,13 @@ public class HelixBrokerStarterTest extends ControllerTest {
   private HelixBrokerStarter _brokerStarter;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     startZk();
     startController();
 
     Map<String, Object> properties = new HashMap<>();
     properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, 18099);
-    
+
     _brokerStarter =
         new HelixBrokerStarter(new PinotConfiguration(properties), getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR);
     _brokerStarter.start();
@@ -85,25 +84,22 @@ public class HelixBrokerStarterTest extends ControllerTest {
     addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKERS - 1, true);
     addFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVERS, true);
 
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
-        .addDateTime(TIME_COLUMN_NAME, FieldSpec.DataType.INT,
-            new DateTimeFormatSpec(1, TimeUnit.DAYS.toString(), DateTimeFieldSpec.TimeFormat.EPOCH.toString())
-                .getFormat(), new DateTimeGranularitySpec(1, TimeUnit.DAYS).getGranularity()).build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME).addDateTime(TIME_COLUMN_NAME,
+        FieldSpec.DataType.INT,
+        new DateTimeFormatSpec(1, TimeUnit.DAYS.toString(), DateTimeFieldSpec.TimeFormat.EPOCH.toString()).getFormat(),
+        new DateTimeGranularitySpec(1, TimeUnit.DAYS).getGranularity()).build();
     _helixResourceManager.addSchema(schema, true);
-    TableConfig offlineTableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
-            .setTimeType(TimeUnit.DAYS.name()).build();
+    TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN_NAME).setTimeType(TimeUnit.DAYS.name()).build();
     _helixResourceManager.addTable(offlineTableConfig);
     TableConfig realtimeTimeConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
-            .setTimeType(TimeUnit.DAYS.name()).
-            setStreamConfigs(getStreamConfigs()).build();
+            .setTimeType(TimeUnit.DAYS.name()).setStreamConfigs(getStreamConfigs()).build();
     _helixResourceManager.addTable(realtimeTimeConfig);
 
     for (int i = 0; i < NUM_OFFLINE_SEGMENTS; i++) {
-      _helixResourceManager
-          .addNewSegment(OFFLINE_TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME),
-              "downloadUrl");
+      _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
+          SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME), "downloadUrl");
     }
 
     TestUtils.waitForCondition(aVoid -> {
@@ -119,17 +115,16 @@ public class HelixBrokerStarterTest extends ControllerTest {
     streamConfigs.put("streamType", "kafka");
     streamConfigs.put("stream.kafka.consumer.type", "highLevel");
     streamConfigs.put("stream.kafka.topic.name", "kafkaTopic");
-    streamConfigs
-        .put("stream.kafka.decoder.class.name", "org.apache.pinot.plugin.stream.kafka.KafkaAvroMessageDecoder");
+    streamConfigs.put("stream.kafka.decoder.class.name",
+        "org.apache.pinot.plugin.stream.kafka.KafkaAvroMessageDecoder");
     return streamConfigs;
   }
 
   @Test
-  public void testResourceAndTagAssignment()
-      throws Exception {
-    assertEquals(
-        _helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), TagNameUtils.getBrokerTagForTenant(null))
-            .size(), NUM_BROKERS);
+  public void testResourceAndTagAssignment() throws Exception {
+    assertEquals(_helixAdmin
+        .getInstancesInClusterWithTag(getHelixClusterName(), TagNameUtils.getBrokerTagForTenant(null)).size(),
+        NUM_BROKERS);
 
     IdealState brokerResourceIdealState =
         _helixAdmin.getResourceIdealState(getHelixClusterName(), Helix.BROKER_RESOURCE_INSTANCE);
@@ -153,12 +148,13 @@ public class HelixBrokerStarterTest extends ControllerTest {
     assertTrue(routingTable.getUnavailableSegments().isEmpty());
 
     // Add a new segment into the OFFLINE table
-    _helixResourceManager
-        .addNewSegment(OFFLINE_TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME), "downloadUrl");
+    _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
+        SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME), "downloadUrl");
 
-    TestUtils.waitForCondition(aVoid ->
-        routingManager.getRoutingTable(brokerRequest).getServerInstanceToSegmentsMap().values().iterator().next().size()
-            == NUM_OFFLINE_SEGMENTS + 1, 30_000L, "Failed to add the new segment into the routing table");
+    TestUtils.waitForCondition(
+        aVoid -> routingManager.getRoutingTable(brokerRequest).getServerInstanceToSegmentsMap().values().iterator()
+            .next().size() == NUM_OFFLINE_SEGMENTS + 1,
+        30_000L, "Failed to add the new segment into the routing table");
 
     // Add a new table with different broker tenant
     String newRawTableName = "newTable";
@@ -217,8 +213,10 @@ public class HelixBrokerStarterTest extends ControllerTest {
         SegmentMetadataMockUtils.mockSegmentMetadataWithEndTimeInfo(RAW_TABLE_NAME, segmentToRefresh, newEndTime),
         segmentZKMetadata, "downloadUrl", null);
 
-    TestUtils.waitForCondition(aVoid -> routingManager.getTimeBoundaryInfo(OFFLINE_TABLE_NAME).getTimeValue()
-        .equals(Integer.toString(newEndTime - 1)), 30_000L, "Failed to update the time boundary for refreshed segment");
+    TestUtils.waitForCondition(
+        aVoid -> routingManager.getTimeBoundaryInfo(OFFLINE_TABLE_NAME).getTimeValue()
+            .equals(Integer.toString(newEndTime - 1)),
+        30_000L, "Failed to update the time boundary for refreshed segment");
   }
 
   @AfterClass

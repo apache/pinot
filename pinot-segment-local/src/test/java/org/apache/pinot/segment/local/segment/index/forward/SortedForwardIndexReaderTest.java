@@ -30,8 +30,7 @@ import org.testng.annotations.Test;
 @Test
 public class SortedForwardIndexReaderTest {
 
-  public void testSimple()
-      throws Exception {
+  public void testSimple() throws Exception {
 
     int maxLength = 1000;
     int cardinality = 100000;

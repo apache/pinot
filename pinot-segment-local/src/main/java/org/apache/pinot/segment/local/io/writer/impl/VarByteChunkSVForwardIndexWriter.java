@@ -70,9 +70,8 @@ public class VarByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexWri
    * @param writerVersion writer format version
    * @throws FileNotFoundException Throws {@link FileNotFoundException} if the specified file is not found.
    */
-  public VarByteChunkSVForwardIndexWriter(File file, ChunkCompressionType compressionType,
-      int totalDocs, int numDocsPerChunk, int lengthOfLongestEntry, int writerVersion)
-      throws FileNotFoundException {
+  public VarByteChunkSVForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
+      int numDocsPerChunk, int lengthOfLongestEntry, int writerVersion) throws FileNotFoundException {
     super(file, compressionType, totalDocs, numDocsPerChunk,
         numDocsPerChunk * (CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE + lengthOfLongestEntry), // chunkSize
         lengthOfLongestEntry, writerVersion);
@@ -101,8 +100,7 @@ public class VarByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexWri
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
 
     // Write the chunk if it is non-empty.
     if (_chunkBuffer.position() > 0) {

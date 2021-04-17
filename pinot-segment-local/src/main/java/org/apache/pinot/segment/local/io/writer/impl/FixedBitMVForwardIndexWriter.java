@@ -124,8 +124,7 @@ public class FixedBitMVForwardIndexWriter implements Closeable {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     customBitSet.close();
     chunkOffsetsWriter.close();
     rawDataWriter.close();

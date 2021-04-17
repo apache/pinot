@@ -362,10 +362,10 @@ public class QueryOptimizerTest {
       assertNull(actual.getFilterQuery());
       return;
     }
-    FilterQueryTree actualFilter = RequestUtils
-        .buildFilterQuery(actual.getFilterQuery().getId(), actual.getFilterSubQueryMap().getFilterQueryMap());
-    FilterQueryTree expectedFilter = RequestUtils
-        .buildFilterQuery(expected.getFilterQuery().getId(), expected.getFilterSubQueryMap().getFilterQueryMap());
+    FilterQueryTree actualFilter = RequestUtils.buildFilterQuery(actual.getFilterQuery().getId(),
+        actual.getFilterSubQueryMap().getFilterQueryMap());
+    FilterQueryTree expectedFilter = RequestUtils.buildFilterQuery(expected.getFilterQuery().getId(),
+        expected.getFilterSubQueryMap().getFilterQueryMap());
     compareFilterQueryTree(actualFilter, expectedFilter);
   }
 

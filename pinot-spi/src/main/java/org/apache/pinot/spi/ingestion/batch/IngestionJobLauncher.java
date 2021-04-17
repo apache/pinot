@@ -71,9 +71,9 @@ public class IngestionJobLauncher {
     try {
       jobSpecStr = GroovyTemplateUtils.renderTemplate(jobSpecTemplate, propertiesMap);
     } catch (Exception e) {
-      throw new RuntimeException(String
-          .format("Unable to render templates on ingestion job spec template file - [%s] with propertiesMap - [%s].",
-              jobSpecFilePath, Arrays.toString(propertiesMap.entrySet().toArray())), e);
+      throw new RuntimeException(String.format(
+          "Unable to render templates on ingestion job spec template file - [%s] with propertiesMap - [%s].",
+          jobSpecFilePath, Arrays.toString(propertiesMap.entrySet().toArray())), e);
     }
 
     String jobSpecFormat = (String) propertiesMap.getOrDefault(JOB_SPEC_FORMAT, YAML);
@@ -81,9 +81,8 @@ public class IngestionJobLauncher {
       try {
         return JsonUtils.stringToObject(jobSpecStr, SegmentGenerationJobSpec.class);
       } catch (IOException e) {
-        throw new RuntimeException(String
-            .format("Unable to parse job spec - [%s] to JSON with propertiesMap - [%s]", jobSpecFilePath,
-                Arrays.toString(propertiesMap.entrySet().toArray())), e);
+        throw new RuntimeException(String.format("Unable to parse job spec - [%s] to JSON with propertiesMap - [%s]",
+            jobSpecFilePath, Arrays.toString(propertiesMap.entrySet().toArray())), e);
       }
     }
 
@@ -146,6 +145,12 @@ public class IngestionJobLauncher {
   }
 
   enum PinotIngestionJobType {
-    SegmentCreation, SegmentTarPush, SegmentUriPush, SegmentMetadataPush, SegmentCreationAndTarPush, SegmentCreationAndUriPush, SegmentCreationAndMetadataPush,
+    SegmentCreation,
+    SegmentTarPush,
+    SegmentUriPush,
+    SegmentMetadataPush,
+    SegmentCreationAndTarPush,
+    SegmentCreationAndUriPush,
+    SegmentCreationAndMetadataPush,
   }
 }

@@ -46,7 +46,10 @@ import org.slf4j.LoggerFactory;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TableOp extends BaseOp {
   public enum Op {
-    CREATE, DELETE, UPDATE_CONFIG, UPDATE_SCHEMA,
+    CREATE,
+    DELETE,
+    UPDATE_CONFIG,
+    UPDATE_SCHEMA,
   }
 
   private String _schemaFileName;
@@ -103,12 +106,14 @@ public class TableOp extends BaseOp {
 
   private boolean createSchema() {
     try {
-      Map<String, String> headers = new HashMap<String, String>() {{
-        put("Content-type", "application/json");
-      }};
-      ControllerTest
-          .sendPostRequest(ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forSchemaCreate(),
-              FileUtils.readFileToString(new File(_schemaFileName)), headers);
+      Map<String, String> headers = new HashMap<String, String>() {
+        {
+          put("Content-type", "application/json");
+        }
+      };
+      ControllerTest.sendPostRequest(
+          ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forSchemaCreate(),
+          FileUtils.readFileToString(new File(_schemaFileName)), headers);
       return true;
     } catch (IOException e) {
       LOGGER.error("Failed to create schema with file: {}", _schemaFileName, e);
@@ -118,9 +123,9 @@ public class TableOp extends BaseOp {
 
   private boolean createTable() {
     try {
-      ControllerTest
-          .sendPostRequest(ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forTableCreate(),
-              FileUtils.readFileToString(new File(_tableConfigFileName)));
+      ControllerTest.sendPostRequest(
+          ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forTableCreate(),
+          FileUtils.readFileToString(new File(_tableConfigFileName)));
       return true;
     } catch (IOException e) {
       LOGGER.error("Failed to create table with file: {}", _tableConfigFileName, e);

@@ -101,8 +101,7 @@ public class ProtoBufRecordReaderTest extends AbstractRecordReaderTest {
 
   @BeforeClass
   @Override
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.forceMkdir(_tempDir);
     // Generate Pinot schema
     _pinotSchema = getPinotSchema();
@@ -117,22 +116,19 @@ public class ProtoBufRecordReaderTest extends AbstractRecordReaderTest {
 
   @AfterClass
   @Override
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     FileUtils.forceDelete(_tempFile);
   }
 
   @Test
-  public void testRecordReader()
-      throws Exception {
+  public void testRecordReader() throws Exception {
     checkValue(_recordReader, _records, _primaryKeys);
     _recordReader.rewind();
     checkValue(_recordReader, _records, _primaryKeys);
   }
 
   @Override
-  protected RecordReader createRecordReader()
-      throws Exception {
+  protected RecordReader createRecordReader() throws Exception {
     RecordReader recordReader = new ProtoBufRecordReader();
     Set<String> sourceFields = getSourceFields(getPinotSchema());
     recordReader.init(_tempFile, sourceFields, getProtoRecordReaderConfig());
@@ -140,8 +136,7 @@ public class ProtoBufRecordReaderTest extends AbstractRecordReaderTest {
   }
 
   @Override
-  protected void writeRecordsToFile(List<Map<String, Object>> recordsToWrite)
-      throws Exception {
+  protected void writeRecordsToFile(List<Map<String, Object>> recordsToWrite) throws Exception {
     List<Sample.SampleRecord> lists = new ArrayList<>();
     for (Map<String, Object> record : recordsToWrite) {
       Sample.SampleRecord sampleRecord =
@@ -159,13 +154,11 @@ public class ProtoBufRecordReaderTest extends AbstractRecordReaderTest {
     }
   }
 
-  private File getSampleDataPath()
-      throws IOException {
+  private File getSampleDataPath() throws IOException {
     return File.createTempFile(ProtoBufRecordReaderTest.class.getName(), PROTO_DATA);
   }
 
-  private ProtoBufRecordReaderConfig getProtoRecordReaderConfig()
-      throws URISyntaxException {
+  private ProtoBufRecordReaderConfig getProtoRecordReaderConfig() throws URISyntaxException {
     ProtoBufRecordReaderConfig config = new ProtoBufRecordReaderConfig();
     URL descriptorFile = getClass().getClassLoader().getResource(DESCRIPTOR_FILE);
     config.setDescriptorFile(descriptorFile.toURI());

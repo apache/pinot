@@ -45,8 +45,7 @@ public class TarGzCompressionUtilsTest {
   private static final File UNTAR_DIR = new File(TEMP_DIR, "untarDir");
 
   @BeforeMethod
-  public void setUp()
-      throws IOException {
+  public void setUp() throws IOException {
     FileUtils.deleteQuietly(TEMP_DIR);
     FileUtils.forceMkdir(DATA_DIR);
     FileUtils.forceMkdir(TAR_DIR);
@@ -54,14 +53,12 @@ public class TarGzCompressionUtilsTest {
   }
 
   @AfterMethod
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 
   @Test
-  public void testFile()
-      throws IOException {
+  public void testFile() throws IOException {
     String fileName = "data";
     String fileContent = "fileContent";
     File dataFile = new File(DATA_DIR, fileName);
@@ -82,8 +79,7 @@ public class TarGzCompressionUtilsTest {
   }
 
   @Test
-  public void testDirectory()
-      throws IOException {
+  public void testDirectory() throws IOException {
     String dirName = "dir";
     File dir = new File(DATA_DIR, dirName);
     String fileName1 = "data1";
@@ -120,8 +116,7 @@ public class TarGzCompressionUtilsTest {
   }
 
   @Test
-  public void testSubDirectories()
-      throws IOException {
+  public void testSubDirectories() throws IOException {
     String dirName = "dir";
     File dir = new File(DATA_DIR, dirName);
     String subDirName1 = "subDir1";
@@ -174,8 +169,7 @@ public class TarGzCompressionUtilsTest {
   }
 
   @Test
-  public void testEmptyDirectory()
-      throws IOException {
+  public void testEmptyDirectory() throws IOException {
     String dirName = "dir";
     File dir = new File(DATA_DIR, dirName);
     FileUtils.forceMkdir(dir);
@@ -201,8 +195,7 @@ public class TarGzCompressionUtilsTest {
   }
 
   @Test
-  public void testBadFilePath()
-      throws IOException {
+  public void testBadFilePath() throws IOException {
     String fileName = "data";
     String fileContent = "fileContent";
     File dataFile = new File(DATA_DIR, fileName);

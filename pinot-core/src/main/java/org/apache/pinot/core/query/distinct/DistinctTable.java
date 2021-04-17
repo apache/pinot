@@ -227,8 +227,7 @@ public class DistinctTable {
   /**
    * Serializes the DistinctTable into a byte array.
    */
-  public byte[] toBytes()
-      throws IOException {
+  public byte[] toBytes() throws IOException {
     // NOTE: Serialize the DistinctTable as a DataTable
     DataTableBuilder dataTableBuilder = new DataTableBuilder(_dataSchema);
     DataSchema.ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
@@ -270,8 +269,7 @@ public class DistinctTable {
    * Deserializes the DistinctTable from a {@link ByteBuffer}. The DistinctTable constructed this way is a wrapper
    * DistinctTable and cannot be used to add more records or merge other DistinctTables.
    */
-  public static DistinctTable fromByteBuffer(ByteBuffer byteBuffer)
-      throws IOException {
+  public static DistinctTable fromByteBuffer(ByteBuffer byteBuffer) throws IOException {
     DataTable dataTable = DataTableFactory.getDataTable(byteBuffer);
     DataSchema dataSchema = dataTable.getDataSchema();
     int numRecords = dataTable.getNumberOfRows();

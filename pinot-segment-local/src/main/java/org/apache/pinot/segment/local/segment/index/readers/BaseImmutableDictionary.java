@@ -113,8 +113,7 @@ public abstract class BaseImmutableDictionary implements Dictionary {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     if (_valueReader != null) {
       _valueReader.close();
     }

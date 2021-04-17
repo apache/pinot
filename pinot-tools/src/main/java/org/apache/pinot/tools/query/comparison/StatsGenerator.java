@@ -32,8 +32,7 @@ import org.slf4j.LoggerFactory;
 public class StatsGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(StatsGenerator.class);
 
-  public static void generateReport(String dataFileName)
-      throws IOException {
+  public static void generateReport(String dataFileName) throws IOException {
     List<DescriptiveStatistics> statisticsList = new ArrayList<>();
 
     String dataString;
@@ -66,8 +65,7 @@ public class StatsGenerator {
     }
   }
 
-  public static void main(String[] args)
-      throws IOException {
+  public static void main(String[] args) throws IOException {
     if (args.length != 1) {
       LOGGER.error("Invalid arguments.");
       LOGGER.info("Usage: <exec> <data_file>");

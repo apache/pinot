@@ -57,12 +57,12 @@ public class ChangeTableState extends AbstractBaseAdminCommand implements Comman
   @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
   private String _authToken;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
     if (_controllerHost == null) {
       _controllerHost = NetUtils.getHostAddress();
     }

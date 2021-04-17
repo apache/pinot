@@ -90,8 +90,7 @@ public class SegmentMapper {
    * Reads the input segment and generates partitioned avro data files into the mapper output directory
    * Records for each partition are put into a directory of its own withing the mapper output directory, identified by the partition name
    */
-  public void map()
-      throws Exception {
+  public void map() throws Exception {
 
     PinotSegmentRecordReader segmentRecordReader = new PinotSegmentRecordReader(_inputSegment);
     GenericRow reusableRow = new GenericRow();
@@ -137,8 +136,7 @@ public class SegmentMapper {
   /**
    * Cleanup the mapper state
    */
-  public void cleanup()
-      throws IOException {
+  public void cleanup() throws IOException {
     for (DataFileWriter<GenericData.Record> recordDataFileWriter : _partitionToDataFileWriterMap.values()) {
       recordDataFileWriter.close();
     }

@@ -72,7 +72,9 @@ public class RequestStatistics {
   private long _reduceTimeMillis;
 
   public enum FanoutType {
-    OFFLINE, REALTIME, HYBRID
+    OFFLINE,
+    REALTIME,
+    HYBRID
   }
 
   private FanoutType _fanoutType;
@@ -215,6 +217,6 @@ public class RequestStatistics {
   }
 
   public boolean hasValidTableName() {
-    return ! DEFAULT_TABLE_NAME.equals(_tableName);
+    return !DEFAULT_TABLE_NAME.equals(_tableName);
   }
 }

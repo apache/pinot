@@ -60,14 +60,14 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
   @BeforeClass
   public void setup() {
     streamConfigs.put(StreamConfigProperties.STREAM_TYPE, "kafka");
-    streamConfigs
-        .put(StreamConfigProperties.constructStreamProperty("kafka", StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            StreamConfig.ConsumerType.LOWLEVEL.toString());
+    streamConfigs.put(
+        StreamConfigProperties.constructStreamProperty("kafka", StreamConfigProperties.STREAM_CONSUMER_TYPES),
+        StreamConfig.ConsumerType.LOWLEVEL.toString());
     streamConfigs.put(StreamConfigProperties.constructStreamProperty("kafka", StreamConfigProperties.STREAM_TOPIC_NAME),
         "myTopic");
-    streamConfigs
-        .put(StreamConfigProperties.constructStreamProperty("kafka", StreamConfigProperties.STREAM_DECODER_CLASS),
-            "org.foo.Decoder");
+    streamConfigs.put(
+        StreamConfigProperties.constructStreamProperty("kafka", StreamConfigProperties.STREAM_DECODER_CLASS),
+        "org.foo.Decoder");
   }
 
   private TableConfig getRealtimeTableConfig(Map<String, Map<String, String>> taskConfigsMap) {
@@ -135,9 +135,8 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
         .thenReturn(Lists.newArrayList(new PinotTaskConfig(RealtimeToOfflineSegmentsTask.TASK_TYPE, taskConfigs)));
     when(mockClusterInfoProvide.getMinionRealtimeToOfflineSegmentsTaskMetadata(REALTIME_TABLE_NAME))
         .thenReturn(new RealtimeToOfflineSegmentsTaskMetadata(REALTIME_TABLE_NAME, 100_000L));
-    LLCRealtimeSegmentZKMetadata metadata1 =
-        getRealtimeSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 80_000_000, 90_000_000,
-            TimeUnit.MILLISECONDS, null);
+    LLCRealtimeSegmentZKMetadata metadata1 = getRealtimeSegmentZKMetadata("testTable__0__0__12345", Status.DONE,
+        80_000_000, 90_000_000, TimeUnit.MILLISECONDS, null);
     when(mockClusterInfoProvide.getLLCRealtimeSegmentsMetadata(REALTIME_TABLE_NAME))
         .thenReturn(Lists.newArrayList(metadata1));
 
@@ -215,12 +214,10 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
     when(mockClusterInfoProvide.getTaskStates(RealtimeToOfflineSegmentsTask.TASK_TYPE)).thenReturn(new HashMap<>());
     when(mockClusterInfoProvide.getMinionRealtimeToOfflineSegmentsTaskMetadata(REALTIME_TABLE_NAME)).thenReturn(null);
-    LLCRealtimeSegmentZKMetadata seg1 =
-        getRealtimeSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 1590048000000L, 1590134400000L,
-            TimeUnit.MILLISECONDS, "download1"); // 21 May 2020 8am to 22 May 2020 8am UTC
-    LLCRealtimeSegmentZKMetadata seg2 =
-        getRealtimeSegmentZKMetadata("testTable__1__0__12345", Status.DONE, 1590048000000L, 1590134400000L,
-            TimeUnit.MILLISECONDS, "download2"); // 21 May 2020 8am to 22 May 2020 8am UTC
+    LLCRealtimeSegmentZKMetadata seg1 = getRealtimeSegmentZKMetadata("testTable__0__0__12345", Status.DONE,
+        1590048000000L, 1590134400000L, TimeUnit.MILLISECONDS, "download1"); // 21 May 2020 8am to 22 May 2020 8am UTC
+    LLCRealtimeSegmentZKMetadata seg2 = getRealtimeSegmentZKMetadata("testTable__1__0__12345", Status.DONE,
+        1590048000000L, 1590134400000L, TimeUnit.MILLISECONDS, "download2"); // 21 May 2020 8am to 22 May 2020 8am UTC
     when(mockClusterInfoProvide.getLLCRealtimeSegmentsMetadata(REALTIME_TABLE_NAME))
         .thenReturn(Lists.newArrayList(seg1, seg2));
 
@@ -258,7 +255,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     assertEquals(configs.get(MinionConstants.SEGMENT_NAME_KEY), "testTable__0__0__12345,testTable__1__0__12345");
     assertEquals(configs.get(MinionConstants.DOWNLOAD_URL_KEY), "download1,download2");
     assertEquals(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY), "1590019200000"); // 21 May 2020 UTC
-    assertEquals(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY), "1590105600000");  // 22 May 2020 UTC
+    assertEquals(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY), "1590105600000"); // 22 May 2020 UTC
   }
 
   /**
@@ -270,12 +267,10 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     when(mockClusterInfoProvide.getTaskStates(RealtimeToOfflineSegmentsTask.TASK_TYPE)).thenReturn(new HashMap<>());
     when(mockClusterInfoProvide.getMinionRealtimeToOfflineSegmentsTaskMetadata(REALTIME_TABLE_NAME))
         .thenReturn(new RealtimeToOfflineSegmentsTaskMetadata(REALTIME_TABLE_NAME, 1590019200000L)); // 21 May 2020 UTC
-    LLCRealtimeSegmentZKMetadata seg1 =
-        getRealtimeSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 1589972400000L, 1590048000000L,
-            TimeUnit.MILLISECONDS, "download1"); // 05-20-2020T11:00:00 to 05-21-2020T08:00:00 UTC
-    LLCRealtimeSegmentZKMetadata seg2 =
-        getRealtimeSegmentZKMetadata("testTable__0__1__12345", Status.DONE, 1590048000000L, 1590134400000L,
-            TimeUnit.MILLISECONDS, "download2"); // 05-21-2020T08:00:00 UTC to 05-22-2020T08:00:00 UTC
+    LLCRealtimeSegmentZKMetadata seg1 = getRealtimeSegmentZKMetadata("testTable__0__0__12345", Status.DONE,
+        1589972400000L, 1590048000000L, TimeUnit.MILLISECONDS, "download1"); // 05-20-2020T11:00:00 to 05-21-2020T08:00:00 UTC
+    LLCRealtimeSegmentZKMetadata seg2 = getRealtimeSegmentZKMetadata("testTable__0__1__12345", Status.DONE,
+        1590048000000L, 1590134400000L, TimeUnit.MILLISECONDS, "download2"); // 05-21-2020T08:00:00 UTC to 05-22-2020T08:00:00 UTC
     when(mockClusterInfoProvide.getLLCRealtimeSegmentsMetadata(REALTIME_TABLE_NAME))
         .thenReturn(Lists.newArrayList(seg1, seg2));
 
@@ -319,8 +314,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     assertEquals(configs.get(MinionConstants.TABLE_NAME_KEY), REALTIME_TABLE_NAME);
     assertEquals(configs.get(MinionConstants.SEGMENT_NAME_KEY), "testTable__0__0__12345");
     assertEquals(configs.get(MinionConstants.DOWNLOAD_URL_KEY), "download1");
-    assertEquals(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY),
-        "1590019200000"); // 05-21-2020T00:00:00
+    assertEquals(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY), "1590019200000"); // 05-21-2020T00:00:00
     assertEquals(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY), "1590026400000"); // 05-21-2020T02:00:00
 
     // Segment Processor configs
@@ -340,8 +334,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     assertEquals(configs.get(MinionConstants.TABLE_NAME_KEY), REALTIME_TABLE_NAME);
     assertEquals(configs.get(MinionConstants.SEGMENT_NAME_KEY), "testTable__0__0__12345,testTable__0__1__12345");
     assertEquals(configs.get(MinionConstants.DOWNLOAD_URL_KEY), "download1,download2");
-    assertEquals(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY),
-        "1590019200000"); // 05-21-2020T00:00:00
+    assertEquals(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY), "1590019200000"); // 05-21-2020T00:00:00
     assertEquals(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY), "1590105600000"); // 05-22-2020T00:00:00
     assertEquals(configs.get(RealtimeToOfflineSegmentsTask.TIME_COLUMN_TRANSFORM_FUNCTION_KEY), "foo");
     assertEquals(configs.get(RealtimeToOfflineSegmentsTask.COLLECTOR_TYPE_KEY), "rollup");
@@ -362,9 +355,8 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
 
     when(mockClusterInfoProvide.getMinionRealtimeToOfflineSegmentsTaskMetadata(REALTIME_TABLE_NAME))
         .thenReturn(new RealtimeToOfflineSegmentsTaskMetadata(REALTIME_TABLE_NAME, 100_000L));
-    LLCRealtimeSegmentZKMetadata metadata1 =
-        getRealtimeSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 50_000, 150_000, TimeUnit.MILLISECONDS,
-            null);
+    LLCRealtimeSegmentZKMetadata metadata1 = getRealtimeSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 50_000,
+        150_000, TimeUnit.MILLISECONDS, null);
     LLCRealtimeSegmentZKMetadata metadata2 =
         getRealtimeSegmentZKMetadata("testTable__0__1__12345", Status.IN_PROGRESS, -1, -1, TimeUnit.MILLISECONDS, null);
     when(mockClusterInfoProvide.getLLCRealtimeSegmentsMetadata(REALTIME_TABLE_NAME))
@@ -377,9 +369,8 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(realtimeTableConfig));
     assertTrue(pinotTaskConfigs.isEmpty());
 
-    metadata1 =
-        getRealtimeSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 100_000, 200_000, TimeUnit.MILLISECONDS,
-            null);
+    metadata1 = getRealtimeSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 100_000, 200_000,
+        TimeUnit.MILLISECONDS, null);
     metadata2 =
         getRealtimeSegmentZKMetadata("testTable__0__1__12345", Status.IN_PROGRESS, -1, -1, TimeUnit.MILLISECONDS, null);
     when(mockClusterInfoProvide.getLLCRealtimeSegmentsMetadata(REALTIME_TABLE_NAME))
@@ -388,9 +379,8 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     assertTrue(pinotTaskConfigs.isEmpty());
 
     // last completed segment endtime ends at window end, allow
-    metadata1 =
-        getRealtimeSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 200_000, 86_500_000, TimeUnit.MILLISECONDS,
-            null);
+    metadata1 = getRealtimeSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 200_000, 86_500_000,
+        TimeUnit.MILLISECONDS, null);
     metadata2 =
         getRealtimeSegmentZKMetadata("testTable__0__1__12345", Status.IN_PROGRESS, -1, -1, TimeUnit.MILLISECONDS, null);
     when(mockClusterInfoProvide.getLLCRealtimeSegmentsMetadata(REALTIME_TABLE_NAME))
@@ -412,9 +402,8 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     when(mockClusterInfoProvide.getTaskStates(RealtimeToOfflineSegmentsTask.TASK_TYPE)).thenReturn(new HashMap<>());
     when(mockClusterInfoProvide.getMinionRealtimeToOfflineSegmentsTaskMetadata(REALTIME_TABLE_NAME))
         .thenReturn(new RealtimeToOfflineSegmentsTaskMetadata(REALTIME_TABLE_NAME, watermarkMs));
-    LLCRealtimeSegmentZKMetadata metadata1 =
-        getRealtimeSegmentZKMetadata("testTable__0__0__12345", Status.DONE, watermarkMs - 100, watermarkMs + 100,
-            TimeUnit.MILLISECONDS, null);
+    LLCRealtimeSegmentZKMetadata metadata1 = getRealtimeSegmentZKMetadata("testTable__0__0__12345", Status.DONE,
+        watermarkMs - 100, watermarkMs + 100, TimeUnit.MILLISECONDS, null);
     when(mockClusterInfoProvide.getLLCRealtimeSegmentsMetadata(REALTIME_TABLE_NAME))
         .thenReturn(Lists.newArrayList(metadata1));
 
@@ -433,9 +422,8 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     watermarkMs = now - TimeUnit.DAYS.toMillis(10);
     when(mockClusterInfoProvide.getMinionRealtimeToOfflineSegmentsTaskMetadata(REALTIME_TABLE_NAME))
         .thenReturn(new RealtimeToOfflineSegmentsTaskMetadata(REALTIME_TABLE_NAME, watermarkMs));
-    metadata1 =
-        getRealtimeSegmentZKMetadata("testTable__0__0__12345", Status.DONE, watermarkMs - 100, watermarkMs + 100,
-            TimeUnit.MILLISECONDS, null);
+    metadata1 = getRealtimeSegmentZKMetadata("testTable__0__0__12345", Status.DONE, watermarkMs - 100,
+        watermarkMs + 100, TimeUnit.MILLISECONDS, null);
     when(mockClusterInfoProvide.getLLCRealtimeSegmentsMetadata(REALTIME_TABLE_NAME))
         .thenReturn(Lists.newArrayList(metadata1));
 

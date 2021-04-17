@@ -80,8 +80,7 @@ public class TableResponse {
     }
 
     @Override
-    public TableResponse get(long timeout, TimeUnit unit)
-        throws ExecutionException {
+    public TableResponse get(long timeout, TimeUnit unit) throws ExecutionException {
       String response = getStringResponse(timeout, unit);
       try {
         JsonNode jsonResponse = OBJECT_READER.readTree(response);

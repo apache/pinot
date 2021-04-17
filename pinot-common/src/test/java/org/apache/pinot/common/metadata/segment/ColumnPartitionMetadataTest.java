@@ -37,8 +37,7 @@ public class ColumnPartitionMetadataTest {
   private static final String LEGACY_PARTITION_RANGES_STRING = "[1 3],[5 5]";
 
   @Test
-  public void testSerDe()
-      throws Exception {
+  public void testSerDe() throws Exception {
     ColumnPartitionMetadata expected = new ColumnPartitionMetadata(FUNCTION_NAME, NUM_PARTITIONS, PARTITIONS);
     ColumnPartitionMetadata actual =
         JsonUtils.stringToObject(JsonUtils.objectToString(expected), ColumnPartitionMetadata.class);
@@ -46,8 +45,7 @@ public class ColumnPartitionMetadataTest {
   }
 
   @Test
-  public void testLegacyMetadataDeserialization()
-      throws Exception {
+  public void testLegacyMetadataDeserialization() throws Exception {
     ColumnPartitionMetadata expected = new ColumnPartitionMetadata(FUNCTION_NAME, NUM_PARTITIONS, PARTITIONS);
     ColumnPartitionMetadata actual = JsonUtils.stringToObject(LEGACY_METADATA_JSON, ColumnPartitionMetadata.class);
     assertEquals(actual, expected);

@@ -36,8 +36,7 @@ import org.testng.annotations.Test;
 public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSet {
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
     // Start the Pinot cluster
@@ -81,15 +80,13 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
 
   @Test
   @Override
-  public void testQueriesFromQueryFile()
-      throws Exception {
+  public void testQueriesFromQueryFile() throws Exception {
     super.testQueriesFromQueryFile();
   }
 
   @Test
   @Override
-  public void testGeneratedQueriesWithMultiValues()
-      throws Exception {
+  public void testGeneratedQueriesWithMultiValues() throws Exception {
     super.testGeneratedQueriesWithMultiValues();
   }
 
@@ -102,8 +99,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
    * @throws Exception
    */
   @Test
-  public void testDictionaryBasedQueries()
-      throws Exception {
+  public void testDictionaryBasedQueries() throws Exception {
 
     // Dictionary columns
     // int
@@ -131,21 +127,18 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
 
   @Test
   @Override
-  public void testQueryExceptions()
-      throws Exception {
+  public void testQueryExceptions() throws Exception {
     super.testQueryExceptions();
   }
 
   @Test
   @Override
-  public void testInstanceShutdown()
-      throws Exception {
+  public void testInstanceShutdown() throws Exception {
     super.testInstanceShutdown();
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     dropRealtimeTable(getTableName());
     stopServer();
     stopBroker();
@@ -155,8 +148,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
     FileUtils.deleteDirectory(_tempDir);
   }
 
-  private void testDictionaryBasedFunctions(String column)
-      throws Exception {
+  private void testDictionaryBasedFunctions(String column) throws Exception {
     String pqlQuery;
     String sqlQuery;
     pqlQuery = "SELECT MAX(" + column + ") FROM " + getTableName();
@@ -171,15 +163,13 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
   }
 
   @Test
-  public void testHardcodedSqlQueries()
-      throws Exception {
+  public void testHardcodedSqlQueries() throws Exception {
     super.testHardcodedSqlQueries();
   }
 
   @Test
   @Override
-  public void testSqlQueriesFromQueryFile()
-      throws Exception {
+  public void testSqlQueriesFromQueryFile() throws Exception {
     super.testSqlQueriesFromQueryFile();
   }
 }

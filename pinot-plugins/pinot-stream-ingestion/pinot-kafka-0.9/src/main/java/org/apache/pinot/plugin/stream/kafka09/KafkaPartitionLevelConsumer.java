@@ -59,8 +59,7 @@ public class KafkaPartitionLevelConsumer extends KafkaConnectionHandler implemen
 
   @Override
   public synchronized MessageBatch fetchMessages(StreamPartitionMsgOffset startMsgOffset,
-      StreamPartitionMsgOffset endMsgOffset, int timeoutMillis)
-      throws java.util.concurrent.TimeoutException {
+      StreamPartitionMsgOffset endMsgOffset, int timeoutMillis) throws java.util.concurrent.TimeoutException {
     final long startOffset = ((LongMsgOffset) startMsgOffset).getOffset();
     final long endOffset = (endMsgOffset == null) ? Long.MAX_VALUE : ((LongMsgOffset) endMsgOffset).getOffset();
     return fetchMessages(startOffset, endOffset, timeoutMillis);
@@ -91,9 +90,8 @@ public class KafkaPartitionLevelConsumer extends KafkaConnectionHandler implemen
       throw new java.util.concurrent.TimeoutException();
     }
 
-    FetchResponse fetchResponse = _simpleConsumer.fetch(
-        new FetchRequestBuilder().minBytes(_fetchRequestMinBytes).maxWait(timeoutMillis)
-            .addFetch(_topic, _partition, startOffset, _fetchRequestSizeBytes).build());
+    FetchResponse fetchResponse = _simpleConsumer.fetch(new FetchRequestBuilder().minBytes(_fetchRequestMinBytes)
+        .maxWait(timeoutMillis).addFetch(_topic, _partition, startOffset, _fetchRequestSizeBytes).build());
 
     if (!fetchResponse.hasError()) {
       final Iterable<MessageAndOffset> messageAndOffsetIterable =
@@ -138,8 +136,8 @@ public class KafkaPartitionLevelConsumer extends KafkaConnectionHandler implemen
   @Override
   /**
    * Closes this consumer.
-   */ public void close()
-      throws IOException {
+   */
+  public void close() throws IOException {
     super.close();
   }
 }

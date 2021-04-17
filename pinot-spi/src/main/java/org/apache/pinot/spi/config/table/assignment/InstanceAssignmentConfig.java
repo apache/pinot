@@ -41,10 +41,11 @@ public class InstanceAssignmentConfig extends BaseJsonConfig {
   public InstanceAssignmentConfig(
       @JsonProperty(value = "tagPoolConfig", required = true) InstanceTagPoolConfig tagPoolConfig,
       @JsonProperty("constraintConfig") @Nullable InstanceConstraintConfig constraintConfig,
-      @JsonProperty(value = "replicaGroupPartitionConfig", required = true) InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig) {
+      @JsonProperty(value = "replicaGroupPartitionConfig",
+          required = true) InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig) {
     Preconditions.checkArgument(tagPoolConfig != null, "'tagPoolConfig' must be configured");
-    Preconditions
-        .checkArgument(replicaGroupPartitionConfig != null, "'replicaGroupPartitionConfig' must be configured");
+    Preconditions.checkArgument(replicaGroupPartitionConfig != null,
+        "'replicaGroupPartitionConfig' must be configured");
     _tagPoolConfig = tagPoolConfig;
     _constraintConfig = constraintConfig;
     _replicaGroupPartitionConfig = replicaGroupPartitionConfig;

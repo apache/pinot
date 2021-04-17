@@ -76,8 +76,7 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   }
 
   @Override
-  public void start()
-      throws Exception {
+  public void start() throws Exception {
     consumer = KafkaStreamLevelConsumerManager.acquireKafkaConsumerForConfig(_kafkaStreamLevelStreamConfig);
   }
 
@@ -149,8 +148,7 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   }
 
   @Override
-  public void shutdown()
-      throws Exception {
+  public void shutdown() throws Exception {
     if (consumer != null) {
       // If offsets commit is not succeed, then reset the offsets here.
       resetOffsets();

@@ -60,17 +60,23 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
   // multiple instances allowed per role for testing many minions
   private final List<Entry<ServiceRole, Map<String, Object>>> _bootstrapConfigurations = new ArrayList<>();
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help;
   @Option(name = "-zkAddress", required = true, metaVar = "<http>", usage = "Http address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
   @Option(name = "-clusterName", required = true, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = DEFAULT_CLUSTER_NAME;
-  @Option(name = "-port", required = true, metaVar = "<int>", usage = "Pinot service manager admin port, -1 means disable, 0 means a random available port.")
+  @Option(name = "-port", required = true, metaVar = "<int>",
+      usage = "Pinot service manager admin port, -1 means disable, 0 means a random available port.")
   private int _port;
-  @Option(name = "-bootstrapConfigPaths", handler = StringArrayOptionHandler.class, required = false, usage = "A list of Pinot service config file paths. Each config file requires an extra config: 'pinot.service.role' to indicate which service to start.", forbids = {"-bootstrapServices"})
+  @Option(name = "-bootstrapConfigPaths", handler = StringArrayOptionHandler.class, required = false,
+      usage = "A list of Pinot service config file paths. Each config file requires an extra config: 'pinot.service.role' to indicate which service to start.",
+      forbids = {"-bootstrapServices"})
   private String[] _bootstrapConfigPaths;
-  @Option(name = "-bootstrapServices", handler = StringArrayOptionHandler.class, required = false, usage = "A list of Pinot service roles to start with default config. E.g. CONTROLLER/BROKER/SERVER", forbids = {"-bootstrapConfigPaths"})
+  @Option(name = "-bootstrapServices", handler = StringArrayOptionHandler.class, required = false,
+      usage = "A list of Pinot service roles to start with default config. E.g. CONTROLLER/BROKER/SERVER",
+      forbids = {"-bootstrapConfigPaths"})
   private String[] _bootstrapServices = BOOTSTRAP_SERVICES;
 
   private PinotServiceManager _pinotServiceManager;
@@ -157,8 +163,7 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
   }
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
     try {
       LOGGER.info("Executing command: " + toString());
       if (!startPinotService("SERVICE_MANAGER", this::startServiceManager)) {
@@ -199,8 +204,7 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
     return _pinotServiceManager.getInstanceId();
   }
 
-  private Map<String, Object> getDefaultConfig(ServiceRole serviceRole)
-      throws SocketException, UnknownHostException {
+  private Map<String, Object> getDefaultConfig(ServiceRole serviceRole) throws SocketException, UnknownHostException {
     switch (serviceRole) {
       case CONTROLLER:
         return PinotConfigUtils.generateControllerConf(_zkAddress, _clusterName, null, DEFAULT_CONTROLLER_PORT, null,
@@ -219,7 +223,8 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
    * Starts a controller synchronously unless the cluster already exists. Other services start in parallel.
    */
   private boolean startBootstrapServices() {
-    if (_bootstrapConfigurations.isEmpty()) return true;
+    if (_bootstrapConfigurations.isEmpty())
+      return true;
 
     List<Entry<ServiceRole, Map<String, Object>>> parallelConfigs = new ArrayList<>();
 
@@ -241,11 +246,10 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
     return startBootstrapServicesInParallel(_pinotServiceManager, parallelConfigs);
   }
 
-  static boolean startBootstrapServicesInParallel(
-      PinotServiceManager pinotServiceManager,
-      List<Entry<ServiceRole, Map<String, Object>>> parallelConfigs
-  ) {
-    if (parallelConfigs.isEmpty()) return true;
+  static boolean startBootstrapServicesInParallel(PinotServiceManager pinotServiceManager,
+      List<Entry<ServiceRole, Map<String, Object>>> parallelConfigs) {
+    if (parallelConfigs.isEmpty())
+      return true;
 
     // True is when everything succeeded
     AtomicBoolean failed = new AtomicBoolean(false);
@@ -255,7 +259,8 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
       ServiceRole role = roleToConfig.getKey();
       Map<String, Object> config = roleToConfig.getValue();
       Thread thread = new Thread("Start a Pinot [" + role + "]") {
-        @Override public void run() {
+        @Override
+        public void run() {
           if (!startPinotService(role, () -> pinotServiceManager.startRole(role, config))) {
             failed.set(true);
           }
@@ -297,7 +302,8 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
   }
 
   public StartServiceManagerCommand addBootstrapService(ServiceRole role, Map<String, Object> config) {
-    if (role == null) throw new NullPointerException("role == null");
+    if (role == null)
+      throw new NullPointerException("role == null");
     config.put(PINOT_SERVICE_ROLE, role.toString()); // Ensure config has role key
     _bootstrapConfigurations.add(new SimpleImmutableEntry<>(role, config));
     return this;

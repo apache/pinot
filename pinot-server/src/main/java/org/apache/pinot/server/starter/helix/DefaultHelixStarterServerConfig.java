@@ -47,8 +47,8 @@ public class DefaultHelixStarterServerConfig {
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
         CommonConstants.Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR);
 
-    serverConf
-        .addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_READ_MODE, CommonConstants.Server.DEFAULT_READ_MODE);
+    serverConf.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_READ_MODE,
+        CommonConstants.Server.DEFAULT_READ_MODE);
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_MANAGER_CLASS,
         CommonConstants.Server.DEFAULT_DATA_MANAGER_CLASS);
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_RELOAD_CONSUMING_SEGMENT,
@@ -65,8 +65,8 @@ public class DefaultHelixStarterServerConfig {
         CommonConstants.Server.DEFAULT_REQUEST_HANDLER_FACTORY_CLASS);
 
     // netty port
-    serverConf
-        .addProperty(CommonConstants.Server.CONFIG_OF_NETTY_PORT, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
+    serverConf.addProperty(CommonConstants.Server.CONFIG_OF_NETTY_PORT,
+        CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
 
     return serverConf;
   }

@@ -45,8 +45,8 @@ public class TableConfigTunerRegistry {
   private static final Map<String, TableConfigTuner> _configTunerMap = new HashMap<>();
 
   static {
-    Reflections reflections = new Reflections(
-        new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache.pinot"))
+    Reflections reflections =
+        new Reflections(new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache.pinot"))
             .filterInputsBy(new FilterBuilder.Include(".*\\.tuner\\..*"))
             .setScanners(new ResourcesScanner(), new TypeAnnotationsScanner(), new SubTypesScanner()));
     Set<Class<?>> classes = reflections.getTypesAnnotatedWith(Tuner.class);

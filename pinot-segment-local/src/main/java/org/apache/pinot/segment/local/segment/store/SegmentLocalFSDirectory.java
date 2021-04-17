@@ -59,8 +59,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     this(new File(directoryPath), metadata, readMode);
   }
 
-  SegmentLocalFSDirectory(File directory, ReadMode readMode)
-      throws IOException, ConfigurationException {
+  SegmentLocalFSDirectory(File directory, ReadMode readMode) throws IOException, ConfigurationException {
     this(directory, loadSegmentMetadata(directory), readMode);
   }
 
@@ -84,8 +83,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
   }
 
   @Override
-  public void reloadMetadata()
-      throws Exception {
+  public void reloadMetadata() throws Exception {
     this.segmentMetadata = loadSegmentMetadata(segmentDirectory);
     columnIndexDirectory.metadata = this.segmentMetadata;
   }
@@ -137,8 +135,8 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
       }
     } else {
       if (!SegmentDirectoryPaths.isV3Directory(segmentDirectory)) {
-        LOGGER
-            .error("Segment directory: {} not found on disk and is not v3 format", segmentDirectory.getAbsolutePath());
+        LOGGER.error("Segment directory: {} not found on disk and is not v3 format",
+            segmentDirectory.getAbsolutePath());
         return -1;
       }
       File[] files = segmentDirectory.getParentFile().listFiles();
@@ -158,8 +156,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     }
   }
 
-  public Reader createReader()
-      throws IOException {
+  public Reader createReader() throws IOException {
 
     if (segmentLock.tryReadLock()) {
       loadData();
@@ -168,8 +165,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     return null;
   }
 
-  public Writer createWriter()
-      throws IOException {
+  public Writer createWriter() throws IOException {
 
     if (segmentLock.tryWriteLock()) {
       loadData();
@@ -184,14 +180,12 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     return segmentDirectory.toString();
   }
 
-  protected void load()
-      throws IOException, ConfigurationException {
+  protected void load() throws IOException, ConfigurationException {
     // in future, we can extend this to support metadata loading as well
     loadData();
   }
 
-  private synchronized void loadData()
-      throws IOException {
+  private synchronized void loadData() throws IOException {
     if (columnIndexDirectory != null) {
       return;
     }
@@ -216,8 +210,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     segmentLock.close();
     synchronized (this) {
       if (columnIndexDirectory != null) {
@@ -227,8 +220,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     }
   }
 
-  private PinotDataBuffer getIndexForColumn(String column, ColumnIndexType type)
-      throws IOException {
+  private PinotDataBuffer getIndexForColumn(String column, ColumnIndexType type) throws IOException {
     PinotDataBuffer buffer;
 
     buffer = columnIndexDirectory.getBuffer(column, type);
@@ -272,8 +264,8 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     } else {
       // pos needs to be long because buffer.size() is 32 bit but
       // adding 4k can make it go over int size
-      for (long pos = 0; pos < buffer.size() && prefetchedPages.get() < prefetchSlowdownPageLimit;
-          pos += PAGE_SIZE_BYTES) {
+      for (long pos = 0; pos < buffer.size() && prefetchedPages.get() < prefetchSlowdownPageLimit; pos +=
+          PAGE_SIZE_BYTES) {
         buffer.getByte((int) pos);
         prefetchedPages.incrementAndGet();
       }
@@ -288,8 +280,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
   public class Reader extends SegmentDirectory.Reader {
 
     @Override
-    public PinotDataBuffer getIndexFor(String column, ColumnIndexType type)
-        throws IOException {
+    public PinotDataBuffer getIndexFor(String column, ColumnIndexType type) throws IOException {
       return getIndexForColumn(column, type);
     }
 
@@ -335,8 +326,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
       columnIndexDirectory.removeIndex(columnName, indexType);
     }
 
-    private PinotDataBuffer getNewIndexBuffer(IndexKey key, long sizeBytes)
-        throws IOException {
+    private PinotDataBuffer getNewIndexBuffer(IndexKey key, long sizeBytes) throws IOException {
       return columnIndexDirectory.newBuffer(key.name, key.type, sizeBytes);
     }
 
@@ -350,8 +340,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     }
 
     @Override
-    public void close()
-        throws IOException {
+    public void close() throws IOException {
       segmentLock.unlock();
       if (columnIndexDirectory != null) {
         columnIndexDirectory.close();
@@ -360,8 +349,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     }
 
     @Override
-    public PinotDataBuffer getIndexFor(String column, ColumnIndexType type)
-        throws IOException {
+    public PinotDataBuffer getIndexFor(String column, ColumnIndexType type) throws IOException {
       return getIndexForColumn(column, type);
     }
 

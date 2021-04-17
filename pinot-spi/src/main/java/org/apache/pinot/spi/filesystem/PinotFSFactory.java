@@ -83,8 +83,7 @@ public class PinotFSFactory {
     return PINOT_FS_MAP.containsKey(scheme);
   }
 
-  public static void shutdown()
-      throws IOException {
+  public static void shutdown() throws IOException {
     for (PinotFS pinotFS : PINOT_FS_MAP.values()) {
       pinotFS.close();
     }

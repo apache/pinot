@@ -63,8 +63,7 @@ public class AuthenticationFilter implements ContainerRequestFilter {
   HttpHeaders _httpHeaders;
 
   @Override
-  public void filter(ContainerRequestContext requestContext)
-      throws IOException {
+  public void filter(ContainerRequestContext requestContext) throws IOException {
     Method endpointMethod = _resourceInfo.getResourceMethod();
     AccessControl accessControl = _accessControlFactory.create();
     String endpointUrl = _requestProvider.get().getRequestURL().toString();

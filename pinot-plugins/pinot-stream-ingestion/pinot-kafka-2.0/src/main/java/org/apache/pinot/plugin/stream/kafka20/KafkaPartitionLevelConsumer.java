@@ -35,7 +35,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHandler implements PartitionLevelConsumer {
+public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHandler
+    implements PartitionLevelConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaPartitionLevelConsumer.class);
 
   public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
@@ -44,15 +45,13 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
 
   @Override
   public MessageBatch fetchMessages(StreamPartitionMsgOffset startMsgOffset, StreamPartitionMsgOffset endMsgOffset,
-      int timeoutMillis)
-      throws TimeoutException {
-    final long startOffset = ((LongMsgOffset)startMsgOffset).getOffset();
-    final long endOffset = endMsgOffset == null ? Long.MAX_VALUE : ((LongMsgOffset)endMsgOffset).getOffset();
+      int timeoutMillis) throws TimeoutException {
+    final long startOffset = ((LongMsgOffset) startMsgOffset).getOffset();
+    final long endOffset = endMsgOffset == null ? Long.MAX_VALUE : ((LongMsgOffset) endMsgOffset).getOffset();
     return fetchMessages(startOffset, endOffset, timeoutMillis);
   }
 
-  public MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis)
-      throws TimeoutException {
+  public MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis) throws TimeoutException {
     _consumer.seek(_topicPartition, startOffset);
     ConsumerRecords<String, Bytes> consumerRecords = _consumer.poll(Duration.ofMillis(timeoutMillis));
     final Iterable<ConsumerRecord<String, Bytes>> messageAndOffsetIterable =
@@ -69,8 +68,7 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     super.close();
   }
 }

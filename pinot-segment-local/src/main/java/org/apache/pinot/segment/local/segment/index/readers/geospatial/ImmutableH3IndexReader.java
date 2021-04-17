@@ -73,8 +73,7 @@ public class ImmutableH3IndexReader implements H3IndexReader {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     // NOTE: DO NOT close the PinotDataBuffer here because it is tracked by the caller and might be reused later. The
     // caller is responsible of closing the PinotDataBuffer.
 

@@ -113,8 +113,7 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
     UpdateSketchBuilder sketchBuilder = new UpdateSketchBuilder();
 
@@ -193,9 +192,8 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
       }
     }
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 4 * 11 * NUM_RECORDS, 4 * NUM_RECORDS,
-            expectedResults);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 4 * 11 * NUM_RECORDS,
+        4 * NUM_RECORDS, expectedResults);
   }
 
   @Test
@@ -212,9 +210,8 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
       // Inner segment
       AggregationGroupByOperator aggregationGroupByOperator = getOperatorForPqlQuery(query);
       IntermediateResultsBlock resultsBlock = aggregationGroupByOperator.nextBlock();
-      QueriesTestUtils
-          .testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
-              11 * NUM_RECORDS, NUM_RECORDS);
+      QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(),
+          NUM_RECORDS, 0, 11 * NUM_RECORDS, NUM_RECORDS);
       AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
       assertNotNull(aggregationGroupByResult);
       int numGroups = 0;
@@ -297,9 +294,8 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
     // Inter segments
     String[] expectedResults = new String[]{Integer.toString(225)};
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 4 * 8 * NUM_RECORDS, 4 * NUM_RECORDS,
-            expectedResults);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 4 * 8 * NUM_RECORDS,
+        4 * NUM_RECORDS, expectedResults);
   }
 
   @Test
@@ -335,8 +331,7 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     _indexSegment.destroy();
     FileUtils.deleteDirectory(INDEX_DIR);
   }

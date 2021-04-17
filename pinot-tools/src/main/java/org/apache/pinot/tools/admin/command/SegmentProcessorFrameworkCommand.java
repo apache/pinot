@@ -39,7 +39,8 @@ public class SegmentProcessorFrameworkCommand extends AbstractBaseAdminCommand i
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentProcessorFrameworkCommand.class);
 
-  @Option(name = "-segmentProcessorFrameworkSpec", required = true, metaVar = "<String>", usage = "Path to SegmentProcessorFrameworkSpec json file")
+  @Option(name = "-segmentProcessorFrameworkSpec", required = true, metaVar = "<String>",
+      usage = "Path to SegmentProcessorFrameworkSpec json file")
   private String _segmentProcessorFrameworkSpec;
 
   @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
@@ -70,8 +71,7 @@ public class SegmentProcessorFrameworkCommand extends AbstractBaseAdminCommand i
   }
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
 
     SegmentProcessorFrameworkSpec segmentProcessorFrameworkSpec =
         JsonUtils.fileToObject(new File(_segmentProcessorFrameworkSpec), SegmentProcessorFrameworkSpec.class);
@@ -80,9 +80,8 @@ public class SegmentProcessorFrameworkCommand extends AbstractBaseAdminCommand i
     File outputSegmentsDir = new File(segmentProcessorFrameworkSpec.getOutputSegmentsDir());
     if (!outputSegmentsDir.exists()) {
       if (!outputSegmentsDir.mkdirs()) {
-        throw new RuntimeException(
-            "Did not find output directory, and could not create it either: " + segmentProcessorFrameworkSpec
-                .getOutputSegmentsDir());
+        throw new RuntimeException("Did not find output directory, and could not create it either: "
+            + segmentProcessorFrameworkSpec.getOutputSegmentsDir());
       }
     }
 

@@ -41,8 +41,7 @@ public class PinotDriver implements Driver {
   public static final String DEFAULT_TENANT = "DefaultTenant";
 
   @Override
-  public Connection connect(String url, Properties info)
-      throws SQLException {
+  public Connection connect(String url, Properties info) throws SQLException {
     try {
       LOGGER.info("Initiating connection to database for url: " + url);
       PinotClientTransport pinotClientTransport = new JsonAsyncHttpPinotClientTransportFactory().buildTransport();
@@ -55,16 +54,14 @@ public class PinotDriver implements Driver {
   }
 
   @Override
-  public boolean acceptsURL(String url)
-      throws SQLException {
+  public boolean acceptsURL(String url) throws SQLException {
     String cleanURI = url.substring(5);
     URI uri = URI.create(cleanURI);
     return uri.getScheme().contentEquals(SCHEME);
   }
 
   @Override
-  public DriverPropertyInfo[] getPropertyInfo(String url, Properties info)
-      throws SQLException {
+  public DriverPropertyInfo[] getPropertyInfo(String url, Properties info) throws SQLException {
     List<DriverPropertyInfo> propertyInfoList = new ArrayList<>();
     DriverPropertyInfo tenantPropertyInfo = new DriverPropertyInfo("tenant", null);
     tenantPropertyInfo.required = true;
@@ -90,8 +87,7 @@ public class PinotDriver implements Driver {
   }
 
   @Override
-  public Logger getParentLogger()
-      throws SQLFeatureNotSupportedException {
+  public Logger getParentLogger() throws SQLFeatureNotSupportedException {
     throw new SQLFeatureNotSupportedException();
   }
 

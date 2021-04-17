@@ -53,13 +53,12 @@ public class InvertedSortedIndexJointRule extends AbstractRule {
     QueryInvertedSortedIndexRecommender totalNESICounter =
         QueryInvertedSortedIndexRecommender.QueryInvertedSortedIndexRecommenderBuilder
             .aQueryInvertedSortedIndexRecommender().setInputManager(_input)
-            .setInvertedSortedIndexJointRuleParams(_params)
-            .setUseOverwrittenIndices(false) // nESI when not using any overwritten indices
+            .setInvertedSortedIndexJointRuleParams(_params).setUseOverwrittenIndices(false) // nESI when not using any overwritten indices
             .build();
 
-    List<Double> perQueryNESI = _input.getParsedQueries().stream().flatMap(
-        query -> totalNESICounter.parseQuery(_input.getQueryContext(query), _input.getQueryWeight(query))
-            .stream()) // List<PredicateParseResult>
+    List<Double> perQueryNESI = _input.getParsedQueries().stream()
+        .flatMap(
+            query -> totalNESICounter.parseQuery(_input.getQueryContext(query), _input.getQueryWeight(query)).stream()) // List<PredicateParseResult>
         .map(exclusiveRecommendations -> exclusiveRecommendations.get(0).getnESI()).collect(Collectors.toList());
     _totalNESI = perQueryNESI.stream().reduce(Double::sum).orElse(0d);
 
@@ -87,14 +86,12 @@ public class InvertedSortedIndexJointRule extends AbstractRule {
     LOGGER.debug("optimalCombination: {}", optimalCombination);
 
     // under the optimal set of indices, calculate nESI saved for each qeury
-    List<PredicateParseResult> perQuerySelectedCandidate =
-        flattenedResults.stream()// stream of List<PredicateParseResult> (exclusive recommendations)
-            .map(exclusiveRecommendations -> exclusiveRecommendations.stream() // stream of PredicateParseResult
-                .filter(predicateParseResult // PredicateParseResult whose index set is in optimal index set
-                    -> optimalCombination.getCandidateDims().contains(predicateParseResult.getCandidateDims()))
-                .min(Comparator.comparing(PredicateParseResult::getnESIWithIdx))
-                .get()) // The selected result in findOptimalCombination process
-            .collect(Collectors.toList());
+    List<PredicateParseResult> perQuerySelectedCandidate = flattenedResults.stream()// stream of List<PredicateParseResult> (exclusive recommendations)
+        .map(exclusiveRecommendations -> exclusiveRecommendations.stream() // stream of PredicateParseResult
+            .filter(predicateParseResult // PredicateParseResult whose index set is in optimal index set
+            -> optimalCombination.getCandidateDims().contains(predicateParseResult.getCandidateDims()))
+            .min(Comparator.comparing(PredicateParseResult::getnESIWithIdx)).get()) // The selected result in findOptimalCombination process
+        .collect(Collectors.toList());
 
     LOGGER.debug("perQuerySelectedCandidate: {}", perQuerySelectedCandidate);
 
@@ -123,8 +120,7 @@ public class InvertedSortedIndexJointRule extends AbstractRule {
       if (_input.getOverWrittenConfigs().getIndexConfig().isSortedColumnOverwritten()) {
         // if an overwritten sorted index presents
         dimNameWeightPairRank.forEach(pair -> {
-          _output.getIndexConfig().getInvertedIndexColumns()
-              .add(pair.getLeft()); // Add recommendations to inverted index set
+          _output.getIndexConfig().getInvertedIndexColumns().add(pair.getLeft()); // Add recommendations to inverted index set
         });
       } else {
         // sort dimensions based on the overall nESI saved by each dimension
@@ -139,10 +135,10 @@ public class InvertedSortedIndexJointRule extends AbstractRule {
         LOGGER.debug("dimWeightsRank: {}", dimNameWeightPairRank);
         Double weightThresholdForTopCandidates =
             dimNameWeightPairRank.get(0).getRight() * _params.THRESHOLD_RATIO_MIN_NESI_FOR_TOP_CANDIDATES;
-        Optional<Pair<String, Double>> sortedColumn = dimNameWeightPairRank.stream()
-            .filter(pair -> pair.getRight() >= weightThresholdForTopCandidates) // nESI saved > threshold
-            .filter(pair -> _input.isSingleValueColumn(pair.getLeft())) // sorted index on single valued column
-            .max(Comparator.comparing(pair -> // pick dimension with highest Cardinality as sorted index
+        Optional<Pair<String, Double>> sortedColumn =
+            dimNameWeightPairRank.stream().filter(pair -> pair.getRight() >= weightThresholdForTopCandidates) // nESI saved > threshold
+                .filter(pair -> _input.isSingleValueColumn(pair.getLeft())) // sorted index on single valued column
+                .max(Comparator.comparing(pair -> // pick dimension with highest Cardinality as sorted index
                 _input.getCardinality(pair.getLeft())));
         if (sortedColumn.isPresent()) {
           _output.getIndexConfig().setSortedColumn(sortedColumn.get().getLeft());

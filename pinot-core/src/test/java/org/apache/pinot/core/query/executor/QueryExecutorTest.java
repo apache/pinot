@@ -80,8 +80,7 @@ public class QueryExecutorTest {
   private QueryExecutor _queryExecutor;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     // Set up the segments
     FileUtils.deleteQuietly(INDEX_DIR);
     Assert.assertTrue(INDEX_DIR.mkdirs());
@@ -92,8 +91,8 @@ public class QueryExecutorTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     int i = 0;
     for (; i < NUM_SEGMENTS_TO_GENERATE; i++) {
-      SegmentGeneratorConfig config = SegmentTestUtils
-          .getSegmentGeneratorConfig(avroFile, FileFormat.AVRO, INDEX_DIR, TABLE_NAME, tableConfig, schema);
+      SegmentGeneratorConfig config = SegmentTestUtils.getSegmentGeneratorConfig(avroFile, FileFormat.AVRO, INDEX_DIR,
+          TABLE_NAME, tableConfig, schema);
       config.setSegmentNamePostfix(Integer.toString(i));
       SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
       driver.init(config);
@@ -110,8 +109,8 @@ public class QueryExecutorTest {
     Assert.assertNotNull(resourceUrl);
     File jsonFile = new File(resourceUrl.getFile());
     for (; i < NUM_SEGMENTS_TO_GENERATE + NUM_EMPTY_SEGMENTS_TO_GENERATE; i++) {
-      SegmentGeneratorConfig config = SegmentTestUtils
-          .getSegmentGeneratorConfig(jsonFile, FileFormat.JSON, INDEX_DIR, TABLE_NAME, tableConfig, schema);
+      SegmentGeneratorConfig config = SegmentTestUtils.getSegmentGeneratorConfig(jsonFile, FileFormat.JSON, INDEX_DIR,
+          TABLE_NAME, tableConfig, schema);
       config.setSegmentNamePostfix(Integer.toString(i));
       SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
       driver.init(config);
@@ -127,9 +126,8 @@ public class QueryExecutorTest {
     when(tableDataManagerConfig.getTableName()).thenReturn(TABLE_NAME);
     when(tableDataManagerConfig.getDataDir()).thenReturn(FileUtils.getTempDirectoryPath());
     @SuppressWarnings("unchecked")
-    TableDataManager tableDataManager = TableDataManagerProvider
-        .getTableDataManager(tableDataManagerConfig, "testInstance", mock(ZkHelixPropertyStore.class),
-            mock(ServerMetrics.class), mock(HelixManager.class));
+    TableDataManager tableDataManager = TableDataManagerProvider.getTableDataManager(tableDataManagerConfig,
+        "testInstance", mock(ZkHelixPropertyStore.class), mock(ServerMetrics.class), mock(HelixManager.class));
     tableDataManager.start();
     for (ImmutableSegment indexSegment : _indexSegments) {
       tableDataManager.addSegment(indexSegment);

@@ -55,8 +55,7 @@ public class SegmentStatusCheckerTest {
   private ControllerConf config;
 
   @Test
-  public void offlineBasicTest()
-      throws Exception {
+  public void offlineBasicTest() throws Exception {
     final String tableName = "myTable_OFFLINE";
     List<String> allTableNames = new ArrayList<String>();
     allTableNames.add(tableName);
@@ -100,19 +99,16 @@ public class SegmentStatusCheckerTest {
     segmentStatusChecker.run();
     Assert.assertEquals(
         controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.SEGMENTS_IN_ERROR_STATE), 1);
-    Assert
-        .assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.NUMBER_OF_REPLICAS),
-            1);
-    Assert
-        .assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.PERCENT_OF_REPLICAS),
-            33);
+    Assert.assertEquals(
+        controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.NUMBER_OF_REPLICAS), 1);
+    Assert.assertEquals(
+        controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.PERCENT_OF_REPLICAS), 33);
     Assert.assertEquals(
         controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 100);
   }
 
   @Test
-  public void realtimeBasicTest()
-      throws Exception {
+  public void realtimeBasicTest() throws Exception {
     final String tableName = "myTable_REALTIME";
     final String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     List<String> allTableNames = new ArrayList<String>();
@@ -167,19 +163,16 @@ public class SegmentStatusCheckerTest {
     segmentStatusChecker.run();
     Assert.assertEquals(
         controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
-    Assert
-        .assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.NUMBER_OF_REPLICAS),
-            3);
-    Assert
-        .assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.PERCENT_OF_REPLICAS),
-            100);
+    Assert.assertEquals(
+        controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.NUMBER_OF_REPLICAS), 3);
+    Assert.assertEquals(
+        controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.PERCENT_OF_REPLICAS), 100);
     Assert.assertEquals(
         controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 100);
   }
 
   @Test
-  public void missingEVPartitionTest()
-      throws Exception {
+  public void missingEVPartitionTest() throws Exception {
     final String tableName = "myTable_OFFLINE";
     List<String> allTableNames = new ArrayList<String>();
     allTableNames.add(tableName);
@@ -248,16 +241,14 @@ public class SegmentStatusCheckerTest {
     segmentStatusChecker.run();
     Assert.assertEquals(
         controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.SEGMENTS_IN_ERROR_STATE), 1);
-    Assert
-        .assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.NUMBER_OF_REPLICAS),
-            0);
+    Assert.assertEquals(
+        controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.NUMBER_OF_REPLICAS), 0);
     Assert.assertEquals(
         controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 75);
   }
 
   @Test
-  public void missingEVTest()
-      throws Exception {
+  public void missingEVTest() throws Exception {
     final String tableName = "myTable_REALTIME";
     List<String> allTableNames = new ArrayList<String>();
     allTableNames.add(tableName);
@@ -298,8 +289,7 @@ public class SegmentStatusCheckerTest {
   }
 
   @Test
-  public void missingIdealTest()
-      throws Exception {
+  public void missingIdealTest() throws Exception {
     final String tableName = "myTable_REALTIME";
     List<String> allTableNames = new ArrayList<>();
     allTableNames.add(tableName);
@@ -334,8 +324,7 @@ public class SegmentStatusCheckerTest {
   }
 
   @Test
-  public void missingEVPartitionPushTest()
-      throws Exception {
+  public void missingEVPartitionPushTest() throws Exception {
     final String tableName = "myTable_OFFLINE";
     List<String> allTableNames = new ArrayList<String>();
     allTableNames.add(tableName);
@@ -390,19 +379,16 @@ public class SegmentStatusCheckerTest {
     segmentStatusChecker.run();
     Assert.assertEquals(
         controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
-    Assert
-        .assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.NUMBER_OF_REPLICAS),
-            2);
-    Assert
-        .assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.PERCENT_OF_REPLICAS),
-            100);
+    Assert.assertEquals(
+        controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.NUMBER_OF_REPLICAS), 2);
+    Assert.assertEquals(
+        controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.PERCENT_OF_REPLICAS), 100);
     Assert.assertEquals(
         controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 100);
   }
 
   @Test
-  public void noReplicas()
-      throws Exception {
+  public void noReplicas() throws Exception {
     final String tableName = "myTable_REALTIME";
     List<String> allTableNames = new ArrayList<String>();
     allTableNames.add(tableName);
@@ -442,8 +428,7 @@ public class SegmentStatusCheckerTest {
   }
 
   @Test
-  public void disabledTableTest()
-      throws Exception {
+  public void disabledTableTest() throws Exception {
 
     final String tableName = "myTable_OFFLINE";
     List<String> allTableNames = new ArrayList<String>();
@@ -485,8 +470,7 @@ public class SegmentStatusCheckerTest {
   }
 
   @Test
-  public void disabledEmptyTableTest()
-      throws Exception {
+  public void disabledEmptyTableTest() throws Exception {
 
     final String tableName = "myTable_OFFLINE";
     List<String> allTableNames = Lists.newArrayList(tableName);
@@ -524,15 +508,13 @@ public class SegmentStatusCheckerTest {
   }
 
   @Test
-  public void noSegments()
-      throws Exception {
+  public void noSegments() throws Exception {
     noSegmentsInternal(0);
     noSegmentsInternal(5);
     noSegmentsInternal(-1);
   }
 
-  public void noSegmentsInternal(final int nReplicas)
-      throws Exception {
+  public void noSegmentsInternal(final int nReplicas) throws Exception {
     final String tableName = "myTable_REALTIME";
     String nReplicasStr = Integer.toString(nReplicas);
     int nReplicasExpectedValue = nReplicas;

@@ -41,9 +41,8 @@ public class SegmentUtils {
     // enabled tables have partition ids in their segment metadata.
     RealtimeSegmentZKMetadata segmentZKMetadata = ZKMetadataProvider
         .getRealtimeSegmentZKMetadata(helixManager.getHelixPropertyStore(), realtimeTableName, segmentName);
-    Preconditions
-        .checkState(segmentZKMetadata != null, "Failed to find segment ZK metadata for segment: %s of table: %s",
-            segmentName, realtimeTableName);
+    Preconditions.checkState(segmentZKMetadata != null,
+        "Failed to find segment ZK metadata for segment: %s of table: %s", segmentName, realtimeTableName);
     return getSegmentPartitionIdFromZkMetaData(realtimeTableName, segmentZKMetadata, partitionColumn);
   }
 

@@ -48,8 +48,7 @@ public class PinotSegmentToCsvConverter implements PinotSegmentConverter {
   }
 
   @Override
-  public void convert()
-      throws Exception {
+  public void convert() throws Exception {
     try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader(new File(_segmentDir));
         BufferedWriter recordWriter = new BufferedWriter(new FileWriter(_outputFile))) {
       GenericRow row = new GenericRow();
@@ -67,8 +66,7 @@ public class PinotSegmentToCsvConverter implements PinotSegmentConverter {
     }
   }
 
-  private void writeRow(BufferedWriter recordWriter, GenericRow row, String[] fields)
-      throws IOException {
+  private void writeRow(BufferedWriter recordWriter, GenericRow row, String[] fields) throws IOException {
     int numFields = fields.length;
     String[] values = new String[numFields];
     for (int i = 0; i < numFields; i++) {

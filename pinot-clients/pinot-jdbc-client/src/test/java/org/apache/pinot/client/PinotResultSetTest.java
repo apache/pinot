@@ -42,8 +42,7 @@ public class PinotResultSetTest {
   private PinotClientTransportFactory _previousTransportFactory = null;
 
   @Test
-  public void testFetchValues()
-      throws Exception {
+  public void testFetchValues() throws Exception {
     ResultSetGroup resultSetGroup = getResultSet(TEST_RESULT_SET_RESOURCE);
     ResultSet resultSet = resultSetGroup.getResultSet(0);
     PinotResultSet pinotResultSet = new PinotResultSet(resultSet);
@@ -60,8 +59,7 @@ public class PinotResultSetTest {
   }
 
   @Test
-  public void testCursorMovement()
-      throws Exception {
+  public void testCursorMovement() throws Exception {
     ResultSetGroup resultSetGroup = getResultSet(TEST_RESULT_SET_RESOURCE);
     ResultSet resultSet = resultSetGroup.getResultSet(0);
     PinotResultSet pinotResultSet = new PinotResultSet(resultSet);
@@ -105,8 +103,7 @@ public class PinotResultSetTest {
   }
 
   @Test
-  public void testFetchStreams()
-      throws Exception {
+  public void testFetchStreams() throws Exception {
     ResultSetGroup resultSetGroup = getResultSet(TEST_RESULT_SET_RESOURCE);
     ResultSet resultSet = resultSetGroup.getResultSet(0);
     PinotResultSet pinotResultSet = new PinotResultSet(resultSet);
@@ -122,8 +119,7 @@ public class PinotResultSetTest {
   }
 
   @Test
-  public void testFetchDates()
-      throws Exception {
+  public void testFetchDates() throws Exception {
     ResultSetGroup resultSetGroup = getResultSet(TEST_RESULT_SET_RESOURCE);
     ResultSet resultSet = resultSetGroup.getResultSet(0);
     PinotResultSet pinotResultSet = new PinotResultSet(resultSet);
@@ -138,8 +134,7 @@ public class PinotResultSetTest {
   }
 
   @Test
-  public void testFindColumn()
-      throws Exception {
+  public void testFindColumn() throws Exception {
     ResultSetGroup resultSetGroup = getResultSet(TEST_RESULT_SET_RESOURCE);
     ResultSet resultSet = resultSetGroup.getResultSet(0);
     PinotResultSet pinotResultSet = new PinotResultSet(resultSet);
@@ -150,8 +145,7 @@ public class PinotResultSetTest {
   }
 
   @Test
-  public void testGetResultMetadata()
-      throws Exception {
+  public void testGetResultMetadata() throws Exception {
     ResultSetGroup resultSetGroup = getResultSet(TEST_RESULT_SET_RESOURCE);
     ResultSet resultSet = resultSetGroup.getResultSet(0);
     PinotResultSet pinotResultSet = new PinotResultSet(resultSet);
@@ -183,8 +177,7 @@ public class PinotResultSetTest {
     public String _resource;
 
     @Override
-    public BrokerResponse executeQuery(String brokerAddress, String query)
-        throws PinotClientException {
+    public BrokerResponse executeQuery(String brokerAddress, String query) throws PinotClientException {
       try {
         StringBuilder builder = new StringBuilder();
         InputStream stream = getClass().getClassLoader().getResourceAsStream(_resource);
@@ -202,26 +195,22 @@ public class PinotResultSetTest {
     }
 
     @Override
-    public Future<BrokerResponse> executeQueryAsync(String brokerAddress, String query)
-        throws PinotClientException {
+    public Future<BrokerResponse> executeQueryAsync(String brokerAddress, String query) throws PinotClientException {
       return null;
     }
 
     @Override
-    public BrokerResponse executeQuery(String brokerAddress, Request request)
-        throws PinotClientException {
+    public BrokerResponse executeQuery(String brokerAddress, Request request) throws PinotClientException {
       return executeQuery(brokerAddress, request.getQuery());
     }
 
     @Override
-    public Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
-        throws PinotClientException {
+    public Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request) throws PinotClientException {
       return null;
     }
 
     @Override
-    public void close()
-        throws PinotClientException {
+    public void close() throws PinotClientException {
 
     }
   }

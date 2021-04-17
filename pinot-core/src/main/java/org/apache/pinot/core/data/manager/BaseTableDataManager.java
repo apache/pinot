@@ -131,8 +131,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
-  public void addSegment(File indexDir, IndexLoadingConfig indexLoadingConfig)
-      throws Exception {
+  public void addSegment(File indexDir, IndexLoadingConfig indexLoadingConfig) throws Exception {
     throw new UnsupportedOperationException();
   }
 

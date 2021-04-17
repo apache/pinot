@@ -33,8 +33,7 @@ public interface MutableSegment extends IndexSegment {
    * @param rowMetadata the metadata associated with the message
    * @return Whether the segment is full (i.e. cannot index more record into it)
    */
-  boolean index(GenericRow row, @Nullable RowMetadata rowMetadata)
-      throws IOException;
+  boolean index(GenericRow row, @Nullable RowMetadata rowMetadata) throws IOException;
 
   /**
    * Returns the number of records already indexed into the segment.

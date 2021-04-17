@@ -119,8 +119,7 @@ public class DataSchema {
     }
   }
 
-  public byte[] toBytes()
-      throws IOException {
+  public byte[] toBytes() throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
     int length = _columnNames.length;
@@ -146,8 +145,7 @@ public class DataSchema {
     return byteArrayOutputStream.toByteArray();
   }
 
-  public static DataSchema fromBytes(byte[] buffer)
-      throws IOException {
+  public static DataSchema fromBytes(byte[] buffer) throws IOException {
     ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(buffer);
     DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream);
 
@@ -203,8 +201,8 @@ public class DataSchema {
     }
     if (anObject instanceof DataSchema) {
       DataSchema anotherDataSchema = (DataSchema) anObject;
-      return Arrays.equals(_columnNames, anotherDataSchema._columnNames) && Arrays
-          .equals(_columnDataTypes, anotherDataSchema._columnDataTypes);
+      return Arrays.equals(_columnNames, anotherDataSchema._columnNames)
+          && Arrays.equals(_columnDataTypes, anotherDataSchema._columnDataTypes);
     }
     return false;
   }
@@ -215,7 +213,18 @@ public class DataSchema {
   }
 
   public enum ColumnDataType {
-    INT, LONG, FLOAT, DOUBLE, STRING, BYTES, OBJECT, INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY;
+    INT,
+    LONG,
+    FLOAT,
+    DOUBLE,
+    STRING,
+    BYTES,
+    OBJECT,
+    INT_ARRAY,
+    LONG_ARRAY,
+    FLOAT_ARRAY,
+    DOUBLE_ARRAY,
+    STRING_ARRAY;
 
     public boolean isNumber() {
       return this == INT || this == LONG || this == FLOAT || this == DOUBLE;
@@ -240,8 +249,8 @@ public class DataSchema {
 
     public boolean isCompatible(ColumnDataType anotherColumnDataType) {
       // All numbers are compatible with each other
-      return this == anotherColumnDataType || (this.isNumber() && anotherColumnDataType.isNumber()) || (
-          this.isNumberArray() && anotherColumnDataType.isNumberArray());
+      return this == anotherColumnDataType || (this.isNumber() && anotherColumnDataType.isNumber())
+          || (this.isNumberArray() && anotherColumnDataType.isNumberArray());
     }
 
     public DataType toDataType() {

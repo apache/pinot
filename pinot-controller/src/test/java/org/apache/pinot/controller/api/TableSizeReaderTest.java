@@ -72,13 +72,11 @@ public class TableSizeReaderTest {
   private final int timeoutMsec = 10000;
 
   @BeforeClass
-  public void setUp()
-      throws IOException {
+  public void setUp() throws IOException {
     helix = mock(PinotHelixResourceManager.class);
     when(helix.hasOfflineTable(anyString())).thenAnswer(new Answer() {
       @Override
-      public Object answer(InvocationOnMock invocationOnMock)
-          throws Throwable {
+      public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
         String table = (String) invocationOnMock.getArguments()[0];
         return table.indexOf("offline") >= 0;
       }
@@ -86,8 +84,7 @@ public class TableSizeReaderTest {
 
     when(helix.hasRealtimeTable(anyString())).thenAnswer(new Answer() {
       @Override
-      public Object answer(InvocationOnMock invocationOnMock)
-          throws Throwable {
+      public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
         String table = (String) invocationOnMock.getArguments()[0];
         return table.indexOf("realtime") >= 0;
       }
@@ -141,8 +138,7 @@ public class TableSizeReaderTest {
   private HttpHandler createHandler(final int status, final List<SegmentSizeInfo> segmentSizes, final int sleepTimeMs) {
     return new HttpHandler() {
       @Override
-      public void handle(HttpExchange httpExchange)
-          throws IOException {
+      public void handle(HttpExchange httpExchange) throws IOException {
         if (sleepTimeMs > 0) {
           try {
             Thread.sleep(sleepTimeMs);
@@ -194,8 +190,7 @@ public class TableSizeReaderTest {
       return 100 + index * 10;
     }
 
-    private void start(String path, HttpHandler handler)
-        throws IOException {
+    private void start(String path, HttpHandler handler) throws IOException {
       httpServer = HttpServer.create(socket, 0);
       httpServer.createContext(path, handler);
       new Thread(new Runnable() {
@@ -225,8 +220,7 @@ public class TableSizeReaderTest {
   }
 
   @Test
-  public void testNoSuchTable()
-      throws InvalidConfigException {
+  public void testNoSuchTable() throws InvalidConfigException {
     TableSizeReader reader = new TableSizeReader(executor, connectionManager, _controllerMetrics, helix);
     Assert.assertNull(reader.getTableSizeDetails("mytable", 5000));
   }
@@ -235,16 +229,14 @@ public class TableSizeReaderTest {
       throws InvalidConfigException {
     when(helix.getServerToSegmentsMap(anyString())).thenAnswer(new Answer<Object>() {
       @Override
-      public Object answer(InvocationOnMock invocationOnMock)
-          throws Throwable {
+      public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
         return subsetOfServerSegments(servers);
       }
     });
 
-    when(helix.getDataInstanceAdminEndpoints(ArgumentMatchers.<String>anySet())).thenAnswer(new Answer<Object>() {
+    when(helix.getDataInstanceAdminEndpoints(ArgumentMatchers.<String> anySet())).thenAnswer(new Answer<Object>() {
       @Override
-      public Object answer(InvocationOnMock invocationOnMock)
-          throws Throwable {
+      public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
         return serverEndpoints(servers);
       }
     });
@@ -313,8 +305,7 @@ public class TableSizeReaderTest {
   }
 
   @Test
-  public void testGetTableSubTypeSizeAllSuccess()
-      throws InvalidConfigException {
+  public void testGetTableSubTypeSizeAllSuccess() throws InvalidConfigException {
     final String[] servers = {"server0", "server1"};
     String table = "offline";
     TableSizeReader.TableSizeDetails tableSizeDetails = testRunner(servers, table);
@@ -327,13 +318,12 @@ public class TableSizeReaderTest {
     Assert.assertEquals(tableSizeDetails.reportedSizeInBytes, offlineSizes.reportedSizeInBytes);
     Assert.assertEquals(tableSizeDetails.estimatedSizeInBytes, offlineSizes.estimatedSizeInBytes);
     String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(table);
-    Assert.assertEquals(_controllerMetrics
-        .getValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT), 0);
+    Assert.assertEquals(_controllerMetrics.getValueOfTableGauge(tableNameWithType,
+        ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT), 0);
   }
 
   @Test
-  public void testGetTableSubTypeSizeAllErrors()
-      throws InvalidConfigException {
+  public void testGetTableSubTypeSizeAllErrors() throws InvalidConfigException {
     final String[] servers = {"server2", "server5"};
     String table = "offline";
     TableSizeReader.TableSizeDetails tableSizeDetails = testRunner(servers, table);
@@ -344,13 +334,12 @@ public class TableSizeReaderTest {
     Assert.assertEquals(offlineSizes.reportedSizeInBytes, -1);
     Assert.assertEquals(tableSizeDetails.estimatedSizeInBytes, -1);
     String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(table);
-    Assert.assertEquals(_controllerMetrics
-        .getValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT), 100);
+    Assert.assertEquals(_controllerMetrics.getValueOfTableGauge(tableNameWithType,
+        ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT), 100);
   }
 
   @Test
-  public void testGetTableSubTypeSizesWithErrors()
-      throws InvalidConfigException {
+  public void testGetTableSubTypeSizesWithErrors() throws InvalidConfigException {
     final String[] servers = {"server0", "server1", "server2", "server5"};
     String table = "offline";
     TableSizeReader.TableSizeDetails tableSizeDetails = testRunner(servers, "offline");
@@ -361,13 +350,12 @@ public class TableSizeReaderTest {
     validateTableSubTypeSize(servers, offlineSizes);
     Assert.assertNull(tableSizeDetails.realtimeSegments);
     String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(table);
-    Assert.assertEquals(_controllerMetrics
-        .getValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT), 20);
+    Assert.assertEquals(_controllerMetrics.getValueOfTableGauge(tableNameWithType,
+        ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT), 20);
   }
 
   @Test
-  public void getTableSizeDetailsRealtimeOnly()
-      throws InvalidConfigException {
+  public void getTableSizeDetailsRealtimeOnly() throws InvalidConfigException {
     final String[] servers = {"server3", "server4"};
     TableSizeReader.TableSizeDetails tableSizeDetails = testRunner(servers, "realtime");
     Assert.assertNull(tableSizeDetails.offlineSegments);

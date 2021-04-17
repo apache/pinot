@@ -98,7 +98,8 @@ public class PinotTenantRestletResource {
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = " Create a tenant")
-  @ApiResponses({@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Error creating tenant")})
+  @ApiResponses({@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500,
+      message = "Error creating tenant")})
   public SuccessResponse createTenant(Tenant tenant) {
     PinotResourceManagerResponse response;
     switch (tenant.getTenantRole()) {
@@ -128,7 +129,8 @@ public class PinotTenantRestletResource {
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update a tenant")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Failed to update the tenant")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500,
+      message = "Failed to update the tenant")})
   public SuccessResponse updateTenant(Tenant tenant) {
     PinotResourceManagerResponse response;
     switch (tenant.getTenantRole()) {
@@ -161,9 +163,10 @@ public class PinotTenantRestletResource {
   @Path("/tenants")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List all tenants")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Error reading tenants list")})
-  public TenantsList getAllTenants(
-      @ApiParam(value = "Tenant type", required = false, allowableValues = "BROKER, SERVER", defaultValue = "") @QueryParam("type") @DefaultValue("") String type) {
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500,
+      message = "Error reading tenants list")})
+  public TenantsList getAllTenants(@ApiParam(value = "Tenant type", required = false,
+      allowableValues = "BROKER, SERVER", defaultValue = "") @QueryParam("type") @DefaultValue("") String type) {
     TenantsList tenants = new TenantsList();
 
     if (type == null || type.isEmpty() || type.equalsIgnoreCase("server")) {
@@ -179,12 +182,12 @@ public class PinotTenantRestletResource {
   @Path("/tenants/{tenantName}")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List instance for a tenant, or enable/disable/drop a tenant")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Error reading tenants list")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500,
+      message = "Error reading tenants list")})
   public String listInstanceOrToggleTenantState(
       @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName,
       @ApiParam(value = "Tenant type (server|broker)") @QueryParam("type") String tenantType,
-      @ApiParam(value = "state") @QueryParam("state") String stateStr)
-      throws Exception {
+      @ApiParam(value = "state") @QueryParam("state") String stateStr) throws Exception {
     if (stateStr == null) {
       return listInstancesForTenant(tenantName, tenantType);
     } else {
@@ -202,7 +205,8 @@ public class PinotTenantRestletResource {
   @Path("/tenants/{tenantName}/tables")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List tables on a a server tenant")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Error reading list")})
+  @ApiResponses(
+      value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Error reading list")})
   public String getTablesOnTenant(
       @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName) {
     return getTablesServedFromTenant(tenantName);
@@ -269,31 +273,35 @@ public class PinotTenantRestletResource {
     List<InstanceConfig> instanceConfigList = pinotHelixResourceManager.getAllHelixInstanceConfigs();
 
     if (tenantType == null) {
-      Set<String> allServerInstances = pinotHelixResourceManager.getAllInstancesForServerTenant(instanceConfigList, tenantName);
-      Set<String> allBrokerInstances = pinotHelixResourceManager.getAllInstancesForBrokerTenant(instanceConfigList, tenantName);
+      Set<String> allServerInstances =
+          pinotHelixResourceManager.getAllInstancesForServerTenant(instanceConfigList, tenantName);
+      Set<String> allBrokerInstances =
+          pinotHelixResourceManager.getAllInstancesForBrokerTenant(instanceConfigList, tenantName);
 
       if (allServerInstances.isEmpty() && allBrokerInstances.isEmpty()) {
-        throw new ControllerApplicationException(LOGGER, "Failed to find any instances for broker and server tenants: " + tenantName,
-            Response.Status.NOT_FOUND);
+        throw new ControllerApplicationException(LOGGER,
+            "Failed to find any instances for broker and server tenants: " + tenantName, Response.Status.NOT_FOUND);
       }
       resourceGetRet.set("ServerInstances", JsonUtils.objectToJsonNode(allServerInstances));
       resourceGetRet.set("BrokerInstances", JsonUtils.objectToJsonNode(allBrokerInstances));
     } else {
       if (tenantType.equalsIgnoreCase("server")) {
-        Set<String> allServerInstances = pinotHelixResourceManager.getAllInstancesForServerTenant(instanceConfigList, tenantName);
+        Set<String> allServerInstances =
+            pinotHelixResourceManager.getAllInstancesForServerTenant(instanceConfigList, tenantName);
 
         if (allServerInstances.isEmpty()) {
-          throw new ControllerApplicationException(LOGGER, "Failed to find any instances for server tenant: " + tenantName,
-              Response.Status.NOT_FOUND);
+          throw new ControllerApplicationException(LOGGER,
+              "Failed to find any instances for server tenant: " + tenantName, Response.Status.NOT_FOUND);
         }
         resourceGetRet.set("ServerInstances", JsonUtils.objectToJsonNode(allServerInstances));
       }
       if (tenantType.equalsIgnoreCase("broker")) {
-        Set<String> allBrokerInstances = pinotHelixResourceManager.getAllInstancesForBrokerTenant(instanceConfigList, tenantName);
+        Set<String> allBrokerInstances =
+            pinotHelixResourceManager.getAllInstancesForBrokerTenant(instanceConfigList, tenantName);
 
         if (allBrokerInstances.isEmpty()) {
-          throw new ControllerApplicationException(LOGGER, "Failed to find any instances for broker tenant: " + tenantName,
-              Response.Status.NOT_FOUND);
+          throw new ControllerApplicationException(LOGGER,
+              "Failed to find any instances for broker tenant: " + tenantName, Response.Status.NOT_FOUND);
         }
         resourceGetRet.set("BrokerInstances", JsonUtils.objectToJsonNode(allBrokerInstances));
       }
@@ -306,10 +314,13 @@ public class PinotTenantRestletResource {
   @Path("/tenants/{tenantName}/metadata")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get tenant information")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = TenantMetadata.class), @ApiResponse(code = 404, message = "Tenant not found"), @ApiResponse(code = 500, message = "Server error reading tenant information")})
+  @ApiResponses(
+      value = {@ApiResponse(code = 200, message = "Success", response = TenantMetadata.class), @ApiResponse(code = 404,
+          message = "Tenant not found"), @ApiResponse(code = 500, message = "Server error reading tenant information")})
   public TenantMetadata getTenantMetadata(
       @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName,
-      @ApiParam(value = "tenant type", required = false, defaultValue = "", allowableValues = "SERVER, BROKER") @QueryParam("type") @DefaultValue("") String type) {
+      @ApiParam(value = "tenant type", required = false, defaultValue = "",
+          allowableValues = "SERVER, BROKER") @QueryParam("type") @DefaultValue("") String type) {
 
     TenantMetadata tenantMeta = new TenantMetadata();
     if (type == null || type.isEmpty()) {
@@ -346,11 +357,15 @@ public class PinotTenantRestletResource {
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Change tenant state")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = String.class), @ApiResponse(code = 404, message = "Tenant not found"), @ApiResponse(code = 500, message = "Server error reading tenant information")})
+  @ApiResponses(
+      value = {@ApiResponse(code = 200, message = "Success", response = String.class), @ApiResponse(code = 404,
+          message = "Tenant not found"), @ApiResponse(code = 500, message = "Server error reading tenant information")})
   public String changeTenantState(
       @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName,
-      @ApiParam(value = "tenant type", required = false, defaultValue = "", allowableValues = "SERVER, BROKER") @QueryParam("type") String type,
-      @ApiParam(value = "state", required = true, defaultValue = "", allowableValues = "enable, disable, drop") @QueryParam("state") @DefaultValue("") String state) {
+      @ApiParam(value = "tenant type", required = false, defaultValue = "",
+          allowableValues = "SERVER, BROKER") @QueryParam("type") String type,
+      @ApiParam(value = "state", required = true, defaultValue = "",
+          allowableValues = "enable, disable, drop") @QueryParam("state") @DefaultValue("") String state) {
     TenantMetadata tenantMetadata = getTenantMetadata(tenantName, type);
     Set<String> allInstances = new HashSet<>();
     if (tenantMetadata.brokerInstances != null) {
@@ -402,10 +417,13 @@ public class PinotTenantRestletResource {
   @Authenticate(AccessType.DELETE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Delete a tenant")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 400, message = "Tenant can not be deleted"), @ApiResponse(code = 404, message = "Tenant not found"), @ApiResponse(code = 500, message = "Error deleting tenant")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 400,
+      message = "Tenant can not be deleted"), @ApiResponse(code = 404,
+          message = "Tenant not found"), @ApiResponse(code = 500, message = "Error deleting tenant")})
   public SuccessResponse deleteTenant(
       @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName,
-      @ApiParam(value = "Tenant type", required = true, allowableValues = "SERVER, BROKER") @QueryParam("type") @DefaultValue("") String type) {
+      @ApiParam(value = "Tenant type", required = true,
+          allowableValues = "SERVER, BROKER") @QueryParam("type") @DefaultValue("") String type) {
 
     if (type == null || type.isEmpty()) {
       throw new ControllerApplicationException(LOGGER, "Tenant type (BROKER | SERVER) is required as query parameter",

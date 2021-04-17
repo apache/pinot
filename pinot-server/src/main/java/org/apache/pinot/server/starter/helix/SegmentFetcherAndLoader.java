@@ -56,8 +56,7 @@ public class SegmentFetcherAndLoader {
   private final ServerMetrics _serverMetrics;
 
   public SegmentFetcherAndLoader(PinotConfiguration config, InstanceDataManager instanceDataManager,
-      ServerMetrics serverMetrics)
-      throws Exception {
+      ServerMetrics serverMetrics) throws Exception {
     _instanceDataManager = instanceDataManager;
     _serverMetrics = serverMetrics;
 
@@ -122,9 +121,8 @@ public class SegmentFetcherAndLoader {
             FileUtils.deleteQuietly(indexDir);
             localSegmentMetadata = null;
           } catch (Exception e) {
-            LOGGER
-                .error("Failed to load {} of table {} from local, will try to reload it from controller!", segmentName,
-                    tableNameWithType, e);
+            LOGGER.error("Failed to load {} of table {} from local, will try to reload it from controller!",
+                segmentName, tableNameWithType, e);
             FileUtils.deleteQuietly(indexDir);
             localSegmentMetadata = null;
           }

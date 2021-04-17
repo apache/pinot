@@ -100,21 +100,20 @@ public class BenchmarkIndexedTable {
   }
 
   private Record getNewRecord() {
-    Object[] columns =
-        new Object[]{_d1.get(RANDOM.nextInt(_d1.size())), _d2.get(RANDOM.nextInt(_d2.size())), (double) RANDOM
-            .nextInt(1000), (double) RANDOM.nextInt(1000)};
+    Object[] columns = new Object[]{_d1.get(RANDOM.nextInt(_d1.size())), _d2
+        .get(RANDOM.nextInt(_d2.size())), (double) RANDOM.nextInt(1000), (double) RANDOM.nextInt(1000)};
     return new Record(columns);
   }
 
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
-  public void concurrentIndexedTable()
-      throws InterruptedException {
+  public void concurrentIndexedTable() throws InterruptedException {
     int numSegments = 10;
 
     // make 1 concurrent table
-    IndexedTable concurrentIndexedTable = new ConcurrentIndexedTable(_dataSchema, _queryContext, TRIM_SIZE, TRIM_THRESHOLD);
+    IndexedTable concurrentIndexedTable =
+        new ConcurrentIndexedTable(_dataSchema, _queryContext, TRIM_SIZE, TRIM_THRESHOLD);
 
     // 10 parallel threads putting 10k records into the table
 
@@ -152,8 +151,7 @@ public class BenchmarkIndexedTable {
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
-  public void simpleIndexedTable()
-      throws InterruptedException, TimeoutException, ExecutionException {
+  public void simpleIndexedTable() throws InterruptedException, TimeoutException, ExecutionException {
     int numSegments = 10;
 
     List<IndexedTable> simpleIndexedTables = new ArrayList<>(numSegments);
@@ -193,8 +191,7 @@ public class BenchmarkIndexedTable {
     mergedTable.finish(false);
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     ChainedOptionsBuilder opt =
         new OptionsBuilder().include(BenchmarkIndexedTable.class.getSimpleName()).warmupTime(TimeValue.seconds(10))
             .warmupIterations(1).measurementTime(TimeValue.seconds(30)).measurementIterations(3).forks(1);

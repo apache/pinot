@@ -128,8 +128,8 @@ public class StarTreeUtils {
             case IS_NOT_NULL:
               return null;
           }
-          PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider
-              .getPredicateEvaluator(predicate, dictionary, dataSource.getDataSourceMetadata().getDataType());
+          PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate,
+              dictionary, dataSource.getDataSourceMetadata().getDataType());
           if (predicateEvaluator.isAlwaysFalse()) {
             // Do not use star-tree if there is no matching record
             return null;

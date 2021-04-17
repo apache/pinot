@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.compat.tests;
 
-
 public class ClusterDescriptor {
 
   public static final String DEFAULT_HOST = "localhost";

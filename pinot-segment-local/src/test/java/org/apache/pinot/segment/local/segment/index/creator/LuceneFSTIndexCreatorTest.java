@@ -37,20 +37,17 @@ public class LuceneFSTIndexCreatorTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "LuceneFSTIndex");
 
   @BeforeClass
-  public void setUp()
-      throws IOException {
+  public void setUp() throws IOException {
     FileUtils.forceMkdir(INDEX_DIR);
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     FileUtils.deleteDirectory(INDEX_DIR);
   }
 
   @Test
-  public void testIndexWriterReader()
-      throws IOException {
+  public void testIndexWriterReader() throws IOException {
     String[] uniqueValues = new String[3];
     uniqueValues[0] = "hello-world";
     uniqueValues[1] = "hello-world123";

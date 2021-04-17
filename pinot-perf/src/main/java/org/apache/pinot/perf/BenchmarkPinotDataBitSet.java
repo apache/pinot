@@ -75,8 +75,7 @@ public class BenchmarkPinotDataBitSet {
   public int _numBits;
 
   @Setup
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
     FileUtils.forceMkdir(INDEX_DIR);
     File indexFile = new File(INDEX_DIR, "bit-" + _numBits);
@@ -108,8 +107,7 @@ public class BenchmarkPinotDataBitSet {
   }
 
   @TearDown
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     _dataBuffer.close();
     FileUtils.deleteDirectory(INDEX_DIR);
   }
@@ -231,8 +229,7 @@ public class BenchmarkPinotDataBitSet {
     return _dictIdBuffer[0];
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     new Runner(new OptionsBuilder().include(BenchmarkPinotDataBitSet.class.getSimpleName()).build()).run();
   }
 }

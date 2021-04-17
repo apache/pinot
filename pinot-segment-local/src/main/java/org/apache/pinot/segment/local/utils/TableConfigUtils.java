@@ -171,8 +171,8 @@ public final class TableConfigUtils {
 
     String peerSegmentDownloadScheme = validationConfig.getPeerSegmentDownloadScheme();
     if (peerSegmentDownloadScheme != null) {
-      if (!CommonConstants.HTTP_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme) && !CommonConstants.HTTPS_PROTOCOL
-          .equalsIgnoreCase(peerSegmentDownloadScheme)) {
+      if (!CommonConstants.HTTP_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme)
+          && !CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme)) {
         throw new IllegalStateException("Invalid value '" + peerSegmentDownloadScheme
             + "' for peerSegmentDownloadScheme. Must be one of http or https");
       }
@@ -273,9 +273,8 @@ public final class TableConfigUtils {
           }
           List<String> arguments = expressionEvaluator.getArguments();
           if (arguments.contains(columnName)) {
-            throw new IllegalStateException(
-                "Arguments of a transform function '" + arguments + "' cannot contain the destination column '"
-                    + columnName + "'");
+            throw new IllegalStateException("Arguments of a transform function '" + arguments
+                + "' cannot contain the destination column '" + columnName + "'");
           }
         }
       }
@@ -294,8 +293,8 @@ public final class TableConfigUtils {
       return;
     }
     // check table type is realtime
-    Preconditions
-        .checkState(tableConfig.getTableType() == TableType.REALTIME, "Upsert table is for realtime table only.");
+    Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
+        "Upsert table is for realtime table only.");
     // primary key exists
     Preconditions.checkState(CollectionUtils.isNotEmpty(schema.getPrimaryKeyColumns()),
         "Upsert table must have primary key columns in the schema");
@@ -311,8 +310,9 @@ public final class TableConfigUtils {
         "Upsert table must use strict replica-group (i.e. strictReplicaGroup) based routing");
     // no startree index
     Preconditions.checkState(
-        CollectionUtils.isEmpty(tableConfig.getIndexingConfig().getStarTreeIndexConfigs()) && !tableConfig
-            .getIndexingConfig().isEnableDefaultStarTree(), "The upsert table cannot have star-tree index.");
+        CollectionUtils.isEmpty(tableConfig.getIndexingConfig().getStarTreeIndexConfigs())
+            && !tableConfig.getIndexingConfig().isEnableDefaultStarTree(),
+        "The upsert table cannot have star-tree index.");
   }
 
   /**
@@ -334,9 +334,8 @@ public final class TableConfigUtils {
       String segmentSelectorType = tierConfig.getSegmentSelectorType();
       String segmentAge = tierConfig.getSegmentAge();
       if (segmentSelectorType.equalsIgnoreCase(TierFactory.TIME_SEGMENT_SELECTOR_TYPE)) {
-        Preconditions
-            .checkState(segmentAge != null, "Must provide 'segmentAge' for segmentSelectorType: %s in tier: %s",
-                segmentSelectorType, tierName);
+        Preconditions.checkState(segmentAge != null,
+            "Must provide 'segmentAge' for segmentSelectorType: %s in tier: %s", segmentSelectorType, tierName);
         Preconditions.checkState(TimeUtils.isPeriodValid(segmentAge),
             "segmentAge: %s must be a valid period string (eg. 30d, 24h) in tier: %s", segmentAge, tierName);
       } else {
@@ -347,9 +346,8 @@ public final class TableConfigUtils {
       String storageType = tierConfig.getStorageType();
       String serverTag = tierConfig.getServerTag();
       if (storageType.equalsIgnoreCase(TierFactory.PINOT_SERVER_STORAGE_TYPE)) {
-        Preconditions
-            .checkState(serverTag != null, "Must provide 'serverTag' for storageType: %s in tier: %s", storageType,
-                tierName);
+        Preconditions.checkState(serverTag != null, "Must provide 'serverTag' for storageType: %s in tier: %s",
+            storageType, tierName);
         Preconditions.checkState(TagNameUtils.isServerTag(serverTag),
             "serverTag: %s must have a valid server tag format (<tenantName>_OFFLINE or <tenantName>_REALTIME) in tier: %s",
             serverTag, tierName);
@@ -482,8 +480,8 @@ public final class TableConfigUtils {
     if (indexingConfig.getRangeIndexColumns() != null) {
       for (String rangeIndexCol : indexingConfig.getRangeIndexColumns()) {
         Preconditions.checkState(
-            schema.getFieldSpecFor(rangeIndexCol).getDataType().isNumeric() || !noDictionaryColumnsSet
-                .contains(rangeIndexCol),
+            schema.getFieldSpecFor(rangeIndexCol).getDataType().isNumeric()
+                || !noDictionaryColumnsSet.contains(rangeIndexCol),
             "Cannot create a range index on non-numeric/no-dictionary column " + rangeIndexCol);
       }
     }
@@ -507,8 +505,8 @@ public final class TableConfigUtils {
     if (indexingConfig.getJsonIndexColumns() != null) {
       for (String jsonIndexCol : indexingConfig.getJsonIndexColumns()) {
         Preconditions.checkState(
-            schema.getFieldSpecFor(jsonIndexCol).isSingleValueField() && schema.getFieldSpecFor(jsonIndexCol)
-                .getDataType().equals(FieldSpec.DataType.STRING),
+            schema.getFieldSpecFor(jsonIndexCol).isSingleValueField()
+                && schema.getFieldSpecFor(jsonIndexCol).getDataType().equals(FieldSpec.DataType.STRING),
             "Json index can only be created for single value String column. Invalid for column: " + jsonIndexCol);
       }
     }

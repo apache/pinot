@@ -137,8 +137,8 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
         throw new RuntimeException("Missing property 'schemaURI' in 'tableSpec'");
       }
       PinotClusterSpec pinotClusterSpec = _spec.getPinotClusterSpecs()[0];
-      String schemaURI = SegmentGenerationUtils
-          .generateSchemaURI(pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
+      String schemaURI = SegmentGenerationUtils.generateSchemaURI(pinotClusterSpec.getControllerURI(),
+          _spec.getTableSpec().getTableName());
       _spec.getTableSpec().setSchemaURI(schemaURI);
     }
     _schema = SegmentGenerationUtils.getSchema(_spec.getTableSpec().getSchemaURI(), _spec.getAuthToken());
@@ -149,8 +149,8 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
         throw new RuntimeException("Missing property 'tableConfigURI' in 'tableSpec'");
       }
       PinotClusterSpec pinotClusterSpec = _spec.getPinotClusterSpecs()[0];
-      String tableConfigURI = SegmentGenerationUtils
-          .generateTableConfigURI(pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
+      String tableConfigURI = SegmentGenerationUtils.generateTableConfigURI(pinotClusterSpec.getControllerURI(),
+          _spec.getTableSpec().getTableName());
       _spec.getTableSpec().setTableConfigURI(tableConfigURI);
     }
     _tableConfig = SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), spec.getAuthToken());
@@ -163,8 +163,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
   }
 
   @Override
-  public void run()
-      throws Exception {
+  public void run() throws Exception {
     //Get list of files to process
     String[] files = _inputDirFS.listFiles(_inputDirURI, true);
 
@@ -209,8 +208,8 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
           List<String> siblingFiles = localDirIndex.get(parentPath);
           Collections.sort(siblingFiles);
           for (int i = 0; i < siblingFiles.size(); i++) {
-            URI inputFileURI = SegmentGenerationUtils
-                .getFileURI(siblingFiles.get(i), SegmentGenerationUtils.getDirectoryURI(parentPath));
+            URI inputFileURI = SegmentGenerationUtils.getFileURI(siblingFiles.get(i),
+                SegmentGenerationUtils.getDirectoryURI(parentPath));
             submitSegmentGenTask(localTempDir, inputFileURI, i);
           }
         }
@@ -229,8 +228,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     }
   }
 
-  private void submitSegmentGenTask(File localTempDir, URI inputFileURI, int seqId)
-      throws Exception {
+  private void submitSegmentGenTask(File localTempDir, URI inputFileURI, int seqId) throws Exception {
     //create localTempDir for input and output
     File localInputTempDir = new File(localTempDir, "input");
     FileUtils.forceMkdir(localInputTempDir);
@@ -272,9 +270,8 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
         LOGGER.info("Size for segment: {}, uncompressed: {}, compressed: {}", segmentName,
             DataSizeUtils.fromBytes(uncompressedSegmentSize), DataSizeUtils.fromBytes(compressedSegmentSize));
         //move segment to output PinotFS
-        URI outputSegmentTarURI =
-            SegmentGenerationUtils.getRelativeOutputPath(_inputDirURI, inputFileURI, _outputDirURI)
-                .resolve(segmentTarFileName);
+        URI outputSegmentTarURI = SegmentGenerationUtils
+            .getRelativeOutputPath(_inputDirURI, inputFileURI, _outputDirURI).resolve(segmentTarFileName);
         if (!_spec.isOverwriteOutput() && _outputDirFS.exists(outputSegmentTarURI)) {
           LOGGER.warn("Not overwrite existing output segment tar file: {}", _outputDirFS.exists(outputSegmentTarURI));
         } else {

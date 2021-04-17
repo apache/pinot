@@ -109,7 +109,7 @@ public class SegmentNameBuilderTest {
     // Double underscores should not work
     try {
       HLCSegmentName segName = new HLCSegmentName("__", "a", "b");
-//      SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("__", "a", "b");
+      //      SegmentNameBuilder.Realtime.buildHighLevelConsumerSegmentName("__", "a", "b");
       fail("Exception not thrown");
     } catch (Exception e) {
       // Expected
@@ -150,7 +150,8 @@ public class SegmentNameBuilderTest {
     LLCSegmentName segName6 = new LLCSegmentName(tableName, partitionGroupId, sequenceNumber + 1, msSinceEpoch);
     Assert.assertTrue(segName1.compareTo(segName6) < 0);
 
-    LLCSegmentName segName7 = new LLCSegmentName(tableName + "NotGood", partitionGroupId, sequenceNumber + 1, msSinceEpoch);
+    LLCSegmentName segName7 =
+        new LLCSegmentName(tableName + "NotGood", partitionGroupId, sequenceNumber + 1, msSinceEpoch);
     try {
       segName1.compareTo(segName7);
       Assert.fail("Not failing when comparing " + segName1.getSegmentName() + " and " + segName7.getSegmentName());

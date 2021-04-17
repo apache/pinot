@@ -56,8 +56,7 @@ public class MultiplePinotSegmentRecordReaderTest {
   private List<List<GenericRow>> _rowsList;
 
   @BeforeClass
-  public void setup()
-      throws Exception {
+  public void setup() throws Exception {
     Schema schema = createPinotSchema();
     TableConfig tableConfig = createTableConfig();
     _segmentOutputDir = Files.createTempDir().toString();
@@ -75,16 +74,12 @@ public class MultiplePinotSegmentRecordReaderTest {
   }
 
   private Schema createPinotSchema() {
-    return new Schema.SchemaBuilder()
-        .setSchemaName("schema")
-        .addSingleValueDimension(D_SV_1, FieldSpec.DataType.STRING)
+    return new Schema.SchemaBuilder().setSchemaName("schema").addSingleValueDimension(D_SV_1, FieldSpec.DataType.STRING)
         .addSingleValueDimension(D_SV_2, FieldSpec.DataType.INT)
-        .addMultiValueDimension(D_MV_1, FieldSpec.DataType.STRING)
-        .addMetric(M1, FieldSpec.DataType.INT)
+        .addMultiValueDimension(D_MV_1, FieldSpec.DataType.STRING).addMetric(M1, FieldSpec.DataType.INT)
         .addMetric(M2, FieldSpec.DataType.FLOAT)
         .addDateTime(TIME_1, FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
-        .addDateTime(TIME_2, FieldSpec.DataType.LONG, "1:DAYS:EPOCH", "1:DAYS")
-        .build();
+        .addDateTime(TIME_2, FieldSpec.DataType.LONG, "1:DAYS:EPOCH", "1:DAYS").build();
   }
 
   private TableConfig createTableConfig() {
@@ -92,11 +87,10 @@ public class MultiplePinotSegmentRecordReaderTest {
   }
 
   @Test
-  public void testMultiplePinotSegmentRecordReader()
-      throws Exception {
+  public void testMultiplePinotSegmentRecordReader() throws Exception {
     List<GenericRow> outputRows = new ArrayList<>();
-    try (MultiplePinotSegmentRecordReader pinotSegmentRecordReader = new MultiplePinotSegmentRecordReader(
-        _segmentIndexDirList)) {
+    try (MultiplePinotSegmentRecordReader pinotSegmentRecordReader =
+        new MultiplePinotSegmentRecordReader(_segmentIndexDirList)) {
       while (pinotSegmentRecordReader.hasNext()) {
         outputRows.add(pinotSegmentRecordReader.next());
       }
@@ -121,15 +115,14 @@ public class MultiplePinotSegmentRecordReaderTest {
   }
 
   @Test
-  public void testMultiplePinotSegmentRecordReaderSortedColumn()
-      throws Exception {
+  public void testMultiplePinotSegmentRecordReaderSortedColumn() throws Exception {
     List<String> sortOrder = new ArrayList<>();
     sortOrder.add(D_SV_1);
     sortOrder.add(D_SV_2);
 
     List<GenericRow> outputRows = new ArrayList<>();
-    try (MultiplePinotSegmentRecordReader pinotSegmentRecordReader = new MultiplePinotSegmentRecordReader(
-        _segmentIndexDirList, null, sortOrder)) {
+    try (MultiplePinotSegmentRecordReader pinotSegmentRecordReader =
+        new MultiplePinotSegmentRecordReader(_segmentIndexDirList, null, sortOrder)) {
       while (pinotSegmentRecordReader.hasNext()) {
         outputRows.add(pinotSegmentRecordReader.next());
       }

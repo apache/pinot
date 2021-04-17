@@ -59,81 +59,66 @@ public class JsonUtils {
   public static final ObjectWriter DEFAULT_WRITER = DEFAULT_MAPPER.writer();
   public static final ObjectWriter DEFAULT_PRETTY_WRITER = DEFAULT_MAPPER.writerWithDefaultPrettyPrinter();
 
-  public static <T> T stringToObject(String jsonString, Class<T> valueType)
-      throws IOException {
+  public static <T> T stringToObject(String jsonString, Class<T> valueType) throws IOException {
     return DEFAULT_READER.forType(valueType).readValue(jsonString);
   }
 
-  public static <T> T stringToObject(String jsonString, TypeReference<T> valueTypeRef)
-      throws IOException {
+  public static <T> T stringToObject(String jsonString, TypeReference<T> valueTypeRef) throws IOException {
     return DEFAULT_READER.forType(valueTypeRef).readValue(jsonString);
   }
 
-  public static JsonNode stringToJsonNode(String jsonString)
-      throws IOException {
+  public static JsonNode stringToJsonNode(String jsonString) throws IOException {
     return DEFAULT_READER.readTree(jsonString);
   }
 
-  public static <T> T fileToObject(File jsonFile, Class<T> valueType)
-      throws IOException {
+  public static <T> T fileToObject(File jsonFile, Class<T> valueType) throws IOException {
     return DEFAULT_READER.forType(valueType).readValue(jsonFile);
   }
 
-  public static <T> List<T> fileToList(File jsonFile, Class<T> valueType)
-      throws IOException {
+  public static <T> List<T> fileToList(File jsonFile, Class<T> valueType) throws IOException {
     return DEFAULT_READER.forType(DEFAULT_MAPPER.getTypeFactory().constructCollectionType(List.class, valueType))
         .readValue(jsonFile);
   }
 
-  public static JsonNode fileToJsonNode(File jsonFile)
-      throws IOException {
+  public static JsonNode fileToJsonNode(File jsonFile) throws IOException {
     try (InputStream inputStream = new FileInputStream(jsonFile)) {
       return DEFAULT_READER.readTree(inputStream);
     }
   }
 
-  public static <T> T inputStreamToObject(InputStream jsonInputStream, Class<T> valueType)
-      throws IOException {
+  public static <T> T inputStreamToObject(InputStream jsonInputStream, Class<T> valueType) throws IOException {
     return DEFAULT_READER.forType(valueType).readValue(jsonInputStream);
   }
 
-  public static JsonNode inputStreamToJsonNode(InputStream jsonInputStream)
-      throws IOException {
+  public static JsonNode inputStreamToJsonNode(InputStream jsonInputStream) throws IOException {
     return DEFAULT_READER.readTree(jsonInputStream);
   }
 
-  public static <T> T bytesToObject(byte[] jsonBytes, Class<T> valueType)
-      throws IOException {
+  public static <T> T bytesToObject(byte[] jsonBytes, Class<T> valueType) throws IOException {
     return DEFAULT_READER.forType(valueType).readValue(jsonBytes);
   }
 
-  public static JsonNode bytesToJsonNode(byte[] jsonBytes)
-      throws IOException {
+  public static JsonNode bytesToJsonNode(byte[] jsonBytes) throws IOException {
     return DEFAULT_READER.readTree(new ByteArrayInputStream(jsonBytes));
   }
 
-  public static <T> T jsonNodeToObject(JsonNode jsonNode, Class<T> valueType)
-      throws IOException {
+  public static <T> T jsonNodeToObject(JsonNode jsonNode, Class<T> valueType) throws IOException {
     return DEFAULT_READER.forType(valueType).readValue(jsonNode);
   }
 
-  public static <T> T jsonNodeToObject(JsonNode jsonNode, TypeReference<T> valueTypeRef)
-      throws IOException {
+  public static <T> T jsonNodeToObject(JsonNode jsonNode, TypeReference<T> valueTypeRef) throws IOException {
     return DEFAULT_READER.forType(valueTypeRef).readValue(jsonNode);
   }
 
-  public static String objectToString(Object object)
-      throws JsonProcessingException {
+  public static String objectToString(Object object) throws JsonProcessingException {
     return DEFAULT_WRITER.writeValueAsString(object);
   }
 
-  public static String objectToPrettyString(Object object)
-      throws JsonProcessingException {
+  public static String objectToPrettyString(Object object) throws JsonProcessingException {
     return DEFAULT_PRETTY_WRITER.writeValueAsString(object);
   }
 
-  public static byte[] objectToBytes(Object object)
-      throws JsonProcessingException {
+  public static byte[] objectToBytes(Object object) throws JsonProcessingException {
     return DEFAULT_WRITER.writeValueAsBytes(object);
   }
 

@@ -66,8 +66,7 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
     return new FakeStreamMetadataProvider(_streamConfig);
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     String clientId = "client_id_localhost_tester";
 
     // stream config
@@ -93,7 +92,8 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
     // Partition level consumer
     PartitionLevelConsumer partitionLevelConsumer =
         streamConsumerFactory.createPartitionLevelConsumer(clientId, partition);
-    MessageBatch messageBatch = partitionLevelConsumer.fetchMessages(new LongMsgOffset(10), new LongMsgOffset(40), 10_000);
+    MessageBatch messageBatch =
+        partitionLevelConsumer.fetchMessages(new LongMsgOffset(10), new LongMsgOffset(40), 10_000);
 
     // Message decoder
     Schema pinotSchema = FakeStreamConfigUtils.getPinotSchema();

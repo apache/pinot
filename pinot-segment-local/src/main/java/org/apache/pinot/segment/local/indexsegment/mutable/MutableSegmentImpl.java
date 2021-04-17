@@ -292,9 +292,8 @@ public class MutableSegmentImpl implements MutableSegment {
         int estimatedCardinality = (int) (_statsHistory.getEstimatedCardinality(column) * 1.1);
         String dictionaryAllocationContext =
             buildAllocationContext(_segmentName, column, V1Constants.Dict.FILE_EXTENSION);
-        dictionary = MutableDictionaryFactory
-            .getMutableDictionary(dataType, _offHeap, _memoryManager, dictionaryColumnSize,
-                Math.min(estimatedCardinality, _capacity), dictionaryAllocationContext);
+        dictionary = MutableDictionaryFactory.getMutableDictionary(dataType, _offHeap, _memoryManager,
+            dictionaryColumnSize, Math.min(estimatedCardinality, _capacity), dictionaryAllocationContext);
 
         if (fieldSpec.isSingleValueField()) {
           // Single-value dictionary-encoded forward index
@@ -306,9 +305,8 @@ public class MutableSegmentImpl implements MutableSegment {
           String allocationContext = buildAllocationContext(_segmentName, column,
               V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
           // TODO: Start with a smaller capacity on FixedByteMVForwardIndexReaderWriter and let it expand
-          forwardIndex =
-              new FixedByteMVMutableForwardIndex(MAX_MULTI_VALUES_PER_ROW, avgNumMultiValues, _capacity, Integer.BYTES,
-                  _memoryManager, allocationContext);
+          forwardIndex = new FixedByteMVMutableForwardIndex(MAX_MULTI_VALUES_PER_ROW, avgNumMultiValues, _capacity,
+              Integer.BYTES, _memoryManager, allocationContext);
         }
 
         // Even though the column is defined as 'no-dictionary' in the config, we did create dictionary for consuming segment.
@@ -399,9 +397,9 @@ public class MutableSegmentImpl implements MutableSegment {
       // So to continue aggregating metrics for such cases, we will create dictionary even
       // if the column is part of noDictionary set from table config
       if (fieldSpec instanceof DimensionFieldSpec && _aggregateMetrics && (dataType == STRING || dataType == BYTES)) {
-        _logger
-            .info("Aggregate metrics is enabled. Will create dictionary in consuming segment for column {} of type {}",
-                column, dataType.toString());
+        _logger.info(
+            "Aggregate metrics is enabled. Will create dictionary in consuming segment for column {} of type {}",
+            column, dataType.toString());
         return false;
       }
       // So don't create dictionary if the column is member of noDictionary, is single-value
@@ -461,8 +459,7 @@ public class MutableSegmentImpl implements MutableSegment {
   // NOTE: Okay for single-writer
   @SuppressWarnings("NonAtomicOperationOnVolatileField")
   @Override
-  public boolean index(GenericRow row, @Nullable RowMetadata rowMetadata)
-      throws IOException {
+  public boolean index(GenericRow row, @Nullable RowMetadata rowMetadata) throws IOException {
     // Update dictionary first
     updateDictionary(row);
 
@@ -505,9 +502,8 @@ public class MutableSegmentImpl implements MutableSegment {
     Object timeValue = row.getValue(_timeColumnName);
     Preconditions.checkArgument(timeValue instanceof Comparable, "time column shall be comparable");
     long timestamp = IngestionUtils.extractTimeValue((Comparable) timeValue);
-    _partitionUpsertMetadataManager
-        .updateRecord(_segmentName, new PartitionUpsertMetadataManager.RecordInfo(primaryKey, docId, timestamp),
-            _validDocIds);
+    _partitionUpsertMetadataManager.updateRecord(_segmentName,
+        new PartitionUpsertMetadataManager.RecordInfo(primaryKey, docId, timestamp), _validDocIds);
   }
 
   private void updateDictionary(GenericRow row) {
@@ -530,8 +526,7 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
-  private void addNewRow(GenericRow row)
-      throws IOException {
+  private void addNewRow(GenericRow row) throws IOException {
     int docId = _numDocsIndexed;
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
       String column = entry.getKey();
@@ -826,9 +821,8 @@ public class MutableSegmentImpl implements MutableSegment {
       if (_numDocsIndexed > 0) {
         int numSeconds = (int) ((System.currentTimeMillis() - _startTimeMillis) / 1000);
         long totalMemBytes = _memoryManager.getTotalAllocatedBytes();
-        _logger
-            .info("Segment used {} bytes of memory for {} rows consumed in {} seconds", totalMemBytes, _numDocsIndexed,
-                numSeconds);
+        _logger.info("Segment used {} bytes of memory for {} rows consumed in {} seconds", totalMemBytes,
+            _numDocsIndexed, numSeconds);
 
         RealtimeSegmentStatsHistory.SegmentStats segmentStats = new RealtimeSegmentStatsHistory.SegmentStats();
         for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
@@ -982,15 +976,15 @@ public class MutableSegmentImpl implements MutableSegment {
     for (FieldSpec fieldSpec : _physicalMetricFieldSpecs) {
       String metric = fieldSpec.getName();
       if (!noDictionaryColumns.contains(metric)) {
-        _logger
-            .warn("Metrics aggregation cannot be turned ON in presence of dictionary encoded metrics, eg: {}", metric);
+        _logger.warn("Metrics aggregation cannot be turned ON in presence of dictionary encoded metrics, eg: {}",
+            metric);
         _aggregateMetrics = false;
         break;
       }
 
       if (!fieldSpec.isSingleValueField()) {
-        _logger
-            .warn("Metrics aggregation cannot be turned ON in presence of multi-value metric columns, eg: {}", metric);
+        _logger.warn("Metrics aggregation cannot be turned ON in presence of multi-value metric columns, eg: {}",
+            metric);
         _aggregateMetrics = false;
         break;
       }
@@ -1001,8 +995,8 @@ public class MutableSegmentImpl implements MutableSegment {
     for (FieldSpec fieldSpec : _physicalDimensionFieldSpecs) {
       String dimension = fieldSpec.getName();
       if (noDictionaryColumns.contains(dimension)) {
-        _logger
-            .warn("Metrics aggregation cannot be turned ON in presence of no-dictionary dimensions, eg: {}", dimension);
+        _logger.warn("Metrics aggregation cannot be turned ON in presence of no-dictionary dimensions, eg: {}",
+            dimension);
         _aggregateMetrics = false;
         break;
       }
@@ -1018,9 +1012,9 @@ public class MutableSegmentImpl implements MutableSegment {
     // Time columns should be dictionary encoded.
     for (String timeColumnName : _physicalTimeColumnNames) {
       if (noDictionaryColumns.contains(timeColumnName)) {
-        _logger
-            .warn("Metrics aggregation cannot be turned ON in presence of no-dictionary datetime/time columns, eg: {}",
-                timeColumnName);
+        _logger.warn(
+            "Metrics aggregation cannot be turned ON in presence of no-dictionary datetime/time columns, eg: {}",
+            timeColumnName);
         _aggregateMetrics = false;
         break;
       }
@@ -1136,8 +1130,8 @@ public class MutableSegmentImpl implements MutableSegment {
         try {
           _invertedIndex.close();
         } catch (Exception e) {
-          _logger
-              .error("Caught exception while closing inverted index for column: {}, continuing with error", column, e);
+          _logger.error("Caught exception while closing inverted index for column: {}, continuing with error", column,
+              e);
         }
       }
       if (_rangeIndex != null) {

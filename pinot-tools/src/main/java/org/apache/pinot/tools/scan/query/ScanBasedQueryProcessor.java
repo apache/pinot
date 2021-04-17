@@ -50,8 +50,7 @@ public class ScanBasedQueryProcessor implements Cloneable {
   private ScanBasedQueryProcessor() {
   }
 
-  public ScanBasedQueryProcessor(String segmentsDirName)
-      throws Exception {
+  public ScanBasedQueryProcessor(String segmentsDirName) throws Exception {
     File segmentsDir = new File(segmentsDirName);
     _segmentQueryProcessorMap = new HashMap<>();
     _ownsQueryProcessors = true;
@@ -61,8 +60,7 @@ public class ScanBasedQueryProcessor implements Cloneable {
     }
   }
 
-  public QueryResponse processQuery(String query)
-      throws Exception {
+  public QueryResponse processQuery(String query) throws Exception {
     long startTimeInMillis = System.currentTimeMillis();
     Pql2Compiler pql2Compiler = new Pql2Compiler();
     BrokerRequest brokerRequest = pql2Compiler.compileToBrokerRequest(query);
@@ -150,8 +148,7 @@ public class ScanBasedQueryProcessor implements Cloneable {
     return resultTables;
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     if (args.length != 3) {
       LOGGER.error("Incorrect arguments");
       LOGGER.info("Usage: <exec> <UntarredSegmentDir> <QueryFile> <outputFile>");
@@ -177,8 +174,7 @@ public class ScanBasedQueryProcessor implements Cloneable {
     printWriter.close();
   }
 
-  public static void printResult(QueryResponse queryResponse)
-      throws IOException {
+  public static void printResult(QueryResponse queryResponse) throws IOException {
     LOGGER.info(JsonUtils.objectToString(queryResponse));
   }
 }

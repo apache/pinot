@@ -76,8 +76,7 @@ public class DataFetcherTest {
   private DataFetcher _dataFetcher;
 
   @BeforeClass
-  private void setup()
-      throws Exception {
+  private void setup() throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
 
     // Generate random values
@@ -108,23 +107,22 @@ public class DataFetcherTest {
 
     // Create the segment
     String tableName = "testTable";
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setNoDictionaryColumns(
-        Arrays.asList(NO_DICT_INT_COLUMN, NO_DICT_LONG_COLUMN, NO_DICT_FLOAT_COLUMN, NO_DICT_DOUBLE_COLUMN,
-            NO_DICT_STRING_COLUMN, NO_DICT_BYTES_COLUMN, NO_DICT_HEX_STRING_COLUMN)).build();
-    Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(tableName).addSingleValueDimension(INT_COLUMN, DataType.INT)
-            .addSingleValueDimension(LONG_COLUMN, DataType.LONG).addSingleValueDimension(FLOAT_COLUMN, DataType.FLOAT)
-            .addSingleValueDimension(DOUBLE_COLUMN, DataType.DOUBLE)
-            .addSingleValueDimension(STRING_COLUMN, DataType.STRING)
-            .addSingleValueDimension(BYTES_COLUMN, DataType.BYTES)
-            .addSingleValueDimension(HEX_STRING_COLUMN, DataType.STRING)
-            .addSingleValueDimension(NO_DICT_INT_COLUMN, DataType.INT)
-            .addSingleValueDimension(NO_DICT_LONG_COLUMN, DataType.LONG)
-            .addSingleValueDimension(NO_DICT_FLOAT_COLUMN, DataType.FLOAT)
-            .addSingleValueDimension(NO_DICT_DOUBLE_COLUMN, DataType.DOUBLE)
-            .addSingleValueDimension(NO_DICT_STRING_COLUMN, DataType.STRING)
-            .addSingleValueDimension(NO_DICT_BYTES_COLUMN, DataType.BYTES)
-            .addSingleValueDimension(NO_DICT_HEX_STRING_COLUMN, DataType.STRING).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName)
+        .setNoDictionaryColumns(Arrays.asList(NO_DICT_INT_COLUMN, NO_DICT_LONG_COLUMN, NO_DICT_FLOAT_COLUMN,
+            NO_DICT_DOUBLE_COLUMN, NO_DICT_STRING_COLUMN, NO_DICT_BYTES_COLUMN, NO_DICT_HEX_STRING_COLUMN))
+        .build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(tableName)
+        .addSingleValueDimension(INT_COLUMN, DataType.INT).addSingleValueDimension(LONG_COLUMN, DataType.LONG)
+        .addSingleValueDimension(FLOAT_COLUMN, DataType.FLOAT).addSingleValueDimension(DOUBLE_COLUMN, DataType.DOUBLE)
+        .addSingleValueDimension(STRING_COLUMN, DataType.STRING).addSingleValueDimension(BYTES_COLUMN, DataType.BYTES)
+        .addSingleValueDimension(HEX_STRING_COLUMN, DataType.STRING)
+        .addSingleValueDimension(NO_DICT_INT_COLUMN, DataType.INT)
+        .addSingleValueDimension(NO_DICT_LONG_COLUMN, DataType.LONG)
+        .addSingleValueDimension(NO_DICT_FLOAT_COLUMN, DataType.FLOAT)
+        .addSingleValueDimension(NO_DICT_DOUBLE_COLUMN, DataType.DOUBLE)
+        .addSingleValueDimension(NO_DICT_STRING_COLUMN, DataType.STRING)
+        .addSingleValueDimension(NO_DICT_BYTES_COLUMN, DataType.BYTES)
+        .addSingleValueDimension(NO_DICT_HEX_STRING_COLUMN, DataType.STRING).build();
     String segmentName = "testSegment";
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(TEMP_DIR.getPath());
@@ -334,8 +332,7 @@ public class DataFetcherTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     _indexSegment.destroy();
     FileUtils.deleteDirectory(TEMP_DIR);
   }

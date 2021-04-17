@@ -84,7 +84,8 @@ public class ColumnValueSegmentPrunerTest {
     assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column IN (5, 10, 15)"));
     //although the segment can be pruned, it will not be pruned as the size of values is greater than threshold
     assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column IN (0, 1, 2, 3, 4, 5, 6, 7, 8, 9)"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column IN (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)"));
+    assertFalse(
+        runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column IN (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)"));
     // AND operator
     assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column = 0 AND column > 10"));
     assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column > 0 AND column < 10"));

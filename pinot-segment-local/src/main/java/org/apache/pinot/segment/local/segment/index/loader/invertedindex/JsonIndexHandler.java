@@ -67,15 +67,13 @@ public class JsonIndexHandler {
     }
   }
 
-  public void createJsonIndices()
-      throws Exception {
+  public void createJsonIndices() throws Exception {
     for (ColumnMetadata columnMetadata : _jsonIndexColumns) {
       createJsonIndexForColumn(columnMetadata);
     }
   }
 
-  private void createJsonIndexForColumn(ColumnMetadata columnMetadata)
-      throws Exception {
+  private void createJsonIndexForColumn(ColumnMetadata columnMetadata) throws Exception {
     String columnName = columnMetadata.getColumnName();
 
     File inProgress = new File(_indexDir, columnName + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION + ".inprogress");
@@ -126,8 +124,7 @@ public class JsonIndexHandler {
     properties.save();
   }
 
-  private void handleDictionaryBasedColumn(ColumnMetadata columnMetadata)
-      throws IOException {
+  private void handleDictionaryBasedColumn(ColumnMetadata columnMetadata) throws IOException {
     String columnName = columnMetadata.getColumnName();
     try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
@@ -142,8 +139,7 @@ public class JsonIndexHandler {
     }
   }
 
-  private void handleNonDictionaryBasedColumn(ColumnMetadata columnMetadata)
-      throws IOException {
+  private void handleNonDictionaryBasedColumn(ColumnMetadata columnMetadata) throws IOException {
     String columnName = columnMetadata.getColumnName();
     try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();

@@ -53,9 +53,8 @@ public class SegmentGenerationWithFilterRecordsTest {
   private static final long[] LONG_VALUES =
       {1588316400000L, 1588489200000L, 1588662000000L, 1588834800000L, 1589007600000L};
   private static final String MV_INT_COLUMN = "col3";
-  private static final ArrayList[] MV_INT_VALUES =
-      {Lists.newArrayList(1, 2, 3), Lists.newArrayList(4), Lists.newArrayList(5, 1), Lists.newArrayList(
-          2), Lists.newArrayList(3, 4, 5)};
+  private static final ArrayList[] MV_INT_VALUES = {Lists.newArrayList(1, 2, 3), Lists.newArrayList(4), Lists
+      .newArrayList(5, 1), Lists.newArrayList(2), Lists.newArrayList(3, 4, 5)};
   private static final String SEGMENT_DIR_NAME =
       FileUtils.getTempDirectoryPath() + File.separator + "segmentFilterRecordsTest";
   private static final String SEGMENT_NAME = "testSegment";
@@ -81,8 +80,7 @@ public class SegmentGenerationWithFilterRecordsTest {
   }
 
   @Test
-  public void testNumDocs()
-      throws Exception {
+  public void testNumDocs() throws Exception {
     File segmentDir = buildSegment(_tableConfig, _schema);
     SegmentMetadataImpl metadata = SegmentDirectory.loadSegmentMetadata(segmentDir);
     Assert.assertEquals(metadata.getTotalDocs(), 2);
@@ -93,8 +91,7 @@ public class SegmentGenerationWithFilterRecordsTest {
     Assert.assertEquals(next.getValue(STRING_COLUMN), "E");
   }
 
-  private File buildSegment(final TableConfig tableConfig, final Schema schema)
-      throws Exception {
+  private File buildSegment(final TableConfig tableConfig, final Schema schema) throws Exception {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(SEGMENT_DIR_NAME);
     config.setSegmentName(SEGMENT_NAME);

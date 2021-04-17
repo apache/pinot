@@ -80,8 +80,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
   @Override
   public synchronized void init(PinotConfiguration config, InstanceDataManager instanceDataManager,
-      ServerMetrics serverMetrics)
-      throws ConfigurationException {
+      ServerMetrics serverMetrics) throws ConfigurationException {
     _instanceDataManager = instanceDataManager;
     _serverMetrics = serverMetrics;
     QueryExecutorConfig queryExecutorConfig = new QueryExecutorConfig(config);
@@ -135,9 +134,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     // Query scheduler wait time already exceeds query timeout, directly return
     if (querySchedulingTimeMs >= queryTimeoutMs) {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS, 1);
-      String errorMessage = String
-          .format("Query scheduling took %dms (longer than query timeout of %dms)", querySchedulingTimeMs,
-              queryTimeoutMs);
+      String errorMessage = String.format("Query scheduling took %dms (longer than query timeout of %dms)",
+          querySchedulingTimeMs, queryTimeoutMs);
       DataTable dataTable = DataTableBuilder.getEmptyDataTable();
       dataTable.addException(QueryException.getException(QueryException.QUERY_SCHEDULING_TIMEOUT_ERROR, errorMessage));
       LOGGER.error("{} while processing requestId: {}", errorMessage, requestId);
@@ -200,9 +198,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         LOGGER.debug("Did not find valid ingestionTimestamp across consuming segments! Using indexTime instead");
         minConsumingFreshnessTimeMs = minIndexTimeMs;
       }
-      LOGGER
-          .debug("Querying: {} consuming segments with minConsumingFreshnessTimeMs: {}", numConsumingSegmentsProcessed,
-              minConsumingFreshnessTimeMs);
+      LOGGER.debug("Querying: {} consuming segments with minConsumingFreshnessTimeMs: {}",
+          numConsumingSegmentsProcessed, minConsumingFreshnessTimeMs);
     }
 
     boolean enableTrace = queryRequest.isEnableTrace();
@@ -244,10 +241,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     dataTable.getMetadata().put(DataTable.TIME_USED_MS_METADATA_KEY, Long.toString(queryProcessingTime));
 
     if (numConsumingSegmentsProcessed > 0) {
-      dataTable.getMetadata()
-          .put(DataTable.NUM_CONSUMING_SEGMENTS_PROCESSED, Integer.toString(numConsumingSegmentsProcessed));
-      dataTable.getMetadata()
-          .put(DataTable.MIN_CONSUMING_FRESHNESS_TIME_MS, Long.toString(minConsumingFreshnessTimeMs));
+      dataTable.getMetadata().put(DataTable.NUM_CONSUMING_SEGMENTS_PROCESSED,
+          Integer.toString(numConsumingSegmentsProcessed));
+      dataTable.getMetadata().put(DataTable.MIN_CONSUMING_FRESHNESS_TIME_MS,
+          Long.toString(minConsumingFreshnessTimeMs));
     }
 
     LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);
@@ -257,8 +254,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
   private DataTable processQuery(List<IndexSegment> indexSegments, QueryContext queryContext, TimerContext timerContext,
       ExecutorService executorService, @Nullable StreamObserver<Server.ServerResponse> responseObserver, long endTimeMs,
-      boolean enableStreaming)
-      throws Exception {
+      boolean enableStreaming) throws Exception {
     handleSubquery(queryContext, indexSegments, timerContext, executorService, endTimeMs);
 
     // Compute total docs for the table before pruning the segments
@@ -286,8 +282,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       return dataTable;
     } else {
       TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
-      Plan queryPlan = enableStreaming ? _planMaker
-          .makeStreamingInstancePlan(selectedSegments, queryContext, executorService, responseObserver, endTimeMs)
+      Plan queryPlan = enableStreaming ? _planMaker.makeStreamingInstancePlan(selectedSegments, queryContext,
+          executorService, responseObserver, endTimeMs)
           : _planMaker.makeInstancePlan(selectedSegments, queryContext, executorService, endTimeMs);
       planBuildTimer.stopAndRecord();
 
@@ -307,8 +303,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
    * <p>Currently only supports subquery within the filter.
    */
   private void handleSubquery(QueryContext queryContext, List<IndexSegment> indexSegments, TimerContext timerContext,
-      ExecutorService executorService, long endTimeMs)
-      throws Exception {
+      ExecutorService executorService, long endTimeMs) throws Exception {
     FilterContext filter = queryContext.getFilter();
     if (filter != null) {
       handleSubquery(filter, indexSegments, timerContext, executorService, endTimeMs);
@@ -320,8 +315,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
    * <p>Currently only supports subquery within the lhs of the predicate.
    */
   private void handleSubquery(FilterContext filter, List<IndexSegment> indexSegments, TimerContext timerContext,
-      ExecutorService executorService, long endTimeMs)
-      throws Exception {
+      ExecutorService executorService, long endTimeMs) throws Exception {
     List<FilterContext> children = filter.getChildren();
     if (children != null) {
       for (FilterContext child : children) {
@@ -340,16 +334,15 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
    * rewritten to an IN_ID_SET transform function.
    */
   private void handleSubquery(ExpressionContext expression, List<IndexSegment> indexSegments, TimerContext timerContext,
-      ExecutorService executorService, long endTimeMs)
-      throws Exception {
+      ExecutorService executorService, long endTimeMs) throws Exception {
     FunctionContext function = expression.getFunction();
     if (function == null) {
       return;
     }
     List<ExpressionContext> arguments = function.getArguments();
     if (StringUtils.remove(function.getFunctionName(), '_').equalsIgnoreCase(IN_PARTITIONED_SUBQUERY)) {
-      Preconditions
-          .checkState(arguments.size() == 2, "IN_PARTITIONED_SUBQUERY requires 2 arguments: expression, subquery");
+      Preconditions.checkState(arguments.size() == 2,
+          "IN_PARTITIONED_SUBQUERY requires 2 arguments: expression, subquery");
       ExpressionContext subqueryExpression = arguments.get(1);
       Preconditions.checkState(subqueryExpression.getType() == ExpressionContext.Type.LITERAL,
           "Second argument of IN_PARTITIONED_SUBQUERY must be a literal (subquery)");
@@ -357,7 +350,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       // Subquery should be an ID_SET aggregation only query
       //noinspection rawtypes
       AggregationFunction[] aggregationFunctions = subquery.getAggregationFunctions();
-      Preconditions.checkState(aggregationFunctions != null && aggregationFunctions.length == 1
+      Preconditions.checkState(
+          aggregationFunctions != null && aggregationFunctions.length == 1
               && aggregationFunctions[0].getType() == AggregationFunctionType.IDSET
               && subquery.getGroupByExpressions() == null,
           "Subquery in IN_PARTITIONED_SUBQUERY should be an ID_SET aggregation only query, found: %s",

@@ -177,9 +177,9 @@ public class SegmentProcessorConfig {
 
   @Override
   public String toString() {
-    return "SegmentProcessorConfig{" + "\n_tableConfig=" + _tableConfig + ", \n_schema=" + _schema
-        .toSingleLineJsonString() + ", \n_recordFilterConfig=" + _recordFilterConfig + ", \n_recordTransformerConfig="
-        + _recordTransformerConfig + ", \n_partitionerConfigs=" + _partitionerConfigs + ", \n_collectorConfig="
-        + _collectorConfig + ", \n_segmentsConfig=" + _segmentConfig + "\n}";
+    return "SegmentProcessorConfig{" + "\n_tableConfig=" + _tableConfig + ", \n_schema="
+        + _schema.toSingleLineJsonString() + ", \n_recordFilterConfig=" + _recordFilterConfig
+        + ", \n_recordTransformerConfig=" + _recordTransformerConfig + ", \n_partitionerConfigs=" + _partitionerConfigs
+        + ", \n_collectorConfig=" + _collectorConfig + ", \n_segmentsConfig=" + _segmentConfig + "\n}";
   }
 }

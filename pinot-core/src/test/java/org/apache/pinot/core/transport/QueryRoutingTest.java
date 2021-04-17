@@ -76,8 +76,7 @@ public class QueryRoutingTest {
   }
 
   @Test
-  public void testValidResponse()
-      throws Exception {
+  public void testValidResponse() throws Exception {
     long requestId = 123;
     DataTable dataTable = DataTableBuilder.getEmptyDataTable();
     dataTable.getMetadata().put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(requestId));
@@ -108,8 +107,8 @@ public class QueryRoutingTest {
     assertEquals(serverResponse.getResponseSize(), responseBytes.length);
 
     // Hybrid
-    asyncQueryResponse = _queryRouter
-        .submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, BROKER_REQUEST, ROUTING_TABLE, 1_000L);
+    asyncQueryResponse = _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, BROKER_REQUEST,
+        ROUTING_TABLE, 1_000L);
     response = asyncQueryResponse.getResponse();
     assertEquals(response.size(), 2);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
@@ -126,8 +125,7 @@ public class QueryRoutingTest {
   }
 
   @Test
-  public void testInvalidResponse()
-      throws Exception {
+  public void testInvalidResponse() throws Exception {
     long requestId = 123;
 
     // Start the server
@@ -153,8 +151,7 @@ public class QueryRoutingTest {
   }
 
   @Test
-  public void testNonMatchingRequestId()
-      throws Exception {
+  public void testNonMatchingRequestId() throws Exception {
     long requestId = 123;
     DataTable dataTable = DataTableBuilder.getEmptyDataTable();
     dataTable.getMetadata().put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(requestId));
@@ -183,8 +180,7 @@ public class QueryRoutingTest {
   }
 
   @Test
-  public void testServerDown()
-      throws Exception {
+  public void testServerDown() throws Exception {
     long requestId = 123;
     DataTable dataTable = DataTableBuilder.getEmptyDataTable();
     dataTable.getMetadata().put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(requestId));

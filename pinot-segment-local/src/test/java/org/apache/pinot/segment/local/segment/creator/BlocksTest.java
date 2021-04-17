@@ -45,19 +45,17 @@ public class BlocksTest {
   }
 
   @BeforeClass
-  public static void before()
-      throws Exception {
+  public static void before() throws Exception {
     final String filePath = TestUtils.getFileFromResourceUrl(BlocksTest.class.getClassLoader().getResource(AVRO_DATA));
     if (INDEX_DIR.exists()) {
       FileUtils.deleteQuietly(INDEX_DIR);
     }
 
-//    System.out.println(INDEX_DIR.getAbsolutePath());
+    //    System.out.println(INDEX_DIR.getAbsolutePath());
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
 
-    final SegmentGeneratorConfig config = SegmentTestUtils
-        .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch", TimeUnit.DAYS,
-            "test");
+    final SegmentGeneratorConfig config = SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(
+        new File(filePath), INDEX_DIR, "daysSinceEpoch", TimeUnit.DAYS, "test");
     config.setTimeColumnName("daysSinceEpoch");
     driver.init(config);
     driver.build();

@@ -42,8 +42,8 @@ public class RecommenderDriver {
   private static final Logger LOGGER = LoggerFactory.getLogger(RecommenderDriver.class);
   private static final String RULE_EXECUTION_PREFIX = "isRecommend";
   private static final String RULE_EXECUTION_SUFFIX = "Rule";
-  public static String run(String inputJson)
-      throws InvalidInputException, IOException {
+
+  public static String run(String inputJson) throws InvalidInputException, IOException {
 
     InputManager inputManager;
     ConfigManager outputManager;
@@ -56,8 +56,8 @@ public class RecommenderDriver {
 
     for (RulesToExecute.Rule value : RulesToExecute.Rule.values()) {
       try {
-        Method ruleExecuteFlag =
-            inputManager.getRulesToExecute().getClass().getDeclaredMethod(RULE_EXECUTION_PREFIX + value.name().replace(RULE_EXECUTION_SUFFIX,""));
+        Method ruleExecuteFlag = inputManager.getRulesToExecute().getClass()
+            .getDeclaredMethod(RULE_EXECUTION_PREFIX + value.name().replace(RULE_EXECUTION_SUFFIX, ""));
         LOGGER.info("{}:{}", ruleExecuteFlag.getName(), ruleExecuteFlag.invoke(inputManager.getRulesToExecute()));
         if (!(boolean) ruleExecuteFlag.invoke(inputManager.getRulesToExecute())) {
           continue;

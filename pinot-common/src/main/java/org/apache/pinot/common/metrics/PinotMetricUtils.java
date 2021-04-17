@@ -112,8 +112,8 @@ public class PinotMetricUtils {
           LOGGER.info("Registering metricsRegistry to listener {}", listenerClassName);
           addMetricsRegistryRegistrationListener(listener);
         } catch (Exception e) {
-          LOGGER
-              .warn("Caught exception while initializing MetricsRegistryRegistrationListener " + listenerClassName, e);
+          LOGGER.warn("Caught exception while initializing MetricsRegistryRegistrationListener " + listenerClassName,
+              e);
         }
       }
     }

@@ -30,6 +30,7 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.joda.time.DateTimeField;
 
+
 /**
  * The <code>DateTruncTransformationFunction</code> class implements the sql compatible date_trunc function for TIMESTAMP type.
  * <p>
@@ -106,9 +107,8 @@ public class DateTruncTransformFunction extends BaseTransformFunction {
     _inputTimeUnit = TimeUnit.valueOf(inputTimeUnitStr);
 
     String timeZone = arguments.size() >= 4 ? ((LiteralTransformFunction) arguments.get(3)).getLiteral() : UTC_TZ;
-    String outputTimeUnitStr =
-        arguments.size() >= 5 ? ((LiteralTransformFunction) arguments.get(4)).getLiteral().toUpperCase()
-            : inputTimeUnitStr;
+    String outputTimeUnitStr = arguments.size() >= 5
+        ? ((LiteralTransformFunction) arguments.get(4)).getLiteral().toUpperCase() : inputTimeUnitStr;
     TimeZoneKey timeZoneKey = TimeZoneKey.getTimeZoneKey(timeZone);
 
     _field = DateTimeUtils.getTimestampField(DateTimeUtils.getChronology(timeZoneKey), unit);

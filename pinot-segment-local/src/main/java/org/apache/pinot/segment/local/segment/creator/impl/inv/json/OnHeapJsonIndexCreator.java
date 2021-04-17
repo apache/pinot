@@ -37,18 +37,16 @@ import org.roaringbitmap.RoaringBitmapWriter;
  */
 public class OnHeapJsonIndexCreator extends BaseJsonIndexCreator {
 
-  public OnHeapJsonIndexCreator(File indexDir, String columnName)
-      throws IOException {
+  public OnHeapJsonIndexCreator(File indexDir, String columnName) throws IOException {
     super(indexDir, columnName);
   }
 
   @Override
-  public void seal()
-      throws IOException {
+  public void seal() throws IOException {
     int numPostingLists = _postingListMap.size();
     try (VarLengthValueWriter dictionaryWriter = new VarLengthValueWriter(_dictionaryFile, numPostingLists);
-        BitmapInvertedIndexWriter invertedIndexWriter = new BitmapInvertedIndexWriter(_invertedIndexFile,
-            numPostingLists)) {
+        BitmapInvertedIndexWriter invertedIndexWriter =
+            new BitmapInvertedIndexWriter(_invertedIndexFile, numPostingLists)) {
       for (Map.Entry<String, RoaringBitmapWriter<RoaringBitmap>> entry : _postingListMap.entrySet()) {
         byte[] valueBytes = StringUtils.encodeUtf8(entry.getKey());
         _maxValueLength = Integer.max(_maxValueLength, valueBytes.length);

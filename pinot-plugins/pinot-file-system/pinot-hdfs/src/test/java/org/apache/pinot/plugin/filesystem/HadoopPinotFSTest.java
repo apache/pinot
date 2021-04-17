@@ -31,8 +31,7 @@ public class HadoopPinotFSTest {
   private static final String TMP_DIR = System.getProperty("java.io.tmpdir");
 
   @Test
-  public void testCopy()
-      throws IOException {
+  public void testCopy() throws IOException {
     URI baseURI = URI.create(TMP_DIR + "/HadoopPinotFSTest");
     try (HadoopPinotFS hadoopFS = new HadoopPinotFS()) {
       hadoopFS.init(new PinotConfiguration());

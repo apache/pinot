@@ -86,14 +86,12 @@ public class AzurePinotFS extends PinotFS {
   }
 
   @Override
-  public boolean mkdir(URI uri)
-      throws IOException {
+  public boolean mkdir(URI uri) throws IOException {
     return _adlStoreClient.createDirectory(uri.getPath());
   }
 
   @Override
-  public boolean delete(URI segmentUri, boolean forceDelete)
-      throws IOException {
+  public boolean delete(URI segmentUri, boolean forceDelete) throws IOException {
     // Returns false if directory we want to delete is not empty
     if (isDirectory(segmentUri) && listFiles(segmentUri, false).length > 0 && !forceDelete) {
       return false;
@@ -102,14 +100,12 @@ public class AzurePinotFS extends PinotFS {
   }
 
   @Override
-  public boolean doMove(URI srcUri, URI dstUri)
-      throws IOException {
+  public boolean doMove(URI srcUri, URI dstUri) throws IOException {
     return _adlStoreClient.rename(srcUri.getPath(), dstUri.getPath());
   }
 
   @Override
-  public boolean copy(URI srcUri, URI dstUri)
-      throws IOException {
+  public boolean copy(URI srcUri, URI dstUri) throws IOException {
     if (exists(dstUri)) {
       delete(dstUri, true);
     }
@@ -127,30 +123,26 @@ public class AzurePinotFS extends PinotFS {
       inputStream.close();
       outputStream.close();
     } catch (IOException e) {
-      LOGGER
-          .error("Exception encountered during copy, input: '{}', output: '{}'.", srcUri.toString(), dstUri.toString(),
-              e);
+      LOGGER.error("Exception encountered during copy, input: '{}', output: '{}'.", srcUri.toString(),
+          dstUri.toString(), e);
     }
     return true;
   }
 
   @Override
-  public boolean exists(URI fileUri)
-      throws IOException {
+  public boolean exists(URI fileUri) throws IOException {
     return _adlStoreClient.checkExists(fileUri.getPath());
   }
 
   @Override
-  public long length(URI fileUri)
-      throws IOException {
+  public long length(URI fileUri) throws IOException {
     // get file metadata
     DirectoryEntry ent = _adlStoreClient.getDirectoryEntry(fileUri.getPath());
     return ent.length;
   }
 
   @Override
-  public String[] listFiles(URI fileUri, boolean recursive)
-      throws IOException {
+  public String[] listFiles(URI fileUri, boolean recursive) throws IOException {
     DirectoryEntry rootDir = _adlStoreClient.getDirectoryEntry(fileUri.getPath());
     if (rootDir == null) {
       return EMPTY_ARR;
@@ -173,8 +165,7 @@ public class AzurePinotFS extends PinotFS {
     return fullFilePaths.toArray(new String[fullFilePaths.size()]);
   }
 
-  private List<DirectoryEntry> listFiles(DirectoryEntry origDirEntry)
-      throws IOException {
+  private List<DirectoryEntry> listFiles(DirectoryEntry origDirEntry) throws IOException {
     List<DirectoryEntry> fileList = new ArrayList<>();
     if (origDirEntry.type.equals(DirectoryEntryType.DIRECTORY)) {
       for (DirectoryEntry directoryEntry : _adlStoreClient.enumerateDirectory(origDirEntry.fullName)) {
@@ -188,8 +179,7 @@ public class AzurePinotFS extends PinotFS {
   }
 
   @Override
-  public void copyToLocalFile(URI srcUri, File dstFile)
-      throws Exception {
+  public void copyToLocalFile(URI srcUri, File dstFile) throws Exception {
     if (dstFile.exists()) {
       if (dstFile.isDirectory()) {
         FileUtils.deleteDirectory(dstFile);
@@ -211,8 +201,7 @@ public class AzurePinotFS extends PinotFS {
   }
 
   @Override
-  public void copyFromLocalFile(File srcFile, URI dstUri)
-      throws Exception {
+  public void copyFromLocalFile(File srcFile, URI dstUri) throws Exception {
     OutputStream stream = _adlStoreClient.createFile(dstUri.getPath(), IfExists.OVERWRITE);
     PrintStream out = new PrintStream(stream);
     byte[] inputStream = IOUtils.toByteArray(new FileInputStream(srcFile));
@@ -244,8 +233,7 @@ public class AzurePinotFS extends PinotFS {
   }
 
   @Override
-  public boolean touch(URI uri)
-      throws IOException {
+  public boolean touch(URI uri) throws IOException {
     if (!exists(uri)) {
       _adlStoreClient.createEmptyFile(uri.getPath());
     } else {
@@ -255,8 +243,7 @@ public class AzurePinotFS extends PinotFS {
   }
 
   @Override
-  public InputStream open(URI uri)
-      throws IOException {
+  public InputStream open(URI uri) throws IOException {
     return _adlStoreClient.getReadStream(uri.getPath());
   }
 }

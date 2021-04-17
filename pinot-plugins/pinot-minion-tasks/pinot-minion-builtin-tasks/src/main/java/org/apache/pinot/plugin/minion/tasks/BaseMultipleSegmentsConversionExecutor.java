@@ -61,8 +61,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
    * @throws Exception
    */
   protected abstract List<SegmentConversionResult> convert(PinotTaskConfig pinotTaskConfig, List<File> originalIndexDir,
-      File workingDir)
-      throws Exception;
+      File workingDir) throws Exception;
 
   /**
    * Pre processing operations to be done at the beginning of task execution
@@ -77,8 +76,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
   }
 
   @Override
-  public List<SegmentConversionResult> executeTask(PinotTaskConfig pinotTaskConfig)
-      throws Exception {
+  public List<SegmentConversionResult> executeTask(PinotTaskConfig pinotTaskConfig) throws Exception {
     preProcess(pinotTaskConfig);
 
     String taskType = pinotTaskConfig.getTaskType();
@@ -150,17 +148,15 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
             TableNameBuilder.extractRawTableName(tableNameWithType));
         List<NameValuePair> parameters = Arrays.asList(enableParallelPushProtectionParameter, tableNameParameter);
 
-        SegmentConversionUtils
-            .uploadSegment(configs, FileUploadDownloadClient.makeAuthHeader(authToken), parameters, tableNameWithType,
-                resultSegmentName, uploadURL, convertedTarredSegmentFile);
+        SegmentConversionUtils.uploadSegment(configs, FileUploadDownloadClient.makeAuthHeader(authToken), parameters,
+            tableNameWithType, resultSegmentName, uploadURL, convertedTarredSegmentFile);
       }
 
       String outputSegmentNames = segmentConversionResults.stream().map(SegmentConversionResult::getSegmentName)
           .collect(Collectors.joining(","));
       postProcess(pinotTaskConfig);
-      LOGGER
-          .info("Done executing {} on table: {}, input segments: {}, output segments: {}", taskType, tableNameWithType,
-              inputSegmentNames, outputSegmentNames);
+      LOGGER.info("Done executing {} on table: {}, input segments: {}, output segments: {}", taskType,
+          tableNameWithType, inputSegmentNames, outputSegmentNames);
 
       return segmentConversionResults;
     } finally {

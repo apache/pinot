@@ -77,8 +77,7 @@ abstract class ColumnIndexDirectory implements Closeable {
    * @return ByteBuffer like buffer for data
    * @throws IOException
    */
-  public abstract PinotDataBuffer getBuffer(String column, ColumnIndexType type)
-      throws IOException;
+  public abstract PinotDataBuffer getBuffer(String column, ColumnIndexType type) throws IOException;
 
   /**
    * Allocate a new data buffer of specified sizeBytes in the columnar index directory
@@ -88,8 +87,7 @@ abstract class ColumnIndexDirectory implements Closeable {
    * @return ByteBuffer like buffer for data
    * @throws IOException
    */
-  public abstract PinotDataBuffer newBuffer(String column, ColumnIndexType type, long sizeBytes)
-      throws IOException;
+  public abstract PinotDataBuffer newBuffer(String column, ColumnIndexType type, long sizeBytes) throws IOException;
 
   /**
    * Check if an index exists for a column

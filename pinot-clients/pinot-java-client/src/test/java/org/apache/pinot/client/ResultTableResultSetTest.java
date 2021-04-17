@@ -28,6 +28,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
 
+
 public class ResultTableResultSetTest {
 
   private JsonNode jsonNode;

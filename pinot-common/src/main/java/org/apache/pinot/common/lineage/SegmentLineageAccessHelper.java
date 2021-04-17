@@ -72,8 +72,8 @@ public class SegmentLineageAccessHelper {
    * @param expectedVersion expected version of ZNRecord. -1 for indicating to match any version.
    * @return true if update is successful. false otherwise.
    */
-  public static boolean writeSegmentLineage(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      SegmentLineage segmentLineage, int expectedVersion) {
+  public static boolean writeSegmentLineage(ZkHelixPropertyStore<ZNRecord> propertyStore, SegmentLineage segmentLineage,
+      int expectedVersion) {
     String tableNameWithType = segmentLineage.getTableNameWithType();
     String path = ZKMetadataProvider.constructPropertyStorePathForSegmentLineage(tableNameWithType);
     return propertyStore.set(path, segmentLineage.toZNRecord(), expectedVersion, AccessOption.PERSISTENT);

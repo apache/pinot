@@ -96,10 +96,9 @@ public class PinotSegmentSorter implements SegmentSorter {
         boolean isMultiValueColumn = !fieldSpec.isSingleValueField();
         boolean isNoDictionaryColumn = !columnReader.hasDictionary();
         if (isMultiValueColumn || isNoDictionaryColumn) {
-          throw new IllegalStateException(
-              "Multi value column or no dictionary column is not supported. ( column name: " + dimensionName
-                  + ", multi value column: " + isMultiValueColumn + ", no dictionary column: " + isNoDictionaryColumn
-                  + " )");
+          throw new IllegalStateException("Multi value column or no dictionary column is not supported. ( column name: "
+              + dimensionName + ", multi value column: " + isMultiValueColumn + ", no dictionary column: "
+              + isNoDictionaryColumn + " )");
         }
 
         // Compute the order

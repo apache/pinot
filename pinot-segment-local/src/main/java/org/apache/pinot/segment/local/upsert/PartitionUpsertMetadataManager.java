@@ -116,12 +116,12 @@ public class PartitionUpsertMetadataManager {
 
             // Update the record location when getting a newer timestamp, or the timestamp is the same as the current
             // timestamp, but the segment has a larger sequence number (the segment is newer than the current segment).
-            if (recordInfo._timestamp > currentRecordLocation.getTimestamp() || (
-                recordInfo._timestamp == currentRecordLocation.getTimestamp()
+            if (recordInfo._timestamp > currentRecordLocation.getTimestamp()
+                || (recordInfo._timestamp == currentRecordLocation.getTimestamp()
                     && LLCSegmentName.isLowLevelConsumerSegmentName(segmentName)
                     && LLCSegmentName.isLowLevelConsumerSegmentName(currentRecordLocation.getSegmentName())
                     && LLCSegmentName.getSequenceNumber(segmentName) > LLCSegmentName
-                    .getSequenceNumber(currentRecordLocation.getSegmentName()))) {
+                        .getSequenceNumber(currentRecordLocation.getSegmentName()))) {
               currentRecordLocation.getValidDocIds().remove(currentRecordLocation.getDocId());
               validDocIds.add(recordInfo._docId);
               return new RecordLocation(segmentName, recordInfo._docId, recordInfo._timestamp, validDocIds);

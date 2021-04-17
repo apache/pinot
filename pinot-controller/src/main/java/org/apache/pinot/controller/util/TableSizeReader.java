@@ -222,9 +222,8 @@ public class TableSizeReader {
     if (subTypeSizeDetails.missingSegments > 0) {
       int numSegments = segmentToSizeDetailsMap.size();
       int missingPercent = subTypeSizeDetails.missingSegments * 100 / numSegments;
-      _controllerMetrics
-          .setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT,
-              missingPercent);
+      _controllerMetrics.setValueOfTableGauge(tableNameWithType,
+          ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT, missingPercent);
       if (subTypeSizeDetails.missingSegments == numSegments) {
         LOGGER.warn("Failed to get size report for all {} segments of table: {}", numSegments, tableNameWithType);
         subTypeSizeDetails.reportedSizeInBytes = -1;
@@ -234,8 +233,8 @@ public class TableSizeReader {
             numSegments, tableNameWithType);
       }
     } else {
-      _controllerMetrics
-          .setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT, 0);
+      _controllerMetrics.setValueOfTableGauge(tableNameWithType,
+          ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT, 0);
     }
 
     return subTypeSizeDetails;

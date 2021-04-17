@@ -63,8 +63,8 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   private static final String TABLE_NAME_1 = "testTable1";
   private static final String TABLE_NAME_2 = "testTable2";
   private static final String TABLE_NAME_3 = "testTable3";
-  private static final long STATE_TRANSITION_TIMEOUT_MS = 60_000L;  // 1 minute
-  private static final long ZK_CALLBACK_TIMEOUT_MS = 30_000L;       // 30 seconds
+  private static final long STATE_TRANSITION_TIMEOUT_MS = 60_000L; // 1 minute
+  private static final long ZK_CALLBACK_TIMEOUT_MS = 30_000L; // 30 seconds
   private static final int NUM_TASKS = 2;
   private static final int NUM_CONFIGS = 3;
 
@@ -78,8 +78,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   private PinotTaskManager _taskManager;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     startZk();
     startController();
     startBroker();
@@ -218,8 +217,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     dropOfflineTable(TABLE_NAME_1);
     dropOfflineTable(TABLE_NAME_2);
     dropOfflineTable(TABLE_NAME_3);

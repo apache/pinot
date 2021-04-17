@@ -39,14 +39,12 @@ public class SegmentColumnarIndexCreatorTest {
   private static final int NUM_ROUNDS = 1000;
 
   @BeforeClass
-  public void setUp()
-      throws IOException {
+  public void setUp() throws IOException {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 
   @Test
-  public void testPropertyValueWithSpecialCharacters()
-      throws Exception {
+  public void testPropertyValueWithSpecialCharacters() throws Exception {
     // Leading/trailing whitespace
     Assert.assertFalse(SegmentColumnarIndexCreator.isValidPropertyValue(" a"));
     Assert.assertFalse(SegmentColumnarIndexCreator.isValidPropertyValue("a\t"));
@@ -80,8 +78,7 @@ public class SegmentColumnarIndexCreatorTest {
     }
   }
 
-  private void testPropertyValueWithSpecialCharacters(String value)
-      throws Exception {
+  private void testPropertyValueWithSpecialCharacters(String value) throws Exception {
     if (SegmentColumnarIndexCreator.isValidPropertyValue(value)) {
       PropertiesConfiguration configuration = new PropertiesConfiguration(CONFIG_FILE);
       configuration.setProperty(PROPERTY_KEY, value);
@@ -94,8 +91,7 @@ public class SegmentColumnarIndexCreatorTest {
   }
 
   @Test
-  public void testRemoveColumnMetadataInfo()
-      throws Exception {
+  public void testRemoveColumnMetadataInfo() throws Exception {
     PropertiesConfiguration configuration = new PropertiesConfiguration(CONFIG_FILE);
     configuration.setProperty(COLUMN_PROPERTY_KEY_PREFIX + "a", "foo");
     configuration.setProperty(COLUMN_PROPERTY_KEY_PREFIX + "b", "bar");
@@ -119,8 +115,7 @@ public class SegmentColumnarIndexCreatorTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 }

@@ -237,8 +237,7 @@ public class OffHeapMutableBytesStore implements Closeable {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     for (int i = 0; i < MAX_NUM_BUFFERS; i++) {
       PinotDataBuffer offsetBuffer = _offsetBuffers.get(i);
       if (offsetBuffer != null) {

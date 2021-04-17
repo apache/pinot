@@ -34,7 +34,10 @@ public class Quickstart {
   private static final String NEW_LINE = "\n";
 
   public enum Color {
-    RESET("\u001B[0m"), GREEN("\u001B[32m"), YELLOW("\u001B[33m"), CYAN("\u001B[36m");
+    RESET("\u001B[0m"),
+    GREEN("\u001B[32m"),
+    YELLOW("\u001B[33m"),
+    CYAN("\u001B[36m");
 
     private String _code;
 
@@ -147,8 +150,7 @@ public class Quickstart {
     return responseBuilder.toString();
   }
 
-  public void execute()
-      throws Exception {
+  public void execute() throws Exception {
     File quickstartTmpDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
     File baseDir = new File(quickstartTmpDir, "baseballStats");
     File dataDir = new File(baseDir, "rawdata");
@@ -175,9 +177,8 @@ public class Quickstart {
     FileUtils.copyURLToFile(resource, tableConfigFile);
 
     QuickstartTableRequest request = new QuickstartTableRequest(baseDir.getAbsolutePath());
-    QuickstartRunner runner =
-        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, getNumMinions(), dataDir, true, getAuthToken(),
-            getConfigOverrides());
+    QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, getNumMinions(), dataDir, true,
+        getAuthToken(), getConfigOverrides());
 
     printStatus(Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");
     runner.startAll();
@@ -233,8 +234,7 @@ public class Quickstart {
     printStatus(Color.GREEN, "You can always go to http://localhost:9000 to play around in the query console");
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     PluginManager.get().init();
     new Quickstart().execute();
   }

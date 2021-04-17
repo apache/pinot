@@ -73,15 +73,13 @@ public class H3IndexHandler {
     }
   }
 
-  public void createH3Indices()
-      throws Exception {
+  public void createH3Indices() throws Exception {
     for (ColumnMetadata columnMetadata : _h3IndexColumns) {
       createH3IndexForColumn(columnMetadata);
     }
   }
 
-  private void createH3IndexForColumn(ColumnMetadata columnMetadata)
-      throws Exception {
+  private void createH3IndexForColumn(ColumnMetadata columnMetadata) throws Exception {
     String column = columnMetadata.getColumnName();
     File inProgress = new File(_indexDir, column + V1Constants.Indexes.H3_INDEX_FILE_EXTENSION + ".inprogress");
     File h3IndexFile = new File(_indexDir, column + V1Constants.Indexes.H3_INDEX_FILE_EXTENSION);
@@ -108,8 +106,8 @@ public class H3IndexHandler {
 
     // Create new H3 index for the column.
     LOGGER.info("Creating new H3 index for segment: {}, column: {}", _segmentName, column);
-    Preconditions
-        .checkState(columnMetadata.getDataType() == DataType.BYTES, "H3 index can only be applied to BYTES columns");
+    Preconditions.checkState(columnMetadata.getDataType() == DataType.BYTES,
+        "H3 index can only be applied to BYTES columns");
     if (columnMetadata.hasDictionary()) {
       handleDictionaryBasedColumn(columnMetadata);
     } else {
@@ -127,14 +125,13 @@ public class H3IndexHandler {
     LOGGER.info("Created H3 index for segment: {}, column: {}", _segmentName, column);
   }
 
-  private void handleDictionaryBasedColumn(ColumnMetadata columnMetadata)
-      throws IOException {
+  private void handleDictionaryBasedColumn(ColumnMetadata columnMetadata) throws IOException {
     String columnName = columnMetadata.getColumnName();
     try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, columnMetadata);
-        OffHeapH3IndexCreator h3IndexCreator = new OffHeapH3IndexCreator(_indexDir, columnName,
-            _h3IndexConfigs.get(columnName).getResolution())) {
+        OffHeapH3IndexCreator h3IndexCreator =
+            new OffHeapH3IndexCreator(_indexDir, columnName, _h3IndexConfigs.get(columnName).getResolution())) {
       int numDocs = columnMetadata.getTotalDocs();
       for (int i = 0; i < numDocs; i++) {
         int dictId = forwardIndexReader.getDictId(i, readerContext);
@@ -144,13 +141,12 @@ public class H3IndexHandler {
     }
   }
 
-  private void handleNonDictionaryBasedColumn(ColumnMetadata columnMetadata)
-      throws Exception {
+  private void handleNonDictionaryBasedColumn(ColumnMetadata columnMetadata) throws Exception {
     String columnName = columnMetadata.getColumnName();
     try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        OffHeapH3IndexCreator h3IndexCreator = new OffHeapH3IndexCreator(_indexDir, columnName,
-            _h3IndexConfigs.get(columnName).getResolution())) {
+        OffHeapH3IndexCreator h3IndexCreator =
+            new OffHeapH3IndexCreator(_indexDir, columnName, _h3IndexConfigs.get(columnName).getResolution())) {
       int numDocs = columnMetadata.getTotalDocs();
       for (int i = 0; i < numDocs; i++) {
         h3IndexCreator.add(GeometrySerializer.deserialize(forwardIndexReader.getBytes(i, readerContext)));

@@ -106,7 +106,7 @@ public class SegmentCompletionProtocol {
 
   public static final String STATUS_KEY = "status";
   public static final String OFFSET_KEY = "offset";
-  public static final String BUILD_TIME_KEY = "buildTimeSec";  // Sent by controller in COMMIT message
+  public static final String BUILD_TIME_KEY = "buildTimeSec"; // Sent by controller in COMMIT message
   public static final String COMMIT_TYPE_KEY = "isSplitCommitType";
   public static final String SEGMENT_LOCATION_KEY = "segmentLocation";
   public static final String CONTROLLER_VIP_URL_KEY = "controllerVipUrl";
@@ -133,10 +133,10 @@ public class SegmentCompletionProtocol {
   public static final String PARAM_EXTRA_TIME_SEC = "extraTimeSec";
   public static final String PARAM_ROW_COUNT = "rowCount"; // Sent by servers to indicate the number of rows read so far
   public static final String PARAM_BUILD_TIME_MILLIS = "buildTimeMillis"; // Time taken to build segment
-  public static final String PARAM_WAIT_TIME_MILLIS = "waitTimeMillis";   // Time taken to wait for build to start.
+  public static final String PARAM_WAIT_TIME_MILLIS = "waitTimeMillis"; // Time taken to wait for build to start.
 
-  public static final String REASON_ROW_LIMIT = "rowLimit";  // Stop reason sent by server as max num rows reached
-  public static final String REASON_TIME_LIMIT = "timeLimit";  // Stop reason sent by server as max time reached
+  public static final String REASON_ROW_LIMIT = "rowLimit"; // Stop reason sent by server as max num rows reached
+  public static final String REASON_TIME_LIMIT = "timeLimit"; // Stop reason sent by server as max time reached
   public static final String REASON_END_OF_PARTITION_GROUP = "endOfPartitionGroup"; // Stop reason sent by server as end of partitionGroup reached
 
   // Canned responses
@@ -191,22 +191,22 @@ public class SegmentCompletionProtocol {
       if (_params.getReason() != null) {
         params.put(PARAM_REASON, _params.getReason());
       }
-      if ( _params.getBuildTimeMillis() > 0) {
+      if (_params.getBuildTimeMillis() > 0) {
         params.put(PARAM_BUILD_TIME_MILLIS, String.valueOf(_params.getBuildTimeMillis()));
       }
-      if ( _params.getWaitTimeMillis() > 0) {
+      if (_params.getWaitTimeMillis() > 0) {
         params.put(PARAM_WAIT_TIME_MILLIS, String.valueOf(_params.getWaitTimeMillis()));
       }
-      if ( _params.getExtraTimeSec() > 0) {
+      if (_params.getExtraTimeSec() > 0) {
         params.put(PARAM_EXTRA_TIME_SEC, String.valueOf(_params.getExtraTimeSec()));
       }
-      if ( _params.getMemoryUsedBytes() > 0) {
+      if (_params.getMemoryUsedBytes() > 0) {
         params.put(PARAM_MEMORY_USED_BYTES, String.valueOf(_params.getMemoryUsedBytes()));
       }
-      if ( _params.getSegmentSizeBytes() > 0) {
+      if (_params.getSegmentSizeBytes() > 0) {
         params.put(PARAM_SEGMENT_SIZE_BYTES, String.valueOf(_params.getSegmentSizeBytes()));
       }
-      if ( _params.getNumRows() > 0) {
+      if (_params.getNumRows() > 0) {
         params.put(PARAM_ROW_COUNT, String.valueOf(_params.getNumRows()));
       }
       if (_params.getSegmentLocation() != null) {

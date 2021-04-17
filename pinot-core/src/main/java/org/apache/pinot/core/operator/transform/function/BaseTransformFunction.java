@@ -42,7 +42,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
   protected static final TransformResultMetadata STRING_MV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.STRING, false, false);
   protected static final TransformResultMetadata BYTES_SV_NO_DICTIONARY_METADATA =
-          new TransformResultMetadata(DataType.BYTES, true, false);
+      new TransformResultMetadata(DataType.BYTES, true, false);
 
   private int[] _intValuesSV;
   private long[] _longValuesSV;

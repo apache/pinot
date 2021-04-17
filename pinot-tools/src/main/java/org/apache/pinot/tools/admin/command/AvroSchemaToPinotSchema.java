@@ -40,10 +40,12 @@ import org.slf4j.LoggerFactory;
 public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AvroSchemaToPinotSchema.class);
 
-  @Option(name = "-avroSchemaFile", forbids = {"-avroDataFile"}, metaVar = "<String>", usage = "Path to avro schema file.")
+  @Option(name = "-avroSchemaFile", forbids = {"-avroDataFile"}, metaVar = "<String>",
+      usage = "Path to avro schema file.")
   String _avroSchemaFile;
 
-  @Option(name = "-avroDataFile", forbids = {"-avroSchemaFile"}, metaVar = "<String>", usage = "Path to avro data file.")
+  @Option(name = "-avroDataFile", forbids = {"-avroSchemaFile"}, metaVar = "<String>",
+      usage = "Path to avro data file.")
   String _avroDataFile;
 
   @Option(name = "-outputDir", required = true, metaVar = "<string>", usage = "Path to output directory")
@@ -69,8 +71,7 @@ public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements
   private boolean _help = false;
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
     if (_dimensions == null && _metrics == null && _timeColumnName == null) {
       LOGGER.error(
           "Error: Missing required argument, please specify at least one of -dimensions, -metrics, -timeColumnName");

@@ -99,19 +99,17 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   private final static String[] REQUIRED_KEYS = {INSTANCE_ID, INSTANCE_DATA_DIR, READ_MODE};
   private PinotConfiguration _instanceDataManagerConfiguration = null;
 
-  public HelixInstanceDataManagerConfig(PinotConfiguration serverConfig)
-      throws ConfigurationException {
+  public HelixInstanceDataManagerConfig(PinotConfiguration serverConfig) throws ConfigurationException {
     _instanceDataManagerConfiguration = serverConfig;
 
-    for (String key: serverConfig.getKeys()) {
+    for (String key : serverConfig.getKeys()) {
       LOGGER.info("InstanceDataManagerConfig, key: {} , value: {}", key, serverConfig.getProperty(key));
     }
 
     checkRequiredKeys();
   }
 
-  private void checkRequiredKeys()
-      throws ConfigurationException {
+  private void checkRequiredKeys() throws ConfigurationException {
     for (String keyString : REQUIRED_KEYS) {
       Optional.ofNullable(_instanceDataManagerConfiguration.getProperty(keyString))
 
@@ -185,8 +183,8 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   public boolean shouldReloadConsumingSegment() {
-    return _instanceDataManagerConfiguration
-        .getProperty(INSTANCE_RELOAD_CONSUMING_SEGMENT, Server.DEFAULT_RELOAD_CONSUMING_SEGMENT);
+    return _instanceDataManagerConfiguration.getProperty(INSTANCE_RELOAD_CONSUMING_SEGMENT,
+        Server.DEFAULT_RELOAD_CONSUMING_SEGMENT);
   }
 
   @Override

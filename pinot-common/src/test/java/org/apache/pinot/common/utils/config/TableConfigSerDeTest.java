@@ -63,8 +63,7 @@ import static org.testng.Assert.*;
 public class TableConfigSerDeTest {
 
   @Test
-  public void testSerDe()
-      throws IOException {
+  public void testSerDe() throws IOException {
     TableConfigBuilder tableConfigBuilder = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable");
     {
       // Default table config

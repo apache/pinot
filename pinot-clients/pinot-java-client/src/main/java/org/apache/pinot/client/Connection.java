@@ -80,8 +80,7 @@ public class Connection {
    * @throws PinotClientException If an exception occurs while processing the query
    */
   @Deprecated
-  public ResultSetGroup execute(String query)
-      throws PinotClientException {
+  public ResultSetGroup execute(String query) throws PinotClientException {
     return execute(null, new Request("pql", query));
   }
 
@@ -91,8 +90,7 @@ public class Connection {
    * @return The result of the query
    * @throws PinotClientException If an exception occurs while processing the query
    */
-  public ResultSetGroup execute(Request request)
-      throws PinotClientException {
+  public ResultSetGroup execute(Request request) throws PinotClientException {
     return execute(null, request);
   }
 
@@ -105,8 +103,7 @@ public class Connection {
    * @throws PinotClientException If an exception occurs while processing the query
    */
   @Deprecated
-  public ResultSetGroup execute(String tableName, String query)
-      throws PinotClientException {
+  public ResultSetGroup execute(String tableName, String query) throws PinotClientException {
     return execute(tableName, new Request("pql", query));
   }
 
@@ -117,8 +114,7 @@ public class Connection {
    * @return The result of the query
    * @throws PinotClientException If an exception occurs while processing the query
    */
-  public ResultSetGroup execute(String tableName, Request request)
-      throws PinotClientException {
+  public ResultSetGroup execute(String tableName, Request request) throws PinotClientException {
     String brokerHostPort = _brokerSelector.selectBroker(tableName);
     if (brokerHostPort == null) {
       throw new PinotClientException(
@@ -141,8 +137,7 @@ public class Connection {
    * @throws PinotClientException If an exception occurs while processing the query
    */
   @Deprecated
-  public Future<ResultSetGroup> executeAsync(String query)
-      throws PinotClientException {
+  public Future<ResultSetGroup> executeAsync(String query) throws PinotClientException {
     return executeAsync(new Request("pql", query));
   }
 
@@ -153,13 +148,11 @@ public class Connection {
    * @return A future containing the result of the query
    * @throws PinotClientException If an exception occurs while processing the query
    */
-  public Future<ResultSetGroup> executeAsync(Request request)
-      throws PinotClientException {
+  public Future<ResultSetGroup> executeAsync(Request request) throws PinotClientException {
     String brokerHostPort = _brokerSelector.selectBroker(null);
     if (brokerHostPort == null) {
-      throw new PinotClientException(
-          "Could not find broker to query for statement: " + (request.getQuery() == null ? "null"
-              : request.getQuery()));
+      throw new PinotClientException("Could not find broker to query for statement: "
+          + (request.getQuery() == null ? "null" : request.getQuery()));
     }
     final Future<BrokerResponse> responseFuture = _transport.executeQueryAsync(brokerHostPort, request);
     return new ResultSetGroupFuture(responseFuture);
@@ -179,8 +172,7 @@ public class Connection {
    *
    * @throws PinotClientException when connection is already closed
    */
-  public void close()
-      throws PinotClientException {
+  public void close() throws PinotClientException {
     _transport.close();
   }
 
@@ -207,8 +199,7 @@ public class Connection {
     }
 
     @Override
-    public ResultSetGroup get()
-        throws InterruptedException, ExecutionException {
+    public ResultSetGroup get() throws InterruptedException, ExecutionException {
       try {
         return get(1000L, TimeUnit.DAYS);
       } catch (TimeoutException e) {

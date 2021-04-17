@@ -37,11 +37,9 @@ public class KafkaJSONMessageDecoderTest {
   private static ObjectMapper objectMapper = new ObjectMapper();
 
   @Test
-  public void testJsonDecoderWithoutOutgoingTimeSpec()
-      throws Exception {
-    Schema schema = Schema.fromFile(new File(
-        getClass().getClassLoader().getResource("data/test_sample_data_schema_without_outgoing_time_spec.json")
-            .getFile()));
+  public void testJsonDecoderWithoutOutgoingTimeSpec() throws Exception {
+    Schema schema = Schema.fromFile(new File(getClass().getClassLoader()
+        .getResource("data/test_sample_data_schema_without_outgoing_time_spec.json").getFile()));
     Map<String, FieldSpec.DataType> sourceFields = new HashMap<>();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       sourceFields.put(fieldSpec.getName(), fieldSpec.getDataType());
@@ -50,11 +48,9 @@ public class KafkaJSONMessageDecoderTest {
   }
 
   @Test
-  public void testJsonDecoderWithOutgoingTimeSpec()
-      throws Exception {
-    Schema schema = Schema.fromFile(new File(
-        getClass().getClassLoader().getResource("data/test_sample_data_schema_with_outgoing_time_spec.json")
-            .getFile()));
+  public void testJsonDecoderWithOutgoingTimeSpec() throws Exception {
+    Schema schema = Schema.fromFile(new File(getClass().getClassLoader()
+        .getResource("data/test_sample_data_schema_with_outgoing_time_spec.json").getFile()));
     Map<String, FieldSpec.DataType> sourceFields = new HashMap<>();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       sourceFields.put(fieldSpec.getName(), fieldSpec.getDataType());
@@ -65,8 +61,7 @@ public class KafkaJSONMessageDecoderTest {
   }
 
   @Test
-  public void testJsonDecoderNoTimeSpec()
-      throws Exception {
+  public void testJsonDecoderNoTimeSpec() throws Exception {
     Schema schema = Schema.fromFile(
         new File(getClass().getClassLoader().getResource("data/test_sample_data_schema_no_time_field.json").getFile()));
     Map<String, FieldSpec.DataType> sourceFields = new HashMap<>();
@@ -76,8 +71,7 @@ public class KafkaJSONMessageDecoderTest {
     testJsonDecoder(sourceFields);
   }
 
-  private void testJsonDecoder(Map<String, FieldSpec.DataType> sourceFields)
-      throws Exception {
+  private void testJsonDecoder(Map<String, FieldSpec.DataType> sourceFields) throws Exception {
     try (BufferedReader reader = new BufferedReader(
         new FileReader(getClass().getClassLoader().getResource("data/test_sample_data.json").getFile()))) {
       KafkaJSONMessageDecoder decoder = new KafkaJSONMessageDecoder();

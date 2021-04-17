@@ -162,7 +162,8 @@ public final class TlsUtils {
         keyStore.load(is, trustStorePassword.toCharArray());
       }
 
-      TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+      TrustManagerFactory trustManagerFactory =
+          TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
       trustManagerFactory.init(keyStore);
 
       return trustManagerFactory;
@@ -190,8 +191,8 @@ public final class TlsUtils {
    * @param trustStorePath trust store path
    * @param trustStorePassword trust password
    */
-  public static void installDefaultSSLSocketFactory(String keyStorePath, String keyStorePassword,
-      String trustStorePath, String trustStorePassword) {
+  public static void installDefaultSSLSocketFactory(String keyStorePath, String keyStorePassword, String trustStorePath,
+      String trustStorePassword) {
     KeyManager[] keyManagers = null;
     if (keyStorePath != null) {
       keyManagers = createKeyManagerFactory(keyStorePath, keyStorePassword).getKeyManagers();
@@ -210,8 +211,8 @@ public final class TlsUtils {
       HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
 
       // Apache HTTP client 3.x
-      Protocol.registerProtocol("https", new Protocol(CommonConstants.HTTPS_PROTOCOL,
-          new PinotProtocolSocketFactory(sc.getSocketFactory()), 443));
+      Protocol.registerProtocol("https",
+          new Protocol(CommonConstants.HTTPS_PROTOCOL, new PinotProtocolSocketFactory(sc.getSocketFactory()), 443));
 
       // FileUploadDownloadClient
       FileUploadDownloadClient.installDefaultSSLContext(sc);
@@ -243,8 +244,7 @@ public final class TlsUtils {
 
     @Override
     public Socket createSocket(String host, int port, InetAddress localAddress, int localPort,
-        HttpConnectionParams params)
-        throws IOException, UnknownHostException, ConnectTimeoutException {
+        HttpConnectionParams params) throws IOException, UnknownHostException, ConnectTimeoutException {
       Preconditions.checkNotNull(params);
 
       int timeout = params.getConnectionTimeout();
@@ -261,8 +261,7 @@ public final class TlsUtils {
     }
 
     @Override
-    public Socket createSocket(String host, int port)
-        throws IOException, UnknownHostException {
+    public Socket createSocket(String host, int port) throws IOException, UnknownHostException {
       return _sslSocketFactory.createSocket(host, port);
     }
   }

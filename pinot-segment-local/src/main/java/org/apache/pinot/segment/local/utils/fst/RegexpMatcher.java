@@ -54,8 +54,7 @@ public class RegexpMatcher {
     _automaton = (new RegExp(_regexQuery)).toAutomaton();
   }
 
-  public static List<Long> regexMatch(String regexQuery, FST<Long> fst)
-      throws IOException {
+  public static List<Long> regexMatch(String regexQuery, FST<Long> fst) throws IOException {
     RegexpMatcher matcher = new RegexpMatcher(regexQuery, fst);
     return matcher.regexMatchOnFST();
   }
@@ -82,8 +81,7 @@ public class RegexpMatcher {
    * @return
    * @throws IOException
    */
-  public List<Long> regexMatchOnFST()
-      throws IOException {
+  public List<Long> regexMatchOnFST() throws IOException {
     final List<Path<Long>> queue = new ArrayList<>();
     final List<Path<Long>> endNodes = new ArrayList<>();
     if (_automaton.getNumStates() == 0) {
@@ -130,9 +128,8 @@ public class RegexpMatcher {
             final IntsRefBuilder newInput = new IntsRefBuilder();
             newInput.copyInts(currentInput.get());
             newInput.append(nextArc.label);
-            queue.add(
-                new Path<>(t.dest, new FST.Arc<Long>().copyFrom(nextArc), _fst.outputs.add(path.output, nextArc.output),
-                    newInput));
+            queue.add(new Path<>(t.dest, new FST.Arc<Long>().copyFrom(nextArc),
+                _fst.outputs.add(path.output, nextArc.output), newInput));
             nextArc = nextArc.isLast() ? null : _fst.readNextRealArc(nextArc, fstReader);
           }
         }

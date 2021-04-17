@@ -34,6 +34,7 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.spi.utils.JsonUtils;
 
+
 /**
  * This is a wrapper class for fetching segment metadata related information.
  */
@@ -87,7 +88,8 @@ public class SegmentMetadataFetcher {
    * Helper to loop through column index container to create a index map as follows for each column:
    * {<"bloom-filter", "YES">, <"dictionary", "NO">}
    */
-  private static Map<String, Map<String, String>> getImmutableSegmentColumnIndexes(Map<String, ColumnIndexContainer> columnIndexContainerMap) {
+  private static Map<String, Map<String, String>> getImmutableSegmentColumnIndexes(
+      Map<String, ColumnIndexContainer> columnIndexContainerMap) {
     Map<String, Map<String, String>> columnIndexMap = new LinkedHashMap<>();
     for (Map.Entry<String, ColumnIndexContainer> entry : columnIndexContainerMap.entrySet()) {
       ColumnIndexContainer columnIndexContainer = entry.getValue();

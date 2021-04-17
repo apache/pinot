@@ -46,13 +46,11 @@ public class MeetupRsvpStream {
   protected ClientManager _client;
   protected volatile boolean _keepPublishing;
 
-  public MeetupRsvpStream()
-      throws Exception {
+  public MeetupRsvpStream() throws Exception {
     this(false);
   }
 
-  public MeetupRsvpStream(boolean partitionByKey)
-      throws Exception {
+  public MeetupRsvpStream(boolean partitionByKey) throws Exception {
     _partitionByKey = partitionByKey;
 
     Properties properties = new Properties();
@@ -62,8 +60,7 @@ public class MeetupRsvpStream {
     _producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
   }
 
-  public void run()
-      throws Exception {
+  public void run() throws Exception {
     _client = ClientManager.createClient();
     _keepPublishing = true;
 

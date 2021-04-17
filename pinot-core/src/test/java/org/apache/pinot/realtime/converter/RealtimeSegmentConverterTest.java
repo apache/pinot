@@ -68,7 +68,8 @@ public class RealtimeSegmentConverterTest {
   public void testNoVirtualColumnsInSchema() {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("col1", FieldSpec.DataType.STRING)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "col1"),
-            new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "col2")).build();
+            new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "col2"))
+        .build();
     String segmentName = "segment1";
     VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(schema, segmentName);
     Assert.assertEquals(schema.getColumnNames().size(), 5);
@@ -77,17 +78,15 @@ public class RealtimeSegmentConverterTest {
   }
 
   @Test
-  public void testNoRecordsIndexed()
-      throws Exception {
+  public void testNoRecordsIndexed() throws Exception {
 
     File tmpDir = new File(TMP_DIR, "tmp_" + System.currentTimeMillis());
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName(DATE_TIME_COLUMN)
-            .setInvertedIndexColumns(Lists.newArrayList(STRING_COLUMN1)).setSortedColumn(LONG_COLUMN1)
-            .setRangeIndexColumns(Lists.newArrayList(STRING_COLUMN2))
-            .setNoDictionaryColumns(Lists.newArrayList(LONG_COLUMN2))
-            .setVarLengthDictionaryColumns(Lists.newArrayList(STRING_COLUMN3))
-            .setOnHeapDictionaryColumns(Lists.newArrayList(LONG_COLUMN3)).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable")
+        .setTimeColumnName(DATE_TIME_COLUMN).setInvertedIndexColumns(Lists.newArrayList(STRING_COLUMN1))
+        .setSortedColumn(LONG_COLUMN1).setRangeIndexColumns(Lists.newArrayList(STRING_COLUMN2))
+        .setNoDictionaryColumns(Lists.newArrayList(LONG_COLUMN2))
+        .setVarLengthDictionaryColumns(Lists.newArrayList(STRING_COLUMN3))
+        .setOnHeapDictionaryColumns(Lists.newArrayList(LONG_COLUMN3)).build();
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(STRING_COLUMN1, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_COLUMN2, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_COLUMN3, FieldSpec.DataType.STRING)

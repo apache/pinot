@@ -75,8 +75,7 @@ public class ClusterStarter {
 
   private static final long TIMEOUT_IN_MILLISECONDS = 200 * 1000;
 
-  ClusterStarter(QueryComparisonConfig config)
-      throws SocketException, UnknownHostException {
+  ClusterStarter(QueryComparisonConfig config) throws SocketException, UnknownHostException {
 
     _segmentName = config.getSegmentName();
     _schemaFileName = config.getSchemaFileName();
@@ -146,48 +145,41 @@ public class ClusterStarter {
     return this;
   }
 
-  private void startZookeeper()
-      throws IOException {
+  private void startZookeeper() throws IOException {
     if (_startZookeeper) {
       StartZookeeperCommand zkStarter = new StartZookeeperCommand();
       zkStarter.execute();
     }
   }
 
-  private void startController()
-      throws Exception {
+  private void startController() throws Exception {
 
     // Delete existing cluster first.
     DeleteClusterCommand deleteClusterCommand = new DeleteClusterCommand().setClusterName(_clusterName);
     deleteClusterCommand.execute();
 
-    StartControllerCommand controllerStarter =
-        new StartControllerCommand().setControllerPort(_controllerPort).setZkAddress(_zkAddress)
-            .setClusterName(_clusterName);
+    StartControllerCommand controllerStarter = new StartControllerCommand().setControllerPort(_controllerPort)
+        .setZkAddress(_zkAddress).setClusterName(_clusterName);
 
     controllerStarter.execute();
   }
 
-  private void startBroker()
-      throws Exception {
+  private void startBroker() throws Exception {
     StartBrokerCommand brokerStarter =
         new StartBrokerCommand().setClusterName(_clusterName).setPort(Integer.valueOf(_brokerPort));
     brokerStarter.execute();
   }
 
-  private void startServer()
-      throws Exception {
+  private void startServer() throws Exception {
     StartServerCommand serverStarter =
         new StartServerCommand().setPort(Integer.valueOf(_serverPort)).setClusterName(_clusterName);
     serverStarter.execute();
   }
 
-  private void addTable()
-      throws Exception {
+  private void addTable() throws Exception {
     if (_tableConfigFile != null) {
-      AddTableCommand addTableCommand =
-          new AddTableCommand().setControllerPort(_controllerPort).setSchemaFile(_schemaFileName)
-              .setTableConfigFile(_tableConfigFile).setExecute(true);
+      AddTableCommand addTableCommand = new AddTableCommand().setControllerPort(_controllerPort)
+          .setSchemaFile(_schemaFileName).setTableConfigFile(_tableConfigFile).setExecute(true);
       addTableCommand.execute();
       return;
     }
@@ -205,17 +197,14 @@ public class ClusterStarter {
         tableConfig.toJsonString());
   }
 
-  private void uploadData()
-      throws Exception {
-    UploadSegmentCommand segmentUploader =
-        new UploadSegmentCommand().setSegmentDir(_segmentDirName).setControllerHost(_localhost)
-            .setControllerPort(_controllerPort);
+  private void uploadData() throws Exception {
+    UploadSegmentCommand segmentUploader = new UploadSegmentCommand().setSegmentDir(_segmentDirName)
+        .setControllerHost(_localhost).setControllerPort(_controllerPort);
     segmentUploader.execute();
     PerfBenchmarkDriver.waitForExternalViewUpdate(_zkAddress, _clusterName, TIMEOUT_IN_MILLISECONDS);
   }
 
-  private void createSegments()
-      throws Exception {
+  private void createSegments() throws Exception {
     if (_inputDataDir != null) {
       CreateSegmentCommand segmentCreator =
           new CreateSegmentCommand().setDataDir(_inputDataDir).setOutDir(_segmentDirName).setOverwrite(true)
@@ -225,8 +214,7 @@ public class ClusterStarter {
     }
   }
 
-  public void start()
-      throws Exception {
+  public void start() throws Exception {
     startZookeeper();
     startController();
     startBroker();
@@ -237,16 +225,14 @@ public class ClusterStarter {
     uploadData();
   }
 
-  public String query(String query)
-      throws Exception {
+  public String query(String query) throws Exception {
     LOGGER.debug("Running query on Pinot Cluster");
     PostQueryCommand queryRunner =
         new PostQueryCommand().setQuery(query).setBrokerHost(_brokerHost).setBrokerPort(_brokerPort);
     return queryRunner.run();
   }
 
-  public int perfQuery(String query)
-      throws Exception {
+  public int perfQuery(String query) throws Exception {
     LOGGER.debug("Running perf query on Pinot Cluster");
     String encodedQuery = URIUtils.encode(query);
     String brokerUrl = _perfUrl + encodedQuery;

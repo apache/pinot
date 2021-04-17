@@ -46,8 +46,7 @@ public class EnumArrayOptionHandler<T extends Enum<T>> extends OptionHandler<T> 
    * Tries to parse {@code String[]} argument from {@link Parameters}.
    */
   @Override
-  public int parseArguments(Parameters params)
-      throws CmdLineException {
+  public int parseArguments(Parameters params) throws CmdLineException {
     int counter = 0;
     for (; counter < params.size(); counter++) {
       String param = params.getParameter(counter);

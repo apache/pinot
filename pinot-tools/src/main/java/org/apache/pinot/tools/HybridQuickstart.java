@@ -48,16 +48,14 @@ public class HybridQuickstart {
   private File _dataFile;
   private File _ingestionJobSpecFile;
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     // TODO: Explicitly call below method to load dependencies from pinot-plugins libs which are excluded from pinot-tools packaging.
     // E.g. Kafka related libs are coming from pinot-kafka-* lib, avro libs are coming from pinot-avro lib.
     PluginManager.get().init();
     new HybridQuickstart().execute();
   }
 
-  private QuickstartTableRequest prepareTableRequest(File baseDir)
-      throws IOException {
+  private QuickstartTableRequest prepareTableRequest(File baseDir) throws IOException {
     _schemaFile = new File(baseDir, "airlineStats_schema.json");
     _ingestionJobSpecFile = new File(baseDir, "ingestionJobSpec.yaml");
     File tableConfigFile = new File(baseDir, "airlineStats_offline_table_config.json");
@@ -99,15 +97,13 @@ public class HybridQuickstart {
     _kafkaStarter.createTopic("flights-realtime", KafkaStarterUtils.getTopicCreationProps(10));
   }
 
-  public void execute()
-      throws Exception {
+  public void execute() throws Exception {
     File quickstartTmpDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
     File baseDir = new File(quickstartTmpDir, "airlineStats");
     File dataDir = new File(baseDir, "data");
     Preconditions.checkState(dataDir.mkdirs());
     QuickstartTableRequest bootstrapTableRequest = prepareTableRequest(baseDir);
-    final QuickstartRunner runner =
-        new QuickstartRunner(Lists.newArrayList(bootstrapTableRequest), 1, 1, 1, dataDir);
+    final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(bootstrapTableRequest), 1, 1, 1, dataDir);
     printStatus(Color.YELLOW, "***** Starting Kafka  *****");
     startKafka();
     printStatus(Color.YELLOW, "***** Starting airline data stream and publishing to Kafka *****");
@@ -153,19 +149,22 @@ public class HybridQuickstart {
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q2 = "select AirlineID, sum(Cancelled) from airlineStats group by AirlineID order by sum(Cancelled) desc limit 5";
+    String q2 =
+        "select AirlineID, sum(Cancelled) from airlineStats group by AirlineID order by sum(Cancelled) desc limit 5";
     printStatus(Color.YELLOW, "Top 5 airlines in cancellation ");
     printStatus(Color.CYAN, "Query : " + q2);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q2)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q3 = "select AirlineID, Year, sum(Flights) from airlineStats where Year > 2010 group by AirlineID, Year order by sum(Flights) desc limit 5";
+    String q3 =
+        "select AirlineID, Year, sum(Flights) from airlineStats where Year > 2010 group by AirlineID, Year order by sum(Flights) desc limit 5";
     printStatus(Color.YELLOW, "Top 5 airlines in number of flights after 2010");
     printStatus(Color.CYAN, "Query : " + q3);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q3)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q4 = "select OriginCityName, max(Flights) from airlineStats group by OriginCityName order by max(Flights) desc limit 5";
+    String q4 =
+        "select OriginCityName, max(Flights) from airlineStats group by OriginCityName order by max(Flights) desc limit 5";
     printStatus(Color.YELLOW, "Top 5 cities for number of flights");
     printStatus(Color.CYAN, "Query : " + q4);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q4)));

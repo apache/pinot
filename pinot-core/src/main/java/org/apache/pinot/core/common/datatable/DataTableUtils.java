@@ -93,8 +93,7 @@ public class DataTableUtils {
   /**
    * Builds an empty data table based on the broker request.
    */
-  public static DataTable buildEmptyDataTable(QueryContext queryContext)
-      throws IOException {
+  public static DataTable buildEmptyDataTable(QueryContext queryContext) throws IOException {
     if (QueryContextUtils.isSelectionQuery(queryContext)) {
       return buildEmptyDataTableForSelectionQuery(queryContext);
     } else if (QueryContextUtils.isAggregationQuery(queryContext)) {
@@ -125,8 +124,7 @@ public class DataTableUtils {
   /**
    * Helper method to build an empty data table for aggregation query.
    */
-  private static DataTable buildEmptyDataTableForAggregationQuery(QueryContext queryContext)
-      throws IOException {
+  private static DataTable buildEmptyDataTableForAggregationQuery(QueryContext queryContext) throws IOException {
     AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
     assert aggregationFunctions != null;
     int numAggregations = aggregationFunctions.length;
@@ -201,9 +199,8 @@ public class DataTableUtils {
             dataTableBuilder.setColumn(i, aggregationResults[i]);
             break;
           default:
-            throw new UnsupportedOperationException(
-                "Unsupported aggregation column data type: " + columnDataTypes[i] + " for column: "
-                    + aggregationColumnNames[i]);
+            throw new UnsupportedOperationException("Unsupported aggregation column data type: " + columnDataTypes[i]
+                + " for column: " + aggregationColumnNames[i]);
         }
       }
       dataTableBuilder.finishRow();
@@ -214,8 +211,7 @@ public class DataTableUtils {
   /**
    * Helper method to build an empty data table for distinct query.
    */
-  private static DataTable buildEmptyDataTableForDistinctQuery(QueryContext queryContext)
-      throws IOException {
+  private static DataTable buildEmptyDataTableForDistinctQuery(QueryContext queryContext) throws IOException {
     AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
     assert aggregationFunctions != null && aggregationFunctions.length == 1
         && aggregationFunctions[0] instanceof DistinctAggregationFunction;
@@ -230,8 +226,8 @@ public class DataTableUtils {
         new DistinctTable(new DataSchema(columnNames, columnDataTypes), Collections.emptySet());
 
     // Build the data table
-    DataTableBuilder dataTableBuilder = new DataTableBuilder(
-        new DataSchema(new String[]{distinctAggregationFunction.getColumnName()},
+    DataTableBuilder dataTableBuilder =
+        new DataTableBuilder(new DataSchema(new String[]{distinctAggregationFunction.getColumnName()},
             new ColumnDataType[]{ColumnDataType.OBJECT}));
     dataTableBuilder.startRow();
     dataTableBuilder.setColumn(0, distinctTable);
@@ -242,8 +238,7 @@ public class DataTableUtils {
   /**
    * Helper method to decode string.
    */
-  public static String decodeString(DataInputStream dataInputStream)
-      throws IOException {
+  public static String decodeString(DataInputStream dataInputStream) throws IOException {
     int length = dataInputStream.readInt();
     if (length == 0) {
       return StringUtils.EMPTY;
@@ -258,8 +253,7 @@ public class DataTableUtils {
   /**
    * Helper method to decode int.
    */
-  public static int decodeInt(DataInputStream dataInputStream)
-      throws IOException {
+  public static int decodeInt(DataInputStream dataInputStream) throws IOException {
     int length = Integer.BYTES;
     byte[] buffer = new byte[length];
     int numBytesRead = dataInputStream.read(buffer);
@@ -270,8 +264,7 @@ public class DataTableUtils {
   /**
    * Helper method to decode long.
    */
-  public static long decodeLong(DataInputStream dataInputStream)
-      throws IOException {
+  public static long decodeLong(DataInputStream dataInputStream) throws IOException {
     int length = Long.BYTES;
     byte[] buffer = new byte[length];
     int numBytesRead = dataInputStream.read(buffer);

@@ -49,10 +49,12 @@ public class PinotTableInstances {
   @Path("/tables/{tableName}/instances")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List table instances", notes = "List instances of the given table")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Table not found"), @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404,
+      message = "Table not found"), @ApiResponse(code = 500, message = "Internal server error")})
   public String getTableInstances(
       @ApiParam(value = "Table name without type", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "Instance type", example = "broker", allowableValues = "BROKER, SERVER") @DefaultValue("") @QueryParam("type") String type) {
+      @ApiParam(value = "Instance type", example = "broker",
+          allowableValues = "BROKER, SERVER") @DefaultValue("") @QueryParam("type") String type) {
     ObjectNode ret = JsonUtils.newObjectNode();
     ret.put("tableName", tableName);
     ArrayNode brokers = JsonUtils.newArrayNode();
@@ -105,7 +107,7 @@ public class PinotTableInstances {
       }
     }
     ret.set("brokers", brokers);
-    ret.set("server", servers);   // Keeping compatibility with previous API, so "server" and "brokers"
+    ret.set("server", servers); // Keeping compatibility with previous API, so "server" and "brokers"
     return ret.toString();
   }
 }

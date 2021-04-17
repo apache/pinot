@@ -68,7 +68,8 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
   @Option(name = "-tableName", required = false, metaVar = "<string>", usage = "Table name to upload.")
   private String _tableName = null;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -133,8 +134,7 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
   }
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
     if (_controllerHost == null) {
       _controllerHost = NetUtils.getHostAddress();
     }
@@ -150,8 +150,8 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
     Preconditions.checkNotNull(segmentFiles);
 
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      URI uploadSegmentHttpURI =
-          FileUploadDownloadClient.getUploadSegmentURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort));
+      URI uploadSegmentHttpURI = FileUploadDownloadClient.getUploadSegmentURI(_controllerProtocol, _controllerHost,
+          Integer.parseInt(_controllerPort));
       for (File segmentFile : segmentFiles) {
         File segmentTarFile;
         if (segmentFile.isDirectory()) {
@@ -165,11 +165,11 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
         }
 
         LOGGER.info("Uploading segment tar file: {}", segmentTarFile);
-        fileUploadDownloadClient
-            .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile,
-                makeAuthHeader(makeAuthToken(_authToken, _user, _password)), Collections.singletonList(new BasicNameValuePair(
-                    FileUploadDownloadClient.QueryParameters.TABLE_NAME, _tableName)),
-                FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+        fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile,
+            makeAuthHeader(makeAuthToken(_authToken, _user, _password)),
+            Collections
+                .singletonList(new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME, _tableName)),
+            FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
       }
     } finally {
       // Delete the temporary working directory.

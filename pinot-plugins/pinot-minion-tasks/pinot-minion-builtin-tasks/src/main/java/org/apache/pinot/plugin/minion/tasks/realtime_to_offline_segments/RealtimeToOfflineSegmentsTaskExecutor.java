@@ -110,16 +110,15 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     long windowStartMs = Long.parseLong(configs.get(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY));
     Preconditions.checkState(realtimeToOfflineSegmentsTaskMetadata.getWatermarkMs() == windowStartMs,
         "watermarkMs in RealtimeToOfflineSegmentsTask metadata: %s does not match windowStartMs: %d in task configs for table: %s. "
-            + "ZNode may have been modified by another task", realtimeToOfflineSegmentsTaskMetadata, windowStartMs,
-        realtimeTableName);
+            + "ZNode may have been modified by another task",
+        realtimeToOfflineSegmentsTaskMetadata, windowStartMs, realtimeTableName);
 
     _expectedVersion = realtimeToOfflineSegmentsTaskZNRecord.getVersion();
   }
 
   @Override
   protected List<SegmentConversionResult> convert(PinotTaskConfig pinotTaskConfig, List<File> originalIndexDirs,
-      File workingDir)
-      throws Exception {
+      File workingDir) throws Exception {
     String taskType = pinotTaskConfig.getTaskType();
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     LOGGER.info("Starting task: {} with configs: {}", taskType, configs);
@@ -133,9 +132,8 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     Set<String> schemaColumns = schema.getPhysicalColumnNames();
     String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
     DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumn);
-    Preconditions
-        .checkState(dateTimeFieldSpec != null, "No valid spec found for time column: %s in schema for table: %s",
-            timeColumn, offlineTableName);
+    Preconditions.checkState(dateTimeFieldSpec != null,
+        "No valid spec found for time column: %s in schema for table: %s", timeColumn, offlineTableName);
 
     long windowStartMs = Long.parseLong(configs.get(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY));
     long windowEndMs = Long.parseLong(configs.get(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY));
@@ -295,17 +293,15 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     Map<String, ValueAggregatorFactory.ValueAggregatorType> aggregatorTypeMap = new HashMap<>();
     for (Map.Entry<String, String> entry : aggregateConfigs.entrySet()) {
       String column = entry.getKey();
-      Preconditions
-          .checkState(schemaColumns.contains(column), "Aggregate column: %s is not a physical column in the schema",
-              column);
+      Preconditions.checkState(schemaColumns.contains(column),
+          "Aggregate column: %s is not a physical column in the schema", column);
       aggregatorTypeMap.put(column, ValueAggregatorFactory.ValueAggregatorType.valueOf(entry.getValue().toUpperCase()));
     }
 
     if (sortedColumns != null) {
       for (String column : sortedColumns) {
-        Preconditions
-            .checkState(schemaColumns.contains(column), "Sorted column: %s is not a physical column in the schema",
-                column);
+        Preconditions.checkState(schemaColumns.contains(column),
+            "Sorted column: %s is not a physical column in the schema", column);
       }
     }
     return new CollectorConfig.Builder().setCollectorType(collectorType).setAggregatorTypeMap(aggregatorTypeMap)
@@ -324,8 +320,8 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
    * windowStart inclusive and windowEnd exclusive using the time column, where time column is a INT/LONG column
    */
   private String getFilterFunctionLong(long windowStart, long windowEnd, String timeColumn) {
-    return String
-        .format("Groovy({%s < %d || %s >= %d}, %s)", timeColumn, windowStart, timeColumn, windowEnd, timeColumn);
+    return String.format("Groovy({%s < %d || %s >= %d}, %s)", timeColumn, windowStart, timeColumn, windowEnd,
+        timeColumn);
   }
 
   /**

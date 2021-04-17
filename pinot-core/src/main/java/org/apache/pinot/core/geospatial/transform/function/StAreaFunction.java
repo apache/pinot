@@ -57,8 +57,8 @@ public class StAreaFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    Preconditions
-        .checkArgument(arguments.size() == 1, "Exactly 1 argument is required for transform function: %s", getName());
+    Preconditions.checkArgument(arguments.size() == 1, "Exactly 1 argument is required for transform function: %s",
+        getName());
     TransformFunction transformFunction = arguments.get(0);
     Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
         "Argument must be single-valued for transform function: %s", getName());
@@ -149,8 +149,7 @@ public class StAreaFunction extends BaseTransformFunction {
       _firstPoint = true;
     }
 
-    private void add(Point point)
-        throws IllegalStateException {
+    private void add(Point point) throws IllegalStateException {
       checkState(!_done, "Computation of spherical excess is complete");
 
       double phi = toRadians(point.getY());

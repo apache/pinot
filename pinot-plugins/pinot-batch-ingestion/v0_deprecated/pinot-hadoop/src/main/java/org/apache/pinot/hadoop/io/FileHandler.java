@@ -59,35 +59,30 @@ public class FileHandler {
     }
 
     @Override
-    public void write(int b)
-        throws IOException {
+    public void write(int b) throws IOException {
       _out.write(b);
       _written++;
     }
 
     @Override
-    public void write(byte[] buff)
-        throws IOException {
+    public void write(byte[] buff) throws IOException {
       _out.write(buff);
       _written += buff.length;
     }
 
     @Override
-    public void write(byte[] buff, int off, int len)
-        throws IOException {
+    public void write(byte[] buff, int off, int len) throws IOException {
       _out.write(buff, off, len);
       _written += len;
     }
 
     @Override
-    public void flush()
-        throws IOException {
+    public void flush() throws IOException {
       _out.flush();
     }
 
     @Override
-    public void close()
-        throws IOException {
+    public void close() throws IOException {
       _out.close();
     }
 
@@ -96,8 +91,7 @@ public class FileHandler {
     }
   }
 
-  public void open(boolean append)
-      throws IOException {
+  public void open(boolean append) throws IOException {
     long len = 0;
     if (append) {
       len = _logFile.length();
@@ -107,21 +101,18 @@ public class FileHandler {
     _meter = new MeteredStream(bout, len);
   }
 
-  public void write(byte[] b)
-      throws IOException {
+  public void write(byte[] b) throws IOException {
     if (getSize() >= _maxSize) {
       rotate();
     }
     _meter.write(b);
   }
 
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     rotate(false);
   }
 
-  public void rotate()
-      throws IOException {
+  public void rotate() throws IOException {
     rotate(true);
   }
 
@@ -132,8 +123,7 @@ public class FileHandler {
   /**
    * Rotate the set of output files
    */
-  private synchronized void rotate(boolean isNew)
-      throws IOException {
+  private synchronized void rotate(boolean isNew) throws IOException {
     _meter.flush();
     _meter.close();
     File rotateFile = newRotateFile();

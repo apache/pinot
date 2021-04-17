@@ -29,8 +29,7 @@ import org.testng.annotations.Test;
 public class BrokerResponseNativeTest {
 
   @Test
-  public void testEmptyResponse()
-      throws IOException {
+  public void testEmptyResponse() throws IOException {
     BrokerResponseNative expected = BrokerResponseNative.EMPTY_RESULT;
     String brokerString = expected.toJsonString();
     BrokerResponseNative actual = BrokerResponseNative.fromJsonString(brokerString);
@@ -41,8 +40,7 @@ public class BrokerResponseNativeTest {
   }
 
   @Test
-  public void testNullResponse()
-      throws IOException {
+  public void testNullResponse() throws IOException {
     BrokerResponseNative expected = BrokerResponseNative.NO_TABLE_RESULT;
     String brokerString = expected.toJsonString();
     BrokerResponseNative actual = BrokerResponseNative.fromJsonString(brokerString);
@@ -53,20 +51,19 @@ public class BrokerResponseNativeTest {
   }
 
   @Test
-  public void testMultipleExceptionsResponse()
-      throws IOException {
+  public void testMultipleExceptionsResponse() throws IOException {
     BrokerResponseNative expected = BrokerResponseNative.NO_TABLE_RESULT;
     String errorMsgStr = "Some random string!";
     QueryProcessingException processingException = new QueryProcessingException(400, errorMsgStr);
     expected.addToExceptions(processingException);
     String brokerString = expected.toJsonString();
-//    System.out.println(brokerString);
+    //    System.out.println(brokerString);
     BrokerResponseNative newBrokerResponse = BrokerResponseNative.fromJsonString(brokerString);
     Assert.assertEquals(newBrokerResponse.getProcessingExceptions().get(0).getErrorCode(),
         QueryException.BROKER_RESOURCE_MISSING_ERROR.getErrorCode());
     Assert.assertEquals(newBrokerResponse.getProcessingExceptions().get(0).getMessage(),
         QueryException.BROKER_RESOURCE_MISSING_ERROR.getMessage());
-//    System.out.println(newBrokerResponse.getProcessingExceptions().get(1));
+    //    System.out.println(newBrokerResponse.getProcessingExceptions().get(1));
     Assert.assertEquals(newBrokerResponse.getProcessingExceptions().get(1).getErrorCode(), 400);
     Assert.assertEquals(newBrokerResponse.getProcessingExceptions().get(1).getMessage(), errorMsgStr);
   }

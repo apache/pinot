@@ -30,7 +30,10 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 public class PartitionFunctionFactory {
   // Enum for various partition functions to be added.
   public enum PartitionFunctionType {
-    Modulo, Murmur, ByteArray, HashCode;
+    Modulo,
+    Murmur,
+    ByteArray,
+    HashCode;
     // Add more functions here.
 
     private static final Map<String, PartitionFunctionType> VALUE_MAP = new HashMap<>();

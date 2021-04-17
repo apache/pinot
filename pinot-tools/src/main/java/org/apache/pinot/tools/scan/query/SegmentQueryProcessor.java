@@ -60,8 +60,7 @@ class SegmentQueryProcessor {
   private final String _segmentName;
   private final int _totalDocs;
 
-  SegmentQueryProcessor(File segmentDir)
-      throws Exception {
+  SegmentQueryProcessor(File segmentDir) throws Exception {
     _segmentDir = segmentDir;
 
     _immutableSegment = ImmutableSegmentLoader.load(_segmentDir, ReadMode.mmap);
@@ -88,8 +87,7 @@ class SegmentQueryProcessor {
     _immutableSegment.destroy();
   }
 
-  public ResultTable process(BrokerRequest brokerRequest)
-      throws Exception {
+  public ResultTable process(BrokerRequest brokerRequest) throws Exception {
     if (pruneSegment(brokerRequest)) {
       return null;
     }
@@ -102,15 +100,13 @@ class SegmentQueryProcessor {
     if (brokerRequest.isSetAggregationsInfo()) {
       // Aggregation only
       if (!brokerRequest.isSetGroupBy()) {
-        Aggregation aggregation =
-            new Aggregation(_immutableSegment, _metadata, filteredDocIds, brokerRequest.getAggregationsInfo(), null,
-                10);
+        Aggregation aggregation = new Aggregation(_immutableSegment, _metadata, filteredDocIds,
+            brokerRequest.getAggregationsInfo(), null, 10);
         result = aggregation.run();
       } else { // Aggregation GroupBy
         GroupBy groupBy = brokerRequest.getGroupBy();
-        Aggregation aggregation =
-            new Aggregation(_immutableSegment, _metadata, filteredDocIds, brokerRequest.getAggregationsInfo(),
-                groupBy.getExpressions(), groupBy.getTopN());
+        Aggregation aggregation = new Aggregation(_immutableSegment, _metadata, filteredDocIds,
+            brokerRequest.getAggregationsInfo(), groupBy.getExpressions(), groupBy.getTopN());
         result = aggregation.run();
       }
     } else {// Only Selection
@@ -197,8 +193,8 @@ class SegmentQueryProcessor {
     List<Integer> result = filterDocIds(childFilters.get(0), inputDocIds);
     final FilterOperator operator = filterQueryTree.getOperator();
     for (int i = 1; i < childFilters.size(); ++i) {
-//      List<Integer> childResult = operator.equals(FilterOperator.AND) ? filterDocIds(childFilters.get(i), result)
-//          : filterDocIds(childFilters.get(i), inputDocIds);
+      //      List<Integer> childResult = operator.equals(FilterOperator.AND) ? filterDocIds(childFilters.get(i), result)
+      //          : filterDocIds(childFilters.get(i), inputDocIds);
       List<Integer> childResult = filterDocIds(childFilters.get(i), inputDocIds);
       result = combine(result, childResult, operator);
     }

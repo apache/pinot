@@ -45,15 +45,13 @@ public class SegmentMetadataImplTest {
   private File segmentDirectory;
 
   @BeforeMethod
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     final String filePath =
         TestUtils.getFileFromResourceUrl(SegmentMetadataImplTest.class.getClassLoader().getResource(AVRO_DATA));
 
     // intentionally changed this to TimeUnit.Hours to make it non-default for testing
-    final SegmentGeneratorConfig config = SegmentTestUtils
-        .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch", TimeUnit.HOURS,
-            "testTable");
+    final SegmentGeneratorConfig config = SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(
+        new File(filePath), INDEX_DIR, "daysSinceEpoch", TimeUnit.HOURS, "testTable");
     config.setSegmentNamePostfix("1");
     // The segment generation code in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable
@@ -74,8 +72,7 @@ public class SegmentMetadataImplTest {
   }
 
   @Test
-  public void testToJson()
-      throws IOException {
+  public void testToJson() throws IOException {
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(segmentDirectory);
     Assert.assertNotNull(metadata);
 

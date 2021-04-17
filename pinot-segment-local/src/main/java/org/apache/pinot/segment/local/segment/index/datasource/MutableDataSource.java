@@ -47,9 +47,11 @@ public class MutableDataSource extends BaseDataSource {
       @Nullable TextIndexReader textIndex, boolean enableFST, @Nullable JsonIndexReader jsonIndex,
       @Nullable H3IndexReader h3Index, @Nullable BloomFilterReader bloomFilter,
       @Nullable NullValueVectorReader nullValueVector) {
-    super(new MutableDataSourceMetadata(fieldSpec, numDocs, numValues, maxNumValuesPerMVEntry, partitionFunction,
-            partitions, minValue, maxValue), forwardIndex, dictionary, invertedIndex, rangeIndex, textIndex, null,
-        jsonIndex, h3Index, bloomFilter, nullValueVector);
+    super(
+        new MutableDataSourceMetadata(fieldSpec, numDocs, numValues, maxNumValuesPerMVEntry, partitionFunction,
+            partitions, minValue, maxValue),
+        forwardIndex, dictionary, invertedIndex, rangeIndex, textIndex, null, jsonIndex, h3Index, bloomFilter,
+        nullValueVector);
     _enableFST = enableFST;
   }
 

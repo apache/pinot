@@ -128,8 +128,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     buildSegment();
@@ -138,8 +137,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
     _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
   }
 
-  private void buildSegment()
-      throws Exception {
+  private void buildSegment() throws Exception {
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
       int numValues = RANDOM.nextInt(MAX_NUM_VALUES_TO_PRE_AGGREGATE) + 1;
@@ -223,8 +221,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testInnerSegmentAggregation()
-      throws Exception {
+  public void testInnerSegmentAggregation() throws Exception {
     AggregationOperator aggregationOperator = getOperatorForPqlQuery(getAggregationQuery());
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     List<Object> aggregationResult = resultsBlock.getAggregationResult();
@@ -285,8 +282,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testInterSegmentAggregation()
-      throws Exception {
+  public void testInterSegmentAggregation() throws Exception {
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(getAggregationQuery());
     List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
     assertNotNull(aggregationResults);
@@ -384,8 +380,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testInnerSegmentSVGroupBy()
-      throws Exception {
+  public void testInnerSegmentSVGroupBy() throws Exception {
     AggregationGroupByOperator groupByOperator = getOperatorForPqlQuery(getSVGroupByQuery());
     IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
     AggregationGroupByResult groupByResult = resultsBlock.getAggregationGroupByResult();
@@ -451,8 +446,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testInterSegmentSVGroupBy()
-      throws Exception {
+  public void testInterSegmentSVGroupBy() throws Exception {
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(getSVGroupByQuery());
     List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
     assertNotNull(aggregationResults);
@@ -580,8 +574,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testInnerSegmentMVGroupBy()
-      throws Exception {
+  public void testInnerSegmentMVGroupBy() throws Exception {
     AggregationGroupByOperator groupByOperator = getOperatorForPqlQuery(getMVGroupByQuery());
     IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
     AggregationGroupByResult groupByResult = resultsBlock.getAggregationGroupByResult();
@@ -656,8 +649,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testInterSegmentMVGroupBy()
-      throws Exception {
+  public void testInterSegmentMVGroupBy() throws Exception {
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(getMVGroupByQuery());
     List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
     assertNotNull(aggregationResults);

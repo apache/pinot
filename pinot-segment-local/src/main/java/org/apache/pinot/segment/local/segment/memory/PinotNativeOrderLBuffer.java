@@ -36,8 +36,7 @@ public class PinotNativeOrderLBuffer extends BasePinotLBuffer {
     return new PinotNativeOrderLBuffer(buffer, true, false);
   }
 
-  static PinotNativeOrderLBuffer loadFile(File file, long offset, long size)
-      throws IOException {
+  static PinotNativeOrderLBuffer loadFile(File file, long offset, long size) throws IOException {
     PinotNativeOrderLBuffer buffer = allocateDirect(size);
     buffer.readFrom(0, file, offset, size);
     return buffer;

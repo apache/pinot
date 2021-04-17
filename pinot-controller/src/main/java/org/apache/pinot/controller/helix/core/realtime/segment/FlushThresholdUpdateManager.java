@@ -44,8 +44,8 @@ public class FlushThresholdUpdateManager {
       _flushThresholdUpdaterMap.remove(realtimeTableName);
       return new DefaultFlushThresholdUpdater(flushThresholdRows);
     } else {
-      return _flushThresholdUpdaterMap
-          .computeIfAbsent(realtimeTableName, k -> new SegmentSizeBasedFlushThresholdUpdater());
+      return _flushThresholdUpdaterMap.computeIfAbsent(realtimeTableName,
+          k -> new SegmentSizeBasedFlushThresholdUpdater());
     }
   }
 

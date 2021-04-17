@@ -30,28 +30,25 @@ public class MultiplicationTransformFunctionTest extends BaseTransformFunctionTe
 
   @Test
   public void testMultiplicationTransformFunction() {
-    ExpressionContext expression = RequestContextUtils.getExpression(String
-        .format("mult(%s,%s,%s,%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN, FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN,
-            STRING_SV_COLUMN));
+    ExpressionContext expression = RequestContextUtils.getExpression(String.format("mult(%s,%s,%s,%s,%s)",
+        INT_SV_COLUMN, LONG_SV_COLUMN, FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN, STRING_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof MultiplicationTransformFunction);
     Assert.assertEquals(transformFunction.getName(), MultiplicationTransformFunction.FUNCTION_NAME);
     double[] expectedValues = new double[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] =
-          (double) _intSVValues[i] * (double) _longSVValues[i] * (double) _floatSVValues[i] * _doubleSVValues[i]
-              * Double.parseDouble(_stringSVValues[i]);
+      expectedValues[i] = (double) _intSVValues[i] * (double) _longSVValues[i] * (double) _floatSVValues[i]
+          * _doubleSVValues[i] * Double.parseDouble(_stringSVValues[i]);
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = RequestContextUtils.getExpression(String
-        .format("mult(mult(12,%s),%s,mult(mult(%s,%s),0.34,%s),%s)", STRING_SV_COLUMN, DOUBLE_SV_COLUMN,
-            FLOAT_SV_COLUMN, LONG_SV_COLUMN, INT_SV_COLUMN, DOUBLE_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("mult(mult(12,%s),%s,mult(mult(%s,%s),0.34,%s),%s)",
+        STRING_SV_COLUMN, DOUBLE_SV_COLUMN, FLOAT_SV_COLUMN, LONG_SV_COLUMN, INT_SV_COLUMN, DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof MultiplicationTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = ((12d * Double.parseDouble(_stringSVValues[i])) * _doubleSVValues[i] * (
-          ((double) _floatSVValues[i] * (double) _longSVValues[i]) * 0.34 * (double) _intSVValues[i])
+      expectedValues[i] = ((12d * Double.parseDouble(_stringSVValues[i])) * _doubleSVValues[i]
+          * (((double) _floatSVValues[i] * (double) _longSVValues[i]) * 0.34 * (double) _intSVValues[i])
           * _doubleSVValues[i]);
     }
   }
@@ -64,7 +61,7 @@ public class MultiplicationTransformFunctionTest extends BaseTransformFunctionTe
 
   @DataProvider(name = "testIllegalArguments")
   public Object[][] testIllegalArguments() {
-    return new Object[][]{new Object[]{String.format("mult(%s)", INT_SV_COLUMN)}, new Object[]{String.format(
-        "mult(%s, %s)", LONG_SV_COLUMN, INT_MV_COLUMN)}};
+    return new Object[][]{new Object[]{String.format("mult(%s)", INT_SV_COLUMN)}, new Object[]{String
+        .format("mult(%s, %s)", LONG_SV_COLUMN, INT_MV_COLUMN)}};
   }
 }

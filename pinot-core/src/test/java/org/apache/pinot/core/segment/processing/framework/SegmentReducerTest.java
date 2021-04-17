@@ -59,14 +59,12 @@ public class SegmentReducerTest {
   private File _baseDir;
   private File _partDir;
   private Schema _pinotSchema;
-  private final List<Object[]> _rawData1597795200000L = Lists
-      .newArrayList(new Object[]{"abc", 4000, 1597795200000L}, new Object[]{"abc", 3000, 1597795200000L},
-          new Object[]{"pqr", 1000, 1597795200000L}, new Object[]{"xyz", 4000, 1597795200000L},
-          new Object[]{"pqr", 1000, 1597795200000L});
+  private final List<Object[]> _rawData1597795200000L = Lists.newArrayList(new Object[]{"abc", 4000, 1597795200000L},
+      new Object[]{"abc", 3000, 1597795200000L}, new Object[]{"pqr", 1000, 1597795200000L},
+      new Object[]{"xyz", 4000, 1597795200000L}, new Object[]{"pqr", 1000, 1597795200000L});
 
   @BeforeClass
-  public void before()
-      throws IOException {
+  public void before() throws IOException {
     _baseDir = new File(FileUtils.getTempDirectory(), "segment_reducer_test_" + System.currentTimeMillis());
     FileUtils.deleteQuietly(_baseDir);
     assertTrue(_baseDir.mkdirs());
@@ -102,8 +100,7 @@ public class SegmentReducerTest {
 
   @Test(dataProvider = "segmentReducerDataProvider")
   public void segmentReducerTest(String reducerId, SegmentReducerConfig reducerConfig, Set<String> expectedFileNames,
-      List<Object[]> expectedRecords, Comparator comparator)
-      throws Exception {
+      List<Object[]> expectedRecords, Comparator comparator) throws Exception {
 
     File reducerOutputDir = new File(_baseDir, "reducer_output");
     FileUtils.deleteQuietly(reducerOutputDir);
@@ -173,21 +170,18 @@ public class SegmentReducerTest {
     SegmentReducerConfig config3 = new SegmentReducerConfig(_pinotSchema,
         new CollectorConfig.Builder().setCollectorType(CollectorFactory.CollectorType.ROLLUP).build(), 100);
     HashSet<String> expectedFileNames3 = Sets.newHashSet(SegmentReducer.createReducerOutputFileName(reducerId, 0));
-    List<Object> rollupRows3 = Lists
-        .newArrayList(new Object[]{"abc", 7000, 1597795200000L}, new Object[]{"pqr", 2000, 1597795200000L},
-            new Object[]{"xyz", 4000, 1597795200000L});
+    List<Object> rollupRows3 = Lists.newArrayList(new Object[]{"abc", 7000, 1597795200000L},
+        new Object[]{"pqr", 2000, 1597795200000L}, new Object[]{"xyz", 4000, 1597795200000L});
     inputs.add(new Object[]{reducerId, config3, expectedFileNames3, rollupRows3, comparator});
 
     // ROLLUP MAX
     Map<String, ValueAggregatorFactory.ValueAggregatorType> valueAggregators = new HashMap<>();
     valueAggregators.put("clicks", ValueAggregatorFactory.ValueAggregatorType.MAX);
-    SegmentReducerConfig config4 = new SegmentReducerConfig(_pinotSchema,
-        new CollectorConfig.Builder().setCollectorType(CollectorFactory.CollectorType.ROLLUP)
-            .setAggregatorTypeMap(valueAggregators).build(), 100);
+    SegmentReducerConfig config4 = new SegmentReducerConfig(_pinotSchema, new CollectorConfig.Builder()
+        .setCollectorType(CollectorFactory.CollectorType.ROLLUP).setAggregatorTypeMap(valueAggregators).build(), 100);
     HashSet<String> expectedFileNames4 = Sets.newHashSet(SegmentReducer.createReducerOutputFileName(reducerId, 0));
-    List<Object> rollupRows4 = Lists
-        .newArrayList(new Object[]{"abc", 4000, 1597795200000L}, new Object[]{"pqr", 1000, 1597795200000L},
-            new Object[]{"xyz", 4000, 1597795200000L});
+    List<Object> rollupRows4 = Lists.newArrayList(new Object[]{"abc", 4000, 1597795200000L},
+        new Object[]{"pqr", 1000, 1597795200000L}, new Object[]{"xyz", 4000, 1597795200000L});
     inputs.add(new Object[]{reducerId, config4, expectedFileNames4, rollupRows4, comparator});
 
     // CONCAT and sort
@@ -199,11 +193,11 @@ public class SegmentReducerTest {
     // ROLLUP and sort
     SegmentReducerConfig config7 = new SegmentReducerConfig(_pinotSchema,
         new CollectorConfig.Builder().setCollectorType(CollectorFactory.CollectorType.ROLLUP)
-            .setSortOrder(Lists.newArrayList("campaign", "clicks")).build(), 100);
+            .setSortOrder(Lists.newArrayList("campaign", "clicks")).build(),
+        100);
     HashSet<String> expectedFileNames7 = Sets.newHashSet(SegmentReducer.createReducerOutputFileName(reducerId, 0));
-    List<Object> rollupRows7 = Lists
-        .newArrayList(new Object[]{"abc", 7000, 1597795200000L}, new Object[]{"pqr", 2000, 1597795200000L},
-            new Object[]{"xyz", 4000, 1597795200000L});
+    List<Object> rollupRows7 = Lists.newArrayList(new Object[]{"abc", 7000, 1597795200000L},
+        new Object[]{"pqr", 2000, 1597795200000L}, new Object[]{"xyz", 4000, 1597795200000L});
     inputs.add(new Object[]{reducerId, config7, expectedFileNames7, rollupRows7, null});
 
     return inputs.toArray(new Object[0][]);

@@ -180,8 +180,8 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     // 1. latest segment could get deleted in the middle of repair by RealtimeSegmentValidationManager
     // 2. for a brand new segment, if this code kicks in after new metadata is created but ideal state entry is not yet created (between step 2 and 3),
     // the latest segment metadata could get marked for deletion
-    if (System.currentTimeMillis() - realtimeSegmentZKMetadata.getCreationTime()
-        <= OLD_LLC_SEGMENTS_RETENTION_IN_MILLIS) {
+    if (System.currentTimeMillis()
+        - realtimeSegmentZKMetadata.getCreationTime() <= OLD_LLC_SEGMENTS_RETENTION_IN_MILLIS) {
       return false;
     }
     Map<String, String> stateMap = idealState.getInstanceStateMap(segmentName);
@@ -244,8 +244,8 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         }
 
         // Write back to the lineage entry
-        if (SegmentLineageAccessHelper
-            .writeSegmentLineage(_pinotHelixResourceManager.getPropertyStore(), segmentLineage, expectedVersion)) {
+        if (SegmentLineageAccessHelper.writeSegmentLineage(_pinotHelixResourceManager.getPropertyStore(),
+            segmentLineage, expectedVersion)) {
           // Delete segments based on the segment lineage
           _pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentsToDelete);
           return true;

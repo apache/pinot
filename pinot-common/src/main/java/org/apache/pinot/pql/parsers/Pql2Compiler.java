@@ -78,8 +78,7 @@ public class Pql2Compiler implements AbstractCompiler {
    * @return BrokerRequest
    */
   @Override
-  public BrokerRequest compileToBrokerRequest(String expression)
-      throws Pql2CompilationException {
+  public BrokerRequest compileToBrokerRequest(String expression) throws Pql2CompilationException {
     try {
       //
       CharStream charStream = new ANTLRInputStream(expression);

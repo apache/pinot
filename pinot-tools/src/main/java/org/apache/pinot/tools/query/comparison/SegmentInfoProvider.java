@@ -55,8 +55,7 @@ public class SegmentInfoProvider {
    * @param segmentDirName Name of directory containing tarred/untarred segments.
    * @throws Exception
    */
-  public SegmentInfoProvider(String segmentDirName)
-      throws Exception {
+  public SegmentInfoProvider(String segmentDirName) throws Exception {
     Set<String> uniqueMetrics = new HashSet<>();
     Set<String> uniqueSingleValueDimensions = new HashSet<>();
     Map<String, Set<Object>> uniqueSingleValueDimensionValues = new HashMap<>();
@@ -88,8 +87,7 @@ public class SegmentInfoProvider {
    * @throws Exception
    */
   private void readOneSegment(File segmentFile, Set<String> uniqueMetrics, Set<String> uniqueSingleValueDimensions,
-      Map<String, Set<Object>> singleValueDimensionValuesMap)
-      throws Exception {
+      Map<String, Set<Object>> singleValueDimensionValuesMap) throws Exception {
     // Get segment directory from segment file (decompress if necessary).
     File segmentDir;
     File tmpDir = null;

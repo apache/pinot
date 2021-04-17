@@ -83,8 +83,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
 
   @BeforeClass
   @Override
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     System.out.println(String.format(
         "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableSplitCommit: %s, enableLeadControllerResource: %s",
         RANDOM_SEED, _isDirectAlloc, _isConsumerDirConfigured, _enableSplitCommit, _enableLeadControllerResource));
@@ -100,15 +99,13 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     super.setUp();
   }
 
-
   @Override
   public void startServer() {
     startServers(NUM_SERVERS);
   }
 
   @Override
-  public void addTableConfig(TableConfig tableConfig)
-      throws IOException {
+  public void addTableConfig(TableConfig tableConfig) throws IOException {
     SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig =
         new SegmentsValidationAndRetentionConfig();
     CompletionConfig completionConfig = new CompletionConfig("DOWNLOAD");
@@ -121,7 +118,6 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
 
     sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
   }
-
 
   @Override
   public void startController() {
@@ -158,7 +154,8 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     // Set the segment deep store uri.
     configuration.setProperty("pinot.server.instance.segment.store.uri", "mockfs://" + getHelixClusterName());
     // For setting the HDFS segment fetcher.
-    configuration.setProperty(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY + ".protocols", "file,http");
+    configuration.setProperty(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY + ".protocols",
+        "file,http");
     if (_isConsumerDirConfigured) {
       configuration.setProperty(CommonConstants.Server.CONFIG_OF_CONSUMER_DIR, CONSUMER_DIRECTORY);
     }
@@ -212,24 +209,22 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
 
   @Test
   public void testAllSegmentsAreOnlineOrConsuming() {
-    ExternalView externalView =
-        HelixHelper.getExternalViewForResource(_helixAdmin, getHelixClusterName(),
-            TableNameBuilder.REALTIME.tableNameWithType(getTableName()));
+    ExternalView externalView = HelixHelper.getExternalViewForResource(_helixAdmin, getHelixClusterName(),
+        TableNameBuilder.REALTIME.tableNameWithType(getTableName()));
     Assert.assertEquals("2", externalView.getReplicas());
     // Verify for each segment e, the state of e in its 2 hosting servers is either ONLINE or CONSUMING
-    for(String segment : externalView.getPartitionSet()) {
+    for (String segment : externalView.getPartitionSet()) {
       Map<String, String> instanceToStateMap = externalView.getStateMap(segment);
       Assert.assertEquals(2, instanceToStateMap.size());
       for (Map.Entry<String, String> instanceState : instanceToStateMap.entrySet()) {
-        Assert.assertTrue("ONLINE".equalsIgnoreCase(instanceState.getValue()) || "CONSUMING"
-            .equalsIgnoreCase(instanceState.getValue()));
+        Assert.assertTrue("ONLINE".equalsIgnoreCase(instanceState.getValue())
+            || "CONSUMING".equalsIgnoreCase(instanceState.getValue()));
       }
     }
   }
 
   @Test(expectedExceptions = IOException.class)
-  public void testAddHLCTableShouldFail()
-      throws IOException {
+  public void testAddHLCTableShouldFail() throws IOException {
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
         .setStreamConfigs(Collections.singletonMap("stream.kafka.consumer.type", "HIGHLEVEL")).build();
     sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
@@ -239,6 +234,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
   public static class MockPinotFS extends PinotFS {
     LocalPinotFS _localPinotFS = new LocalPinotFS();
     File _basePath;
+
     @Override
     public void init(PinotConfiguration config) {
       _localPinotFS.init(config);
@@ -246,8 +242,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     }
 
     @Override
-    public boolean mkdir(URI uri)
-        throws IOException {
+    public boolean mkdir(URI uri) throws IOException {
       try {
         return _localPinotFS.mkdir(new URI(_basePath + uri.getPath()));
       } catch (URISyntaxException e) {
@@ -256,8 +251,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     }
 
     @Override
-    public boolean delete(URI segmentUri, boolean forceDelete)
-        throws IOException {
+    public boolean delete(URI segmentUri, boolean forceDelete) throws IOException {
       try {
         return _localPinotFS.delete(new URI(_basePath + segmentUri.getPath()), forceDelete);
       } catch (URISyntaxException e) {
@@ -266,8 +260,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     }
 
     @Override
-    public boolean doMove(URI srcUri, URI dstUri)
-        throws IOException {
+    public boolean doMove(URI srcUri, URI dstUri) throws IOException {
       try {
         LOGGER.warn("Moving from {} to {}", srcUri, dstUri);
         return _localPinotFS.doMove(new URI(_basePath + srcUri.getPath()), new URI(_basePath + dstUri.getPath()));
@@ -277,8 +270,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     }
 
     @Override
-    public boolean copy(URI srcUri, URI dstUri)
-        throws IOException {
+    public boolean copy(URI srcUri, URI dstUri) throws IOException {
       try {
         return _localPinotFS.copy(new URI(_basePath + srcUri.getPath()), new URI(_basePath + dstUri.getPath()));
       } catch (URISyntaxException e) {
@@ -287,8 +279,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     }
 
     @Override
-    public boolean exists(URI fileUri)
-        throws IOException {
+    public boolean exists(URI fileUri) throws IOException {
       try {
         return _localPinotFS.exists(new URI(_basePath + fileUri.getPath()));
       } catch (URISyntaxException e) {
@@ -297,8 +288,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     }
 
     @Override
-    public long length(URI fileUri)
-        throws IOException {
+    public long length(URI fileUri) throws IOException {
       try {
         return _localPinotFS.length(new URI(_basePath + fileUri.getPath()));
       } catch (URISyntaxException e) {
@@ -307,8 +297,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     }
 
     @Override
-    public String[] listFiles(URI fileUri, boolean recursive)
-        throws IOException {
+    public String[] listFiles(URI fileUri, boolean recursive) throws IOException {
       try {
         return _localPinotFS.listFiles(new URI(_basePath + fileUri.getPath()), recursive);
       } catch (URISyntaxException e) {
@@ -317,14 +306,12 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     }
 
     @Override
-    public void copyToLocalFile(URI srcUri, File dstFile)
-        throws Exception {
+    public void copyToLocalFile(URI srcUri, File dstFile) throws Exception {
       _localPinotFS.copyToLocalFile(new URI(_basePath + srcUri.getPath()), dstFile);
     }
 
     @Override
-    public void copyFromLocalFile(File srcFile, URI dstUri)
-        throws Exception {
+    public void copyFromLocalFile(File srcFile, URI dstUri) throws Exception {
       // Inject failures for segments whose seq number mod 5 is 0.
       if (new LLCSegmentName(srcFile.getName()).getSequenceNumber() % UPLOAD_FAILURE_MOD == 0) {
         throw new IllegalArgumentException(srcFile.getAbsolutePath());
@@ -337,8 +324,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     }
 
     @Override
-    public boolean isDirectory(URI uri)
-        throws IOException {
+    public boolean isDirectory(URI uri) throws IOException {
       try {
         return _localPinotFS.isDirectory(new URI(_basePath + uri.getPath()));
       } catch (URISyntaxException e) {
@@ -347,8 +333,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     }
 
     @Override
-    public long lastModified(URI uri)
-        throws IOException {
+    public long lastModified(URI uri) throws IOException {
       try {
         return _localPinotFS.lastModified(new URI(_basePath + uri.getPath()));
       } catch (URISyntaxException e) {
@@ -357,8 +342,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     }
 
     @Override
-    public boolean touch(URI uri)
-        throws IOException {
+    public boolean touch(URI uri) throws IOException {
       try {
         return _localPinotFS.touch(new URI(_basePath + uri.getPath()));
       } catch (URISyntaxException e) {
@@ -367,8 +351,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     }
 
     @Override
-    public InputStream open(URI uri)
-        throws IOException {
+    public InputStream open(URI uri) throws IOException {
       try {
         return _localPinotFS.open(new URI(_basePath + uri.getPath()));
       } catch (URISyntaxException e) {

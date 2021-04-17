@@ -237,7 +237,8 @@ public class CommonConstants {
         "pinot.server.instance.realtime.alloc.offheap.direct";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.server.storage.factory";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.server.crypter";
-    public static final String CONFIG_OF_VALUE_PRUNER_IN_PREDICATE_THRESHOLD = "pinot.server.query.executor.pruner.columnvaluesegmentpruner.inpredicate.threshold";
+    public static final String CONFIG_OF_VALUE_PRUNER_IN_PREDICATE_THRESHOLD =
+        "pinot.server.query.executor.pruner.columnvaluesegmentpruner.inpredicate.threshold";
     public static final int DEFAULT_VALUE_PRUNER_IN_PREDICATE_THRESHOLD = 10;
 
     /**
@@ -451,7 +452,8 @@ public class CommonConstants {
     public static final String METADATA_URI_FOR_PEER_DOWNLOAD = "";
 
     public enum SegmentType {
-      OFFLINE, REALTIME
+      OFFLINE,
+      REALTIME
     }
 
     public static class AssignmentStrategy {

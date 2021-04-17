@@ -106,8 +106,8 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
     }
     _mainTransformFunction = firstArgument;
 
-    _dateTimeTransformer = DateTimeTransformerFactory
-        .getDateTimeTransformer(((LiteralTransformFunction) arguments.get(1)).getLiteral(),
+    _dateTimeTransformer =
+        DateTimeTransformerFactory.getDateTimeTransformer(((LiteralTransformFunction) arguments.get(1)).getLiteral(),
             ((LiteralTransformFunction) arguments.get(2)).getLiteral(),
             ((LiteralTransformFunction) arguments.get(3)).getLiteral());
     if (_dateTimeTransformer instanceof EpochToEpochTransformer
@@ -133,12 +133,12 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
       int length = projectionBlock.getNumDocs();
       if (_dateTimeTransformer instanceof EpochToEpochTransformer) {
         EpochToEpochTransformer dateTimeTransformer = (EpochToEpochTransformer) _dateTimeTransformer;
-        dateTimeTransformer
-            .transform(_mainTransformFunction.transformToLongValuesSV(projectionBlock), _longOutputTimes, length);
+        dateTimeTransformer.transform(_mainTransformFunction.transformToLongValuesSV(projectionBlock), _longOutputTimes,
+            length);
       } else {
         SDFToEpochTransformer dateTimeTransformer = (SDFToEpochTransformer) _dateTimeTransformer;
-        dateTimeTransformer
-            .transform(_mainTransformFunction.transformToStringValuesSV(projectionBlock), _longOutputTimes, length);
+        dateTimeTransformer.transform(_mainTransformFunction.transformToStringValuesSV(projectionBlock),
+            _longOutputTimes, length);
       }
       return _longOutputTimes;
     } else {
@@ -156,12 +156,12 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
       int length = projectionBlock.getNumDocs();
       if (_dateTimeTransformer instanceof EpochToSDFTransformer) {
         EpochToSDFTransformer dateTimeTransformer = (EpochToSDFTransformer) _dateTimeTransformer;
-        dateTimeTransformer
-            .transform(_mainTransformFunction.transformToLongValuesSV(projectionBlock), _stringOutputTimes, length);
+        dateTimeTransformer.transform(_mainTransformFunction.transformToLongValuesSV(projectionBlock),
+            _stringOutputTimes, length);
       } else {
         SDFToSDFTransformer dateTimeTransformer = (SDFToSDFTransformer) _dateTimeTransformer;
-        dateTimeTransformer
-            .transform(_mainTransformFunction.transformToStringValuesSV(projectionBlock), _stringOutputTimes, length);
+        dateTimeTransformer.transform(_mainTransformFunction.transformToStringValuesSV(projectionBlock),
+            _stringOutputTimes, length);
       }
       return _stringOutputTimes;
     } else {

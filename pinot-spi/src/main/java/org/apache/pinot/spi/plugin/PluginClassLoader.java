@@ -55,8 +55,7 @@ public class PluginClassLoader extends URLClassLoader {
   }
 
   @Override
-  protected Class<?> loadClass(String name, boolean resolve)
-      throws ClassNotFoundException {
+  protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
     // has the class loaded already?
     Class<?> loadedClass = findLoadedClass(name);
     if (loadedClass == null) {
@@ -81,15 +80,14 @@ public class PluginClassLoader extends URLClassLoader {
       }
     }
 
-    if (resolve) {      // marked to resolve
+    if (resolve) { // marked to resolve
       resolveClass(loadedClass);
     }
     return loadedClass;
   }
 
   @Override
-  public Enumeration<URL> getResources(String name)
-      throws IOException {
+  public Enumeration<URL> getResources(String name) throws IOException {
     List<URL> allRes = new LinkedList<>();
 
     // load resources from sys class loader

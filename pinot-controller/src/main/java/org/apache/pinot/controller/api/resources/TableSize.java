@@ -62,11 +62,15 @@ public class TableSize {
   @GET
   @Path("/tables/{tableName}/size")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Read table sizes", notes = "Get table size details. Table size is the size of untarred segments including replication")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Table not found"), @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiOperation(value = "Read table sizes",
+      notes = "Get table size details. Table size is the size of untarred segments including replication")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404,
+      message = "Table not found"), @ApiResponse(code = 500, message = "Internal server error")})
   public TableSizeReader.TableSizeDetails getTableSize(
-      @ApiParam(value = "Table name without type", required = true, example = "myTable | myTable_OFFLINE") @PathParam("tableName") String tableName,
-      @ApiParam(value = "Get detailed information", required = false) @DefaultValue("true") @QueryParam("detailed") boolean detailed) {
+      @ApiParam(value = "Table name without type", required = true,
+          example = "myTable | myTable_OFFLINE") @PathParam("tableName") String tableName,
+      @ApiParam(value = "Get detailed information",
+          required = false) @DefaultValue("true") @QueryParam("detailed") boolean detailed) {
     TableSizeReader tableSizeReader =
         new TableSizeReader(_executor, _connectionManager, _controllerMetrics, _pinotHelixResourceManager);
     TableSizeReader.TableSizeDetails tableSizeDetails = null;

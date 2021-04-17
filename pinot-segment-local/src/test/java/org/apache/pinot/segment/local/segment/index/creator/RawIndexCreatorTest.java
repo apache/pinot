@@ -79,8 +79,7 @@ public class RawIndexCreatorTest {
    * @throws Exception
    */
   @BeforeClass
-  public void setup()
-      throws Exception {
+  public void setup() throws Exception {
     Schema schema = new Schema();
     schema.addField(new DimensionFieldSpec(INT_COLUMN, DataType.INT, true));
     schema.addField(new DimensionFieldSpec(LONG_COLUMN, DataType.LONG, true));
@@ -108,8 +107,7 @@ public class RawIndexCreatorTest {
    * @throws Exception
    */
   @Test
-  public void testIntRawIndexCreator()
-      throws Exception {
+  public void testIntRawIndexCreator() throws Exception {
     testFixedLengthRawIndexCreator(INT_COLUMN, DataType.INT);
   }
 
@@ -119,8 +117,7 @@ public class RawIndexCreatorTest {
    * @throws Exception
    */
   @Test
-  public void testLongRawIndexCreator()
-      throws Exception {
+  public void testLongRawIndexCreator() throws Exception {
     testFixedLengthRawIndexCreator(LONG_COLUMN, DataType.LONG);
   }
 
@@ -130,8 +127,7 @@ public class RawIndexCreatorTest {
    * @throws Exception
    */
   @Test
-  public void testFloatRawIndexCreator()
-      throws Exception {
+  public void testFloatRawIndexCreator() throws Exception {
     testFixedLengthRawIndexCreator(FLOAT_COLUMN, DataType.FLOAT);
   }
 
@@ -141,8 +137,7 @@ public class RawIndexCreatorTest {
    * @throws Exception
    */
   @Test
-  public void testDoubleRawIndexCreator()
-      throws Exception {
+  public void testDoubleRawIndexCreator() throws Exception {
     testFixedLengthRawIndexCreator(DOUBLE_COLUMN, DataType.DOUBLE);
   }
 
@@ -152,11 +147,11 @@ public class RawIndexCreatorTest {
    * @throws Exception
    */
   @Test
-  public void testStringRawIndexCreator()
-      throws Exception {
+  public void testStringRawIndexCreator() throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(STRING_COLUMN);
-    try (VarByteChunkSVForwardIndexReader rawIndexReader = new VarByteChunkSVForwardIndexReader(indexBuffer,
-        DataType.STRING);
+    try (
+        VarByteChunkSVForwardIndexReader rawIndexReader =
+            new VarByteChunkSVForwardIndexReader(indexBuffer, DataType.STRING);
         BaseChunkSVForwardIndexReader.ChunkReaderContext readerContext = rawIndexReader.createContext()) {
       _recordReader.rewind();
       for (int row = 0; row < NUM_ROWS; row++) {
@@ -173,11 +168,12 @@ public class RawIndexCreatorTest {
    * @param dataType Data type of the column
    * @throws Exception
    */
-  private void testFixedLengthRawIndexCreator(String column, DataType dataType)
-      throws Exception {
+  private void testFixedLengthRawIndexCreator(String column, DataType dataType) throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(column);
-    try (FixedByteChunkSVForwardIndexReader rawIndexReader = new FixedByteChunkSVForwardIndexReader(indexBuffer,
-        dataType); BaseChunkSVForwardIndexReader.ChunkReaderContext readerContext = rawIndexReader.createContext()) {
+    try (
+        FixedByteChunkSVForwardIndexReader rawIndexReader =
+            new FixedByteChunkSVForwardIndexReader(indexBuffer, dataType);
+        BaseChunkSVForwardIndexReader.ChunkReaderContext readerContext = rawIndexReader.createContext()) {
       _recordReader.rewind();
       for (int row = 0; row < NUM_ROWS; row++) {
         GenericRow expectedRow = _recordReader.next();
@@ -192,8 +188,7 @@ public class RawIndexCreatorTest {
    * @param column Column name for which to get the index file name
    * @return Name of index file for the given column name
    */
-  private PinotDataBuffer getIndexBufferForColumn(String column)
-      throws IOException {
+  private PinotDataBuffer getIndexBufferForColumn(String column) throws IOException {
     return _segmentReader.getIndexFor(column, ColumnIndexType.FORWARD_INDEX);
   }
 
@@ -203,8 +198,7 @@ public class RawIndexCreatorTest {
    * @return Array of string values for the rows in the generated index.
    * @throws Exception
    */
-  private RecordReader buildIndex(TableConfig tableConfig, Schema schema)
-      throws Exception {
+  private RecordReader buildIndex(TableConfig tableConfig, Schema schema) throws Exception {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setRawIndexCreationColumns(schema.getDimensionNames());
 
@@ -254,8 +248,8 @@ public class RawIndexCreatorTest {
       case DOUBLE:
         return random.nextDouble();
       case STRING:
-        return StringUtil
-            .sanitizeStringValue(RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH)), Integer.MAX_VALUE);
+        return StringUtil.sanitizeStringValue(RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH)),
+            Integer.MAX_VALUE);
       default:
         throw new UnsupportedOperationException("Unsupported data type for random value generator: " + dataType);
     }

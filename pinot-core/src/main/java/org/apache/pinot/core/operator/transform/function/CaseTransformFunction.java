@@ -383,8 +383,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
             ArrayCopyUtils.copy(transformFunction.transformToFloatValuesSV(projectionBlock), evalDoubles, blockNumDocs);
             break;
           default:
-            throw new IllegalStateException(String
-                .format("Cannot convert result type [%s] to [DOUBLE] for transform function [%s]", dataType,
+            throw new IllegalStateException(
+                String.format("Cannot convert result type [%s] to [DOUBLE] for transform function [%s]", dataType,
                     transformFunction));
         }
       }
@@ -426,15 +426,15 @@ public class CaseTransformFunction extends BaseTransformFunction {
             ArrayCopyUtils.copy(transformFunction.transformToFloatValuesSV(projectionBlock), evalStrings, blockNumDocs);
             break;
           case DOUBLE:
-            ArrayCopyUtils
-                .copy(transformFunction.transformToDoubleValuesSV(projectionBlock), evalStrings, blockNumDocs);
+            ArrayCopyUtils.copy(transformFunction.transformToDoubleValuesSV(projectionBlock), evalStrings,
+                blockNumDocs);
             break;
           case BYTES:
             ArrayCopyUtils.copy(transformFunction.transformToBytesValuesSV(projectionBlock), evalStrings, blockNumDocs);
             break;
           default:
-            throw new IllegalStateException(String
-                .format("Cannot convert result type [%s] to [STRING] for transform function [%s]", dataType,
+            throw new IllegalStateException(
+                String.format("Cannot convert result type [%s] to [STRING] for transform function [%s]", dataType,
                     transformFunction));
         }
       }

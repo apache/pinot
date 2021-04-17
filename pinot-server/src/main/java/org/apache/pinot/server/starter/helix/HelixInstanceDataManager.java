@@ -88,7 +88,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     _serverMetrics = serverMetrics;
     _authToken = config.getProperty(CommonConstants.Server.CONFIG_OF_AUTH_TOKEN);
     _segmentUploader = new PinotFSSegmentUploader(_instanceDataManagerConfig.getSegmentStoreUri(),
-            PinotFSSegmentUploader.DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS);
+        PinotFSSegmentUploader.DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS);
 
     File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
     if (!instanceDataDir.exists()) {
@@ -123,8 +123,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void addOfflineSegment(String offlineTableName, String segmentName, File indexDir)
-      throws Exception {
+  public void addOfflineSegment(String offlineTableName, String segmentName, File indexDir) throws Exception {
     LOGGER.info("Adding segment: {} to table: {}", segmentName, offlineTableName);
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, offlineTableName);
     Preconditions.checkNotNull(tableConfig);
@@ -134,8 +133,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void addRealtimeSegment(String realtimeTableName, String segmentName)
-      throws Exception {
+  public void addRealtimeSegment(String realtimeTableName, String segmentName) throws Exception {
     LOGGER.info("Adding segment: {} to table: {}", segmentName, realtimeTableName);
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, realtimeTableName);
     Preconditions.checkNotNull(tableConfig);
@@ -149,8 +147,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     TableDataManagerConfig tableDataManagerConfig =
         TableDataManagerConfig.getDefaultHelixTableDataManagerConfig(_instanceDataManagerConfig, tableNameWithType);
     tableDataManagerConfig.overrideConfigs(tableConfig, _authToken);
-    TableDataManager tableDataManager = TableDataManagerProvider
-        .getTableDataManager(tableDataManagerConfig, _instanceId, _propertyStore, _serverMetrics, _helixManager);
+    TableDataManager tableDataManager = TableDataManagerProvider.getTableDataManager(tableDataManagerConfig,
+        _instanceId, _propertyStore, _serverMetrics, _helixManager);
     tableDataManager.start();
     LOGGER.info("Created table data manager for table: {}", tableNameWithType);
     return tableDataManager;
@@ -172,8 +170,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void reloadSegment(String tableNameWithType, String segmentName)
-      throws Exception {
+  public void reloadSegment(String tableNameWithType, String segmentName) throws Exception {
     LOGGER.info("Reloading single segment: {} in table: {}", segmentName, tableNameWithType);
     SegmentMetadata segmentMetadata = getSegmentMetadata(tableNameWithType, segmentName);
     if (segmentMetadata == null) {
@@ -192,8 +189,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void reloadAllSegments(String tableNameWithType)
-      throws Exception {
+  public void reloadAllSegments(String tableNameWithType) throws Exception {
     LOGGER.info("Reloading all segments in table: {}", tableNameWithType);
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     Preconditions.checkNotNull(tableConfig);
@@ -208,8 +204,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   private void reloadSegment(String tableNameWithType, SegmentMetadata segmentMetadata, TableConfig tableConfig,
-      @Nullable Schema schema)
-      throws Exception {
+      @Nullable Schema schema) throws Exception {
     String segmentName = segmentMetadata.getName();
     LOGGER.info("Reloading segment: {} in table: {}", segmentName, tableNameWithType);
 
@@ -260,8 +255,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       FileUtils.copyDirectory(segmentBackupDir, indexDir);
 
       // Load from index directory
-      ImmutableSegment immutableSegment = ImmutableSegmentLoader
-          .load(indexDir, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig), schema);
+      ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(indexDir,
+          new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig), schema);
 
       // Replace the old segment in memory
       tableDataManager.addSegment(immutableSegment);

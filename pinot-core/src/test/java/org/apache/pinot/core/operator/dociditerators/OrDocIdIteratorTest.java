@@ -41,9 +41,8 @@ public class OrDocIdIteratorTest {
     bitmap2.add(docIds2);
     MutableRoaringBitmap bitmap3 = new MutableRoaringBitmap();
     bitmap3.add(docIds3);
-    OrDocIdIterator andDocIdIterator = new OrDocIdIterator(
-        new BlockDocIdIterator[]{new RangelessBitmapDocIdIterator(bitmap1), new RangelessBitmapDocIdIterator(
-            bitmap2), new RangelessBitmapDocIdIterator(bitmap3)});
+    OrDocIdIterator andDocIdIterator = new OrDocIdIterator(new BlockDocIdIterator[]{new RangelessBitmapDocIdIterator(
+        bitmap1), new RangelessBitmapDocIdIterator(bitmap2), new RangelessBitmapDocIdIterator(bitmap3)});
 
     assertEquals(andDocIdIterator.advance(1), 1);
     assertEquals(andDocIdIterator.next(), 2);

@@ -142,11 +142,8 @@ public class MemoryEstimator {
    */
   public MemoryEstimator(TableConfig tableConfig, Schema schema, SchemaWithMetaData schemaWithMetadata,
       int numberOfRows, int ingestionRatePerPartition, long maxUsableHostMemory, int tableRetentionHours) {
-    this(tableConfig,
-        generateCompletedSegment(schemaWithMetadata, schema, tableConfig, numberOfRows),
-        ingestionRatePerPartition,
-        maxUsableHostMemory,
-        tableRetentionHours);
+    this(tableConfig, generateCompletedSegment(schemaWithMetadata, schema, tableConfig, numberOfRows),
+        ingestionRatePerPartition, maxUsableHostMemory, tableRetentionHours);
   }
 
   /**
@@ -171,14 +168,13 @@ public class MemoryEstimator {
         getRealtimeSegmentZKMetadata(_segmentMetadata, _segmentMetadata.getTotalDocs());
 
     // create a config
-    RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
-        new RealtimeSegmentConfig.Builder().setTableNameWithType(_tableNameWithType)
-            .setSegmentName(_segmentMetadata.getName()).setStreamName(_tableNameWithType)
-            .setSchema(_segmentMetadata.getSchema()).setCapacity(_segmentMetadata.getTotalDocs())
-            .setAvgNumMultiValues(_avgMultiValues).setNoDictionaryColumns(_noDictionaryColumns)
-            .setVarLengthDictionaryColumns(_varLengthDictionaryColumns).setInvertedIndexColumns(_invertedIndexColumns)
-            .setRealtimeSegmentZKMetadata(segmentZKMetadata).setOffHeap(true).setMemoryManager(memoryManager)
-            .setStatsHistory(sampleStatsHistory);
+    RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder = new RealtimeSegmentConfig.Builder()
+        .setTableNameWithType(_tableNameWithType).setSegmentName(_segmentMetadata.getName())
+        .setStreamName(_tableNameWithType).setSchema(_segmentMetadata.getSchema())
+        .setCapacity(_segmentMetadata.getTotalDocs()).setAvgNumMultiValues(_avgMultiValues)
+        .setNoDictionaryColumns(_noDictionaryColumns).setVarLengthDictionaryColumns(_varLengthDictionaryColumns)
+        .setInvertedIndexColumns(_invertedIndexColumns).setRealtimeSegmentZKMetadata(segmentZKMetadata).setOffHeap(true)
+        .setMemoryManager(memoryManager).setStatsHistory(sampleStatsHistory);
 
     // create mutable segment impl
     MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
@@ -234,8 +230,7 @@ public class MemoryEstimator {
    * @throws IOException
    */
   public void estimateMemoryUsed(File statsFile, int[] numHosts, int[] numHours, final int totalConsumingPartitions,
-      final int retentionHours)
-      throws IOException {
+      final int retentionHours) throws IOException {
     _activeMemoryPerHost = new String[numHours.length][numHosts.length];
     _optimalSegmentSize = new String[numHours.length][numHosts.length];
     _consumingMemoryPerHost = new String[numHours.length][numHosts.length];
@@ -284,9 +279,8 @@ public class MemoryEstimator {
             memoryForConsumingSegmentPerPartition * totalConsumingPartitionsPerHost;
         long activeMemoryPerHostBytes =
             activeMemoryForCompletedSegmentsPerHost + totalMemoryForConsumingSegmentsPerHost;
-        long mappedMemoryPerHost =
-            totalMemoryForConsumingSegmentsPerHost + (numCompletedSegmentsPerPartition * totalConsumingPartitionsPerHost
-                * completedSegmentSizeBytes);
+        long mappedMemoryPerHost = totalMemoryForConsumingSegmentsPerHost
+            + (numCompletedSegmentsPerPartition * totalConsumingPartitionsPerHost * completedSegmentSizeBytes);
 
         if (activeMemoryPerHostBytes <= _maxUsableHostMemory) {
           _activeMemoryPerHost[i][j] =
@@ -300,8 +294,7 @@ public class MemoryEstimator {
     }
   }
 
-  private long getMemoryForConsumingSegmentPerPartition(File statsFile, int totalDocs)
-      throws IOException {
+  private long getMemoryForConsumingSegmentPerPartition(File statsFile, int totalDocs) throws IOException {
     // We don't want the stats history to get updated from all our dummy runs
     // So we copy over the original stats history every time we start
     File statsFileCopy = new File(_tableDataDir, STATS_FILE_COPY_NAME);
@@ -338,9 +331,8 @@ public class MemoryEstimator {
    */
   private int getAvgMultiValues() {
     int avgMultiValues = 0;
-    Set<String> multiValueColumns =
-        _segmentMetadata.getSchema().getAllFieldSpecs().stream().filter(fieldSpec -> !fieldSpec.isSingleValueField())
-            .map(FieldSpec::getName).collect(Collectors.toSet());
+    Set<String> multiValueColumns = _segmentMetadata.getSchema().getAllFieldSpecs().stream()
+        .filter(fieldSpec -> !fieldSpec.isSingleValueField()).map(FieldSpec::getName).collect(Collectors.toSet());
 
     if (!multiValueColumns.isEmpty()) {
 
@@ -501,16 +493,14 @@ public class MemoryEstimator {
         dataTypes.put(name, timeSpec.getDataType());
         fieldTypes.put(name, timeSpec.getFieldType());
         TimeGranularitySpecMetadata timeGranSpec = timeSpec.getOutgoingGranularitySpec() != null
-            ? timeSpec.getOutgoingGranularitySpec()
-            : timeSpec.getIncomingGranularitySpec();
+            ? timeSpec.getOutgoingGranularitySpec() : timeSpec.getIncomingGranularitySpec();
         timeUnits.put(name, timeGranSpec.getTimeType());
       }
 
       // generate data
       String outputDir = getOutputDir(now, "-csv");
-      DataGeneratorSpec spec =
-          new DataGeneratorSpec(colNames, cardinalities, new HashMap<>(), new HashMap<>(), mvCounts, lengths, dataTypes,
-              fieldTypes, timeUnits, FileFormat.CSV, outputDir, true);
+      DataGeneratorSpec spec = new DataGeneratorSpec(colNames, cardinalities, new HashMap<>(), new HashMap<>(),
+          mvCounts, lengths, dataTypes, fieldTypes, timeUnits, FileFormat.CSV, outputDir, true);
       DataGenerator dataGenerator = new DataGenerator();
       try {
         dataGenerator.init(spec);
@@ -548,8 +538,7 @@ public class MemoryEstimator {
       } catch (Exception e) {
         throw new RuntimeException("Caught exception while verifying the created segment", e);
       }
-      LOGGER.info("Successfully loaded segment: {} of size: {} bytes", segmentName,
-          segment.getSegmentSizeBytes());
+      LOGGER.info("Successfully loaded segment: {} of size: {} bytes", segmentName, segment.getSegmentSizeBytes());
       segment.destroy();
 
       return indexDir;

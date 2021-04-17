@@ -60,8 +60,7 @@ public class SingleValueUnsortedForwardIndexCreator implements ForwardIndexCreat
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _writer.close();
   }
 }

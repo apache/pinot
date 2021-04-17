@@ -266,12 +266,13 @@ public class BenchmarkGeospatialSerde {
 
       simpleGeometryCollection = fromText(BenchmarkResource.GEOMETRYCOLLECTION);
       simpleGeometryCollectionSerialized = serialize(simpleGeometryCollection);
-      complexGeometryCollection = fromText("GEOMETRYCOLLECTION (" + Joiner.on(", ")
-          .join(BenchmarkResource.readResource("geospatial/complex-multipoint.txt"),
+      complexGeometryCollection = fromText("GEOMETRYCOLLECTION ("
+          + Joiner.on(", ").join(BenchmarkResource.readResource("geospatial/complex-multipoint.txt"),
               BenchmarkResource.readResource("geospatial/complex-linestring.txt"),
               BenchmarkResource.readResource("geospatial/complex-multilinestring.txt"),
               BenchmarkResource.readResource("geospatial/complex-polygon.txt"),
-              BenchmarkResource.readResource("geospatial/complex-multipolygon.txt")) + ")");
+              BenchmarkResource.readResource("geospatial/complex-multipolygon.txt"))
+          + ")");
       complexGeometryCollectionSerialized = serialize(complexGeometryCollection);
     }
   }
@@ -285,12 +286,11 @@ public class BenchmarkGeospatialSerde {
     public static final String POLYGON = "POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10))";
     public static final String MULTIPOLYGON =
         "MULTIPOLYGON (((30 20, 45 40, 10 40, 30 20)), ((15 5, 40 10, 10 20, 5 10, 15 5)), ((30 10, 40 40, 20 40, 10 20, 30 10)))";
-    public static final String GEOMETRYCOLLECTION =
-        "GEOMETRYCOLLECTION (" + "POINT (-2e3 -4e33), " + "MULTIPOINT (-2e3 -4e33, 0 0, 1 1, 2 3), "
-            + "LINESTRING (-2e3 -4e33, 0 0, 1 1, 2 3), "
-            + "MULTILINESTRING ((-2e3 -4e33, 0 0, 1 1, 2 3), (0 1, 2 3, 4 5), (0 1, 2 3, 4 6), (0 1, 2 3, 4 7)), "
-            + "POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10)), "
-            + "MULTIPOLYGON (((30 20, 45 40, 10 40, 30 20)), ((15 5, 40 10, 10 20, 5 10, 15 5)), ((30 10, 40 40, 20 40, 10 20, 30 10))))";
+    public static final String GEOMETRYCOLLECTION = "GEOMETRYCOLLECTION (" + "POINT (-2e3 -4e33), "
+        + "MULTIPOINT (-2e3 -4e33, 0 0, 1 1, 2 3), " + "LINESTRING (-2e3 -4e33, 0 0, 1 1, 2 3), "
+        + "MULTILINESTRING ((-2e3 -4e33, 0 0, 1 1, 2 3), (0 1, 2 3, 4 5), (0 1, 2 3, 4 6), (0 1, 2 3, 4 7)), "
+        + "POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10)), "
+        + "MULTIPOLYGON (((30 20, 45 40, 10 40, 30 20)), ((15 5, 40 10, 10 20, 5 10, 15 5)), ((30 10, 40 40, 20 40, 10 20, 30 10))))";
 
     public static String readResource(String resource) {
       try {
@@ -309,11 +309,9 @@ public class BenchmarkGeospatialSerde {
     }
   }
 
-  public static void main(String[] args)
-      throws RunnerException {
-    Options options =
-        new OptionsBuilder().verbosity(VerboseMode.NORMAL).include(".*" + BenchmarkData.class.getSimpleName() + ".*")
-            .build();
+  public static void main(String[] args) throws RunnerException {
+    Options options = new OptionsBuilder().verbosity(VerboseMode.NORMAL)
+        .include(".*" + BenchmarkData.class.getSimpleName() + ".*").build();
     new Runner(options).run();
   }
 }

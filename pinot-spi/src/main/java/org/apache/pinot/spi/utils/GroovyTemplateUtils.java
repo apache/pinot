@@ -69,8 +69,7 @@ public class GroovyTemplateUtils {
     return context;
   }
 
-  public static String renderTemplate(String template)
-      throws IOException, ClassNotFoundException {
+  public static String renderTemplate(String template) throws IOException, ClassNotFoundException {
     return renderTemplate(template, Collections.emptyMap());
   }
 

@@ -163,14 +163,13 @@ public class GroupByCombineOperator extends BaseCombineOperator {
    * </ul>
    */
   @Override
-  protected IntermediateResultsBlock mergeResults()
-      throws Exception {
+  protected IntermediateResultsBlock mergeResults() throws Exception {
     long timeoutMs = _endTimeMs - System.currentTimeMillis();
     boolean opCompleted = _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
     if (!opCompleted) {
       // If this happens, the broker side should already timed out, just log the error and return
-      String errorMessage = String
-          .format("Timed out while combining group-by results after %dms, queryContext = %s", timeoutMs, _queryContext);
+      String errorMessage = String.format("Timed out while combining group-by results after %dms, queryContext = %s",
+          timeoutMs, _queryContext);
       LOGGER.error(errorMessage);
       return new IntermediateResultsBlock(new TimeoutException(errorMessage));
     }

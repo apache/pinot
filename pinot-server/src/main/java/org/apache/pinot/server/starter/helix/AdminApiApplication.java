@@ -70,8 +70,7 @@ public class AdminApiApplication extends ResourceConfig {
     register(new ContainerResponseFilter() {
       @Override
       public void filter(ContainerRequestContext containerRequestContext,
-          ContainerResponseContext containerResponseContext)
-          throws IOException {
+          ContainerResponseContext containerResponseContext) throws IOException {
         containerResponseContext.getHeaders().add("Access-Control-Allow-Origin", "*");
       }
     });

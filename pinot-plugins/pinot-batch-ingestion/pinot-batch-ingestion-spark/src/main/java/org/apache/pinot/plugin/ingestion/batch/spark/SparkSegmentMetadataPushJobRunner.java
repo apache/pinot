@@ -109,16 +109,15 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
       // Prevent using lambda expression in Spark to avoid potential serialization exceptions, use inner function instead.
       pathRDD.foreach(new VoidFunction<String>() {
         @Override
-        public void call(String segmentTarPath)
-            throws Exception {
+        public void call(String segmentTarPath) throws Exception {
           for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
-            PinotFSFactory
-                .register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
+            PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(),
+                new PinotConfiguration(pinotFSSpec));
           }
           try {
-            Map<String, String> segmentUriToTarPathMap = SegmentPushUtils
-                .getSegmentUriToTarPathMap(finalOutputDirURI, _spec.getPushJobSpec().getSegmentUriPrefix(),
-                    _spec.getPushJobSpec().getSegmentUriSuffix(), new String[]{segmentTarPath});
+            Map<String, String> segmentUriToTarPathMap = SegmentPushUtils.getSegmentUriToTarPathMap(finalOutputDirURI,
+                _spec.getPushJobSpec().getSegmentUriPrefix(), _spec.getPushJobSpec().getSegmentUriSuffix(),
+                new String[]{segmentTarPath});
             SegmentPushUtils.sendSegmentUriAndMetadata(_spec, PinotFSFactory.create(finalOutputDirURI.getScheme()),
                 segmentUriToTarPathMap);
           } catch (RetriableOperationException | AttemptsExceededException e) {

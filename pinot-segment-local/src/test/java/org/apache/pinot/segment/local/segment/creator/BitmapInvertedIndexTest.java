@@ -52,8 +52,8 @@ public class BitmapInvertedIndexTest {
       new File(FileUtils.getTempDirectory(), BitmapInvertedIndexTest.class.getSimpleName());
   private static final Set<String> INVERTED_INDEX_COLUMNS = new HashSet<String>(3) {
     {
-      add("time_day");            // INT, cardinality 1
-      add("column10");            // STRING, cardinality 27
+      add("time_day"); // INT, cardinality 1
+      add("column10"); // STRING, cardinality 27
       add("met_impressionCount"); // LONG, cardinality 21
     }
   };
@@ -62,8 +62,7 @@ public class BitmapInvertedIndexTest {
   private File _segmentDirectory;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
     URL resourceUrl = getClass().getClassLoader().getResource(AVRO_FILE_PATH);
     Assert.assertNotNull(resourceUrl);
@@ -80,22 +79,20 @@ public class BitmapInvertedIndexTest {
   }
 
   @Test
-  public void testBitmapInvertedIndex()
-      throws Exception {
+  public void testBitmapInvertedIndex() throws Exception {
     testBitmapInvertedIndex(ReadMode.heap);
     testBitmapInvertedIndex(ReadMode.mmap);
   }
 
-  private void testBitmapInvertedIndex(ReadMode readMode)
-      throws Exception {
+  private void testBitmapInvertedIndex(ReadMode readMode) throws Exception {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
     indexLoadingConfig.setReadMode(readMode);
     indexLoadingConfig.setInvertedIndexColumns(INVERTED_INDEX_COLUMNS);
     IndexSegment indexSegment = ImmutableSegmentLoader.load(_segmentDirectory, indexLoadingConfig);
 
     // Compare the loaded inverted index with the record in avro file
-    try (DataFileStream<GenericRecord> reader = new DataFileStream<>(new FileInputStream(_avroFile),
-        new GenericDatumReader<>())) {
+    try (DataFileStream<GenericRecord> reader =
+        new DataFileStream<>(new FileInputStream(_avroFile), new GenericDatumReader<>())) {
       // Check the first 1000 records
       for (int docId = 0; docId < 1000; docId++) {
         GenericRecord record = reader.next();

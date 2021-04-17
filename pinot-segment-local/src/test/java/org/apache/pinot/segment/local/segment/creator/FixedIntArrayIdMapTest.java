@@ -53,8 +53,7 @@ public class FixedIntArrayIdMapTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     _idMap.close();
     _memoryManager.close();
   }

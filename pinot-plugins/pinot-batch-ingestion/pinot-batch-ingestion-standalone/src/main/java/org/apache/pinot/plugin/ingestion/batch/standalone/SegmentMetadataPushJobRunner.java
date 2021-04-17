@@ -79,9 +79,8 @@ public class SegmentMetadataPushJobRunner implements IngestionJobRunner {
     } catch (IOException e) {
       throw new RuntimeException("Unable to list all files under outputDirURI - '" + outputDirURI + "'");
     }
-    Map<String, String> segmentUriToTarPathMap = SegmentPushUtils
-        .getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec().getSegmentUriPrefix(),
-            _spec.getPushJobSpec().getSegmentUriSuffix(), files);
+    Map<String, String> segmentUriToTarPathMap = SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI,
+        _spec.getPushJobSpec().getSegmentUriPrefix(), _spec.getPushJobSpec().getSegmentUriSuffix(), files);
     try {
       SegmentPushUtils.sendSegmentUriAndMetadata(_spec, outputDirFS, segmentUriToTarPathMap);
     } catch (Exception e) {

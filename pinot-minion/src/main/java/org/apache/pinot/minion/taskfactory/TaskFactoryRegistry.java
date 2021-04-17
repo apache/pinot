@@ -74,8 +74,8 @@ public class TaskFactoryRegistry {
 
               PinotTaskConfig pinotTaskConfig = PinotTaskConfig.fromHelixTaskConfig(_taskConfig);
               if (StringUtils.isBlank(pinotTaskConfig.getConfigs().get(MinionConstants.AUTH_TOKEN))) {
-                pinotTaskConfig.getConfigs()
-                    .put(MinionConstants.AUTH_TOKEN, MinionContext.getInstance().getTaskAuthToken());
+                pinotTaskConfig.getConfigs().put(MinionConstants.AUTH_TOKEN,
+                    MinionContext.getInstance().getTaskAuthToken());
               }
 
               _eventObserver.notifyTaskStart(pinotTaskConfig);

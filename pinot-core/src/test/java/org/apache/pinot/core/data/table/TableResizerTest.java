@@ -39,9 +39,9 @@ import static org.testng.Assert.assertTrue;
 public class TableResizerTest {
   private static final String QUERY_PREFIX =
       "SELECT SUM(m1), MAX(m2), DISTINCTCOUNT(m3), AVG(m4) FROM testTable GROUP BY d1, d2, d3 ORDER BY ";
-  private static final DataSchema DATA_SCHEMA =
-      new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)", "distinctcount(m3)", "avg(m4)"},
-          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.OBJECT, DataSchema.ColumnDataType.OBJECT});
+  private static final DataSchema DATA_SCHEMA = new DataSchema(
+      new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)", "distinctcount(m3)", "avg(m4)"},
+      new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.OBJECT, DataSchema.ColumnDataType.OBJECT});
   private static final int TRIM_TO_SIZE = 3;
 
   private Map<Key, Record> _recordsMap;
@@ -52,19 +52,19 @@ public class TableResizerTest {
   public void setUp() {
     //@formatter:off
     _records = Arrays.asList(
-        new Record(new Object[]{"a", 10, 1.0, 10.0, 100.0, new IntOpenHashSet(new int[]{1}), new AvgPair(10, 2) /* 5 */}),
-        new Record(new Object[]{"b", 10, 2.0, 20.0, 200.0, new IntOpenHashSet(new int[]{1, 2}), new AvgPair(10, 3) /* 3.33 */}),
-        new Record(new Object[]{"c", 200, 3.0, 30.0, 300.0, new IntOpenHashSet(new int[]{1, 2}), new AvgPair(20, 4) /* 5 */}),
-        new Record(new Object[]{"c", 50, 4.0, 30.0, 200.0, new IntOpenHashSet(new int[]{1, 2, 3}), new AvgPair(30, 10) /* 3 */}),
-        new Record(new Object[]{"c", 300, 5.0, 20.0, 100.0, new IntOpenHashSet(new int[]{1, 2, 3, 4}), new AvgPair(10, 5) /* 2 */})
-    );
-    _keys = Arrays.asList(
-        new Key(new Object[]{"a", 10, 1.0}),
-        new Key(new Object[]{"b", 10, 2.0}),
-        new Key(new Object[]{"c", 200, 3.0}),
-        new Key(new Object[]{"c", 50, 4.0}),
-        new Key(new Object[]{"c", 300, 5.0})
-    );
+        new Record(
+            new Object[]{"a", 10, 1.0, 10.0, 100.0, new IntOpenHashSet(new int[]{1}), new AvgPair(10, 2) /* 5 */ }),
+        new Record(new Object[]{"b", 10, 2.0, 20.0, 200.0, new IntOpenHashSet(new int[]{1, 2}), new AvgPair(10,
+            3) /* 3.33 */ }),
+        new Record(
+            new Object[]{"c", 200, 3.0, 30.0, 300.0, new IntOpenHashSet(new int[]{1, 2}), new AvgPair(20, 4) /* 5 */ }),
+        new Record(new Object[]{"c", 50, 4.0, 30.0, 200.0, new IntOpenHashSet(new int[]{1, 2, 3}), new AvgPair(30,
+            10) /* 3 */ }),
+        new Record(new Object[]{"c", 300, 5.0, 20.0, 100.0, new IntOpenHashSet(new int[]{1, 2, 3, 4}), new AvgPair(10,
+            5) /* 2 */ }));
+    _keys = Arrays.asList(new Key(new Object[]{"a", 10, 1.0}), new Key(new Object[]{"b", 10, 2.0}),
+        new Key(new Object[]{"c", 200, 3.0}), new Key(new Object[]{"c", 50, 4.0}),
+        new Key(new Object[]{"c", 300, 5.0}));
     //@formatter:on
     _recordsMap = new HashMap<>();
     int numRecords = _records.size();
@@ -219,13 +219,13 @@ public class TableResizerTest {
     Map<Key, Record> recordsMap = new HashMap<>(_recordsMap);
     List<Record> sortedRecords = tableResizer.sortRecordsMap(recordsMap, TRIM_TO_SIZE);
     assertEquals(sortedRecords.size(), TRIM_TO_SIZE);
-    assertEquals(sortedRecords.get(0), _records.get(0));  // a, b
+    assertEquals(sortedRecords.get(0), _records.get(0)); // a, b
     assertEquals(sortedRecords.get(1), _records.get(1));
 
     // d1 asc - trim to 1
     recordsMap = new HashMap<>(_recordsMap);
     sortedRecords = tableResizer.sortRecordsMap(recordsMap, 1);
-    assertEquals(sortedRecords.get(0), _records.get(0));  // a
+    assertEquals(sortedRecords.get(0), _records.get(0)); // a
 
     // d1 asc, d3 desc (tie breaking with 2nd comparator)
     tableResizer =
@@ -233,7 +233,7 @@ public class TableResizerTest {
     recordsMap = new HashMap<>(_recordsMap);
     sortedRecords = tableResizer.sortRecordsMap(recordsMap, TRIM_TO_SIZE);
     assertEquals(sortedRecords.size(), TRIM_TO_SIZE);
-    assertEquals(sortedRecords.get(0), _records.get(0));  // a, b, c (300)
+    assertEquals(sortedRecords.get(0), _records.get(0)); // a, b, c (300)
     assertEquals(sortedRecords.get(1), _records.get(1));
     assertEquals(sortedRecords.get(2), _records.get(4));
 
@@ -241,7 +241,7 @@ public class TableResizerTest {
     recordsMap = new HashMap<>(_recordsMap);
     sortedRecords = tableResizer.sortRecordsMap(recordsMap, 1);
     assertEquals(sortedRecords.size(), 1);
-    assertEquals(sortedRecords.get(0), _records.get(0));  // a
+    assertEquals(sortedRecords.get(0), _records.get(0)); // a
 
     // d1 asc, sum(m1) desc, max(m2) desc
     tableResizer = new TableResizer(DATA_SCHEMA,
@@ -249,7 +249,7 @@ public class TableResizerTest {
     recordsMap = new HashMap<>(_recordsMap);
     sortedRecords = tableResizer.sortRecordsMap(recordsMap, TRIM_TO_SIZE);
     assertEquals(sortedRecords.size(), TRIM_TO_SIZE);
-    assertEquals(sortedRecords.get(0), _records.get(0));  // a, b, c (30, 300)
+    assertEquals(sortedRecords.get(0), _records.get(0)); // a, b, c (30, 300)
     assertEquals(sortedRecords.get(1), _records.get(1));
     assertEquals(sortedRecords.get(2), _records.get(2));
 
@@ -257,7 +257,7 @@ public class TableResizerTest {
     recordsMap = new HashMap<>(_recordsMap);
     sortedRecords = tableResizer.sortRecordsMap(recordsMap, 1);
     assertEquals(sortedRecords.size(), 1);
-    assertEquals(sortedRecords.get(0), _records.get(0));  // a
+    assertEquals(sortedRecords.get(0), _records.get(0)); // a
 
     // avg(m4) asc (object type)
     tableResizer =
@@ -265,7 +265,7 @@ public class TableResizerTest {
     recordsMap = new HashMap<>(_recordsMap);
     sortedRecords = tableResizer.sortRecordsMap(recordsMap, TRIM_TO_SIZE);
     assertEquals(sortedRecords.size(), TRIM_TO_SIZE);
-    assertEquals(sortedRecords.get(0), _records.get(4));  // 2, 3, 3.33
+    assertEquals(sortedRecords.get(0), _records.get(4)); // 2, 3, 3.33
     assertEquals(sortedRecords.get(1), _records.get(3));
     assertEquals(sortedRecords.get(2), _records.get(1));
 
@@ -275,7 +275,7 @@ public class TableResizerTest {
     recordsMap = new HashMap<>(_recordsMap);
     sortedRecords = tableResizer.sortRecordsMap(recordsMap, TRIM_TO_SIZE);
     assertEquals(sortedRecords.size(), TRIM_TO_SIZE);
-    assertEquals(sortedRecords.get(0), _records.get(4));  // 4, 3, 2 (b)
+    assertEquals(sortedRecords.get(0), _records.get(4)); // 4, 3, 2 (b)
     assertEquals(sortedRecords.get(1), _records.get(3));
     assertEquals(sortedRecords.get(2), _records.get(1));
 
@@ -285,7 +285,7 @@ public class TableResizerTest {
     recordsMap = new HashMap<>(_recordsMap);
     sortedRecords = tableResizer.sortRecordsMap(recordsMap, TRIM_TO_SIZE);
     assertEquals(sortedRecords.size(), TRIM_TO_SIZE);
-    assertEquals(sortedRecords.get(0), _records.get(1));  // 3.33, 12.5, 5
+    assertEquals(sortedRecords.get(0), _records.get(1)); // 3.33, 12.5, 5
     assertEquals(sortedRecords.get(1), _records.get(0));
     assertEquals(sortedRecords.get(2), _records.get(3));
   }

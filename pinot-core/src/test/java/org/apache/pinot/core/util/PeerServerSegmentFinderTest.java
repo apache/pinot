@@ -56,8 +56,7 @@ public class PeerServerSegmentFinderTest {
   private HelixManager _helixManager;
 
   @BeforeClass
-  public void initSegmentFetcherFactoryWithPeerServerSegmentFetcher()
-      throws Exception {
+  public void initSegmentFetcherFactoryWithPeerServerSegmentFetcher() throws Exception {
     HelixAdmin helixAdmin;
     {
       ExternalView ev = new ExternalView(TABLE_NAME_WITH_TYPE);
@@ -93,24 +92,26 @@ public class PeerServerSegmentFinderTest {
   }
 
   @Test
-  public void testSegmentFoundSuccessfully()
-      throws Exception {
+  public void testSegmentFoundSuccessfully() throws Exception {
     // SEGMENT_1 has only 2 online replicas.
     List<URI> httpServerURIs =
         PeerServerSegmentFinder.getPeerServerURIs(SEGMENT_1, CommonConstants.HTTP_PROTOCOL, _helixManager);
     assertEquals(2, httpServerURIs.size());
-    httpServerURIs.contains(new URI(StringUtil.join("/", "http://" + HOST_1_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1)));
-    httpServerURIs.contains(new URI(StringUtil.join("/", "http://" + HOST_3_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1)));
+    httpServerURIs.contains(new URI(
+        StringUtil.join("/", "http://" + HOST_1_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1)));
+    httpServerURIs.contains(new URI(
+        StringUtil.join("/", "http://" + HOST_3_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1)));
     List<URI> httpsServerURIs =
         PeerServerSegmentFinder.getPeerServerURIs(SEGMENT_1, CommonConstants.HTTPS_PROTOCOL, _helixManager);
     assertEquals(2, httpsServerURIs.size());
-    httpServerURIs.contains(new URI(StringUtil.join("/", "https://" + HOST_1_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1)));
-    httpServerURIs.contains(new URI(StringUtil.join("/", "https://" + HOST_3_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1)));
+    httpServerURIs.contains(new URI(StringUtil.join("/", "https://" + HOST_1_NAME + ":" + ADMIN_PORT, "segments",
+        TABLE_NAME_WITH_TYPE, SEGMENT_1)));
+    httpServerURIs.contains(new URI(StringUtil.join("/", "https://" + HOST_3_NAME + ":" + ADMIN_PORT, "segments",
+        TABLE_NAME_WITH_TYPE, SEGMENT_1)));
   }
 
   @Test
-  public void testSegmentNotFound()
-      throws Exception {
+  public void testSegmentNotFound() throws Exception {
     Assert.assertEquals(0,
         PeerServerSegmentFinder.getPeerServerURIs(SEGMENT_2, CommonConstants.HTTP_PROTOCOL, _helixManager).size());
   }

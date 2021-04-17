@@ -31,8 +31,7 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 public class PassThroughCompressor implements ChunkCompressor {
 
   @Override
-  public int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed)
-      throws IOException {
+  public int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed) throws IOException {
     outCompressed.put(inUncompressed);
 
     // Make the output ByteBuffer read for read.

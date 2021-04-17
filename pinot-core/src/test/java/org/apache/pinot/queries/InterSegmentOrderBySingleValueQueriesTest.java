@@ -47,10 +47,9 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
       long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs,
       DataSchema expectedDataSchema) {
     BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
-    QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, expectedNumDocsScanned, expectedNumEntriesScannedInFilter,
-            expectedNumEntriesScannedPostFilter, expectedNumTotalDocs, expectedResults, expectedResults.size(),
-            expectedDataSchema);
+    QueriesTestUtils.testInterSegmentResultTable(brokerResponse, expectedNumDocsScanned,
+        expectedNumEntriesScannedInFilter, expectedNumEntriesScannedPostFilter, expectedNumTotalDocs, expectedResults,
+        expectedResults.size(), expectedDataSchema);
   }
 
   @Test(dataProvider = "orderByPQLResultProvider")
@@ -310,10 +309,10 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
 
     // aggregation in order-by but not in select
     query = "SELECT column12 FROM testTable GROUP BY column12 ORDER BY Min(column6) DESC, column12";
-    results = Lists
-        .newArrayList(new Object[]{"XcBNHe"}, new Object[]{"fykKFqiw"}, new Object[]{"gFuH"}, new Object[]{"HEuxNvH"},
-            new Object[]{"MaztCmmxxgguBUxPti"}, new Object[]{"dJWwFk"}, new Object[]{"KrNxpdycSiwoRohEiTIlLqDHnx"},
-            new Object[]{"TTltMtFiRqUjvOG"}, new Object[]{"oZgnrlDEtjjVpUoFLol"});
+    results = Lists.newArrayList(new Object[]{"XcBNHe"}, new Object[]{"fykKFqiw"}, new Object[]{"gFuH"},
+        new Object[]{"HEuxNvH"}, new Object[]{"MaztCmmxxgguBUxPti"}, new Object[]{"dJWwFk"},
+        new Object[]{"KrNxpdycSiwoRohEiTIlLqDHnx"}, new Object[]{"TTltMtFiRqUjvOG"},
+        new Object[]{"oZgnrlDEtjjVpUoFLol"});
     dataSchema =
         new DataSchema(new String[]{"column12"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING});
     numEntriesScannedPostFilter = 240000;
@@ -342,12 +341,12 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
 
     // numeric dimension should follow numeric ordering
     query = "select column17, count(*) from testTable group by column17 order by column17 limit 15";
-    results = Lists
-        .newArrayList(new Object[]{83386499, 2924L}, new Object[]{217787432, 3892L}, new Object[]{227908817, 6564L},
-            new Object[]{402773817, 7304L}, new Object[]{423049234, 6556L}, new Object[]{561673250, 7420L},
-            new Object[]{635942547, 3308L}, new Object[]{638936844, 3816L}, new Object[]{939479517, 3116L},
-            new Object[]{984091268, 3824L}, new Object[]{1230252339, 5620L}, new Object[]{1284373442, 7428L},
-            new Object[]{1555255521, 2900L}, new Object[]{1618904660, 2744L}, new Object[]{1670085862, 3388L});
+    results = Lists.newArrayList(new Object[]{83386499, 2924L}, new Object[]{217787432, 3892L},
+        new Object[]{227908817, 6564L}, new Object[]{402773817, 7304L}, new Object[]{423049234, 6556L},
+        new Object[]{561673250, 7420L}, new Object[]{635942547, 3308L}, new Object[]{638936844, 3816L},
+        new Object[]{939479517, 3116L}, new Object[]{984091268, 3824L}, new Object[]{1230252339, 5620L},
+        new Object[]{1284373442, 7428L}, new Object[]{1555255521, 2900L}, new Object[]{1618904660, 2744L},
+        new Object[]{1670085862, 3388L});
     dataSchema = new DataSchema(new String[]{"column17", "count(*)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG});
     numEntriesScannedPostFilter = 120000;
@@ -385,9 +384,8 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
     query = "SELECT column11, AVG(column6) FROM testTable GROUP BY column11 ORDER BY AVG(column6), column11 DESC";
-    results = Lists
-        .newArrayList(new Object[]{"o", 296467636.0}, new Object[]{"gFuH", 296467636.0}, new Object[]{"", 296467636.0},
-            new Object[]{"t", 526245333.3900426}, new Object[]{"P", 909380310.3521485});
+    results = Lists.newArrayList(new Object[]{"o", 296467636.0}, new Object[]{"gFuH", 296467636.0},
+        new Object[]{"", 296467636.0}, new Object[]{"t", 526245333.3900426}, new Object[]{"P", 909380310.3521485});
     dataSchema = new DataSchema(new String[]{"column11", "avg(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     numEntriesScannedPostFilter = 240000;
@@ -463,8 +461,8 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
 
     // order by one of the group by columns
     query = "SELECT SUM(column1) FROM testTable GROUP BY column11 ORDER BY column11";
-    groups = Lists
-        .newArrayList(new String[]{""}, new String[]{"P"}, new String[]{"gFuH"}, new String[]{"o"}, new String[]{"t"});
+    groups = Lists.newArrayList(new String[]{""}, new String[]{"P"}, new String[]{"gFuH"}, new String[]{"o"},
+        new String[]{"t"});
     result1 = Lists.newArrayList(5935285005452.0, 88832999206836.0, 63202785888.0, 18105331533948.0, 16331923219264.0);
     results = new ArrayList<>();
     results.add(result1);
@@ -552,9 +550,8 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
         new String[]{"", "KrNxpdycSiwoRohEiTIlLqDHnx"}, new String[]{"", "MaztCmmxxgguBUxPti"},
         new String[]{"", "HEuxNvH"}, new String[]{"P", "XcBNHe"}, new String[]{"P", "gFuH"},
         new String[]{"P", "fykKFqiw"}, new String[]{"P", "TTltMtFiRqUjvOG"}, new String[]{"P", "dJWwFk"});
-    result1 = Lists
-        .newArrayList(22680162504.0, 55470665124.0000, 733802350944.0, 1333941430664.0, 3789390396216.0, 120021767504.0,
-            860077643636.0, 1574451324140.0, 4462670055540.0, 6224665921376.0);
+    result1 = Lists.newArrayList(22680162504.0, 55470665124.0000, 733802350944.0, 1333941430664.0, 3789390396216.0,
+        120021767504.0, 860077643636.0, 1574451324140.0, 4462670055540.0, 6224665921376.0);
     results = new ArrayList<>();
     results.add(result1);
     numEntriesScannedPostFilter = 360000;
@@ -590,8 +587,8 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
 
     // multiple aggregations
     query = "SELECT SUM(column1), MIN(column6) FROM testTable GROUP BY column11 ORDER BY column11";
-    groups = Lists
-        .newArrayList(new String[]{""}, new String[]{"P"}, new String[]{"gFuH"}, new String[]{"o"}, new String[]{"t"});
+    groups = Lists.newArrayList(new String[]{""}, new String[]{"P"}, new String[]{"gFuH"}, new String[]{"o"},
+        new String[]{"t"});
     result1 = Lists.newArrayList(5935285005452.0, 88832999206836.0, 63202785888.0, 18105331533948.0, 16331923219264.0);
     result2 = Lists.newArrayList(2.96467636E8, 1689277.0, 2.96467636E8, 2.96467636E8, 1980174.0);
     results = new ArrayList<>();
@@ -614,13 +611,12 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
 
     // order by an aggregation DESC, and group by column
     query = "SELECT MIN(column6) FROM testTable GROUP BY column12 ORDER BY MIN(column6) DESC, column12";
-    groups = Lists
-        .newArrayList(new String[]{"XcBNHe"}, new String[]{"fykKFqiw"}, new String[]{"gFuH"}, new String[]{"HEuxNvH"},
-            new String[]{"MaztCmmxxgguBUxPti"}, new String[]{"dJWwFk"}, new String[]{"KrNxpdycSiwoRohEiTIlLqDHnx"},
-            new String[]{"TTltMtFiRqUjvOG"}, new String[]{"oZgnrlDEtjjVpUoFLol"});
-    result1 = Lists
-        .newArrayList(329467557.0, 296467636.0, 296467636.0, 6043515.0, 6043515.0, 6043515.0, 1980174.0, 1980174.0,
-            1689277.0);
+    groups = Lists.newArrayList(new String[]{"XcBNHe"}, new String[]{"fykKFqiw"}, new String[]{"gFuH"},
+        new String[]{"HEuxNvH"}, new String[]{"MaztCmmxxgguBUxPti"}, new String[]{"dJWwFk"},
+        new String[]{"KrNxpdycSiwoRohEiTIlLqDHnx"}, new String[]{"TTltMtFiRqUjvOG"},
+        new String[]{"oZgnrlDEtjjVpUoFLol"});
+    result1 = Lists.newArrayList(329467557.0, 296467636.0, 296467636.0, 6043515.0, 6043515.0, 6043515.0, 1980174.0,
+        1980174.0, 1689277.0);
     results = new ArrayList<>();
     results.add(result1);
     numEntriesScannedPostFilter = 240000;
@@ -633,9 +629,8 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
         new String[]{"402773817"}, new String[]{"423049234"}, new String[]{"561673250"}, new String[]{"635942547"},
         new String[]{"638936844"}, new String[]{"939479517"}, new String[]{"984091268"}, new String[]{"1230252339"},
         new String[]{"1284373442"}, new String[]{"1555255521"}, new String[]{"1618904660"}, new String[]{"1670085862"});
-    result1 = Lists
-        .newArrayList(2924L, 3892L, 6564L, 7304L, 6556L, 7420L, 3308L, 3816L, 3116L, 3824L, 5620L, 7428L, 2900L, 2744L,
-            3388L);
+    result1 = Lists.newArrayList(2924L, 3892L, 6564L, 7304L, 6556L, 7420L, 3308L, 3816L, 3116L, 3824L, 5620L, 7428L,
+        2900L, 2744L, 3388L);
     results = new ArrayList<>();
     results.add(result1);
     numEntriesScannedPostFilter = 120000;
@@ -664,8 +659,8 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
 
     // Object type aggregation - comparable intermediate results (AVG, MINMAXRANGE)
     query = "SELECT AVG(column6) FROM testTable GROUP BY column11  ORDER BY column11";
-    groups = Lists
-        .newArrayList(new String[]{""}, new String[]{"P"}, new String[]{"gFuH"}, new String[]{"o"}, new String[]{"t"});
+    groups = Lists.newArrayList(new String[]{""}, new String[]{"P"}, new String[]{"gFuH"}, new String[]{"o"},
+        new String[]{"t"});
     result1 = Lists.newArrayList(296467636.0, 909380310.3521485, 296467636.0, 296467636.0, 526245333.3900426);
     results = new ArrayList<>();
     results.add(result1);
@@ -674,8 +669,8 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
         new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 
     query = "SELECT AVG(column6) FROM testTable GROUP BY column11 ORDER BY AVG(column6), column11 DESC";
-    groups = Lists
-        .newArrayList(new String[]{"o"}, new String[]{"gFuH"}, new String[]{""}, new String[]{"t"}, new String[]{"P"});
+    groups = Lists.newArrayList(new String[]{"o"}, new String[]{"gFuH"}, new String[]{""}, new String[]{"t"},
+        new String[]{"P"});
     result1 = Lists.newArrayList(296467636.0, 296467636.0, 296467636.0, 526245333.3900426, 909380310.3521485);
     results = new ArrayList<>();
     results.add(result1);

@@ -58,8 +58,7 @@ public class StarTreeIndexViewer {
    */
   private static final int MAX_CHILDREN = 100;
 
-  public StarTreeIndexViewer(File segmentDir)
-      throws Exception {
+  public StarTreeIndexViewer(File segmentDir) throws Exception {
     IndexSegment indexSegment = ImmutableSegmentLoader.load(segmentDir, ReadMode.heap);
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();
     if (starTrees == null) {
@@ -89,8 +88,7 @@ public class StarTreeIndexViewer {
     LOGGER.info("Go to http://localhost:8090/ to view the star-trees");
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     if (args.length != 1) {
       LOGGER.error("USAGE: StarIndexViewer <segmentDirectory>");
       System.exit(1);

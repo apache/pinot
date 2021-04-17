@@ -1,3 +1,4 @@
+
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -56,14 +57,12 @@ import static org.testng.Assert.assertTrue;
 
 
 public class SegmentCreationSparkTest extends SharedJavaSparkContext implements Serializable {
-  private static final String SAMPLE_DATA_PATH =
-      Preconditions.checkNotNull(SegmentCreationSparkTest.class.getClassLoader().getResource("test_sample_data.csv"))
-          .getPath();
+  private static final String SAMPLE_DATA_PATH = Preconditions
+      .checkNotNull(SegmentCreationSparkTest.class.getClassLoader().getResource("test_sample_data.csv")).getPath();
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "SegmentCreationSparkTest");
 
   @BeforeClass
-  public void setUp()
-      throws IOException {
+  public void setUp() throws IOException {
     FileUtils.deleteQuietly(TEMP_DIR);
   }
 
@@ -124,8 +123,7 @@ public class SegmentCreationSparkTest extends SharedJavaSparkContext implements 
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 }

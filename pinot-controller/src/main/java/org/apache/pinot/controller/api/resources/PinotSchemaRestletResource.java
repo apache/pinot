@@ -104,7 +104,8 @@ public class PinotSchemaRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas/{schemaName}")
   @ApiOperation(value = "Get a schema", notes = "Gets a schema by name")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 500, message = "Internal error")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404,
+      message = "Schema not found"), @ApiResponse(code = 500, message = "Internal error")})
   public String getSchema(
       @ApiParam(value = "Schema name", required = true) @PathParam("schemaName") String schemaName) {
     LOGGER.info("looking for schema {}", schemaName);
@@ -120,7 +121,9 @@ public class PinotSchemaRestletResource {
   @Path("/schemas/{schemaName}")
   @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Delete a schema", notes = "Deletes a schema by name")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully deleted schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 409, message = "Schema is in use"), @ApiResponse(code = 500, message = "Error deleting schema")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully deleted schema"), @ApiResponse(code = 404,
+      message = "Schema not found"), @ApiResponse(code = 409,
+          message = "Schema is in use"), @ApiResponse(code = 500, message = "Error deleting schema")})
   public SuccessResponse deleteSchema(
       @ApiParam(value = "Schema name", required = true) @PathParam("schemaName") String schemaName) {
     deleteSchemaInternal(schemaName);
@@ -132,10 +135,13 @@ public class PinotSchemaRestletResource {
   @Path("/schemas/{schemaName}")
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Update a schema", notes = "Updates a schema")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully updated schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully updated schema"), @ApiResponse(code = 404,
+      message = "Schema not found"), @ApiResponse(code = 400,
+          message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
   public SuccessResponse updateSchema(
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
-      @ApiParam(value = "Whether to reload the table if the new schema is backward compatible") @DefaultValue("false") @QueryParam("reload") boolean reload,
+      @ApiParam(
+          value = "Whether to reload the table if the new schema is backward compatible") @DefaultValue("false") @QueryParam("reload") boolean reload,
       FormDataMultiPart multiPart) {
     return updateSchema(schemaName, getSchemaFromMultiPart(multiPart), reload);
   }
@@ -146,10 +152,13 @@ public class PinotSchemaRestletResource {
   @Path("/schemas/{schemaName}")
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Update a schema", notes = "Updates a schema")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully updated schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully updated schema"), @ApiResponse(code = 404,
+      message = "Schema not found"), @ApiResponse(code = 400,
+          message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
   public SuccessResponse updateSchema(
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
-      @ApiParam(value = "Whether to reload the table if the new schema is backward compatible") @DefaultValue("false") @QueryParam("reload") boolean reload,
+      @ApiParam(
+          value = "Whether to reload the table if the new schema is backward compatible") @DefaultValue("false") @QueryParam("reload") boolean reload,
       Schema schema) {
     return updateSchema(schemaName, schema, reload);
   }
@@ -158,9 +167,11 @@ public class PinotSchemaRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas")
   @ApiOperation(value = "Add a new schema", notes = "Adds a new schema")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully created schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
-  public SuccessResponse addSchema(
-      @ApiParam(value = "Whether to override the schema if the schema exists") @DefaultValue("true") @QueryParam("override") boolean override,
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully created schema"), @ApiResponse(code = 404,
+      message = "Schema not found"), @ApiResponse(code = 400,
+          message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
+  public SuccessResponse addSchema(@ApiParam(
+      value = "Whether to override the schema if the schema exists") @DefaultValue("true") @QueryParam("override") boolean override,
       FormDataMultiPart multiPart, @Context HttpHeaders httpHeaders, @Context Request request) {
     Schema schema = getSchemaFromMultiPart(multiPart);
     String endpointUrl = request.getRequestURL().toString();
@@ -174,9 +185,11 @@ public class PinotSchemaRestletResource {
   @Consumes(MediaType.APPLICATION_JSON)
   @Path("/schemas")
   @ApiOperation(value = "Add a new schema", notes = "Adds a new schema")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully created schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
-  public SuccessResponse addSchema(
-      @ApiParam(value = "Whether to override the schema if the schema exists") @DefaultValue("true") @QueryParam("override") boolean override,
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully created schema"), @ApiResponse(code = 404,
+      message = "Schema not found"), @ApiResponse(code = 400,
+          message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
+  public SuccessResponse addSchema(@ApiParam(
+      value = "Whether to override the schema if the schema exists") @DefaultValue("true") @QueryParam("override") boolean override,
       Schema schema, @Context HttpHeaders httpHeaders, @Context Request request) {
     String endpointUrl = request.getRequestURL().toString();
     _accessControlUtils.validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl,
@@ -189,7 +202,8 @@ public class PinotSchemaRestletResource {
   @Path("/schemas/validate")
   @ApiOperation(value = "Validate schema", notes = "This API returns the schema that matches the one you get "
       + "from 'GET /schema/{schemaName}'. This allows us to validate schema before apply.")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully validated schema"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully validated schema"), @ApiResponse(code = 400,
+      message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
   public String validateSchema(FormDataMultiPart multiPart) {
     Schema schema = getSchemaFromMultiPart(multiPart);
     try {
@@ -208,7 +222,8 @@ public class PinotSchemaRestletResource {
   @Path("/schemas/validate")
   @ApiOperation(value = "Validate schema", notes = "This API returns the schema that matches the one you get "
       + "from 'GET /schema/{schemaName}'. This allows us to validate schema before apply.")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully validated schema"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully validated schema"), @ApiResponse(code = 400,
+      message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
   public String validateSchema(Schema schema) {
     try {
       List<TableConfig> tableConfigs = _pinotHelixResourceManager.getTableConfigsForSchema(schema.getSchemaName());
@@ -268,9 +283,10 @@ public class PinotSchemaRestletResource {
 
     if (schemaName != null && !schema.getSchemaName().equals(schemaName)) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
-      throw new ControllerApplicationException(LOGGER, String
-          .format("Schema name mismatch for uploaded schema, tried to add schema with name %s as %s",
-              schema.getSchemaName(), schema), Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Schema name mismatch for uploaded schema, tried to add schema with name %s as %s",
+              schema.getSchemaName(), schema),
+          Response.Status.BAD_REQUEST);
     }
 
     try {

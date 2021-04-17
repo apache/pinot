@@ -32,8 +32,7 @@ import static org.testng.Assert.assertFalse;
 public class PeriodicTaskSchedulerTest {
 
   @Test
-  public void testTaskWithInvalidInterval()
-      throws Exception {
+  public void testTaskWithInvalidInterval() throws Exception {
     AtomicBoolean startCalled = new AtomicBoolean();
     AtomicBoolean runCalled = new AtomicBoolean();
     AtomicBoolean stopCalled = new AtomicBoolean();
@@ -67,8 +66,7 @@ public class PeriodicTaskSchedulerTest {
   }
 
   @Test
-  public void testScheduleMultipleTasks()
-      throws Exception {
+  public void testScheduleMultipleTasks() throws Exception {
     int numTasks = 3;
     AtomicInteger numTimesStartCalled = new AtomicInteger();
     AtomicInteger numTimesRunCalled = new AtomicInteger();

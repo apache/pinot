@@ -44,8 +44,7 @@ public class ColumnMetadataTest {
   private static final String CREATOR_VERSION = "TestHadoopJar.1.1.1";
 
   @BeforeMethod
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
@@ -54,14 +53,12 @@ public class ColumnMetadataTest {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  public SegmentGeneratorConfig CreateSegmentConfigWithoutCreator()
-      throws Exception {
+  public SegmentGeneratorConfig CreateSegmentConfigWithoutCreator() throws Exception {
     final String filePath =
         TestUtils.getFileFromResourceUrl(ColumnMetadataTest.class.getClassLoader().getResource(AVRO_DATA));
     // Intentionally changed this to TimeUnit.Hours to make it non-default for testing.
-    SegmentGeneratorConfig config = SegmentTestUtils
-        .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch", TimeUnit.HOURS,
-            "testTable");
+    SegmentGeneratorConfig config = SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath),
+        INDEX_DIR, "daysSinceEpoch", TimeUnit.HOURS, "testTable");
     config.setSegmentNamePostfix("1");
     // The segment generation code in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable
@@ -72,8 +69,7 @@ public class ColumnMetadataTest {
     return config;
   }
 
-  public SegmentGeneratorConfig createSegmentConfigWithCreator()
-      throws Exception {
+  public SegmentGeneratorConfig createSegmentConfigWithCreator() throws Exception {
     SegmentGeneratorConfig config = CreateSegmentConfigWithoutCreator();
     config.setCreatorVersion(CREATOR_VERSION);
     return config;
@@ -140,8 +136,7 @@ public class ColumnMetadataTest {
   }
 
   @Test
-  public void testAllFieldsInitialized()
-      throws Exception {
+  public void testAllFieldsInitialized() throws Exception {
     // Build the Segment metadata.
     SegmentGeneratorConfig config = createSegmentConfigWithCreator();
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
@@ -159,8 +154,7 @@ public class ColumnMetadataTest {
   }
 
   @Test
-  public void testAllFieldsExceptCreatorName()
-      throws Exception {
+  public void testAllFieldsExceptCreatorName() throws Exception {
     // Build the Segment metadata.
     SegmentGeneratorConfig config = CreateSegmentConfigWithoutCreator();
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
@@ -178,8 +172,7 @@ public class ColumnMetadataTest {
   }
 
   @Test
-  public void testPaddingCharacter()
-      throws Exception {
+  public void testPaddingCharacter() throws Exception {
     // Build the Segment metadata.
     SegmentGeneratorConfig config = CreateSegmentConfigWithoutCreator();
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);

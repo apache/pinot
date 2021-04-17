@@ -54,8 +54,7 @@ public class TarGzCompressionUtils {
    * Creates a tar.gz file from the input file/directory to the output file. The output file must have ".tar.gz" as the
    * file extension.
    */
-  public static void createTarGzFile(File inputFile, File outputFile)
-      throws IOException {
+  public static void createTarGzFile(File inputFile, File outputFile) throws IOException {
     Preconditions.checkArgument(outputFile.getName().endsWith(TAR_GZ_FILE_EXTENSION),
         "Output file: %s does not have '.tar.gz' file extension", outputFile);
     try (OutputStream fileOut = Files.newOutputStream(outputFile.toPath());
@@ -72,8 +71,7 @@ public class TarGzCompressionUtils {
    * Helper method to write a file into the tar.gz file output stream. The base entry name is the relative path of the
    * file to the root directory.
    */
-  private static void addFileToTarGz(ArchiveOutputStream tarGzOut, File file, String baseEntryName)
-      throws IOException {
+  private static void addFileToTarGz(ArchiveOutputStream tarGzOut, File file, String baseEntryName) throws IOException {
     String entryName = baseEntryName + file.getName();
     TarArchiveEntry entry = new TarArchiveEntry(file, entryName);
     tarGzOut.putArchiveEntry(entry);
@@ -98,8 +96,7 @@ public class TarGzCompressionUtils {
    * Un-tars a tar.gz file into a directory, returns all the untarred files/directories.
    * <p>For security reason, the untarred files must reside in the output directory.
    */
-  public static List<File> untar(File inputFile, File outputDir)
-      throws IOException {
+  public static List<File> untar(File inputFile, File outputDir) throws IOException {
     String outputDirCanonicalPath = outputDir.getCanonicalPath();
     List<File> untarredFiles = new ArrayList<>();
     try (InputStream fileIn = Files.newInputStream(inputFile.toPath());
@@ -116,8 +113,8 @@ public class TarGzCompressionUtils {
         }
         if (entry.isDirectory()) {
           if (!outputFile.getCanonicalPath().startsWith(outputDirCanonicalPath)) {
-            throw new IOException(String
-                .format("Trying to create directory: %s outside of the output directory: %s", outputFile, outputDir));
+            throw new IOException(String.format("Trying to create directory: %s outside of the output directory: %s",
+                outputFile, outputDir));
           }
           if (!outputFile.isDirectory() && !outputFile.mkdirs()) {
             throw new IOException(String.format("Failed to create directory: %s", outputFile));
@@ -125,8 +122,8 @@ public class TarGzCompressionUtils {
         } else {
           File parentFile = outputFile.getParentFile();
           if (!parentFile.getCanonicalPath().startsWith(outputDirCanonicalPath)) {
-            throw new IOException(String
-                .format("Trying to create directory: %s outside of the output directory: %s", parentFile, outputDir));
+            throw new IOException(String.format("Trying to create directory: %s outside of the output directory: %s",
+                parentFile, outputDir));
           }
           if (!parentFile.isDirectory() && !parentFile.mkdirs()) {
             throw new IOException(String.format("Failed to create directory: %s", parentFile));
@@ -144,8 +141,7 @@ public class TarGzCompressionUtils {
   /**
    * Un-tars one single file with the given file name from a tar.gz file.
    */
-  public static void untarOneFile(File inputFile, String fileName, File outputFile)
-      throws IOException {
+  public static void untarOneFile(File inputFile, String fileName, File outputFile) throws IOException {
     try (InputStream fileIn = Files.newInputStream(inputFile.toPath());
         InputStream bufferedIn = new BufferedInputStream(fileIn);
         InputStream gzipIn = new GzipCompressorInputStream(bufferedIn);

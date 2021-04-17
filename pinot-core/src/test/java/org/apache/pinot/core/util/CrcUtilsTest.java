@@ -45,8 +45,7 @@ public class CrcUtilsTest {
   private static File INDEX_DIR = new File("/tmp/testingCrc");
 
   @Test
-  public void test1()
-      throws Exception {
+  public void test1() throws Exception {
     if (INDEX_DIR.exists()) {
       FileUtils.deleteQuietly(INDEX_DIR);
     }
@@ -69,19 +68,17 @@ public class CrcUtilsTest {
     final IndexSegment segment = ImmutableSegmentLoader.load(new File(makeSegmentAndReturnPath()), ReadMode.mmap);
     final SegmentMetadata m = segment.getSegmentMetadata();
 
-//    System.out.println(m.getCrc());
-//    System.out.println(m.getIndexCreationTime());
+    //    System.out.println(m.getCrc());
+    //    System.out.println(m.getIndexCreationTime());
 
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  private String makeSegmentAndReturnPath()
-      throws Exception {
+  private String makeSegmentAndReturnPath() throws Exception {
     final String filePath = TestUtils.getFileFromResourceUrl(CrcUtils.class.getClassLoader().getResource(AVRO_DATA));
 
-    final SegmentGeneratorConfig config = SegmentTestUtils
-        .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch", TimeUnit.DAYS,
-            "testTable");
+    final SegmentGeneratorConfig config = SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(
+        new File(filePath), INDEX_DIR, "daysSinceEpoch", TimeUnit.DAYS, "testTable");
     config.setSegmentNamePostfix("1");
     // The segment generation code in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable

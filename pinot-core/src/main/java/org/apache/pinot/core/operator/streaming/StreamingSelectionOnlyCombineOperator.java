@@ -49,9 +49,8 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
   private static final String OPERATOR_NAME = "StreamingSelectionOnlyCombineOperator";
 
   // Special IntermediateResultsBlock to indicate that this is the last results block for an operator
-  private static final IntermediateResultsBlock LAST_RESULTS_BLOCK =
-      new IntermediateResultsBlock(new DataSchema(new String[0], new DataSchema.ColumnDataType[0]),
-          Collections.emptyList());
+  private static final IntermediateResultsBlock LAST_RESULTS_BLOCK = new IntermediateResultsBlock(
+      new DataSchema(new String[0], new DataSchema.ColumnDataType[0]), Collections.emptyList());
 
   private final StreamObserver<Server.ServerResponse> _streamObserver;
   private final int _limit;
@@ -99,8 +98,7 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
   }
 
   @Override
-  protected IntermediateResultsBlock mergeResults()
-      throws Exception {
+  protected IntermediateResultsBlock mergeResults() throws Exception {
     long numRowsCollected = 0;
     int numOperatorsFinished = 0;
     while (numRowsCollected < _limit && numOperatorsFinished < _numOperators) {

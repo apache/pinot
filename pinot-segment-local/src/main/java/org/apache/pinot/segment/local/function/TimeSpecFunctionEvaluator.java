@@ -68,8 +68,8 @@ public class TimeSpecFunctionEvaluator implements FunctionEvaluator {
 
   private Object evaluate(Object incomingTimeValue) {
     if (!_isValidated) {
-      if (_incomingTimeColumn == null || !TimeUtils
-          .timeValueInValidRange(_incomingTimeConverter.toMillisSinceEpoch(incomingTimeValue))) {
+      if (_incomingTimeColumn == null
+          || !TimeUtils.timeValueInValidRange(_incomingTimeConverter.toMillisSinceEpoch(incomingTimeValue))) {
         throw new IllegalStateException("No valid time value found in incoming time column: " + _incomingTimeColumn);
       }
       _isValidated = true;

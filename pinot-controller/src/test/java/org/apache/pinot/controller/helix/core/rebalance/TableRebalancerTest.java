@@ -229,14 +229,14 @@ public class TableRebalancerTest {
     //   }
     // }
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
-    currentAssignment
-        .put("segment1", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
-    currentAssignment
-        .put("segment2", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
-    currentAssignment
-        .put("segment3", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
-    currentAssignment
-        .put("segment4", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
+    currentAssignment.put("segment1",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
+    currentAssignment.put("segment2",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
+    currentAssignment.put("segment3",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
+    currentAssignment.put("segment4",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
 
     // Target assignment:
     // {
@@ -262,14 +262,14 @@ public class TableRebalancerTest {
     //   }
     // }
     Map<String, Map<String, String>> targetAssignment = new TreeMap<>();
-    targetAssignment
-        .put("segment1", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3", "host5"), ONLINE));
-    targetAssignment
-        .put("segment2", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host6"), ONLINE));
-    targetAssignment
-        .put("segment3", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3", "host5"), ONLINE));
-    targetAssignment
-        .put("segment4", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host6"), ONLINE));
+    targetAssignment.put("segment1",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3", "host5"), ONLINE));
+    targetAssignment.put("segment2",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host6"), ONLINE));
+    targetAssignment.put("segment3",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3", "host5"), ONLINE));
+    targetAssignment.put("segment4",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host6"), ONLINE));
 
     // Next assignment with 2 minimum available replicas with or without strict replica-group should reach the target
     // assignment
@@ -303,14 +303,14 @@ public class TableRebalancerTest {
     //   }
     // }
     currentAssignment = new TreeMap<>();
-    currentAssignment
-        .put("segment1", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
-    currentAssignment
-        .put("segment2", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
-    currentAssignment
-        .put("segment3", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
-    currentAssignment
-        .put("segment4", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
+    currentAssignment.put("segment1",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
+    currentAssignment.put("segment2",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
+    currentAssignment.put("segment3",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
+    currentAssignment.put("segment4",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
 
     // Target assignment:
     // {
@@ -336,14 +336,14 @@ public class TableRebalancerTest {
     //   }
     // }
     targetAssignment = new TreeMap<>();
-    targetAssignment
-        .put("segment1", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host6"), ONLINE));
-    targetAssignment
-        .put("segment2", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host4", "host5"), ONLINE));
-    targetAssignment
-        .put("segment3", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host6"), ONLINE));
-    targetAssignment
-        .put("segment4", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host4", "host5"), ONLINE));
+    targetAssignment.put("segment1",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host6"), ONLINE));
+    targetAssignment.put("segment2",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host4", "host5"), ONLINE));
+    targetAssignment.put("segment3",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host6"), ONLINE));
+    targetAssignment.put("segment4",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host4", "host5"), ONLINE));
 
     // Next assignment with 2 minimum available replicas without strict replica-group:
     // (This assignment will move "segment1" and "segment3" from "host3" to "host4", and move "segment2" and "segment4"
@@ -450,77 +450,77 @@ public class TableRebalancerTest {
     Map<String, Map<String, String>> idealStateSegmentStates = new TreeMap<>();
 
     // Empty segment states should match
-    assertTrue(TableRebalancer
-        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, false));
-    assertTrue(TableRebalancer
-        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, true));
+    assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+        idealStateSegmentStates, false));
+    assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+        idealStateSegmentStates, true));
 
     // Do not check segment that does not exist in IdealState
     Map<String, String> instanceStateMap = new TreeMap<>();
     instanceStateMap.put("instance1", ONLINE);
     externalViewSegmentStates.put("segment1", instanceStateMap);
-    assertTrue(TableRebalancer
-        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, false));
-    assertTrue(TableRebalancer
-        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, true));
+    assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+        idealStateSegmentStates, false));
+    assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+        idealStateSegmentStates, true));
 
     // Do not check segment that is OFFLINE in IdealState
     instanceStateMap = new TreeMap<>();
     instanceStateMap.put("instance1", OFFLINE);
     idealStateSegmentStates.put("segment2", instanceStateMap);
-    assertTrue(TableRebalancer
-        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, false));
-    assertTrue(TableRebalancer
-        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, true));
+    assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+        idealStateSegmentStates, false));
+    assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+        idealStateSegmentStates, true));
 
     // Should fail when a segment has CONSUMING instance in IdealState but does not exist in ExternalView
     instanceStateMap.put("instance2", CONSUMING);
-    assertFalse(TableRebalancer
-        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, false));
-    assertFalse(TableRebalancer
-        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, true));
+    assertFalse(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+        idealStateSegmentStates, false));
+    assertFalse(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+        idealStateSegmentStates, true));
 
     // Should fail when instance state does not exist
     instanceStateMap = new TreeMap<>();
     externalViewSegmentStates.put("segment2", instanceStateMap);
-    assertFalse(TableRebalancer
-        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, false));
-    assertFalse(TableRebalancer
-        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, true));
+    assertFalse(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+        idealStateSegmentStates, false));
+    assertFalse(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+        idealStateSegmentStates, true));
 
     // Should fail when instance state does not match
     instanceStateMap.put("instance2", OFFLINE);
-    assertFalse(TableRebalancer
-        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, false));
-    assertFalse(TableRebalancer
-        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, true));
+    assertFalse(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+        idealStateSegmentStates, false));
+    assertFalse(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+        idealStateSegmentStates, true));
 
     // Should pass when instance state matches
     instanceStateMap.put("instance2", CONSUMING);
-    assertTrue(TableRebalancer
-        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, false));
-    assertTrue(TableRebalancer
-        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, true));
+    assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+        idealStateSegmentStates, false));
+    assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+        idealStateSegmentStates, true));
 
     // Should pass when there are extra instances in ExternalView
     instanceStateMap.put("instance3", CONSUMING);
-    assertTrue(TableRebalancer
-        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, false));
-    assertTrue(TableRebalancer
-        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, true));
+    assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+        idealStateSegmentStates, false));
+    assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+        idealStateSegmentStates, true));
 
     // Should throw exception when instance state is ERROR in ExternalView and best-efforts is disabled
     instanceStateMap.put("instance2", ERROR);
     try {
-      TableRebalancer
-          .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, false);
+      TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates,
+          false);
       fail();
     } catch (Exception e) {
       // Expected
     }
 
     // Should pass when instance state is ERROR in ExternalView and best-efforts is enabled
-    assertTrue(TableRebalancer
-        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, true));
+    assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+        idealStateSegmentStates, true));
   }
 }

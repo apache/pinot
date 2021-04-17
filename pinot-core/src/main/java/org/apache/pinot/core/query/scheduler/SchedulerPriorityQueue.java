@@ -36,8 +36,7 @@ public interface SchedulerPriorityQueue {
    */
   // TODO: throw OutOfCapacity or drop from the front of the queue ?
   // It may be more beneficial to drop oldest queries to move forward
-  void put(@Nonnull SchedulerQueryContext query)
-      throws OutOfCapacityException;
+  void put(@Nonnull SchedulerQueryContext query) throws OutOfCapacityException;
 
   /**
    * Blocking call to select the query with highest priority to schedule for execution next.

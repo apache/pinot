@@ -46,8 +46,8 @@ public class InstanceAssignmentConfigUtils {
     Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap =
         tableConfig.getInstanceAssignmentConfigMap();
     return (instanceAssignmentConfigMap != null
-        && instanceAssignmentConfigMap.get(InstancePartitionsType.COMPLETED) != null) || TagNameUtils
-        .isRelocateCompletedSegments(tableConfig.getTenantConfig());
+        && instanceAssignmentConfigMap.get(InstancePartitionsType.COMPLETED) != null)
+        || TagNameUtils.isRelocateCompletedSegments(tableConfig.getTenantConfig());
   }
 
   /**
@@ -65,12 +65,12 @@ public class InstanceAssignmentConfigUtils {
         return tableType == TableType.OFFLINE && ((instanceAssignmentConfigMap != null
             && instanceAssignmentConfigMap.get(InstancePartitionsType.OFFLINE) != null)
             || AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY
-            .equalsIgnoreCase(tableConfig.getValidationConfig().getSegmentAssignmentStrategy()));
+                .equalsIgnoreCase(tableConfig.getValidationConfig().getSegmentAssignmentStrategy()));
       // Allow CONSUMING/COMPLETED instance assignment if the real-time table has it configured
       case CONSUMING:
       case COMPLETED:
-        return tableType == TableType.REALTIME && (instanceAssignmentConfigMap != null
-            && instanceAssignmentConfigMap.get(instancePartitionsType) != null);
+        return tableType == TableType.REALTIME
+            && (instanceAssignmentConfigMap != null && instanceAssignmentConfigMap.get(instancePartitionsType) != null);
       default:
         throw new IllegalStateException();
     }

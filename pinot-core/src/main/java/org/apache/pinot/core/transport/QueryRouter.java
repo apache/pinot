@@ -74,8 +74,8 @@ public class QueryRouter {
     _brokerId = brokerId;
     _brokerMetrics = brokerMetrics;
     _serverChannels = new ServerChannels(this, brokerMetrics);
-    _serverChannelsTls = Optional.ofNullable(tlsConfig)
-        .map(conf -> new ServerChannels(this, brokerMetrics, conf)).orElse(null);
+    _serverChannelsTls =
+        Optional.ofNullable(tlsConfig).map(conf -> new ServerChannels(this, brokerMetrics, conf)).orElse(null);
   }
 
   public AsyncQueryResponse submitQuery(long requestId, String rawTableName,
@@ -92,7 +92,8 @@ public class QueryRouter {
     if (offlineBrokerRequest != null) {
       assert offlineRoutingTable != null;
       for (Map.Entry<ServerInstance, List<String>> entry : offlineRoutingTable.entrySet()) {
-        ServerRoutingInstance serverRoutingInstance = entry.getKey().toServerRoutingInstance(TableType.OFFLINE, preferTls);
+        ServerRoutingInstance serverRoutingInstance =
+            entry.getKey().toServerRoutingInstance(TableType.OFFLINE, preferTls);
         InstanceRequest instanceRequest = getInstanceRequest(requestId, offlineBrokerRequest, entry.getValue());
         requestMap.put(serverRoutingInstance, instanceRequest);
       }
@@ -100,7 +101,8 @@ public class QueryRouter {
     if (realtimeBrokerRequest != null) {
       assert realtimeRoutingTable != null;
       for (Map.Entry<ServerInstance, List<String>> entry : realtimeRoutingTable.entrySet()) {
-        ServerRoutingInstance serverRoutingInstance = entry.getKey().toServerRoutingInstance(TableType.REALTIME, preferTls);
+        ServerRoutingInstance serverRoutingInstance =
+            entry.getKey().toServerRoutingInstance(TableType.REALTIME, preferTls);
         InstanceRequest instanceRequest = getInstanceRequest(requestId, realtimeBrokerRequest, entry.getValue());
         requestMap.put(serverRoutingInstance, instanceRequest);
       }

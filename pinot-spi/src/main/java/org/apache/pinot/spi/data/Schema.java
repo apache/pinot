@@ -79,18 +79,15 @@ public final class Schema implements Serializable {
   private transient final List<String> _metricNames = new ArrayList<>();
   private transient final List<String> _dateTimeNames = new ArrayList<>();
 
-  public static Schema fromFile(File schemaFile)
-      throws IOException {
+  public static Schema fromFile(File schemaFile) throws IOException {
     return JsonUtils.fileToObject(schemaFile, Schema.class);
   }
 
-  public static Schema fromString(String schemaString)
-      throws IOException {
+  public static Schema fromString(String schemaString) throws IOException {
     return JsonUtils.stringToObject(schemaString, Schema.class);
   }
 
-  public static Schema fromInputSteam(InputStream schemaInputStream)
-      throws IOException {
+  public static Schema fromInputSteam(InputStream schemaInputStream) throws IOException {
     return JsonUtils.inputStreamToObject(schemaInputStream, Schema.class);
   }
 
@@ -183,8 +180,8 @@ public final class Schema implements Serializable {
     Preconditions.checkNotNull(fieldSpec);
     String columnName = fieldSpec.getName();
     Preconditions.checkNotNull(columnName);
-    Preconditions
-        .checkState(!_fieldSpecMap.containsKey(columnName), "Field spec already exists for column: " + columnName);
+    Preconditions.checkState(!_fieldSpecMap.containsKey(columnName),
+        "Field spec already exists for column: " + columnName);
 
     FieldType fieldType = fieldSpec.getFieldType();
     switch (fieldType) {
@@ -632,12 +629,12 @@ public final class Schema implements Serializable {
 
     Schema that = (Schema) o;
 
-    return EqualityUtils.isEqual(_schemaName, that._schemaName) && EqualityUtils
-        .isEqualIgnoreOrder(_dimensionFieldSpecs, that._dimensionFieldSpecs) && EqualityUtils
-        .isEqualIgnoreOrder(_metricFieldSpecs, that._metricFieldSpecs) && EqualityUtils
-        .isEqual(_timeFieldSpec, that._timeFieldSpec) && EqualityUtils
-        .isEqualIgnoreOrder(_dateTimeFieldSpecs, that._dateTimeFieldSpecs) && EqualityUtils
-        .isEqual(_primaryKeyColumns, that._primaryKeyColumns);
+    return EqualityUtils.isEqual(_schemaName, that._schemaName)
+        && EqualityUtils.isEqualIgnoreOrder(_dimensionFieldSpecs, that._dimensionFieldSpecs)
+        && EqualityUtils.isEqualIgnoreOrder(_metricFieldSpecs, that._metricFieldSpecs)
+        && EqualityUtils.isEqual(_timeFieldSpec, that._timeFieldSpec)
+        && EqualityUtils.isEqualIgnoreOrder(_dateTimeFieldSpecs, that._dateTimeFieldSpecs)
+        && EqualityUtils.isEqual(_primaryKeyColumns, that._primaryKeyColumns);
   }
 
   /**
@@ -711,12 +708,11 @@ public final class Schema implements Serializable {
       TimeUnit incomingTimeUnit = incomingGranularitySpec.getTimeType();
       String incomingTimeFormat = incomingGranularitySpec.getTimeFormat();
       Preconditions.checkState(
-          incomingTimeFormat.equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()) && outgoingTimeFormat
-              .equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()),
+          incomingTimeFormat.equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString())
+              && outgoingTimeFormat.equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()),
           "Conversion from incoming to outgoing is not supported for SIMPLE_DATE_FORMAT");
-      String transformFunction =
-          constructTransformFunctionString(incomingName, incomingTimeSize, incomingTimeUnit, outgoingTimeSize,
-              outgoingTimeUnit);
+      String transformFunction = constructTransformFunctionString(incomingName, incomingTimeSize, incomingTimeUnit,
+          outgoingTimeSize, outgoingTimeUnit);
       dateTimeFieldSpec.setTransformFunction(transformFunction);
     }
 

@@ -92,34 +92,32 @@ public class LLRealtimeSegmentDataManagerTest {
 
   private static long _timeNow = System.currentTimeMillis();
 
-  private final String _tableConfigJson =
-      "{\n" + "  \"metadata\": {}, \n" + "  \"segmentsConfig\": {\n" + "    \"replicasPerPartition\": \"3\", \n"
-          + "    \"replication\": \"3\", \n" + "    \"replicationNumber\": 3, \n"
-          + "    \"retentionTimeUnit\": \"DAYS\", \n" + "    \"retentionTimeValue\": \"3\", \n"
-          + "    \"schemaName\": \"UnknownSchema\", \n"
-          + "    \"segmentAssignmentStrategy\": \"BalanceNumSegmentAssignmentStrategy\", \n"
-          + "    \"segmentPushFrequency\": \"daily\", \n" + "    \"segmentPushType\": \"APPEND\", \n"
-          + "    \"timeColumnName\": \"minutesSinceEpoch\", \n" + "    \"timeType\": \"MINUTES\"\n" + "  }, \n"
-          + "  \"tableIndexConfig\": {\n" + "    \"invertedIndexColumns\": [" + "    ], \n"
-          + "    \"lazyLoad\": \"false\", \n" + "    \"loadMode\": \"HEAP\", \n"
-          + "    \"segmentFormatVersion\": null, \n" + "    \"sortedColumn\": [], \n" + "    \"streamConfigs\": {\n"
-          + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS + "\": \"" + maxRowsInSegment + "\", \n"
-          + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME + "\": \"" + maxTimeForSegmentCloseMs
-          + "\", \n" + "      \"stream.fakeStream.broker.list\": \"broker:7777\", \n"
-          + "      \"stream.fakeStream.consumer.prop.auto.offset.reset\": \"smallest\", \n"
-          + "      \"stream.fakeStream.consumer.type\": \"simple\", \n"
-          + "      \"stream.fakeStream.consumer.factory.class.name\": \"" + FakeStreamConsumerFactory.class.getName()
-          + "\", \n" + "      \"stream.fakeStream.decoder.class.name\": \"" + FakeStreamMessageDecoder.class.getName()
-          + "\", \n"
-          + "      \"stream.fakeStream.decoder.prop.schema.registry.rest.url\": \"http://schema-registry-host.corp.ceo:1766/schemas\", \n"
-          + "      \"stream.fakeStream.decoder.prop.schema.registry.schema.name\": \"UnknownSchema\", \n"
-          + "      \"stream.fakeStream.hlc.zk.connect.string\": \"zoo:2181/kafka-queuing\", \n"
-          + "      \"stream.fakeStream.topic.name\": \"" + _topicName + "\", \n"
-          + "      \"stream.fakeStream.zk.broker.url\": \"kafka-broker:2181/kafka-queuing\", \n"
-          + "      \"streamType\": \"fakeStream\"\n" + "    }\n" + "  }, \n"
-          + "  \"tableName\": \"Coffee_REALTIME\", \n" + "  \"tableType\": \"realtime\", \n" + "  \"tenants\": {\n"
-          + "    \"broker\": \"shared\", \n" + "    \"server\": \"server-1\"\n" + "  },\n"
-          + " \"upsertConfig\": {\"mode\": \"FULL\" } \n" + "}";
+  private final String _tableConfigJson = "{\n" + "  \"metadata\": {}, \n" + "  \"segmentsConfig\": {\n"
+      + "    \"replicasPerPartition\": \"3\", \n" + "    \"replication\": \"3\", \n"
+      + "    \"replicationNumber\": 3, \n" + "    \"retentionTimeUnit\": \"DAYS\", \n"
+      + "    \"retentionTimeValue\": \"3\", \n" + "    \"schemaName\": \"UnknownSchema\", \n"
+      + "    \"segmentAssignmentStrategy\": \"BalanceNumSegmentAssignmentStrategy\", \n"
+      + "    \"segmentPushFrequency\": \"daily\", \n" + "    \"segmentPushType\": \"APPEND\", \n"
+      + "    \"timeColumnName\": \"minutesSinceEpoch\", \n" + "    \"timeType\": \"MINUTES\"\n" + "  }, \n"
+      + "  \"tableIndexConfig\": {\n" + "    \"invertedIndexColumns\": [" + "    ], \n"
+      + "    \"lazyLoad\": \"false\", \n" + "    \"loadMode\": \"HEAP\", \n" + "    \"segmentFormatVersion\": null, \n"
+      + "    \"sortedColumn\": [], \n" + "    \"streamConfigs\": {\n" + "      \""
+      + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS + "\": \"" + maxRowsInSegment + "\", \n" + "      \""
+      + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME + "\": \"" + maxTimeForSegmentCloseMs + "\", \n"
+      + "      \"stream.fakeStream.broker.list\": \"broker:7777\", \n"
+      + "      \"stream.fakeStream.consumer.prop.auto.offset.reset\": \"smallest\", \n"
+      + "      \"stream.fakeStream.consumer.type\": \"simple\", \n"
+      + "      \"stream.fakeStream.consumer.factory.class.name\": \"" + FakeStreamConsumerFactory.class.getName()
+      + "\", \n" + "      \"stream.fakeStream.decoder.class.name\": \"" + FakeStreamMessageDecoder.class.getName()
+      + "\", \n"
+      + "      \"stream.fakeStream.decoder.prop.schema.registry.rest.url\": \"http://schema-registry-host.corp.ceo:1766/schemas\", \n"
+      + "      \"stream.fakeStream.decoder.prop.schema.registry.schema.name\": \"UnknownSchema\", \n"
+      + "      \"stream.fakeStream.hlc.zk.connect.string\": \"zoo:2181/kafka-queuing\", \n"
+      + "      \"stream.fakeStream.topic.name\": \"" + _topicName + "\", \n"
+      + "      \"stream.fakeStream.zk.broker.url\": \"kafka-broker:2181/kafka-queuing\", \n"
+      + "      \"streamType\": \"fakeStream\"\n" + "    }\n" + "  }, \n" + "  \"tableName\": \"Coffee_REALTIME\", \n"
+      + "  \"tableType\": \"realtime\", \n" + "  \"tenants\": {\n" + "    \"broker\": \"shared\", \n"
+      + "    \"server\": \"server-1\"\n" + "  },\n" + " \"upsertConfig\": {\"mode\": \"FULL\" } \n" + "}";
 
   private String makeSchema() {
     return "{" + "  \"schemaName\":\"SchemaTest\"," + "  \"metricFieldSpecs\":[" + "    {\"name\":\"m\",\"dataType\":\""
@@ -129,8 +127,7 @@ public class LLRealtimeSegmentDataManagerTest {
         + "    \"defaultNullValue\":12345" + "  },\n" + "\"primaryKeyColumns\": [\"event_id\"] \n" + "}";
   }
 
-  private TableConfig createTableConfig()
-      throws Exception {
+  private TableConfig createTableConfig() throws Exception {
     return JsonUtils.stringToObject(_tableConfigJson, TableConfig.class);
   }
 
@@ -157,8 +154,7 @@ public class LLRealtimeSegmentDataManagerTest {
     return segmentZKMetadata;
   }
 
-  private FakeLLRealtimeSegmentDataManager createFakeSegmentManager()
-      throws Exception {
+  private FakeLLRealtimeSegmentDataManager createFakeSegmentManager() throws Exception {
     LLCRealtimeSegmentZKMetadata segmentZKMetadata = createZkMetadata();
     TableConfig tableConfig = createTableConfig();
     InstanceZKMetadata instanceZKMetadata = new InstanceZKMetadata();
@@ -187,16 +183,14 @@ public class LLRealtimeSegmentDataManagerTest {
   }
 
   @Test
-  public void testOffsetParsing()
-      throws Exception {
+  public void testOffsetParsing() throws Exception {
     final String offset = "34";
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
     {
       //  Controller sends catchup response with both offset as well as streamPartitionMsgOffset
-      String responseStr =
-          "{" + "  \"streamPartitionMsgOffset\" : \"" + offset + "\"," + "  \"offset\" : " + offset + ","
-              + "  \"buildTimeSec\" : -1," + "  \"isSplitCommitType\" : false,"
-              + "  \"segmentLocation\" : \"file:///a/b\"," + "  \"status\" : \"CATCH_UP\"" + "}";
+      String responseStr = "{" + "  \"streamPartitionMsgOffset\" : \"" + offset + "\"," + "  \"offset\" : " + offset
+          + "," + "  \"buildTimeSec\" : -1," + "  \"isSplitCommitType\" : false,"
+          + "  \"segmentLocation\" : \"file:///a/b\"," + "  \"status\" : \"CATCH_UP\"" + "}";
       SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       StreamPartitionMsgOffset extractedOffset = segmentDataManager.extractOffset(response);
       Assert.assertEquals(extractedOffset.compareTo(new LongMsgOffset(offset)), 0);
@@ -225,15 +219,14 @@ public class LLRealtimeSegmentDataManagerTest {
   // Test that we are in HOLDING state as long as the controller responds HOLD to our segmentConsumed() message.
   // we should not consume when holding.
   @Test
-  public void testHolding()
-      throws Exception {
+  public void testHolding() throws Exception {
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
     LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final LongMsgOffset endOffset = new LongMsgOffset(_startOffsetValue + 500);
     // We should consume initially...
     segmentDataManager._consumeOffsets.add(endOffset);
-    final SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(
-        new SegmentCompletionProtocol.Response.Params()
+    final SegmentCompletionProtocol.Response response =
+        new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params()
             .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.HOLD)
             .withStreamPartitionMsgOffset(endOffset.toString()));
     // And then never consume as long as we get a hold response, 100 times.
@@ -255,8 +248,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
   // Test that we go to commit when the controller responds commit after 2 holds.
   @Test
-  public void testCommitAfterHold()
-      throws Exception {
+  public void testCommitAfterHold() throws Exception {
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
     LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final LongMsgOffset endOffset = new LongMsgOffset(_startOffsetValue + 500);
@@ -280,14 +272,13 @@ public class LLRealtimeSegmentDataManagerTest {
     Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
     Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
     Assert.assertTrue(segmentDataManager._commitSegmentCalled);
-    Assert
-        .assertEquals(segmentDataManager._state.get(segmentDataManager), LLRealtimeSegmentDataManager.State.COMMITTED);
+    Assert.assertEquals(segmentDataManager._state.get(segmentDataManager),
+        LLRealtimeSegmentDataManager.State.COMMITTED);
     segmentDataManager.destroy();
   }
 
   @Test
-  public void testSegmentBuildException()
-      throws Exception {
+  public void testSegmentBuildException() throws Exception {
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
     LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final LongMsgOffset endOffset = new LongMsgOffset(_startOffsetValue + 500);
@@ -307,8 +298,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
   // Test hold, catchup. hold, commit
   @Test
-  public void testCommitAfterCatchup()
-      throws Exception {
+  public void testCommitAfterCatchup() throws Exception {
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
     LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final LongMsgOffset firstOffset = new LongMsgOffset(_startOffsetValue + 500);
@@ -316,12 +306,12 @@ public class LLRealtimeSegmentDataManagerTest {
     // We should consume initially...
     segmentDataManager._consumeOffsets.add(firstOffset);
     segmentDataManager._consumeOffsets.add(catchupOffset); // Offset after catchup
-    final SegmentCompletionProtocol.Response holdResponse1 = new SegmentCompletionProtocol.Response(
-        new SegmentCompletionProtocol.Response.Params()
-            .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.HOLD).
-            withStreamPartitionMsgOffset(firstOffset.toString()));
-    final SegmentCompletionProtocol.Response catchupResponse = new SegmentCompletionProtocol.Response(
-        new SegmentCompletionProtocol.Response.Params()
+    final SegmentCompletionProtocol.Response holdResponse1 =
+        new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params()
+            .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.HOLD)
+            .withStreamPartitionMsgOffset(firstOffset.toString()));
+    final SegmentCompletionProtocol.Response catchupResponse =
+        new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params()
             .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP)
             .withStreamPartitionMsgOffset(catchupOffset.toString()));
     final SegmentCompletionProtocol.Response holdResponse2 = new SegmentCompletionProtocol.Response(
@@ -344,14 +334,13 @@ public class LLRealtimeSegmentDataManagerTest {
     Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
     Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
     Assert.assertTrue(segmentDataManager._commitSegmentCalled);
-    Assert
-        .assertEquals(segmentDataManager._state.get(segmentDataManager), LLRealtimeSegmentDataManager.State.COMMITTED);
+    Assert.assertEquals(segmentDataManager._state.get(segmentDataManager),
+        LLRealtimeSegmentDataManager.State.COMMITTED);
     segmentDataManager.destroy();
   }
 
   @Test
-  public void testDiscarded()
-      throws Exception {
+  public void testDiscarded() throws Exception {
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
     LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final LongMsgOffset endOffset = new LongMsgOffset(_startOffsetValue + 500);
@@ -369,21 +358,20 @@ public class LLRealtimeSegmentDataManagerTest {
     Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
     Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
     Assert.assertFalse(segmentDataManager._commitSegmentCalled);
-    Assert
-        .assertEquals(segmentDataManager._state.get(segmentDataManager), LLRealtimeSegmentDataManager.State.DISCARDED);
+    Assert.assertEquals(segmentDataManager._state.get(segmentDataManager),
+        LLRealtimeSegmentDataManager.State.DISCARDED);
     segmentDataManager.destroy();
   }
 
   @Test
-  public void testRetained()
-      throws Exception {
+  public void testRetained() throws Exception {
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
     LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final LongMsgOffset endOffset = new LongMsgOffset(_startOffsetValue + 500);
     segmentDataManager._consumeOffsets.add(endOffset);
     SegmentCompletionProtocol.Response.Params params = new SegmentCompletionProtocol.Response.Params();
-    params.withStreamPartitionMsgOffset(endOffset.toString()).
-        withStatus(SegmentCompletionProtocol.ControllerResponseStatus.KEEP);
+    params.withStreamPartitionMsgOffset(endOffset.toString())
+        .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.KEEP);
     final SegmentCompletionProtocol.Response keepResponse = new SegmentCompletionProtocol.Response(params);
     segmentDataManager._responses.add(keepResponse);
 
@@ -400,8 +388,7 @@ public class LLRealtimeSegmentDataManagerTest {
   }
 
   @Test
-  public void testNotLeader()
-      throws Exception {
+  public void testNotLeader() throws Exception {
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
     LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final LongMsgOffset endOffset = new LongMsgOffset(_startOffsetValue + 500);
@@ -428,8 +415,7 @@ public class LLRealtimeSegmentDataManagerTest {
   }
 
   @Test
-  public void testConsumingException()
-      throws Exception {
+  public void testConsumingException() throws Exception {
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
     LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
 
@@ -445,8 +431,7 @@ public class LLRealtimeSegmentDataManagerTest {
   // If the state is is COMMITTED or RETAINED, nothing to do
   // If discarded or error state, then downloadAndReplace the segment
   @Test
-  public void testOnlineTransitionAfterStop()
-      throws Exception {
+  public void testOnlineTransitionAfterStop() throws Exception {
     LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
     final long finalOffsetValue = _startOffsetValue + 600;
     final LongMsgOffset finalOffset = new LongMsgOffset(finalOffsetValue);
@@ -542,8 +527,7 @@ public class LLRealtimeSegmentDataManagerTest {
   }
 
   @Test
-  public void testEndCriteriaChecking()
-      throws Exception {
+  public void testEndCriteriaChecking() throws Exception {
     // test reaching max row limit
     {
       FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
@@ -640,8 +624,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
   // If commit fails, make sure that we do not re-build the segment when we try to commit again.
   @Test
-  public void testReuseOfBuiltSegment()
-      throws Exception {
+  public void testReuseOfBuiltSegment() throws Exception {
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
 
     SegmentCompletionProtocol.Response.Params params = new SegmentCompletionProtocol.Response.Params();
@@ -677,8 +660,7 @@ public class LLRealtimeSegmentDataManagerTest {
   // If commit fails, and we still have the file, make sure that we remove the file when we go
   // online.
   @Test
-  public void testFileRemovedDuringOnlineTransition()
-      throws Exception {
+  public void testFileRemovedDuringOnlineTransition() throws Exception {
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
 
     SegmentCompletionProtocol.Response.Params params = new SegmentCompletionProtocol.Response.Params();
@@ -709,8 +691,7 @@ public class LLRealtimeSegmentDataManagerTest {
   }
 
   @Test
-  public void testOnlyOneSegmentHoldingTheSemaphoreForParticularPartition()
-      throws Exception {
+  public void testOnlyOneSegmentHoldingTheSemaphoreForParticularPartition() throws Exception {
     long timeout = 10_000L;
     FakeLLRealtimeSegmentDataManager firstSegmentDataManager = createFakeSegmentManager();
     Assert.assertTrue(firstSegmentDataManager.getAcquiredConsumerSemaphore().get());
@@ -761,8 +742,7 @@ public class LLRealtimeSegmentDataManagerTest {
   }
 
   @Test
-  public void testShutdownTableDataManagerWillNotShutdownLeaseExtenderExecutor()
-      throws Exception {
+  public void testShutdownTableDataManagerWillNotShutdownLeaseExtenderExecutor() throws Exception {
     TableConfig tableConfig = createTableConfig();
     tableConfig.setUpsertConfig(null);
     ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
@@ -773,9 +753,8 @@ public class LLRealtimeSegmentDataManagerTest {
     when(tableDataManagerConfig.getTableName()).thenReturn(tableConfig.getTableName());
     when(tableDataManagerConfig.getDataDir()).thenReturn(FileUtils.getTempDirectoryPath());
 
-    TableDataManager tableDataManager = TableDataManagerProvider
-        .getTableDataManager(tableDataManagerConfig, "testInstance", propertyStore, mock(ServerMetrics.class),
-            mock(HelixManager.class));
+    TableDataManager tableDataManager = TableDataManagerProvider.getTableDataManager(tableDataManagerConfig,
+        "testInstance", propertyStore, mock(ServerMetrics.class), mock(HelixManager.class));
     tableDataManager.start();
     tableDataManager.shutDown();
     Assert.assertFalse(SegmentBuildTimeLeaseExtender.isExecutorShutdown());
@@ -871,8 +850,7 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected boolean consumeLoop()
-        throws Exception {
+    protected boolean consumeLoop() throws Exception {
       if (_throwExceptionFromConsume) {
         throw new PermanentConsumerException(new Throwable("Offset out of range"));
       }
@@ -1007,11 +985,11 @@ public class LLRealtimeSegmentDataManagerTest {
         Field field = LLRealtimeSegmentDataManager.class.getDeclaredField(fieldName);
         field.setAccessible(true);
         StreamPartitionMsgOffset offset = (StreamPartitionMsgOffset) field.get(this);
-//        if (offset == null) {
+        //        if (offset == null) {
         field.set(this, new LongMsgOffset(value));
-//        } else {
-//          offset.setOffset(value);
-//        }
+        //        } else {
+        //          offset.setOffset(value);
+        //        }
       } catch (NoSuchFieldException e) {
         Assert.fail();
       } catch (IllegalAccessException e) {

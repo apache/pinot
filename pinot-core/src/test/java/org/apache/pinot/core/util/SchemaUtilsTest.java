@@ -90,8 +90,9 @@ public class SchemaUtilsTest {
 
     // schema doesn't have destination columns from transformConfigs
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
-        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("colA", "round(colB, 1000)"))))
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setIngestionConfig(
+            new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("colA", "round(colB, 1000)"))))
         .build();
     try {
       SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
@@ -186,16 +187,14 @@ public class SchemaUtilsTest {
     pinotSchema.addField(dateTimeFieldSpec);
     checkValidationFails(pinotSchema);
 
-    pinotSchema =
-        new Schema.SchemaBuilder().addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "time"), null)
-            .build();
+    pinotSchema = new Schema.SchemaBuilder()
+        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "time"), null).build();
     pinotSchema.getFieldSpecFor("time").setTransformFunction("Groovy({function}, time)");
     checkValidationFails(pinotSchema);
 
     // derived transformations
-    pinotSchema =
-        new Schema.SchemaBuilder().addSingleValueDimension("x", DataType.INT).addSingleValueDimension("z", DataType.INT)
-            .build();
+    pinotSchema = new Schema.SchemaBuilder().addSingleValueDimension("x", DataType.INT)
+        .addSingleValueDimension("z", DataType.INT).build();
     pinotSchema.getFieldSpecFor("x").setTransformFunction("Groovy({y + 10}, y)");
     pinotSchema.getFieldSpecFor("z").setTransformFunction("Groovy({x*w*20}, x, w)");
     checkValidationFails(pinotSchema);
@@ -205,21 +204,21 @@ public class SchemaUtilsTest {
   public void testValidateTimeFieldSpec() {
     Schema pinotSchema;
     // time field spec using same name for incoming and outgoing
-    pinotSchema = new Schema.SchemaBuilder()
-        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "time"),
+    pinotSchema =
+        new Schema.SchemaBuilder().addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "time"),
             new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "time")).build();
     checkValidationFails(pinotSchema);
 
     // time field spec using SIMPLE_DATE_FORMAT, not allowed when conversion is needed
     pinotSchema = new Schema.SchemaBuilder()
-        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
-            new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS,
-                TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString(), "outgoing")).build();
+        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incoming"), new TimeGranularitySpec(
+            DataType.INT, TimeUnit.DAYS, TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString(), "outgoing"))
+        .build();
     checkValidationFails(pinotSchema);
 
     // valid time field spec
-    pinotSchema = new Schema.SchemaBuilder()
-        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
+    pinotSchema =
+        new Schema.SchemaBuilder().addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
             new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "outgoing")).build();
     SchemaUtils.validate(pinotSchema);
   }
@@ -272,47 +271,46 @@ public class SchemaUtilsTest {
   }
 
   @Test
-  public void testDateTimeFieldSpec()
-      throws IOException {
+  public void testDateTimeFieldSpec() throws IOException {
     Schema pinotSchema;
-    pinotSchema = Schema.fromString(
-        "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
-            + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"x:HOURS:EPOCH\",\"granularity\":\"1:HOURS\"}]}");
+    pinotSchema = Schema.fromString("{\"schemaName\":\"testSchema\","
+        + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
+        + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"x:HOURS:EPOCH\",\"granularity\":\"1:HOURS\"}]}");
     checkValidationFails(pinotSchema);
 
-    pinotSchema = Schema.fromString(
-        "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
-            + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:DUMMY:EPOCH\",\"granularity\":\"1:HOURS\"}]}");
+    pinotSchema = Schema.fromString("{\"schemaName\":\"testSchema\","
+        + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
+        + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:DUMMY:EPOCH\",\"granularity\":\"1:HOURS\"}]}");
     checkValidationFails(pinotSchema);
 
-    pinotSchema = Schema.fromString(
-        "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
-            + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:HOURS:DUMMY\",\"granularity\":\"1:HOURS\"}]}");
+    pinotSchema = Schema.fromString("{\"schemaName\":\"testSchema\","
+        + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
+        + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:HOURS:DUMMY\",\"granularity\":\"1:HOURS\"}]}");
     checkValidationFails(pinotSchema);
 
-    pinotSchema = Schema.fromString(
-        "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
-            + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:HOURS:EPOCH\",\"granularity\":\"x:HOURS\"}]}");
+    pinotSchema = Schema.fromString("{\"schemaName\":\"testSchema\","
+        + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
+        + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:HOURS:EPOCH\",\"granularity\":\"x:HOURS\"}]}");
     checkValidationFails(pinotSchema);
 
-    pinotSchema = Schema.fromString(
-        "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
-            + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:HOURS:EPOCH\",\"granularity\":\"1:DUMMY\"}]}");
+    pinotSchema = Schema.fromString("{\"schemaName\":\"testSchema\","
+        + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
+        + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:HOURS:EPOCH\",\"granularity\":\"1:DUMMY\"}]}");
     checkValidationFails(pinotSchema);
 
-    pinotSchema = Schema.fromString(
-        "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
-            + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT\",\"granularity\":\"1:DAYS\"}]}");
+    pinotSchema = Schema.fromString("{\"schemaName\":\"testSchema\","
+        + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
+        + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT\",\"granularity\":\"1:DAYS\"}]}");
     checkValidationFails(pinotSchema);
 
-    pinotSchema = Schema.fromString(
-        "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
-            + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:HOURS:EPOCH\",\"granularity\":\"1:HOURS\"}]}");
+    pinotSchema = Schema.fromString("{\"schemaName\":\"testSchema\","
+        + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
+        + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:HOURS:EPOCH\",\"granularity\":\"1:HOURS\"}]}");
     SchemaUtils.validate(pinotSchema);
 
-    pinotSchema = Schema.fromString(
-        "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
-            + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd\",\"granularity\":\"1:DAYS\"}]}");
+    pinotSchema = Schema.fromString("{\"schemaName\":\"testSchema\","
+        + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
+        + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd\",\"granularity\":\"1:DAYS\"}]}");
     SchemaUtils.validate(pinotSchema);
   }
 
@@ -322,33 +320,32 @@ public class SchemaUtilsTest {
    * names later on, we can corresponding tests here.
    */
   @Test
-  public void testColumnNameValidation()
-      throws IOException {
+  public void testColumnNameValidation() throws IOException {
     Schema pinotSchema;
     // A schema all column names does not contains blank space should pass the validation.
-    pinotSchema = Schema.fromString(
-        "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
-            + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd\",\"granularity\":\"1:DAYS\"}]}");
+    pinotSchema = Schema.fromString("{\"schemaName\":\"testSchema\","
+        + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
+        + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd\",\"granularity\":\"1:DAYS\"}]}");
     SchemaUtils.validate(pinotSchema);
     // Validation will fail if dimensionFieldSpecs column name contain blank space.
-    pinotSchema = Schema.fromString(
-        "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim 1\",\"dataType\":\"STRING\"}],"
-            + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd\",\"granularity\":\"1:DAYS\"}]}");
+    pinotSchema = Schema.fromString("{\"schemaName\":\"testSchema\","
+        + "\"dimensionFieldSpecs\":[ {\"name\":\"dim 1\",\"dataType\":\"STRING\"}],"
+        + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd\",\"granularity\":\"1:DAYS\"}]}");
     checkValidationFails(pinotSchema);
     // Validation will fail if dateTimeFieldSpecs column name contain blank space.
-    pinotSchema = Schema.fromString(
-        "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
-            + "\"dateTimeFieldSpecs\":[{\"name\":\"dt 1\",\"dataType\":\"INT\",\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd\",\"granularity\":\"1:DAYS\"}]}");
+    pinotSchema = Schema.fromString("{\"schemaName\":\"testSchema\","
+        + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
+        + "\"dateTimeFieldSpecs\":[{\"name\":\"dt 1\",\"dataType\":\"INT\",\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd\",\"granularity\":\"1:DAYS\"}]}");
     checkValidationFails(pinotSchema);
     // Test case for column name has leading blank space.
-    pinotSchema = Schema.fromString(
-        "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\" dim1\",\"dataType\":\"STRING\"}],"
-            + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd\",\"granularity\":\"1:DAYS\"}]}");
+    pinotSchema = Schema.fromString("{\"schemaName\":\"testSchema\","
+        + "\"dimensionFieldSpecs\":[ {\"name\":\" dim1\",\"dataType\":\"STRING\"}],"
+        + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd\",\"granularity\":\"1:DAYS\"}]}");
     checkValidationFails(pinotSchema);
     // Test case for column name has trailing blank space.
-    pinotSchema = Schema.fromString(
-        "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
-            + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1  \",\"dataType\":\"INT\",\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd\",\"granularity\":\"1:DAYS\"}]}");
+    pinotSchema = Schema.fromString("{\"schemaName\":\"testSchema\","
+        + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
+        + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1  \",\"dataType\":\"INT\",\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd\",\"granularity\":\"1:DAYS\"}]}");
     checkValidationFails(pinotSchema);
   }
 

@@ -35,14 +35,12 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
   }
 
   @Override
-  public void fetchSegmentToLocal(URI uri, File dest)
-      throws Exception {
+  public void fetchSegmentToLocal(URI uri, File dest) throws Exception {
     RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
       try {
         int statusCode = _httpClient.downloadFile(uri, dest, _authToken);
-        _logger
-            .info("Downloaded segment from: {} to: {} of size: {}; Response status code: {}", uri, dest, dest.length(),
-                statusCode);
+        _logger.info("Downloaded segment from: {} to: {} of size: {}; Response status code: {}", uri, dest,
+            dest.length(), statusCode);
         return true;
       } catch (HttpErrorStatusException e) {
         int statusCode = e.getStatusCode();
@@ -65,14 +63,12 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
   }
 
   @Override
-  public void fetchSegmentToLocalWithoutRetry(URI uri, File dest)
-      throws Exception {
+  public void fetchSegmentToLocalWithoutRetry(URI uri, File dest) throws Exception {
     try {
       int statusCode = _httpClient.downloadFile(uri, dest, _authToken);
-      _logger
-          .info("Downloaded segment from: {} to: {} of size: {}; Response status code: {}", uri, dest, dest.length(),
-              statusCode);
-    }  catch (Exception e) {
+      _logger.info("Downloaded segment from: {} to: {} of size: {}; Response status code: {}", uri, dest, dest.length(),
+          statusCode);
+    } catch (Exception e) {
       _logger.warn("Caught exception while downloading segment from: {} to: {}", uri, dest, e);
       throw e;
     }

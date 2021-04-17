@@ -61,8 +61,7 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster
@@ -96,8 +95,7 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
     waitForAllDocsLoaded(60_000);
   }
 
-  private File createAvroFile()
-      throws Exception {
+  private File createAvroFile() throws Exception {
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
     org.apache.avro.Schema stringKeyMapAvroSchema =
         org.apache.avro.Schema.createMap(org.apache.avro.Schema.create(Type.INT));
@@ -128,8 +126,7 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Test
-  public void testJsonPathQueries()
-      throws Exception {
+  public void testJsonPathQueries() throws Exception {
     // Selection only
     String query = "SELECT stringKeyMapStr FROM " + getTableName();
     JsonNode pinotResponse = postQuery(query);
@@ -274,8 +271,7 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Test
-  public void testQueries()
-      throws Exception {
+  public void testQueries() throws Exception {
     // Selection only
     String query = "SELECT mapValue(stringKeyMap__KEYS, 'k1', stringKeyMap__VALUES) FROM " + getTableName();
     JsonNode pinotResponse = postQuery(query);
@@ -404,8 +400,7 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     dropOfflineTable(getTableName());
 
     stopServer();

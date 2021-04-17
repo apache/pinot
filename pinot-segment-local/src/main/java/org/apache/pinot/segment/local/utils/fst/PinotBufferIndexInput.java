@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.utils.fst;
 
-
 import java.io.IOException;
 import org.apache.lucene.store.IndexInput;
 import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
@@ -31,59 +30,55 @@ import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
  *
  */
 public class PinotBufferIndexInput extends IndexInput {
-    PinotDataBuffer pinotDataBuffer;
-    Long sliceOffset;
-    Long readPointerOffset;
-    Long length;
+  PinotDataBuffer pinotDataBuffer;
+  Long sliceOffset;
+  Long readPointerOffset;
+  Long length;
 
-    public PinotBufferIndexInput(
-            PinotDataBuffer pinotDataBuffer,
-            Long offset, Long length) {
-        super("");
-        this.pinotDataBuffer = pinotDataBuffer;
-        this.sliceOffset = offset;
-        this.readPointerOffset = offset;
-        this.length = length;
+  public PinotBufferIndexInput(PinotDataBuffer pinotDataBuffer, Long offset, Long length) {
+    super("");
+    this.pinotDataBuffer = pinotDataBuffer;
+    this.sliceOffset = offset;
+    this.readPointerOffset = offset;
+    this.length = length;
+  }
+
+  @Override
+  public void close() throws IOException {
+  }
+
+  @Override
+  public long getFilePointer() {
+    return this.readPointerOffset;
+  }
+
+  @Override
+  public void seek(long l) throws IOException {
+    this.readPointerOffset = this.sliceOffset + l;
+  }
+
+  @Override
+  public long length() {
+    return this.length;
+  }
+
+  @Override
+  public IndexInput slice(String s, long l, long l1) throws IOException {
+    return new PinotBufferIndexInput(this.pinotDataBuffer, this.sliceOffset + l, l1);
+  }
+
+  @Override
+  public byte readByte() throws IOException {
+    Byte b = this.pinotDataBuffer.getByte(this.readPointerOffset);
+    this.readPointerOffset += 1;
+    return b;
+  }
+
+  @Override
+  public void readBytes(byte[] bytes, int destOffset, int length) throws IOException {
+    for (int i = 0; i < length; i++) {
+      bytes[destOffset] = readByte();
+      destOffset += 1;
     }
-
-
-    @Override
-    public void close() throws IOException {
-    }
-
-    @Override
-    public long getFilePointer() {
-        return this.readPointerOffset;
-    }
-
-    @Override
-    public void seek(long l) throws IOException {
-        this.readPointerOffset = this.sliceOffset + l;
-    }
-
-    @Override
-    public long length() {
-        return this.length;
-    }
-
-    @Override
-    public IndexInput slice(String s, long l, long l1) throws IOException {
-        return new PinotBufferIndexInput(
-                this.pinotDataBuffer, this.sliceOffset + l, l1);
-    }
-
-    @Override
-    public byte readByte() throws IOException {
-        Byte b = this.pinotDataBuffer.getByte(this.readPointerOffset);
-        this.readPointerOffset += 1;
-        return b;
-    }
-
-    @Override
-    public void readBytes(byte[] bytes, int destOffset, int length) throws IOException {
-        for (int i = 0; i < length; i++) {
-            bytes[destOffset] = readByte();
-            destOffset += 1;
-        }
-    }
+  }
 }

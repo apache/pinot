@@ -44,8 +44,7 @@ public class ValidationManagerStatelessTest extends ControllerTest {
   private TableConfig _offlineTableConfig;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     startZk();
     startController();
     addFakeBrokerInstancesToAutoJoinHelixCluster(2, true);
@@ -57,8 +56,7 @@ public class ValidationManagerStatelessTest extends ControllerTest {
   }
 
   @Test
-  public void testRebuildBrokerResourceWhenBrokerAdded()
-      throws Exception {
+  public void testRebuildBrokerResourceWhenBrokerAdded() throws Exception {
     // Check that the first table we added doesn't need to be rebuilt(case where ideal state brokers and brokers in broker resource are the same.
     String partitionName = _offlineTableConfig.getTableName();
     HelixAdmin helixAdmin = _helixManager.getClusterManagmentTool();

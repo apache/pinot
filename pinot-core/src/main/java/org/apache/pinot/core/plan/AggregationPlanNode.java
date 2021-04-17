@@ -62,9 +62,8 @@ public class AggregationPlanNode implements PlanNode {
             if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, null,
                 predicateEvaluatorsMap.keySet())) {
               _transformPlanNode = null;
-              _starTreeTransformPlanNode =
-                  new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, null,
-                      predicateEvaluatorsMap, queryContext.getDebugOptions());
+              _starTreeTransformPlanNode = new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs,
+                  null, predicateEvaluatorsMap, queryContext.getDebugOptions());
               return;
             }
           }

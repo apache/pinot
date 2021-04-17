@@ -48,11 +48,11 @@ public class StarTreeIndexContainer implements Closeable {
       throws ConfigurationException, IOException {
     File indexFile = new File(segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME);
     if (readMode == ReadMode.heap) {
-      _dataBuffer = PinotDataBuffer
-          .loadFile(indexFile, 0, indexFile.length(), ByteOrder.LITTLE_ENDIAN, "Star-tree V2 data buffer");
+      _dataBuffer = PinotDataBuffer.loadFile(indexFile, 0, indexFile.length(), ByteOrder.LITTLE_ENDIAN,
+          "Star-tree V2 data buffer");
     } else {
-      _dataBuffer = PinotDataBuffer
-          .mapFile(indexFile, true, 0, indexFile.length(), ByteOrder.LITTLE_ENDIAN, "Star-tree V2 data buffer");
+      _dataBuffer = PinotDataBuffer.mapFile(indexFile, true, 0, indexFile.length(), ByteOrder.LITTLE_ENDIAN,
+          "Star-tree V2 data buffer");
     }
     File indexMapFile = new File(segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME);
     List<Map<IndexKey, IndexValue>> indexMapList =
@@ -65,8 +65,7 @@ public class StarTreeIndexContainer implements Closeable {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _dataBuffer.close();
   }
 }

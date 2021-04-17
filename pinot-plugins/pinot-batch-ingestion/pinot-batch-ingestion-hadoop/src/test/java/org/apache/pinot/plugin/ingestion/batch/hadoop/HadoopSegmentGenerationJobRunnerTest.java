@@ -46,6 +46,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+
 public class HadoopSegmentGenerationJobRunnerTest {
 
   @Test
@@ -68,20 +69,14 @@ public class HadoopSegmentGenerationJobRunnerTest {
     // Set up schema file.
     final String schemaName = "mySchema";
     File schemaFile = new File(testDir, "schema");
-    Schema schema = new SchemaBuilder()
-      .setSchemaName(schemaName)
-      .addSingleValueDimension("col1", DataType.STRING)
-      .addMetric("col2", DataType.INT)
-      .build();
+    Schema schema = new SchemaBuilder().setSchemaName(schemaName).addSingleValueDimension("col1", DataType.STRING)
+        .addMetric("col2", DataType.INT).build();
     FileUtils.write(schemaFile, schema.toPrettyJsonString(), StandardCharsets.UTF_8);
 
     // Set up table config file.
     File tableConfigFile = new File(testDir, "tableConfig");
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-      .setTableName("myTable")
-      .setSchemaName(schemaName)
-      .setNumReplicas(1)
-      .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable")
+        .setSchemaName(schemaName).setNumReplicas(1).build();
     FileUtils.write(tableConfigFile, tableConfig.toJsonString(), StandardCharsets.UTF_8);
 
     File stagingDir = new File(testDir, "staging");

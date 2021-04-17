@@ -42,8 +42,8 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     super(arguments.get(0));
     int numExpressions = arguments.size();
     // This function expects 1 or 2 arguments.
-    Preconditions
-        .checkArgument(numExpressions <= 2, "DistinctCountHLL expects 1 or 2 arguments, got: %s", numExpressions);
+    Preconditions.checkArgument(numExpressions <= 2, "DistinctCountHLL expects 1 or 2 arguments, got: %s",
+        numExpressions);
     if (arguments.size() == 2) {
       _log2m = Integer.parseInt(arguments.get(1).getLiteral());
     } else {
@@ -255,8 +255,8 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
                 hyperLogLog.addAll(value);
               } else {
                 // Create a new HyperLogLog for the group
-                groupByResultHolder
-                    .setValueForKey(groupKey, ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]));
+                groupByResultHolder.setValueForKey(groupKey,
+                    ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]));
               }
             }
           }
@@ -296,8 +296,8 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       if (intermediateResult1.cardinality() == 0) {
         return intermediateResult2;
       } else {
-        Preconditions
-            .checkState(intermediateResult2.cardinality() == 0, "Cannot merge HyperLogLogs of different sizes");
+        Preconditions.checkState(intermediateResult2.cardinality() == 0,
+            "Cannot merge HyperLogLogs of different sizes");
         return intermediateResult1;
       }
     }

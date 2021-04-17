@@ -30,15 +30,17 @@ public class ValidateTableRetention extends AbstractBaseCommand implements Comma
   @Option(name = "-clusterName", required = true, metaVar = "<string>", usage = "Pinot cluster name")
   private String _clusterName;
 
-  @Option(name = "-tableNamePattern", required = false, metaVar = "<string>", usage = "Optional table name pattern to trigger adding inverted index, default: null (match any table name)")
+  @Option(name = "-tableNamePattern", required = false, metaVar = "<string>",
+      usage = "Optional table name pattern to trigger adding inverted index, default: null (match any table name)")
   private String _tableNamePattern = null;
 
-  @Option(name = "-durationInDaysThreshold", required = false, metaVar = "<long>", usage =
-      "Optional duration in days threshold to log a warning for table with too large retention time, default: "
+  @Option(name = "-durationInDaysThreshold", required = false, metaVar = "<long>",
+      usage = "Optional duration in days threshold to log a warning for table with too large retention time, default: "
           + TableRetentionValidator.DEFAULT_DURATION_IN_DAYS_THRESHOLD)
   private long _durationInDaysThreshold = TableRetentionValidator.DEFAULT_DURATION_IN_DAYS_THRESHOLD;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -57,8 +59,7 @@ public class ValidateTableRetention extends AbstractBaseCommand implements Comma
   }
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
     TableRetentionValidator tableRetentionValidator = new TableRetentionValidator(_zkAddress, _clusterName);
     tableRetentionValidator.overrideDefaultSettings(_tableNamePattern, _durationInDaysThreshold);
     tableRetentionValidator.run();

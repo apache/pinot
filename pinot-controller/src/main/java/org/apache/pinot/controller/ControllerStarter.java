@@ -196,24 +196,23 @@ public class ControllerStarter implements ServiceStartable {
     // NOTE: Helix will disconnect the manager and disable the instance if it detects flapping (too frequent disconnect
     // from ZooKeeper). Setting flapping time window to a small value can avoid this from happening. Helix ignores the
     // non-positive value, so set the default value as 1.
-    System.setProperty(SystemPropertyKeys.FLAPPING_TIME_WINDOW, _config
-        .getProperty(CommonConstants.Helix.CONFIG_OF_CONTROLLER_FLAPPING_TIME_WINDOW_MS,
+    System.setProperty(SystemPropertyKeys.FLAPPING_TIME_WINDOW,
+        _config.getProperty(CommonConstants.Helix.CONFIG_OF_CONTROLLER_FLAPPING_TIME_WINDOW_MS,
             CommonConstants.Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
   }
 
   private void setupHelixClusterConstraints() {
-    String maxStateTransitions = _config
-        .getProperty(CommonConstants.Helix.CONFIG_OF_HELIX_INSTANCE_MAX_STATE_TRANSITIONS,
+    String maxStateTransitions =
+        _config.getProperty(CommonConstants.Helix.CONFIG_OF_HELIX_INSTANCE_MAX_STATE_TRANSITIONS,
             CommonConstants.Helix.DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS);
     Map<ClusterConstraints.ConstraintAttribute, String> constraintAttributes = new HashMap<>();
     constraintAttributes.put(ClusterConstraints.ConstraintAttribute.INSTANCE, ".*");
-    constraintAttributes
-        .put(ClusterConstraints.ConstraintAttribute.MESSAGE_TYPE, Message.MessageType.STATE_TRANSITION.name());
+    constraintAttributes.put(ClusterConstraints.ConstraintAttribute.MESSAGE_TYPE,
+        Message.MessageType.STATE_TRANSITION.name());
     ConstraintItem constraintItem = new ConstraintItem(constraintAttributes, maxStateTransitions);
 
-    _helixControllerManager.getClusterManagmentTool()
-        .setConstraint(_helixClusterName, ClusterConstraints.ConstraintType.MESSAGE_CONSTRAINT,
-            MAX_STATE_TRANSITIONS_PER_INSTANCE, constraintItem);
+    _helixControllerManager.getClusterManagmentTool().setConstraint(_helixClusterName,
+        ClusterConstraints.ConstraintType.MESSAGE_CONSTRAINT, MAX_STATE_TRANSITIONS_PER_INSTANCE, constraintItem);
   }
 
   public PinotHelixResourceManager getHelixResourceManager() {
@@ -320,8 +319,8 @@ public class ControllerStarter implements ServiceStartable {
   private void setUpPinotController() {
     // install default SSL context if necessary (even if not force-enabled everywhere)
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_config, ControllerConf.CONTROLLER_TLS_PREFIX);
-    if (StringUtils.isNotBlank(tlsDefaults.getKeyStorePath()) || StringUtils
-        .isNotBlank(tlsDefaults.getTrustStorePath())) {
+    if (StringUtils.isNotBlank(tlsDefaults.getKeyStorePath())
+        || StringUtils.isNotBlank(tlsDefaults.getTrustStorePath())) {
       LOGGER.info("Installing default SSL context for any client requests");
       TlsUtils.installDefaultSSLSocketFactory(tlsDefaults);
     }
@@ -337,8 +336,8 @@ public class ControllerStarter implements ServiceStartable {
     initPinotCrypterFactory();
 
     LOGGER.info("Initializing Helix participant manager");
-    _helixParticipantManager = HelixManagerFactory
-        .getZKHelixManager(_helixClusterName, _helixParticipantInstanceId, InstanceType.PARTICIPANT, _helixZkURL);
+    _helixParticipantManager = HelixManagerFactory.getZKHelixManager(_helixClusterName, _helixParticipantInstanceId,
+        InstanceType.PARTICIPANT, _helixZkURL);
 
     // LeadControllerManager needs to be initialized before registering as Helix participant.
     LOGGER.info("Initializing lead controller manager");
@@ -364,9 +363,8 @@ public class ControllerStarter implements ServiceStartable {
         new PinotLLCRealtimeSegmentManager(_helixResourceManager, _config, _controllerMetrics);
     // TODO: Need to put this inside HelixResourceManager when HelixControllerLeadershipManager is removed.
     _helixResourceManager.registerPinotLLCRealtimeSegmentManager(_pinotLLCRealtimeSegmentManager);
-    _segmentCompletionManager =
-        new SegmentCompletionManager(_helixParticipantManager, _pinotLLCRealtimeSegmentManager, _controllerMetrics,
-            _leadControllerManager, _config.getSegmentCommitTimeoutSeconds());
+    _segmentCompletionManager = new SegmentCompletionManager(_helixParticipantManager, _pinotLLCRealtimeSegmentManager,
+        _controllerMetrics, _leadControllerManager, _config.getSegmentCommitTimeoutSeconds());
 
     if (_config.getHLCTablesAllowed()) {
       LOGGER.info("Realtime tables with High Level consumers will be supported");
@@ -567,16 +565,14 @@ public class ControllerStarter implements ServiceStartable {
   protected List<PeriodicTask> setupControllerPeriodicTasks() {
     LOGGER.info("Setting up periodic tasks");
     List<PeriodicTask> periodicTasks = new ArrayList<>();
-    _taskManager =
-        new PinotTaskManager(_helixTaskResourceManager, _helixResourceManager, _leadControllerManager, _config,
-            _controllerMetrics);
+    _taskManager = new PinotTaskManager(_helixTaskResourceManager, _helixResourceManager, _leadControllerManager,
+        _config, _controllerMetrics);
     periodicTasks.add(_taskManager);
     _retentionManager =
         new RetentionManager(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
     periodicTasks.add(_retentionManager);
-    _offlineSegmentIntervalChecker =
-        new OfflineSegmentIntervalChecker(_config, _helixResourceManager, _leadControllerManager,
-            new ValidationMetrics(_metricsRegistry), _controllerMetrics);
+    _offlineSegmentIntervalChecker = new OfflineSegmentIntervalChecker(_config, _helixResourceManager,
+        _leadControllerManager, new ValidationMetrics(_metricsRegistry), _controllerMetrics);
     periodicTasks.add(_offlineSegmentIntervalChecker);
     _realtimeSegmentValidationManager =
         new RealtimeSegmentValidationManager(_config, _helixResourceManager, _leadControllerManager,

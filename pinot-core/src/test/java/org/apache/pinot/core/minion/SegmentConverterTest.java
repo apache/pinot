@@ -63,8 +63,7 @@ public class SegmentConverterTest {
   private TableConfig _tableConfig;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteDirectory(WORKING_DIR);
     _segmentIndexDirList = new ArrayList<>(NUM_SEGMENTS);
 
@@ -101,12 +100,10 @@ public class SegmentConverterTest {
   }
 
   @Test
-  public void testSegmentConcatenate()
-      throws Exception {
-    SegmentConverter segmentConverter =
-        new SegmentConverter.Builder().setTableName(TABLE_NAME).setSegmentName("segmentConcatenate")
-            .setInputIndexDirs(_segmentIndexDirList).setWorkingDir(WORKING_DIR).setRecordTransformer((row) -> row)
-            .setTotalNumPartition(1).setTableConfig(_tableConfig).build();
+  public void testSegmentConcatenate() throws Exception {
+    SegmentConverter segmentConverter = new SegmentConverter.Builder().setTableName(TABLE_NAME)
+        .setSegmentName("segmentConcatenate").setInputIndexDirs(_segmentIndexDirList).setWorkingDir(WORKING_DIR)
+        .setRecordTransformer((row) -> row).setTotalNumPartition(1).setTableConfig(_tableConfig).build();
 
     List<File> result = segmentConverter.convertSegment();
 
@@ -135,15 +132,13 @@ public class SegmentConverterTest {
   }
 
   @Test
-  public void testSegmentRollupWithTimeConversion()
-      throws Exception {
-    SegmentConverter segmentConverter =
-        new SegmentConverter.Builder().setTableName(TABLE_NAME).setSegmentName("segmentRollupWithTimeConversion")
-            .setInputIndexDirs(_segmentIndexDirList).setWorkingDir(WORKING_DIR).setSkipTimeValueCheck(false)
-            .setRecordTransformer((row) -> {
-              row.putValue(T, BASE_TIMESTAMP);
-              return row;
-            }).setGroupByColumns(Arrays.asList(D1, D2, T)).setRecordAggregator((rows) -> {
+  public void testSegmentRollupWithTimeConversion() throws Exception {
+    SegmentConverter segmentConverter = new SegmentConverter.Builder().setTableName(TABLE_NAME)
+        .setSegmentName("segmentRollupWithTimeConversion").setInputIndexDirs(_segmentIndexDirList)
+        .setWorkingDir(WORKING_DIR).setSkipTimeValueCheck(false).setRecordTransformer((row) -> {
+          row.putValue(T, BASE_TIMESTAMP);
+          return row;
+        }).setGroupByColumns(Arrays.asList(D1, D2, T)).setRecordAggregator((rows) -> {
           GenericRow result = rows.get(0);
           for (int i = 1; i < rows.size(); i++) {
             GenericRow current = rows.get(i);
@@ -179,12 +174,10 @@ public class SegmentConverterTest {
   }
 
   @Test
-  public void testMultipleOutput()
-      throws Exception {
-    SegmentConverter segmentConverter =
-        new SegmentConverter.Builder().setTableName(TABLE_NAME).setSegmentName("segmentConcatenate")
-            .setInputIndexDirs(_segmentIndexDirList).setWorkingDir(WORKING_DIR).setRecordTransformer((row) -> row)
-            .setTotalNumPartition(3).setTableConfig(_tableConfig).build();
+  public void testMultipleOutput() throws Exception {
+    SegmentConverter segmentConverter = new SegmentConverter.Builder().setTableName(TABLE_NAME)
+        .setSegmentName("segmentConcatenate").setInputIndexDirs(_segmentIndexDirList).setWorkingDir(WORKING_DIR)
+        .setRecordTransformer((row) -> row).setTotalNumPartition(3).setTableConfig(_tableConfig).build();
 
     List<File> result = segmentConverter.convertSegment();
 
@@ -205,8 +198,7 @@ public class SegmentConverterTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     FileUtils.deleteDirectory(WORKING_DIR);
   }
 }

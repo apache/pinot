@@ -64,18 +64,15 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
     return Integer.parseInt(processName.split("@")[0]);
   }
 
-  public static String sendPostRequest(String urlString, String payload)
-      throws IOException {
+  public static String sendPostRequest(String urlString, String payload) throws IOException {
     return sendRequest("POST", urlString, payload);
   }
 
-  public static String sendDeleteRequest(String urlString, String payload)
-      throws IOException {
+  public static String sendDeleteRequest(String urlString, String payload) throws IOException {
     return sendRequest("DELETE", urlString, payload);
   }
 
-  public static String sendRequest(String requestMethod, String urlString, String payload)
-      throws IOException {
+  public static String sendRequest(String requestMethod, String urlString, String payload) throws IOException {
     return sendRequest(requestMethod, urlString, payload, Collections.emptyList());
   }
 
@@ -88,8 +85,8 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
     conn.setRequestMethod(requestMethod);
     conn.setDoOutput(true);
     if (payload != null) {
-      final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(),
-          StandardCharsets.UTF_8));
+      final BufferedWriter writer =
+          new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(), StandardCharsets.UTF_8));
       writer.write(payload, 0, payload.length());
       writer.flush();
     }
@@ -111,15 +108,13 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
     return sb.toString();
   }
 
-  protected void savePID(String fileName)
-      throws IOException {
+  protected void savePID(String fileName) throws IOException {
     FileWriter pidFile = new FileWriter(fileName);
     pidFile.write(getPID());
     pidFile.close();
   }
 
-  Map<String, Object> readConfigFromFile(String configFileName)
-      throws ConfigurationException {
+  Map<String, Object> readConfigFromFile(String configFileName) throws ConfigurationException {
     return PinotConfigUtils.readConfigFromFile(configFileName);
   }
 

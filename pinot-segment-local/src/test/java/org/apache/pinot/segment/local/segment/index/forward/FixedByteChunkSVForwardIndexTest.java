@@ -50,8 +50,7 @@ public class FixedByteChunkSVForwardIndexTest {
   private static final Random RANDOM = new Random();
 
   @Test
-  public void testWithCompression()
-      throws Exception {
+  public void testWithCompression() throws Exception {
     ChunkCompressionType compressionType = ChunkCompressionType.SNAPPY;
     testInt(compressionType);
     testLong(compressionType);
@@ -60,8 +59,7 @@ public class FixedByteChunkSVForwardIndexTest {
   }
 
   @Test
-  public void testWithoutCompression()
-      throws Exception {
+  public void testWithoutCompression() throws Exception {
     ChunkCompressionType compressionType = ChunkCompressionType.PASS_THROUGH;
     testInt(compressionType);
     testLong(compressionType);
@@ -69,8 +67,7 @@ public class FixedByteChunkSVForwardIndexTest {
     testDouble(compressionType);
   }
 
-  public void testInt(ChunkCompressionType compressionType)
-      throws Exception {
+  public void testInt(ChunkCompressionType compressionType) throws Exception {
     int[] expected = new int[NUM_VALUES];
     for (int i = 0; i < NUM_VALUES; i++) {
       expected[i] = RANDOM.nextInt();
@@ -82,26 +79,28 @@ public class FixedByteChunkSVForwardIndexTest {
     FileUtils.deleteQuietly(outFileEightByte);
 
     // test both formats (4-byte chunk offsets and 8-byte chunk offsets)
-    try (FixedByteChunkSVForwardIndexWriter fourByteOffsetWriter = new FixedByteChunkSVForwardIndexWriter(
-        outFileFourByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Integer.BYTES,
-        BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
-        FixedByteChunkSVForwardIndexWriter eightByteOffsetWriter = new FixedByteChunkSVForwardIndexWriter(
-            outFileEightByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Integer.BYTES,
-            BaseChunkSVForwardIndexWriter.CURRENT_VERSION)) {
+    try (
+        FixedByteChunkSVForwardIndexWriter fourByteOffsetWriter =
+            new FixedByteChunkSVForwardIndexWriter(outFileFourByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
+                Integer.BYTES, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
+        FixedByteChunkSVForwardIndexWriter eightByteOffsetWriter =
+            new FixedByteChunkSVForwardIndexWriter(outFileEightByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
+                Integer.BYTES, BaseChunkSVForwardIndexWriter.CURRENT_VERSION)) {
       for (int value : expected) {
         fourByteOffsetWriter.putInt(value);
         eightByteOffsetWriter.putInt(value);
       }
     }
 
-    try (FixedByteChunkSVForwardIndexReader fourByteOffsetReader = new FixedByteChunkSVForwardIndexReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.INT);
-        BaseChunkSVForwardIndexReader.ChunkReaderContext fourByteOffsetReaderContext = fourByteOffsetReader
-            .createContext();
+    try (
+        FixedByteChunkSVForwardIndexReader fourByteOffsetReader = new FixedByteChunkSVForwardIndexReader(
+            PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.INT);
+        BaseChunkSVForwardIndexReader.ChunkReaderContext fourByteOffsetReaderContext =
+            fourByteOffsetReader.createContext();
         FixedByteChunkSVForwardIndexReader eightByteOffsetReader = new FixedByteChunkSVForwardIndexReader(
             PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte), DataType.INT);
-        BaseChunkSVForwardIndexReader.ChunkReaderContext eightByteOffsetReaderContext = eightByteOffsetReader
-            .createContext()) {
+        BaseChunkSVForwardIndexReader.ChunkReaderContext eightByteOffsetReaderContext =
+            eightByteOffsetReader.createContext()) {
       for (int i = 0; i < NUM_VALUES; i++) {
         Assert.assertEquals(fourByteOffsetReader.getInt(i, fourByteOffsetReaderContext), expected[i]);
         Assert.assertEquals(eightByteOffsetReader.getInt(i, eightByteOffsetReaderContext), expected[i]);
@@ -112,8 +111,7 @@ public class FixedByteChunkSVForwardIndexTest {
     FileUtils.deleteQuietly(outFileEightByte);
   }
 
-  public void testLong(ChunkCompressionType compressionType)
-      throws Exception {
+  public void testLong(ChunkCompressionType compressionType) throws Exception {
     long[] expected = new long[NUM_VALUES];
     for (int i = 0; i < NUM_VALUES; i++) {
       expected[i] = RANDOM.nextLong();
@@ -125,26 +123,28 @@ public class FixedByteChunkSVForwardIndexTest {
     FileUtils.deleteQuietly(outFileEightByte);
 
     // test both formats (4-byte chunk offsets and 8-byte chunk offsets)
-    try (FixedByteChunkSVForwardIndexWriter fourByteOffsetWriter = new FixedByteChunkSVForwardIndexWriter(
-        outFileFourByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Long.BYTES,
-        BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
-        FixedByteChunkSVForwardIndexWriter eightByteOffsetWriter = new FixedByteChunkSVForwardIndexWriter(
-            outFileEightByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Long.BYTES,
-            BaseChunkSVForwardIndexWriter.CURRENT_VERSION)) {
+    try (
+        FixedByteChunkSVForwardIndexWriter fourByteOffsetWriter =
+            new FixedByteChunkSVForwardIndexWriter(outFileFourByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
+                Long.BYTES, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
+        FixedByteChunkSVForwardIndexWriter eightByteOffsetWriter =
+            new FixedByteChunkSVForwardIndexWriter(outFileEightByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
+                Long.BYTES, BaseChunkSVForwardIndexWriter.CURRENT_VERSION)) {
       for (long value : expected) {
         fourByteOffsetWriter.putLong(value);
         eightByteOffsetWriter.putLong(value);
       }
     }
 
-    try (FixedByteChunkSVForwardIndexReader fourByteOffsetReader = new FixedByteChunkSVForwardIndexReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.LONG);
-        BaseChunkSVForwardIndexReader.ChunkReaderContext fourByteOffsetReaderContext = fourByteOffsetReader
-            .createContext();
+    try (
+        FixedByteChunkSVForwardIndexReader fourByteOffsetReader = new FixedByteChunkSVForwardIndexReader(
+            PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.LONG);
+        BaseChunkSVForwardIndexReader.ChunkReaderContext fourByteOffsetReaderContext =
+            fourByteOffsetReader.createContext();
         FixedByteChunkSVForwardIndexReader eightByteOffsetReader = new FixedByteChunkSVForwardIndexReader(
             PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte), DataType.LONG);
-        BaseChunkSVForwardIndexReader.ChunkReaderContext eightByteOffsetReaderContext = eightByteOffsetReader
-            .createContext()) {
+        BaseChunkSVForwardIndexReader.ChunkReaderContext eightByteOffsetReaderContext =
+            eightByteOffsetReader.createContext()) {
       for (int i = 0; i < NUM_VALUES; i++) {
         Assert.assertEquals(fourByteOffsetReader.getLong(i, fourByteOffsetReaderContext), expected[i]);
         Assert.assertEquals(eightByteOffsetReader.getLong(i, eightByteOffsetReaderContext), expected[i]);
@@ -155,8 +155,7 @@ public class FixedByteChunkSVForwardIndexTest {
     FileUtils.deleteQuietly(outFileEightByte);
   }
 
-  public void testFloat(ChunkCompressionType compressionType)
-      throws Exception {
+  public void testFloat(ChunkCompressionType compressionType) throws Exception {
     float[] expected = new float[NUM_VALUES];
     for (int i = 0; i < NUM_VALUES; i++) {
       expected[i] = RANDOM.nextFloat();
@@ -168,26 +167,28 @@ public class FixedByteChunkSVForwardIndexTest {
     FileUtils.deleteQuietly(outFileEightByte);
 
     // test both formats (4-byte chunk offsets and 8-byte chunk offsets)
-    try (FixedByteChunkSVForwardIndexWriter fourByteOffsetWriter = new FixedByteChunkSVForwardIndexWriter(
-        outFileFourByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Float.BYTES,
-        BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
-        FixedByteChunkSVForwardIndexWriter eightByteOffsetWriter = new FixedByteChunkSVForwardIndexWriter(
-            outFileEightByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Float.BYTES,
-            BaseChunkSVForwardIndexWriter.CURRENT_VERSION)) {
+    try (
+        FixedByteChunkSVForwardIndexWriter fourByteOffsetWriter =
+            new FixedByteChunkSVForwardIndexWriter(outFileFourByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
+                Float.BYTES, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
+        FixedByteChunkSVForwardIndexWriter eightByteOffsetWriter =
+            new FixedByteChunkSVForwardIndexWriter(outFileEightByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
+                Float.BYTES, BaseChunkSVForwardIndexWriter.CURRENT_VERSION)) {
       for (float value : expected) {
         fourByteOffsetWriter.putFloat(value);
         eightByteOffsetWriter.putFloat(value);
       }
     }
 
-    try (FixedByteChunkSVForwardIndexReader fourByteOffsetReader = new FixedByteChunkSVForwardIndexReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.FLOAT);
-        BaseChunkSVForwardIndexReader.ChunkReaderContext fourByteOffsetReaderContext = fourByteOffsetReader
-            .createContext();
+    try (
+        FixedByteChunkSVForwardIndexReader fourByteOffsetReader = new FixedByteChunkSVForwardIndexReader(
+            PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.FLOAT);
+        BaseChunkSVForwardIndexReader.ChunkReaderContext fourByteOffsetReaderContext =
+            fourByteOffsetReader.createContext();
         FixedByteChunkSVForwardIndexReader eightByteOffsetReader = new FixedByteChunkSVForwardIndexReader(
             PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte), DataType.FLOAT);
-        BaseChunkSVForwardIndexReader.ChunkReaderContext eightByteOffsetReaderContext = eightByteOffsetReader
-            .createContext()) {
+        BaseChunkSVForwardIndexReader.ChunkReaderContext eightByteOffsetReaderContext =
+            eightByteOffsetReader.createContext()) {
       for (int i = 0; i < NUM_VALUES; i++) {
         Assert.assertEquals(fourByteOffsetReader.getFloat(i, fourByteOffsetReaderContext), expected[i]);
         Assert.assertEquals(eightByteOffsetReader.getFloat(i, eightByteOffsetReaderContext), expected[i]);
@@ -198,8 +199,7 @@ public class FixedByteChunkSVForwardIndexTest {
     FileUtils.deleteQuietly(outFileEightByte);
   }
 
-  public void testDouble(ChunkCompressionType compressionType)
-      throws Exception {
+  public void testDouble(ChunkCompressionType compressionType) throws Exception {
     double[] expected = new double[NUM_VALUES];
     for (int i = 0; i < NUM_VALUES; i++) {
       expected[i] = RANDOM.nextDouble();
@@ -211,26 +211,28 @@ public class FixedByteChunkSVForwardIndexTest {
     FileUtils.deleteQuietly(outFileEightByte);
 
     // test both formats (4-byte chunk offsets and 8-byte chunk offsets)
-    try (FixedByteChunkSVForwardIndexWriter fourByteOffsetWriter = new FixedByteChunkSVForwardIndexWriter(
-        outFileFourByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Double.BYTES,
-        BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
-        FixedByteChunkSVForwardIndexWriter eightByteOffsetWriter = new FixedByteChunkSVForwardIndexWriter(
-            outFileEightByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Double.BYTES,
-            BaseChunkSVForwardIndexWriter.CURRENT_VERSION)) {
+    try (
+        FixedByteChunkSVForwardIndexWriter fourByteOffsetWriter =
+            new FixedByteChunkSVForwardIndexWriter(outFileFourByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
+                Double.BYTES, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
+        FixedByteChunkSVForwardIndexWriter eightByteOffsetWriter =
+            new FixedByteChunkSVForwardIndexWriter(outFileEightByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
+                Double.BYTES, BaseChunkSVForwardIndexWriter.CURRENT_VERSION)) {
       for (double value : expected) {
         fourByteOffsetWriter.putDouble(value);
         eightByteOffsetWriter.putDouble(value);
       }
     }
 
-    try (FixedByteChunkSVForwardIndexReader fourByteOffsetReader = new FixedByteChunkSVForwardIndexReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.DOUBLE);
-        BaseChunkSVForwardIndexReader.ChunkReaderContext fourByteOffsetReaderContext = fourByteOffsetReader
-            .createContext();
+    try (
+        FixedByteChunkSVForwardIndexReader fourByteOffsetReader = new FixedByteChunkSVForwardIndexReader(
+            PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.DOUBLE);
+        BaseChunkSVForwardIndexReader.ChunkReaderContext fourByteOffsetReaderContext =
+            fourByteOffsetReader.createContext();
         FixedByteChunkSVForwardIndexReader eightByteOffsetReader = new FixedByteChunkSVForwardIndexReader(
             PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte), DataType.DOUBLE);
-        BaseChunkSVForwardIndexReader.ChunkReaderContext eightByteOffsetReaderContext = eightByteOffsetReader
-            .createContext()) {
+        BaseChunkSVForwardIndexReader.ChunkReaderContext eightByteOffsetReaderContext =
+            eightByteOffsetReader.createContext()) {
       for (int i = 0; i < NUM_VALUES; i++) {
         Assert.assertEquals(fourByteOffsetReader.getDouble(i, fourByteOffsetReaderContext), expected[i]);
         Assert.assertEquals(eightByteOffsetReader.getDouble(i, eightByteOffsetReaderContext), expected[i]);
@@ -245,8 +247,7 @@ public class FixedByteChunkSVForwardIndexTest {
    * This test ensures that the reader can read in an data file from version 1.
    */
   @Test
-  public void testBackwardCompatibilityV1()
-      throws Exception {
+  public void testBackwardCompatibilityV1() throws Exception {
     testBackwardCompatibilityHelper("data/fixedByteSVRDoubles.v1", 10009, 0);
   }
 
@@ -254,22 +255,21 @@ public class FixedByteChunkSVForwardIndexTest {
    * This test ensures that the reader can read in an data file from version 2.
    */
   @Test
-  public void testBackwardCompatibilityV2()
-      throws Exception {
+  public void testBackwardCompatibilityV2() throws Exception {
     testBackwardCompatibilityHelper("data/fixedByteCompressed.v2", 2000, 100.2356);
     testBackwardCompatibilityHelper("data/fixedByteRaw.v2", 2000, 100.2356);
   }
 
-  private void testBackwardCompatibilityHelper(String fileName, int numDocs, double startValue)
-      throws Exception {
+  private void testBackwardCompatibilityHelper(String fileName, int numDocs, double startValue) throws Exception {
     ClassLoader classLoader = getClass().getClassLoader();
     URL resource = classLoader.getResource(fileName);
     if (resource == null) {
       throw new RuntimeException("Input file not found: " + fileName);
     }
     File file = new File(resource.getFile());
-    try (FixedByteChunkSVForwardIndexReader reader = new FixedByteChunkSVForwardIndexReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(file), DataType.DOUBLE);
+    try (
+        FixedByteChunkSVForwardIndexReader reader =
+            new FixedByteChunkSVForwardIndexReader(PinotDataBuffer.mapReadOnlyBigEndianFile(file), DataType.DOUBLE);
         BaseChunkSVForwardIndexReader.ChunkReaderContext readerContext = reader.createContext()) {
       for (int i = 0; i < numDocs; i++) {
         double actual = reader.getDouble(i, readerContext);

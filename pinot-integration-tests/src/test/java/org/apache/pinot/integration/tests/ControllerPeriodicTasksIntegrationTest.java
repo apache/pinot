@@ -99,8 +99,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     startZk();
@@ -108,15 +107,22 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
 
     Map<String, Object> properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
-    properties.put(ControllerPeriodicTasksConf.STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS, PERIODIC_TASK_INITIAL_DELAY_SECONDS);
+    properties.put(ControllerPeriodicTasksConf.STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS,
+        PERIODIC_TASK_INITIAL_DELAY_SECONDS);
     properties.put(ControllerPeriodicTasksConf.STATUS_CHECKER_FREQUENCY_IN_SECONDS, PERIODIC_TASK_FREQUENCY_SECONDS);
-    properties.put(ControllerPeriodicTasksConf.DEPRECATED_REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS, PERIODIC_TASK_INITIAL_DELAY_SECONDS);
-    properties.put(ControllerPeriodicTasksConf.DEPRECATED_REALTIME_SEGMENT_RELOCATOR_FREQUENCY, PERIODIC_TASK_FREQUENCY);
-    properties.put(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_INITIAL_DELAY_IN_SECONDS, PERIODIC_TASK_INITIAL_DELAY_SECONDS);
-    properties.put(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS, PERIODIC_TASK_FREQUENCY_SECONDS);
-    properties.put(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_INITIAL_DELAY_IN_SECONDS, PERIODIC_TASK_INITIAL_DELAY_SECONDS);
-    properties.put(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS, PERIODIC_TASK_FREQUENCY_SECONDS);
-    
+    properties.put(ControllerPeriodicTasksConf.DEPRECATED_REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS,
+        PERIODIC_TASK_INITIAL_DELAY_SECONDS);
+    properties.put(ControllerPeriodicTasksConf.DEPRECATED_REALTIME_SEGMENT_RELOCATOR_FREQUENCY,
+        PERIODIC_TASK_FREQUENCY);
+    properties.put(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_INITIAL_DELAY_IN_SECONDS,
+        PERIODIC_TASK_INITIAL_DELAY_SECONDS);
+    properties.put(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS,
+        PERIODIC_TASK_FREQUENCY_SECONDS);
+    properties.put(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_INITIAL_DELAY_IN_SECONDS,
+        PERIODIC_TASK_INITIAL_DELAY_SECONDS);
+    properties.put(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS,
+        PERIODIC_TASK_FREQUENCY_SECONDS);
+
     startController(properties);
     startBrokers(NUM_BROKERS);
     startServers(NUM_OFFLINE_SERVERS + NUM_REALTIME_SERVERS);
@@ -143,8 +149,8 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
     addTableConfig(createRealtimeTableConfig(realtimeAvroFiles.get(0)));
 
     // Create and upload segments
-    ClusterIntegrationTestUtils
-        .buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir, _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir,
+        _tarDir);
     uploadSegments(getTableName(), _tarDir);
 
     // Push data into Kafka
@@ -155,8 +161,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     String tableName = getTableName();
     dropOfflineTable(tableName);
     dropRealtimeTable(tableName);
@@ -170,8 +175,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
   }
 
   @Test
-  public void testSegmentStatusChecker()
-      throws Exception {
+  public void testSegmentStatusChecker() throws Exception {
     String emptyTable = "emptyTable";
     String disabledTable = "disabledTable";
     String tableWithOfflineSegment = "tableWithOfflineSegment";
@@ -200,9 +204,8 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
     int numTables = 5;
     ControllerMetrics controllerMetrics = _controllerStarter.getControllerMetrics();
     TestUtils.waitForCondition(aVoid -> {
-      if (controllerMetrics
-          .getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, "SegmentStatusChecker")
-          != numTables) {
+      if (controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED,
+          "SegmentStatusChecker") != numTables) {
         return false;
       }
       if (!checkSegmentStatusCheckerMetrics(controllerMetrics, TableNameBuilder.OFFLINE.tableNameWithType(emptyTable),
@@ -256,24 +259,22 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
         return false;
       }
     }
-    return controllerMetrics.getValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS)
-        == expectedNumReplicas
-        && controllerMetrics.getValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS)
-        == expectedPercentReplicas
-        && controllerMetrics.getValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_IN_ERROR_STATE)
-        == expectedSegmentsInErrorState
-        && controllerMetrics.getValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE)
-        == expectedPercentSegmentsAvailable;
+    return controllerMetrics.getValueOfTableGauge(tableNameWithType,
+        ControllerGauge.NUMBER_OF_REPLICAS) == expectedNumReplicas
+        && controllerMetrics.getValueOfTableGauge(tableNameWithType,
+            ControllerGauge.PERCENT_OF_REPLICAS) == expectedPercentReplicas
+        && controllerMetrics.getValueOfTableGauge(tableNameWithType,
+            ControllerGauge.SEGMENTS_IN_ERROR_STATE) == expectedSegmentsInErrorState
+        && controllerMetrics.getValueOfTableGauge(tableNameWithType,
+            ControllerGauge.PERCENT_SEGMENTS_AVAILABLE) == expectedPercentSegmentsAvailable;
   }
 
   @Test
-  public void testRealtimeSegmentRelocator()
-      throws Exception {
+  public void testRealtimeSegmentRelocator() throws Exception {
     // Add relocation tenant config
     TableConfig realtimeTableConfig = getRealtimeTableConfig();
-    realtimeTableConfig.setTenantConfig(new TenantConfig(TENANT_NAME, TENANT_NAME,
-        new TagOverrideConfig(TagNameUtils.getRealtimeTagForTenant(TENANT_NAME),
-            TagNameUtils.getOfflineTagForTenant(TENANT_NAME))));
+    realtimeTableConfig.setTenantConfig(new TenantConfig(TENANT_NAME, TENANT_NAME, new TagOverrideConfig(
+        TagNameUtils.getRealtimeTagForTenant(TENANT_NAME), TagNameUtils.getOfflineTagForTenant(TENANT_NAME))));
     updateTableConfig(realtimeTableConfig);
 
     TestUtils.waitForCondition(aVoid -> {

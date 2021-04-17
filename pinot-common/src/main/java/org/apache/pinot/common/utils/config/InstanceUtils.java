@@ -76,8 +76,10 @@ public class InstanceUtils {
       }
       instanceConfig.getRecord().setMapField(POOL_KEY, mapValue);
     }
-    instanceConfig.getRecord().setSimpleField(CommonConstants.Helix.Instance.GRPC_PORT_KEY, Integer.toString(instance.getGrpcPort()));
-    instanceConfig.getRecord().setSimpleField(CommonConstants.Helix.Instance.ADMIN_PORT_KEY, Integer.toString(instance.getAdminPort()));
+    instanceConfig.getRecord().setSimpleField(CommonConstants.Helix.Instance.GRPC_PORT_KEY,
+        Integer.toString(instance.getGrpcPort()));
+    instanceConfig.getRecord().setSimpleField(CommonConstants.Helix.Instance.ADMIN_PORT_KEY,
+        Integer.toString(instance.getAdminPort()));
     if (instance.isQueriesDisabled()) {
       instanceConfig.getRecord().setBooleanField(Helix.QUERIES_DISABLED, true);
     }

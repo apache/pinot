@@ -81,14 +81,14 @@ public class LuceneTextIndexReader implements TextIndexReader {
       _indexDirectory = FSDirectory.open(indexFile.toPath());
       _indexReader = DirectoryReader.open(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
-      if (textIndexProperties == null || !Boolean
-          .parseBoolean(textIndexProperties.get(FieldConfig.TEXT_INDEX_ENABLE_QUERY_CACHE))) {
+      if (textIndexProperties == null
+          || !Boolean.parseBoolean(textIndexProperties.get(FieldConfig.TEXT_INDEX_ENABLE_QUERY_CACHE))) {
         // Disable Lucene query result cache. While it helps a lot with performance for
         // repeated queries, on the downside it cause heap issues.
         _indexSearcher.setQueryCache(null);
       }
-      if (textIndexProperties != null && Boolean
-          .parseBoolean(textIndexProperties.get(FieldConfig.TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES))) {
+      if (textIndexProperties != null
+          && Boolean.parseBoolean(textIndexProperties.get(FieldConfig.TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES))) {
         _useANDForMultiTermQueries = true;
       }
       // TODO: consider using a threshold of num docs per segment to decide between building
@@ -96,8 +96,8 @@ public class LuceneTextIndexReader implements TextIndexReader {
       _docIdTranslator = new DocIdTranslator(indexDir, _column, numDocs, _indexSearcher);
       _standardAnalyzer = new StandardAnalyzer(LuceneTextIndexCreator.ENGLISH_STOP_WORDS_SET);
     } catch (Exception e) {
-      LOGGER
-          .error("Failed to instantiate Lucene text index reader for column {}, exception {}", column, e.getMessage());
+      LOGGER.error("Failed to instantiate Lucene text index reader for column {}, exception {}", column,
+          e.getMessage());
       throw new RuntimeException(e);
     }
   }
@@ -158,8 +158,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
    * @throws IOException
    */
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _indexReader.close();
     _indexDirectory.close();
     _docIdTranslator.close();
@@ -176,8 +175,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
   static class DocIdTranslator implements Closeable {
     final PinotDataBuffer _buffer;
 
-    DocIdTranslator(File segmentIndexDir, String column, int numDocs, IndexSearcher indexSearcher)
-        throws Exception {
+    DocIdTranslator(File segmentIndexDir, String column, int numDocs, IndexSearcher indexSearcher) throws Exception {
       int length = Integer.BYTES * numDocs;
       File docIdMappingFile = new File(SegmentDirectoryPaths.findSegmentDirectory(segmentIndexDir),
           column + LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
@@ -212,8 +210,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
     }
 
     @Override
-    public void close()
-        throws IOException {
+    public void close() throws IOException {
       _buffer.close();
     }
   }

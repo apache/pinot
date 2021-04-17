@@ -31,6 +31,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+
 /**
  * Tests that the controller, broker and server admin consoles return the expected pages.
  */
@@ -63,20 +64,19 @@ public class AdminConsoleIntegrationTest extends BaseClusterIntegrationTest {
   public void testApiHelp() throws Exception {
     // test controller
     String response = sendGetRequest(_controllerBaseApiUrl + "/help");
-    String expected =
-        IOUtils.toString(ControllerAdminApiApplication.class.getClassLoader().getResourceAsStream("api/index.html"),
-            "UTF-8").replace("\n", "");
+    String expected = IOUtils
+        .toString(ControllerAdminApiApplication.class.getClassLoader().getResourceAsStream("api/index.html"), "UTF-8")
+        .replace("\n", "");
     Assert.assertEquals(response, expected);
     // help and api map to the same content
     response = sendGetRequest(_controllerBaseApiUrl + "/api");
     Assert.assertEquals(response, expected);
 
-
     // test broker
     response = sendGetRequest(_brokerBaseApiUrl + "/help");
-    expected =
-        IOUtils.toString(BrokerAdminApiApplication.class.getClassLoader().getResourceAsStream("api/index.html"),
-            "UTF-8").replace("\n", "");
+    expected = IOUtils
+        .toString(BrokerAdminApiApplication.class.getClassLoader().getResourceAsStream("api/index.html"), "UTF-8")
+        .replace("\n", "");
     Assert.assertEquals(response, expected);
     // help and api map to the same content
     response = sendGetRequest(_brokerBaseApiUrl + "/api");
@@ -84,10 +84,10 @@ public class AdminConsoleIntegrationTest extends BaseClusterIntegrationTest {
 
     String serverBaseApiUrl = "http://localhost:" + CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
     // test server
-    response = sendGetRequest( serverBaseApiUrl + "/help");
-    expected =
-        IOUtils.toString(BrokerAdminApiApplication.class.getClassLoader().getResourceAsStream("api/index.html"),
-            "UTF-8").replace("\n", "");
+    response = sendGetRequest(serverBaseApiUrl + "/help");
+    expected = IOUtils
+        .toString(BrokerAdminApiApplication.class.getClassLoader().getResourceAsStream("api/index.html"), "UTF-8")
+        .replace("\n", "");
     Assert.assertEquals(response, expected);
 
     // help and api map to the same content

@@ -200,8 +200,8 @@ public class OffsetCriteria {
 
     OffsetCriteria that = (OffsetCriteria) o;
 
-    return EqualityUtils.isEqual(_offsetType, that._offsetType) && EqualityUtils
-        .isEqual(_offsetString, that._offsetString);
+    return EqualityUtils.isEqual(_offsetType, that._offsetType)
+        && EqualityUtils.isEqual(_offsetString, that._offsetString);
   }
 
   @Override

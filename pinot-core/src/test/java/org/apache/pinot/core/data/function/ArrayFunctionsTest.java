@@ -56,33 +56,33 @@ public class ArrayFunctionsTest {
     row.putValue("integerArray", new Integer[]{3, 2, 10, 6, 1, 12});
     row.putValue("stringArray", new String[]{"3", "2", "10", "6", "1", "12"});
 
-    inputs.add(new Object[]{"array_reverse_int(intArray)", Collections.singletonList(
-        "intArray"), row, new int[]{12, 1, 6, 10, 2, 3}});
-    inputs.add(new Object[]{"array_reverse_int(integerArray)", Collections.singletonList(
-        "integerArray"), row, new int[]{12, 1, 6, 10, 2, 3}});
-    inputs.add(new Object[]{"array_reverse_int(stringArray)", Collections.singletonList(
-        "stringArray"), row, new int[]{12, 1, 6, 10, 2, 3}});
+    inputs.add(new Object[]{"array_reverse_int(intArray)", Collections
+        .singletonList("intArray"), row, new int[]{12, 1, 6, 10, 2, 3}});
+    inputs.add(new Object[]{"array_reverse_int(integerArray)", Collections
+        .singletonList("integerArray"), row, new int[]{12, 1, 6, 10, 2, 3}});
+    inputs.add(new Object[]{"array_reverse_int(stringArray)", Collections
+        .singletonList("stringArray"), row, new int[]{12, 1, 6, 10, 2, 3}});
 
-    inputs.add(new Object[]{"array_reverse_string(intArray)", Collections.singletonList(
-        "intArray"), row, new String[]{"12", "1", "6", "10", "2", "3"}});
-    inputs.add(new Object[]{"array_reverse_string(integerArray)", Collections.singletonList(
-        "integerArray"), row, new String[]{"12", "1", "6", "10", "2", "3"}});
-    inputs.add(new Object[]{"array_reverse_string(stringArray)", Collections.singletonList(
-        "stringArray"), row, new String[]{"12", "1", "6", "10", "2", "3"}});
+    inputs.add(new Object[]{"array_reverse_string(intArray)", Collections
+        .singletonList("intArray"), row, new String[]{"12", "1", "6", "10", "2", "3"}});
+    inputs.add(new Object[]{"array_reverse_string(integerArray)", Collections
+        .singletonList("integerArray"), row, new String[]{"12", "1", "6", "10", "2", "3"}});
+    inputs.add(new Object[]{"array_reverse_string(stringArray)", Collections
+        .singletonList("stringArray"), row, new String[]{"12", "1", "6", "10", "2", "3"}});
 
-    inputs.add(new Object[]{"array_sort_int(intArray)", Collections.singletonList(
-        "intArray"), row, new int[]{1, 2, 3, 6, 10, 12}});
-    inputs.add(new Object[]{"array_sort_int(integerArray)", Collections.singletonList(
-        "integerArray"), row, new int[]{1, 2, 3, 6, 10, 12}});
-    inputs.add(new Object[]{"array_sort_int(stringArray)", Collections.singletonList(
-        "stringArray"), row, new int[]{1, 2, 3, 6, 10, 12}});
+    inputs.add(new Object[]{"array_sort_int(intArray)", Collections
+        .singletonList("intArray"), row, new int[]{1, 2, 3, 6, 10, 12}});
+    inputs.add(new Object[]{"array_sort_int(integerArray)", Collections
+        .singletonList("integerArray"), row, new int[]{1, 2, 3, 6, 10, 12}});
+    inputs.add(new Object[]{"array_sort_int(stringArray)", Collections
+        .singletonList("stringArray"), row, new int[]{1, 2, 3, 6, 10, 12}});
 
-    inputs.add(new Object[]{"array_sort_string(intArray)", Collections.singletonList(
-        "intArray"), row, new String[]{"1", "10", "12", "2", "3", "6"}});
-    inputs.add(new Object[]{"array_sort_string(integerArray)", Collections.singletonList(
-        "integerArray"), row, new String[]{"1", "10", "12", "2", "3", "6"}});
-    inputs.add(new Object[]{"array_sort_string(stringArray)", Collections.singletonList(
-        "stringArray"), row, new String[]{"1", "10", "12", "2", "3", "6"}});
+    inputs.add(new Object[]{"array_sort_string(intArray)", Collections
+        .singletonList("intArray"), row, new String[]{"1", "10", "12", "2", "3", "6"}});
+    inputs.add(new Object[]{"array_sort_string(integerArray)", Collections
+        .singletonList("integerArray"), row, new String[]{"1", "10", "12", "2", "3", "6"}});
+    inputs.add(new Object[]{"array_sort_string(stringArray)", Collections
+        .singletonList("stringArray"), row, new String[]{"1", "10", "12", "2", "3", "6"}});
 
     inputs.add(new Object[]{"array_index_of_int(intArray, 2)", Collections.singletonList("intArray"), row, 1});
     inputs.add(new Object[]{"array_index_of_int(integerArray, 2)", Collections.singletonList("integerArray"), row, 1});
@@ -107,24 +107,24 @@ public class ArrayFunctionsTest {
 
     inputs
         .add(new Object[]{"array_slice_int(intArray, 1, 2)", Collections.singletonList("intArray"), row, new int[]{2}});
-    inputs.add(new Object[]{"array_slice_int(integerArray, 1, 2)", Collections.singletonList(
-        "integerArray"), row, new int[]{2}});
-    inputs.add(new Object[]{"array_slice_string(stringArray, 1, 2)", Collections.singletonList(
-        "stringArray"), row, new String[]{"2"}});
+    inputs.add(new Object[]{"array_slice_int(integerArray, 1, 2)", Collections
+        .singletonList("integerArray"), row, new int[]{2}});
+    inputs.add(new Object[]{"array_slice_string(stringArray, 1, 2)", Collections
+        .singletonList("stringArray"), row, new String[]{"2"}});
 
-    inputs.add(new Object[]{"array_distinct_int(intArray)", Collections.singletonList(
-        "intArray"), row, new int[]{3, 2, 10, 6, 1, 12}});
-    inputs.add(new Object[]{"array_distinct_int(integerArray)", Collections.singletonList(
-        "integerArray"), row, new int[]{3, 2, 10, 6, 1, 12}});
-    inputs.add(new Object[]{"array_distinct_string(stringArray)", Collections.singletonList(
-        "stringArray"), row, new String[]{"3", "2", "10", "6", "1", "12"}});
+    inputs.add(new Object[]{"array_distinct_int(intArray)", Collections
+        .singletonList("intArray"), row, new int[]{3, 2, 10, 6, 1, 12}});
+    inputs.add(new Object[]{"array_distinct_int(integerArray)", Collections
+        .singletonList("integerArray"), row, new int[]{3, 2, 10, 6, 1, 12}});
+    inputs.add(new Object[]{"array_distinct_string(stringArray)", Collections
+        .singletonList("stringArray"), row, new String[]{"3", "2", "10", "6", "1", "12"}});
 
-    inputs.add(new Object[]{"array_remove_int(intArray, 2)", Collections.singletonList(
-        "intArray"), row, new int[]{3, 10, 6, 1, 12}});
-    inputs.add(new Object[]{"array_remove_int(integerArray, 2)", Collections.singletonList(
-        "integerArray"), row, new int[]{3, 10, 6, 1, 12}});
-    inputs.add(new Object[]{"array_remove_string(stringArray, 2)", Collections.singletonList(
-        "stringArray"), row, new String[]{"3", "10", "6", "1", "12"}});
+    inputs.add(new Object[]{"array_remove_int(intArray, 2)", Collections
+        .singletonList("intArray"), row, new int[]{3, 10, 6, 1, 12}});
+    inputs.add(new Object[]{"array_remove_int(integerArray, 2)", Collections
+        .singletonList("integerArray"), row, new int[]{3, 10, 6, 1, 12}});
+    inputs.add(new Object[]{"array_remove_string(stringArray, 2)", Collections
+        .singletonList("stringArray"), row, new String[]{"3", "10", "6", "1", "12"}});
 
     inputs.add(new Object[]{"array_union_int(intArray, intArray)", Lists.newArrayList("intArray",
         "intArray"), row, new int[]{3, 2, 10, 6, 1, 12}});

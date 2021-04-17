@@ -91,8 +91,7 @@ public class QueryComparison {
     }
   }
 
-  private void run()
-      throws Exception {
+  private void run() throws Exception {
     startCluster();
 
     // For function mode, compare response with the expected response.
@@ -106,13 +105,12 @@ public class QueryComparison {
     }
   }
 
-  private void runFunctionMode()
-      throws Exception {
+  private void runFunctionMode() throws Exception {
     BufferedReader resultReader = null;
     ScanBasedQueryProcessor scanBasedQueryProcessor = null;
 
-    try (BufferedReader queryReader = new BufferedReader(
-        new InputStreamReader(new FileInputStream(_queryFile), "UTF8"))) {
+    try (BufferedReader queryReader =
+        new BufferedReader(new InputStreamReader(new FileInputStream(_queryFile), "UTF8"))) {
       if (_resultFile == null) {
         scanBasedQueryProcessor = new ScanBasedQueryProcessor(_segmentsDir.getAbsolutePath());
       } else {
@@ -180,10 +178,9 @@ public class QueryComparison {
     }
   }
 
-  private void runPerfMode()
-      throws Exception {
-    try (BufferedReader queryReader = new BufferedReader(
-        new InputStreamReader(new FileInputStream(_queryFile), "UTF8"))) {
+  private void runPerfMode() throws Exception {
+    try (BufferedReader queryReader =
+        new BufferedReader(new InputStreamReader(new FileInputStream(_queryFile), "UTF8"))) {
       String query;
       while ((query = queryReader.readLine()) != null) {
         if (query.isEmpty() || query.startsWith("#")) {
@@ -196,8 +193,7 @@ public class QueryComparison {
     }
   }
 
-  private void startCluster()
-      throws Exception {
+  private void startCluster() throws Exception {
     _clusterStarter = new ClusterStarter(_config);
 
     if (_config.getStartCluster()) {
@@ -210,7 +206,9 @@ public class QueryComparison {
   }
 
   public enum ComparisonStatus {
-    PASSED, EMPTY, FAILED
+    PASSED,
+    EMPTY,
+    FAILED
   }
 
   public static ComparisonStatus compareWithEmpty(JsonNode actualJson, JsonNode expectedJson) {
@@ -419,8 +417,8 @@ public class QueryComparison {
     final int numActualRows = actualRows.size();
     final int numExpectedRows = expectedRows.size();
     if (numActualRows > numExpectedRows) {
-      LOGGER
-          .error("In selection, number of actual rows: {} more than expected rows: {}", numActualRows, numExpectedRows);
+      LOGGER.error("In selection, number of actual rows: {} more than expected rows: {}", numActualRows,
+          numExpectedRows);
       return false;
     }
     Map<String, Integer> expectedRowMap = new HashMap<>(numExpectedRows);

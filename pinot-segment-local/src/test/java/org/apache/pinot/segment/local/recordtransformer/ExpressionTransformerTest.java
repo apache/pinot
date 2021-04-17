@@ -216,7 +216,8 @@ public class ExpressionTransformerTest {
 
     pinotSchema = new Schema.SchemaBuilder()
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
-            new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "outgoing")).build();
+            new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "outgoing"))
+        .build();
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testValueExists")
         .setIngestionConfig(new IngestionConfig(null, null, null, null)).build();
     expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);

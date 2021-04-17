@@ -46,8 +46,7 @@ public final class MiniKafkaCluster implements Closeable {
   private final AdminClient _adminClient;
 
   @SuppressWarnings({"rawtypes", "unchecked"})
-  public MiniKafkaCluster(String brokerId)
-      throws IOException, InterruptedException {
+  public MiniKafkaCluster(String brokerId) throws IOException, InterruptedException {
     _zkServer = new EmbeddedZooKeeper();
     int kafkaServerPort = getAvailablePort();
     KafkaConfig kafkaBrokerConfig = new KafkaConfig(createBrokerConfig(brokerId, kafkaServerPort));
@@ -95,8 +94,7 @@ public final class MiniKafkaCluster implements Closeable {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _kafkaServer.shutdown();
     _zkServer.close();
     FileUtils.deleteDirectory(TEMP_DIR);
@@ -112,8 +110,7 @@ public final class MiniKafkaCluster implements Closeable {
     _adminClient.createTopics(Collections.singletonList(newTopic)).all().get();
   }
 
-  public void deleteTopic(String topicName)
-      throws ExecutionException, InterruptedException {
+  public void deleteTopic(String topicName) throws ExecutionException, InterruptedException {
     _adminClient.deleteTopics(Collections.singletonList(topicName)).all().get();
   }
 }

@@ -37,65 +37,58 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+
 public class FSTBuilderTest {
-    private static final File TEMP_DIR =
-            new File(FileUtils.getTempDirectory(), "FST");
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "FST");
 
-    @BeforeClass
-    public void setUp()
-            throws Exception {
-        FileUtils.deleteDirectory(TEMP_DIR);
-        TEMP_DIR.mkdirs();
-    }
+  @BeforeClass
+  public void setUp() throws Exception {
+    FileUtils.deleteDirectory(TEMP_DIR);
+    TEMP_DIR.mkdirs();
+  }
 
-    @Test
-    public void testRegexMatch() {
-        RegexpMatcher regexpMatcher = new RegexpMatcher("hello.*ld", null);
-        Assert.assertTrue(regexpMatcher.match("helloworld"));
-        Assert.assertTrue(regexpMatcher.match("helloworld"));
-        Assert.assertTrue(regexpMatcher.match("helloasdfworld"));
-        Assert.assertFalse(regexpMatcher.match("ahelloasdfworld"));
-    }
+  @Test
+  public void testRegexMatch() {
+    RegexpMatcher regexpMatcher = new RegexpMatcher("hello.*ld", null);
+    Assert.assertTrue(regexpMatcher.match("helloworld"));
+    Assert.assertTrue(regexpMatcher.match("helloworld"));
+    Assert.assertTrue(regexpMatcher.match("helloasdfworld"));
+    Assert.assertFalse(regexpMatcher.match("ahelloasdfworld"));
+  }
 
-    @Test
-    public void testFSTBuilder() throws IOException {
-        SortedMap<String, Integer> x = new TreeMap<>();
-        x.put("hello-world", 12);
-        x.put("hello-world123", 21);
-        x.put("still", 123);
+  @Test
+  public void testFSTBuilder() throws IOException {
+    SortedMap<String, Integer> x = new TreeMap<>();
+    x.put("hello-world", 12);
+    x.put("hello-world123", 21);
+    x.put("still", 123);
 
-        FST<Long> fst = FSTBuilder.buildFST(x);
-        File outputFile = new File(TEMP_DIR, "test.lucene");
-        FileOutputStream fileOutputStream = new FileOutputStream(outputFile);
-        OutputStreamDataOutput d = new OutputStreamDataOutput(fileOutputStream);
-        fst.save(d);
-        fileOutputStream.close();
+    FST<Long> fst = FSTBuilder.buildFST(x);
+    File outputFile = new File(TEMP_DIR, "test.lucene");
+    FileOutputStream fileOutputStream = new FileOutputStream(outputFile);
+    OutputStreamDataOutput d = new OutputStreamDataOutput(fileOutputStream);
+    fst.save(d);
+    fileOutputStream.close();
 
+    Outputs<Long> outputs = PositiveIntOutputs.getSingleton();
+    File fstFile = new File(outputFile.getAbsolutePath());
 
-        Outputs<Long> outputs = PositiveIntOutputs.getSingleton();
-        File fstFile = new File(outputFile.getAbsolutePath());
+    PinotDataBuffer pinotDataBuffer =
+        PinotDataBuffer.mapFile(fstFile, true, 0, fstFile.length(), ByteOrder.BIG_ENDIAN, "");
+    PinotBufferIndexInput indexInput = new PinotBufferIndexInput(pinotDataBuffer, 0L, fstFile.length());
+    FST<Long> readFST = new FST(indexInput, outputs, new OffHeapFSTStore());
 
-        PinotDataBuffer pinotDataBuffer =
-                PinotDataBuffer.mapFile(
-                        fstFile, true,0,
-                        fstFile.length(),
-                        ByteOrder.BIG_ENDIAN, "");
-        PinotBufferIndexInput indexInput = new PinotBufferIndexInput(
-                pinotDataBuffer, 0L, fstFile.length());
-        FST<Long> readFST = new FST(indexInput, outputs, new OffHeapFSTStore());
+    List<Long> results = RegexpMatcher.regexMatch("hello.*123", fst);
+    Assert.assertEquals(results.size(), 1);
+    Assert.assertEquals(results.get(0).longValue(), 21L);
 
-        List<Long> results = RegexpMatcher.regexMatch("hello.*123", fst);
-        Assert.assertEquals(results.size(), 1);
-        Assert.assertEquals(results.get(0).longValue(), 21L);
+    results = RegexpMatcher.regexMatch(".*world", fst);
+    Assert.assertEquals(results.size(), 1);
+    Assert.assertEquals(results.get(0).longValue(), 12L);
+  }
 
-        results = RegexpMatcher.regexMatch(".*world", fst);
-        Assert.assertEquals(results.size(), 1);
-        Assert.assertEquals(results.get(0).longValue(), 12L);
-    }
-
-    @AfterClass
-    public void tearDown()
-            throws IOException {
-        FileUtils.deleteDirectory(TEMP_DIR);
-    }
+  @AfterClass
+  public void tearDown() throws IOException {
+    FileUtils.deleteDirectory(TEMP_DIR);
+  }
 }

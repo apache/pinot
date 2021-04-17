@@ -110,8 +110,8 @@ public class OfflineSegmentZKMetadata extends SegmentZKMetadata {
     }
 
     OfflineSegmentZKMetadata metadata = (OfflineSegmentZKMetadata) segmentMetadata;
-    return super.equals(metadata) && isEqual(_pushTime, metadata._pushTime) && isEqual(_refreshTime,
-        metadata._refreshTime) && isEqual(_downloadUrl, metadata._downloadUrl);
+    return super.equals(metadata) && isEqual(_pushTime, metadata._pushTime)
+        && isEqual(_refreshTime, metadata._refreshTime) && isEqual(_downloadUrl, metadata._downloadUrl);
   }
 
   @Override

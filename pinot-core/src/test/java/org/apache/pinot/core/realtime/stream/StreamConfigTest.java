@@ -60,18 +60,16 @@ public class StreamConfigTest {
     // All mandatory properties set
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
-            topic);
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            consumerType);
-    streamConfigMap.put(StreamConfigProperties
-            .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
-        consumerFactoryClass);
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
-            decoderClass);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME), topic);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+        consumerType);
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
+        StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), consumerFactoryClass);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
+        decoderClass);
     streamConfig = new StreamConfig(tableName, streamConfigMap);
 
     // Missing streamType
@@ -97,9 +95,8 @@ public class StreamConfigTest {
     Assert.assertTrue(exception);
 
     // Missing consumer type
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
-            topic);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME), topic);
     streamConfigMap.remove(
         StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES));
     exception = false;
@@ -111,11 +108,11 @@ public class StreamConfigTest {
     Assert.assertTrue(exception);
 
     // Missing consumer factory
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            consumerType);
-    streamConfigMap.remove(StreamConfigProperties
-        .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS));
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+        consumerType);
+    streamConfigMap.remove(StreamConfigProperties.constructStreamProperty(streamType,
+        StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS));
     exception = false;
     try {
       streamConfig = new StreamConfig(tableName, streamConfigMap);
@@ -127,9 +124,8 @@ public class StreamConfigTest {
         StreamConfig.DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING);
 
     // Missing decoder class
-    streamConfigMap.put(StreamConfigProperties
-            .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
-        consumerFactoryClass);
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
+        StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), consumerFactoryClass);
     streamConfigMap.remove(
         StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS));
     exception = false;
@@ -140,9 +136,9 @@ public class StreamConfigTest {
     }
     Assert.assertTrue(exception);
 
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
-            decoderClass);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
+        decoderClass);
     streamConfig = new StreamConfig(tableName, streamConfigMap);
     Assert.assertEquals(streamConfig.getType(), streamType);
     Assert.assertEquals(streamConfig.getTopicName(), topic);
@@ -165,18 +161,16 @@ public class StreamConfigTest {
 
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
-            topic);
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            consumerType);
-    streamConfigMap.put(StreamConfigProperties
-            .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
-        consumerFactoryClass);
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
-            decoderClass);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME), topic);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+        consumerType);
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
+        StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), consumerFactoryClass);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
+        decoderClass);
 
     // Mandatory values + defaults
     StreamConfig streamConfig = new StreamConfig(tableName, streamConfigMap);
@@ -186,10 +180,10 @@ public class StreamConfigTest {
     Assert.assertEquals(streamConfig.getConsumerFactoryClassName(), consumerFactoryClass);
     Assert.assertEquals(streamConfig.getDecoderClass(), decoderClass);
     Assert.assertEquals(streamConfig.getDecoderProperties().size(), 0);
-    Assert
-        .assertEquals(streamConfig.getOffsetCriteria(), new OffsetCriteria.OffsetCriteriaBuilder().withOffsetLargest());
-    Assert
-        .assertEquals(streamConfig.getConnectionTimeoutMillis(), StreamConfig.DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS);
+    Assert.assertEquals(streamConfig.getOffsetCriteria(),
+        new OffsetCriteria.OffsetCriteriaBuilder().withOffsetLargest());
+    Assert.assertEquals(streamConfig.getConnectionTimeoutMillis(),
+        StreamConfig.DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS);
     Assert.assertEquals(streamConfig.getFetchTimeoutMillis(), StreamConfig.DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS);
     Assert.assertEquals(streamConfig.getFlushThresholdRows(), StreamConfig.DEFAULT_FLUSH_THRESHOLD_ROWS);
     Assert.assertEquals(streamConfig.getFlushThresholdTimeMillis(), StreamConfig.DEFAULT_FLUSH_THRESHOLD_TIME_MILLIS);
@@ -205,17 +199,16 @@ public class StreamConfigTest {
     String flushThresholdTime = "2h";
     String flushThresholdRows = "500";
     String flushSegmentSize = "20M";
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            consumerType);
     streamConfigMap.put(
-        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.DECODER_PROPS_PREFIX) + "."
-            + decoderProp1Key, decoderProp1Value);
-    streamConfigMap.put(StreamConfigProperties
-        .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), offsetCriteria);
-    streamConfigMap.put(StreamConfigProperties
-            .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONNECTION_TIMEOUT_MILLIS),
-        connectionTimeout);
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+        consumerType);
+    streamConfigMap
+        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.DECODER_PROPS_PREFIX)
+            + "." + decoderProp1Key, decoderProp1Value);
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
+        StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), offsetCriteria);
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
+        StreamConfigProperties.STREAM_CONNECTION_TIMEOUT_MILLIS), connectionTimeout);
     streamConfigMap.put(
         StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_FETCH_TIMEOUT_MILLIS),
         fetchTimeout);
@@ -280,24 +273,22 @@ public class StreamConfigTest {
     // All mandatory properties set
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
-            topic);
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            consumerType);
-    streamConfigMap.put(StreamConfigProperties
-            .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
-        consumerFactoryClass);
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
-            decoderClass);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME), topic);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+        consumerType);
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
+        StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), consumerFactoryClass);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
+        decoderClass);
     streamConfig = new StreamConfig(tableName, streamConfigMap);
 
     // Invalid consumer type
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            "invalidConsumerType");
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+        "invalidConsumerType");
     exception = false;
     try {
       streamConfig = new StreamConfig(tableName, streamConfigMap);
@@ -307,9 +298,9 @@ public class StreamConfigTest {
     Assert.assertTrue(exception);
 
     // Invalid fetch timeout
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            consumerType);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+        consumerType);
     streamConfigMap.put(
         StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_FETCH_TIMEOUT_MILLIS),
         "timeout");
@@ -319,15 +310,15 @@ public class StreamConfigTest {
     // Invalid connection timeout
     streamConfigMap.remove(
         StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_FETCH_TIMEOUT_MILLIS));
-    streamConfigMap.put(StreamConfigProperties
-        .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONNECTION_TIMEOUT_MILLIS), "timeout");
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
+        StreamConfigProperties.STREAM_CONNECTION_TIMEOUT_MILLIS), "timeout");
     streamConfig = new StreamConfig(tableName, streamConfigMap);
-    Assert
-        .assertEquals(streamConfig.getConnectionTimeoutMillis(), StreamConfig.DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS);
+    Assert.assertEquals(streamConfig.getConnectionTimeoutMillis(),
+        StreamConfig.DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS);
 
     // Invalid flush threshold rows - deprecated property
-    streamConfigMap.remove(StreamConfigProperties
-        .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONNECTION_TIMEOUT_MILLIS));
+    streamConfigMap.remove(StreamConfigProperties.constructStreamProperty(streamType,
+        StreamConfigProperties.STREAM_CONNECTION_TIMEOUT_MILLIS));
     streamConfigMap.put(StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_THRESHOLD_ROWS, "rows");
     streamConfig = new StreamConfig(tableName, streamConfigMap);
     Assert.assertEquals(streamConfig.getFlushThresholdRows(), StreamConfig.DEFAULT_FLUSH_THRESHOLD_ROWS);
@@ -378,18 +369,16 @@ public class StreamConfigTest {
 
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
-            topic);
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            consumerType);
-    streamConfigMap.put(StreamConfigProperties
-            .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
-        consumerFactoryClass);
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
-            decoderClass);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME), topic);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+        consumerType);
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
+        StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), consumerFactoryClass);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
+        decoderClass);
 
     // use defaults if nothing provided
     streamConfig = new StreamConfig(tableName, streamConfigMap);
@@ -405,7 +394,8 @@ public class StreamConfigTest {
         (long) TimeUtils.convertPeriodToMillis(flushThresholdTime));
 
     // llc overrides provided, but base values will be picked in base StreamConfigs
-    streamConfigMap.put(StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_THRESHOLD_ROWS + StreamConfigProperties.LLC_SUFFIX,
+    streamConfigMap.put(
+        StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_THRESHOLD_ROWS + StreamConfigProperties.LLC_SUFFIX,
         flushThresholdRowsLLC);
     streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME + StreamConfigProperties.LLC_SUFFIX,
         flushThresholdTimeLLC);
@@ -428,7 +418,8 @@ public class StreamConfigTest {
         (long) TimeUtils.convertPeriodToMillis(flushThresholdTimeLLC));
 
     // PartitionLevelStreamConfig should use base values if llc overrides not provided
-    streamConfigMap.remove(StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_THRESHOLD_ROWS + StreamConfigProperties.LLC_SUFFIX);
+    streamConfigMap
+        .remove(StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_THRESHOLD_ROWS + StreamConfigProperties.LLC_SUFFIX);
     streamConfigMap.remove(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME + StreamConfigProperties.LLC_SUFFIX);
     streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, flushThresholdRows);
     streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME, flushThresholdTime);
@@ -456,47 +447,45 @@ public class StreamConfigTest {
 
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
-            topic);
-    streamConfigMap.put(StreamConfigProperties
-            .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
-        consumerFactoryClass);
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
-            decoderClass);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME), topic);
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
+        StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), consumerFactoryClass);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
+        decoderClass);
 
     String consumerType = "simple";
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            consumerType);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+        consumerType);
     StreamConfig streamConfig = new StreamConfig(tableName, streamConfigMap);
     Assert.assertEquals(streamConfig.getConsumerTypes().get(0), StreamConfig.ConsumerType.LOWLEVEL);
     Assert.assertTrue(streamConfig.hasLowLevelConsumerType());
     Assert.assertFalse(streamConfig.hasHighLevelConsumerType());
 
     consumerType = "lowlevel";
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            consumerType);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+        consumerType);
     streamConfig = new StreamConfig(tableName, streamConfigMap);
     Assert.assertEquals(streamConfig.getConsumerTypes().get(0), StreamConfig.ConsumerType.LOWLEVEL);
     Assert.assertTrue(streamConfig.hasLowLevelConsumerType());
     Assert.assertFalse(streamConfig.hasHighLevelConsumerType());
 
     consumerType = "highLevel";
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            consumerType);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+        consumerType);
     streamConfig = new StreamConfig(tableName, streamConfigMap);
     Assert.assertEquals(streamConfig.getConsumerTypes().get(0), StreamConfig.ConsumerType.HIGHLEVEL);
     Assert.assertFalse(streamConfig.hasLowLevelConsumerType());
     Assert.assertTrue(streamConfig.hasHighLevelConsumerType());
 
     consumerType = "highLevel,simple";
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            consumerType);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+        consumerType);
     streamConfig = new StreamConfig(tableName, streamConfigMap);
     Assert.assertEquals(streamConfig.getConsumerTypes().get(0), StreamConfig.ConsumerType.HIGHLEVEL);
     Assert.assertEquals(streamConfig.getConsumerTypes().get(1), StreamConfig.ConsumerType.LOWLEVEL);
@@ -504,9 +493,9 @@ public class StreamConfigTest {
     Assert.assertTrue(streamConfig.hasHighLevelConsumerType());
 
     consumerType = "highLevel,lowlevel";
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            consumerType);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+        consumerType);
     streamConfig = new StreamConfig(tableName, streamConfigMap);
     Assert.assertEquals(streamConfig.getConsumerTypes().get(0), StreamConfig.ConsumerType.HIGHLEVEL);
     Assert.assertEquals(streamConfig.getConsumerTypes().get(1), StreamConfig.ConsumerType.LOWLEVEL);

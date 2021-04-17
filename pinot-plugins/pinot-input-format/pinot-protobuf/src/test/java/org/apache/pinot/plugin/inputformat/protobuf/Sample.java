@@ -33,8 +33,8 @@ public final class Sample {
   }
 
   public interface SampleRecordOrBuilder extends
-                                         // @@protoc_insertion_point(interface_extends:org.apache.pinot.plugin.inputformat.protobuf.SampleRecord)
-                                             com.google.protobuf.MessageOrBuilder {
+      // @@protoc_insertion_point(interface_extends:org.apache.pinot.plugin.inputformat.protobuf.SampleRecord)
+      com.google.protobuf.MessageOrBuilder {
 
     /**
      * <code>string name = 1;</code>
@@ -97,8 +97,8 @@ public final class Sample {
    * Protobuf type {@code org.apache.pinot.plugin.inputformat.protobuf.SampleRecord}
    */
   public static final class SampleRecord extends com.google.protobuf.GeneratedMessageV3 implements
-                                                                                        // @@protoc_insertion_point(message_implements:org.apache.pinot.plugin.inputformat.protobuf.SampleRecord)
-                                                                                            SampleRecordOrBuilder {
+      // @@protoc_insertion_point(message_implements:org.apache.pinot.plugin.inputformat.protobuf.SampleRecord)
+      SampleRecordOrBuilder {
     private static final long serialVersionUID = 0L;
 
     // Use SampleRecord.newBuilder() to construct.
@@ -331,8 +331,7 @@ public final class Sample {
     }
 
     @java.lang.Override
-    public void writeTo(com.google.protobuf.CodedOutputStream output)
-        throws java.io.IOException {
+    public void writeTo(com.google.protobuf.CodedOutputStream output) throws java.io.IOException {
       if (!getNameBytes().isEmpty()) {
         com.google.protobuf.GeneratedMessageV3.writeString(output, 1, name_);
       }
@@ -441,8 +440,7 @@ public final class Sample {
     }
 
     public static org.apache.pinot.plugin.inputformat.protobuf.Sample.SampleRecord parseFrom(
-        com.google.protobuf.ByteString data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
+        com.google.protobuf.ByteString data) throws com.google.protobuf.InvalidProtocolBufferException {
       return PARSER.parseFrom(data);
     }
 
@@ -469,14 +467,12 @@ public final class Sample {
     }
 
     public static org.apache.pinot.plugin.inputformat.protobuf.Sample.SampleRecord parseFrom(java.io.InputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry) throws java.io.IOException {
       return com.google.protobuf.GeneratedMessageV3.parseWithIOException(PARSER, input, extensionRegistry);
     }
 
     public static org.apache.pinot.plugin.inputformat.protobuf.Sample.SampleRecord parseDelimitedFrom(
-        java.io.InputStream input)
-        throws java.io.IOException {
+        java.io.InputStream input) throws java.io.IOException {
       return com.google.protobuf.GeneratedMessageV3.parseDelimitedWithIOException(PARSER, input);
     }
 
@@ -487,8 +483,7 @@ public final class Sample {
     }
 
     public static org.apache.pinot.plugin.inputformat.protobuf.Sample.SampleRecord parseFrom(
-        com.google.protobuf.CodedInputStream input)
-        throws java.io.IOException {
+        com.google.protobuf.CodedInputStream input) throws java.io.IOException {
       return com.google.protobuf.GeneratedMessageV3.parseWithIOException(PARSER, input);
     }
 
@@ -526,8 +521,8 @@ public final class Sample {
      * Protobuf type {@code org.apache.pinot.plugin.inputformat.protobuf.SampleRecord}
      */
     public static final class Builder extends com.google.protobuf.GeneratedMessageV3.Builder<Builder> implements
-                                                                                                      // @@protoc_insertion_point(builder_implements:org.apache.pinot.plugin.inputformat.protobuf.SampleRecord)
-                                                                                                          org.apache.pinot.plugin.inputformat.protobuf.Sample.SampleRecordOrBuilder {
+        // @@protoc_insertion_point(builder_implements:org.apache.pinot.plugin.inputformat.protobuf.SampleRecord)
+        org.apache.pinot.plugin.inputformat.protobuf.Sample.SampleRecordOrBuilder {
       public static final com.google.protobuf.Descriptors.Descriptor getDescriptor() {
         return org.apache.pinot.plugin.inputformat.protobuf.Sample.internal_static_org_apache_pinot_plugin_inputformat_protobuf_SampleRecord_descriptor;
       }
@@ -682,8 +677,7 @@ public final class Sample {
 
       @java.lang.Override
       public Builder mergeFrom(com.google.protobuf.CodedInputStream input,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws java.io.IOException {
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry) throws java.io.IOException {
         org.apache.pinot.plugin.inputformat.protobuf.Sample.SampleRecord parsedMessage = null;
         try {
           parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
@@ -1045,10 +1039,8 @@ public final class Sample {
     }
   }
 
-  private static final com.google.protobuf.Descriptors.Descriptor
-      internal_static_org_apache_pinot_plugin_inputformat_protobuf_SampleRecord_descriptor;
-  private static final com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
-      internal_static_org_apache_pinot_plugin_inputformat_protobuf_SampleRecord_fieldAccessorTable;
+  private static final com.google.protobuf.Descriptors.Descriptor internal_static_org_apache_pinot_plugin_inputformat_protobuf_SampleRecord_descriptor;
+  private static final com.google.protobuf.GeneratedMessageV3.FieldAccessorTable internal_static_org_apache_pinot_plugin_inputformat_protobuf_SampleRecord_fieldAccessorTable;
 
   public static com.google.protobuf.Descriptors.FileDescriptor getDescriptor() {
     return descriptor;
@@ -1061,8 +1053,8 @@ public final class Sample {
         {"\n\014sample.proto\022,org.apache.pinot.plugin." + "inputformat.protobuf\"H\n\014SampleRecord\022\014\n\004"
             + "name\030\001 \001(\t\022\n\n\002id\030\002 \001(\005\022\r\n\005email\030\003 \001(\t\022\017\n"
             + "\007friends\030\004 \003(\tb\006proto3"};
-    descriptor = com.google.protobuf.Descriptors.FileDescriptor
-        .internalBuildGeneratedFileFrom(descriptorData, new com.google.protobuf.Descriptors.FileDescriptor[]{});
+    descriptor = com.google.protobuf.Descriptors.FileDescriptor.internalBuildGeneratedFileFrom(descriptorData,
+        new com.google.protobuf.Descriptors.FileDescriptor[]{});
     internal_static_org_apache_pinot_plugin_inputformat_protobuf_SampleRecord_descriptor =
         getDescriptor().getMessageTypes().get(0);
     internal_static_org_apache_pinot_plugin_inputformat_protobuf_SampleRecord_fieldAccessorTable =

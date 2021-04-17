@@ -68,8 +68,7 @@ public class ZookeeperLauncher {
     return _tempDir.delete();
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     ZookeeperLauncher launcher = new ZookeeperLauncher();
     launcher.start(2188);
   }

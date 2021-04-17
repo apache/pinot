@@ -57,8 +57,8 @@ public class StDistanceFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    Preconditions
-        .checkArgument(arguments.size() == 2, "2 arguments are required for transform function: %s", getName());
+    Preconditions.checkArgument(arguments.size() == 2, "2 arguments are required for transform function: %s",
+        getName());
     TransformFunction transformFunction = arguments.get(0);
     Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
         "First argument must be single-valued for transform function: %s", getName());
@@ -102,8 +102,8 @@ public class StDistanceFunction extends BaseTransformFunction {
   }
 
   private static void checkLatitude(double latitude) {
-    Preconditions
-        .checkArgument(latitude >= MIN_LATITUDE && latitude <= MAX_LATITUDE, "Latitude must be between -90 and 90");
+    Preconditions.checkArgument(latitude >= MIN_LATITUDE && latitude <= MAX_LATITUDE,
+        "Latitude must be between -90 and 90");
   }
 
   private static void checkLongitude(double longitude) {

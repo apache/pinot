@@ -93,9 +93,8 @@ public class StarTreeBuilderUtils {
     long totalSizeInBytes = headerSizeInBytes + (long) numNodes * OffHeapStarTreeNode.SERIALIZABLE_SIZE_IN_BYTES;
 
     // Backward-compatible: star-tree file is always little-endian
-    try (PinotDataBuffer buffer = PinotDataBuffer
-        .mapFile(starTreeFile, false, 0, totalSizeInBytes, ByteOrder.LITTLE_ENDIAN,
-            "StarTreeBuilderUtils#serializeTree: star-tree buffer")) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(starTreeFile, false, 0, totalSizeInBytes,
+        ByteOrder.LITTLE_ENDIAN, "StarTreeBuilderUtils#serializeTree: star-tree buffer")) {
       long offset = writeHeader(buffer, headerSizeInBytes, dimensions, numNodes);
       writeNodes(buffer, offset, rootNode);
     }
@@ -258,8 +257,7 @@ public class StarTreeBuilderUtils {
   /**
    * Removes all the star-trees from the given segment.
    */
-  public static void removeStarTrees(File indexDir)
-      throws Exception {
+  public static void removeStarTrees(File indexDir) throws Exception {
     File segmentDirectory = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
 
     // Remove the star-tree metadata

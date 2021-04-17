@@ -67,8 +67,7 @@ public class MutableSegmentImplTest {
   private long _startTimeMs;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteQuietly(TEMP_DIR);
 
     URL resourceUrl = MutableSegmentImplTest.class.getClassLoader().getResource(AVRO_FILE);
@@ -84,15 +83,14 @@ public class MutableSegmentImplTest {
 
     _schema = config.getSchema();
     VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(_schema, "testSegment");
-    _mutableSegmentImpl = MutableSegmentImplTestUtils
-        .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
-            false);
+    _mutableSegmentImpl = MutableSegmentImplTestUtils.createMutableSegmentImpl(_schema, Collections.emptySet(),
+        Collections.emptySet(), Collections.emptySet(), false);
     _lastIngestionTimeMs = System.currentTimeMillis();
     StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(_lastIngestionTimeMs);
     _startTimeMs = System.currentTimeMillis();
 
-    try (RecordReader recordReader = RecordReaderFactory
-        .getRecordReader(FileFormat.AVRO, avroFile, _schema.getColumnNames(), null)) {
+    try (RecordReader recordReader =
+        RecordReaderFactory.getRecordReader(FileFormat.AVRO, avroFile, _schema.getColumnNames(), null)) {
       GenericRow reuse = new GenericRow();
       while (recordReader.hasNext()) {
         _mutableSegmentImpl.index(recordReader.next(reuse), defaultMetadata);
@@ -129,8 +127,7 @@ public class MutableSegmentImplTest {
   }
 
   @Test
-  public void testDataSourceForSVColumns()
-      throws IOException {
+  public void testDataSourceForSVColumns() throws IOException {
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       if (fieldSpec.isSingleValueField()) {
         String column = fieldSpec.getName();
@@ -165,8 +162,7 @@ public class MutableSegmentImplTest {
   }
 
   @Test
-  public void testDataSourceForMVColumns()
-      throws IOException {
+  public void testDataSourceForMVColumns() throws IOException {
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       if (!fieldSpec.isSingleValueField()) {
         String column = fieldSpec.getName();

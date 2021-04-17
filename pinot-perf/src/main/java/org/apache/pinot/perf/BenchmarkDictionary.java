@@ -61,16 +61,14 @@ public class BenchmarkDictionary {
   }
 
   @TearDown
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     _memoryManager.close();
   }
 
   @Benchmark
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public int benchmarkOnHeap0ToN()
-      throws IOException {
+  public int benchmarkOnHeap0ToN() throws IOException {
     try (LongOnHeapMutableDictionary dictionary = new LongOnHeapMutableDictionary()) {
       int value = 0;
       for (Long colValue : _colValues) {
@@ -84,10 +82,9 @@ public class BenchmarkDictionary {
   @Benchmark
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public int benchmarkOffHeapMidSizeWithOverflow()
-      throws IOException {
-    try (LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(CARDINALITY / 3, 1000,
-        _memoryManager, "longColumn")) {
+  public int benchmarkOffHeapMidSizeWithOverflow() throws IOException {
+    try (LongOffHeapMutableDictionary dictionary =
+        new LongOffHeapMutableDictionary(CARDINALITY / 3, 1000, _memoryManager, "longColumn")) {
       int value = 0;
       for (Long colValue : _colValues) {
         value += dictionary.index(colValue);
@@ -100,10 +97,9 @@ public class BenchmarkDictionary {
   @Benchmark
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public int benchmarkOffHeapMidSizeWithoutOverflow()
-      throws IOException {
-    try (LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(CARDINALITY / 3, 0, _memoryManager,
-        "longColumn")) {
+  public int benchmarkOffHeapMidSizeWithoutOverflow() throws IOException {
+    try (LongOffHeapMutableDictionary dictionary =
+        new LongOffHeapMutableDictionary(CARDINALITY / 3, 0, _memoryManager, "longColumn")) {
       int value = 0;
       for (Long colValue : _colValues) {
         value += dictionary.index(colValue);
@@ -116,10 +112,9 @@ public class BenchmarkDictionary {
   @Benchmark
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public int benchmarkOffHeapPreSizeWithOverflow()
-      throws IOException {
-    try (LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(CARDINALITY, 1000, _memoryManager,
-        "longColumn")) {
+  public int benchmarkOffHeapPreSizeWithOverflow() throws IOException {
+    try (LongOffHeapMutableDictionary dictionary =
+        new LongOffHeapMutableDictionary(CARDINALITY, 1000, _memoryManager, "longColumn")) {
       int value = 0;
       for (Long colValue : _colValues) {
         value += dictionary.index(colValue);
@@ -132,10 +127,9 @@ public class BenchmarkDictionary {
   @Benchmark
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public int benchmarkOffHeapPreSizeWithoutOverflow()
-      throws IOException {
-    try (LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(CARDINALITY, 0, _memoryManager,
-        "longColumn")) {
+  public int benchmarkOffHeapPreSizeWithoutOverflow() throws IOException {
+    try (LongOffHeapMutableDictionary dictionary =
+        new LongOffHeapMutableDictionary(CARDINALITY, 0, _memoryManager, "longColumn")) {
       int value = 0;
       for (Long colValue : _colValues) {
         value += dictionary.index(colValue);
@@ -148,10 +142,9 @@ public class BenchmarkDictionary {
   @Benchmark
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public int benchmarkOffHeapMinSizeWithoutOverflow()
-      throws IOException {
-    try (LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(10000, 0, _memoryManager,
-        "longColumn")) {
+  public int benchmarkOffHeapMinSizeWithoutOverflow() throws IOException {
+    try (LongOffHeapMutableDictionary dictionary =
+        new LongOffHeapMutableDictionary(10000, 0, _memoryManager, "longColumn")) {
       int value = 0;
       for (Long colValue : _colValues) {
         value += dictionary.index(colValue);
@@ -164,10 +157,9 @@ public class BenchmarkDictionary {
   @Benchmark
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public int benchmarkOffHeapMinSizeWithOverflow()
-      throws IOException {
-    try (LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(10000, 1000, _memoryManager,
-        "longColumn")) {
+  public int benchmarkOffHeapMinSizeWithOverflow() throws IOException {
+    try (LongOffHeapMutableDictionary dictionary =
+        new LongOffHeapMutableDictionary(10000, 1000, _memoryManager, "longColumn")) {
       int value = 0;
       for (Long colValue : _colValues) {
         value += dictionary.index(colValue);
@@ -176,8 +168,7 @@ public class BenchmarkDictionary {
     }
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     ChainedOptionsBuilder opt =
         new OptionsBuilder().include(BenchmarkDictionary.class.getSimpleName()).warmupTime(TimeValue.seconds(60))
             .warmupIterations(8).measurementTime(TimeValue.seconds(60)).measurementIterations(8).forks(5);

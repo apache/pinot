@@ -82,8 +82,7 @@ public class PinotServiceManager {
     pinotServiceManager.start();
   }
 
-  public String startRole(ServiceRole role, Map<String, Object> properties)
-      throws Exception {
+  public String startRole(ServiceRole role, Map<String, Object> properties) throws Exception {
     switch (role) {
       case CONTROLLER:
         return startController(new ControllerConf(properties));
@@ -97,8 +96,7 @@ public class PinotServiceManager {
     return null;
   }
 
-  public String startController(ControllerConf controllerConf)
-      throws Exception {
+  public String startController(ControllerConf controllerConf) throws Exception {
     LOGGER.info("Trying to start Pinot Controller...");
     if (controllerConf.getHelixClusterName() == null) {
       controllerConf.setHelixClusterName(_clusterName);
@@ -118,8 +116,7 @@ public class PinotServiceManager {
     return instanceId;
   }
 
-  public String startBroker(PinotConfiguration brokerConf)
-      throws Exception {
+  public String startBroker(PinotConfiguration brokerConf) throws Exception {
     LOGGER.info("Trying to start Pinot Broker...");
     String brokerHost = brokerConf.getProperty("broker.host");
     HelixBrokerStarter brokerStarter;
@@ -141,8 +138,7 @@ public class PinotServiceManager {
     return instanceId;
   }
 
-  public String startServer(PinotConfiguration serverConf)
-      throws Exception {
+  public String startServer(PinotConfiguration serverConf) throws Exception {
     LOGGER.info("Trying to start Pinot Server...");
     HelixServerStarter serverStarter = new HelixServerStarter(_clusterName, _zkAddress, serverConf);
     serverStarter.start();
@@ -153,8 +149,7 @@ public class PinotServiceManager {
     return instanceId;
   }
 
-  public String startMinion(PinotConfiguration minionConf)
-      throws Exception {
+  public String startMinion(PinotConfiguration minionConf) throws Exception {
     LOGGER.info("Trying to start Pinot Minion...");
     MinionStarter minionStarter = new MinionStarter(_clusterName, _zkAddress, minionConf);
     minionStarter.start();
@@ -218,10 +213,9 @@ public class PinotServiceManager {
     if (serviceStartable == null) {
       return null;
     }
-    PinotInstanceStatus status =
-        new PinotInstanceStatus(serviceStartable.getServiceRole(), serviceStartable.getInstanceId(),
-            serviceStartable.getConfig(), ServiceStatus.getServiceStatus(instanceName),
-            ServiceStatus.getStatusDescription(instanceName));
+    PinotInstanceStatus status = new PinotInstanceStatus(serviceStartable.getServiceRole(),
+        serviceStartable.getInstanceId(), serviceStartable.getConfig(), ServiceStatus.getServiceStatus(instanceName),
+        ServiceStatus.getStatusDescription(instanceName));
 
     return status;
   }

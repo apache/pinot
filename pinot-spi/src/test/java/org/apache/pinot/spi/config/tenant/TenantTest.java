@@ -28,8 +28,7 @@ import static org.testng.Assert.assertEquals;
 public class TenantTest {
 
   @Test
-  public void testDeserializeFromJson()
-      throws IOException {
+  public void testDeserializeFromJson() throws IOException {
     Tenant tenant = new Tenant(TenantRole.SERVER, "newTenant", 10, 5, 5);
     tenant = JsonUtils.stringToObject(JsonUtils.objectToString(tenant), Tenant.class);
     assertEquals(tenant.getTenantRole(), TenantRole.SERVER);

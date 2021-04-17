@@ -83,8 +83,7 @@ public class SparkSegmentCreationFunction implements Serializable {
   protected File _localSegmentDir;
   protected File _localSegmentTarDir;
 
-  public SparkSegmentCreationFunction(Properties properties, String workerOutputPath)
-      throws IOException {
+  public SparkSegmentCreationFunction(Properties properties, String workerOutputPath) throws IOException {
     _jobConf = new Configuration();
     for (Map.Entry<Object, Object> entry : properties.entrySet()) {
       _jobConf.set(entry.getKey().toString(), entry.getValue().toString());
@@ -149,8 +148,8 @@ public class SparkSegmentCreationFunction implements Serializable {
       _logger.warn("Deleting existing file: {}", _localStagingDir);
       FileUtils.forceDelete(_localStagingDir);
     }
-    _logger
-        .info("Making local temporary directories: {}, {}, {}", _localStagingDir, _localInputDir, _localSegmentTarDir);
+    _logger.info("Making local temporary directories: {}, {}, {}", _localStagingDir, _localInputDir,
+        _localSegmentTarDir);
     Preconditions.checkState(_localStagingDir.mkdirs());
     Preconditions.checkState(_localInputDir.mkdir());
     Preconditions.checkState(_localSegmentDir.mkdir());
@@ -192,8 +191,7 @@ public class SparkSegmentCreationFunction implements Serializable {
     _logger.info("*********************************************************************");
   }
 
-  protected void run(String hdfsInputFileString, Long seqId)
-      throws IOException, InterruptedException {
+  protected void run(String hdfsInputFileString, Long seqId) throws IOException, InterruptedException {
     Path hdfsInputFile = new Path(hdfsInputFileString);
     int sequenceId = seqId.intValue();
     _logger.info("Generating segment with HDFS input file: {}, sequence id: {}", hdfsInputFile, sequenceId);
@@ -201,8 +199,8 @@ public class SparkSegmentCreationFunction implements Serializable {
     String inputFileName = hdfsInputFile.getName();
     File localInputFile = new File(_localInputDir, inputFileName);
     _logger.info("Copying input file from: {} to: {}", hdfsInputFile, localInputFile);
-    FileSystem.get(hdfsInputFile.toUri(), _jobConf)
-        .copyToLocalFile(hdfsInputFile, new Path(localInputFile.getAbsolutePath()));
+    FileSystem.get(hdfsInputFile.toUri(), _jobConf).copyToLocalFile(hdfsInputFile,
+        new Path(localInputFile.getAbsolutePath()));
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, _schema);
     segmentGeneratorConfig.setTableName(_rawTableName);
@@ -249,14 +247,13 @@ public class SparkSegmentCreationFunction implements Serializable {
 
     Path hdfsSegmentTarFile = new Path(_hdfsSegmentTarDir, segmentTarFileName);
     if (_useRelativePath) {
-      Path relativeOutputPath =
-          getRelativeOutputPath(new Path(_jobConf.get(JobConfigConstants.PATH_TO_INPUT)).toUri(), hdfsInputFile.toUri(),
-              _hdfsSegmentTarDir);
+      Path relativeOutputPath = getRelativeOutputPath(new Path(_jobConf.get(JobConfigConstants.PATH_TO_INPUT)).toUri(),
+          hdfsInputFile.toUri(), _hdfsSegmentTarDir);
       hdfsSegmentTarFile = new Path(relativeOutputPath, segmentTarFileName);
     }
     _logger.info("Copying segment tar file from: {} to: {}", localSegmentTarFile, hdfsSegmentTarFile);
-    FileSystem.get(hdfsSegmentTarFile.toUri(), _jobConf)
-        .copyFromLocalFile(true, true, new Path(localSegmentTarFile.getAbsolutePath()), hdfsSegmentTarFile);
+    FileSystem.get(hdfsSegmentTarFile.toUri(), _jobConf).copyFromLocalFile(true, true,
+        new Path(localSegmentTarFile.getAbsolutePath()), hdfsSegmentTarFile);
 
     _logger.info("Finish generating segment: {} with HDFS input file: {}, sequence id: {}", segmentName, hdfsInputFile,
         sequenceId);
@@ -279,8 +276,7 @@ public class SparkSegmentCreationFunction implements Serializable {
   }
 
   @Nullable
-  protected RecordReaderConfig getReaderConfig(FileFormat fileFormat)
-      throws IOException {
+  protected RecordReaderConfig getReaderConfig(FileFormat fileFormat) throws IOException {
     if (_readerConfigFile != null) {
       if (fileFormat == FileFormat.CSV) {
         try (InputStream inputStream = FileSystem.get(_readerConfigFile.toUri(), _jobConf).open(_readerConfigFile)) {

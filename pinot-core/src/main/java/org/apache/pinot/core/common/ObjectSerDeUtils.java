@@ -876,31 +876,8 @@ public class ObjectSerDeUtils {
 
   // NOTE: DO NOT change the order, it has to be the same order as the ObjectType
   //@formatter:off
-  private static final ObjectSerDe[] SER_DES = {
-      STRING_SER_DE,
-      LONG_SER_DE,
-      DOUBLE_SER_DE,
-      DOUBLE_ARRAY_LIST_SER_DE,
-      AVG_PAIR_SER_DE,
-      MIN_MAX_RANGE_PAIR_SER_DE,
-      HYPER_LOG_LOG_SER_DE,
-      QUANTILE_DIGEST_SER_DE,
-      MAP_SER_DE,
-      INT_SET_SER_DE,
-      TDIGEST_SER_DE,
-      DISTINCT_TABLE_SER_DE,
-      DATA_SKETCH_SER_DE,
-      GEOMETRY_SER_DE,
-      ROARING_BITMAP_SER_DE,
-      LONG_SET_SER_DE,
-      FLOAT_SET_SER_DE,
-      DOUBLE_SET_SER_DE,
-      STRING_SET_SER_DE,
-      BYTES_SET_SER_DE,
-      ID_SET_SER_DE,
-      LIST_SER_DE,
-      BIGDECIMAL_SER_DE
-  };
+  private static final ObjectSerDe[] SER_DES =
+      {STRING_SER_DE, LONG_SER_DE, DOUBLE_SER_DE, DOUBLE_ARRAY_LIST_SER_DE, AVG_PAIR_SER_DE, MIN_MAX_RANGE_PAIR_SER_DE, HYPER_LOG_LOG_SER_DE, QUANTILE_DIGEST_SER_DE, MAP_SER_DE, INT_SET_SER_DE, TDIGEST_SER_DE, DISTINCT_TABLE_SER_DE, DATA_SKETCH_SER_DE, GEOMETRY_SER_DE, ROARING_BITMAP_SER_DE, LONG_SET_SER_DE, FLOAT_SET_SER_DE, DOUBLE_SET_SER_DE, STRING_SET_SER_DE, BYTES_SET_SER_DE, ID_SET_SER_DE, LIST_SER_DE, BIGDECIMAL_SER_DE};
   //@formatter:on
 
   public static byte[] serialize(Object value) {

@@ -31,8 +31,7 @@ import static org.testng.Assert.fail;
 public class QuotaConfigTest {
 
   @Test
-  public void testStorageQuota()
-      throws IOException {
+  public void testStorageQuota() throws IOException {
     {
       String quotaConfigStr = "{\"storage\" : \"100gb\"}";
       QuotaConfig quotaConfig = JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
@@ -66,8 +65,7 @@ public class QuotaConfigTest {
   }
 
   @Test
-  public void testQPSQuota()
-      throws IOException {
+  public void testQPSQuota() throws IOException {
     {
       String quotaConfigStr = "{\"maxQueriesPerSecond\" : \"100\"}";
       QuotaConfig quotaConfig = JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
@@ -114,8 +112,7 @@ public class QuotaConfigTest {
   }
 
   @Test
-  public void testSerDe()
-      throws IOException {
+  public void testSerDe() throws IOException {
     QuotaConfig quotaConfig = new QuotaConfig("100G", "100.0");
     JsonNode quotaConfigJson = quotaConfig.toJsonNode();
     assertEquals(quotaConfigJson.get("storage").asText(), "100G");

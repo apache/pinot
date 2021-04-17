@@ -151,11 +151,12 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   private void addValueToTimer(String fullTimerName, final long duration, final TimeUnit timeUnit) {
     final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullTimerName);
-    PinotTimer timer = PinotMetricUtils.makePinotTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS);
+    PinotTimer timer =
+        PinotMetricUtils.makePinotTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS);
     if (timer != null) {
       timer.update(duration, timeUnit);
-    }  
-   }
+    }
+  }
 
   /**
    * Logs a value to a meter.
@@ -254,8 +255,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
           _gaugeValues.put(fullGaugeName, new AtomicLong(unitCount));
           addCallbackGauge(fullGaugeName, new Callable<Long>() {
             @Override
-            public Long call()
-                throws Exception {
+            public Long call() throws Exception {
               return _gaugeValues.get(fullGaugeName).get();
             }
           });
@@ -356,8 +356,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
           _gaugeValues.put(gaugeName, new AtomicLong(unitCount));
           addCallbackGauge(gaugeName, new Callable<Long>() {
             @Override
-            public Long call()
-                throws Exception {
+            public Long call() throws Exception {
               return _gaugeValues.get(gaugeName).get();
             }
           });
@@ -462,7 +461,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param valueCallback The callback function used to retrieve the value of the gauge
    */
   public void addCallbackGauge(final String metricName, final Callable<Long> valueCallback) {
-    PinotMetricUtils.makeGauge(_metricsRegistry, PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
+    PinotMetricUtils.makeGauge(_metricsRegistry,
+        PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
         PinotMetricUtils.makePinotGauge(avoid -> {
           try {
             return valueCallback.call();

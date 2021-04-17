@@ -38,9 +38,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.Controller.DEFAULT_METR
 
 
 public class ControllerConf extends PinotConfiguration {
-  public static final List<String> SUPPORTED_PROTOCOLS = Arrays.asList(
-      CommonConstants.HTTP_PROTOCOL,
-      CommonConstants.HTTPS_PROTOCOL);
+  public static final List<String> SUPPORTED_PROTOCOLS =
+      Arrays.asList(CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL);
 
   public static final String CONTROLLER_VIP_HOST = "controller.vip.host";
   public static final String CONTROLLER_VIP_PORT = "controller.vip.port";
@@ -66,7 +65,9 @@ public class ControllerConf extends PinotConfiguration {
   public static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY = "controller.resource.rebalance.strategy";
 
   public enum ControllerMode {
-    DUAL, PINOT_ONLY, HELIX_ONLY
+    DUAL,
+    PINOT_ONLY,
+    HELIX_ONLY
   }
 
   public static class ControllerPeriodicTasksConf {
@@ -90,9 +91,10 @@ public class ControllerConf extends PinotConfiguration {
     public static final String STATUS_CHECKER_WAIT_FOR_PUSH_TIME_IN_SECONDS =
         "controller.statuschecker.waitForPushTimeInSeconds";
     public static final String TASK_MANAGER_FREQUENCY_IN_SECONDS = "controller.task.frequencyInSeconds";
-    public static final String MINION_INSTANCES_CLEANUP_TASK_FREQUENCY_IN_SECONDS = "controller.minion.instances.cleanup.task.frequencyInSeconds";
-    public static final String MINION_INSTANCES_CLEANUP_TASK_INITIAL_DELAY_SECONDS = "controller.minion.instances.cleanup.task.initialDelaySeconds";
-
+    public static final String MINION_INSTANCES_CLEANUP_TASK_FREQUENCY_IN_SECONDS =
+        "controller.minion.instances.cleanup.task.frequencyInSeconds";
+    public static final String MINION_INSTANCES_CLEANUP_TASK_INITIAL_DELAY_SECONDS =
+        "controller.minion.instances.cleanup.task.initialDelaySeconds";
 
     public static final String PINOT_TASK_MANAGER_SCHEDULER_ENABLED = "controller.task.scheduler.enabled";
     @Deprecated
@@ -190,7 +192,7 @@ public class ControllerConf extends PinotConfiguration {
   public ControllerConf() {
     super(new HashMap<>());
   }
-  
+
   public ControllerConf(Map<String, Object> baseProperties) {
     super(baseProperties);
   }
@@ -303,7 +305,7 @@ public class ControllerConf extends PinotConfiguration {
   public String getControllerPort() {
     return getProperty(CONTROLLER_PORT);
   }
-  
+
   public List<String> getControllerAccessProtocols() {
     return getProperty(CONTROLLER_ACCESS_PROTOCOLS,
         getControllerPort() == null ? Arrays.asList("http") : Arrays.asList());
@@ -378,7 +380,7 @@ public class ControllerConf extends PinotConfiguration {
 
             // No protocol defines a port as VIP. Fallback on legacy controller.port property.
             .orElseGet(this::getControllerPort));
-  }  
+  }
 
   public String getControllerVipProtocol() {
     return getSupportedProtocol(CONTROLLER_VIP_PROTOCOL);
@@ -553,7 +555,8 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public void setMinionInstancesCleanupTaskFrequencyInSeconds(int frequencyInSeconds) {
-    setProperty(ControllerPeriodicTasksConf.MINION_INSTANCES_CLEANUP_TASK_FREQUENCY_IN_SECONDS, Integer.toString(frequencyInSeconds));
+    setProperty(ControllerPeriodicTasksConf.MINION_INSTANCES_CLEANUP_TASK_FREQUENCY_IN_SECONDS,
+        Integer.toString(frequencyInSeconds));
   }
 
   public long getMinionInstancesCleanupTaskInitialDelaySeconds() {
@@ -562,7 +565,8 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public void setMinionInstancesCleanupTaskInitialDelaySeconds(int initialDelaySeconds) {
-    setProperty(ControllerPeriodicTasksConf.MINION_INSTANCES_CLEANUP_TASK_INITIAL_DELAY_SECONDS, Integer.toString(initialDelaySeconds));
+    setProperty(ControllerPeriodicTasksConf.MINION_INSTANCES_CLEANUP_TASK_INITIAL_DELAY_SECONDS,
+        Integer.toString(initialDelaySeconds));
   }
 
   public int getDefaultTableMinReplicas() {
@@ -674,7 +678,8 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public String getLeadControllerResourceRebalanceStrategy() {
-    return getProperty(LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY, DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY);
+    return getProperty(LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY,
+        DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY);
   }
 
   public boolean getHLCTablesAllowed() {
@@ -706,8 +711,7 @@ public class ControllerConf extends PinotConfiguration {
 
   private String getSupportedProtocol(String property) {
     String value = getProperty(property, CommonConstants.HTTP_PROTOCOL);
-    Preconditions.checkArgument(SUPPORTED_PROTOCOLS.contains(value),
-        "Unsupported %s protocol '%s'", property, value);
+    Preconditions.checkArgument(SUPPORTED_PROTOCOLS.contains(value), "Unsupported %s protocol '%s'", property, value);
     return value;
   }
 }

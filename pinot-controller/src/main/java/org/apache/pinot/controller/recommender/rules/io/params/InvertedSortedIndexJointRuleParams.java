@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.Nulls;
 
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.InvertedSortedIndexJointRule.*;
 
+
 /**
  * Thresholds and parameters used in InvertedSortedIndexJointRule
  */
@@ -31,7 +32,8 @@ public class InvertedSortedIndexJointRuleParams {
   // When the number of indices we recommend increment 1,
   // the corresponding nESI saved should be > THRESHOLD_GAIN_DIFF_BETWEEN_ITERATION * totalNESI
   // to be consider a valid gain
-  public Double THRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION = DEFAULT_THRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION;
+  public Double THRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION =
+      DEFAULT_THRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION;
 
   // When we do not have a valid gain for MAX_NUM_ITERATION_WITHOUT_GAIN of iterations
   // The process will stop because adding more indices does not bring down the nESI
@@ -45,7 +47,8 @@ public class InvertedSortedIndexJointRuleParams {
   // THRESHOLD_AND_PREDICATE_TOP_VOTES * nESI_saved_of_top_one_candidate
   // then candidates [1st, nth] will from a exclusive vote
   // Meaning that during the overall vote counting, only one candidate can be counted
-  public Double THRESHOLD_RATIO_MIN_AND_PREDICATE_TOP_CANDIDATES = DEFAULT_THRESHOLD_RATIO_MIN_AND_PREDICATE_TOP_CANDIDATES;
+  public Double THRESHOLD_RATIO_MIN_AND_PREDICATE_TOP_CANDIDATES =
+      DEFAULT_THRESHOLD_RATIO_MIN_AND_PREDICATE_TOP_CANDIDATES;
 
   // In the over all recommendation for sorted and inverted indices, iff the nESI saved of top N-th candidate is larger than
   // THRESHOLD_RATIO_MIN_NESI_FOR_TOP_CANDIDATES * nESI_saved_of_top_one_candidate,
@@ -59,7 +62,6 @@ public class InvertedSortedIndexJointRuleParams {
   public Double PERCENT_SELECT_FOR_RANGE = DEFAULT_PERCENT_SELECT_FOR_RANGE;
   public Double PERCENT_SELECT_FOR_REGEX = DEFAULT_PERCENT_SELECT_FOR_REGEX;
   public Double PERCENT_SELECT_FOR_ISNULL = DEFAULT_PERCENT_SELECT_FOR_ISNULL;
-
 
   public Double getTHRESHOLD_RATIO_MIN_NESI_FOR_TOP_CANDIDATES() {
     return THRESHOLD_RATIO_MIN_NESI_FOR_TOP_CANDIDATES;
@@ -75,7 +77,8 @@ public class InvertedSortedIndexJointRuleParams {
   }
 
   @JsonSetter(value = "THRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION", nulls = Nulls.SKIP)
-  public void setTHRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION(Double THRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION) {
+  public void setTHRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION(
+      Double THRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION) {
     this.THRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION = THRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION;
   }
 
@@ -102,7 +105,8 @@ public class InvertedSortedIndexJointRuleParams {
   }
 
   @JsonSetter(value = "THRESHOLD_RATIO_MIN_AND_PREDICATE_TOP_CANDIDATES", nulls = Nulls.SKIP)
-  public void setTHRESHOLD_RATIO_MIN_AND_PREDICATE_TOP_CANDIDATES(Double THRESHOLD_RATIO_MIN_AND_PREDICATE_TOP_CANDIDATES) {
+  public void setTHRESHOLD_RATIO_MIN_AND_PREDICATE_TOP_CANDIDATES(
+      Double THRESHOLD_RATIO_MIN_AND_PREDICATE_TOP_CANDIDATES) {
     this.THRESHOLD_RATIO_MIN_AND_PREDICATE_TOP_CANDIDATES = THRESHOLD_RATIO_MIN_AND_PREDICATE_TOP_CANDIDATES;
   }
 

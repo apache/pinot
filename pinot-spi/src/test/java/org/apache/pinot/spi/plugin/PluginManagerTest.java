@@ -56,8 +56,7 @@ public class PluginManagerTest {
   }
 
   @Test
-  public void testSimple()
-      throws Exception {
+  public void testSimple() throws Exception {
     JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
     URL javaFile = Thread.currentThread().getContextClassLoader().getResource(TEST_RECORD_READER_FILE);
     if (javaFile != null) {
@@ -90,16 +89,20 @@ public class PluginManagerTest {
 
   @Test
   public void testBackwardCompatible() {
-    Assert.assertEquals(PluginManager
+    Assert.assertEquals(
+        PluginManager
             .loadClassWithBackwardCompatibleCheck("org.apache.pinot.core.realtime.stream.SimpleAvroMessageDecoder"),
         "org.apache.pinot.plugin.inputformat.avro.SimpleAvroMessageDecoder");
-    Assert.assertEquals(PluginManager
+    Assert.assertEquals(
+        PluginManager
             .loadClassWithBackwardCompatibleCheck("org.apache.pinot.core.realtime.stream.SimpleAvroMessageDecoder"),
         "org.apache.pinot.plugin.inputformat.avro.SimpleAvroMessageDecoder");
-    Assert.assertEquals(PluginManager
+    Assert.assertEquals(
+        PluginManager
             .loadClassWithBackwardCompatibleCheck("org.apache.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder"),
         "org.apache.pinot.plugin.inputformat.avro.KafkaAvroMessageDecoder");
-    Assert.assertEquals(PluginManager
+    Assert.assertEquals(
+        PluginManager
             .loadClassWithBackwardCompatibleCheck("org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder"),
         "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder");
 
@@ -132,10 +135,12 @@ public class PluginManagerTest {
         "org.apache.pinot.spi.filesystem.LocalPinotFS");
 
     // StreamConsumerFactory
-    Assert.assertEquals(PluginManager
+    Assert.assertEquals(
+        PluginManager
             .loadClassWithBackwardCompatibleCheck("org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory"),
         "org.apache.pinot.plugin.stream.kafka09.KafkaConsumerFactory");
-    Assert.assertEquals(PluginManager
+    Assert.assertEquals(
+        PluginManager
             .loadClassWithBackwardCompatibleCheck("org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory"),
         "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory");
   }

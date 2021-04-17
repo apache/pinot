@@ -66,7 +66,8 @@ public class ExpressionTransformerTimeTest {
     // 2] both incoming and outgoing defined - exactly the same - Doesn't create DefaultTimeFSpecEvaluator, incoming used as is.
     pinotSchema = new Schema.SchemaBuilder()
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"),
-            new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time")).build();
+            new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"))
+        .build();
 
     // correct value - use incoming
     expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
@@ -86,7 +87,8 @@ public class ExpressionTransformerTimeTest {
     try {
       pinotSchema = new Schema.SchemaBuilder()
           .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"),
-              new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.HOURS, "time")).build();
+              new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.HOURS, "time"))
+          .build();
       new ExpressionTransformer(tableConfig, pinotSchema);
       Assert.fail();
     } catch (Exception e) {
@@ -96,7 +98,8 @@ public class ExpressionTransformerTimeTest {
     // 4] both incoming and outgoing defined - different column names - convert when possible
     pinotSchema = new Schema.SchemaBuilder()
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
-            new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.HOURS, "outgoing")).build();
+            new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.HOURS, "outgoing"))
+        .build();
 
     // only valid incoming value exists - convert using DefaultTimeSpecEvaluator
     expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);

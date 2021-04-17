@@ -72,8 +72,7 @@ public class ConsumingSegmentInfoReaderTest {
   private static final String SEGMENT_NAME_PARTITION_1 = "table__1__32__12345";
 
   @BeforeClass
-  public void setUp()
-      throws IOException {
+  public void setUp() throws IOException {
     helix = mock(PinotHelixResourceManager.class);
     String uriPath = "/tables/";
 
@@ -82,22 +81,22 @@ public class ConsumingSegmentInfoReaderTest {
     partitionToOffset0.put("0", "150");
     Map<String, String> partitionToOffset1 = new HashMap<>();
     partitionToOffset1.put("1", "150");
-    FakeConsumingInfoServer s0 = new FakeConsumingInfoServer(Lists
-        .newArrayList(new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_0, "CONSUMING", 0, partitionToOffset0),
+    FakeConsumingInfoServer s0 = new FakeConsumingInfoServer(
+        Lists.newArrayList(new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_0, "CONSUMING", 0, partitionToOffset0),
             new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_1, "CONSUMING", 0, partitionToOffset1)));
     s0.start(uriPath, createHandler(200, s0.consumerInfos, 0));
     serverMap.put("server0", s0);
 
     // server1 - 1 consumer each for p0 and p1. CONSUMING.
-    FakeConsumingInfoServer s1 = new FakeConsumingInfoServer(Lists
-        .newArrayList(new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_0, "CONSUMING", 0, partitionToOffset0),
+    FakeConsumingInfoServer s1 = new FakeConsumingInfoServer(
+        Lists.newArrayList(new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_0, "CONSUMING", 0, partitionToOffset0),
             new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_1, "CONSUMING", 0, partitionToOffset1)));
     s1.start(uriPath, createHandler(200, s1.consumerInfos, 0));
     serverMap.put("server1", s1);
 
     // server2 - p1 consumer CONSUMING. p0 consumer NOT_CONSUMING
-    FakeConsumingInfoServer s2 = new FakeConsumingInfoServer(Lists
-        .newArrayList(new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_0, "NOT_CONSUMING", 0, partitionToOffset0),
+    FakeConsumingInfoServer s2 = new FakeConsumingInfoServer(
+        Lists.newArrayList(new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_0, "NOT_CONSUMING", 0, partitionToOffset0),
             new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_1, "CONSUMING", 0, partitionToOffset1)));
     s2.start(uriPath, createHandler(200, s2.consumerInfos, 0));
     serverMap.put("server2", s2);
@@ -109,8 +108,8 @@ public class ConsumingSegmentInfoReaderTest {
     serverMap.put("server3", s3);
 
     // server4 - unreachable/error/timeout
-    FakeConsumingInfoServer s4 = new FakeConsumingInfoServer(Lists
-        .newArrayList(new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_0, "CONSUMING", 0, partitionToOffset0),
+    FakeConsumingInfoServer s4 = new FakeConsumingInfoServer(
+        Lists.newArrayList(new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_0, "CONSUMING", 0, partitionToOffset0),
             new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_1, "CONSUMING", 0, partitionToOffset1)));
     s4.start(uriPath, createHandler(200, s4.consumerInfos, timeoutMsec * 1000));
     serverMap.put("server4", s4);
@@ -154,8 +153,7 @@ public class ConsumingSegmentInfoReaderTest {
       this.consumerInfos = consumerInfos;
     }
 
-    private void start(String path, HttpHandler handler)
-        throws IOException {
+    private void start(String path, HttpHandler handler) throws IOException {
       httpServer = HttpServer.create(socket, 0);
       httpServer.createContext(path, handler);
       new Thread(() -> httpServer.start()).start();
@@ -181,8 +179,7 @@ public class ConsumingSegmentInfoReaderTest {
   }
 
   private ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap testRunner(final String[] servers,
-      final Set<String> consumingSegments, String table)
-      throws InvalidConfigException {
+      final Set<String> consumingSegments, String table) throws InvalidConfigException {
     when(helix.getServerToSegmentsMap(anyString())).thenAnswer(invocationOnMock -> subsetOfServerSegments(servers));
     when(helix.getDataInstanceAdminEndpoints(ArgumentMatchers.anySet()))
         .thenAnswer(invocationOnMock -> serverEndpoints(servers));
@@ -192,8 +189,7 @@ public class ConsumingSegmentInfoReaderTest {
   }
 
   @Test
-  public void testEmptyTable()
-      throws InvalidConfigException {
+  public void testEmptyTable() throws InvalidConfigException {
     ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentsInfoMap =
         testRunner(new String[]{}, Collections.emptySet(), TABLE_NAME);
     Assert.assertTrue(consumingSegmentsInfoMap._segmentToConsumingInfoMap.isEmpty());
@@ -203,8 +199,7 @@ public class ConsumingSegmentInfoReaderTest {
    * 2 servers, 2 partitions, 2 replicas, all CONSUMING
    */
   @Test
-  public void testHappyPath()
-      throws InvalidConfigException {
+  public void testHappyPath() throws InvalidConfigException {
     final String[] servers = {"server0", "server1"};
     ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentsInfoMap =
         testRunner(servers, Sets.newHashSet(SEGMENT_NAME_PARTITION_0, SEGMENT_NAME_PARTITION_1), TABLE_NAME);
@@ -228,8 +223,7 @@ public class ConsumingSegmentInfoReaderTest {
    * 2 servers, 2 partitions, 2 replicas. p0 consumer in NOT_CONSUMING
    */
   @Test
-  public void testNotConsumingState()
-      throws InvalidConfigException {
+  public void testNotConsumingState() throws InvalidConfigException {
     final String[] servers = {"server0", "server2"};
     ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentsInfoMap =
         testRunner(servers, Sets.newHashSet(SEGMENT_NAME_PARTITION_0, SEGMENT_NAME_PARTITION_1), TABLE_NAME);
@@ -255,8 +249,7 @@ public class ConsumingSegmentInfoReaderTest {
    * 1 servers, 2 partitions, 1 replicas. No consumer for p0. CONSUMING state in idealstate.
    */
   @Test
-  public void testNoConsumerButConsumingInIdealState()
-      throws InvalidConfigException {
+  public void testNoConsumerButConsumingInIdealState() throws InvalidConfigException {
     final String[] servers = {"server3"};
     ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentsInfoMap =
         testRunner(servers, Sets.newHashSet(SEGMENT_NAME_PARTITION_0, SEGMENT_NAME_PARTITION_1), TABLE_NAME);
@@ -274,8 +267,7 @@ public class ConsumingSegmentInfoReaderTest {
    * 1 servers, 2 partitions, 1 replicas. No consumer for p0. OFFLINE state in idealstate.
    */
   @Test
-  public void testNoConsumerOfflineInIdealState()
-      throws InvalidConfigException {
+  public void testNoConsumerOfflineInIdealState() throws InvalidConfigException {
     final String[] servers = {"server3"};
     ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentsInfoMap =
         testRunner(servers, Sets.newHashSet(SEGMENT_NAME_PARTITION_1), TABLE_NAME);
@@ -293,8 +285,7 @@ public class ConsumingSegmentInfoReaderTest {
    * 2 servers, 2 partitions, 2 replicas. server4 times out.
    */
   @Test
-  public void testErrorFromServer()
-      throws InvalidConfigException {
+  public void testErrorFromServer() throws InvalidConfigException {
     final String[] servers = {"server0", "server4"};
     ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentsInfoMap =
         testRunner(servers, Sets.newHashSet(SEGMENT_NAME_PARTITION_0, SEGMENT_NAME_PARTITION_1), TABLE_NAME);

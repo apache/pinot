@@ -71,8 +71,8 @@ public class TimeBoundaryManager {
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _offlineTableName);
     Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _offlineTableName);
     _timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
-    Preconditions
-        .checkNotNull(_timeColumn, "Time column must be configured in table config for table: %s", _offlineTableName);
+    Preconditions.checkNotNull(_timeColumn, "Time column must be configured in table config for table: %s",
+        _offlineTableName);
     DateTimeFieldSpec dateTimeSpec = schema.getSpecForTimeColumn(_timeColumn);
     Preconditions.checkNotNull(dateTimeSpec, "Field spec must be specified in schema for time column: %s of table: %s",
         _timeColumn, _offlineTableName);

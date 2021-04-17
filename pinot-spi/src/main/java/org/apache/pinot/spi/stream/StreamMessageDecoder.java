@@ -43,8 +43,7 @@ public interface StreamMessageDecoder<T> {
    * @param topicName Topic name of the stream
    * @throws Exception If an error occurs
    */
-  void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
-      throws Exception;
+  void init(Map<String, String> props, Set<String> fieldsToRead, String topicName) throws Exception;
 
   /**
    * Decodes a row.

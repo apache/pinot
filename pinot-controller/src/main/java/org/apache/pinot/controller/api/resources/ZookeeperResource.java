@@ -68,8 +68,8 @@ public class ZookeeperResource {
       @ApiResponse(code = 404, message = "ZK Path not found"), //
       @ApiResponse(code = 204, message = "No Content"), //
       @ApiResponse(code = 500, message = "Internal server error")})
-  public String getData(
-      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path") @DefaultValue("") String path) {
+  public String getData(@ApiParam(value = "Zookeeper Path, must start with /", required = true,
+      defaultValue = "/") @QueryParam("path") @DefaultValue("") String path) {
 
     path = validateAndNormalizeZKPath(path);
 
@@ -90,8 +90,8 @@ public class ZookeeperResource {
       @ApiResponse(code = 404, message = "ZK Path not found"), //
       @ApiResponse(code = 204, message = "No Content"), //
       @ApiResponse(code = 500, message = "Internal server error")})
-  public SuccessResponse delete(
-      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path") @DefaultValue("") String path) {
+  public SuccessResponse delete(@ApiParam(value = "Zookeeper Path, must start with /", required = true,
+      defaultValue = "/") @QueryParam("path") @DefaultValue("") String path) {
 
     path = validateAndNormalizeZKPath(path);
 
@@ -115,18 +115,21 @@ public class ZookeeperResource {
       @ApiResponse(code = 204, message = "No Content"), //
       @ApiResponse(code = 500, message = "Internal server error")})
   public SuccessResponse putData(
-      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path") @DefaultValue("") String path,
+      @ApiParam(value = "Zookeeper Path, must start with /", required = true,
+          defaultValue = "/") @QueryParam("path") @DefaultValue("") String path,
       @ApiParam(value = "Content", required = true) @QueryParam("data") @DefaultValue("") String content,
-      @ApiParam(value = "expectedVersion", required = true, defaultValue = "-1") @QueryParam("expectedVersion") @DefaultValue("-1") String expectedVersion,
-      @ApiParam(value = "accessOption", required = true, defaultValue = "1") @QueryParam("accessOption") @DefaultValue("1") String accessOption) {
+      @ApiParam(value = "expectedVersion", required = true,
+          defaultValue = "-1") @QueryParam("expectedVersion") @DefaultValue("-1") String expectedVersion,
+      @ApiParam(value = "accessOption", required = true,
+          defaultValue = "1") @QueryParam("accessOption") @DefaultValue("1") String accessOption) {
     path = validateAndNormalizeZKPath(path);
     ZNRecord record = null;
     if (content != null) {
       record = (ZNRecord) _znRecordSerializer.deserialize(content.getBytes(Charsets.UTF_8));
     }
     try {
-      boolean result = pinotHelixResourceManager
-          .setZKData(path, record, Integer.parseInt(expectedVersion), Integer.parseInt(accessOption));
+      boolean result = pinotHelixResourceManager.setZKData(path, record, Integer.parseInt(expectedVersion),
+          Integer.parseInt(accessOption));
       if (result) {
         return new SuccessResponse("Successfully Updated path: " + path);
       } else {
@@ -147,8 +150,8 @@ public class ZookeeperResource {
       @ApiResponse(code = 200, message = "Success"), //
       @ApiResponse(code = 404, message = "ZK Path not found"), //
       @ApiResponse(code = 500, message = "Internal server error")})
-  public String ls(
-      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path") @DefaultValue("") String path) {
+  public String ls(@ApiParam(value = "Zookeeper Path, must start with /", required = true,
+      defaultValue = "/") @QueryParam("path") @DefaultValue("") String path) {
 
     path = validateAndNormalizeZKPath(path);
 
@@ -168,8 +171,8 @@ public class ZookeeperResource {
       @ApiResponse(code = 200, message = "Success"), //
       @ApiResponse(code = 404, message = "ZK Path not found"), //
       @ApiResponse(code = 500, message = "Internal server error")})
-  public String lsl(
-      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path") @DefaultValue("") String path) {
+  public String lsl(@ApiParam(value = "Zookeeper Path, must start with /", required = true,
+      defaultValue = "/") @QueryParam("path") @DefaultValue("") String path) {
 
     path = validateAndNormalizeZKPath(path);
 
@@ -185,13 +188,14 @@ public class ZookeeperResource {
   @GET
   @Path("/zk/stat")
   @Produces(MediaType.TEXT_PLAIN)
-  @ApiOperation(value = "Get the stat", notes = " Use this api to fetch additional details of a znode such as creation time, modified time, numChildren etc ")
+  @ApiOperation(value = "Get the stat",
+      notes = " Use this api to fetch additional details of a znode such as creation time, modified time, numChildren etc ")
   @ApiResponses(value = { //
       @ApiResponse(code = 200, message = "Success"), //
       @ApiResponse(code = 404, message = "Table not found"), //
       @ApiResponse(code = 500, message = "Internal server error")})
-  public String stat(
-      @ApiParam(value = "Zookeeper Path, must start with /", required = true, defaultValue = "/") @QueryParam("path") @DefaultValue("") String path) {
+  public String stat(@ApiParam(value = "Zookeeper Path, must start with /", required = true,
+      defaultValue = "/") @QueryParam("path") @DefaultValue("") String path) {
 
     path = validateAndNormalizeZKPath(path);
 
@@ -203,8 +207,8 @@ public class ZookeeperResource {
     }
   }
 
-  private String validateAndNormalizeZKPath(
-      @DefaultValue("") @QueryParam("path") @ApiParam(value = "Zookeeper Path, must start with /", required = false, defaultValue = "/") String path) {
+  private String validateAndNormalizeZKPath(@DefaultValue("") @QueryParam("path") @ApiParam(
+      value = "Zookeeper Path, must start with /", required = false, defaultValue = "/") String path) {
 
     if (path == null || path.trim().isEmpty()) {
       throw new ControllerApplicationException(LOGGER, "ZKPath " + path + " cannot be null or empty",

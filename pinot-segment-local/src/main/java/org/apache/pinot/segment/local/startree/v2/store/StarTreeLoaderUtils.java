@@ -124,8 +124,7 @@ public class StarTreeLoaderUtils {
         }
 
         @Override
-        public void close()
-            throws IOException {
+        public void close() throws IOException {
           // NOTE: Close the indexes managed by the star-tree (dictionary is managed inside the ColumnIndexContainer).
           for (DataSource dataSource : dataSourceMap.values()) {
             dataSource.getForwardIndex().close();

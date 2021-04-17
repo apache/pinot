@@ -65,7 +65,8 @@ import org.apache.thrift.scheme.TupleScheme;
 import org.apache.thrift.transport.TIOStreamTransport;
 
 
-public class ThriftSampleData implements TBase<ThriftSampleData, ThriftSampleData._Fields>, Serializable, Cloneable, Comparable<ThriftSampleData> {
+public class ThriftSampleData implements TBase<ThriftSampleData, ThriftSampleData._Fields>, Serializable, Cloneable,
+    Comparable<ThriftSampleData> {
   private static final TStruct STRUCT_DESC = new TStruct("ThriftSampleData");
   private static final TField ID_FIELD_DESC = new TField("id", (byte) 8, (short) 1);
   private static final TField NAME_FIELD_DESC = new TField("name", (byte) 11, (short) 2);
@@ -688,13 +689,11 @@ public class ThriftSampleData implements TBase<ThriftSampleData, ThriftSampleDat
     return ThriftSampleData._Fields.findByThriftId(fieldId);
   }
 
-  public void read(TProtocol iprot)
-      throws TException {
+  public void read(TProtocol iprot) throws TException {
     ((SchemeFactory) schemes.get(iprot.getScheme())).getScheme().read(iprot, this);
   }
 
-  public void write(TProtocol oprot)
-      throws TException {
+  public void write(TProtocol oprot) throws TException {
     ((SchemeFactory) schemes.get(oprot.getScheme())).getScheme().write(oprot, this);
   }
 
@@ -782,12 +781,10 @@ public class ThriftSampleData implements TBase<ThriftSampleData, ThriftSampleDat
     return sb.toString();
   }
 
-  public void validate()
-      throws TException {
+  public void validate() throws TException {
   }
 
-  private void writeObject(ObjectOutputStream out)
-      throws IOException {
+  private void writeObject(ObjectOutputStream out) throws IOException {
     try {
       this.write(new TCompactProtocol(new TIOStreamTransport(out)));
     } catch (TException var3) {
@@ -795,8 +792,7 @@ public class ThriftSampleData implements TBase<ThriftSampleData, ThriftSampleDat
     }
   }
 
-  private void readObject(ObjectInputStream in)
-      throws IOException, ClassNotFoundException {
+  private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
     try {
       this.__isset_bitfield = 0;
       this.read(new TCompactProtocol(new TIOStreamTransport(in)));
@@ -815,8 +811,8 @@ public class ThriftSampleData implements TBase<ThriftSampleData, ThriftSampleDat
     tmpMap.put(ThriftSampleData._Fields.NAME, new FieldMetaData("name", (byte) 2, new FieldValueMetaData((byte) 11)));
     tmpMap.put(ThriftSampleData._Fields.CREATED_AT,
         new FieldMetaData("created_at", (byte) 2, new FieldValueMetaData((byte) 10)));
-    tmpMap
-        .put(ThriftSampleData._Fields.ACTIVE, new FieldMetaData("active", (byte) 2, new FieldValueMetaData((byte) 2)));
+    tmpMap.put(ThriftSampleData._Fields.ACTIVE,
+        new FieldMetaData("active", (byte) 2, new FieldValueMetaData((byte) 2)));
     tmpMap.put(ThriftSampleData._Fields.GROUPS,
         new FieldMetaData("groups", (byte) 3, new ListMetaData((byte) 15, new FieldValueMetaData((byte) 6))));
     tmpMap.put(ThriftSampleData._Fields.MAP_VALUES, new FieldMetaData("map_values", (byte) 3,
@@ -831,8 +827,7 @@ public class ThriftSampleData implements TBase<ThriftSampleData, ThriftSampleDat
     private ThriftSampleData1TupleScheme() {
     }
 
-    public void write(TProtocol prot, ThriftSampleData struct)
-        throws TException {
+    public void write(TProtocol prot, ThriftSampleData struct) throws TException {
       TTupleProtocol oprot = (TTupleProtocol) prot;
       BitSet optionals = new BitSet();
       if (struct.isSetId()) {
@@ -913,8 +908,7 @@ public class ThriftSampleData implements TBase<ThriftSampleData, ThriftSampleDat
       }
     }
 
-    public void read(TProtocol prot, ThriftSampleData struct)
-        throws TException {
+    public void read(TProtocol prot, ThriftSampleData struct) throws TException {
       TTupleProtocol iprot = (TTupleProtocol) prot;
       BitSet incoming = iprot.readBitSet(7);
       if (incoming.get(0)) {
@@ -991,8 +985,7 @@ public class ThriftSampleData implements TBase<ThriftSampleData, ThriftSampleDat
     private ThriftSampleData1StandardScheme() {
     }
 
-    public void read(TProtocol iprot, ThriftSampleData struct)
-        throws TException {
+    public void read(TProtocol iprot, ThriftSampleData struct) throws TException {
       iprot.readStructBegin();
 
       while (true) {
@@ -1098,8 +1091,7 @@ public class ThriftSampleData implements TBase<ThriftSampleData, ThriftSampleDat
       }
     }
 
-    public void write(TProtocol oprot, ThriftSampleData struct)
-        throws TException {
+    public void write(TProtocol oprot, ThriftSampleData struct) throws TException {
       struct.validate();
       oprot.writeStructBegin(ThriftSampleData.STRUCT_DESC);
       if (struct.isSetId()) {

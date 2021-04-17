@@ -31,8 +31,7 @@ import org.testng.annotations.Test;
 public class IngestionSchemaValidatorTest {
 
   @Test
-  public void testAvroIngestionSchemaValidatorForSingleValueColumns()
-      throws Exception {
+  public void testAvroIngestionSchemaValidatorForSingleValueColumns() throws Exception {
     String inputFilePath = new File(Preconditions
         .checkNotNull(IngestionSchemaValidatorTest.class.getClassLoader().getResource("data/test_sample_data.avro"))
         .getFile()).toString();
@@ -102,10 +101,10 @@ public class IngestionSchemaValidatorTest {
   }
 
   @Test
-  public void testAvroIngestionValidatorForMultiValueColumns()
-      throws Exception {
-    String inputFilePath = new File(Preconditions.checkNotNull(
-        IngestionSchemaValidatorTest.class.getClassLoader().getResource("data/test_sample_data_multi_value.avro"))
+  public void testAvroIngestionValidatorForMultiValueColumns() throws Exception {
+    String inputFilePath = new File(Preconditions
+        .checkNotNull(
+            IngestionSchemaValidatorTest.class.getClassLoader().getResource("data/test_sample_data_multi_value.avro"))
         .getFile()).toString();
     String recordReaderClassName = "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader";
 

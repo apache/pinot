@@ -61,10 +61,10 @@ public class PqlAndCalciteSqlCompatibilityTest {
   }
 
   @Test
-  public void testPqlAndSqlCompatible()
-      throws Exception {
-    try (BufferedReader pqlReader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(
-        PqlAndCalciteSqlCompatibilityTest.class.getClassLoader().getResourceAsStream("pql_queries.list"))));
+  public void testPqlAndSqlCompatible() throws Exception {
+    try (
+        BufferedReader pqlReader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(
+            PqlAndCalciteSqlCompatibilityTest.class.getClassLoader().getResourceAsStream("pql_queries.list"))));
         BufferedReader sqlReader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(
             PqlAndCalciteSqlCompatibilityTest.class.getClassLoader().getResourceAsStream("sql_queries.list"))))) {
       String pql;

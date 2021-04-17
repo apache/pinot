@@ -39,18 +39,18 @@ public class GuavaBloomFilterReaderUtils {
   }
 
   /* Cheat sheet:
-
+  
      m: total bits
      n: expected insertions
      b: m/n, bits per insertion
      p: expected false positive probability
      k: number of hash functions
-
+  
      1) Optimal k = b * ln2
      2) p = (1 - e ^ (-kn/m)) ^ k
      3) For optimal k: p = 2 ^ (-k) ~= 0.6185^b
      4) For optimal k: m = -nlnp / ((ln2) ^ 2)
-
+  
      See http://en.wikipedia.org/wiki/Bloom_filter#Probability_of_false_positives for the formula.
    */
 

@@ -76,8 +76,7 @@ public class SegmentPartitionMetadata {
    * @param jsonString Input JSON string
    * @return Instance of {@link SegmentPartitionMetadata} built from the input string.
    */
-  public static SegmentPartitionMetadata fromJsonString(String jsonString)
-      throws IOException {
+  public static SegmentPartitionMetadata fromJsonString(String jsonString) throws IOException {
     return JsonUtils.stringToObject(jsonString, SegmentPartitionMetadata.class);
   }
 
@@ -86,8 +85,7 @@ public class SegmentPartitionMetadata {
    *
    * @return JSON string equivalent of the object.
    */
-  public String toJsonString()
-      throws IOException {
+  public String toJsonString() throws IOException {
     return JsonUtils.objectToString(this);
   }
 

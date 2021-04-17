@@ -54,8 +54,7 @@ public class LoaderUtils {
    * Returns the forward index reader for the given column.
    */
   public static ForwardIndexReader<?> getForwardIndexReader(SegmentDirectory.Reader segmentReader,
-      ColumnMetadata columnMetadata)
-      throws IOException {
+      ColumnMetadata columnMetadata) throws IOException {
     PinotDataBuffer dataBuffer =
         segmentReader.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.FORWARD_INDEX);
     if (columnMetadata.hasDictionary()) {
@@ -81,8 +80,7 @@ public class LoaderUtils {
    * Returns the dictionary for the given column.
    */
   public static BaseImmutableDictionary getDictionary(SegmentDirectory.Reader segmentReader,
-      ColumnMetadata columnMetadata)
-      throws IOException {
+      ColumnMetadata columnMetadata) throws IOException {
     PinotDataBuffer dataBuffer = segmentReader.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.DICTIONARY);
     return PhysicalColumnIndexContainer.loadDictionary(dataBuffer, columnMetadata, false);
   }
@@ -97,8 +95,7 @@ public class LoaderUtils {
    * @throws IOException
    */
   public static void writeIndexToV3Format(SegmentDirectory.Writer segmentWriter, String column, File indexFile,
-      ColumnIndexType indexType)
-      throws IOException {
+      ColumnIndexType indexType) throws IOException {
     long fileLength = indexFile.length();
     // NOTE: DO NOT close buffer here as it is managed in the SegmentDirectory.
     PinotDataBuffer buffer = segmentWriter.newIndexFor(column, indexType, fileLength);
@@ -157,15 +154,14 @@ public class LoaderUtils {
    * </ul>
    * <p>Should be called before trying to load the segment or metadata from index directory.
    */
-  public static void reloadFailureRecovery(@Nonnull File indexDir)
-      throws IOException {
+  public static void reloadFailureRecovery(@Nonnull File indexDir) throws IOException {
     File parentDir = indexDir.getParentFile();
 
     // Recover index directory from segment backup directory if the segment backup directory exists
     File segmentBackupDir = new File(parentDir, indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX);
     if (segmentBackupDir.exists()) {
-      LOGGER
-          .info("Trying to recover index directory: {} from segment backup directory: {}", indexDir, segmentBackupDir);
+      LOGGER.info("Trying to recover index directory: {} from segment backup directory: {}", indexDir,
+          segmentBackupDir);
       if (indexDir.exists()) {
         LOGGER.info("Deleting index directory: {}", indexDir);
         FileUtils.forceDelete(indexDir);

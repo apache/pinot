@@ -39,14 +39,12 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
 public class RealtimeQuickStart {
   private StreamDataServerStartable _kafkaStarter;
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     PluginManager.get().init();
     new RealtimeQuickStart().execute();
   }
 
-  public void execute()
-      throws Exception {
+  public void execute() throws Exception {
     File quickstartTmpDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
 
     File baseDir = new File(quickstartTmpDir, "meetupRsvp");
@@ -70,7 +68,8 @@ public class RealtimeQuickStart {
     printStatus(Color.CYAN, "***** Starting Kafka *****");
     final ZkStarter.ZookeeperInstance zookeeperInstance = ZkStarter.startLocalZkServer();
     try {
-      _kafkaStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, KafkaStarterUtils.getDefaultKafkaConfiguration());
+      _kafkaStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME,
+          KafkaStarterUtils.getDefaultKafkaConfiguration());
     } catch (Exception e) {
       throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
     }
@@ -106,7 +105,8 @@ public class RealtimeQuickStart {
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q2 = "select group_city, sum(rsvp_count) from meetupRsvp group by group_city order by sum(rsvp_count) desc limit 10";
+    String q2 =
+        "select group_city, sum(rsvp_count) from meetupRsvp group by group_city order by sum(rsvp_count) desc limit 10";
     printStatus(Color.YELLOW, "Top 10 cities with the most rsvp");
     printStatus(Color.CYAN, "Query : " + q2);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q2)));
@@ -118,7 +118,8 @@ public class RealtimeQuickStart {
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q3)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q4 = "select event_name, sum(rsvp_count) from meetupRsvp group by event_name order by sum(rsvp_count) desc limit 10";
+    String q4 =
+        "select event_name, sum(rsvp_count) from meetupRsvp group by event_name order by sum(rsvp_count) desc limit 10";
     printStatus(Color.YELLOW, "Show top 10 rsvp'ed events");
     printStatus(Color.CYAN, "Query : " + q4);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q4)));

@@ -67,9 +67,8 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
 
     long dictionaryStartOffset = BaseJsonIndexCreator.HEADER_LENGTH;
     long dictionaryEndOffset = dictionaryStartOffset + dictionaryLength;
-    _dictionary =
-        new StringDictionary(dataBuffer.view(dictionaryStartOffset, dictionaryEndOffset, ByteOrder.BIG_ENDIAN), 0,
-            maxValueLength, (byte) 0);
+    _dictionary = new StringDictionary(
+        dataBuffer.view(dictionaryStartOffset, dictionaryEndOffset, ByteOrder.BIG_ENDIAN), 0, maxValueLength, (byte) 0);
     long invertedIndexEndOffset = dictionaryEndOffset + invertedIndexLength;
     _invertedIndex = new BitmapInvertedIndexReader(
         dataBuffer.view(dictionaryEndOffset, invertedIndexEndOffset, ByteOrder.BIG_ENDIAN), _dictionary.length());
@@ -135,8 +134,8 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
       }
       case PREDICATE: {
         Predicate predicate = filter.getPredicate();
-        Preconditions
-            .checkState(!isExclusive(predicate.getType()), "Exclusive predicate: %s cannot be nested", predicate);
+        Preconditions.checkState(!isExclusive(predicate.getType()), "Exclusive predicate: %s cannot be nested",
+            predicate);
         return getMatchingFlattenedDocIds(predicate);
       }
       default:
@@ -174,9 +173,8 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
       String rightPart = key.substring(rightBracketIndex + 1);
 
       // foo[1].bar -> foo.$index=1
-      String searchKey =
-          leftPart + JsonUtils.KEY_SEPARATOR + JsonUtils.ARRAY_INDEX_KEY + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR
-              + arrayIndex;
+      String searchKey = leftPart + JsonUtils.KEY_SEPARATOR + JsonUtils.ARRAY_INDEX_KEY
+          + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + arrayIndex;
       int dictId = _dictionary.indexOf(searchKey);
       if (dictId >= 0) {
         ImmutableRoaringBitmap docIds = _invertedIndex.getDocIds(dictId);

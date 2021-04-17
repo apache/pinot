@@ -39,8 +39,7 @@ import static org.testng.Assert.assertTrue;
 public class ConfigUtilsTest {
 
   @Test
-  public void testIndexing()
-      throws Exception {
+  public void testIndexing() throws Exception {
     IndexingConfig indexingConfig = new IndexingConfig();
     indexingConfig.setLoadMode("${LOAD_MODE}");
     indexingConfig.setAggregateMetrics(true);
@@ -71,22 +70,20 @@ public class ConfigUtilsTest {
 
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
-            topic);
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            consumerType);
-    streamConfigMap.put(StreamConfigProperties
-            .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
-        consumerFactoryClass);
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
-            decoderClass);
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, "aws.accessKey"), "${AWS_ACCESS_KEY}");
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, "aws.secretKey"), "${AWS_SECRET_KEY}");
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME), topic);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+        consumerType);
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
+        StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), consumerFactoryClass);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
+        decoderClass);
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType, "aws.accessKey"),
+        "${AWS_ACCESS_KEY}");
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType, "aws.secretKey"),
+        "${AWS_SECRET_KEY}");
     indexingConfig.setStreamConfigs(streamConfigMap);
 
     setEnv(ImmutableMap.of("LOAD_MODE", "MMAP", "AWS_ACCESS_KEY", "default_aws_access_key", "AWS_SECRET_KEY",
@@ -114,10 +111,10 @@ public class ConfigUtilsTest {
     Assert.assertEquals(streamConfig.getStreamConfigsMap().get("stream.fakeStream.aws.secretKey"),
         "default_aws_secret_key");
     Assert.assertEquals(streamConfig.getDecoderProperties().size(), 0);
-    Assert
-        .assertEquals(streamConfig.getOffsetCriteria(), new OffsetCriteria.OffsetCriteriaBuilder().withOffsetLargest());
-    Assert
-        .assertEquals(streamConfig.getConnectionTimeoutMillis(), StreamConfig.DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS);
+    Assert.assertEquals(streamConfig.getOffsetCriteria(),
+        new OffsetCriteria.OffsetCriteriaBuilder().withOffsetLargest());
+    Assert.assertEquals(streamConfig.getConnectionTimeoutMillis(),
+        StreamConfig.DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS);
     Assert.assertEquals(streamConfig.getFetchTimeoutMillis(), StreamConfig.DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS);
     Assert.assertEquals(streamConfig.getFlushThresholdRows(), StreamConfig.DEFAULT_FLUSH_THRESHOLD_ROWS);
     Assert.assertEquals(streamConfig.getFlushThresholdTimeMillis(), StreamConfig.DEFAULT_FLUSH_THRESHOLD_TIME_MILLIS);
@@ -125,8 +122,7 @@ public class ConfigUtilsTest {
         StreamConfig.DEFAULT_FLUSH_THRESHOLD_SEGMENT_SIZE_BYTES);
   }
 
-  private static void setEnv(Map<String, String> newEnvVariablsMap)
-      throws Exception {
+  private static void setEnv(Map<String, String> newEnvVariablsMap) throws Exception {
     try {
       Class<?> processEnvironmentClass = Class.forName("java.lang.ProcessEnvironment");
       Field theEnvironmentField = processEnvironmentClass.getDeclaredField("theEnvironment");

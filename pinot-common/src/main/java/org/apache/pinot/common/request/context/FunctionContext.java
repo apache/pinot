@@ -29,7 +29,8 @@ import java.util.Set;
  */
 public class FunctionContext {
   public enum Type {
-    AGGREGATION, TRANSFORM
+    AGGREGATION,
+    TRANSFORM
   }
 
   private final Type _type;
@@ -78,8 +79,8 @@ public class FunctionContext {
       return false;
     }
     FunctionContext that = (FunctionContext) o;
-    return _type == that._type && Objects.equals(_functionName, that._functionName) && Objects
-        .equals(_arguments, that._arguments);
+    return _type == that._type && Objects.equals(_functionName, that._functionName)
+        && Objects.equals(_arguments, that._arguments);
   }
 
   @Override

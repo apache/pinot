@@ -71,8 +71,7 @@ public class StringDictionaryPerfTest {
    *   <li>Row values for the column are randomly generated strings of length 1 to 100</li>
    * </ul>
    */
-  private void buildSegment(int dictLength)
-      throws Exception {
+  private void buildSegment(int dictLength) throws Exception {
     Schema schema = new Schema();
     String segmentName = "perfTestSegment" + System.currentTimeMillis();
     _indexDir = new File(TMP_DIR + File.separator + segmentName);
@@ -125,8 +124,7 @@ public class StringDictionaryPerfTest {
   /**
    * Measures the performance of string dictionary lookups by performing the provided number of lookups to random value.
    */
-  public void perfTestLookups(int numLookups)
-      throws Exception {
+  public void perfTestLookups(int numLookups) throws Exception {
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(_indexDir, ReadMode.heap);
     Dictionary dictionary = immutableSegment.getDictionary(COLUMN_NAME);
 
@@ -144,8 +142,7 @@ public class StringDictionaryPerfTest {
   /**
    * Measures the performance of string dictionary reads by performing the provided number of reads for random index.
    */
-  private String[] perfTestGetValues(int numGetValues)
-      throws Exception {
+  private String[] perfTestGetValues(int numGetValues) throws Exception {
     Runtime r = Runtime.getRuntime();
     System.gc();
     long oldMemory = r.totalMemory() - r.freeMemory();
@@ -172,16 +169,14 @@ public class StringDictionaryPerfTest {
 
     System.out.println("Total time for " + numGetValues + " lookups: " + time + "ms");
     System.out.println("Memory usage: " + (newMemory - oldMemory));
-    return new String[]{String.valueOf(_statistics.getN()), String.valueOf(time), String.valueOf(
-        segmentSize), String.valueOf(numGetValues), String.valueOf(_statistics.getMin()), String.valueOf(
-        _statistics.getMax()), String.valueOf(_statistics.getMean()), String.valueOf(
-        _statistics.getStandardDeviation()), String.valueOf(_statistics.getPercentile(50.0D)), String.valueOf(
-        _statistics.getSkewness()), String.valueOf(_statistics.getKurtosis()), String.valueOf(
-        _statistics.getVariance())};
+    return new String[]{String.valueOf(_statistics.getN()), String.valueOf(time), String.valueOf(segmentSize), String
+        .valueOf(numGetValues), String.valueOf(_statistics.getMin()), String.valueOf(_statistics.getMax()), String
+            .valueOf(_statistics.getMean()), String.valueOf(_statistics.getStandardDeviation()), String
+                .valueOf(_statistics.getPercentile(50.0D)), String.valueOf(_statistics.getSkewness()), String
+                    .valueOf(_statistics.getKurtosis()), String.valueOf(_statistics.getVariance())};
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     if (args.length < 2) {
       System.out.println("Usage: StringDictionaryPerfTest <dictionary_length> <dictionary_length> ... <num_lookups> ");
     }

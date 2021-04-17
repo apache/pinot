@@ -32,14 +32,12 @@ public class QueryPlannerConfig {
   private PinotConfiguration _queryPlannerConfig;
   private static String[] REQUIRED_KEYS = {};
 
-  public QueryPlannerConfig(PinotConfiguration queryPlannerConfig)
-      throws ConfigurationException {
+  public QueryPlannerConfig(PinotConfiguration queryPlannerConfig) throws ConfigurationException {
     _queryPlannerConfig = queryPlannerConfig;
     checkRequiredKeys();
   }
 
-  private void checkRequiredKeys()
-      throws ConfigurationException {
+  private void checkRequiredKeys() throws ConfigurationException {
     for (String keyString : REQUIRED_KEYS) {
       if (!_queryPlannerConfig.containsKey(keyString)) {
         throw new ConfigurationException("Cannot find required key : " + keyString);

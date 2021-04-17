@@ -27,8 +27,7 @@ public class DataTableFactory {
   private DataTableFactory() {
   }
 
-  public static DataTable getDataTable(ByteBuffer byteBuffer)
-      throws IOException {
+  public static DataTable getDataTable(ByteBuffer byteBuffer) throws IOException {
     int version = byteBuffer.getInt();
     switch (version) {
       case DataTableBuilder.VERSION_2:
@@ -40,8 +39,7 @@ public class DataTableFactory {
     }
   }
 
-  public static DataTable getDataTable(byte[] bytes)
-      throws IOException {
+  public static DataTable getDataTable(byte[] bytes) throws IOException {
     return getDataTable(ByteBuffer.wrap(bytes));
   }
 }

@@ -32,9 +32,8 @@ public class SegmentLineageTest {
   public void testSegmentLineage() {
     SegmentLineage segmentLineage = new SegmentLineage("test_OFFLINE");
     String id = SegmentLineageUtils.generateLineageEntryId();
-    segmentLineage.addLineageEntry(id,
-        new LineageEntry(Arrays.asList("s1", "s2", "s3"), Arrays.asList("s4", "s5"), LineageEntryState.COMPLETED,
-            11111L));
+    segmentLineage.addLineageEntry(id, new LineageEntry(Arrays.asList("s1", "s2", "s3"), Arrays.asList("s4", "s5"),
+        LineageEntryState.COMPLETED, 11111L));
     LineageEntry lineageEntry = segmentLineage.getLineageEntry(id);
     Assert.assertEquals(lineageEntry.getSegmentsFrom(), Arrays.asList("s1", "s2", "s3"));
     Assert.assertEquals(lineageEntry.getSegmentsTo(), Arrays.asList("s4", "s5"));
@@ -42,9 +41,8 @@ public class SegmentLineageTest {
     Assert.assertEquals(lineageEntry.getTimestamp(), 11111L);
 
     String id2 = SegmentLineageUtils.generateLineageEntryId();
-    segmentLineage.addLineageEntry(id2,
-        new LineageEntry(Arrays.asList("s6", "s6", "s8"), Arrays.asList("s9", "s10"), LineageEntryState.COMPLETED,
-            22222L));
+    segmentLineage.addLineageEntry(id2, new LineageEntry(Arrays.asList("s6", "s6", "s8"), Arrays.asList("s9", "s10"),
+        LineageEntryState.COMPLETED, 22222L));
     LineageEntry lineageEntry2 = segmentLineage.getLineageEntry(id2);
     Assert.assertEquals(lineageEntry2.getSegmentsFrom(), Arrays.asList("s6", "s6", "s8"));
     Assert.assertEquals(lineageEntry2.getSegmentsTo(), Arrays.asList("s9", "s10"));

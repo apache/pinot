@@ -69,12 +69,11 @@ public class MinionStarter implements ServiceStartable {
   private final TaskExecutorFactoryRegistry _taskExecutorFactoryRegistry;
   private final EventObserverFactoryRegistry _eventObserverFactoryRegistry;
 
-  public MinionStarter(String helixClusterName, String zkAddress, PinotConfiguration config)
-      throws Exception {
+  public MinionStarter(String helixClusterName, String zkAddress, PinotConfiguration config) throws Exception {
     _config = config;
     String host = _config.getProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST,
-        _config.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils
-            .getHostnameOrAddress() : NetUtils.getHostAddress());
+        _config.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false)
+            ? NetUtils.getHostnameOrAddress() : NetUtils.getHostAddress());
     int port = _config.getProperty(CommonConstants.Helix.KEY_OF_MINION_PORT, CommonConstants.Minion.DEFAULT_HELIX_PORT);
     _instanceId = _config.getProperty(CommonConstants.Helix.Instance.INSTANCE_ID_KEY,
         CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE + host + "_" + port);
@@ -89,8 +88,8 @@ public class MinionStarter implements ServiceStartable {
     // NOTE: Helix will disconnect the manager and disable the instance if it detects flapping (too frequent disconnect
     // from ZooKeeper). Setting flapping time window to a small value can avoid this from happening. Helix ignores the
     // non-positive value, so set the default value as 1.
-    System.setProperty(SystemPropertyKeys.FLAPPING_TIME_WINDOW, _config
-        .getProperty(CommonConstants.Helix.CONFIG_OF_MINION_FLAPPING_TIME_WINDOW_MS,
+    System.setProperty(SystemPropertyKeys.FLAPPING_TIME_WINDOW,
+        _config.getProperty(CommonConstants.Helix.CONFIG_OF_MINION_FLAPPING_TIME_WINDOW_MS,
             CommonConstants.Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
   }
 
@@ -130,16 +129,15 @@ public class MinionStarter implements ServiceStartable {
    * <p>Should be called after all classes of task executor get registered.
    */
   @Override
-  public void start()
-      throws Exception {
+  public void start() throws Exception {
     LOGGER.info("Starting Pinot minion: {}", _instanceId);
     Utils.logVersions();
     MinionContext minionContext = MinionContext.getInstance();
 
     // Initialize data directory
     LOGGER.info("Initializing data directory");
-    File dataDir = new File(_config
-        .getProperty(CommonConstants.Helix.Instance.DATA_DIR_KEY, CommonConstants.Minion.DEFAULT_INSTANCE_DATA_DIR));
+    File dataDir = new File(_config.getProperty(CommonConstants.Helix.Instance.DATA_DIR_KEY,
+        CommonConstants.Minion.DEFAULT_INSTANCE_DATA_DIR));
     if (dataDir.exists()) {
       FileUtils.cleanDirectory(dataDir);
     } else {
@@ -154,8 +152,8 @@ public class MinionStarter implements ServiceStartable {
     PinotMetricUtils.init(metricsConfiguration);
     PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
 
-    MinionMetrics minionMetrics = new MinionMetrics(_config
-        .getProperty(CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX_KEY,
+    MinionMetrics minionMetrics =
+        new MinionMetrics(_config.getProperty(CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX_KEY,
             CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX), metricsRegistry);
     minionMetrics.initializeGlobalMeters();
     minionContext.setMinionMetrics(minionMetrics);

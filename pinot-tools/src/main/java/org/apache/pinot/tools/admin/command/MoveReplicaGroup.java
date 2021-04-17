@@ -65,28 +65,36 @@ import org.slf4j.LoggerFactory;
 public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Command {
   private static Logger LOGGER = LoggerFactory.getLogger(MoveReplicaGroup.class);
 
-  @Option(name = "-srcHosts", aliases = {"-s", "--src"}, required = true, metaVar = "<filePath or csv hostnames>", usage = "File with names of source hosts or csv list of hostnames")
+  @Option(name = "-srcHosts", aliases = {"-s", "--src"}, required = true, metaVar = "<filePath or csv hostnames>",
+      usage = "File with names of source hosts or csv list of hostnames")
   private String srcHosts;
 
-  @Option(name = "-destHostsFile", aliases = {"-d", "--dest"}, required = false, metaVar = "<File Path>", usage = "File with destination servers list")
+  @Option(name = "-destHostsFile", aliases = {"-d", "--dest"}, required = false, metaVar = "<File Path>",
+      usage = "File with destination servers list")
   private String destHostsFile = "";
 
-  @Option(name = "-tableName", aliases = {"-t", "-table"}, required = true, metaVar = "<string>", usage = "Table name. Supports only OFFLINE table (type is optional)")
+  @Option(name = "-tableName", aliases = {"-t", "-table"}, required = true, metaVar = "<string>",
+      usage = "Table name. Supports only OFFLINE table (type is optional)")
   private String tableName;
 
-  @Option(name = "-maxSegmentsToMove", aliases = {"-m", "--max"}, required = false, metaVar = "<int>", usage = "MaxSegmentsToMove")
+  @Option(name = "-maxSegmentsToMove", aliases = {"-m", "--max"}, required = false, metaVar = "<int>",
+      usage = "MaxSegmentsToMove")
   private int maxSegmentsToMove = Integer.MAX_VALUE;
 
-  @Option(name = "-zkHost", aliases = {"--zk", "-z"}, required = true, metaVar = "<string>", usage = "Zookeeper host:port")
+  @Option(name = "-zkHost", aliases = {"--zk", "-z"}, required = true, metaVar = "<string>",
+      usage = "Zookeeper host:port")
   private String zkHost;
 
-  @Option(name = "-zkPath", aliases = {"--cluster", "-c"}, required = true, metaVar = "<string>", usage = "Zookeeper cluster path(Ex: /pinot")
+  @Option(name = "-zkPath", aliases = {"--cluster", "-c"}, required = true, metaVar = "<string>",
+      usage = "Zookeeper cluster path(Ex: /pinot")
   private String zkPath;
 
-  @Option(name = "-exec", required = false, metaVar = "<boolean>", usage = "Execute replica group move. dryRun(default) if not specified")
+  @Option(name = "-exec", required = false, metaVar = "<boolean>",
+      usage = "Execute replica group move. dryRun(default) if not specified")
   private boolean exec = false;
 
-  @Option(name = "-help", required = false, aliases = {"-h", "--h", "--help"}, metaVar = "<boolean>", usage = "Prints help")
+  @Option(name = "-help", required = false, aliases = {"-h", "--h", "--help"}, metaVar = "<boolean>",
+      usage = "Prints help")
   private boolean help = false;
 
   private ZKHelixAdmin helix;
@@ -107,9 +115,8 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
   }
 
   public String toString() {
-    String retString =
-        "MoveReplicaGroup -srcHosts " + srcHosts + " -tableName " + tableName + " -zkHost " + zkHost + " -zkPath "
-            + zkPath + (exec ? " -exec" : "");
+    String retString = "MoveReplicaGroup -srcHosts " + srcHosts + " -tableName " + tableName + " -zkHost " + zkHost
+        + " -zkPath " + zkPath + (exec ? " -exec" : "");
     return retString;
   }
 
@@ -118,8 +125,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
 
   }
 
-  public boolean execute()
-      throws IOException, InterruptedException {
+  public boolean execute() throws IOException, InterruptedException {
     validateParams();
 
     zkChanger = new PinotZKChanger(zkHost, zkPath);
@@ -163,8 +169,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
     return true;
   }
 
-  private List<String> readSourceHosts()
-      throws IOException {
+  private List<String> readSourceHosts() throws IOException {
     if (this.srcHosts.isEmpty()) {
       LOGGER.error("Source hosts(-s) are required");
       System.exit(1);
@@ -194,8 +199,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
     }
   }
 
-  private void printIdealState(Map<String, Map<String, String>> idealState)
-      throws JsonProcessingException {
+  private void printIdealState(Map<String, Map<String, String>> idealState) throws JsonProcessingException {
     System.out.println(JsonUtils.objectToPrettyString(idealState));
   }
 
@@ -412,13 +416,11 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
     LOGGER.info("Using zkHost: {}, zkPath: {}", zkHost, zkPath);
   }
 
-  private String getServerTenantName(String tableName)
-      throws IOException {
+  private String getServerTenantName(String tableName) throws IOException {
     return getTableConfig(tableName).getTenantConfig().getServer();
   }
 
-  private TableConfig getTableConfig(String tableName)
-      throws IOException {
+  private TableConfig getTableConfig(String tableName) throws IOException {
     ZNRecordSerializer serializer = new ZNRecordSerializer();
     String path = PropertyPathConfig.getPath(PropertyType.PROPERTYSTORE, zkPath);
     ZkHelixPropertyStore<ZNRecord> propertyStore = new ZkHelixPropertyStore<>(zkHost, serializer, path);
@@ -432,8 +434,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
     return helix.getResourcesInCluster(zkPath).contains(tableName);
   }
 
-  private List<String> readDestinationServers()
-      throws IOException {
+  private List<String> readDestinationServers() throws IOException {
     if (destHostsFile.isEmpty()) {
       String serverTenant = getServerTenantName(tableName) + "_OFFLINE";
       LOGGER.debug("Using server tenant: {}", serverTenant);
@@ -443,8 +444,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
     }
   }
 
-  private List<String> readHostsFromFile(String filename)
-      throws IOException {
+  private List<String> readHostsFromFile(String filename) throws IOException {
     List<String> hosts = Files.readAllLines(Paths.get(filename), Charset.defaultCharset());
     return hostNameToInstanceNames(hosts);
   }
@@ -461,8 +461,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
     return srcHosts;
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     MoveReplicaGroup mrg = new MoveReplicaGroup();
 
     CmdLineParser parser = new CmdLineParser(mrg);

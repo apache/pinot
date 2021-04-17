@@ -27,8 +27,8 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 
 
 public class BrokerRequestOptimizer {
-  private static final List<? extends FilterQueryTreeOptimizer> FILTER_QUERY_TREE_OPTIMIZERS = Arrays
-      .asList(new FlattenNestedPredicatesFilterQueryTreeOptimizer(),
+  private static final List<? extends FilterQueryTreeOptimizer> FILTER_QUERY_TREE_OPTIMIZERS =
+      Arrays.asList(new FlattenNestedPredicatesFilterQueryTreeOptimizer(),
           new MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer(), new RangeMergeOptimizer());
 
   /**
@@ -68,16 +68,14 @@ public class BrokerRequestOptimizer {
     if (optimizationFlags == null) {
       for (FilterQueryTreeOptimizer filterQueryTreeOptimizer : FILTER_QUERY_TREE_OPTIMIZERS) {
         filterQueryTree = filterQueryTreeOptimizer.optimize(request);
-        request
-            .setFilterQueryTree(filterQueryTree); // Optimizers may return a new tree instead of in-place optimization
+        request.setFilterQueryTree(filterQueryTree); // Optimizers may return a new tree instead of in-place optimization
       }
     } else {
       if (optimizationFlags.isOptimizationEnabled("filterQueryTree")) {
         for (FilterQueryTreeOptimizer filterQueryTreeOptimizer : FILTER_QUERY_TREE_OPTIMIZERS) {
           if (optimizationFlags.isOptimizationEnabled(filterQueryTreeOptimizer.getOptimizationName())) {
             filterQueryTree = filterQueryTreeOptimizer.optimize(request);
-            request.setFilterQueryTree(
-                filterQueryTree); // Optimizers may return a new tree instead of in-place optimization
+            request.setFilterQueryTree(filterQueryTree); // Optimizers may return a new tree instead of in-place optimization
           }
         }
       }

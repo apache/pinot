@@ -117,8 +117,8 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
   private FixedByteSingleValueMultiColWriter _curHeaderWriter;
   private FixedByteSingleValueMultiColWriter _currentDataWriter;
   private int _currentCapacity = 0;
-  private int _prevRowStartIndex = 0;  // Offset in the data-buffer for the last row added.
-  private int _prevRowLength = 0;  // Number of values in the column for the last row added.
+  private int _prevRowStartIndex = 0; // Offset in the data-buffer for the last row added.
+  private int _prevRowLength = 0; // Number of values in the column for the last row added.
 
   public FixedByteMVMutableForwardIndex(int maxNumberOfMultiValuesPerRow, int avgMultiValueCount, int rowCountPerChunk,
       int columnSizeInBytes, PinotDataBufferMemoryManager memoryManager, String context) {
@@ -332,8 +332,7 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     for (FixedByteSingleValueMultiColWriter writer : _headerWriters) {
       writer.close();
     }

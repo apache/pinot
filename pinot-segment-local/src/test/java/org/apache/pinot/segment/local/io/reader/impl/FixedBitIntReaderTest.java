@@ -37,20 +37,17 @@ public class FixedBitIntReaderTest {
   private static final Random RANDOM = new Random();
 
   @BeforeClass
-  public void setUp()
-      throws IOException {
+  public void setUp() throws IOException {
     FileUtils.forceMkdir(INDEX_DIR);
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     FileUtils.deleteDirectory(INDEX_DIR);
   }
 
   @Test
-  public void testFixedBitIntReader()
-      throws Exception {
+  public void testFixedBitIntReader() throws Exception {
     int[] values = new int[NUM_VALUES];
     for (int numBits = 1; numBits <= 31; numBits++) {
       File indexFile = new File(INDEX_DIR, "bit-" + numBits);

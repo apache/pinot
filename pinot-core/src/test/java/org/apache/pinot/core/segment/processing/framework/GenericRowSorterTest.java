@@ -48,8 +48,8 @@ public class GenericRowSorterTest {
     List<GenericRow> rows = new ArrayList<>(1000);
     List<Object[]> ogRows = new ArrayList<>(1000);
     for (int i = 0; i < 1000; i++) {
-      Object[] ogRow = new Object[]{RandomStringUtils.randomAlphabetic(5), RANDOM.nextInt(
-          10), RANDOM.nextLong(), RANDOM.nextDouble()};
+      Object[] ogRow = new Object[]{RandomStringUtils.randomAlphabetic(5), RANDOM.nextInt(10), RANDOM.nextLong(), RANDOM
+          .nextDouble()};
       GenericRow row = new GenericRow();
       row.putValue("stringCol", ogRow[0]);
       row.putValue("intCol", ogRow[1]);

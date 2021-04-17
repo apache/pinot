@@ -116,9 +116,8 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _segmentName = realtimeSegmentZKMetadata.getSegmentName();
     _tableNameWithType = tableConfig.getTableName();
     _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
-    Preconditions
-        .checkNotNull(_timeColumnName, "Must provide valid timeColumnName in tableConfig for realtime table {}",
-            _tableNameWithType);
+    Preconditions.checkNotNull(_timeColumnName,
+        "Must provide valid timeColumnName in tableConfig for realtime table {}", _tableNameWithType);
     DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(_timeColumnName);
     Preconditions.checkNotNull(dateTimeFieldSpec, "Must provide field spec for time column {}", _timeColumnName);
     _timeType = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat()).getColumnUnit();
@@ -135,9 +134,9 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             firstSortedColumn, _segmentName);
         _sortedColumn = firstSortedColumn;
       } else {
-        LOGGER
-            .warn("Sorted column name: {} from RealtimeDataResourceZKMetadata is not existed in schema for segment {}.",
-                firstSortedColumn, _segmentName);
+        LOGGER.warn(
+            "Sorted column name: {} from RealtimeDataResourceZKMetadata is not existed in schema for segment {}.",
+            firstSortedColumn, _segmentName);
         _sortedColumn = null;
       }
     }
@@ -186,19 +185,19 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // lets create a new realtime segment
     _segmentLogger.info("Started {} stream provider", _streamConfig.getType());
     final int capacity = _streamConfig.getFlushThresholdRows();
-    RealtimeSegmentConfig realtimeSegmentConfig =
-        new RealtimeSegmentConfig.Builder().setTableNameWithType(_tableNameWithType).setSegmentName(_segmentName)
-            .setStreamName(_streamConfig.getTopicName()).setSchema(schema).setTimeColumnName(_timeColumnName)
-            .setCapacity(capacity).setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
-            .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
-            .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
-            .setInvertedIndexColumns(invertedIndexColumns).setRealtimeSegmentZKMetadata(realtimeSegmentZKMetadata)
-            .setOffHeap(indexLoadingConfig.isRealtimeOffHeapAllocation()).setMemoryManager(
-            getMemoryManager(realtimeTableDataManager.getConsumerDir(), _segmentName,
-                indexLoadingConfig.isRealtimeOffHeapAllocation(),
-                indexLoadingConfig.isDirectRealtimeOffHeapAllocation(), serverMetrics))
-            .setStatsHistory(realtimeTableDataManager.getStatsHistory())
-            .setNullHandlingEnabled(indexingConfig.isNullHandlingEnabled()).build();
+    RealtimeSegmentConfig realtimeSegmentConfig = new RealtimeSegmentConfig.Builder()
+        .setTableNameWithType(_tableNameWithType).setSegmentName(_segmentName)
+        .setStreamName(_streamConfig.getTopicName()).setSchema(schema).setTimeColumnName(_timeColumnName)
+        .setCapacity(capacity).setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
+        .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
+        .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
+        .setInvertedIndexColumns(invertedIndexColumns).setRealtimeSegmentZKMetadata(realtimeSegmentZKMetadata)
+        .setOffHeap(indexLoadingConfig.isRealtimeOffHeapAllocation())
+        .setMemoryManager(getMemoryManager(realtimeTableDataManager.getConsumerDir(), _segmentName,
+            indexLoadingConfig.isRealtimeOffHeapAllocation(), indexLoadingConfig.isDirectRealtimeOffHeapAllocation(),
+            serverMetrics))
+        .setStatsHistory(realtimeTableDataManager.getStatsHistory())
+        .setNullHandlingEnabled(indexingConfig.isNullHandlingEnabled()).build();
     _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfig, serverMetrics);
 
     _notifier = realtimeTableDataManager;
@@ -229,9 +228,8 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             GenericRow consumedRow;
             try {
               consumedRow = _streamLevelConsumer.next(reuse);
-              _tableAndStreamRowsConsumed = serverMetrics
-                  .addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_ROWS_CONSUMED, 1L,
-                      _tableAndStreamRowsConsumed);
+              _tableAndStreamRowsConsumed = serverMetrics.addMeteredTableValue(_tableStreamName,
+                  ServerMeter.REALTIME_ROWS_CONSUMED, 1L, _tableAndStreamRowsConsumed);
               _tableRowsConsumed =
                   serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L, _tableRowsConsumed);
             } catch (Exception e) {
@@ -313,8 +311,8 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             _streamLevelConsumer.commit();
             commitSuccessful = true;
             _streamLevelConsumer.shutdown();
-            _segmentLogger
-                .info("Successfully committed {} offsets, consumer release requested.", _streamConfig.getType());
+            _segmentLogger.info("Successfully committed {} offsets, consumer release requested.",
+                _streamConfig.getType());
             serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_OFFSET_COMMITS, 1L);
             serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_OFFSET_COMMITS, 1L);
           } catch (Throwable e) {
@@ -365,9 +363,8 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             //   metadata to reflect the new consumer group id, copy the Kafka offsets from the shutdown replica onto
             //   the new consumer group id and then restart both replicas. This should get you the missing rows.
 
-            _segmentLogger
-                .error("FATAL: Exception committing or shutting down consumer commitSuccessful={}", commitSuccessful,
-                    e);
+            _segmentLogger.error("FATAL: Exception committing or shutting down consumer commitSuccessful={}",
+                commitSuccessful, e);
             serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_OFFSET_COMMIT_EXCEPTIONS, 1L);
             if (!commitSuccessful) {
               _streamLevelConsumer.shutdown();

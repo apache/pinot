@@ -43,8 +43,8 @@ public class OffHeapStarTree implements StarTree {
 
   public OffHeapStarTree(PinotDataBuffer dataBuffer) {
     long offset = 0L;
-    Preconditions
-        .checkState(MAGIC_MARKER == dataBuffer.getLong(offset), "Invalid magic marker in star-tree data buffer");
+    Preconditions.checkState(MAGIC_MARKER == dataBuffer.getLong(offset),
+        "Invalid magic marker in star-tree data buffer");
     offset += Long.BYTES;
 
     Preconditions.checkState(VERSION == dataBuffer.getInt(offset), "Invalid version in star-tree data buffer");

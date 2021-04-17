@@ -77,8 +77,7 @@ public abstract class BaseMultiValueQueriesTest extends BaseQueriesTest {
   private List<IndexSegment> _indexSegments;
 
   @BeforeTest
-  public void buildSegment()
-      throws Exception {
+  public void buildSegment() throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     // Get resource file path.
@@ -118,8 +117,7 @@ public abstract class BaseMultiValueQueriesTest extends BaseQueriesTest {
   }
 
   @BeforeClass
-  public void loadSegment()
-      throws Exception {
+  public void loadSegment() throws Exception {
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
     _indexSegment = immutableSegment;
     _indexSegments = Arrays.asList(immutableSegment, immutableSegment);

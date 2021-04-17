@@ -101,8 +101,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testFastHllWithPreGeneratedHllColumns()
-      throws Exception {
+  public void testFastHllWithPreGeneratedHllColumns() throws Exception {
     buildAndLoadSegment();
 
     // Test inner segment queries
@@ -137,22 +136,21 @@ public class FastHllQueriesTest extends BaseQueriesTest {
 
     // Test inter segments base query
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(BASE_QUERY);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L, new String[]{"21", "1762"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L,
+        new String[]{"21", "1762"});
     // Test inter segments query with filter
     brokerResponse = getBrokerResponseForPqlQueryWithFilter(BASE_QUERY);
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
         new String[]{"17", "1197"});
     // Test inter segments query with group-by
     brokerResponse = getBrokerResponseForPqlQuery(BASE_QUERY + GROUP_BY);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L, new String[]{"21", "1762"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L,
+        new String[]{"21", "1762"});
 
     deleteSegment();
   }
 
-  private void buildAndLoadSegment()
-      throws Exception {
+  private void buildAndLoadSegment() throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     // Get resource file path

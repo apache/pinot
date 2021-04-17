@@ -75,7 +75,8 @@ public class StarTreeIndexMapUtils {
    * Type of the index.
    */
   public enum IndexType {
-    STAR_TREE, FORWARD_INDEX
+    STAR_TREE,
+    FORWARD_INDEX
   }
 
   /**
@@ -153,7 +154,7 @@ public class StarTreeIndexMapUtils {
         configuration.addProperty(key.getPropertyName(i, SIZE_SUFFIX), value._size);
       }
     }
-    
+
     // Commons Configuration 1.10 does not support file path containing '%'. 
     // Explicitly providing the output stream for the file bypasses the problem.       
     try (FileOutputStream fileOutputStream = new FileOutputStream(configuration.getFile())) {
@@ -171,10 +172,10 @@ public class StarTreeIndexMapUtils {
     Preconditions.checkState(indexMapFile.exists(), "Star-tree index map file does not exist");
 
     PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(indexMapFile);
-    
+
     List<Map<IndexKey, IndexValue>> indexMaps = IntStream.range(0, numStarTrees).boxed()
         .map(index -> new HashMap<IndexKey, IndexValue>()).collect(Collectors.toList());
-    
+
     for (String key : CommonsConfigurationUtils.getKeys(configuration)) {
       String[] split = key.split("\\.");
       Preconditions.checkState(split.length == 4,

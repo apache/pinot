@@ -83,8 +83,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   private final NullValueVectorReaderImpl _nullValueVectorReader;
 
   public PhysicalColumnIndexContainer(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata,
-      IndexLoadingConfig indexLoadingConfig, File segmentIndexDir)
-      throws IOException {
+      IndexLoadingConfig indexLoadingConfig, File segmentIndexDir) throws IOException {
     String columnName = metadata.getColumnName();
     boolean loadInvertedIndex = indexLoadingConfig.getInvertedIndexColumns().contains(columnName);
     boolean loadRangeIndex = indexLoadingConfig.getRangeIndexColumns().contains(columnName);
@@ -160,9 +159,8 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
             metadata.getTotalNumberOfEntries(), metadata.getBitsPerElement());
       }
       if (loadInvertedIndex) {
-        _invertedIndex =
-            new BitmapInvertedIndexReader(segmentReader.getIndexFor(columnName, ColumnIndexType.INVERTED_INDEX),
-                metadata.getCardinality());
+        _invertedIndex = new BitmapInvertedIndexReader(
+            segmentReader.getIndexFor(columnName, ColumnIndexType.INVERTED_INDEX), metadata.getCardinality());
       } else {
         _invertedIndex = null;
       }
@@ -280,8 +278,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     }
   }
 
-  private static ForwardIndexReader<?> loadRawForwardIndex(PinotDataBuffer forwardIndexBuffer,
-      DataType dataType) {
+  private static ForwardIndexReader<?> loadRawForwardIndex(PinotDataBuffer forwardIndexBuffer, DataType dataType) {
     switch (dataType) {
       case INT:
       case LONG:
@@ -297,8 +294,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _forwardIndex.close();
     if (_invertedIndex != null) {
       _invertedIndex.close();

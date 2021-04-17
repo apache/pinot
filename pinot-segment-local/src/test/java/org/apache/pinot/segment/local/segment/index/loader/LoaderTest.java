@@ -76,8 +76,7 @@ public class LoaderTest {
   private IndexLoadingConfig _v3IndexLoadingConfig;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     URL resourceUrl = getClass().getClassLoader().getResource(AVRO_DATA);
@@ -93,8 +92,7 @@ public class LoaderTest {
     _v3IndexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
   }
 
-  private Schema constructV1Segment()
-      throws Exception {
+  private Schema constructV1Segment() throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     SegmentGeneratorConfig segmentGeneratorConfig =
@@ -109,8 +107,7 @@ public class LoaderTest {
   }
 
   @Test
-  public void testLoad()
-      throws Exception {
+  public void testLoad() throws Exception {
     constructV1Segment();
     Assert.assertEquals(new SegmentMetadataImpl(_indexDir).getSegmentVersion(), SegmentVersion.v1);
     Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
@@ -123,8 +120,7 @@ public class LoaderTest {
    * that scenario.
    */
   @Test
-  public void testLoadWithStaleConversionDir()
-      throws Exception {
+  public void testLoadWithStaleConversionDir() throws Exception {
     constructV1Segment();
 
     File v3TempDir = new SegmentV1V2ToV3FormatConverter().v3ConversionTempDirectory(_indexDir);
@@ -133,8 +129,7 @@ public class LoaderTest {
     Assert.assertFalse(v3TempDir.exists());
   }
 
-  private void testConversion()
-      throws Exception {
+  private void testConversion() throws Exception {
     // Do not set segment version, should not convert the segment
     IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, ReadMode.mmap);
     Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1.toString());
@@ -155,8 +150,7 @@ public class LoaderTest {
   }
 
   @Test
-  public void testBuiltInVirtualColumns()
-      throws Exception {
+  public void testBuiltInVirtualColumns() throws Exception {
     Schema schema = constructV1Segment();
 
     IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, _v1IndexLoadingConfig, schema);
@@ -177,8 +171,7 @@ public class LoaderTest {
   }
 
   @Test
-  public void testPadding()
-      throws Exception {
+  public void testPadding() throws Exception {
     // Old Format
     URL resourceUrl = LoaderTest.class.getClassLoader().getResource(PADDING_OLD);
     Assert.assertNotNull(resourceUrl);
@@ -190,9 +183,8 @@ public class LoaderTest {
     SegmentDirectory segmentDir = SegmentDirectory.createFromLocalFS(segmentDirectory, segmentMetadata, ReadMode.heap);
     SegmentDirectory.Reader reader = segmentDir.createReader();
     PinotDataBuffer dictionaryBuffer = reader.getIndexFor("name", ColumnIndexType.DICTIONARY);
-    StringDictionary dict =
-        new StringDictionary(dictionaryBuffer, columnMetadata.getCardinality(), columnMetadata.getColumnMaxLength(),
-            (byte) columnMetadata.getPaddingCharacter());
+    StringDictionary dict = new StringDictionary(dictionaryBuffer, columnMetadata.getCardinality(),
+        columnMetadata.getColumnMaxLength(), (byte) columnMetadata.getPaddingCharacter());
     Assert.assertEquals(dict.getStringValue(0), "lynda 2.0");
     Assert.assertEquals(dict.getStringValue(1), "lynda");
     Assert.assertEquals(dict.get(0), "lynda 2.0");
@@ -245,8 +237,7 @@ public class LoaderTest {
    * Tests loading default string column with empty ("") default null value.
    */
   @Test
-  public void testDefaultEmptyValueStringColumn()
-      throws Exception {
+  public void testDefaultEmptyValueStringColumn() throws Exception {
     Schema schema = constructV1Segment();
     schema.addField(new DimensionFieldSpec("SVString", FieldSpec.DataType.STRING, true, ""));
     schema.addField(new DimensionFieldSpec("MVString", FieldSpec.DataType.STRING, false, ""));
@@ -263,8 +254,7 @@ public class LoaderTest {
   }
 
   @Test
-  public void testDefaultBytesColumn()
-      throws Exception {
+  public void testDefaultBytesColumn() throws Exception {
     Schema schema = constructV1Segment();
     String newColumnName = "byteMetric";
     String defaultValue = "0000ac0000";
@@ -272,14 +262,13 @@ public class LoaderTest {
     FieldSpec byteMetric = new MetricFieldSpec(newColumnName, FieldSpec.DataType.BYTES, defaultValue);
     schema.addField(byteMetric);
     IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, _v3IndexLoadingConfig, schema);
-    Assert
-        .assertEquals(BytesUtils.toHexString((byte[]) indexSegment.getDataSource(newColumnName).getDictionary().get(0)),
-            defaultValue);
+    Assert.assertEquals(
+        BytesUtils.toHexString((byte[]) indexSegment.getDataSource(newColumnName).getDictionary().get(0)),
+        defaultValue);
     indexSegment.destroy();
   }
 
-  private void constructSegmentWithFSTIndex(SegmentVersion segmentVersion)
-      throws Exception {
+  private void constructSegmentWithFSTIndex(SegmentVersion segmentVersion) throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
     SegmentGeneratorConfig segmentGeneratorConfig =
         SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(_avroFile, INDEX_DIR, "testTable");
@@ -294,8 +283,7 @@ public class LoaderTest {
   }
 
   @Test
-  public void testFSTIndexLoad()
-      throws Exception {
+  public void testFSTIndexLoad() throws Exception {
     constructSegmentWithFSTIndex(SegmentVersion.v3);
     Assert.assertEquals(new SegmentMetadataImpl(_indexDir).getSegmentVersion(), SegmentVersion.v3);
     Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
@@ -410,8 +398,7 @@ public class LoaderTest {
     indexSegment.destroy();
   }
 
-  private void constructSegmentWithTextIndex(SegmentVersion segmentVersion)
-      throws Exception {
+  private void constructSegmentWithTextIndex(SegmentVersion segmentVersion) throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
     SegmentGeneratorConfig segmentGeneratorConfig =
         SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(_avroFile, INDEX_DIR, "testTable");
@@ -428,8 +415,7 @@ public class LoaderTest {
   }
 
   @Test
-  public void testTextIndexLoad()
-      throws Exception {
+  public void testTextIndexLoad() throws Exception {
     // Tests for scenarios by creating on-disk segment in V3 and then loading
     // the segment with and without specifying segmentVersion in IndexLoadingConfig
 
@@ -478,8 +464,8 @@ public class LoaderTest {
     Assert.assertEquals(textIndexFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
     Assert.assertEquals(textIndexDocIdMappingFile.getName(),
         TEXT_INDEX_COL_NAME + LuceneTextIndexReader.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
-    Assert
-        .assertEquals(textIndexDocIdMappingFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+    Assert.assertEquals(textIndexDocIdMappingFile.getParentFile().getName(),
+        SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
     indexSegment.destroy();
 
     // CASE 2: set the segment version to load in IndexLoadingConfig as V3
@@ -506,8 +492,8 @@ public class LoaderTest {
     Assert.assertEquals(textIndexFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
     Assert.assertEquals(textIndexDocIdMappingFile.getName(),
         TEXT_INDEX_COL_NAME + LuceneTextIndexReader.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
-    Assert
-        .assertEquals(textIndexDocIdMappingFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+    Assert.assertEquals(textIndexDocIdMappingFile.getParentFile().getName(),
+        SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
     indexSegment.destroy();
 
     // Test for scenarios by creating on-disk segment in V1 and then loading
@@ -608,8 +594,8 @@ public class LoaderTest {
     Assert.assertEquals(textIndexFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
     Assert.assertEquals(textIndexDocIdMappingFile.getName(),
         TEXT_INDEX_COL_NAME + LuceneTextIndexReader.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
-    Assert
-        .assertEquals(textIndexDocIdMappingFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+    Assert.assertEquals(textIndexDocIdMappingFile.getParentFile().getName(),
+        SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
     indexSegment.destroy();
   }
 

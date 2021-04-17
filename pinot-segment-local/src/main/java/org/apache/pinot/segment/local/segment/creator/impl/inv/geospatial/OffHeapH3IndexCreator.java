@@ -60,16 +60,14 @@ public class OffHeapH3IndexCreator extends BaseH3IndexCreator {
 
   private long _postingListChunkOffset;
 
-  public OffHeapH3IndexCreator(File indexDir, String columnName, H3IndexResolution resolution)
-      throws IOException {
+  public OffHeapH3IndexCreator(File indexDir, String columnName, H3IndexResolution resolution) throws IOException {
     super(indexDir, columnName, resolution);
     _postingListFile = new File(_tempDir, POSTING_LIST_FILE_NAME);
     _postingListOutputStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(_postingListFile)));
   }
 
   @Override
-  public void add(Geometry geometry)
-      throws IOException {
+  public void add(Geometry geometry) throws IOException {
     super.add(geometry);
     if (_postingListMap.size() % FLUSH_THRESHOLD == 0) {
       flush();
@@ -79,8 +77,7 @@ public class OffHeapH3IndexCreator extends BaseH3IndexCreator {
   /**
    * Flushes the current posting list map into the file.
    */
-  private void flush()
-      throws IOException {
+  private void flush() throws IOException {
     long length = 0;
     for (Map.Entry<Long, RoaringBitmapWriter<RoaringBitmap>> entry : _postingListMap.entrySet()) {
       _postingListOutputStream.writeLong(entry.getKey());
@@ -98,8 +95,7 @@ public class OffHeapH3IndexCreator extends BaseH3IndexCreator {
   }
 
   @Override
-  public void seal()
-      throws IOException {
+  public void seal() throws IOException {
     // If all posting lists are on-heap, directly generate the index file from the on-heap posting list map
     if (_postingListChunkEndOffsets.size() == 0) {
       _postingListOutputStream.close();
@@ -117,8 +113,8 @@ public class OffHeapH3IndexCreator extends BaseH3IndexCreator {
     _postingListOutputStream.close();
 
     // Merge posting lists to calculate the final posting lists
-    try (PinotDataBuffer postingListBuffer = PinotDataBuffer
-        .mapFile(_postingListFile, true, 0, _postingListFile.length(), ByteOrder.BIG_ENDIAN, "H3 index posting list")) {
+    try (PinotDataBuffer postingListBuffer = PinotDataBuffer.mapFile(_postingListFile, true, 0,
+        _postingListFile.length(), ByteOrder.BIG_ENDIAN, "H3 index posting list")) {
       // Create chunk iterators from the posting list file
       int numChunks = _postingListChunkEndOffsets.size();
       List<ChunkIterator> chunkIterators = new ArrayList<>(numChunks);
@@ -162,8 +158,7 @@ public class OffHeapH3IndexCreator extends BaseH3IndexCreator {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _postingListOutputStream.close();
     super.close();
   }

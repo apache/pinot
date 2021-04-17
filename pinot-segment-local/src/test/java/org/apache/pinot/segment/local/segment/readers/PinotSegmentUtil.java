@@ -83,8 +83,7 @@ public class PinotSegmentUtil {
   }
 
   public static File createSegment(TableConfig tableConfig, Schema schema, String segmentName, String segmentOutputDir,
-      RecordReader recordReader)
-      throws Exception {
+      RecordReader recordReader) throws Exception {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setTableName(segmentName);
     segmentGeneratorConfig.setOutDir(segmentOutputDir);
@@ -106,7 +105,7 @@ public class PinotSegmentUtil {
     if (fieldSpec instanceof TimeFieldSpec) {
       // explicitly generate the time column values within allowed range so that
       // segment generation code doesn't throw exception
-      TimeFieldSpec timeFieldSpec = (TimeFieldSpec)fieldSpec;
+      TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
       TimeUnit unit = timeFieldSpec.getIncomingGranularitySpec().getTimeType();
       return generateTimeValue(random, unit);
     } else if (fieldSpec instanceof DateTimeFieldSpec) {
@@ -144,11 +143,11 @@ public class PinotSegmentUtil {
       case MILLISECONDS:
         return random.nextLong(milliMin, milliMax);
       case SECONDS:
-        return random.nextLong(milliMin/1000, milliMax/1000);
+        return random.nextLong(milliMin / 1000, milliMax / 1000);
       case MICROSECONDS:
-        return random.nextLong(milliMin*1000, milliMax*1000);
+        return random.nextLong(milliMin * 1000, milliMax * 1000);
       case NANOSECONDS:
-        return random.nextLong(milliMin*1000*1000, milliMax*1000*1000);
+        return random.nextLong(milliMin * 1000 * 1000, milliMax * 1000 * 1000);
       case DAYS:
         return random.nextLong(daysMin, daysMax);
       case HOURS:

@@ -59,8 +59,7 @@ public class HeaderAdder implements ContainerRequestFilter {
   }
 
   @Override
-  public void filter(ContainerRequestContext req)
-      throws IOException {
+  public void filter(ContainerRequestContext req) throws IOException {
     {
       // TODO HACK TO BE REMOVED ONCE CLIENTS HAVE UPGRADED TO NEW THIRD-EYE JAR
       // When a client sends an HTTP request without the leading slash (e.g. "GET tables HTTP/1.1")
@@ -84,9 +83,8 @@ public class HeaderAdder implements ContainerRequestFilter {
           // In the example described above, relativeUri will be "tables"
           if (!relativeUri.startsWith("/")) {
             URI newReqUri = new URI(baseUriWithoutSlash + "/" + relativeUri);
-            LOGGER
-                .warn("Rewriting new Request URI {} (incomingBaseUri = {}, incomingReqUri = {})", newReqUri.toString(),
-                    incomingBaseUri, incomingReqUri);
+            LOGGER.warn("Rewriting new Request URI {} (incomingBaseUri = {}, incomingReqUri = {})",
+                newReqUri.toString(), incomingBaseUri, incomingReqUri);
             req.setRequestUri(newReqUri);
           }
         }

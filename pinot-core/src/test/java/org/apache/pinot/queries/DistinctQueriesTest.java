@@ -108,9 +108,9 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       .addSingleValueDimension(RAW_STRING_COLUMN, DataType.STRING)
       .addSingleValueDimension(RAW_BYTES_COLUMN, DataType.BYTES).build();
   private static final TableConfig TABLE = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-      .setNoDictionaryColumns(Arrays
-          .asList(RAW_INT_COLUMN, RAW_LONG_COLUMN, RAW_FLOAT_COLUMN, RAW_DOUBLE_COLUMN, RAW_STRING_COLUMN,
-              RAW_BYTES_COLUMN)).build();
+      .setNoDictionaryColumns(Arrays.asList(RAW_INT_COLUMN, RAW_LONG_COLUMN, RAW_FLOAT_COLUMN, RAW_DOUBLE_COLUMN,
+          RAW_STRING_COLUMN, RAW_BYTES_COLUMN))
+      .build();
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
@@ -131,8 +131,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     ImmutableSegment segment0 = createSegment(0, generateRecords(0));
@@ -184,8 +183,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     return records;
   }
 
-  private ImmutableSegment createSegment(int index, List<GenericRow> records)
-      throws Exception {
+  private ImmutableSegment createSegment(int index, List<GenericRow> records) throws Exception {
     String segmentName = SEGMENT_NAME_PREFIX + index;
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE, SCHEMA);
@@ -201,13 +199,12 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testSingleColumnDistinctOnlyInnerSegment()
-      throws Exception {
+  public void testSingleColumnDistinctOnlyInnerSegment() throws Exception {
     {
       // Numeric columns
       //@formatter:off
-      List<String> queries = Arrays
-          .asList("SELECT DISTINCT(intColumn) FROM testTable", "SELECT DISTINCT(longColumn) FROM testTable",
+      List<String> queries =
+          Arrays.asList("SELECT DISTINCT(intColumn) FROM testTable", "SELECT DISTINCT(longColumn) FROM testTable",
               "SELECT DISTINCT(floatColumn) FROM testTable", "SELECT DISTINCT(doubleColumn) FROM testTable",
               "SELECT DISTINCT(rawIntColumn) FROM testTable", "SELECT DISTINCT(rawLongColumn) FROM testTable",
               "SELECT DISTINCT(rawFloatColumn) FROM testTable", "SELECT DISTINCT(rawDoubleColumn) FROM testTable",
@@ -229,8 +226,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         DistinctTable pqlDistinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(pqlDistinctTable.toBytes()));
         DistinctTable sqlDistinctTable = getDistinctTableInnerSegment(query, false);
         DistinctTable sqlDistinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(sqlDistinctTable.toBytes()));
-        for (DistinctTable distinctTable : Arrays
-            .asList(pqlDistinctTable, pqlDistinctTable2, sqlDistinctTable, sqlDistinctTable2)) {
+        for (DistinctTable distinctTable : Arrays.asList(pqlDistinctTable, pqlDistinctTable2, sqlDistinctTable,
+            sqlDistinctTable2)) {
           assertEquals(distinctTable.size(), 10);
           Set<Integer> actualValues = new HashSet<>();
           for (Record record : distinctTable.getRecords()) {
@@ -246,8 +243,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     {
       // String columns
       //@formatter:off
-      List<String> queries = Arrays
-          .asList("SELECT DISTINCT(stringColumn) FROM testTable", "SELECT DISTINCT(rawStringColumn) FROM testTable");
+      List<String> queries = Arrays.asList("SELECT DISTINCT(stringColumn) FROM testTable",
+          "SELECT DISTINCT(rawStringColumn) FROM testTable");
       //@formatter:on
       Set<Integer> expectedValues = new HashSet<>();
       for (int i = 0; i < 10; i++) {
@@ -258,8 +255,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         DistinctTable pqlDistinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(pqlDistinctTable.toBytes()));
         DistinctTable sqlDistinctTable = getDistinctTableInnerSegment(query, false);
         DistinctTable sqlDistinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(sqlDistinctTable.toBytes()));
-        for (DistinctTable distinctTable : Arrays
-            .asList(pqlDistinctTable, pqlDistinctTable2, sqlDistinctTable, sqlDistinctTable2)) {
+        for (DistinctTable distinctTable : Arrays.asList(pqlDistinctTable, pqlDistinctTable2, sqlDistinctTable,
+            sqlDistinctTable2)) {
           assertEquals(distinctTable.size(), 10);
           Set<Integer> actualValues = new HashSet<>();
           for (Record record : distinctTable.getRecords()) {
@@ -275,8 +272,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     {
       // Bytes columns
       //@formatter:off
-      List<String> queries = Arrays
-          .asList("SELECT DISTINCT(bytesColumn) FROM testTable", "SELECT DISTINCT(rawBytesColumn) FROM testTable");
+      List<String> queries = Arrays.asList("SELECT DISTINCT(bytesColumn) FROM testTable",
+          "SELECT DISTINCT(rawBytesColumn) FROM testTable");
       //@formatter:on
       Set<Integer> expectedValues = new HashSet<>();
       for (int i = 0; i < 10; i++) {
@@ -287,8 +284,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         DistinctTable pqlDistinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(pqlDistinctTable.toBytes()));
         DistinctTable sqlDistinctTable = getDistinctTableInnerSegment(query, false);
         DistinctTable sqlDistinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(sqlDistinctTable.toBytes()));
-        for (DistinctTable distinctTable : Arrays
-            .asList(pqlDistinctTable, pqlDistinctTable2, sqlDistinctTable, sqlDistinctTable2)) {
+        for (DistinctTable distinctTable : Arrays.asList(pqlDistinctTable, pqlDistinctTable2, sqlDistinctTable,
+            sqlDistinctTable2)) {
           assertEquals(distinctTable.size(), 10);
           Set<Integer> actualValues = new HashSet<>();
           for (Record record : distinctTable.getRecords()) {
@@ -305,8 +302,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testSingleColumnDistinctOrderByInnerSegment()
-      throws Exception {
+  public void testSingleColumnDistinctOrderByInnerSegment() throws Exception {
     {
       // Numeric columns
       //@formatter:off
@@ -328,8 +324,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         DistinctTable pqlDistinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(pqlDistinctTable.toBytes()));
         DistinctTable sqlDistinctTable = getDistinctTableInnerSegment(query, false);
         DistinctTable sqlDistinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(sqlDistinctTable.toBytes()));
-        for (DistinctTable distinctTable : Arrays
-            .asList(pqlDistinctTable, pqlDistinctTable2, sqlDistinctTable, sqlDistinctTable2)) {
+        for (DistinctTable distinctTable : Arrays.asList(pqlDistinctTable, pqlDistinctTable2, sqlDistinctTable,
+            sqlDistinctTable2)) {
           assertEquals(distinctTable.size(), 10);
           Set<Integer> actualValues = new HashSet<>();
           for (Record record : distinctTable.getRecords()) {
@@ -355,8 +351,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         DistinctTable pqlDistinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(pqlDistinctTable.toBytes()));
         DistinctTable sqlDistinctTable = getDistinctTableInnerSegment(query, false);
         DistinctTable sqlDistinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(sqlDistinctTable.toBytes()));
-        for (DistinctTable distinctTable : Arrays
-            .asList(pqlDistinctTable, pqlDistinctTable2, sqlDistinctTable, sqlDistinctTable2)) {
+        for (DistinctTable distinctTable : Arrays.asList(pqlDistinctTable, pqlDistinctTable2, sqlDistinctTable,
+            sqlDistinctTable2)) {
           assertEquals(distinctTable.size(), 10);
           Set<String> actualValues = new HashSet<>();
           for (Record record : distinctTable.getRecords()) {
@@ -380,8 +376,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       DistinctTable pqlDistinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(pqlDistinctTable.toBytes()));
       DistinctTable sqlDistinctTable = getDistinctTableInnerSegment(query, false);
       DistinctTable sqlDistinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(sqlDistinctTable.toBytes()));
-      for (DistinctTable distinctTable : Arrays
-          .asList(pqlDistinctTable, pqlDistinctTable2, sqlDistinctTable, sqlDistinctTable2)) {
+      for (DistinctTable distinctTable : Arrays.asList(pqlDistinctTable, pqlDistinctTable2, sqlDistinctTable,
+          sqlDistinctTable2)) {
         assertEquals(distinctTable.size(), 10);
         Set<Integer> actualValues = new HashSet<>();
         for (Record record : distinctTable.getRecords()) {
@@ -403,8 +399,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       DistinctTable pqlDistinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(pqlDistinctTable.toBytes()));
       DistinctTable sqlDistinctTable = getDistinctTableInnerSegment(query, false);
       DistinctTable sqlDistinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(sqlDistinctTable.toBytes()));
-      for (DistinctTable distinctTable : Arrays
-          .asList(pqlDistinctTable, pqlDistinctTable2, sqlDistinctTable, sqlDistinctTable2)) {
+      for (DistinctTable distinctTable : Arrays.asList(pqlDistinctTable, pqlDistinctTable2, sqlDistinctTable,
+          sqlDistinctTable2)) {
         assertEquals(distinctTable.size(), 10);
         Set<String> actualValues = new HashSet<>();
         for (Record record : distinctTable.getRecords()) {
@@ -962,12 +958,10 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     IndexSegment segment1 = _indexSegments.get(1);
 
     // Server side
-    DataTable instanceResponse0 = PLAN_MAKER
-        .makeInstancePlan(Arrays.asList(segment0, segment0), queryContext, EXECUTOR_SERVICE,
-            System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS).execute();
-    DataTable instanceResponse1 = PLAN_MAKER
-        .makeInstancePlan(Arrays.asList(segment1, segment1), queryContext, EXECUTOR_SERVICE,
-            System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS).execute();
+    DataTable instanceResponse0 = PLAN_MAKER.makeInstancePlan(Arrays.asList(segment0, segment0), queryContext,
+        EXECUTOR_SERVICE, System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS).execute();
+    DataTable instanceResponse1 = PLAN_MAKER.makeInstancePlan(Arrays.asList(segment1, segment1), queryContext,
+        EXECUTOR_SERVICE, System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS).execute();
 
     // Broker side
     Map<String, Object> properties = new HashMap<>();
@@ -976,9 +970,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
     dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.OFFLINE), instanceResponse0);
     dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.REALTIME), instanceResponse1);
-    BrokerResponseNative brokerResponse = brokerReduceService
-        .reduceOnDataTable(queryContext.getBrokerRequest(), dataTableMap,
-            CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS, null);
+    BrokerResponseNative brokerResponse = brokerReduceService.reduceOnDataTable(queryContext.getBrokerRequest(),
+        dataTableMap, CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS, null);
     brokerReduceService.shutDown();
     return brokerResponse;
   }

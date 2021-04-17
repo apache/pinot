@@ -70,9 +70,9 @@ public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
     ControllerStarter secondControllerStarter = new ControllerStarter(new ControllerConf(properties));
     secondControllerStarter.start();
 
-    TestUtils
-        .waitForCondition(aVoid -> secondControllerStarter.getHelixResourceManager().getHelixZkManager().isConnected(),
-            TIMEOUT_IN_MS, "Failed to start the second controller");
+    TestUtils.waitForCondition(
+        aVoid -> secondControllerStarter.getHelixResourceManager().getHelixZkManager().isConnected(), TIMEOUT_IN_MS,
+        "Failed to start the second controller");
 
     // After starting a second controller, there should be two leaders for all the partitions.
     validateResultSet(controllerLeaderLocator, resultSet, 2, "Failed to get two pairs of controllers.");

@@ -31,8 +31,7 @@ public class SegmentReducerConfig {
   private final int _numRecordsPerPart;
   private final CollectorConfig _collectorConfig;
 
-  public SegmentReducerConfig(Schema pinotSchema, CollectorConfig collectorConfig,
-      int numRecordsPerPart) {
+  public SegmentReducerConfig(Schema pinotSchema, CollectorConfig collectorConfig, int numRecordsPerPart) {
     _pinotSchema = pinotSchema;
     _numRecordsPerPart = numRecordsPerPart;
     _collectorConfig = collectorConfig;

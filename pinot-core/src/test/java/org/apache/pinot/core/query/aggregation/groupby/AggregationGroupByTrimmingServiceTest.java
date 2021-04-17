@@ -119,9 +119,8 @@ public class AggregationGroupByTrimmingServiceTest {
       // For distinctCount, because multiple groups have same value, so there is no guarantee on the order of groups,
       // just check the value
       GroupByResult distinctCountGroupByResult = distinctCountGroupByResultList.get(i);
-      Assert
-          .assertEquals(distinctCountGroupByResult.getValue(), expectedGroupIndex / (NUM_GROUPS / MAX_SIZE_OF_SET) + 1,
-              ERROR_MESSAGE);
+      Assert.assertEquals(distinctCountGroupByResult.getValue(),
+          expectedGroupIndex / (NUM_GROUPS / MAX_SIZE_OF_SET) + 1, ERROR_MESSAGE);
     }
   }
 

@@ -30,8 +30,7 @@ import static org.testng.Assert.*;
 public class JsonUtilsTest {
 
   @Test
-  public void testFlatten()
-      throws IOException {
+  public void testFlatten() throws IOException {
     {
       JsonNode jsonNode = JsonUtils.stringToJsonNode(
           "{\"name\":\"adam\",\"addresses\":[{\"country\":\"us\",\"street\":\"main st\",\"number\":1},{\"country\":\"ca\",\"street\":\"second st\",\"number\":2}]}");

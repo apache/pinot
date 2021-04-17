@@ -79,7 +79,8 @@ public class RawIndexBenchmark {
   @Option(name = "-rawIndexColumn", required = false, usage = "Name of column with raw index (no-dictionary")
   private String _rawIndexColumn = DEFAULT_RAW_INDEX_COLUMN;
 
-  @Option(name = "-dataFile", required = false, forbids = {"-segmentDir"}, usage = "File containing input data (one string per line)")
+  @Option(name = "-dataFile", required = false, forbids = {"-segmentDir"},
+      usage = "File containing input data (one string per line)")
   private String _dataFile = null;
 
   @Option(name = "-loadMode", required = false, usage = "Load mode for data (mmap|heap")
@@ -96,8 +97,7 @@ public class RawIndexBenchmark {
 
   private int _numRows = 0;
 
-  public void run()
-      throws Exception {
+  public void run() throws Exception {
     if (_segmentDir == null && _dataFile == null) {
       System.out.println("Error: One of 'segmentDir' or 'dataFile' must be specified");
       return;
@@ -121,8 +121,7 @@ public class RawIndexBenchmark {
    *
    * @throws Exception
    */
-  private File buildSegment()
-      throws Exception {
+  private File buildSegment() throws Exception {
     Schema schema = new Schema();
 
     for (int i = 0; i < NUM_COLUMNS; i++) {
@@ -292,8 +291,7 @@ public class RawIndexBenchmark {
    * @param args Command line arguments.
    * @throws Exception
    */
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     RawIndexBenchmark benchmark = new RawIndexBenchmark();
     CmdLineParser parser = new CmdLineParser(benchmark);
     parser.parseArgument(args);

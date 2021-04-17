@@ -39,8 +39,7 @@ import org.testng.annotations.Test;
 
 public class TablesResourceTest extends BaseResourceTest {
   @Test
-  public void getTables()
-      throws Exception {
+  public void getTables() throws Exception {
     String tablesPath = "/tables";
 
     Response response = _webTarget.path(tablesPath).request().get(Response.class);
@@ -70,8 +69,7 @@ public class TablesResourceTest extends BaseResourceTest {
   }
 
   @Test
-  public void getSegments()
-      throws Exception {
+  public void getSegments() throws Exception {
     String segmentsPath = "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/segments";
     IndexSegment defaultSegment = _realtimeIndexSegments.get(0);
 
@@ -99,12 +97,10 @@ public class TablesResourceTest extends BaseResourceTest {
   }
 
   @Test
-  public void testSegmentMetadata()
-      throws Exception {
+  public void testSegmentMetadata() throws Exception {
     IndexSegment defaultSegment = _realtimeIndexSegments.get(0);
-    String segmentMetadataPath =
-        "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/segments/" + defaultSegment
-            .getSegmentName() + "/metadata";
+    String segmentMetadataPath = "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/segments/"
+        + defaultSegment.getSegmentName() + "/metadata";
 
     JsonNode jsonResponse =
         JsonUtils.stringToJsonNode(_webTarget.path(segmentMetadataPath).request().get(String.class));
@@ -123,9 +119,8 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertTrue(jsonResponse.has("creationTimeReadable"));
     Assert.assertEquals(jsonResponse.get("columns").size(), 0);
 
-    jsonResponse = JsonUtils.stringToJsonNode(
-        _webTarget.path(segmentMetadataPath).queryParam("columns", "column1").queryParam("columns", "column2").request()
-            .get(String.class));
+    jsonResponse = JsonUtils.stringToJsonNode(_webTarget.path(segmentMetadataPath).queryParam("columns", "column1")
+        .queryParam("columns", "column2").request().get(String.class));
     Assert.assertEquals(jsonResponse.get("columns").size(), 2);
 
     jsonResponse = JsonUtils.stringToJsonNode(
@@ -143,8 +138,7 @@ public class TablesResourceTest extends BaseResourceTest {
   }
 
   @Test
-  public void testSegmentCrcMetadata()
-      throws Exception {
+  public void testSegmentCrcMetadata() throws Exception {
     String segmentsCrcPath = "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/segments/crc";
 
     // Upload segments
@@ -164,8 +158,7 @@ public class TablesResourceTest extends BaseResourceTest {
   }
 
   @Test
-  public void testDownloadSegments()
-      throws Exception {
+  public void testDownloadSegments() throws Exception {
     // Verify the content of the downloaded segment from a realtime table.
     downLoadAndVerifySegmentContent(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
         _realtimeIndexSegments.get(0));
@@ -184,8 +177,7 @@ public class TablesResourceTest extends BaseResourceTest {
   }
 
   // Verify metadata file from segments.
-  private void downLoadAndVerifySegmentContent(String tableNameWithType, IndexSegment segment)
-      throws IOException {
+  private void downLoadAndVerifySegmentContent(String tableNameWithType, IndexSegment segment) throws IOException {
     String segmentPath = "/segments/" + tableNameWithType + "/" + segment.getSegmentName();
 
     // Download the segment and save to a temp local file.
@@ -213,41 +205,47 @@ public class TablesResourceTest extends BaseResourceTest {
 
   @Test
   public void testUploadSegments() throws Exception {
-    setUpSegment(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS, null, _realtimeIndexSegments);
-    setUpSegment(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), LLC_SEGMENT_NAME_FOR_UPLOAD_FAILURE, null, _realtimeIndexSegments);
+    setUpSegment(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS, null,
+        _realtimeIndexSegments);
+    setUpSegment(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), LLC_SEGMENT_NAME_FOR_UPLOAD_FAILURE, null,
+        _realtimeIndexSegments);
 
     // Verify segment uploading succeed.
-    Response response = _webTarget.path(String.format("/segments/%s/%s/upload", TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
-        LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS)).request().post(null);
+    Response response =
+        _webTarget.path(String.format("/segments/%s/%s/upload", TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
+            LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS)).request().post(null);
     Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
     Assert.assertEquals(response.readEntity(String.class), SEGMENT_DOWNLOAD_URL);
 
     // Verify bad request: table type is offline
-    response = _webTarget.path(String.format("/segments/%s/%s/upload", TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME), _offlineIndexSegments.get(0).getSegmentName())).request().post(null);
+    response =
+        _webTarget.path(String.format("/segments/%s/%s/upload", TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME),
+            _offlineIndexSegments.get(0).getSegmentName())).request().post(null);
     Assert.assertEquals(response.getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
 
     // Verify bad request: segment is not low level consumer segment
-    response = _webTarget.path(String.format("/segments/%s/%s/upload", TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), _realtimeIndexSegments.get(0).getSegmentName())).request().post(null);
+    response =
+        _webTarget.path(String.format("/segments/%s/%s/upload", TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
+            _realtimeIndexSegments.get(0).getSegmentName())).request().post(null);
     Assert.assertEquals(response.getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
 
     // Verify non-existent segment uploading fail with NOT_FOUND status.
-    response = _webTarget.path(String.format("/segments/%s/%s_dummy/upload", TABLE_NAME,
-        LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS)).request().post(null);
+    response =
+        _webTarget.path(String.format("/segments/%s/%s_dummy/upload", TABLE_NAME, LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS))
+            .request().post(null);
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
 
     // Verify fail to upload segment to segment store with internal server error.
-    response = _webTarget.path(String.format("/segments/%s/%s/upload", TABLE_NAME,
-        LLC_SEGMENT_NAME_FOR_UPLOAD_FAILURE)).request().post(null);
+    response = _webTarget.path(String.format("/segments/%s/%s/upload", TABLE_NAME, LLC_SEGMENT_NAME_FOR_UPLOAD_FAILURE))
+        .request().post(null);
     Assert.assertEquals(response.getStatus(), Response.Status.INTERNAL_SERVER_ERROR.getStatusCode());
   }
 
   @Test
-  public void testOfflineTableSegmentMetadata()
-      throws Exception {
+  public void testOfflineTableSegmentMetadata() throws Exception {
     IndexSegment defaultSegment = _offlineIndexSegments.get(0);
-    String segmentMetadataPath =
-        "/tables/" + TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME) + "/segments/" + defaultSegment
-            .getSegmentName() + "/metadata";
+    String segmentMetadataPath = "/tables/" + TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME) + "/segments/"
+        + defaultSegment.getSegmentName() + "/metadata";
 
     JsonNode jsonResponse =
         JsonUtils.stringToJsonNode(_webTarget.path(segmentMetadataPath).request().get(String.class));
@@ -268,9 +266,8 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(jsonResponse.get("columns").size(), 0);
     Assert.assertEquals(jsonResponse.get("indexes").size(), 17);
 
-    jsonResponse = JsonUtils.stringToJsonNode(
-        _webTarget.path(segmentMetadataPath).queryParam("columns", "column1").queryParam("columns", "column2").request()
-            .get(String.class));
+    jsonResponse = JsonUtils.stringToJsonNode(_webTarget.path(segmentMetadataPath).queryParam("columns", "column1")
+        .queryParam("columns", "column2").request().get(String.class));
     Assert.assertEquals(jsonResponse.get("columns").size(), 2);
     Assert.assertEquals(jsonResponse.get("indexes").size(), 17);
 

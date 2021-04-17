@@ -101,7 +101,10 @@ public class ResultTable implements Iterable<ResultTable.Row> {
   }
 
   enum ResultType {
-    Selection, Aggregation, AggregationGroupBy, Invalid
+    Selection,
+    Aggregation,
+    AggregationGroupBy,
+    Invalid
   }
 
   List<Row> _rows;

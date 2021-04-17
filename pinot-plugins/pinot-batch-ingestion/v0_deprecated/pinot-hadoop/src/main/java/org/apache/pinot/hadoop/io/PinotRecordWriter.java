@@ -53,8 +53,7 @@ public class PinotRecordWriter<T> extends RecordWriter<NullWritable, T> {
   private final Path _outputDir;
 
   public PinotRecordWriter(TaskAttemptContext job, SegmentGeneratorConfig segmentGeneratorConfig,
-      FieldExtractor<T> fieldExtractor)
-      throws IOException {
+      FieldExtractor<T> fieldExtractor) throws IOException {
     _segmentGeneratorConfig = segmentGeneratorConfig;
     _fieldExtractor = fieldExtractor;
 
@@ -75,14 +74,12 @@ public class PinotRecordWriter<T> extends RecordWriter<NullWritable, T> {
   }
 
   @Override
-  public void write(NullWritable key, T value)
-      throws IOException {
+  public void write(NullWritable key, T value) throws IOException {
     _handler.write(JsonUtils.objectToBytes(_fieldExtractor.extractFields(value)));
   }
 
   @Override
-  public void close(TaskAttemptContext context)
-      throws IOException {
+  public void close(TaskAttemptContext context) throws IOException {
     _handler.close();
 
     File[] dataFiles = _dataFileDir.listFiles();
@@ -95,8 +92,7 @@ public class PinotRecordWriter<T> extends RecordWriter<NullWritable, T> {
     FileUtils.deleteDirectory(_tempSegmentDir);
   }
 
-  private void createSegment(File dataFile, int sequenceId)
-      throws IOException {
+  private void createSegment(File dataFile, int sequenceId) throws IOException {
     LOGGER.info("Creating segment from data file: {} of sequence id: {}", dataFile, sequenceId);
     _segmentGeneratorConfig.setInputFilePath(dataFile.getPath());
     _segmentGeneratorConfig.setSequenceId(sequenceId);
@@ -119,8 +115,7 @@ public class PinotRecordWriter<T> extends RecordWriter<NullWritable, T> {
     LOGGER.info("Copying segment tar file from local: {} to HDFS: {}", segmentTarFile, hdfsSegmentTarPath);
     _fileSystem.copyFromLocalFile(true, new Path(segmentTarFile.getPath()), hdfsSegmentTarPath);
 
-    LOGGER
-        .info("Finish creating segment: {} from data file: {} of sequence id: {} into HDFS: {}", segmentName, dataFile,
-            sequenceId, hdfsSegmentTarPath);
+    LOGGER.info("Finish creating segment: {} from data file: {} of sequence id: {} into HDFS: {}", segmentName,
+        dataFile, sequenceId, hdfsSegmentTarPath);
   }
 }

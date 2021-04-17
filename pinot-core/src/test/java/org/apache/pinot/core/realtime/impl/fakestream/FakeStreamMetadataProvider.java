@@ -47,7 +47,8 @@ public class FakeStreamMetadataProvider implements StreamMetadataProvider {
   }
 
   @Override
-  public StreamPartitionMsgOffset fetchStreamPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis) throws TimeoutException {
+  public StreamPartitionMsgOffset fetchStreamPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)
+      throws TimeoutException {
     if (offsetCriteria.isSmallest()) {
       return FakeStreamConfigUtils.getSmallestOffset();
     } else {

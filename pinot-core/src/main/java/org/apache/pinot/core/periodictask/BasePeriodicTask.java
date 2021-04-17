@@ -189,7 +189,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
 
   @Override
   public String toString() {
-    return String
-        .format("Task: %s, Interval: %ds, Initial Delay: %ds", _taskName, _intervalInSeconds, _initialDelayInSeconds);
+    return String.format("Task: %s, Interval: %ds, Initial Delay: %ds", _taskName, _intervalInSeconds,
+        _initialDelayInSeconds);
   }
 }

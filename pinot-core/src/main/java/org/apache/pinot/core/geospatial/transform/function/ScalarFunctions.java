@@ -41,8 +41,7 @@ public class ScalarFunctions {
    */
   @ScalarFunction
   public static byte[] stPoint(double x, double y) {
-    return GeometrySerializer
-        .serialize(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(x, y)));
+    return GeometrySerializer.serialize(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(x, y)));
   }
 
   /**

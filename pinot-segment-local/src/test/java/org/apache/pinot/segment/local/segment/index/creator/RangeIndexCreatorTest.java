@@ -43,67 +43,56 @@ public class RangeIndexCreatorTest {
   private static final String COLUMN_NAME = "testColumn";
 
   @BeforeClass
-  public void setUp()
-      throws IOException {
+  public void setUp() throws IOException {
     FileUtils.forceMkdir(INDEX_DIR);
   }
 
   @Test
-  public void testInt()
-      throws Exception {
+  public void testInt() throws Exception {
     testDataType(DataType.INT);
   }
 
   @Test
-  public void testLong()
-      throws Exception {
+  public void testLong() throws Exception {
     testDataType(DataType.LONG);
   }
 
   @Test
-  public void testFloat()
-      throws Exception {
+  public void testFloat() throws Exception {
     testDataType(DataType.FLOAT);
   }
 
   @Test
-  public void testDouble()
-      throws Exception {
+  public void testDouble() throws Exception {
     testDataType(DataType.DOUBLE);
   }
 
   @Test
-  public void testIntMV()
-      throws Exception {
+  public void testIntMV() throws Exception {
     testDataTypeMV(DataType.INT);
   }
 
   @Test
-  public void testLongMV()
-      throws Exception {
+  public void testLongMV() throws Exception {
     testDataTypeMV(DataType.LONG);
   }
 
   @Test
-  public void testFloatMV()
-      throws Exception {
+  public void testFloatMV() throws Exception {
     testDataTypeMV(DataType.FLOAT);
   }
 
   @Test
-  public void testDoubleMV()
-      throws Exception {
+  public void testDoubleMV() throws Exception {
     testDataTypeMV(DataType.DOUBLE);
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     FileUtils.deleteDirectory(INDEX_DIR);
   }
 
-  private void testDataType(DataType dataType)
-      throws IOException {
+  private void testDataType(DataType dataType) throws IOException {
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, dataType, true);
     int numDocs = 1000;
     Number[] values = new Number[numDocs];
@@ -128,8 +117,7 @@ public class RangeIndexCreatorTest {
     FileUtils.forceDelete(rangeIndexFile);
   }
 
-  private void testDataTypeMV(DataType dataType)
-      throws IOException {
+  private void testDataTypeMV(DataType dataType) throws IOException {
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, dataType, false);
     int numDocs = 1000;
     int numValuesPerMVEntry = 10;

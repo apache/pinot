@@ -93,14 +93,12 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public PinotDataBuffer getBuffer(String column, ColumnIndexType type)
-      throws IOException {
+  public PinotDataBuffer getBuffer(String column, ColumnIndexType type) throws IOException {
     return checkAndGetIndexBuffer(column, type);
   }
 
   @Override
-  public PinotDataBuffer newBuffer(String column, ColumnIndexType type, long sizeBytes)
-      throws IOException {
+  public PinotDataBuffer newBuffer(String column, ColumnIndexType type, long sizeBytes) throws IOException {
     return allocNewBufferInternal(column, type, sizeBytes, type.name().toLowerCase() + ".create");
   }
 
@@ -122,9 +120,8 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       }
     });
     if (textIndexFiles.length > 0) {
-      Preconditions.checkState(textIndexFiles.length == 1,
-          "Illegal number of text index directories for columns " + column + " segment directory " + segmentDirectory
-              .getAbsolutePath());
+      Preconditions.checkState(textIndexFiles.length == 1, "Illegal number of text index directories for columns "
+          + column + " segment directory " + segmentDirectory.getAbsolutePath());
       return true;
     }
     return false;
@@ -134,9 +131,8 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     IndexKey key = new IndexKey(column, type);
     IndexEntry entry = columnEntries.get(key);
     if (entry == null || entry.buffer == null) {
-      throw new RuntimeException(
-          "Could not find index for column: " + column + ", type: " + type + ", segment: " + segmentDirectory
-              .toString());
+      throw new RuntimeException("Could not find index for column: " + column + ", type: " + type + ", segment: "
+          + segmentDirectory.toString());
     }
     return entry.buffer;
   }
@@ -171,9 +167,8 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
 
   private void checkKeyNotPresent(IndexKey key) {
     if (columnEntries.containsKey(key)) {
-      throw new RuntimeException(
-          "Attempt to re-create an existing index for key: " + key.toString() + ", for segmentDirectory: "
-              + segmentDirectory.getAbsolutePath());
+      throw new RuntimeException("Attempt to re-create an existing index for key: " + key.toString()
+          + ", for segmentDirectory: " + segmentDirectory.getAbsolutePath());
     }
   }
 
@@ -186,14 +181,12 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     }
   }
 
-  private void load()
-      throws IOException, ConfigurationException {
+  private void load() throws IOException, ConfigurationException {
     loadMap();
     mapBufferEntries();
   }
 
-  private void loadMap()
-      throws ConfigurationException {
+  private void loadMap() throws ConfigurationException {
     File mapFile = new File(segmentDirectory, INDEX_MAP_FILE);
 
     PropertiesConfiguration mapConfig = CommonsConfigurationUtils.fromFile(mapFile);
@@ -203,13 +196,13 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       // parsing names like "column.name.dictionary.startOffset"
       // or, "column.name.dictionary.endOffset" where column.name is the key
       int lastSeparatorPos = key.lastIndexOf(MAP_KEY_SEPARATOR);
-      Preconditions
-          .checkState(lastSeparatorPos != -1, "Key separator not found: " + key + ", segment: " + segmentDirectory);
+      Preconditions.checkState(lastSeparatorPos != -1,
+          "Key separator not found: " + key + ", segment: " + segmentDirectory);
       String propertyName = key.substring(lastSeparatorPos + 1);
 
       int indexSeparatorPos = key.lastIndexOf(MAP_KEY_SEPARATOR, lastSeparatorPos - 1);
-      Preconditions
-          .checkState(indexSeparatorPos != -1, "Index separator not found: " + key + " , segment: " + segmentDirectory);
+      Preconditions.checkState(indexSeparatorPos != -1,
+          "Index separator not found: " + key + " , segment: " + segmentDirectory);
       String indexName = key.substring(indexSeparatorPos + 1, lastSeparatorPos);
       String columnName = key.substring(0, indexSeparatorPos);
       IndexKey indexKey = new IndexKey(columnName, ColumnIndexType.getValue(indexName));
@@ -233,15 +226,13 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     for (Map.Entry<IndexKey, IndexEntry> colIndexEntry : columnEntries.entrySet()) {
       IndexEntry entry = colIndexEntry.getValue();
       if (entry.size < 0 || entry.startOffset < 0) {
-        throw new ConfigurationException(
-            "Invalid map entry for key: " + colIndexEntry.getKey().toString() + ", segment: " + segmentDirectory
-                .toString());
+        throw new ConfigurationException("Invalid map entry for key: " + colIndexEntry.getKey().toString()
+            + ", segment: " + segmentDirectory.toString());
       }
     }
   }
 
-  private void mapBufferEntries()
-      throws IOException {
+  private void mapBufferEntries() throws IOException {
     SortedMap<Long, IndexEntry> indexStartMap = new TreeMap<>();
 
     for (Map.Entry<IndexKey, IndexEntry> columnEntry : columnEntries.entrySet()) {
@@ -299,8 +290,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     }
   }
 
-  private void persistIndexMap(IndexEntry entry)
-      throws IOException {
+  private void persistIndexMap(IndexEntry entry) throws IOException {
     File mapFile = new File(segmentDirectory, INDEX_MAP_FILE);
     try (PrintWriter writer = new PrintWriter(new BufferedWriter(new FileWriter(mapFile, true)))) {
       String startKey = getKey(entry.key.name, entry.key.type.getIndexName(), true);
@@ -325,8 +315,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     for (PinotDataBuffer buf : allocBuffers) {
       buf.close();
     }

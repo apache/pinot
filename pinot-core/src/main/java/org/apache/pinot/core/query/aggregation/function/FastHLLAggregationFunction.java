@@ -150,8 +150,8 @@ public class FastHLLAggregationFunction extends BaseSingleInputAggregationFuncti
       if (intermediateResult1.cardinality() == 0) {
         return intermediateResult2;
       } else {
-        Preconditions
-            .checkState(intermediateResult2.cardinality() == 0, "Cannot merge HyperLogLogs of different sizes");
+        Preconditions.checkState(intermediateResult2.cardinality() == 0,
+            "Cannot merge HyperLogLogs of different sizes");
         return intermediateResult1;
       }
     }

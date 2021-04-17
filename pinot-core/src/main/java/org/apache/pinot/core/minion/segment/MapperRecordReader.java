@@ -47,8 +47,7 @@ public class MapperRecordReader implements RecordReader {
   private boolean _nextRowReturned = true;
 
   public MapperRecordReader(List<File> indexDirs, RecordTransformer recordTransformer,
-      RecordPartitioner recordPartitioner, int totalNumPartition, int currentPartition)
-      throws Exception {
+      RecordPartitioner recordPartitioner, int totalNumPartition, int currentPartition) throws Exception {
     _multiplePinotSegmentRecordReader = new MultiplePinotSegmentRecordReader(indexDirs);
     _recordPartitioner = recordPartitioner;
     _recordTransformer = recordTransformer;
@@ -117,8 +116,7 @@ public class MapperRecordReader implements RecordReader {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _multiplePinotSegmentRecordReader.close();
   }
 }

@@ -92,11 +92,11 @@ public class QueryGenerator {
 
   private final List<QueryGenerationStrategy> _queryGenerationStrategies =
       Arrays.asList(new SelectionQueryGenerationStrategy(), new AggregationQueryGenerationStrategy());
-  private final List<PredicateGenerator> _singleValuePredicateGenerators = Arrays
-      .asList(new SingleValueComparisonPredicateGenerator(), new SingleValueInPredicateGenerator(),
+  private final List<PredicateGenerator> _singleValuePredicateGenerators =
+      Arrays.asList(new SingleValueComparisonPredicateGenerator(), new SingleValueInPredicateGenerator(),
           new SingleValueBetweenPredicateGenerator(), new SingleValueRegexPredicateGenerator());
-  private final List<PredicateGenerator> _multiValuePredicateGenerators = Arrays
-      .asList(new MultiValueComparisonPredicateGenerator(), new MultiValueInPredicateGenerator(),
+  private final List<PredicateGenerator> _multiValuePredicateGenerators =
+      Arrays.asList(new MultiValueComparisonPredicateGenerator(), new MultiValueInPredicateGenerator(),
           new MultiValueBetweenPredicateGenerator());
 
   private final String _pinotTableName;
@@ -212,8 +212,7 @@ public class QueryGenerator {
    *
    * @param args arguments.
    */
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     File avroFile = new File("pinot-integration-tests/src/test/resources/On_Time_On_Time_Performance_2014_1.avro");
     QueryGenerator queryGenerator = new QueryGenerator(Collections.singletonList(avroFile), "mytable", "mytable");
     File outputFile = new File(
@@ -348,7 +347,7 @@ public class QueryGenerator {
 
     if (predicateCount < 2) {
       // No need to join.
-      return new PredicateQueryFragment(predicates, Collections.<QueryFragment>emptyList());
+      return new PredicateQueryFragment(predicates, Collections.<QueryFragment> emptyList());
     } else {
       // Join predicates with ANDs and ORs.
       List<QueryFragment> operators = new ArrayList<>(predicateCount - 1);
@@ -471,9 +470,8 @@ public class QueryGenerator {
           h2ProjectionColumns.add(projectionColumn);
         }
       }
-      return Collections.singletonList(
-          joinWithSpaces("SELECT", StringUtils.join(h2ProjectionColumns, ", "), "FROM", _h2TableName,
-              _predicate.generateH2Sql(), _orderBy.generateH2Sql(), _limit.generateH2Sql()));
+      return Collections.singletonList(joinWithSpaces("SELECT", StringUtils.join(h2ProjectionColumns, ", "), "FROM",
+          _h2TableName, _predicate.generateH2Sql(), _orderBy.generateH2Sql(), _limit.generateH2Sql()));
     }
   }
 
@@ -534,9 +532,8 @@ public class QueryGenerator {
 
         if (_groupColumns.isEmpty()) {
           // Aggregation query.
-          queries.add(
-              joinWithSpaces("SELECT", aggregateColumnAndFunction, "FROM", _h2TableName, _predicate.generateH2Sql(),
-                  _top.generateH2Sql()));
+          queries.add(joinWithSpaces("SELECT", aggregateColumnAndFunction, "FROM", _h2TableName,
+              _predicate.generateH2Sql(), _top.generateH2Sql()));
         } else {
           // Group-by query.
 

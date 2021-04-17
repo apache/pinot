@@ -34,8 +34,7 @@ import static org.testng.Assert.assertTrue;
 public class ResourceManagerTest {
 
   @Test
-  public void testCanSchedule()
-      throws Exception {
+  public void testCanSchedule() throws Exception {
     ResourceManager rm = getResourceManager(2, 5, 1, 3);
 
     SchedulerGroupAccountant accountant = mock(SchedulerGroupAccountant.class);

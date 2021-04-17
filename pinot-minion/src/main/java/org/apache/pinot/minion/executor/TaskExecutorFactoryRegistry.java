@@ -67,8 +67,8 @@ public class TaskExecutorFactoryRegistry {
   }
 
   public static Set<Class<?>> getTaskExecutorFactoryClasses() {
-    return PinotReflectionUtils
-        .getClassesThroughReflection(TASK_EXECUTOR_PACKAGE_REGEX_PATTERN, TaskExecutorFactory.class);
+    return PinotReflectionUtils.getClassesThroughReflection(TASK_EXECUTOR_PACKAGE_REGEX_PATTERN,
+        TaskExecutorFactory.class);
   }
 
   /**

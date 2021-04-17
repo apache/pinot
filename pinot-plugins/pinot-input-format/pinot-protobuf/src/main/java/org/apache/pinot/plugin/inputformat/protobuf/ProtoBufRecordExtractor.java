@@ -120,10 +120,8 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
       return null;
     }
 
-    List<Descriptors.FieldDescriptor> fieldDescriptors = protoBufFieldInfo
-        .getFieldDescriptor()
-        .getMessageType()
-        .getFields();
+    List<Descriptors.FieldDescriptor> fieldDescriptors =
+        protoBufFieldInfo.getFieldDescriptor().getMessageType().getFields();
     Descriptors.FieldDescriptor keyFieldDescriptor = fieldDescriptors.get(0);
     Descriptors.FieldDescriptor valueFieldDescriptor = fieldDescriptors.get(1);
     Map<Object, Object> convertedMap = new HashMap<>();
@@ -137,10 +135,8 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
         }
 
         if (convertedFieldValue != null) {
-          convertedMap.put(
-              convertSingleValue(new ProtoBufFieldInfo(fieldKey, keyFieldDescriptor)),
-              convertedFieldValue
-          );
+          convertedMap.put(convertSingleValue(new ProtoBufFieldInfo(fieldKey, keyFieldDescriptor)),
+              convertedFieldValue);
         }
       }
     }

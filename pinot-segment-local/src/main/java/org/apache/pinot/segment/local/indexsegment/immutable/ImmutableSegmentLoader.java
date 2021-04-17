@@ -57,8 +57,7 @@ public class ImmutableSegmentLoader {
   /**
    * For tests only.
    */
-  public static ImmutableSegment load(File indexDir, ReadMode readMode)
-      throws Exception {
+  public static ImmutableSegment load(File indexDir, ReadMode readMode) throws Exception {
     IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig();
     defaultIndexLoadingConfig.setReadMode(readMode);
     return load(indexDir, defaultIndexLoadingConfig, null);
@@ -67,22 +66,21 @@ public class ImmutableSegmentLoader {
   /**
    * For tests only.
    */
-  public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig)
-      throws Exception {
+  public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig) throws Exception {
     return load(indexDir, indexLoadingConfig, null);
   }
 
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema)
       throws Exception {
-    Preconditions
-        .checkArgument(indexDir.isDirectory(), "Index directory: %s does not exist or is not a directory", indexDir);
+    Preconditions.checkArgument(indexDir.isDirectory(), "Index directory: %s does not exist or is not a directory",
+        indexDir);
 
     // Convert segment version if necessary
     // NOTE: this step may modify the segment metadata
     String segmentName = indexDir.getName();
     SegmentVersion segmentVersionToLoad = indexLoadingConfig.getSegmentVersion();
-    if (segmentVersionToLoad != null && !SegmentDirectoryPaths.segmentDirectoryFor(indexDir, segmentVersionToLoad)
-        .isDirectory()) {
+    if (segmentVersionToLoad != null
+        && !SegmentDirectoryPaths.segmentDirectoryFor(indexDir, segmentVersionToLoad).isDirectory()) {
       SegmentVersion segmentVersionOnDisk = new SegmentMetadataImpl(indexDir).getSegmentVersion();
       if (segmentVersionOnDisk != segmentVersionToLoad) {
         LOGGER.info("Segment: {} needs to be converted from version: {} to {}", segmentName, segmentVersionOnDisk,
@@ -147,9 +145,8 @@ public class ImmutableSegmentLoader {
     // Load star-tree index if it exists
     StarTreeIndexContainer starTreeIndexContainer = null;
     if (segmentMetadata.getStarTreeV2MetadataList() != null) {
-      starTreeIndexContainer =
-          new StarTreeIndexContainer(SegmentDirectoryPaths.findSegmentDirectory(indexDir), segmentMetadata,
-              indexContainerMap, readMode);
+      starTreeIndexContainer = new StarTreeIndexContainer(SegmentDirectoryPaths.findSegmentDirectory(indexDir),
+          segmentMetadata, indexContainerMap, readMode);
     }
 
     ImmutableSegmentImpl segment =

@@ -39,8 +39,7 @@ public class Utils {
   public static void replaceContent(File originalDataFile, File replacedDataFile, String original, String replaced)
       throws IOException {
     Stream<String> lines = Files.lines(originalDataFile.toPath());
-    List<String> replacedContent = lines.map(line -> line.replaceAll(original, replaced)).
-        collect(Collectors.toList());
+    List<String> replacedContent = lines.map(line -> line.replaceAll(original, replaced)).collect(Collectors.toList());
     Files.write(replacedDataFile.toPath(), replacedContent);
     lines.close();
   }

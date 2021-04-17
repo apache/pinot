@@ -42,8 +42,7 @@ public class PinotSegmentToJsonConverter implements PinotSegmentConverter {
   }
 
   @Override
-  public void convert()
-      throws Exception {
+  public void convert() throws Exception {
     try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader(new File(_segmentDir));
         BufferedWriter recordWriter = new BufferedWriter(new FileWriter(_outputFile))) {
       GenericRow row = new GenericRow();

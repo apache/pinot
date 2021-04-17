@@ -72,12 +72,10 @@ public class SqlResultComparator {
   private static final String FIELD_TYPE_STRING_ARRAY = "STRING_ARRAY";
   private static final String FIELD_TYPE_BYTES_ARRRAY = "BYTES_ARRRAY";
 
-  private static final SqlParser.Config SQL_PARSER_CONFIG =
-      SqlParser.configBuilder().setLex(Lex.MYSQL_ANSI).setConformance(SqlConformanceEnum.BABEL)
-          .setParserFactory(SqlBabelParserImpl.FACTORY).build();
+  private static final SqlParser.Config SQL_PARSER_CONFIG = SqlParser.configBuilder().setLex(Lex.MYSQL_ANSI)
+      .setConformance(SqlConformanceEnum.BABEL).setParserFactory(SqlBabelParserImpl.FACTORY).build();
 
-  public static boolean areEqual(JsonNode actual, JsonNode expected, String query)
-      throws IOException {
+  public static boolean areEqual(JsonNode actual, JsonNode expected, String query) throws IOException {
     if (hasExceptions(actual)) {
       return false;
     }
@@ -92,8 +90,8 @@ public class SqlResultComparator {
 
     ArrayNode actualRows = (ArrayNode) actual.get(FIELD_RESULT_TABLE).get(FIELD_ROWS);
     ArrayNode expectedRows = (ArrayNode) expected.get(FIELD_RESULT_TABLE).get(FIELD_ROWS);
-    ArrayNode columnDataTypes = (ArrayNode) expected.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).
-        get(FIELD_COLUMN_DATA_TYPES);
+    ArrayNode columnDataTypes =
+        (ArrayNode) expected.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).get(FIELD_COLUMN_DATA_TYPES);
 
     convertNumbersToString(expectedRows, columnDataTypes);
     convertNumbersToString(actualRows, columnDataTypes);
@@ -113,8 +111,9 @@ public class SqlResultComparator {
     if (expected.has(FIELD_IS_SUPERSET) && expected.get(FIELD_IS_SUPERSET).asBoolean(false)) {
       return areElementsSubset(actualElementsSerialized, expectedElementsSerialized);
     } else {
-      return areLengthsEqual(actual, expected) && areElementsEqual(actualElementsSerialized, expectedElementsSerialized,
-          query) && areMetadataEqual(actual, expected);
+      return areLengthsEqual(actual, expected)
+          && areElementsEqual(actualElementsSerialized, expectedElementsSerialized, query)
+          && areMetadataEqual(actual, expected);
     }
   }
 
@@ -216,9 +215,8 @@ public class SqlResultComparator {
     long actualNumEntriesScannedInFilter = actual.get(FIELD_NUM_ENTRIES_SCANNED_IN_FILTER).asLong();
     long expectedNumEntriesScannedInFilter = expected.get(FIELD_NUM_ENTRIES_SCANNED_IN_FILTER).asLong();
     if (actualNumEntriesScannedInFilter != expectedNumEntriesScannedInFilter) {
-      LOGGER
-          .error("The numEntriesScannedInFilter don't match! Actual: {}, Expected: {}", actualNumEntriesScannedInFilter,
-              expectedNumEntriesScannedInFilter);
+      LOGGER.error("The numEntriesScannedInFilter don't match! Actual: {}, Expected: {}",
+          actualNumEntriesScannedInFilter, expectedNumEntriesScannedInFilter);
       return false;
     }
     return true;
@@ -279,7 +277,8 @@ public class SqlResultComparator {
     JsonNode actualColumnNames = actual.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).get(FIELD_COLUMN_NAMES);
     JsonNode expectedColumnNames = expected.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).get(FIELD_COLUMN_NAMES);
     JsonNode actualColumnDataTypes = actual.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).get(FIELD_COLUMN_DATA_TYPES);
-    JsonNode expectedColumnDataTypes = expected.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).get(FIELD_COLUMN_DATA_TYPES);
+    JsonNode expectedColumnDataTypes =
+        expected.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).get(FIELD_COLUMN_DATA_TYPES);
 
     String actualDataSchemaStr = actualColumnNames.toString() + actualColumnDataTypes.toString();
     String expectedDataSchemaStr = expectedColumnNames.toString() + expectedColumnDataTypes.toString();
@@ -321,8 +320,7 @@ public class SqlResultComparator {
     return true;
   }
 
-  private static void convertNumbersToString(ArrayNode rows, ArrayNode columnDataTypes)
-      throws IOException {
+  private static void convertNumbersToString(ArrayNode rows, ArrayNode columnDataTypes) throws IOException {
     for (int i = 0; i < rows.size(); i++) {
       for (int j = 0; j < columnDataTypes.size(); j++) {
         ArrayNode row = (ArrayNode) rows.get(i);

@@ -119,8 +119,7 @@ public class HelixServerStarter implements ServiceStartable {
   private ServerQueriesDisabledTracker _serverQueriesDisabledTracker;
   private RealtimeLuceneIndexRefreshState _realtimeLuceneIndexRefreshState;
 
-  public HelixServerStarter(String helixClusterName, String zkAddress, PinotConfiguration serverConf)
-      throws Exception {
+  public HelixServerStarter(String helixClusterName, String zkAddress, PinotConfiguration serverConf) throws Exception {
     _helixClusterName = helixClusterName;
     _zkAddress = zkAddress;
     // Make a clone so that changes to the config won't propagate to the caller
@@ -139,30 +138,26 @@ public class HelixServerStarter implements ServiceStartable {
     }
     _instanceId = instanceId;
 
-    _instanceConfigScope =
-        new HelixConfigScopeBuilder(ConfigScopeProperty.PARTICIPANT, _helixClusterName).forParticipant(_instanceId)
-            .build();
+    _instanceConfigScope = new HelixConfigScopeBuilder(ConfigScopeProperty.PARTICIPANT, _helixClusterName)
+        .forParticipant(_instanceId).build();
 
     // Enable/disable thread CPU time measurement through instance config.
-    ThreadTimer.setThreadCpuTimeMeasurementEnabled(_serverConf
-        .getProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
-            Server.DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT));
+    ThreadTimer.setThreadCpuTimeMeasurementEnabled(_serverConf.getProperty(
+        Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, Server.DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT));
 
     // Set data table version send to broker.
-    DataTableBuilder.setCurrentDataTableVersion(_serverConf
-        .getProperty(Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION,
-            Server.DEFAULT_CURRENT_DATA_TABLE_VERSION));
+    DataTableBuilder.setCurrentDataTableVersion(_serverConf.getProperty(Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION,
+        Server.DEFAULT_CURRENT_DATA_TABLE_VERSION));
   }
 
   /**
    * Fetches the resources to monitor and registers the {@link org.apache.pinot.common.utils.ServiceStatus.ServiceStatusCallback}s
    */
   private void registerServiceStatusHandler() {
-    double minResourcePercentForStartup = _serverConf
-        .getProperty(Server.CONFIG_OF_SERVER_MIN_RESOURCE_PERCENT_FOR_START,
-            Server.DEFAULT_SERVER_MIN_RESOURCE_PERCENT_FOR_START);
-    int realtimeConsumptionCatchupWaitMs = _serverConf
-        .getProperty(Server.CONFIG_OF_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS,
+    double minResourcePercentForStartup = _serverConf.getProperty(
+        Server.CONFIG_OF_SERVER_MIN_RESOURCE_PERCENT_FOR_START, Server.DEFAULT_SERVER_MIN_RESOURCE_PERCENT_FOR_START);
+    int realtimeConsumptionCatchupWaitMs =
+        _serverConf.getProperty(Server.CONFIG_OF_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS,
             Server.DEFAULT_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS);
 
     // collect all resources which have this instance in the ideal state
@@ -201,16 +196,13 @@ public class HelixServerStarter implements ServiceStartable {
 
     ImmutableList.Builder<ServiceStatus.ServiceStatusCallback> serviceStatusCallbackListBuilder =
         new ImmutableList.Builder<>();
-    serviceStatusCallbackListBuilder.add(
-        new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, _helixClusterName,
-            _instanceId, resourcesToMonitor, minResourcePercentForStartup));
-    serviceStatusCallbackListBuilder.add(
-        new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _helixClusterName,
-            _instanceId, resourcesToMonitor, minResourcePercentForStartup));
+    serviceStatusCallbackListBuilder.add(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(
+        _helixManager, _helixClusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup));
+    serviceStatusCallbackListBuilder.add(new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(
+        _helixManager, _helixClusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup));
     if (checkRealtime && foundConsuming) {
-      serviceStatusCallbackListBuilder.add(
-          new ServiceStatus.RealtimeConsumptionCatchupServiceStatusCallback(_helixManager, _helixClusterName,
-              _instanceId, realtimeConsumptionCatchupWaitMs));
+      serviceStatusCallbackListBuilder.add(new ServiceStatus.RealtimeConsumptionCatchupServiceStatusCallback(
+          _helixManager, _helixClusterName, _instanceId, realtimeConsumptionCatchupWaitMs));
     }
     LOGGER.info("Registering service status handler");
     ServiceStatus.setServiceStatusCallback(_instanceId,
@@ -313,8 +305,7 @@ public class HelixServerStarter implements ServiceStartable {
   }
 
   @Override
-  public void start()
-      throws Exception {
+  public void start() throws Exception {
     LOGGER.info("Starting Pinot server");
     long startTimeMs = System.currentTimeMillis();
 
@@ -356,9 +347,8 @@ public class HelixServerStarter implements ServiceStartable {
     try {
       accessControlFactory = PluginManager.get().createInstance(accessControlFactoryClass);
     } catch (Exception e) {
-      throw new RuntimeException(
-          "Caught exception while creating new AccessControlFactory instance using class '" + accessControlFactoryClass
-              + "'", e);
+      throw new RuntimeException("Caught exception while creating new AccessControlFactory instance using class '"
+          + accessControlFactoryClass + "'", e);
     }
 
     // Update admin API port
@@ -405,8 +395,8 @@ public class HelixServerStarter implements ServiceStartable {
     // Register message handler factory
     SegmentMessageHandlerFactory messageHandlerFactory =
         new SegmentMessageHandlerFactory(fetcherAndLoader, instanceDataManager, serverMetrics);
-    _helixManager.getMessagingService()
-        .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(), messageHandlerFactory);
+    _helixManager.getMessagingService().registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(),
+        messageHandlerFactory);
 
     serverMetrics.addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME, () -> _helixManager.isConnected() ? 1L : 0L);
     _helixManager
@@ -433,7 +423,8 @@ public class HelixServerStarter implements ServiceStartable {
     serverMetrics.addCallbackGauge("memory.allocationFailureCount", PinotDataBuffer::getAllocationFailureCount);
 
     // Track metric for queries disabled
-    _serverQueriesDisabledTracker = new ServerQueriesDisabledTracker(_helixClusterName, _instanceId, _helixManager, serverMetrics);
+    _serverQueriesDisabledTracker =
+        new ServerQueriesDisabledTracker(_helixClusterName, _instanceId, _helixManager, serverMetrics);
     _serverQueriesDisabledTracker.start();
 
     _realtimeLuceneIndexRefreshState = RealtimeLuceneIndexRefreshState.getInstance();
@@ -457,14 +448,14 @@ public class HelixServerStarter implements ServiceStartable {
 
     long endTimeMs =
         startTimeMs + _serverConf.getProperty(Server.CONFIG_OF_SHUTDOWN_TIMEOUT_MS, Server.DEFAULT_SHUTDOWN_TIMEOUT_MS);
-    if (_serverConf
-        .getProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK, Server.DEFAULT_SHUTDOWN_ENABLE_QUERY_CHECK)) {
+    if (_serverConf.getProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK,
+        Server.DEFAULT_SHUTDOWN_ENABLE_QUERY_CHECK)) {
       shutdownQueryCheck(endTimeMs);
     }
     _helixManager.disconnect();
     _serverInstance.shutDown();
-    if (_serverConf
-        .getProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_RESOURCE_CHECK, Server.DEFAULT_SHUTDOWN_ENABLE_RESOURCE_CHECK)) {
+    if (_serverConf.getProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_RESOURCE_CHECK,
+        Server.DEFAULT_SHUTDOWN_ENABLE_RESOURCE_CHECK)) {
       shutdownResourceCheck(endTimeMs);
     }
     _serverQueriesDisabledTracker.stop();
@@ -647,8 +638,7 @@ public class HelixServerStarter implements ServiceStartable {
   /**
    * This method is for reference purpose only.
    */
-  public static HelixServerStarter startDefault()
-      throws Exception {
+  public static HelixServerStarter startDefault() throws Exception {
     Map<String, Object> properties = new HashMap<>();
     int port = 8003;
     properties.put(Helix.KEY_OF_SERVER_NETTY_PORT, port);
@@ -661,8 +651,7 @@ public class HelixServerStarter implements ServiceStartable {
     return serverStarter;
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     startDefault();
   }
 }

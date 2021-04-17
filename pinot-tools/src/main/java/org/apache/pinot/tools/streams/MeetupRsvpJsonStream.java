@@ -27,8 +27,7 @@ import org.apache.pinot.spi.utils.StringUtils;
 
 public class MeetupRsvpJsonStream extends MeetupRsvpStream {
 
-  public MeetupRsvpJsonStream()
-      throws Exception {
+  public MeetupRsvpJsonStream() throws Exception {
     super();
   }
 

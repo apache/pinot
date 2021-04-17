@@ -55,7 +55,7 @@ public class ControllerTenantBrokerResponse {
       String hostName = broker.get("host").textValue();
       Integer port = broker.get("port").intValue();
       String brokerIP = hostName;
-      if(hostName.contains("_")) {
+      if (hostName.contains("_")) {
         String[] hostNamePart = hostName.split("_");
         brokerIP = hostNamePart[hostNamePart.length - 1];
       }
@@ -66,7 +66,8 @@ public class ControllerTenantBrokerResponse {
     return brokerList;
   }
 
-  public static class ControllerTenantBrokerResponseFuture extends ControllerResponseFuture<ControllerTenantBrokerResponse> {
+  public static class ControllerTenantBrokerResponseFuture
+      extends ControllerResponseFuture<ControllerTenantBrokerResponse> {
     private final ObjectReader OBJECT_READER = new ObjectMapper().reader();
 
     public ControllerTenantBrokerResponseFuture(Future<Response> response, String url) {
@@ -74,8 +75,7 @@ public class ControllerTenantBrokerResponse {
     }
 
     @Override
-    public ControllerTenantBrokerResponse get(long timeout, TimeUnit unit)
-        throws ExecutionException {
+    public ControllerTenantBrokerResponse get(long timeout, TimeUnit unit) throws ExecutionException {
       String response = getStringResponse(timeout, unit);
       try {
         JsonNode jsonResponse = OBJECT_READER.readTree(response);

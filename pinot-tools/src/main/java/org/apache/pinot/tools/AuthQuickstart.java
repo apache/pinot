@@ -37,7 +37,8 @@ public class AuthQuickstart extends Quickstart {
 
     // controller
     properties.put("controller.segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
-    properties.put("controller.admin.access.control.factory.class", "org.apache.pinot.controller.api.access.BasicAuthAccessControlFactory");
+    properties.put("controller.admin.access.control.factory.class",
+        "org.apache.pinot.controller.api.access.BasicAuthAccessControlFactory");
     properties.put("controller.admin.access.control.principals", "admin, user");
     properties.put("controller.admin.access.control.principals.admin.password", "verysecret");
     properties.put("controller.admin.access.control.principals.user.password", "secret");
@@ -64,8 +65,7 @@ public class AuthQuickstart extends Quickstart {
     return properties;
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     PluginManager.get().init();
     new AuthQuickstart().execute();
   }

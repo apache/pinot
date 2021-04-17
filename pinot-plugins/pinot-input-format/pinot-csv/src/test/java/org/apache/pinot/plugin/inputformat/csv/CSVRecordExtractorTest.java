@@ -48,8 +48,7 @@ public class CSVRecordExtractorTest extends AbstractRecordExtractorTest {
    * Create a CSVRecordReader
    */
   @Override
-  protected RecordReader createRecordReader(Set<String> fieldsToRead)
-      throws IOException {
+  protected RecordReader createRecordReader(Set<String> fieldsToRead) throws IOException {
     CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
     csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
     CSVRecordReader csvRecordReader = new CSVRecordReader();
@@ -61,11 +60,10 @@ public class CSVRecordExtractorTest extends AbstractRecordExtractorTest {
    * Create a CSV input file using the input records
    */
   @Override
-  public void createInputFile()
-      throws IOException {
+  public void createInputFile() throws IOException {
     String[] header = _sourceFieldNames.toArray(new String[0]);
-    try (FileWriter fileWriter = new FileWriter(_dataFile); CSVPrinter csvPrinter = new CSVPrinter(fileWriter,
-        CSVFormat.DEFAULT.withHeader(header))) {
+    try (FileWriter fileWriter = new FileWriter(_dataFile);
+        CSVPrinter csvPrinter = new CSVPrinter(fileWriter, CSVFormat.DEFAULT.withHeader(header))) {
 
       for (Map<String, Object> inputRecord : _inputRecords) {
         Object[] record = new Object[header.length];
@@ -109,8 +107,7 @@ public class CSVRecordExtractorTest extends AbstractRecordExtractorTest {
    * Check if we can parse a CSV file that has escaped comma characters within fields.
    */
   @Test
-  public void testEscapeCharacterInCSV()
-    throws Exception {
+  public void testEscapeCharacterInCSV() throws Exception {
     // Create CSV config with backslash as escape character.
     CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
     csvRecordReaderConfig.setEscapeCharacter('\\');

@@ -234,8 +234,7 @@ public class SelectionOperatorUtils {
    * @return data table.
    * @throws Exception
    */
-  public static DataTable getDataTableFromRows(Collection<Object[]> rows, DataSchema dataSchema)
-      throws Exception {
+  public static DataTable getDataTableFromRows(Collection<Object[]> rows, DataSchema dataSchema) throws Exception {
     int numColumns = dataSchema.size();
 
     DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);

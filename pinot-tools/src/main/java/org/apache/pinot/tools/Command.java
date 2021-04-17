@@ -24,8 +24,7 @@ package org.apache.pinot.tools;
  *
  */
 public interface Command {
-  public boolean execute()
-      throws Exception;
+  public boolean execute() throws Exception;
 
   public void printUsage();
 

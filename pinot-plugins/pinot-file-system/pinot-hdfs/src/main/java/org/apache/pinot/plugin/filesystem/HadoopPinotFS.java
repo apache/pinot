@@ -39,6 +39,7 @@ import org.apache.pinot.spi.filesystem.PinotFS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * Implementation of PinotFS for the Hadoop Filesystem
  */
@@ -71,14 +72,12 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean mkdir(URI uri)
-      throws IOException {
+  public boolean mkdir(URI uri) throws IOException {
     return _hadoopFS.mkdirs(new Path(uri));
   }
 
   @Override
-  public boolean delete(URI segmentUri, boolean forceDelete)
-      throws IOException {
+  public boolean delete(URI segmentUri, boolean forceDelete) throws IOException {
     // Returns false if we are moving a directory and that directory is not empty
     if (isDirectory(segmentUri) && listFiles(segmentUri, false).length > 0 && !forceDelete) {
       return false;
@@ -87,8 +86,7 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean doMove(URI srcUri, URI dstUri)
-      throws IOException {
+  public boolean doMove(URI srcUri, URI dstUri) throws IOException {
     return _hadoopFS.rename(new Path(srcUri), new Path(dstUri));
   }
 
@@ -97,8 +95,7 @@ public class HadoopPinotFS extends PinotFS {
    * need to create a new configuration and filesystem. Keeps files if copy/move is partial.
    */
   @Override
-  public boolean copy(URI srcUri, URI dstUri)
-      throws IOException {
+  public boolean copy(URI srcUri, URI dstUri) throws IOException {
     Path source = new Path(srcUri);
     Path target = new Path(dstUri);
     RemoteIterator<FileStatus> sourceFiles = _hadoopFS.listStatusIterator(source);
@@ -126,20 +123,17 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean exists(URI fileUri)
-      throws IOException {
+  public boolean exists(URI fileUri) throws IOException {
     return _hadoopFS.exists(new Path(fileUri));
   }
 
   @Override
-  public long length(URI fileUri)
-      throws IOException {
+  public long length(URI fileUri) throws IOException {
     return _hadoopFS.getFileStatus(new Path(fileUri)).getLen();
   }
 
   @Override
-  public String[] listFiles(URI fileUri, boolean recursive)
-      throws IOException {
+  public String[] listFiles(URI fileUri, boolean recursive) throws IOException {
     ArrayList<String> filePathStrings = new ArrayList<>();
     Path path = new Path(fileUri);
     if (_hadoopFS.exists(path)) {
@@ -156,8 +150,7 @@ public class HadoopPinotFS extends PinotFS {
     return retArray;
   }
 
-  private List<FileStatus> listStatus(Path path, boolean recursive)
-      throws IOException {
+  private List<FileStatus> listStatus(Path path, boolean recursive) throws IOException {
     List<FileStatus> fileStatuses = new ArrayList<>();
     FileStatus[] files = _hadoopFS.listStatus(path);
     for (FileStatus file : files) {
@@ -171,8 +164,7 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public void copyToLocalFile(URI srcUri, File dstFile)
-      throws Exception {
+  public void copyToLocalFile(URI srcUri, File dstFile) throws Exception {
     LOGGER.debug("starting to fetch segment from hdfs");
     final String dstFilePath = dstFile.getAbsolutePath();
 
@@ -193,8 +185,7 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public void copyFromLocalFile(File srcFile, URI dstUri)
-      throws Exception {
+  public void copyFromLocalFile(File srcFile, URI dstUri) throws Exception {
     _hadoopFS.copyFromLocalFile(new Path(srcFile.toURI()), new Path(dstUri));
   }
 
@@ -219,8 +210,7 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean touch(URI uri)
-      throws IOException {
+  public boolean touch(URI uri) throws IOException {
     Path path = new Path(uri);
     if (!exists(uri)) {
       FSDataOutputStream fos = _hadoopFS.create(path);
@@ -232,22 +222,20 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public InputStream open(URI uri)
-      throws IOException {
+  public InputStream open(URI uri) throws IOException {
     Path path = new Path(uri);
     return _hadoopFS.open(path);
   }
 
-  private void authenticate(Configuration hadoopConf,
-      PinotConfiguration configs) {
+  private void authenticate(Configuration hadoopConf, PinotConfiguration configs) {
     String principal = configs.getProperty(PRINCIPAL);
     String keytab = configs.getProperty(KEYTAB);
     if (!Strings.isNullOrEmpty(principal) && !Strings.isNullOrEmpty(keytab)) {
       UserGroupInformation.setConfiguration(hadoopConf);
       if (UserGroupInformation.isSecurityEnabled()) {
         try {
-          if (!UserGroupInformation.getCurrentUser().hasKerberosCredentials() || !UserGroupInformation.getCurrentUser()
-              .getUserName().equals(principal)) {
+          if (!UserGroupInformation.getCurrentUser().hasKerberosCredentials()
+              || !UserGroupInformation.getCurrentUser().getUserName().equals(principal)) {
             LOGGER.info("Trying to authenticate user {} with keytab {}..", principal, keytab);
             UserGroupInformation.loginUserFromKeytab(principal, keytab);
           }

@@ -161,8 +161,7 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
   /**
    * Merges the results from the worker threads into a results block.
    */
-  protected IntermediateResultsBlock mergeResults()
-      throws Exception {
+  protected IntermediateResultsBlock mergeResults() throws Exception {
     IntermediateResultsBlock mergedBlock = null;
     int numBlocksMerged = 0;
     while (numBlocksMerged < _numOperators) {

@@ -27,7 +27,9 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 public class UpsertConfig extends BaseJsonConfig {
 
   public enum Mode {
-    FULL, PARTIAL, NONE
+    FULL,
+    PARTIAL,
+    NONE
   }
 
   private final Mode _mode;

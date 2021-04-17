@@ -59,8 +59,7 @@ public class SegmentGenerationAndPushTaskGeneratorTest extends ControllerTest {
   }
 
   @Test
-  public void testRealCluster()
-      throws Exception {
+  public void testRealCluster() throws Exception {
     // Default is 1
     Assert.assertEquals(_generator.getNumConcurrentTasksPerInstance(), 1);
 
@@ -71,9 +70,8 @@ public class SegmentGenerationAndPushTaskGeneratorTest extends ControllerTest {
     Assert.assertEquals(_generator.getNumConcurrentTasksPerInstance(), 5);
 
     // Set config to invalid and should still get 1
-    request = JsonUtils.objectToString(Collections
-        .singletonMap(MinionConstants.SegmentGenerationAndPushTask.CONFIG_NUMBER_CONCURRENT_TASKS_PER_INSTANCE,
-            "abcd"));
+    request = JsonUtils.objectToString(Collections.singletonMap(
+        MinionConstants.SegmentGenerationAndPushTask.CONFIG_NUMBER_CONCURRENT_TASKS_PER_INSTANCE, "abcd"));
     ControllerTest.sendPostRequest(_controllerRequestURLBuilder.forClusterConfigs(), request);
     Assert.assertEquals(_generator.getNumConcurrentTasksPerInstance(), 1);
   }

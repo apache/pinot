@@ -119,8 +119,7 @@ public class ReducerRecordReader implements RecordReader {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _pinotSegmentRecordReader.close();
   }
 

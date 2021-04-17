@@ -95,8 +95,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
   private static final long DEFAULT_PUSH_RETRY_INTERVAL_MILLIS = 1000L;
 
   @Override
-  public Object executeTask(PinotTaskConfig pinotTaskConfig)
-      throws Exception {
+  public Object executeTask(PinotTaskConfig pinotTaskConfig) throws Exception {
     LOGGER.info("Executing SegmentGenerationAndPushTask with task config: {}", pinotTaskConfig);
     Map<String, String> taskConfigs = pinotTaskConfig.getConfigs();
     SegmentGenerationAndPushResult.Builder resultBuilder = new SegmentGenerationAndPushResult.Builder();
@@ -161,9 +160,8 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
       case URI:
         try {
           List<String> segmentUris = new ArrayList<>();
-          URI updatedURI = SegmentPushUtils
-              .generateSegmentTarURI(outputSegmentDirURI, outputSegmentTarURI, pushJobSpec.getSegmentUriPrefix(),
-                  pushJobSpec.getSegmentUriSuffix());
+          URI updatedURI = SegmentPushUtils.generateSegmentTarURI(outputSegmentDirURI, outputSegmentTarURI,
+              pushJobSpec.getSegmentUriPrefix(), pushJobSpec.getSegmentUriSuffix());
           segmentUris.add(updatedURI.toString());
           SegmentPushUtils.sendSegmentUris(spec, segmentUris);
         } catch (RetriableOperationException | AttemptsExceededException e) {
@@ -172,8 +170,8 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
         break;
       case METADATA:
         try {
-          Map<String, String> segmentUriToTarPathMap = SegmentPushUtils
-              .getSegmentUriToTarPathMap(outputSegmentDirURI, pushJobSpec.getSegmentUriPrefix(),
+          Map<String, String> segmentUriToTarPathMap =
+              SegmentPushUtils.getSegmentUriToTarPathMap(outputSegmentDirURI, pushJobSpec.getSegmentUriPrefix(),
                   pushJobSpec.getSegmentUriSuffix(), new String[]{outputSegmentTarURI.toString()});
           SegmentPushUtils.sendSegmentUriAndMetadata(spec, outputFileFS, segmentUriToTarPathMap);
         } catch (RetriableOperationException | AttemptsExceededException e) {
@@ -202,16 +200,15 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     return spec;
   }
 
-  private URI moveSegmentToOutputPinotFS(Map<String, String> taskConfigs, File localSegmentTarFile)
-      throws Exception {
+  private URI moveSegmentToOutputPinotFS(Map<String, String> taskConfigs, File localSegmentTarFile) throws Exception {
     if (!taskConfigs.containsKey(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI)) {
       return localSegmentTarFile.toURI();
     }
     URI outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
     PinotFS outputFileFS = SegmentGenerationAndPushTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI);
     URI outputSegmentTarURI = URI.create(outputSegmentDirURI + localSegmentTarFile.getName());
-    if (!Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.OVERWRITE_OUTPUT)) && outputFileFS
-        .exists(outputSegmentDirURI)) {
+    if (!Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.OVERWRITE_OUTPUT))
+        && outputFileFS.exists(outputSegmentDirURI)) {
       LOGGER.warn("Not overwrite existing output segment tar file: {}", outputFileFS.exists(outputSegmentDirURI));
     } else {
       outputFileFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
@@ -219,8 +216,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     return outputSegmentTarURI;
   }
 
-  private File tarSegmentDir(SegmentGenerationTaskSpec taskSpec, String segmentName)
-      throws IOException {
+  private File tarSegmentDir(SegmentGenerationTaskSpec taskSpec, String segmentName) throws IOException {
     File localOutputTempDir = new File(taskSpec.getOutputDirectoryPath());
     File localSegmentDir = new File(localOutputTempDir, segmentName);
     String segmentTarFileName = segmentName + Constants.TAR_GZ_FILE_EXT;
@@ -262,8 +258,8 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     String tableNameWithType = taskConfigs.get(BatchConfigProperties.TABLE_NAME);
     Schema schema;
     if (taskConfigs.containsKey(BatchConfigProperties.SCHEMA)) {
-      schema = JsonUtils
-          .stringToObject(JsonUtils.objectToString(taskConfigs.get(BatchConfigProperties.SCHEMA)), Schema.class);
+      schema = JsonUtils.stringToObject(JsonUtils.objectToString(taskConfigs.get(BatchConfigProperties.SCHEMA)),
+          Schema.class);
     } else if (taskConfigs.containsKey(BatchConfigProperties.SCHEMA_URI)) {
       schema = SegmentGenerationUtils.getSchema(taskConfigs.get(BatchConfigProperties.SCHEMA_URI), authToken);
     } else {
@@ -287,8 +283,8 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     }
     SegmentNameGeneratorSpec segmentNameGeneratorSpec = new SegmentNameGeneratorSpec();
     segmentNameGeneratorSpec.setType(taskConfigs.get(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE));
-    segmentNameGeneratorSpec.setConfigs(IngestionConfigUtils
-        .getConfigMapWithPrefix(taskConfigs, BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX));
+    segmentNameGeneratorSpec.setConfigs(IngestionConfigUtils.getConfigMapWithPrefix(taskConfigs,
+        BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX));
     taskSpec.setSegmentNameGeneratorSpec(segmentNameGeneratorSpec);
     taskSpec.setCustomProperty(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, inputFileURI.toString());
     return taskSpec;

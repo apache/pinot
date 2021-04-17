@@ -43,8 +43,7 @@ import static org.testng.Assert.assertTrue;
 public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends BaseClusterIntegrationTest {
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster
@@ -74,8 +73,7 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
   }
 
   @Test
-  public void testDictionaryBasedQueries()
-      throws Exception {
+  public void testDictionaryBasedQueries() throws Exception {
     String tableName = getTableName();
     String pqlQuery;
     String sqlQuery;
@@ -278,8 +276,7 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
   }
 
   @Test
-  public void testMetadataBasedQueries()
-      throws Exception {
+  public void testMetadataBasedQueries() throws Exception {
     String tableName = getTableName();
     String pqlQuery;
     String sqlQuery;
@@ -325,8 +322,7 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     dropOfflineTable(getTableName());
 
     stopServer();

@@ -115,8 +115,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
   }
 
   @Override
-  public void setup(Context context)
-      throws IOException, InterruptedException {
+  public void setup(Context context) throws IOException, InterruptedException {
     _jobConf = context.getConfiguration();
     logConfigurations();
 
@@ -181,8 +180,8 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
       _logger.warn("Deleting existing file: {}", _localStagingDir);
       FileUtils.forceDelete(_localStagingDir);
     }
-    _logger
-        .info("Making local temporary directories: {}, {}, {}", _localStagingDir, _localInputDir, _localSegmentTarDir);
+    _logger.info("Making local temporary directories: {}, {}, {}", _localStagingDir, _localInputDir,
+        _localSegmentTarDir);
     Preconditions.checkState(_localStagingDir.mkdirs());
     Preconditions.checkState(_localInputDir.mkdir());
     Preconditions.checkState(_localSegmentDir.mkdir());
@@ -225,8 +224,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
   }
 
   @Override
-  protected void map(LongWritable key, Text value, Context context)
-      throws IOException, InterruptedException {
+  protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
     String[] splits = StringUtils.split(value.toString(), ' ');
     Preconditions.checkState(splits.length == 2, "Illegal input value: {}", value);
 
@@ -237,8 +235,8 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     String inputFileName = hdfsInputFile.getName();
     File localInputFile = new File(_localInputDir, inputFileName);
     _logger.info("Copying input file from: {} to: {}", hdfsInputFile, localInputFile);
-    FileSystem.get(hdfsInputFile.toUri(), _jobConf)
-        .copyToLocalFile(hdfsInputFile, new Path(localInputFile.getAbsolutePath()));
+    FileSystem.get(hdfsInputFile.toUri(), _jobConf).copyToLocalFile(hdfsInputFile,
+        new Path(localInputFile.getAbsolutePath()));
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, _schema);
     segmentGeneratorConfig.setTableName(_rawTableName);
@@ -299,14 +297,13 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
 
     Path hdfsSegmentTarFile = new Path(_hdfsSegmentTarDir, segmentTarFileName);
     if (_useRelativePath) {
-      Path relativeOutputPath =
-          getRelativeOutputPath(new Path(_jobConf.get(JobConfigConstants.PATH_TO_INPUT)).toUri(), hdfsInputFile.toUri(),
-              _hdfsSegmentTarDir);
+      Path relativeOutputPath = getRelativeOutputPath(new Path(_jobConf.get(JobConfigConstants.PATH_TO_INPUT)).toUri(),
+          hdfsInputFile.toUri(), _hdfsSegmentTarDir);
       hdfsSegmentTarFile = new Path(relativeOutputPath, segmentTarFileName);
     }
     _logger.info("Copying segment tar file from: {} to: {}", localSegmentTarFile, hdfsSegmentTarFile);
-    FileSystem.get(hdfsSegmentTarFile.toUri(), _jobConf)
-        .copyFromLocalFile(true, true, new Path(localSegmentTarFile.getAbsolutePath()), hdfsSegmentTarFile);
+    FileSystem.get(hdfsSegmentTarFile.toUri(), _jobConf).copyFromLocalFile(true, true,
+        new Path(localSegmentTarFile.getAbsolutePath()), hdfsSegmentTarFile);
 
     context.write(new LongWritable(sequenceId), new Text(segmentTarFileName));
     _logger.info("Finish generating segment: {} with HDFS input file: {}, sequence id: {}", segmentName, hdfsInputFile,
@@ -330,8 +327,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
   }
 
   @Nullable
-  protected RecordReaderConfig getReaderConfig(FileFormat fileFormat)
-      throws IOException {
+  protected RecordReaderConfig getReaderConfig(FileFormat fileFormat) throws IOException {
     if (_readerConfigFile != null) {
       if (fileFormat == FileFormat.CSV) {
         try (InputStream inputStream = FileSystem.get(_readerConfigFile.toUri(), _jobConf).open(_readerConfigFile)) {
@@ -383,7 +379,8 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     }
     Map<String, String> customConfigsMap = tableCustomConfig.getCustomConfigs();
     if (customConfigsMap != null && customConfigsMap.containsKey(InternalConfigConstants.FAIL_ON_SCHEMA_MISMATCH)) {
-      _failIfSchemaMismatch = Boolean.parseBoolean(customConfigsMap.get(InternalConfigConstants.FAIL_ON_SCHEMA_MISMATCH));
+      _failIfSchemaMismatch =
+          Boolean.parseBoolean(customConfigsMap.get(InternalConfigConstants.FAIL_ON_SCHEMA_MISMATCH));
     }
     _logger.info(_failIfSchemaMismatch ? failJobMsg : notFailJobMsg);
   }
@@ -410,13 +407,14 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     }
 
     if (isSchemaMismatch() && _failIfSchemaMismatch) {
-      throw new RuntimeException("Schema mismatch detected. Forcing to fail the job. Please checking log message above.");
+      throw new RuntimeException(
+          "Schema mismatch detected. Forcing to fail the job. Please checking log message above.");
     }
   }
 
   private boolean isSchemaMismatch() {
-    return _dataTypeMismatch + _singleValueMultiValueFieldMismatch + _multiValueStructureMismatch + _missingPinotColumn
-        != 0;
+    return _dataTypeMismatch + _singleValueMultiValueFieldMismatch + _multiValueStructureMismatch
+        + _missingPinotColumn != 0;
   }
 
   @Override

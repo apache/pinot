@@ -61,30 +61,26 @@ public class ParquetAvroRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next()
-      throws IOException {
+  public GenericRow next() throws IOException {
     return next(new GenericRow());
   }
 
   @Override
-  public GenericRow next(GenericRow reuse)
-      throws IOException {
+  public GenericRow next(GenericRow reuse) throws IOException {
     _recordExtractor.extract(_nextRecord, reuse);
     _nextRecord = _parquetReader.read();
     return reuse;
   }
 
   @Override
-  public void rewind()
-      throws IOException {
+  public void rewind() throws IOException {
     _parquetReader.close();
     _parquetReader = ParquetUtils.getParquetAvroReader(_dataFilePath);
     _nextRecord = _parquetReader.read();
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _parquetReader.close();
   }
 }

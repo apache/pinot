@@ -39,8 +39,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
     return new PinotByteBuffer(ByteBuffer.allocateDirect(size).order(byteOrder), true, false);
   }
 
-  static PinotByteBuffer loadFile(File file, long offset, int size, ByteOrder byteOrder)
-      throws IOException {
+  static PinotByteBuffer loadFile(File file, long offset, int size, ByteOrder byteOrder) throws IOException {
     PinotByteBuffer buffer = allocateDirect(size, byteOrder);
     buffer.readFrom(0, file, offset, size);
     return buffer;
@@ -273,8 +272,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
   }
 
   @Override
-  public void readFrom(long offset, File file, long srcOffset, long size)
-      throws IOException {
+  public void readFrom(long offset, File file, long srcOffset, long size) throws IOException {
     assert offset <= Integer.MAX_VALUE;
     assert size <= Integer.MAX_VALUE;
     try (RandomAccessFile randomAccessFile = new RandomAccessFile(file, "r")) {
@@ -327,8 +325,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
   }
 
   @Override
-  protected void release()
-      throws IOException {
+  protected void release() throws IOException {
     if (CleanerUtil.UNMAP_SUPPORTED) {
       CleanerUtil.getCleaner().freeBuffer(_buffer);
     }

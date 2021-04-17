@@ -66,8 +66,8 @@ public class FunctionEvaluatorFactory {
           functionEvaluator = new TimeSpecFunctionEvaluator(incomingGranularitySpec, outgoingGranularitySpec);
         } else {
           throw new IllegalStateException(
-              "Invalid timeSpec - Incoming and outgoing field specs are different, but name " + incomingGranularitySpec
-                  .getName() + " is same");
+              "Invalid timeSpec - Incoming and outgoing field specs are different, but name "
+                  + incomingGranularitySpec.getName() + " is same");
         }
       }
     } else if (columnName.endsWith(SchemaUtils.MAP_KEY_COLUMN_SUFFIX)) {

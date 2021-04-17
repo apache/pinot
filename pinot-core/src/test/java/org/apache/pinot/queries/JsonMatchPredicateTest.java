@@ -96,8 +96,7 @@ public class JsonMatchPredicateTest extends BaseQueriesTest {
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
 
     List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
@@ -314,8 +313,7 @@ public class JsonMatchPredicateTest extends BaseQueriesTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     _indexSegment.destroy();
     FileUtils.deleteDirectory(INDEX_DIR);
   }

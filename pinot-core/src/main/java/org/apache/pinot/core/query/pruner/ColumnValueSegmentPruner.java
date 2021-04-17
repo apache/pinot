@@ -67,7 +67,8 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
 
   @Override
   public void init(PinotConfiguration config) {
-    _inPredicateThreshold = config.getProperty(IN_PREDICATE_THRESHOLD, Server.DEFAULT_VALUE_PRUNER_IN_PREDICATE_THRESHOLD);
+    _inPredicateThreshold =
+        config.getProperty(IN_PREDICATE_THRESHOLD, Server.DEFAULT_VALUE_PRUNER_IN_PREDICATE_THRESHOLD);
   }
 
   @Override
@@ -244,7 +245,8 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
    * @return true if the segment can be pruned
    * otherwise false if size of values > threshold or any of the value is greater than min value or smaller than max value of segment
    */
-  private boolean pruneInPredicate(IndexSegment segment, InPredicate inPredicate, Map<String, DataSource> dataSourceCache) {
+  private boolean pruneInPredicate(IndexSegment segment, InPredicate inPredicate,
+      Map<String, DataSource> dataSourceCache) {
     String column = inPredicate.getLhs().getIdentifier();
     DataSource dataSource = dataSourceCache.computeIfAbsent(column, segment::getDataSource);
     // NOTE: Column must exist after DataSchemaSegmentPruner

@@ -45,15 +45,13 @@ public class SegmentLocalFSDirectoryTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     segmentDirectory.close();
     FileUtils.deleteQuietly(TEST_DIRECTORY);
   }
 
   @Test
-  public void testMultipleReadersNoWriter()
-      throws Exception {
+  public void testMultipleReadersNoWriter() throws Exception {
     SegmentLocalFSDirectory.Reader reader = segmentDirectory.createReader();
     Assert.assertNotNull(reader);
     SegmentLocalFSDirectory.Reader reader1 = segmentDirectory.createReader();
@@ -66,8 +64,7 @@ public class SegmentLocalFSDirectoryTest {
   }
 
   @Test
-  public void testExclusiveWrite()
-      throws java.lang.Exception {
+  public void testExclusiveWrite() throws java.lang.Exception {
     SegmentLocalFSDirectory.Writer writer = segmentDirectory.createWriter();
     Assert.assertNotNull(writer);
 
@@ -98,8 +95,7 @@ public class SegmentLocalFSDirectoryTest {
   }
 
   @Test
-  public void testWriteAndReadBackData()
-      throws java.lang.Exception {
+  public void testWriteAndReadBackData() throws java.lang.Exception {
     try (SegmentLocalFSDirectory.Writer writer = segmentDirectory.createWriter()) {
       Assert.assertNotNull(writer);
       PinotDataBuffer buffer = writer.newIndexFor("newColumn", ColumnIndexType.FORWARD_INDEX, 1024);
@@ -114,8 +110,7 @@ public class SegmentLocalFSDirectoryTest {
   }
 
   @Test
-  public void testDirectorySize()
-      throws IOException {
+  public void testDirectorySize() throws IOException {
     // this test verifies that the segment size is returned correctly even if v3/ subdir
     // does not exist. We have not good way to test all the conditions since the
     // format converters are higher level modules that can not be used in this package

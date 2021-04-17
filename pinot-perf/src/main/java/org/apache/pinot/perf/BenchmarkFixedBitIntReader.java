@@ -61,8 +61,7 @@ public class BenchmarkFixedBitIntReader {
   public int _numBits;
 
   @Setup
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
     FileUtils.forceMkdir(INDEX_DIR);
     File indexFile = new File(INDEX_DIR, "bit-" + _numBits);
@@ -78,8 +77,7 @@ public class BenchmarkFixedBitIntReader {
   }
 
   @TearDown
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     _dataBuffer.close();
     FileUtils.deleteDirectory(INDEX_DIR);
   }
@@ -124,8 +122,7 @@ public class BenchmarkFixedBitIntReader {
     return sum;
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     new Runner(new OptionsBuilder().include(BenchmarkFixedBitIntReader.class.getSimpleName()).build()).run();
   }
 }

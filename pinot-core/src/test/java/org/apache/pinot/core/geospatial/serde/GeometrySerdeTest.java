@@ -34,8 +34,7 @@ public class GeometrySerdeTest {
   private static final GeometryFactory GEOGRAPHY_FACTORY = new GeometryFactory(new PrecisionModel(), GEOGRAPHY_SRID);
 
   @Test
-  public void testPoint()
-      throws Exception {
+  public void testPoint() throws Exception {
     testSerde("POINT (1 2)");
     testSerde("POINT (-1 -2)");
     testSerde("POINT (0 0)");
@@ -44,8 +43,7 @@ public class GeometrySerdeTest {
   }
 
   @Test
-  public void testMultiPoint()
-      throws Exception{
+  public void testMultiPoint() throws Exception {
     testSerde("MULTIPOINT (0 0)");
     testSerde("MULTIPOINT (0 0, 0 0)");
     testSerde("MULTIPOINT (0 0, 1 1, 2 3)");
@@ -53,8 +51,7 @@ public class GeometrySerdeTest {
   }
 
   @Test
-  public void testLineString()
-      throws Exception {
+  public void testLineString() throws Exception {
     testSerde("LINESTRING (0 1, 2 3)");
     testSerde("LINESTRING (0 1, 2 3, 4 5)");
     testSerde("LINESTRING (0 1, 2 3, 4 5, 0 1)");
@@ -62,8 +59,7 @@ public class GeometrySerdeTest {
   }
 
   @Test
-  public void testMultiLineString()
-      throws Exception {
+  public void testMultiLineString() throws Exception {
     testSerde("MULTILINESTRING ((0 1, 2 3, 4 5))");
     testSerde("MULTILINESTRING ((0 1, 2 3, 4 5), (0 1, 2 3, 4 5))");
     testSerde("MULTILINESTRING ((0 1, 2 3, 4 5), (0 1, 2 3, 4 6), (0 1, 2 3, 4 7), (0 1, 2 3, 4 7, 0 1))");
@@ -74,8 +70,7 @@ public class GeometrySerdeTest {
   }
 
   @Test
-  public void testPolygon()
-      throws Exception {
+  public void testPolygon() throws Exception {
     testSerde("POLYGON ((30 10, 40 40, 20 40, 30 10))");
     testSerde("POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10))");
     testSerde("POLYGON ((0 0, 0 1, 1 1, 1 0, 0 0))");
@@ -92,8 +87,7 @@ public class GeometrySerdeTest {
   }
 
   @Test
-  public void testMultiPolygon()
-      throws Exception {
+  public void testMultiPolygon() throws Exception {
     testSerde("MULTIPOLYGON (((30 20, 45 40, 10 40, 30 20)))");
     testSerde("MULTIPOLYGON (((30 20, 45 40, 10 40, 30 20)), ((30 20, 45 40, 10 40, 30 20)))");
     testSerde("MULTIPOLYGON (((30 20, 45 40, 10 40, 30 20)), ((15 5, 40 10, 10 20, 15 5))), ((0 0, 0 1, 1 1, 1 0"
@@ -104,7 +98,7 @@ public class GeometrySerdeTest {
     testSerde("MULTIPOLYGON (((30 20, 45 40, 10 40, 30 20)), ((0 0, 0 1, 1 1, 1 0, 0 0), (0.25 0.25, 0.25 0.75, 0"
         + ".75 0.75, 0.75 0.25, 0.25 0.25)))");
     testSerde("MULTIPOLYGON (" + "((30 20, 45 40, 10 40, 30 20)), " +
-        // clockwise, counter clockwise
+    // clockwise, counter clockwise
         "((0 0, 0 1, 1 1, 1 0, 0 0), (0.75 0.25, 0.75 0.75, 0.25 0.75, 0.25 0.25, 0.75 0.25)), " +
         // clockwise, clockwise
         "((0 0, 0 1, 1 1, 1 0, 0 0), (0.25 0.25, 0.25 0.75, 0.75 0.75, 0.75 0.25, 0.25 0.25)), " +
@@ -119,8 +113,7 @@ public class GeometrySerdeTest {
   }
 
   @Test
-  public void testGeometryCollection()
-      throws Exception {
+  public void testGeometryCollection() throws Exception {
     testSerde("GEOMETRYCOLLECTION (POINT (1 2))");
     testSerde("GEOMETRYCOLLECTION (POINT (1 2), POINT (2 1), POINT EMPTY)");
     testSerde("GEOMETRYCOLLECTION (POINT (1 2), LINESTRING (0 0, 1 2, 3 4), POLYGON ((0 0, 0 1, 1 1, 1 0, 0 0)))");
@@ -135,16 +128,14 @@ public class GeometrySerdeTest {
         + "(MULTIPOLYGON (((30 20, 45 40, 10 40, 30 20)))))");
   }
 
-  private void testSerde(String wkt)
-      throws Exception {
+  private void testSerde(String wkt) throws Exception {
     // test geometry
     testSerde(wkt, GEOMETRY_FACTORY);
     // test geography
     testSerde(wkt, GEOGRAPHY_FACTORY);
   }
 
-  private void testSerde(String wkt, GeometryFactory factory)
-      throws Exception {
+  private void testSerde(String wkt, GeometryFactory factory) throws Exception {
     Geometry expected = new WKTReader(factory).read(wkt);
     Geometry actual = GeometrySerializer.deserialize(GeometrySerializer.serialize(expected));
     Assert.assertEquals(actual.norm(), expected.norm());

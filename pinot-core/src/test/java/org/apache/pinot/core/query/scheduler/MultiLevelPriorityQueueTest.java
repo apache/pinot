@@ -56,8 +56,7 @@ public class MultiLevelPriorityQueueTest {
   }
 
   @Test
-  public void testSimplePutTake()
-      throws OutOfCapacityException {
+  public void testSimplePutTake() throws OutOfCapacityException {
     MultiLevelPriorityQueue queue = createQueue();
     // NOTE: Timing matters here...running through debugger for
     // over 30 seconds can cause the query to expire
@@ -75,12 +74,11 @@ public class MultiLevelPriorityQueueTest {
   }
 
   @Test
-  public void testPutOutOfCapacity()
-      throws OutOfCapacityException {
+  public void testPutOutOfCapacity() throws OutOfCapacityException {
     Map<String, Object> properties = new HashMap<>();
     properties.put(MultiLevelPriorityQueue.MAX_PENDING_PER_GROUP_KEY, 2);
 
-    PinotConfiguration configuration =new PinotConfiguration(properties);
+    PinotConfiguration configuration = new PinotConfiguration(properties);
 
     ResourceManager rm = new UnboundedResourceManager(configuration);
     MultiLevelPriorityQueue queue = createQueue(configuration, rm);
@@ -102,8 +100,7 @@ public class MultiLevelPriorityQueueTest {
   }
 
   @Test
-  public void testPutForBlockedReader()
-      throws Exception {
+  public void testPutForBlockedReader() throws Exception {
     // test adding a query immediately makes blocked take() to return
     final MultiLevelPriorityQueue queue = createQueue();
     QueueReader reader = new QueueReader(queue);
@@ -119,8 +116,7 @@ public class MultiLevelPriorityQueueTest {
   }
 
   @Test
-  public void testTakeWithLimits()
-      throws OutOfCapacityException, BrokenBarrierException, InterruptedException {
+  public void testTakeWithLimits() throws OutOfCapacityException, BrokenBarrierException, InterruptedException {
     // Test that take() will not return query if that group is already using hardLimit resources
     Map<String, Object> properties = new HashMap<>();
     properties.put(ResourceManager.QUERY_WORKER_CONFIG_KEY, 40);
@@ -186,16 +182,14 @@ public class MultiLevelPriorityQueueTest {
     assertEquals(reader.readQueries.size(), 1);
   }
 
-  private void sleepForQueueWakeup(MultiLevelPriorityQueue queue)
-      throws InterruptedException {
+  private void sleepForQueueWakeup(MultiLevelPriorityQueue queue) throws InterruptedException {
     // sleep is okay since we sleep for short time
     // add 10 millis to avoid any race condition around time boundary
     Thread.sleep(queue.getWakeupTimeMicros() / 1000 + 10);
   }
 
   @Test
-  public void testNoPendingAfterTrim()
-      throws OutOfCapacityException, BrokenBarrierException, InterruptedException {
+  public void testNoPendingAfterTrim() throws OutOfCapacityException, BrokenBarrierException, InterruptedException {
     MultiLevelPriorityQueue queue = createQueue();
     // Pick a query arrival time older than the query deadline of 30s
     long queryArrivalTimeMs = System.currentTimeMillis() - TimeUnit.SECONDS.toMillis(100);
@@ -255,16 +249,14 @@ public class MultiLevelPriorityQueueTest {
     // it keeps calling code concise
     // Use this when test expects to read something from queue. This blocks
     // till an entry is read from the queue
-    void startAndWaitForRead()
-        throws BrokenBarrierException, InterruptedException {
+    void startAndWaitForRead() throws BrokenBarrierException, InterruptedException {
       reader.start();
       startBarrier.await();
       readDoneSignal.await();
     }
 
     // Use this if the reader is not expected to complete read after queue wakeup duration
-    void startAndWaitForQueueWakeup()
-        throws InterruptedException, BrokenBarrierException {
+    void startAndWaitForQueueWakeup() throws InterruptedException, BrokenBarrierException {
       reader.start();
       startBarrier.await();
       readDoneSignal.await(queue.getWakeupTimeMicros() + TimeUnit.MICROSECONDS.convert(10, TimeUnit.MILLISECONDS),

@@ -81,8 +81,7 @@ public class SegmentPartitionTest {
   private IndexSegment _segment;
 
   @BeforeClass
-  public void init()
-      throws Exception {
+  public void init() throws Exception {
     buildSegment();
   }
 
@@ -126,8 +125,7 @@ public class SegmentPartitionTest {
    * @throws IOException
    */
   @Test
-  public void testSegmentPartitionConfig()
-      throws IOException {
+  public void testSegmentPartitionConfig() throws IOException {
     Map<String, ColumnPartitionConfig> expectedMap = new HashMap<>();
 
     for (int i = 0; i < 10; i++) {
@@ -183,8 +181,7 @@ public class SegmentPartitionTest {
    * </ul>
    * @throws Exception
    */
-  private void buildSegment()
-      throws Exception {
+  private void buildSegment() throws Exception {
     Schema schema = new Schema();
     schema.addField(new DimensionFieldSpec(PARTITIONED_COLUMN_NAME, FieldSpec.DataType.INT, true));
     schema.addField(new DimensionFieldSpec(NON_PARTITIONED_COLUMN_NAME, FieldSpec.DataType.INT, true));
@@ -193,8 +190,8 @@ public class SegmentPartitionTest {
     Random random = new Random();
     Map<String, ColumnPartitionConfig> partitionFunctionMap = new HashMap<>();
 
-    partitionFunctionMap
-        .put(PARTITIONED_COLUMN_NAME, new ColumnPartitionConfig(PARTITION_FUNCTION_NAME, NUM_PARTITIONS));
+    partitionFunctionMap.put(PARTITIONED_COLUMN_NAME,
+        new ColumnPartitionConfig(PARTITION_FUNCTION_NAME, NUM_PARTITIONS));
 
     SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(partitionFunctionMap);
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);

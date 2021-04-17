@@ -34,14 +34,12 @@ import org.roaringbitmap.RoaringBitmapWriter;
  */
 public class OnHeapH3IndexCreator extends BaseH3IndexCreator {
 
-  public OnHeapH3IndexCreator(File indexDir, String columnName, H3IndexResolution resolution)
-      throws IOException {
+  public OnHeapH3IndexCreator(File indexDir, String columnName, H3IndexResolution resolution) throws IOException {
     super(indexDir, columnName, resolution);
   }
 
   @Override
-  public void seal()
-      throws IOException {
+  public void seal() throws IOException {
     for (Map.Entry<Long, RoaringBitmapWriter<RoaringBitmap>> entry : _postingListMap.entrySet()) {
       add(entry.getKey(), entry.getValue().get());
     }

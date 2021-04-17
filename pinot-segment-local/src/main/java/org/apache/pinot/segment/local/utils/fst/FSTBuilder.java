@@ -39,8 +39,7 @@ public class FSTBuilder {
   private Builder<Long> _builder = new Builder<>(FST.INPUT_TYPE.BYTE4, PositiveIntOutputs.getSingleton());
   private IntsRefBuilder _scratch = new IntsRefBuilder();
 
-  public static FST buildFST(SortedMap<String, Integer> input)
-      throws IOException {
+  public static FST buildFST(SortedMap<String, Integer> input) throws IOException {
     PositiveIntOutputs fstOutput = PositiveIntOutputs.getSingleton();
     Builder<Long> builder = new Builder<Long>(FST.INPUT_TYPE.BYTE4, fstOutput);
 
@@ -52,13 +51,11 @@ public class FSTBuilder {
     return result;
   }
 
-  public void addEntry(String key, Integer value)
-      throws IOException {
+  public void addEntry(String key, Integer value) throws IOException {
     _builder.add(Util.toUTF16(key, _scratch), value.longValue());
   }
 
-  public FST done()
-      throws IOException {
+  public FST done() throws IOException {
     return _builder.finish();
   }
 }

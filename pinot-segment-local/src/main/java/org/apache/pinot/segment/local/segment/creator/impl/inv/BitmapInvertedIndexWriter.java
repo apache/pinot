@@ -52,16 +52,14 @@ public final class BitmapInvertedIndexWriter implements Closeable {
   private final ByteBuffer _offsetBuffer;
   private final ByteBuffer _bitmapBuffer;
 
-  public BitmapInvertedIndexWriter(File outputFile, int numBitmaps)
-      throws IOException {
+  public BitmapInvertedIndexWriter(File outputFile, int numBitmaps) throws IOException {
     _fileChannel = new RandomAccessFile(outputFile, "rw").getChannel();
     _offsetBuffer = _fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, Integer.MAX_VALUE);
     _bitmapBuffer = _offsetBuffer.duplicate().order(ByteOrder.LITTLE_ENDIAN);
     _bitmapBuffer.position((numBitmaps + 1) * Integer.BYTES);
   }
 
-  public void add(RoaringBitmap bitmap)
-      throws IOException {
+  public void add(RoaringBitmap bitmap) throws IOException {
     _offsetBuffer.putInt(_bitmapBuffer.position());
     bitmap.serialize(_bitmapBuffer);
   }
@@ -76,8 +74,7 @@ public final class BitmapInvertedIndexWriter implements Closeable {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     int fileLength = _bitmapBuffer.position();
     _offsetBuffer.putInt(fileLength);
     _fileChannel.truncate(fileLength);

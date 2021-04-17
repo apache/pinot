@@ -177,7 +177,8 @@ public class PinotSegmentRestletResource {
   @GET
   @Path("segments/{tableName}/servers")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get a map from server to segments hosted by the server", notes = "Get a map from server to segments hosted by the server")
+  @ApiOperation(value = "Get a map from server to segments hosted by the server",
+      notes = "Get a map from server to segments hosted by the server")
   public List<Map<String, Object>> getServerToSegmentsMap(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) {
@@ -197,12 +198,13 @@ public class PinotSegmentRestletResource {
   @GET
   @Path("tables/{tableName}/segments")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get a map from server to segments hosted by the server (deprecated, use 'GET /segments/{tableName}/servers' instead)", notes = "Get a map from server to segments hosted by the server (deprecated, use 'GET /segments/{tableName}/servers' instead)")
+  @ApiOperation(
+      value = "Get a map from server to segments hosted by the server (deprecated, use 'GET /segments/{tableName}/servers' instead)",
+      notes = "Get a map from server to segments hosted by the server (deprecated, use 'GET /segments/{tableName}/servers' instead)")
   public List<Map<String, String>> getServerToSegmentsMapDeprecated1(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "MUST be null") @QueryParam("state") String stateStr,
-      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr)
-      throws JsonProcessingException {
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) throws JsonProcessingException {
     if (stateStr != null) {
       throw new WebApplicationException("Cannot toggle segment state", Status.FORBIDDEN);
     }
@@ -225,19 +227,21 @@ public class PinotSegmentRestletResource {
   @GET
   @Path("tables/{tableName}/segments/metadata")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get a map from server to segments hosted by the server (deprecated, use 'GET /segments/{tableName}/servers' instead)", notes = "Get a map from server to segments hosted by the server (deprecated, use 'GET /segments/{tableName}/servers' instead)")
+  @ApiOperation(
+      value = "Get a map from server to segments hosted by the server (deprecated, use 'GET /segments/{tableName}/servers' instead)",
+      notes = "Get a map from server to segments hosted by the server (deprecated, use 'GET /segments/{tableName}/servers' instead)")
   public List<Map<String, String>> getServerToSegmentsMapDeprecated2(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "MUST be null") @QueryParam("state") String stateStr,
-      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr)
-      throws JsonProcessingException {
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) throws JsonProcessingException {
     return getServerToSegmentsMapDeprecated1(tableName, stateStr, tableTypeStr);
   }
 
   @GET
   @Path("segments/{tableName}/crc")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get a map from segment to CRC of the segment (only apply to OFFLINE table)", notes = "Get a map from segment to CRC of the segment (only apply to OFFLINE table)")
+  @ApiOperation(value = "Get a map from segment to CRC of the segment (only apply to OFFLINE table)",
+      notes = "Get a map from segment to CRC of the segment (only apply to OFFLINE table)")
   public Map<String, String> getSegmentToCrcMap(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
     String offlineTableName = getExistingTableNamesWithType(tableName, TableType.OFFLINE).get(0);
@@ -248,7 +252,9 @@ public class PinotSegmentRestletResource {
   @GET
   @Path("tables/{tableName}/segments/crc")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get a map from segment to CRC of the segment (deprecated, use 'GET /segments/{tableName}/crc' instead)", notes = "Get a map from segment to CRC of the segment (deprecated, use 'GET /segments/{tableName}/crc' instead)")
+  @ApiOperation(
+      value = "Get a map from segment to CRC of the segment (deprecated, use 'GET /segments/{tableName}/crc' instead)",
+      notes = "Get a map from segment to CRC of the segment (deprecated, use 'GET /segments/{tableName}/crc' instead)")
   public Map<String, String> getSegmentToCrcMapDeprecated(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
     return getSegmentToCrcMap(tableName);
@@ -291,7 +297,9 @@ public class PinotSegmentRestletResource {
   @GET
   @Path("tables/{tableName}/segments/{segmentName}/metadata")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get the metadata for a segment (deprecated, use 'GET /segments/{tableName}/{segmentName}/metadata' instead)", notes = "Get the metadata for a segment (deprecated, use 'GET /segments/{tableName}/{segmentName}/metadata' instead)")
+  @ApiOperation(
+      value = "Get the metadata for a segment (deprecated, use 'GET /segments/{tableName}/{segmentName}/metadata' instead)",
+      notes = "Get the metadata for a segment (deprecated, use 'GET /segments/{tableName}/{segmentName}/metadata' instead)")
   public List<List<Map<String, Object>>> getSegmentMetadataDeprecated1(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
@@ -324,7 +332,9 @@ public class PinotSegmentRestletResource {
   @GET
   @Path("tables/{tableName}/segments/{segmentName}")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get the metadata for a segment (deprecated, use 'GET /segments/{tableName}/{segmentName}/metadata' instead)", notes = "Get the metadata for a segment (deprecated, use 'GET /segments/{tableName}/{segmentName}/metadata' instead)")
+  @ApiOperation(
+      value = "Get the metadata for a segment (deprecated, use 'GET /segments/{tableName}/{segmentName}/metadata' instead)",
+      notes = "Get the metadata for a segment (deprecated, use 'GET /segments/{tableName}/{segmentName}/metadata' instead)")
   public List<List<Map<String, Object>>> getSegmentMetadataDeprecated2(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
@@ -366,11 +376,15 @@ public class PinotSegmentRestletResource {
   @Path("segments/{tableNameWithType}/{segmentName}/reset")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Resets a segment by first disabling it, waiting for external view to stabilize, and finally enabling it again", notes = "Resets a segment by disabling and then enabling the segment")
+  @ApiOperation(
+      value = "Resets a segment by first disabling it, waiting for external view to stabilize, and finally enabling it again",
+      notes = "Resets a segment by disabling and then enabling the segment")
   public SuccessResponse resetSegment(
-      @ApiParam(value = "Name of the table with type", required = true) @PathParam("tableNameWithType") String tableNameWithType,
+      @ApiParam(value = "Name of the table with type",
+          required = true) @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @ApiParam(value = "Maximum time in milliseconds to wait for reset to be completed. By default, uses serverAdminRequestTimeout") @QueryParam("maxWaitTimeMs") long maxWaitTimeMs) {
+      @ApiParam(
+          value = "Maximum time in milliseconds to wait for reset to be completed. By default, uses serverAdminRequestTimeout") @QueryParam("maxWaitTimeMs") long maxWaitTimeMs) {
     segmentName = URIUtils.decode(segmentName);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     try {
@@ -399,10 +413,14 @@ public class PinotSegmentRestletResource {
   @Path("segments/{tableNameWithType}/reset")
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
-  @ApiOperation(value = "Resets all segments of the table, by first disabling them, waiting for external view to stabilize, and finally enabling the segments", notes = "Resets a segment by disabling and then enabling a segment")
+  @ApiOperation(
+      value = "Resets all segments of the table, by first disabling them, waiting for external view to stabilize, and finally enabling the segments",
+      notes = "Resets a segment by disabling and then enabling a segment")
   public SuccessResponse resetAllSegments(
-      @ApiParam(value = "Name of the table with type", required = true) @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Maximum time in milliseconds to wait for reset to be completed. By default, uses serverAdminRequestTimeout") @QueryParam("maxWaitTimeMs") long maxWaitTimeMs) {
+      @ApiParam(value = "Name of the table with type",
+          required = true) @PathParam("tableNameWithType") String tableNameWithType,
+      @ApiParam(
+          value = "Maximum time in milliseconds to wait for reset to be completed. By default, uses serverAdminRequestTimeout") @QueryParam("maxWaitTimeMs") long maxWaitTimeMs) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     try {
       Preconditions.checkState(tableType != null, "Must provide table name with type: %s", tableNameWithType);
@@ -425,7 +443,8 @@ public class PinotSegmentRestletResource {
   @Path("tables/{tableName}/segments/{segmentName}/reload")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Reload a segment (deprecated, use 'POST /segments/{tableName}/{segmentName}/reload' instead)", notes = "Reload a segment (deprecated, use 'POST /segments/{tableName}/{segmentName}/reload' instead)")
+  @ApiOperation(value = "Reload a segment (deprecated, use 'POST /segments/{tableName}/{segmentName}/reload' instead)",
+      notes = "Reload a segment (deprecated, use 'POST /segments/{tableName}/{segmentName}/reload' instead)")
   public SuccessResponse reloadSegmentDeprecated1(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
@@ -445,7 +464,8 @@ public class PinotSegmentRestletResource {
   @Path("tables/{tableName}/segments/{segmentName}/reload")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Reload a segment (deprecated, use 'POST /segments/{tableName}/{segmentName}/reload' instead)", notes = "Reload a segment (deprecated, use 'POST /segments/{tableName}/{segmentName}/reload' instead)")
+  @ApiOperation(value = "Reload a segment (deprecated, use 'POST /segments/{tableName}/{segmentName}/reload' instead)",
+      notes = "Reload a segment (deprecated, use 'POST /segments/{tableName}/{segmentName}/reload' instead)")
   public SuccessResponse reloadSegmentDeprecated2(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
@@ -475,7 +495,8 @@ public class PinotSegmentRestletResource {
   @Path("tables/{tableName}/segments/reload")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Reload all segments (deprecated, use 'POST /segments/{tableName}/reload' instead)", notes = "Reload all segments (deprecated, use 'POST /segments/{tableName}/reload' instead)")
+  @ApiOperation(value = "Reload all segments (deprecated, use 'POST /segments/{tableName}/reload' instead)",
+      notes = "Reload all segments (deprecated, use 'POST /segments/{tableName}/reload' instead)")
   public SuccessResponse reloadAllSegmentsDeprecated1(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) {
@@ -493,7 +514,8 @@ public class PinotSegmentRestletResource {
   @Path("tables/{tableName}/segments/reload")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Reload all segments (deprecated, use 'POST /segments/{tableName}/reload' instead)", notes = "Reload all segments (deprecated, use 'POST /segments/{tableName}/reload' instead)")
+  @ApiOperation(value = "Reload all segments (deprecated, use 'POST /segments/{tableName}/reload' instead)",
+      notes = "Reload all segments (deprecated, use 'POST /segments/{tableName}/reload' instead)")
   public SuccessResponse reloadAllSegmentsDeprecated2(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) {
@@ -537,7 +559,8 @@ public class PinotSegmentRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/segments/{tableName}/delete")
   @Authenticate(AccessType.DELETE)
-  @ApiOperation(value = "Delete the segments in the JSON array payload", notes = "Delete the segments in the JSON array payload")
+  @ApiOperation(value = "Delete the segments in the JSON array payload",
+      notes = "Delete the segments in the JSON array payload")
   public SuccessResponse deleteSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       List<String> segments) {
@@ -584,14 +607,16 @@ public class PinotSegmentRestletResource {
   @GET
   @Path("segments/{tableName}/metadata")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get the server metadata for all table segments", notes = "Get the server metadata for all table segments")
-  public String getServerMetadata(@ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-                                               @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) {
+  @ApiOperation(value = "Get the server metadata for all table segments",
+      notes = "Get the server metadata for all table segments")
+  public String getServerMetadata(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) {
     LOGGER.info("Received a request to fetch metadata for all segments for table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == TableType.REALTIME) {
-      throw new ControllerApplicationException(LOGGER,
-          "Table type : " + tableTypeStr + " not yet supported.", Status.NOT_IMPLEMENTED);
+      throw new ControllerApplicationException(LOGGER, "Table type : " + tableTypeStr + " not yet supported.",
+          Status.NOT_IMPLEMENTED);
     }
 
     String tableNameWithType = getExistingTableNamesWithType(tableName, tableType).get(0);
@@ -602,8 +627,8 @@ public class PinotSegmentRestletResource {
     } catch (InvalidConfigException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST);
     } catch (IOException ioe) {
-      throw new ControllerApplicationException(LOGGER,
-          "Error parsing Pinot server response: " + ioe.getMessage(), Status.INTERNAL_SERVER_ERROR, ioe);
+      throw new ControllerApplicationException(LOGGER, "Error parsing Pinot server response: " + ioe.getMessage(),
+          Status.INTERNAL_SERVER_ERROR, ioe);
     }
     return segmentsMetadata;
   }
@@ -613,8 +638,7 @@ public class PinotSegmentRestletResource {
    * @param tableNameWithType name of the table along with its type
    * @return Map<String, String>  metadata of the table segments -> map of segment name to its metadata
    */
-  private JsonNode getSegmentsMetadataFromServer(String tableNameWithType)
-      throws InvalidConfigException, IOException {
+  private JsonNode getSegmentsMetadataFromServer(String tableNameWithType) throws InvalidConfigException, IOException {
     TableMetadataReader tableMetadataReader =
         new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
     return tableMetadataReader.getSegmentsMetadata(tableNameWithType,
@@ -625,9 +649,11 @@ public class PinotSegmentRestletResource {
   @Path("/tables/{realtimeTableName}/consumingSegmentsInfo")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Returns state of consuming segments", notes = "Gets the status of consumers from all servers")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Table not found"), @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404,
+      message = "Table not found"), @ApiResponse(code = 500, message = "Internal server error")})
   public ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap getConsumingSegmentsInfo(
-      @ApiParam(value = "Realtime table name with or without type", required = true, example = "myTable | myTable_REALTIME") @PathParam("realtimeTableName") String realtimeTableName) {
+      @ApiParam(value = "Realtime table name with or without type", required = true,
+          example = "myTable | myTable_REALTIME") @PathParam("realtimeTableName") String realtimeTableName) {
     try {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(realtimeTableName);
       if (TableType.OFFLINE == tableType) {
@@ -636,8 +662,8 @@ public class PinotSegmentRestletResource {
       String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(realtimeTableName);
       ConsumingSegmentInfoReader consumingSegmentInfoReader =
           new ConsumingSegmentInfoReader(_executor, _connectionManager, _pinotHelixResourceManager);
-      return consumingSegmentInfoReader
-          .getConsumingSegmentsInfo(tableNameWithType, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+      return consumingSegmentInfoReader.getConsumingSegmentsInfo(tableNameWithType,
+          _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Failed to get consuming segments info for table %s. %s", realtimeTableName, e.getMessage()),

@@ -71,8 +71,7 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     // Start the Pinot cluster
     startZk();
     startController();
@@ -92,17 +91,15 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
    *
    * @throws Exception
    */
-  private void startFakeServer()
-      throws Exception {
+  private void startFakeServer() throws Exception {
     _serverInstance = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + NetUtils.getHostAddress() + "_"
         + CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
 
     // Create server instance with the fake server state model
-    _serverHelixManager = HelixManagerFactory
-        .getZKHelixManager(getHelixClusterName(), _serverInstance, InstanceType.PARTICIPANT, ZkStarter.DEFAULT_ZK_STR);
-    _serverHelixManager.getStateMachineEngine()
-        .registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelName(),
-            new FakeServerSegmentStateModelFactory());
+    _serverHelixManager = HelixManagerFactory.getZKHelixManager(getHelixClusterName(), _serverInstance,
+        InstanceType.PARTICIPANT, ZkStarter.DEFAULT_ZK_STR);
+    _serverHelixManager.getStateMachineEngine().registerStateModelFactory(
+        SegmentOnlineOfflineStateModelFactory.getStateModelName(), new FakeServerSegmentStateModelFactory());
     _serverHelixManager.connect();
 
     // Add Helix tag to the server
@@ -119,8 +116,7 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
    * @throws Exception
    */
   @Test
-  public void testStopConsumingAndAutoFix()
-      throws Exception {
+  public void testStopConsumingAndAutoFix() throws Exception {
     final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
 
     // Check if segment get into CONSUMING state
@@ -179,10 +175,10 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
           if (!_currentSegment.equals(oldSegment)) {
             ExternalView externalView = _helixAdmin.getResourceExternalView(getHelixClusterName(), realtimeTableName);
             Map<String, String> stateMap = externalView.getStateMap(_currentSegment);
-            return
-                stateMap.get(_serverInstance).equals(PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE)
-                    && (new LLCSegmentName(_currentSegment).getSequenceNumber())
-                    == (new LLCSegmentName(oldSegment).getSequenceNumber()) + 1;
+            return stateMap.get(_serverInstance)
+                .equals(PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE)
+                && (new LLCSegmentName(_currentSegment)
+                    .getSequenceNumber()) == (new LLCSegmentName(oldSegment).getSequenceNumber()) + 1;
           }
           return false;
         } catch (Exception e) {

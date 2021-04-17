@@ -53,8 +53,7 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
    * Create an AvroRecordReader
    */
   @Override
-  protected RecordReader createRecordReader(Set<String> fieldsToRead)
-      throws IOException {
+  protected RecordReader createRecordReader(Set<String> fieldsToRead) throws IOException {
     AvroRecordReader avroRecordReader = new AvroRecordReader();
     avroRecordReader.init(_dataFile, fieldsToRead, null);
     return avroRecordReader;
@@ -64,17 +63,17 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
    * Create an Avro input file using the input records
    */
   @Override
-  protected void createInputFile()
-      throws IOException {
+  protected void createInputFile() throws IOException {
 
     Schema avroSchema = createRecord("eventsRecord", null, null, false);
-    List<Field> fields = Arrays
-        .asList(new Field("user_id", createUnion(Lists.newArrayList(create(Type.INT), create(Type.NULL))), null, null),
-            new Field("firstName", createUnion(Lists.newArrayList(create(Type.STRING), create(Type.NULL))), null, null),
-            new Field("lastName", createUnion(Lists.newArrayList(create(Type.STRING), create(Type.NULL))), null, null),
-            new Field("bids", createUnion(Lists.newArrayList(createArray(create(Type.INT)), create(Type.NULL))), null,
-                null), new Field("campaignInfo", create(Type.STRING), null, null),
-            new Field("cost", create(Type.DOUBLE), null, null), new Field("timestamp", create(Type.LONG), null, null));
+    List<Field> fields = Arrays.asList(
+        new Field("user_id", createUnion(Lists.newArrayList(create(Type.INT), create(Type.NULL))), null, null),
+        new Field("firstName", createUnion(Lists.newArrayList(create(Type.STRING), create(Type.NULL))), null, null),
+        new Field("lastName", createUnion(Lists.newArrayList(create(Type.STRING), create(Type.NULL))), null, null),
+        new Field("bids", createUnion(Lists.newArrayList(createArray(create(Type.INT)), create(Type.NULL))), null,
+            null),
+        new Field("campaignInfo", create(Type.STRING), null, null), new Field("cost", create(Type.DOUBLE), null, null),
+        new Field("timestamp", create(Type.LONG), null, null));
 
     avroSchema.setFields(fields);
 
@@ -91,8 +90,7 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
   }
 
   @Test
-  public void testDataTypeReturnFromAvroRecordExtractor()
-      throws IOException {
+  public void testDataTypeReturnFromAvroRecordExtractor() throws IOException {
     String testColumnName = "column1";
     long columnValue = 999999999L;
     AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();

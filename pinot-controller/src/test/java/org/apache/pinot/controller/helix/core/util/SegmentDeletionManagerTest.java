@@ -88,8 +88,7 @@ public class SegmentDeletionManagerTest {
     */
     when(store.remove(anyList(), anyInt())).thenAnswer(new Answer<boolean[]>() {
       @Override
-      public boolean[] answer(InvocationOnMock invocationOnMock)
-          throws Throwable {
+      public boolean[] answer(InvocationOnMock invocationOnMock) throws Throwable {
         List<String> propStoreList = (List<String>) (invocationOnMock.getArguments()[0]);
         boolean[] result = new boolean[propStoreList.size()];
         for (int i = 0; i < result.length; i++) {
@@ -134,14 +133,12 @@ public class SegmentDeletionManagerTest {
   }
 
   @Test
-  public void testBulkDeleteWithFailures()
-      throws Exception {
+  public void testBulkDeleteWithFailures() throws Exception {
     testBulkDeleteWithFailures(true);
     testBulkDeleteWithFailures(false);
   }
 
-  public void testBulkDeleteWithFailures(boolean useSet)
-      throws Exception {
+  public void testBulkDeleteWithFailures(boolean useSet) throws Exception {
     HelixAdmin helixAdmin = makeHelixAdmin();
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
     FakeDeletionManager deletionManager = new FakeDeletionManager(helixAdmin, propertyStore);
@@ -197,8 +194,7 @@ public class SegmentDeletionManagerTest {
   }
 
   @Test
-  public void testRemoveDeletedSegments()
-      throws Exception {
+  public void testRemoveDeletedSegments() throws Exception {
     Map<String, Object> properties = new HashMap<>();
     properties.put(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY + ".class",
         LocalPinotFS.class.getName());
@@ -261,8 +257,7 @@ public class SegmentDeletionManagerTest {
     Assert.assertEquals(dummyDir2.exists(), false);
   }
 
-  public void createTestFileWithAge(String path, int age)
-      throws Exception {
+  public void createTestFileWithAge(String path, int age) throws Exception {
     File testFile = new File(path);
     testFile.createNewFile();
     testFile.setLastModified(DateTime.now().minusDays(age).getMillis());

@@ -37,12 +37,14 @@ public class CustomTimeUnitTransformer implements TimeUnitTransformer {
       long fromMillis(long millisSinceEpoch) {
         return DurationFieldType.weeks().getField(ISOChronology.getInstanceUTC()).getDifference(millisSinceEpoch, 0L);
       }
-    }, MONTHS {
+    },
+    MONTHS {
       @Override
       long fromMillis(long millisSinceEpoch) {
         return DurationFieldType.months().getField(ISOChronology.getInstanceUTC()).getDifference(millisSinceEpoch, 0L);
       }
-    }, YEARS {
+    },
+    YEARS {
       @Override
       long fromMillis(long millisSinceEpoch) {
         return DurationFieldType.years().getField(ISOChronology.getInstanceUTC()).getDifference(millisSinceEpoch, 0L);

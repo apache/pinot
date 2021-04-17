@@ -82,8 +82,7 @@ public class QuickstartRunner {
 
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
       int numServers, int numMinions, File tempDir, boolean enableIsolation, String authToken,
-      Map<String, Object> configOverrides)
-      throws Exception {
+      Map<String, Object> configOverrides) throws Exception {
     _tableRequests = tableRequests;
     _numControllers = numControllers;
     _numBrokers = numBrokers;
@@ -97,21 +96,18 @@ public class QuickstartRunner {
   }
 
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
-      int numServers, File tempDir)
-      throws Exception {
+      int numServers, File tempDir) throws Exception {
     this(tableRequests, numControllers, numBrokers, numServers, 0, tempDir, true, null, null);
   }
 
-  private void startZookeeper()
-      throws IOException {
+  private void startZookeeper() throws IOException {
     StartZookeeperCommand zkStarter = new StartZookeeperCommand();
     zkStarter.setPort(ZK_PORT);
     zkStarter.setDataDir(new File(_tempDir, DEFAULT_ZK_DIR).getAbsolutePath());
     zkStarter.execute();
   }
 
-  private void startControllers()
-      throws Exception {
+  private void startControllers() throws Exception {
     for (int i = 0; i < _numControllers; i++) {
       StartControllerCommand controllerStarter = new StartControllerCommand();
       controllerStarter.setControllerPort(String.valueOf(DEFAULT_CONTROLLER_PORT + i)).setZkAddress(ZK_ADDRESS)
@@ -123,8 +119,7 @@ public class QuickstartRunner {
     }
   }
 
-  private void startBrokers()
-      throws Exception {
+  private void startBrokers() throws Exception {
     for (int i = 0; i < _numBrokers; i++) {
       StartBrokerCommand brokerStarter = new StartBrokerCommand();
       brokerStarter.setPort(DEFAULT_BROKER_PORT + i).setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME)
@@ -134,8 +129,7 @@ public class QuickstartRunner {
     }
   }
 
-  private void startServers()
-      throws Exception {
+  private void startServers() throws Exception {
     for (int i = 0; i < _numServers; i++) {
       StartServerCommand serverStarter = new StartServerCommand();
       serverStarter.setPort(DEFAULT_SERVER_NETTY_PORT + i).setAdminPort(DEFAULT_SERVER_ADMIN_API_PORT + i)
@@ -147,8 +141,7 @@ public class QuickstartRunner {
     }
   }
 
-  private void startMinions()
-      throws Exception {
+  private void startMinions() throws Exception {
     for (int i = 0; i < _numMinions; i++) {
       StartMinionCommand minionStarter = new StartMinionCommand();
       minionStarter.setMinionPort(DEFAULT_MINION_PORT + i).setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME)
@@ -157,13 +150,11 @@ public class QuickstartRunner {
     }
   }
 
-  private void clean()
-      throws Exception {
+  private void clean() throws Exception {
     FileUtils.cleanDirectory(_tempDir);
   }
 
-  public void startAll()
-      throws Exception {
+  public void startAll() throws Exception {
     registerDefaultPinotFS();
     startZookeeper();
     startControllers();
@@ -172,8 +163,7 @@ public class QuickstartRunner {
     startMinions();
   }
 
-  public void stop()
-      throws Exception {
+  public void stop() throws Exception {
     if (_isStopped) {
       return;
     }
@@ -187,21 +177,18 @@ public class QuickstartRunner {
     _isStopped = true;
   }
 
-  public void createServerTenantWith(int numOffline, int numRealtime, String tenantName)
-      throws Exception {
+  public void createServerTenantWith(int numOffline, int numRealtime, String tenantName) throws Exception {
     new AddTenantCommand().setControllerUrl("http://localhost:" + _controllerPorts.get(0)).setName(tenantName)
         .setOffline(numOffline).setRealtime(numRealtime).setInstances(numOffline + numRealtime)
         .setRole(TenantRole.SERVER).setExecute(true).execute();
   }
 
-  public void createBrokerTenantWith(int number, String tenantName)
-      throws Exception {
+  public void createBrokerTenantWith(int number, String tenantName) throws Exception {
     new AddTenantCommand().setControllerUrl("http://localhost:" + _controllerPorts.get(0)).setName(tenantName)
         .setInstances(number).setRole(TenantRole.BROKER).setExecute(true).execute();
   }
 
-  public void bootstrapTable()
-      throws Exception {
+  public void bootstrapTable() throws Exception {
     for (QuickstartTableRequest request : _tableRequests) {
       if (!new BootstrapTableTool("http", "localhost", _controllerPorts.get(0), request.getBootstrapTableDir(),
           _authToken).execute()) {
@@ -211,8 +198,7 @@ public class QuickstartRunner {
   }
 
   @Deprecated
-  public void addTable()
-      throws Exception {
+  public void addTable() throws Exception {
     for (QuickstartTableRequest request : _tableRequests) {
       new AddTableCommand().setSchemaFile(request.getSchemaFile().getAbsolutePath())
           .setTableConfigFile(request.getTableRequestFile().getAbsolutePath())
@@ -221,8 +207,7 @@ public class QuickstartRunner {
   }
 
   @Deprecated
-  public void launchDataIngestionJob()
-      throws Exception {
+  public void launchDataIngestionJob() throws Exception {
     for (QuickstartTableRequest request : _tableRequests) {
       if (request.getTableType() == TableType.OFFLINE) {
         try (Reader reader = new BufferedReader(new FileReader(request.getIngestionJobFile().getAbsolutePath()))) {
@@ -245,8 +230,7 @@ public class QuickstartRunner {
     }
   }
 
-  public JsonNode runQuery(String query)
-      throws Exception {
+  public JsonNode runQuery(String query) throws Exception {
     int brokerPort = _brokerPorts.get(RANDOM.nextInt(_brokerPorts.size()));
     return JsonUtils.stringToJsonNode(new PostQueryCommand().setBrokerPort(String.valueOf(brokerPort))
         .setQueryType(CommonConstants.Broker.Request.SQL).setAuthToken(_authToken).setQuery(query).run());
@@ -266,8 +250,8 @@ public class QuickstartRunner {
       PinotFSFactory.register(scheme, fsClassName, new PinotConfiguration(configs));
       LOGGER.info("Registered PinotFS for scheme: {}", scheme);
     } catch (Exception e) {
-      LOGGER
-          .error("Unable to init PinotFS for scheme: {}, class name: {}, configs: {}", scheme, fsClassName, configs, e);
+      LOGGER.error("Unable to init PinotFS for scheme: {}, class name: {}, configs: {}", scheme, fsClassName, configs,
+          e);
     }
   }
 }

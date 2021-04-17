@@ -48,9 +48,8 @@ public abstract class LogicalOperatorTransformFunctionTest extends BaseTransform
         RequestContextUtils.getExpression(String.format("EQUALS(%s, %d)", INT_SV_COLUMN, _intSVValues[0]));
     ExpressionContext longEqualsExpr =
         RequestContextUtils.getExpression(String.format("EQUALS(%s, %d)", LONG_SV_COLUMN, _longSVValues[0]));
-    ExpressionContext expression = ExpressionContext.forFunction(
-        new FunctionContext(FunctionContext.Type.TRANSFORM, getFuncName(),
-            Arrays.asList(intEqualsExpr, longEqualsExpr)));
+    ExpressionContext expression = ExpressionContext.forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM,
+        getFuncName(), Arrays.asList(intEqualsExpr, longEqualsExpr)));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertEquals(transformFunction.getName(), getFuncName().toLowerCase());
     int[] expectedIntValues = new int[NUM_ROWS];
@@ -66,9 +65,8 @@ public abstract class LogicalOperatorTransformFunctionTest extends BaseTransform
     for (int i = 0; i < expressions.length; i++) {
       expressionContextList.add(RequestContextUtils.getExpression(expressions[i]));
     }
-    TransformFunctionFactory.get(ExpressionContext
-            .forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM, getFuncName(), expressionContextList)),
-        _dataSourceMap);
+    TransformFunctionFactory.get(ExpressionContext.forFunction(
+        new FunctionContext(FunctionContext.Type.TRANSFORM, getFuncName(), expressionContextList)), _dataSourceMap);
   }
 
   @DataProvider(name = "testIllegalArguments")

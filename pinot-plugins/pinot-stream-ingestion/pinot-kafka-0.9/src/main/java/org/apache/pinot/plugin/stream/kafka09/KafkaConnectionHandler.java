@@ -235,8 +235,8 @@ public class KafkaConnectionHandler {
 
       try {
         LOGGER.info("Connecting to bootstrap host {}:{} for topic {}", _currentHost, _currentPort, _topic);
-        _simpleConsumer = _simpleConsumerFactory
-            .buildSimpleConsumer(_currentHost, _currentPort, _socketTimeout, _bufferSize, _clientId);
+        _simpleConsumer = _simpleConsumerFactory.buildSimpleConsumer(_currentHost, _currentPort, _socketTimeout,
+            _bufferSize, _clientId);
         setCurrentState(new ConnectedToBootstrapNode());
       } catch (Exception e) {
         handleConsumerException(e);
@@ -344,8 +344,8 @@ public class KafkaConnectionHandler {
 
       // Connect to the partition leader
       try {
-        _simpleConsumer = _simpleConsumerFactory
-            .buildSimpleConsumer(_leader.host(), _leader.port(), _socketTimeout, _bufferSize, _clientId);
+        _simpleConsumer = _simpleConsumerFactory.buildSimpleConsumer(_leader.host(), _leader.port(), _socketTimeout,
+            _bufferSize, _clientId);
 
         setCurrentState(new ConnectedToPartitionLeader());
       } catch (Exception e) {
@@ -426,8 +426,7 @@ public class KafkaConnectionHandler {
     }
   }
 
-  void close()
-      throws IOException {
+  void close() throws IOException {
     boolean needToCloseConsumer = _currentState.isConnectedToKafkaBroker() && _simpleConsumer != null;
 
     // Reset the state machine

@@ -61,8 +61,8 @@ public class HelixSetupUtils {
 
   public static HelixManager setupHelixController(String helixClusterName, String zkPath, String instanceId) {
     setupHelixClusterIfNeeded(helixClusterName, zkPath);
-    return HelixControllerMain
-        .startHelixController(zkPath, helixClusterName, instanceId, HelixControllerMain.STANDALONE);
+    return HelixControllerMain.startHelixController(zkPath, helixClusterName, instanceId,
+        HelixControllerMain.STANDALONE);
   }
 
   private static void setupHelixClusterIfNeeded(String helixClusterName, String zkPath) {

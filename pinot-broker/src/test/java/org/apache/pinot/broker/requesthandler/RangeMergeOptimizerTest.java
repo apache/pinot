@@ -119,16 +119,14 @@ public class RangeMergeOptimizerTest {
     compareTrees(actualTree, expectedTree);
 
     // Query with multiple predicates
-    actualTree =
-        buildFilterQueryTree("select * from table where time >= 10 and time <= 20 and time <= 15 and foo = 'bar'",
-            true);
+    actualTree = buildFilterQueryTree(
+        "select * from table where time >= 10 and time <= 20 and time <= 15 and foo = 'bar'", true);
     expectedTree = buildFilterQueryTree("select * from table where time between 10 and 15 and foo = 'bar'", false);
     compareTrees(actualTree, expectedTree);
 
     // Query with nested predicates
-    actualTree =
-        buildFilterQueryTree("select * from table where (time >= 10 and time <= 20) and ((time >= 5 and time <= 15))",
-            true);
+    actualTree = buildFilterQueryTree(
+        "select * from table where (time >= 10 and time <= 20) and ((time >= 5 and time <= 15))", true);
     expectedTree = buildFilterQueryTree("select * from table where time between 10 and 15", false);
     compareTrees(actualTree, expectedTree);
 
@@ -142,31 +140,27 @@ public class RangeMergeOptimizerTest {
     compareTrees(actualTree, expectedTree);
 
     // Query with time range in different levels of tree and all ranges can be merged
-    actualTree =
-        buildFilterQueryTree("select * from table where (((time >= 10 and time <= 20) and time >= 5) and time <= 15)",
-            true);
+    actualTree = buildFilterQueryTree(
+        "select * from table where (((time >= 10 and time <= 20) and time >= 5) and time <= 15)", true);
     expectedTree = buildFilterQueryTree("select * from table where time between 10 and 15", false);
     compareTrees(actualTree, expectedTree);
 
     // Query with time range of one value.
-    actualTree =
-        buildFilterQueryTree("select * from table where (time > 10 and time <= 20) and (time >= 20 and time <= 30)",
-            true);
+    actualTree = buildFilterQueryTree(
+        "select * from table where (time > 10 and time <= 20) and (time >= 20 and time <= 30)", true);
     expectedTree = buildFilterQueryTree("select * from table where time between 20 and 20", false);
     compareTrees(actualTree, expectedTree);
 
     // Query with OR predicates
     actualTree = buildFilterQueryTree(
         "select * from table where (foo1 = 'bar1' or (foo2 = 'bar2' and (time >= 10 and time <= 20)))", true);
-    expectedTree =
-        buildFilterQueryTree("select * from table where (foo1 = 'bar1' or (foo2 = 'bar2' and time between 10 and 20))",
-            false);
+    expectedTree = buildFilterQueryTree(
+        "select * from table where (foo1 = 'bar1' or (foo2 = 'bar2' and time between 10 and 20))", false);
     compareTrees(actualTree, expectedTree);
 
     // Query with same lower and upper range
-    actualTree =
-        buildFilterQueryTree("select * from table where (time >= 10 and time <= 20) and (time between 10 and 20)",
-            true);
+    actualTree = buildFilterQueryTree(
+        "select * from table where (time >= 10 and time <= 20) and (time between 10 and 20)", true);
     expectedTree = buildFilterQueryTree("select * from table where time between 10 and 20", false);
     compareTrees(actualTree, expectedTree);
 

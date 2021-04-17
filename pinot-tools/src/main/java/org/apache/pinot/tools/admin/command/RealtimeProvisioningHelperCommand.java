@@ -50,44 +50,52 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
   private static final String COMMA_SEPARATOR = ",";
   private static final int DEFAULT_RETENTION_FOR_HOURLY_PUSH = 24;
   private static final int DEFAULT_RETENTION_FOR_DAILY_PUSH = 72;
-  private static final int DEFAULT_RETENTION_FOR_WEEKLY_PUSH = 24*7 + 72;
-  private static final int DEFAULT_RETENTION_FOR_MONTHLY_PUSH = 24*31 + 72;
+  private static final int DEFAULT_RETENTION_FOR_WEEKLY_PUSH = 24 * 7 + 72;
+  private static final int DEFAULT_RETENTION_FOR_MONTHLY_PUSH = 24 * 31 + 72;
   private static final int DEFAULT_NUMBER_OF_ROWS = 10_000;
 
   @Option(name = "-tableConfigFile", required = true, metaVar = "<String>")
   private String _tableConfigFile;
 
-  @Option(name = "-numPartitions", required = true, metaVar = "<int>", usage = "number of stream partitions for the table")
+  @Option(name = "-numPartitions", required = true, metaVar = "<int>",
+      usage = "number of stream partitions for the table")
   private int _numPartitions;
 
-  @Option(name = "-retentionHours", metaVar = "<int>", usage = "Number of recent hours queried most often"
-      + "\n\t(-pushFrequency is ignored)")
+  @Option(name = "-retentionHours", metaVar = "<int>",
+      usage = "Number of recent hours queried most often" + "\n\t(-pushFrequency is ignored)")
   private int _retentionHours;
 
-  @Option(name = "-pushFrequency", metaVar = "<String>", usage =
-      "Frequency with which offline table pushes happen, if this is a hybrid table"
+  @Option(name = "-pushFrequency", metaVar = "<String>",
+      usage = "Frequency with which offline table pushes happen, if this is a hybrid table"
           + "\n\t(hourly,daily,weekly,monthly). Do not specify if realtime-only table")
   private String _pushFrequency;
 
-  @Option(name = "-numHosts", metaVar = "<String>", usage = "number of hosts as comma separated values (default 2,4,6,8,10,12,14,16)")
+  @Option(name = "-numHosts", metaVar = "<String>",
+      usage = "number of hosts as comma separated values (default 2,4,6,8,10,12,14,16)")
   private String _numHosts = "2,4,6,8,10,12,14,16";
 
-  @Option(name = "-numHours", metaVar = "<String>", usage = "number of hours to consume as comma separated values (default 2,3,4,5,6,7,8,9,10,11,12)")
+  @Option(name = "-numHours", metaVar = "<String>",
+      usage = "number of hours to consume as comma separated values (default 2,3,4,5,6,7,8,9,10,11,12)")
   private String _numHours = "2,3,4,5,6,7,8,9,10,11,12";
 
-  @Option(name = "-sampleCompletedSegmentDir", required = false, metaVar = "<String>", usage = "Consume from the topic for n hours and provide the path of the segment dir after it completes")
+  @Option(name = "-sampleCompletedSegmentDir", required = false, metaVar = "<String>",
+      usage = "Consume from the topic for n hours and provide the path of the segment dir after it completes")
   private String _sampleCompletedSegmentDir;
 
-  @Option(name = "-schemaWithMetadataFile", required = false, metaVar = "<String>", usage = "Schema file with extra information on each column describing characteristics of data")
+  @Option(name = "-schemaWithMetadataFile", required = false, metaVar = "<String>",
+      usage = "Schema file with extra information on each column describing characteristics of data")
   private String _schemaWithMetadataFile;
 
-  @Option(name = "-numRows", required = false, metaVar = "<String>", usage = "Number of rows to be generated based on schema with metadata file")
+  @Option(name = "-numRows", required = false, metaVar = "<String>",
+      usage = "Number of rows to be generated based on schema with metadata file")
   private int _numRows;
 
-  @Option(name = "-ingestionRate", required = true, metaVar = "<String>", usage = "Avg number of messages per second ingested on any one stream partition (assumed all partitions are uniform)")
+  @Option(name = "-ingestionRate", required = true, metaVar = "<String>",
+      usage = "Avg number of messages per second ingested on any one stream partition (assumed all partitions are uniform)")
   private int _ingestionRate;
 
-  @Option(name = "-maxUsableHostMemory", required = false, metaVar = "<String>", usage = "Maximum memory per host that can be used for pinot data (e.g. 250G, 100M). Default 48g")
+  @Option(name = "-maxUsableHostMemory", required = false, metaVar = "<String>",
+      usage = "Maximum memory per host that can be used for pinot data (e.g. 250G, 100M). Default 48g")
   private String _maxUsableHostMemory = "48G";
 
   @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"})
@@ -145,8 +153,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
 
   @Override
   public String toString() {
-    String segmentStr = _sampleCompletedSegmentDir != null
-        ? " -sampleCompletedSegmentDir " + _sampleCompletedSegmentDir
+    String segmentStr = _sampleCompletedSegmentDir != null ? " -sampleCompletedSegmentDir " + _sampleCompletedSegmentDir
         : " -schemaWithMetadataFile " + _schemaWithMetadataFile + " -numRows " + _numRows;
     return "RealtimeProvisioningHelper -tableConfigFile " + _tableConfigFile + " -numPartitions " + _numPartitions
         + " -pushFrequency " + _pushFrequency + " -numHosts " + _numHosts + " -numHours " + _numHours + segmentStr
@@ -161,10 +168,9 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
 
   @Override
   public String description() {
-    return
-        "Given the table config, partitions, retention and a sample completed segment for a realtime table to be setup, "
-            + "this tool will provide memory used by each host and an optimal segment size for various combinations of hours to consume and hosts. "
-            + "Instead of a completed segment, if schema with characteristics of data is provided, a segment will be generated and used for memory estimation.";
+    return "Given the table config, partitions, retention and a sample completed segment for a realtime table to be setup, "
+        + "this tool will provide memory used by each host and an optimal segment size for various combinations of hours to consume and hosts. "
+        + "Instead of a completed segment, if schema with characteristics of data is provided, a segment will be generated and used for memory estimation.";
   }
 
   @Override
@@ -177,23 +183,27 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     StringBuilder builder = new StringBuilder();
     builder.append("\n\nThis command allows you to estimate the capacity needed for provisioning realtime hosts")
         .append("It assumes that there is no upper limit to the amount of memory you can mmap")
-        .append("\nIf you have a hybrid table, then consult the push frequency setting in your offline table specify it in the -pushFrequency argument")
-        .append("\nIf you have a realtime-only table, then the default behavior is to assume that your queries need all data in memory all the time")
-        .append("\nHowever, if most of your queries are going to be for (say) the last 96 hours, then you can specify that in -retentionHours")
-        .append("\nDoing so will let this program assume that you are willing to take a page hit when querying older data")
+        .append(
+            "\nIf you have a hybrid table, then consult the push frequency setting in your offline table specify it in the -pushFrequency argument")
+        .append(
+            "\nIf you have a realtime-only table, then the default behavior is to assume that your queries need all data in memory all the time")
+        .append(
+            "\nHowever, if most of your queries are going to be for (say) the last 96 hours, then you can specify that in -retentionHours")
+        .append(
+            "\nDoing so will let this program assume that you are willing to take a page hit when querying older data")
         .append("\nand optimize memory and number of hosts accordingly.")
         .append("\n See https://docs.pinot.apache.org/operators/operating-pinot/tuning/realtime for details");
-        ;
+    ;
     System.out.println(builder.toString());
   }
 
   @Override
-  public boolean execute()
-      throws IOException {
+  public boolean execute() throws IOException {
 
     boolean segmentProvided = _sampleCompletedSegmentDir != null;
     boolean characteristicsProvided = _schemaWithMetadataFile != null;
-    Preconditions.checkState(segmentProvided ^ characteristicsProvided, "Either completed segment should be provided or schema with characteristics file!");
+    Preconditions.checkState(segmentProvided ^ characteristicsProvided,
+        "Either completed segment should be provided or schema with characteristics file!");
 
     LOGGER.info("Executing command: {}", toString());
 
@@ -209,9 +219,10 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     note.append("\nNote:\n");
     int numReplicas = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
     int tableRetentionHours = (int) TimeUnit.valueOf(tableConfig.getValidationConfig().getRetentionTimeUnit())
-            .toHours(Long.parseLong(tableConfig.getValidationConfig().getRetentionTimeValue()));
+        .toHours(Long.parseLong(tableConfig.getValidationConfig().getRetentionTimeValue()));
     if (_retentionHours > 0) {
-      note.append("\n* Table retention and push frequency ignored for determining retentionHours since it is specified in command");
+      note.append(
+          "\n* Table retention and push frequency ignored for determining retentionHours since it is specified in command");
     } else {
       if (_pushFrequency == null) {
         // This is a realtime-only table. Pick up the retention time
@@ -247,9 +258,8 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     MemoryEstimator memoryEstimator;
     if (segmentProvided) {
       // use the provided segment to estimate memory
-      memoryEstimator =
-          new MemoryEstimator(tableConfig, new File(_sampleCompletedSegmentDir), _ingestionRate, maxUsableHostMemBytes,
-              tableRetentionHours);
+      memoryEstimator = new MemoryEstimator(tableConfig, new File(_sampleCompletedSegmentDir), _ingestionRate,
+          maxUsableHostMemBytes, tableRetentionHours);
     } else {
       // no segments provided;
       // generate a segment based on the provided characteristics and then use it to estimate memory
@@ -259,13 +269,12 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
       File file = new File(_schemaWithMetadataFile);
       Schema schema = deserialize(file, Schema.class);
       SchemaWithMetaData schemaWithMetaData = deserialize(file, SchemaWithMetaData.class);
-      memoryEstimator =
-          new MemoryEstimator(tableConfig, schema, schemaWithMetaData, _numRows, _ingestionRate, maxUsableHostMemBytes,
-              tableRetentionHours);
+      memoryEstimator = new MemoryEstimator(tableConfig, schema, schemaWithMetaData, _numRows, _ingestionRate,
+          maxUsableHostMemBytes, tableRetentionHours);
     }
     File sampleStatsHistory = memoryEstimator.initializeStatsHistory();
-    memoryEstimator
-        .estimateMemoryUsed(sampleStatsHistory, numHosts, numHours, totalConsumingPartitions, _retentionHours);
+    memoryEstimator.estimateMemoryUsed(sampleStatsHistory, numHosts, numHours, totalConsumingPartitions,
+        _retentionHours);
 
     note.append("\n* See https://docs.pinot.apache.org/operators/operating-pinot/tuning/realtime");
     // TODO: Make a recommendation of what config to choose by considering more inputs such as qps

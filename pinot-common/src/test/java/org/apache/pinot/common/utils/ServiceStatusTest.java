@@ -218,8 +218,7 @@ public class ServiceStatusTest {
   // Create a ServiceStatus object that monitors about 2500 tables
   // and returns
   @Test
-  public void testMultipleResourcesAndPercent()
-      throws Exception {
+  public void testMultipleResourcesAndPercent() throws Exception {
     testMultipleResourcesAndPercent(98.6);
     testMultipleResourcesAndPercent(99.3);
     testMultipleResourcesAndPercent(99.5);
@@ -259,7 +258,7 @@ public class ServiceStatusTest {
 
     final double actualReadyPercent = (double) readyTables * 100 / tableCount;
     double lowestReadyPercent = (int) Math.round(actualReadyPercent);
-    lowestReadyPercent = lowestReadyPercent > 2 ? lowestReadyPercent - 2 : 1;  // Should be 2 below  percentReady
+    lowestReadyPercent = lowestReadyPercent > 2 ? lowestReadyPercent - 2 : 1; // Should be 2 below  percentReady
 
     // Create ServiceCallback objects with minReadyPercent set to values between lowestReadyPercent and 100.
     // Call getServiceStatus() enough number of times so that we are only left with the tables
@@ -295,7 +294,8 @@ public class ServiceStatusTest {
     }
   }
 
-  private static class TestIdealStateAndExternalViewMatchServiceStatusCallback extends ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback {
+  private static class TestIdealStateAndExternalViewMatchServiceStatusCallback
+      extends ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback {
     private IdealState _idealState;
     private ExternalView _externalView;
 
@@ -323,7 +323,8 @@ public class ServiceStatusTest {
     }
   }
 
-  private static class TestMultiResourceISAndEVMatchCB extends ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback {
+  private static class TestMultiResourceISAndEVMatchCB
+      extends ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback {
     public Map<String, IdealState> _idealStates = new HashMap<>();
     public Map<String, ExternalView> _externalViews = new HashMap<>();
 

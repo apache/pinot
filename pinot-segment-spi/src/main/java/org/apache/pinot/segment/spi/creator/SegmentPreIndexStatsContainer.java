@@ -25,8 +25,7 @@ import java.io.Serializable;
  * Container for per-column stats for a segment
  */
 public interface SegmentPreIndexStatsContainer extends Serializable {
-  ColumnStatistics getColumnProfileFor(String column)
-      throws Exception;
+  ColumnStatistics getColumnProfileFor(String column) throws Exception;
 
   int getTotalDocCount();
 }

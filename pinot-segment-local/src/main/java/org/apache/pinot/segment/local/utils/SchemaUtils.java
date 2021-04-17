@@ -94,9 +94,8 @@ public class SchemaUtils {
             transformedColumns.add(column);
             argumentColumns.addAll(arguments);
           } catch (Exception e) {
-            throw new IllegalStateException(
-                "Exception in getting arguments for transform function '" + transformFunction + "' for column '"
-                    + column + "'", e);
+            throw new IllegalStateException("Exception in getting arguments for transform function '"
+                + transformFunction + "' for column '" + column + "'", e);
           }
         }
         if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME)) {
@@ -112,8 +111,8 @@ public class SchemaUtils {
         transformedColumns.retainAll(argumentColumns));
     if (schema.getPrimaryKeyColumns() != null) {
       for (String primaryKeyColumn : schema.getPrimaryKeyColumns()) {
-        Preconditions
-            .checkState(primaryKeyColumnCandidates.contains(primaryKeyColumn), "The primary key column must exist");
+        Preconditions.checkState(primaryKeyColumnCandidates.contains(primaryKeyColumn),
+            "The primary key column must exist");
       }
     }
   }
@@ -125,9 +124,8 @@ public class SchemaUtils {
     try {
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
-      throw new IllegalStateException(
-          "Schema is incompatible with tableConfig with name: " + tableConfig.getTableName() + " and type: "
-              + tableConfig.getTableType(), e);
+      throw new IllegalStateException("Schema is incompatible with tableConfig with name: " + tableConfig.getTableName()
+          + " and type: " + tableConfig.getTableType(), e);
     }
   }
 

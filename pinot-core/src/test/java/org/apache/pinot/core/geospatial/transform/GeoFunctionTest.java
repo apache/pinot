@@ -73,17 +73,15 @@ public class GeoFunctionTest {
     }
   }
 
-  protected void assertRelation(String functionName, String leftWkt, String rightWkt, boolean result)
-      throws Exception {
+  protected void assertRelation(String functionName, String leftWkt, String rightWkt, boolean result) throws Exception {
     assertIntFunction(
         String.format("%s(ST_GeomFromText(%s),ST_GeomFromText(%s))", functionName, STRING_SV_COLUMN, STRING_SV_COLUMN2),
-        new int[]{result ? 1 : 0}, Arrays
-            .asList(new Column(STRING_SV_COLUMN, FieldSpec.DataType.STRING, new String[]{leftWkt}),
-                new Column(STRING_SV_COLUMN2, FieldSpec.DataType.STRING, new String[]{rightWkt})));
+        new int[]{result ? 1 : 0},
+        Arrays.asList(new Column(STRING_SV_COLUMN, FieldSpec.DataType.STRING, new String[]{leftWkt}),
+            new Column(STRING_SV_COLUMN2, FieldSpec.DataType.STRING, new String[]{rightWkt})));
   }
 
-  protected void assertIntFunction(String function, int[] expectedValues, List<Column> columns)
-      throws Exception {
+  protected void assertIntFunction(String function, int[] expectedValues, List<Column> columns) throws Exception {
     assertFunction(function, expectedValues.length, columns,
         (TransformFunction transformFunction, ProjectionBlock projectionBlock) -> {
           int[] actualValues = transformFunction.transformToIntValuesSV(projectionBlock);
@@ -93,8 +91,7 @@ public class GeoFunctionTest {
         });
   }
 
-  protected void assertStringFunction(String function, String[] expectedValues, List<Column> columns)
-      throws Exception {
+  protected void assertStringFunction(String function, String[] expectedValues, List<Column> columns) throws Exception {
     assertFunction(function, expectedValues.length, columns,
         (TransformFunction transformFunction, ProjectionBlock projectionBlock) -> {
           String[] actualValues = transformFunction.transformToStringValuesSV(projectionBlock);
@@ -104,8 +101,7 @@ public class GeoFunctionTest {
         });
   }
 
-  protected void assertDoubleFunction(String function, double[] expectedValues, List<Column> columns)
-      throws Exception {
+  protected void assertDoubleFunction(String function, double[] expectedValues, List<Column> columns) throws Exception {
     assertFunction(function, expectedValues.length, columns,
         (TransformFunction transformFunction, ProjectionBlock projectionBlock) -> {
           double[] actualValues = transformFunction.transformToDoubleValuesSV(projectionBlock);
@@ -116,8 +112,7 @@ public class GeoFunctionTest {
   }
 
   private void assertFunction(String function, int length, List<Column> columns,
-      BiConsumer<TransformFunction, ProjectionBlock> evaluator)
-      throws Exception {
+      BiConsumer<TransformFunction, ProjectionBlock> evaluator) throws Exception {
     FileUtils.deleteQuietly(new File(INDEX_DIR_PATH));
     List<GenericRow> rows = new ArrayList<>(length);
     Schema.SchemaBuilder sb = new Schema.SchemaBuilder();

@@ -38,12 +38,8 @@ public class TestCreateSegmentCommand {
 
   private static CreateSegmentCommand _createSegmentCommand = new CreateSegmentCommand();
 
-  @Test(
-    expectedExceptions = Exception.class,
-    expectedExceptionsMessageRegExp = "^.*test_invalid_data.json.*$"
-  )
-  public void testReadingInvalidJsonFile()
-      throws Exception {
+  @Test(expectedExceptions = Exception.class, expectedExceptionsMessageRegExp = "^.*test_invalid_data.json.*$")
+  public void testReadingInvalidJsonFile() throws Exception {
     String fileDirectoryPath = JSON_INVALID_SAMPLE_DATA_FILE.getParent();
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
     Schema fakeSchema = new Schema.SchemaBuilder().build();

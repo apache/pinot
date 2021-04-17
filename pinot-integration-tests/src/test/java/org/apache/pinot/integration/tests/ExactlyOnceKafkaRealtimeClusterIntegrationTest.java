@@ -51,15 +51,12 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends RealtimeClus
   }
 
   @Override
-  protected void pushAvroIntoKafka(List<File> avroFiles)
-      throws Exception {
+  protected void pushAvroIntoKafka(List<File> avroFiles) throws Exception {
     // the first transaction of kafka messages are aborted
-    ClusterIntegrationTestUtils
-        .pushAvroIntoKafkaWithTransaction(avroFiles, "localhost:" + getBaseKafkaPort(), getKafkaTopic(),
-            getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn(), false);
+    ClusterIntegrationTestUtils.pushAvroIntoKafkaWithTransaction(avroFiles, "localhost:" + getBaseKafkaPort(),
+        getKafkaTopic(), getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn(), false);
     // the second transaction of kafka messages are committed
-    ClusterIntegrationTestUtils
-        .pushAvroIntoKafkaWithTransaction(avroFiles, "localhost:" + getBaseKafkaPort(), getKafkaTopic(),
-            getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn(), true);
+    ClusterIntegrationTestUtils.pushAvroIntoKafkaWithTransaction(avroFiles, "localhost:" + getBaseKafkaPort(),
+        getKafkaTopic(), getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn(), true);
   }
 }

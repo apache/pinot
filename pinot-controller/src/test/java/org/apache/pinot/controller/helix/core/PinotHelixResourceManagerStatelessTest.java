@@ -58,8 +58,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   private static final long TIMEOUT_IN_MS = 10_000L;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     startZk();
     Map<String, Object> properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
@@ -106,9 +105,8 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     offlineTableConfig.setTenantConfig(new TenantConfig(BROKER_TENANT_NAME, SERVER_TENANT_NAME, null));
     _helixResourceManager.validateTableTenantConfig(offlineTableConfig);
 
-    TableConfig realtimeTableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName).setBrokerTenant(BROKER_TENANT_NAME)
-            .setServerTenant(SERVER_TENANT_NAME).build();
+    TableConfig realtimeTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName)
+        .setBrokerTenant(BROKER_TENANT_NAME).setServerTenant(SERVER_TENANT_NAME).build();
 
     // Empty server tag (serverTenant_REALTIME)
     try {

@@ -71,9 +71,8 @@ public class DistinctCombineOperator extends BaseCombineOperator {
 
     // Convert the merged table into a main table if necessary in order to merge other tables
     if (!mergedDistinctTable.isMainTable()) {
-      DistinctTable mainDistinctTable =
-          new DistinctTable(distinctTableToMerge.getDataSchema(), _queryContext.getOrderByExpressions(),
-              _queryContext.getLimit());
+      DistinctTable mainDistinctTable = new DistinctTable(distinctTableToMerge.getDataSchema(),
+          _queryContext.getOrderByExpressions(), _queryContext.getLimit());
       mainDistinctTable.mergeTable(mergedDistinctTable);
       mergedBlock.setAggregationResults(Collections.singletonList(mainDistinctTable));
       mergedDistinctTable = mainDistinctTable;

@@ -77,24 +77,24 @@ public class SegmentValidator {
       quotaResponse = checkStorageQuota(tempSegmentDir, segmentMetadata, offlineTableConfig);
     } catch (InvalidConfigException e) {
       // Admin port is missing, return response with 500 status code.
-      throw new ControllerApplicationException(LOGGER,
-          "Quota check failed for segment: " + segmentName + " of table: " + offlineTableName + ", reason: " + e
-              .getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+      throw new ControllerApplicationException(LOGGER, "Quota check failed for segment: " + segmentName + " of table: "
+          + offlineTableName + ", reason: " + e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
     }
     if (!quotaResponse.isSegmentWithinQuota) {
-      throw new ControllerApplicationException(LOGGER,
-          "Quota check failed for segment: " + segmentName + " of table: " + offlineTableName + ", reason: "
-              + quotaResponse.reason, Response.Status.FORBIDDEN);
+      throw new ControllerApplicationException(LOGGER, "Quota check failed for segment: " + segmentName + " of table: "
+          + offlineTableName + ", reason: " + quotaResponse.reason, Response.Status.FORBIDDEN);
     }
 
     // Check time interval
     // TODO: Pass in schema and check the existence of time interval when time field exists
     Interval timeInterval = segmentMetadata.getTimeInterval();
     if (timeInterval != null && !TimeUtils.isValidTimeInterval(timeInterval)) {
-      throw new ControllerApplicationException(LOGGER, String.format(
-          "Invalid segment start/end time: %s (in millis: %d/%d) for segment: %s of table: %s, must be between: %s",
-          timeInterval, timeInterval.getStartMillis(), timeInterval.getEndMillis(), segmentName, offlineTableName,
-          TimeUtils.VALID_TIME_INTERVAL), Response.Status.NOT_ACCEPTABLE);
+      throw new ControllerApplicationException(LOGGER,
+          String.format(
+              "Invalid segment start/end time: %s (in millis: %d/%d) for segment: %s of table: %s, must be between: %s",
+              timeInterval, timeInterval.getStartMillis(), timeInterval.getEndMillis(), segmentName, offlineTableName,
+              TimeUtils.VALID_TIME_INTERVAL),
+          Response.Status.NOT_ACCEPTABLE);
     }
   }
 
@@ -106,8 +106,7 @@ public class SegmentValidator {
    * @param offlineTableConfig offline table configuration. This should not be null.
    */
   private StorageQuotaChecker.QuotaCheckerResponse checkStorageQuota(File segmentFile, SegmentMetadata metadata,
-      TableConfig offlineTableConfig)
-      throws InvalidConfigException {
+      TableConfig offlineTableConfig) throws InvalidConfigException {
     if (!_controllerConf.getEnableStorageQuotaCheck()) {
       return StorageQuotaChecker.success("Quota check is disabled");
     }

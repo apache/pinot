@@ -31,7 +31,9 @@ import java.util.Set;
  */
 public class ExpressionContext {
   public enum Type {
-    LITERAL, IDENTIFIER, FUNCTION
+    LITERAL,
+    IDENTIFIER,
+    FUNCTION
   }
 
   private final Type _type;

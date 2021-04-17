@@ -90,17 +90,17 @@ public class PinotControllerTransport {
       }
 
       final Future<Response> response =
-              requestBuilder.addHeader("Content-Type", "application/json; charset=utf-8").execute();
+          requestBuilder.addHeader("Content-Type", "application/json; charset=utf-8").execute();
 
-      ControllerTenantBrokerResponse.ControllerTenantBrokerResponseFuture controllerTableBrokerResponseFuture = new ControllerTenantBrokerResponse.ControllerTenantBrokerResponseFuture(response, url);
+      ControllerTenantBrokerResponse.ControllerTenantBrokerResponseFuture controllerTableBrokerResponseFuture =
+          new ControllerTenantBrokerResponse.ControllerTenantBrokerResponseFuture(response, url);
       return controllerTableBrokerResponseFuture.get();
     } catch (ExecutionException e) {
       throw new PinotClientException(e);
     }
   }
 
-  public void close()
-      throws PinotClientException {
+  public void close() throws PinotClientException {
     if (_httpClient.isClosed()) {
       throw new PinotClientException("Connection is already closed!");
     }

@@ -30,7 +30,8 @@ import org.apache.pinot.segment.local.customobject.SerializedHLL;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-public class DistinctCountRawHLLAggregationFunction extends BaseSingleInputAggregationFunction<HyperLogLog, SerializedHLL> {
+public class DistinctCountRawHLLAggregationFunction
+    extends BaseSingleInputAggregationFunction<HyperLogLog, SerializedHLL> {
   private final DistinctCountHLLAggregationFunction _distinctCountHLLAggregationFunction;
 
   public DistinctCountRawHLLAggregationFunction(List<ExpressionContext> arguments) {
@@ -73,8 +74,8 @@ public class DistinctCountRawHLLAggregationFunction extends BaseSingleInputAggre
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    _distinctCountHLLAggregationFunction
-        .aggregateGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSetMap);
+    _distinctCountHLLAggregationFunction.aggregateGroupByMV(length, groupKeysArray, groupByResultHolder,
+        blockValSetMap);
   }
 
   @Override

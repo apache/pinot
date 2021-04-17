@@ -49,9 +49,8 @@ public class ZKMetadataUtils {
     segmentZKMetadata.setTotalDocs(segmentMetadata.getTotalDocs());
     segmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
     segmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
-    SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier =
-        new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE,
-            segmentZKMetadata.getCustomMap());
+    SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier = new SegmentZKMetadataCustomMapModifier(
+        SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE, segmentZKMetadata.getCustomMap());
     segmentZKMetadata.setCustomMap(segmentZKMetadataCustomMapModifier.modifyMap(segmentMetadata.getCustomMap()));
 
     // Extract column partition metadata (if any), and set it into segment ZK metadata.
@@ -64,9 +63,8 @@ public class ZKMetadataUtils {
         PartitionFunction partitionFunction = columnMetadata.getPartitionFunction();
 
         if (partitionFunction != null) {
-          ColumnPartitionMetadata columnPartitionMetadata =
-              new ColumnPartitionMetadata(partitionFunction.toString(), columnMetadata.getNumPartitions(),
-                  columnMetadata.getPartitions());
+          ColumnPartitionMetadata columnPartitionMetadata = new ColumnPartitionMetadata(partitionFunction.toString(),
+              columnMetadata.getNumPartitions(), columnMetadata.getPartitions());
           columnPartitionMap.put(column, columnPartitionMetadata);
         }
       }

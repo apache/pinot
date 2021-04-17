@@ -67,8 +67,7 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
   private File _localTempDir;
 
   @Override
-  public void setup(Context context)
-      throws IOException {
+  public void setup(Context context) throws IOException {
     _jobConf = context.getConfiguration();
     Yaml yaml = new Yaml();
     String segmentGenerationJobSpecStr = _jobConf.get(SEGMENT_GENERATION_JOB_SPEC);

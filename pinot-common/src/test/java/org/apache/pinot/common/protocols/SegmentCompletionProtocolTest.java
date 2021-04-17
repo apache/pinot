@@ -30,8 +30,7 @@ import org.testng.annotations.Test;
 public class SegmentCompletionProtocolTest {
 
   @Test
-  public void testRequestURL()
-      throws Exception {
+  public void testRequestURL() throws Exception {
 
     // test default params
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();

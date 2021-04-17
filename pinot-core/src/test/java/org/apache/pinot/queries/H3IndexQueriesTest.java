@@ -70,9 +70,9 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
           .addSingleValueDimension(NON_H3_INDEX_COLUMN, DataType.BYTES).build();
   private static final Map<String, String> H3_INDEX_PROPERTIES = Collections.singletonMap("resolutions", "5");
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-      .setFieldConfigList(Collections.singletonList(
-          new FieldConfig(H3_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.H3,
-              H3_INDEX_PROPERTIES))).build();
+      .setFieldConfigList(Collections.singletonList(new FieldConfig(H3_INDEX_COLUMN,
+          FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.H3, H3_INDEX_PROPERTIES)))
+      .build();
 
   private IndexSegment _indexSegment;
 
@@ -92,8 +92,7 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
 
     List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
@@ -124,18 +123,17 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testH3Index()
-      throws IOException {
+  public void testH3Index() throws IOException {
     // Invalid upper bound
     {
-      for (String query : Arrays
-          .asList("SELECT COUNT(*) FROM testTable WHERE ST_Distance(h3Column, ST_Point(-122, 37.5, 1)) < -1",
-              "SELECT COUNT(*) FROM testTable WHERE ST_Distance(h3Column, ST_Point(-122, 37.5, 1)) BETWEEN 100 AND 50")) {
+      for (String query : Arrays.asList(
+          "SELECT COUNT(*) FROM testTable WHERE ST_Distance(h3Column, ST_Point(-122, 37.5, 1)) < -1",
+          "SELECT COUNT(*) FROM testTable WHERE ST_Distance(h3Column, ST_Point(-122, 37.5, 1)) BETWEEN 100 AND 50")) {
         AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
         IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
         // Expect 0 entries scanned in filter
-        QueriesTestUtils
-            .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, 0, 0, NUM_RECORDS);
+        QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, 0, 0,
+            NUM_RECORDS);
         List<Object> aggregationResult = resultsBlock.getAggregationResult();
         Assert.assertNotNull(aggregationResult);
         Assert.assertEquals((long) aggregationResult.get(0), 0);
@@ -148,9 +146,8 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
       AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
       IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
       // Expect 0 entries scanned in filter
-      QueriesTestUtils
-          .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), NUM_RECORDS, 0, 0,
-              NUM_RECORDS);
+      QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), NUM_RECORDS, 0,
+          0, NUM_RECORDS);
       List<Object> aggregationResult = resultsBlock.getAggregationResult();
       Assert.assertNotNull(aggregationResult);
       Assert.assertEquals((long) aggregationResult.get(0), NUM_RECORDS);
@@ -202,9 +199,8 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
       AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
       IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
       // Expect 10000 entries scanned in filter
-      QueriesTestUtils
-          .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), NUM_RECORDS, NUM_RECORDS,
-              0, NUM_RECORDS);
+      QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), NUM_RECORDS,
+          NUM_RECORDS, 0, NUM_RECORDS);
       List<Object> aggregationResult = resultsBlock.getAggregationResult();
       Assert.assertNotNull(aggregationResult);
       Assert.assertEquals((long) aggregationResult.get(0), NUM_RECORDS);
@@ -225,8 +221,7 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     _indexSegment.destroy();
     FileUtils.deleteDirectory(INDEX_DIR);
   }

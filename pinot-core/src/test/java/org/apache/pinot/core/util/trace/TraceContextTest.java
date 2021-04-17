@@ -37,8 +37,7 @@ public class TraceContextTest {
   private static final Random RANDOM = new Random();
 
   @Test
-  public void testSingleRequest()
-      throws Exception {
+  public void testSingleRequest() throws Exception {
     ExecutorService executorService = Executors.newCachedThreadPool();
     testSingleRequest(executorService, 0);
     executorService.shutdown();
@@ -46,8 +45,7 @@ public class TraceContextTest {
   }
 
   @Test
-  public void testMultipleRequests()
-      throws Exception {
+  public void testMultipleRequests() throws Exception {
     final ExecutorService executorService = Executors.newCachedThreadPool();
     Future[] futures = new Future[NUM_REQUESTS];
     for (int i = 0; i < NUM_REQUESTS; i++) {
@@ -70,8 +68,7 @@ public class TraceContextTest {
     Assert.assertTrue(TraceContext.REQUEST_TO_TRACES_MAP.isEmpty());
   }
 
-  private void testSingleRequest(ExecutorService executorService, final long requestId)
-      throws Exception {
+  private void testSingleRequest(ExecutorService executorService, final long requestId) throws Exception {
     Set<String> expectedTraces = new HashSet<>(NUM_CHILDREN_PER_REQUEST + 1);
     TraceContext.register(requestId);
     String key = Integer.toString(RANDOM.nextInt());

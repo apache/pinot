@@ -56,9 +56,8 @@ public class StarTreeTransformPlanNode implements PlanNode {
       _groupByExpressions = Collections.emptyList();
       groupByColumns = null;
     }
-    _starTreeProjectionPlanNode =
-        new StarTreeProjectionPlanNode(starTreeV2, projectionColumns, predicateEvaluatorsMap, groupByColumns,
-            debugOptions);
+    _starTreeProjectionPlanNode = new StarTreeProjectionPlanNode(starTreeV2, projectionColumns, predicateEvaluatorsMap,
+        groupByColumns, debugOptions);
   }
 
   @Override

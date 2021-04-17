@@ -77,9 +77,8 @@ public class BrokerReduceService {
     LOGGER.info("Initializing BrokerReduceService with {} threads, and {} max reduce threads.",
         numThreadsInExecutorService, _maxReduceThreadsPerQuery);
 
-    ThreadFactory reduceThreadFactory =
-        new ThreadFactoryBuilder().setDaemon(false).setPriority(QUERY_RUNNER_THREAD_PRIORITY)
-            .setNameFormat(REDUCE_THREAD_NAME_FORMAT).build();
+    ThreadFactory reduceThreadFactory = new ThreadFactoryBuilder().setDaemon(false)
+        .setPriority(QUERY_RUNNER_THREAD_PRIORITY).setNameFormat(REDUCE_THREAD_NAME_FORMAT).build();
 
     // ExecutorService is initialized with numThreads same as availableProcessors.
     _reduceExecutorService = Executors.newFixedThreadPool(numThreadsInExecutorService, reduceThreadFactory);
@@ -144,8 +143,8 @@ public class BrokerReduceService {
 
       // Reduce on trace info.
       if (brokerRequest.isEnableTrace()) {
-        brokerResponseNative.getTraceInfo()
-            .put(entry.getKey().getHostname(), metadata.get(DataTable.TRACE_INFO_METADATA_KEY));
+        brokerResponseNative.getTraceInfo().put(entry.getKey().getHostname(),
+            metadata.get(DataTable.TRACE_INFO_METADATA_KEY));
       }
 
       // Reduce on exceptions.
@@ -245,13 +244,13 @@ public class BrokerReduceService {
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     if (brokerMetrics != null) {
       brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.DOCUMENTS_SCANNED, numDocsScanned);
-      brokerMetrics
-          .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER, numEntriesScannedInFilter);
-      brokerMetrics
-          .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER, numEntriesScannedPostFilter);
+      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER,
+          numEntriesScannedInFilter);
+      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER,
+          numEntriesScannedPostFilter);
       brokerMetrics.addValueToTableGauge(rawTableName, BrokerGauge.OFFLINE_THREAD_CPU_TIME_NS, offlineThreadCpuTimeNs);
-      brokerMetrics
-          .addValueToTableGauge(rawTableName, BrokerGauge.REALTIME_THREAD_CPU_TIME_NS, realtimeThreadCpuTimeNs);
+      brokerMetrics.addValueToTableGauge(rawTableName, BrokerGauge.REALTIME_THREAD_CPU_TIME_NS,
+          realtimeThreadCpuTimeNs);
       if (numConsumingSegmentsProcessed > 0 && minConsumingFreshnessTimeMs > 0) {
         brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.FRESHNESS_LAG_MS,
             System.currentTimeMillis() - minConsumingFreshnessTimeMs, TimeUnit.MILLISECONDS);
@@ -268,7 +267,8 @@ public class BrokerReduceService {
     DataTableReducer dataTableReducer = ResultReducerFactory.getResultReducer(queryContext);
     dataTableReducer.reduceAndSetResults(rawTableName, cachedDataSchema, dataTableMap, brokerResponseNative,
         new DataTableReducerContext(_reduceExecutorService, _maxReduceThreadsPerQuery, reduceTimeOutMs,
-            _groupByTrimThreshold), brokerMetrics);
+            _groupByTrimThreshold),
+        brokerMetrics);
     updateAlias(queryContext, brokerResponseNative);
     return brokerResponseNative;
   }

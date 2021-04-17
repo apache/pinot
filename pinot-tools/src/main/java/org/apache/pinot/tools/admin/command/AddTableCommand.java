@@ -41,16 +41,19 @@ import org.slf4j.LoggerFactory;
 public class AddTableCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AddTableCommand.class);
 
-  @Option(name = "-tableConfigFile", required = true, metaVar = "<string>", aliases = {"-tableConf", "-tableConfig", "-filePath"}, usage = "Path to table config file.")
+  @Option(name = "-tableConfigFile", required = true, metaVar = "<string>",
+      aliases = {"-tableConf", "-tableConfig", "-filePath"}, usage = "Path to table config file.")
   private String _tableConfigFile;
 
-  @Option(name = "-schemaFile", required = false, metaVar = "<string>", aliases = {"-schema"}, usage = "Path to table schema file.")
+  @Option(name = "-schemaFile", required = false, metaVar = "<string>", aliases = {"-schema"},
+      usage = "Path to table schema file.")
   private String _schemaFile = null;
 
   @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
   private String _controllerHost;
 
-  @Option(name = "-controllerPort", required = false, metaVar = "<int>", usage = "Port number to start the controller at.")
+  @Option(name = "-controllerPort", required = false, metaVar = "<int>",
+      usage = "Port number to start the controller at.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
   @Option(name = "-controllerProtocol", required = false, metaVar = "<String>", usage = "protocol for controller.")
@@ -68,7 +71,8 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
   @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
   private String _authToken;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
 
   private String _controllerAddress;
@@ -90,10 +94,9 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
 
   @Override
   public String toString() {
-    String retString =
-        ("AddTable -tableConfigFile " + _tableConfigFile + " -schemaFile " + _schemaFile + " -controllerProtocol "
-            + _controllerProtocol + " -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort
-            + " -user " + _user + " -password " + "[hidden]");
+    String retString = ("AddTable -tableConfigFile " + _tableConfigFile + " -schemaFile " + _schemaFile
+        + " -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost + " -controllerPort "
+        + _controllerPort + " -user " + _user + " -password " + "[hidden]");
     return ((_exec) ? (retString + " -exec") : retString);
   }
 
@@ -146,8 +149,7 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
     return this;
   }
 
-  public void uploadSchema()
-      throws Exception {
+  public void uploadSchema() throws Exception {
     File schemaFile;
     Schema schema;
     try {
@@ -158,8 +160,9 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
       throw e;
     }
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      fileUploadDownloadClient.addSchema(FileUploadDownloadClient
-              .getUploadSchemaURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort)),
+      fileUploadDownloadClient.addSchema(
+          FileUploadDownloadClient.getUploadSchemaURI(_controllerProtocol, _controllerHost,
+              Integer.parseInt(_controllerPort)),
           schema.getSchemaName(), schemaFile, makeAuthHeader(makeAuthToken(_authToken, _user, _password)),
           Collections.emptyList());
     } catch (Exception e) {
@@ -168,18 +171,16 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
     }
   }
 
-  public boolean sendTableCreationRequest(JsonNode node)
-      throws IOException {
-    String res = AbstractBaseAdminCommand
-        .sendRequest("POST", ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableCreate(), node.toString(),
-            makeAuthHeader(makeAuthToken(_authToken, _user, _password)));
+  public boolean sendTableCreationRequest(JsonNode node) throws IOException {
+    String res = AbstractBaseAdminCommand.sendRequest("POST",
+        ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableCreate(), node.toString(),
+        makeAuthHeader(makeAuthToken(_authToken, _user, _password)));
     LOGGER.info(res);
     return res.contains("succesfully added");
   }
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
     if (!_exec) {
       LOGGER.warn("Dry Running Command: " + toString());
       LOGGER.warn("Use the -exec option to actually execute the command.");

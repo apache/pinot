@@ -109,9 +109,8 @@ public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCrea
    * @param numValues total number of values, used for Multi value columns (for single value columns numDocs== numValues)
    * @throws IOException
    */
-  public RangeIndexCreator(File indexDir, FieldSpec fieldSpec, DataType valueType, int numRanges,
-      int numValuesPerRange, int numDocs, int numValues)
-      throws IOException {
+  public RangeIndexCreator(File indexDir, FieldSpec fieldSpec, DataType valueType, int numRanges, int numValuesPerRange,
+      int numDocs, int numValues) throws IOException {
     _valueType = valueType;
     String columnName = fieldSpec.getName();
     _rangeIndexFile = new File(indexDir, columnName + BITMAP_RANGE_INDEX_FILE_EXTENSION);
@@ -243,8 +242,7 @@ public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCrea
    * @throws IOException
    */
   @Override
-  public void seal()
-      throws IOException {
+  public void seal() throws IOException {
     if (TRACE) {
       LOGGER.info("Before sorting");
       dump();
@@ -378,13 +376,11 @@ public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCrea
       FileUtils.deleteQuietly(_rangeIndexFile);
       throw e;
     }
-    Preconditions.checkState(bytesWritten == _rangeIndexFile.length(),
-        "Length of inverted index file: " + _rangeIndexFile.length() + " does not match the number of bytes written: "
-            + bytesWritten);
+    Preconditions.checkState(bytesWritten == _rangeIndexFile.length(), "Length of inverted index file: "
+        + _rangeIndexFile.length() + " does not match the number of bytes written: " + bytesWritten);
   }
 
-  private void writeNumberToHeader(DataOutputStream header, Number number)
-      throws IOException {
+  private void writeNumberToHeader(DataOutputStream header, Number number) throws IOException {
     switch (_valueType) {
       case INT:
         header.writeInt(number.intValue());
@@ -418,8 +414,7 @@ public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCrea
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     org.apache.pinot.common.utils.FileUtils.close(new DataBufferAndFile(_tempValueBuffer, _tempValueBufferFile),
         new DataBufferAndFile(_docIdValueBuffer, _tempDocIdBufferFile));
   }
@@ -434,8 +429,7 @@ public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCrea
     }
 
     @Override
-    public void close()
-        throws IOException {
+    public void close() throws IOException {
       destroyBuffer(_dataBuffer, _file);
     }
   }
@@ -456,14 +450,12 @@ public final class RangeIndexCreator implements DictionaryBasedInvertedIndexCrea
     LOGGER.info(valuesAsString.toString());
   }
 
-  private PinotDataBuffer createTempBuffer(long size, File mmapFile)
-      throws IOException {
-    return PinotDataBuffer
-        .mapFile(mmapFile, false, 0, size, PinotDataBuffer.NATIVE_ORDER, "RangeIndexCreator: temp buffer");
+  private PinotDataBuffer createTempBuffer(long size, File mmapFile) throws IOException {
+    return PinotDataBuffer.mapFile(mmapFile, false, 0, size, PinotDataBuffer.NATIVE_ORDER,
+        "RangeIndexCreator: temp buffer");
   }
 
-  private void destroyBuffer(PinotDataBuffer buffer, File mmapFile)
-      throws IOException {
+  private void destroyBuffer(PinotDataBuffer buffer, File mmapFile) throws IOException {
     if (buffer != null) {
       buffer.close();
       if (mmapFile.exists()) {

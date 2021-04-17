@@ -88,8 +88,7 @@ public abstract class RealtimeIndexOffHeapMemoryManager implements PinotDataBuff
   /**
    * Method to be implemented by inheriting concrete classes
    */
-  protected abstract void doClose()
-      throws IOException;
+  protected abstract void doClose() throws IOException;
 
   protected abstract PinotDataBuffer allocateInternal(long size, String columnName);
 
@@ -101,8 +100,7 @@ public abstract class RealtimeIndexOffHeapMemoryManager implements PinotDataBuff
    *
    * @throws IOException
    */
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     for (PinotDataBuffer buffer : _buffers) {
       buffer.close();
     }

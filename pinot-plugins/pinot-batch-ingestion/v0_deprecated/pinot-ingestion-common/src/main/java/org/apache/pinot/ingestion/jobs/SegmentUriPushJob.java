@@ -43,8 +43,8 @@ public class SegmentUriPushJob extends BaseSegmentJob {
     _segmentUriSuffix = properties.getProperty("uri.suffix", "");
     _segmentPattern = Preconditions.checkNotNull(properties.getProperty(JobConfigConstants.PATH_TO_OUTPUT),
         String.format("Config: %s is missing in job property file.", JobConfigConstants.PATH_TO_OUTPUT));
-    String[] hosts = StringUtils.split(Preconditions
-        .checkNotNull(properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS),
+    String[] hosts =
+        StringUtils.split(Preconditions.checkNotNull(properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS),
             String.format("Config: %s is missing in job property file.", JobConfigConstants.PUSH_TO_HOSTS)), ',');
     int port = Integer.parseInt(Preconditions.checkNotNull(properties.getProperty(JobConfigConstants.PUSH_TO_PORT),
         String.format("Config: %s is missing in job property file.", JobConfigConstants.PUSH_TO_PORT)));
@@ -58,8 +58,7 @@ public class SegmentUriPushJob extends BaseSegmentJob {
     return fileName.endsWith(JobConfigConstants.TAR_GZ_FILE_EXT);
   }
 
-  public void run()
-      throws Exception {
+  public void run() throws Exception {
     try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
       List<Path> tarFilePaths = getDataFilePaths(_segmentPattern);
       retainRecentFiles(tarFilePaths, _lookBackPeriod);

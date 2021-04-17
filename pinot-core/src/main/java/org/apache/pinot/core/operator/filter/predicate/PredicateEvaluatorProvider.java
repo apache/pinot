@@ -44,18 +44,18 @@ public class PredicateEvaluatorProvider {
           case EQ:
             return EqualsPredicateEvaluatorFactory.newDictionaryBasedEvaluator((EqPredicate) predicate, dictionary);
           case NOT_EQ:
-            return NotEqualsPredicateEvaluatorFactory
-                .newDictionaryBasedEvaluator((NotEqPredicate) predicate, dictionary);
+            return NotEqualsPredicateEvaluatorFactory.newDictionaryBasedEvaluator((NotEqPredicate) predicate,
+                dictionary);
           case IN:
             return InPredicateEvaluatorFactory.newDictionaryBasedEvaluator((InPredicate) predicate, dictionary);
           case NOT_IN:
             return NotInPredicateEvaluatorFactory.newDictionaryBasedEvaluator((NotInPredicate) predicate, dictionary);
           case RANGE:
-            return RangePredicateEvaluatorFactory
-                .newDictionaryBasedEvaluator((RangePredicate) predicate, dictionary, dataType);
+            return RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator((RangePredicate) predicate, dictionary,
+                dataType);
           case REGEXP_LIKE:
-            return RegexpLikePredicateEvaluatorFactory
-                .newDictionaryBasedEvaluator((RegexpLikePredicate) predicate, dictionary);
+            return RegexpLikePredicateEvaluatorFactory.newDictionaryBasedEvaluator((RegexpLikePredicate) predicate,
+                dictionary);
           default:
             throw new UnsupportedOperationException("Unsupported predicate type: " + predicate.getType());
         }
@@ -73,8 +73,8 @@ public class PredicateEvaluatorProvider {
           case RANGE:
             return RangePredicateEvaluatorFactory.newRawValueBasedEvaluator((RangePredicate) predicate, dataType);
           case REGEXP_LIKE:
-            return RegexpLikePredicateEvaluatorFactory
-                .newRawValueBasedEvaluator((RegexpLikePredicate) predicate, dataType);
+            return RegexpLikePredicateEvaluatorFactory.newRawValueBasedEvaluator((RegexpLikePredicate) predicate,
+                dataType);
           default:
             throw new UnsupportedOperationException("Unsupported predicate type: " + predicate.getType());
         }

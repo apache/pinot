@@ -30,8 +30,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class ForwardIndexWriterBenchmark {
-  public static void convertRawToForwardIndex(File rawFile)
-      throws Exception {
+  public static void convertRawToForwardIndex(File rawFile) throws Exception {
     List<String> lines = IOUtils.readLines(new FileReader(rawFile));
     int totalDocs = lines.size();
     int max = Integer.MIN_VALUE;
@@ -110,8 +109,7 @@ public class ForwardIndexWriterBenchmark {
         .println("size (with custom bitset)\t\t\t:" + (((totalNumValues + 7) / 8) + (numChunks * 4) + dataSizeinBytes));
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     convertRawToForwardIndex(new File("/tmp/output.mv.raw"));
   }
 }

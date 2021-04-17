@@ -38,6 +38,5 @@ public interface FieldExtractor<T> {
   /**
    * Extracts the fields from the given record.
    */
-  Map<String, Object> extractFields(T record)
-      throws IOException;
+  Map<String, Object> extractFields(T record) throws IOException;
 }

@@ -165,9 +165,8 @@ public abstract class ControllerTest {
     _helixDataAccessor = _helixManager.getHelixDataAccessor();
     ConfigAccessor configAccessor = _helixManager.getConfigAccessor();
     // HelixResourceManager is null in Helix only mode, while HelixManager is null in Pinot only mode.
-    HelixConfigScope scope =
-        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
-            .build();
+    HelixConfigScope scope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
+        .forCluster(getHelixClusterName()).build();
     switch (_controllerStarter.getControllerMode()) {
       case DUAL:
       case PINOT_ONLY:
@@ -208,12 +207,11 @@ public abstract class ControllerTest {
 
   protected void addFakeBrokerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant)
       throws Exception {
-    HelixManager helixManager =
-        HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
-            ZkStarter.DEFAULT_ZK_STR);
-    helixManager.getStateMachineEngine()
-        .registerStateModelFactory(FakeBrokerResourceOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
-            FakeBrokerResourceOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
+    HelixManager helixManager = HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId,
+        InstanceType.PARTICIPANT, ZkStarter.DEFAULT_ZK_STR);
+    helixManager.getStateMachineEngine().registerStateModelFactory(
+        FakeBrokerResourceOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
+        FakeBrokerResourceOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
     helixManager.connect();
     HelixAdmin helixAdmin = helixManager.getClusterManagmentTool();
     if (isSingleTenant) {
@@ -293,12 +291,11 @@ public abstract class ControllerTest {
 
   protected void addFakeServerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant, int adminPort)
       throws Exception {
-    HelixManager helixManager =
-        HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
-            ZkStarter.DEFAULT_ZK_STR);
-    helixManager.getStateMachineEngine()
-        .registerStateModelFactory(FakeSegmentOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
-            FakeSegmentOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
+    HelixManager helixManager = HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId,
+        InstanceType.PARTICIPANT, ZkStarter.DEFAULT_ZK_STR);
+    helixManager.getStateMachineEngine().registerStateModelFactory(
+        FakeSegmentOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
+        FakeSegmentOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
     helixManager.connect();
     HelixAdmin helixAdmin = helixManager.getClusterManagmentTool();
     if (isSingleTenant) {
@@ -307,8 +304,9 @@ public abstract class ControllerTest {
     } else {
       helixAdmin.addInstanceTag(getHelixClusterName(), instanceId, UNTAGGED_SERVER_INSTANCE);
     }
-    HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT,
-        getHelixClusterName()).forParticipant(instanceId).build();
+    HelixConfigScope configScope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT, getHelixClusterName())
+            .forParticipant(instanceId).build();
     helixAdmin.setConfig(configScope, Collections.singletonMap(ADMIN_PORT_KEY, Integer.toString(adminPort)));
     _fakeInstanceHelixManagers.add(helixManager);
   }
@@ -383,21 +381,18 @@ public abstract class ControllerTest {
     }
   }
 
-  protected void addFakeMinionInstancesToAutoJoinHelixCluster(int numInstances)
-      throws Exception {
+  protected void addFakeMinionInstancesToAutoJoinHelixCluster(int numInstances) throws Exception {
     for (int i = 0; i < numInstances; i++) {
       addFakeMinionInstanceToAutoJoinHelixCluster(MINION_INSTANCE_ID_PREFIX + i);
     }
   }
 
-  protected void addFakeMinionInstanceToAutoJoinHelixCluster(String instanceId)
-      throws Exception {
-    HelixManager helixManager =
-        HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
-            ZkStarter.DEFAULT_ZK_STR);
-    helixManager.getStateMachineEngine()
-        .registerStateModelFactory(FakeMinionResourceOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
-            FakeMinionResourceOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
+  protected void addFakeMinionInstanceToAutoJoinHelixCluster(String instanceId) throws Exception {
+    HelixManager helixManager = HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId,
+        InstanceType.PARTICIPANT, ZkStarter.DEFAULT_ZK_STR);
+    helixManager.getStateMachineEngine().registerStateModelFactory(
+        FakeMinionResourceOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
+        FakeMinionResourceOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
     helixManager.connect();
     HelixAdmin helixAdmin = helixManager.getClusterManagmentTool();
     helixAdmin.addInstanceTag(getHelixClusterName(), instanceId, UNTAGGED_MINION_INSTANCE);
@@ -533,8 +528,7 @@ public abstract class ControllerTest {
   }
 
   protected void dropAllSegments(String tableName, TableType tableType) throws IOException {
-    sendDeleteRequest(
-        _controllerRequestURLBuilder.forSegmentDeleteAllAPI(tableName, tableType.toString()));
+    sendDeleteRequest(_controllerRequestURLBuilder.forSegmentDeleteAllAPI(tableName, tableType.toString()));
   }
 
   protected void reloadOfflineTable(String tableName) throws IOException {
@@ -622,8 +616,8 @@ public abstract class ControllerTest {
 
     if (payload != null && !payload.isEmpty()) {
       httpConnection.setDoOutput(true);
-      try (BufferedWriter writer = new BufferedWriter(
-          new OutputStreamWriter(httpConnection.getOutputStream(), StandardCharsets.UTF_8))) {
+      try (BufferedWriter writer =
+          new BufferedWriter(new OutputStreamWriter(httpConnection.getOutputStream(), StandardCharsets.UTF_8))) {
         writer.write(payload, 0, payload.length());
         writer.flush();
       }
@@ -636,7 +630,8 @@ public abstract class ControllerTest {
     return sendPutRequest(urlString, payload, Collections.emptyMap());
   }
 
-  public static String sendPutRequest(String urlString, String payload, Map<String, String> headers) throws IOException {
+  public static String sendPutRequest(String urlString, String payload, Map<String, String> headers)
+      throws IOException {
     HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
     httpConnection.setDoOutput(true);
     httpConnection.setRequestMethod("PUT");
@@ -646,8 +641,8 @@ public abstract class ControllerTest {
       }
     }
 
-    try (BufferedWriter writer = new BufferedWriter(
-        new OutputStreamWriter(httpConnection.getOutputStream(), StandardCharsets.UTF_8))) {
+    try (BufferedWriter writer =
+        new BufferedWriter(new OutputStreamWriter(httpConnection.getOutputStream(), StandardCharsets.UTF_8))) {
       writer.write(payload);
       writer.flush();
     }
@@ -694,7 +689,8 @@ public abstract class ControllerTest {
     return sendMultipartPostRequest(url, body, Collections.emptyMap());
   }
 
-  public static PostMethod sendMultipartPostRequest(String url, String body, Map<String, String> headers) throws IOException {
+  public static PostMethod sendMultipartPostRequest(String url, String body, Map<String, String> headers)
+      throws IOException {
     HttpClient httpClient = new HttpClient();
     PostMethod postMethod = new PostMethod(url);
     // our handlers ignore key...so we can put anything here
@@ -713,7 +709,8 @@ public abstract class ControllerTest {
     return sendMultipartPutRequest(url, body, Collections.emptyMap());
   }
 
-  public static PutMethod sendMultipartPutRequest(String url, String body, Map<String, String> headers) throws IOException {
+  public static PutMethod sendMultipartPutRequest(String url, String body, Map<String, String> headers)
+      throws IOException {
     HttpClient httpClient = new HttpClient();
     PutMethod putMethod = new PutMethod(url);
     // our handlers ignore key...so we can put anything here

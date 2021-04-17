@@ -62,17 +62,15 @@ public class ServerInstance {
 
   private boolean _started = false;
 
-  public ServerInstance(ServerConf serverConf, HelixManager helixManager)
-      throws Exception {
+  public ServerInstance(ServerConf serverConf, HelixManager helixManager) throws Exception {
     LOGGER.info("Initializing server instance");
 
     LOGGER.info("Initializing server metrics");
     PinotConfiguration metricsConfiguration = serverConf.getMetricsConfig();
     PinotMetricUtils.init(metricsConfiguration);
     PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
-    _serverMetrics =
-        new ServerMetrics(serverConf.getMetricsPrefix(), metricsRegistry, serverConf.emitTableLevelMetrics(),
-            serverConf.getAllowedTablesForEmittingMetrics());
+    _serverMetrics = new ServerMetrics(serverConf.getMetricsPrefix(), metricsRegistry,
+        serverConf.emitTableLevelMetrics(), serverConf.getAllowedTablesForEmittingMetrics());
     _serverMetrics.initializeGlobalMeters();
 
     String instanceDataManagerClassName = serverConf.getInstanceDataManagerClassName();
@@ -93,7 +91,8 @@ public class ServerInstance {
     _queryScheduler =
         QuerySchedulerFactory.create(serverConf.getSchedulerConfig(), _queryExecutor, _serverMetrics, _latestQueryTime);
 
-    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_TLS_PREFIX);
+    TlsConfig tlsConfig =
+        TlsUtils.extractTlsConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_TLS_PREFIX);
 
     if (serverConf.isNettyServerEnabled()) {
       int nettyPort = serverConf.getNettyPort();

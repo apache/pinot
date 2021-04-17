@@ -35,17 +35,15 @@ public class SegmentGenerationUtilsTest {
         "input.data");
     Assert.assertEquals(SegmentGenerationUtils.getFileName(URI.create("/var/data/myTable/2020/04/06/input.data")),
         "input.data");
-    Assert.assertEquals(SegmentGenerationUtils
-            .getFileName(URI.create("dbfs:/mnt/mydb/mytable/pt_year=2020/pt_month=4/pt_date=2020-04-01/input.data")),
-        "input.data");
+    Assert.assertEquals(SegmentGenerationUtils.getFileName(
+        URI.create("dbfs:/mnt/mydb/mytable/pt_year=2020/pt_month=4/pt_date=2020-04-01/input.data")), "input.data");
     Assert.assertEquals(SegmentGenerationUtils.getFileName(URI.create("hdfs://var/data/myTable/2020/04/06/input.data")),
         "input.data");
   }
 
   // Confirm output path generation works with URIs that have authority/userInfo.
   @Test
-  public void testRelativeURIs()
-      throws URISyntaxException {
+  public void testRelativeURIs() throws URISyntaxException {
     URI inputDirURI = new URI("hdfs://namenode1:9999/path/to/");
     URI inputFileURI = new URI("hdfs://namenode1:9999/path/to/subdir/file");
     URI outputDirURI = new URI("hdfs://namenode2/output/dir/");
@@ -57,8 +55,7 @@ public class SegmentGenerationUtilsTest {
 
   // Invalid segment tar name with space
   @Test
-  public void testInvalidRelativeURIs()
-      throws URISyntaxException, UnsupportedEncodingException {
+  public void testInvalidRelativeURIs() throws URISyntaxException, UnsupportedEncodingException {
     URI inputDirURI = new URI("hdfs://namenode1:9999/path/to/");
     URI inputFileURI = new URI("hdfs://namenode1:9999/path/to/subdir/file");
     URI outputDirURI = new URI("hdfs://namenode2/output/dir/");
@@ -69,8 +66,8 @@ public class SegmentGenerationUtilsTest {
     } catch (Exception e) {
       Assert.assertTrue(e instanceof URISyntaxException);
     }
-    URI outputSegmentTarURI = SegmentGenerationUtils.getRelativeOutputPath(inputDirURI, inputFileURI, outputDirURI)
-        .resolve(new URI(
+    URI outputSegmentTarURI =
+        SegmentGenerationUtils.getRelativeOutputPath(inputDirURI, inputFileURI, outputDirURI).resolve(new URI(
             URLEncoder.encode("table_OFFLINE_2021-02-01_09:39:00.000_2021-02-01_11:59:00.000_2.tar.gz", "UTF-8")));
     Assert.assertEquals(outputSegmentTarURI.toString(),
         "hdfs://namenode2/output/dir/subdir/table_OFFLINE_2021-02-01_09%3A39%3A00.000_2021-02-01_11%3A59%3A00.000_2.tar.gz");
@@ -80,14 +77,13 @@ public class SegmentGenerationUtilsTest {
   // https://github.com/apache/incubator-pinot/issues/6355
 
   @Test
-  public void testGetFileURI()
-      throws Exception {
+  public void testGetFileURI() throws Exception {
     // Raw path without scheme
     Assert.assertEquals(SegmentGenerationUtils.getFileURI("/path/to/file", new URI("file:/path/to")).toString(),
         "file:/path/to/file");
-    Assert
-        .assertEquals(SegmentGenerationUtils.getFileURI("/path/to/file", new URI("hdfs://namenode/path/to")).toString(),
-            "hdfs://namenode/path/to/file");
+    Assert.assertEquals(
+        SegmentGenerationUtils.getFileURI("/path/to/file", new URI("hdfs://namenode/path/to")).toString(),
+        "hdfs://namenode/path/to/file");
     Assert.assertEquals(SegmentGenerationUtils.getFileURI("/path/to/file", new URI("hdfs:///path/to")).toString(),
         "hdfs:/path/to/file");
 
@@ -111,16 +107,14 @@ public class SegmentGenerationUtilsTest {
     validateFileURI(new URI("s3://username:password@bucket/path/to/"));
   }
 
-  private void validateFileURI(URI directoryURI, String expectedPrefix)
-      throws URISyntaxException {
+  private void validateFileURI(URI directoryURI, String expectedPrefix) throws URISyntaxException {
     URI fileURI = new URI(directoryURI.toString() + "file");
     String rawPath = fileURI.getRawPath();
 
     Assert.assertEquals(SegmentGenerationUtils.getFileURI(rawPath, fileURI).toString(), expectedPrefix + "file");
   }
 
-  private void validateFileURI(URI directoryURI)
-      throws URISyntaxException {
+  private void validateFileURI(URI directoryURI) throws URISyntaxException {
     validateFileURI(directoryURI, directoryURI.toString());
   }
 }

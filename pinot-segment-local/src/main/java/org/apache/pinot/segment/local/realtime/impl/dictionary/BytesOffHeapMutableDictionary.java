@@ -205,8 +205,7 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
   }
 
   @Override
-  public void doClose()
-      throws IOException {
+  public void doClose() throws IOException {
     _byteStore.close();
   }
 

@@ -51,8 +51,7 @@ public class ThriftRecordReaderTest {
   private File _tempFile;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteQuietly(_tempFile);
 
     ThriftSampleData t1 = new ThriftSampleData();
@@ -93,8 +92,7 @@ public class ThriftRecordReaderTest {
   }
 
   @Test
-  public void testReadData()
-      throws IOException {
+  public void testReadData() throws IOException {
     ThriftRecordReader recordReader = new ThriftRecordReader();
     recordReader.init(_tempFile, getSourceFields(), getThriftRecordReaderConfig());
     List<GenericRow> genericRows = new ArrayList<>();
@@ -112,8 +110,7 @@ public class ThriftRecordReaderTest {
   }
 
   @Test
-  public void testRewind()
-      throws IOException {
+  public void testRewind() throws IOException {
     ThriftRecordReader recordReader = new ThriftRecordReader();
     recordReader.init(_tempFile, getSourceFields(), getThriftRecordReaderConfig());
     List<GenericRow> genericRows = new ArrayList<>();
@@ -130,8 +127,7 @@ public class ThriftRecordReaderTest {
     Assert.assertEquals(genericRows.size(), 4, "The number of rows return after the rewind is incorrect");
   }
 
-  private File getSampleDataPath()
-      throws IOException {
+  private File getSampleDataPath() throws IOException {
     return File.createTempFile(ThriftRecordReaderTest.class.getName(), THRIFT_DATA);
   }
 

@@ -63,8 +63,7 @@ public class SegmentPurger {
     _recordModifier = recordModifier;
   }
 
-  public File purgeSegment()
-      throws Exception {
+  public File purgeSegment() throws Exception {
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
     String segmentName = segmentMetadata.getName();
     LOGGER.info("Start purging table: {}, segment: {}", _tableConfig.getTableName(), segmentName);
@@ -135,8 +134,7 @@ public class SegmentPurger {
     // Flag to mark whether all records have been iterated
     boolean _finished = false;
 
-    PurgeRecordReader()
-        throws Exception {
+    PurgeRecordReader() throws Exception {
       _pinotSegmentRecordReader = new PinotSegmentRecordReader(_indexDir);
     }
 
@@ -216,8 +214,7 @@ public class SegmentPurger {
     }
 
     @Override
-    public void close()
-        throws IOException {
+    public void close() throws IOException {
       _pinotSegmentRecordReader.close();
     }
   }

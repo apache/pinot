@@ -84,8 +84,8 @@ public class TimeGranularitySpec implements Serializable {
     Preconditions.checkNotNull(timeType);
     Preconditions.checkNotNull(name);
     Preconditions.checkNotNull(timeFormat);
-    Preconditions.checkArgument(timeFormat.equals(TimeFormat.EPOCH.toString()) || (timeFormat
-        .startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())));
+    Preconditions.checkArgument(timeFormat.equals(TimeFormat.EPOCH.toString())
+        || (timeFormat.startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())));
 
     _dataType = dataType.getStoredType();
     _timeType = timeType;
@@ -107,8 +107,8 @@ public class TimeGranularitySpec implements Serializable {
     Preconditions.checkNotNull(timeType);
     Preconditions.checkNotNull(name);
     Preconditions.checkNotNull(timeFormat);
-    Preconditions.checkArgument(timeFormat.equals(TimeFormat.EPOCH.toString()) || (timeFormat
-        .startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())));
+    Preconditions.checkArgument(timeFormat.equals(TimeFormat.EPOCH.toString())
+        || (timeFormat.startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())));
 
     _dataType = dataType.getStoredType();
     _timeType = timeType;
@@ -208,9 +208,9 @@ public class TimeGranularitySpec implements Serializable {
     }
 
     TimeGranularitySpec that = (TimeGranularitySpec) o;
-    return EqualityUtils.isEqual(_name, that._name) && EqualityUtils.isEqual(_dataType, that._dataType) && EqualityUtils
-        .isEqual(_timeType, that._timeType) && EqualityUtils.isEqual(_timeUnitSize, that._timeUnitSize) && EqualityUtils
-        .isEqual(_timeFormat, that._timeFormat);
+    return EqualityUtils.isEqual(_name, that._name) && EqualityUtils.isEqual(_dataType, that._dataType)
+        && EqualityUtils.isEqual(_timeType, that._timeType) && EqualityUtils.isEqual(_timeUnitSize, that._timeUnitSize)
+        && EqualityUtils.isEqual(_timeFormat, that._timeFormat);
   }
 
   @Override

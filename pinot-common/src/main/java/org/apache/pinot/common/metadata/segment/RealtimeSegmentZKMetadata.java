@@ -86,9 +86,9 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
     }
 
     RealtimeSegmentZKMetadata metadata = (RealtimeSegmentZKMetadata) segmentMetadata;
-    return super.equals(metadata) && isEqual(_status, metadata._status) && isEqual(_sizeThresholdToFlushSegment,
-        metadata._sizeThresholdToFlushSegment) && isEqual(_timeThresholdToFlushSegment,
-        metadata._timeThresholdToFlushSegment);
+    return super.equals(metadata) && isEqual(_status, metadata._status)
+        && isEqual(_sizeThresholdToFlushSegment, metadata._sizeThresholdToFlushSegment)
+        && isEqual(_timeThresholdToFlushSegment, metadata._timeThresholdToFlushSegment);
   }
 
   @Override

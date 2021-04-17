@@ -40,10 +40,10 @@ public class InstanceSelectorFactory {
     RoutingConfig routingConfig = tableConfig.getRoutingConfig();
     if (routingConfig != null) {
       if (RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(routingConfig.getInstanceSelectorType())
-          || (tableConfig.getTableType() == TableType.OFFLINE && LEGACY_REPLICA_GROUP_OFFLINE_ROUTING
-          .equalsIgnoreCase(routingConfig.getRoutingTableBuilderName())) || (
-          tableConfig.getTableType() == TableType.REALTIME && LEGACY_REPLICA_GROUP_REALTIME_ROUTING
-              .equalsIgnoreCase(routingConfig.getRoutingTableBuilderName()))) {
+          || (tableConfig.getTableType() == TableType.OFFLINE
+              && LEGACY_REPLICA_GROUP_OFFLINE_ROUTING.equalsIgnoreCase(routingConfig.getRoutingTableBuilderName()))
+          || (tableConfig.getTableType() == TableType.REALTIME
+              && LEGACY_REPLICA_GROUP_REALTIME_ROUTING.equalsIgnoreCase(routingConfig.getRoutingTableBuilderName()))) {
         LOGGER.info("Using ReplicaGroupInstanceSelector for table: {}", tableNameWithType);
         return new ReplicaGroupInstanceSelector(tableNameWithType, brokerMetrics);
       }

@@ -55,8 +55,7 @@ public class SegmentTestUtils {
 
   @Nonnull
   public static SegmentGeneratorConfig getSegmentGeneratorConfigWithoutTimeColumn(@Nonnull File avroFile,
-      @Nonnull File outputDir, @Nonnull String tableName)
-      throws IOException {
+      @Nonnull File outputDir, @Nonnull String tableName) throws IOException {
     SegmentGeneratorConfig segmentGeneratorConfig =
         new SegmentGeneratorConfig(new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).build(),
             extractSchemaFromAvroWithoutTime(avroFile));
@@ -67,8 +66,7 @@ public class SegmentTestUtils {
   }
 
   public static SegmentGeneratorConfig getSegmentGenSpecWithSchemAndProjectedColumns(File inputAvro, File outputDir,
-      String timeColumn, TimeUnit timeUnit, String tableName)
-      throws IOException {
+      String timeColumn, TimeUnit timeUnit, String tableName) throws IOException {
     final SegmentGeneratorConfig segmentGenSpec =
         new SegmentGeneratorConfig(new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).build(),
             extractSchemaFromAvroWithoutTime(inputAvro));
@@ -104,8 +102,7 @@ public class SegmentTestUtils {
     return segmentGeneratorConfig;
   }
 
-  public static Schema extractSchemaFromAvroWithoutTime(File avroFile)
-      throws IOException {
+  public static Schema extractSchemaFromAvroWithoutTime(File avroFile) throws IOException {
     DataFileStream<GenericRecord> dataStream =
         new DataFileStream<GenericRecord>(new FileInputStream(avroFile), new GenericDatumReader<GenericRecord>());
     Schema schema = new Schema();

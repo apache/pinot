@@ -77,8 +77,7 @@ public class SegmentPreProcessor implements AutoCloseable {
     _segmentDirectory = SegmentDirectory.createFromLocalFS(indexDir, _segmentMetadata, ReadMode.mmap);
   }
 
-  public void process()
-      throws Exception {
+  public void process() throws Exception {
     if (_segmentMetadata.getTotalDocs() == 0) {
       LOGGER.info("Skip preprocessing empty segment: {}", _segmentMetadata.getName());
       return;
@@ -99,8 +98,8 @@ public class SegmentPreProcessor implements AutoCloseable {
     try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
       // Update default columns according to the schema.
       if (_schema != null) {
-        DefaultColumnHandler defaultColumnHandler = DefaultColumnHandlerFactory
-            .getDefaultColumnHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, _schema, segmentWriter);
+        DefaultColumnHandler defaultColumnHandler = DefaultColumnHandlerFactory.getDefaultColumnHandler(_indexDir,
+            _segmentMetadata, _indexLoadingConfig, _schema, segmentWriter);
         defaultColumnHandler.updateDefaultColumns();
         _segmentMetadata = new SegmentMetadataImpl(_indexDir);
         _segmentDirectory.reloadMetadata();
@@ -152,8 +151,8 @@ public class SegmentPreProcessor implements AutoCloseable {
 
       // Create/modify/remove star-trees if required
       if (_indexLoadingConfig.isEnableDynamicStarTreeCreation()) {
-        List<StarTreeV2BuilderConfig> starTreeBuilderConfigs = StarTreeBuilderUtils
-            .generateBuilderConfigs(_indexLoadingConfig.getStarTreeIndexConfigs(),
+        List<StarTreeV2BuilderConfig> starTreeBuilderConfigs =
+            StarTreeBuilderUtils.generateBuilderConfigs(_indexLoadingConfig.getStarTreeIndexConfigs(),
                 _indexLoadingConfig.isEnableDefaultStarTree(), _segmentMetadata);
         boolean shouldGenerateStarTree = !starTreeBuilderConfigs.isEmpty();
         List<StarTreeV2Metadata> starTreeMetadataList = _segmentMetadata.getStarTreeV2MetadataList();
@@ -172,8 +171,8 @@ public class SegmentPreProcessor implements AutoCloseable {
         // Generate the star-trees if needed
         if (shouldGenerateStarTree) {
           // NOTE: Always use OFF_HEAP mode on server side.
-          try (MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeBuilderConfigs, _indexDir,
-              MultipleTreesBuilder.BuildMode.OFF_HEAP)) {
+          try (MultipleTreesBuilder builder =
+              new MultipleTreesBuilder(starTreeBuilderConfigs, _indexDir, MultipleTreesBuilder.BuildMode.OFF_HEAP)) {
             builder.build();
           }
           _segmentMetadata = new SegmentMetadataImpl(_indexDir);
@@ -189,7 +188,7 @@ public class SegmentPreProcessor implements AutoCloseable {
             new ColumnMinMaxValueGenerator(_segmentMetadata, segmentWriter, columnMinMaxValueGeneratorMode);
         columnMinMaxValueGenerator.addColumnMinMaxValue();
         // NOTE: This step may modify the segment metadata. When adding new steps after this, un-comment the next line.
-//        _segmentMetadata = new SegmentMetadataImpl(_indexDir);
+        //        _segmentMetadata = new SegmentMetadataImpl(_indexDir);
       }
 
       segmentWriter.save();
@@ -197,8 +196,7 @@ public class SegmentPreProcessor implements AutoCloseable {
   }
 
   @Override
-  public void close()
-      throws Exception {
+  public void close() throws Exception {
     _segmentDirectory.close();
   }
 }

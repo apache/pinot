@@ -65,13 +65,11 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
     // Perform aggregation group-by on all the blocks
     GroupByExecutor groupByExecutor;
     if (_useStarTree) {
-      groupByExecutor =
-          new StarTreeGroupByExecutor(_aggregationFunctions, _groupByExpressions, _maxInitialResultHolderCapacity,
-              _numGroupsLimit, _transformOperator);
+      groupByExecutor = new StarTreeGroupByExecutor(_aggregationFunctions, _groupByExpressions,
+          _maxInitialResultHolderCapacity, _numGroupsLimit, _transformOperator);
     } else {
-      groupByExecutor =
-          new DefaultGroupByExecutor(_aggregationFunctions, _groupByExpressions, _maxInitialResultHolderCapacity,
-              _numGroupsLimit, _transformOperator);
+      groupByExecutor = new DefaultGroupByExecutor(_aggregationFunctions, _groupByExpressions,
+          _maxInitialResultHolderCapacity, _numGroupsLimit, _transformOperator);
     }
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {

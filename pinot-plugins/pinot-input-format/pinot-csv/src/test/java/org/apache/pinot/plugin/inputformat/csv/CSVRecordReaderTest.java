@@ -39,8 +39,7 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
   private final File _dataFile = new File(_tempDir, "data.csv");
 
   @Override
-  protected RecordReader createRecordReader()
-      throws Exception {
+  protected RecordReader createRecordReader() throws Exception {
     CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
     csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
     CSVRecordReader csvRecordReader = new CSVRecordReader();
@@ -49,8 +48,7 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
   }
 
   @Override
-  protected void writeRecordsToFile(List<Map<String, Object>> recordsToWrite)
-      throws Exception {
+  protected void writeRecordsToFile(List<Map<String, Object>> recordsToWrite) throws Exception {
 
     Schema pinotSchema = getPinotSchema();
     String[] columns = pinotSchema.getColumnNames().toArray(new String[0]);
@@ -73,8 +71,7 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
 
   @Override
   protected void checkValue(RecordReader recordReader, List<Map<String, Object>> expectedRecordsMap,
-      List<Object[]> expectedPrimaryKeys)
-      throws Exception {
+      List<Object[]> expectedPrimaryKeys) throws Exception {
     for (int i = 0; i < expectedRecordsMap.size(); i++) {
       Map<String, Object> expectedRecord = expectedRecordsMap.get(i);
       GenericRow actualRecord = recordReader.next();

@@ -64,15 +64,13 @@ public interface TableDataManager {
   /**
    * Adds a segment from local disk into the OFFLINE table.
    */
-  void addSegment(File indexDir, IndexLoadingConfig indexLoadingConfig)
-      throws Exception;
+  void addSegment(File indexDir, IndexLoadingConfig indexLoadingConfig) throws Exception;
 
   /**
    * Adds a segment into the REALTIME table.
    * <p>The segment could be committed or under consuming.
    */
-  void addSegment(String segmentName, TableConfig tableConfig, IndexLoadingConfig indexLoadingConfig)
-      throws Exception;
+  void addSegment(String segmentName, TableConfig tableConfig, IndexLoadingConfig indexLoadingConfig) throws Exception;
 
   /**
    * Removes a segment from the table.

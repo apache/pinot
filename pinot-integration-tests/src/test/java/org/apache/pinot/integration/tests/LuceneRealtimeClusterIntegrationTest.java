@@ -105,8 +105,7 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
     // Start the Pinot cluster
@@ -142,8 +141,7 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     dropRealtimeTable(getTableName());
     stopServer();
     stopBroker();
@@ -153,8 +151,7 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
     FileUtils.deleteDirectory(_tempDir);
   }
 
-  private File createAvroFile()
-      throws Exception {
+  private File createAvroFile() throws Exception {
     // Read all skills from the skill file
     InputStream inputStream = getClass().getClassLoader().getResourceAsStream("data/text_search_data/skills.txt");
     assertNotNull(inputStream);
@@ -169,7 +166,8 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
 
     File avroFile = new File(_tempDir, "data.avro");
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
-    avroSchema.setFields(Arrays.asList(new org.apache.avro.Schema.Field(TEXT_COLUMN_NAME,
+    avroSchema.setFields(Arrays.asList(
+        new org.apache.avro.Schema.Field(TEXT_COLUMN_NAME,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING), null, null),
         new org.apache.avro.Schema.Field(TIME_COLUMN_NAME,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.LONG), null, null)));
@@ -186,8 +184,7 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
   }
 
   @Test
-  public void testTextSearchCountQuery()
-      throws Exception {
+  public void testTextSearchCountQuery() throws Exception {
     // Keep posting queries until all records are consumed
     long previousResult = 0;
     while (getCurrentCountStarResult() < NUM_RECORDS) {
@@ -198,18 +195,17 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
     }
 
     // TODO: Fix Lucene index on consuming segments to update the latest records, then uncomment the following part
-//    TestUtils.waitForCondition(aVoid -> {
-//      try {
-//        return getTextColumnQueryResult() == NUM_MATCHING_RECORDS;
-//      } catch (Exception e) {
-//        fail("Caught exception while getting text column query result");
-//        return false;
-//      }
-//    }, 10_000L, "Failed to reach expected number of matching records");
+    //    TestUtils.waitForCondition(aVoid -> {
+    //      try {
+    //        return getTextColumnQueryResult() == NUM_MATCHING_RECORDS;
+    //      } catch (Exception e) {
+    //        fail("Caught exception while getting text column query result");
+    //        return false;
+    //      }
+    //    }, 10_000L, "Failed to reach expected number of matching records");
   }
 
-  private long getTextColumnQueryResult()
-      throws Exception {
+  private long getTextColumnQueryResult() throws Exception {
     return postQuery(TEST_TEXT_COLUMN_QUERY).get("aggregationResults").get(0).get("value").asLong();
   }
 }

@@ -44,16 +44,14 @@ public interface SegmentCreator extends Closeable, Serializable {
    * @throws Exception
    */
   void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
-      Map<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir)
-      throws Exception;
+      Map<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir) throws Exception;
 
   /**
    * Adds a row to the index.
    *
    * @param row The row to index.
    */
-  void indexRow(GenericRow row)
-      throws IOException;
+  void indexRow(GenericRow row) throws IOException;
 
   /**
    * Sets the name of the segment.
@@ -68,6 +66,5 @@ public interface SegmentCreator extends Closeable, Serializable {
    * @throws ConfigurationException
    * @throws IOException
    */
-  void seal()
-      throws ConfigurationException, IOException;
+  void seal() throws ConfigurationException, IOException;
 }

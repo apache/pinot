@@ -116,9 +116,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     for (IndexSegment indexSegment : indexSegments) {
       planNodes.add(makeSegmentPlanNode(indexSegment, queryContext));
     }
-    CombinePlanNode combinePlanNode =
-        new CombinePlanNode(planNodes, queryContext, executorService, endTimeMs, _numGroupsLimit, null,
-            _groupByTrimThreshold);
+    CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, executorService, endTimeMs,
+        _numGroupsLimit, null, _groupByTrimThreshold);
     return new GlobalPlanImplV0(new InstanceResponsePlanNode(combinePlanNode));
   }
 
@@ -165,9 +164,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     for (IndexSegment indexSegment : indexSegments) {
       planNodes.add(makeStreamingSegmentPlanNode(indexSegment, queryContext));
     }
-    CombinePlanNode combinePlanNode =
-        new CombinePlanNode(planNodes, queryContext, executorService, endTimeMs, _numGroupsLimit, streamObserver,
-            _groupByTrimThreshold);
+    CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, executorService, endTimeMs,
+        _numGroupsLimit, streamObserver, _groupByTrimThreshold);
     return new GlobalPlanImplV0(new InstanceResponsePlanNode(combinePlanNode));
   }
 

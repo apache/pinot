@@ -103,8 +103,7 @@ abstract class BaseStarTreeV2Test<R, A> {
   private StarTreeV2 _starTreeV2;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     _valueAggregator = getValueAggregator();
     _aggregatedValueType = _valueAggregator.getAggregatedValueType();
 
@@ -142,9 +141,10 @@ abstract class BaseStarTreeV2Test<R, A> {
         MAX_LEAF_RECORDS);
     File indexDir = new File(TEMP_DIR, SEGMENT_NAME);
     // Randomly build star-tree using on-heap or off-heap mode
-    MultipleTreesBuilder.BuildMode buildMode = RANDOM.nextBoolean() ? MultipleTreesBuilder.BuildMode.ON_HEAP : MultipleTreesBuilder.BuildMode.OFF_HEAP;
-    try (MultipleTreesBuilder builder = new MultipleTreesBuilder(Collections.singletonList(starTreeIndexConfig), false,
-        indexDir, buildMode)) {
+    MultipleTreesBuilder.BuildMode buildMode =
+        RANDOM.nextBoolean() ? MultipleTreesBuilder.BuildMode.ON_HEAP : MultipleTreesBuilder.BuildMode.OFF_HEAP;
+    try (MultipleTreesBuilder builder =
+        new MultipleTreesBuilder(Collections.singletonList(starTreeIndexConfig), false, indexDir, buildMode)) {
       builder.build();
     }
 
@@ -153,8 +153,7 @@ abstract class BaseStarTreeV2Test<R, A> {
   }
 
   @Test
-  public void testQueries()
-      throws IOException {
+  public void testQueries() throws IOException {
     AggregationFunctionType aggregationType = _valueAggregator.getAggregationType();
     String aggregation;
     if (aggregationType == AggregationFunctionType.COUNT) {
@@ -175,14 +174,12 @@ abstract class BaseStarTreeV2Test<R, A> {
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     _indexSegment.destroy();
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 
-  void testQuery(String query)
-      throws IOException {
+  void testQuery(String query) throws IOException {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(query);
 
     // Aggregations
@@ -243,9 +240,8 @@ abstract class BaseStarTreeV2Test<R, A> {
     for (String groupByColumn : groupByColumns) {
       nonStarTreeGroupByColumnReaders.add(_indexSegment.getDataSource(groupByColumn).getForwardIndex());
     }
-    Map<List<Integer>, List<Object>> nonStarTreeResult =
-        computeNonStarTreeResult(nonStarTreeFilterPlanNode, nonStarTreeAggregationColumnReaders,
-            nonStarTreeAggregationColumnDictionaries, nonStarTreeGroupByColumnReaders);
+    Map<List<Integer>, List<Object>> nonStarTreeResult = computeNonStarTreeResult(nonStarTreeFilterPlanNode,
+        nonStarTreeAggregationColumnReaders, nonStarTreeAggregationColumnDictionaries, nonStarTreeGroupByColumnReaders);
 
     // Assert results
     assertEquals(starTreeResult.size(), nonStarTreeResult.size());
@@ -329,8 +325,7 @@ abstract class BaseStarTreeV2Test<R, A> {
 
   private Map<List<Integer>, List<Object>> computeNonStarTreeResult(PlanNode nonStarTreeFilterPlanNode,
       List<ForwardIndexReader> aggregationColumnReaders, List<Dictionary> aggregationColumnDictionaries,
-      List<ForwardIndexReader> groupByColumnReaders)
-      throws IOException {
+      List<ForwardIndexReader> groupByColumnReaders) throws IOException {
     Map<List<Integer>, List<Object>> result = new HashMap<>();
     int numAggregations = aggregationColumnReaders.size();
     int numGroupByColumns = groupByColumnReaders.size();

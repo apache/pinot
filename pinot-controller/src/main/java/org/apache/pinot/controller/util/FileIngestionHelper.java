@@ -87,8 +87,7 @@ public class FileIngestionHelper {
   /**
    * Creates a segment using the provided data file/URI and uploads to Pinot
    */
-  public SuccessResponse buildSegmentAndPush(DataPayload payload)
-      throws Exception {
+  public SuccessResponse buildSegmentAndPush(DataPayload payload) throws Exception {
     String tableNameWithType = _tableConfig.getTableName();
     File workingDir = new File(_uploadDir,
         String.format("%s_%s_%d", WORKING_DIR_PREFIX, tableNameWithType, System.currentTimeMillis()));
@@ -100,8 +99,8 @@ public class FileIngestionHelper {
     File outputDir = new File(workingDir, OUTPUT_SEGMENT_DIR);
     File segmentTarDir = new File(workingDir, SEGMENT_TAR_DIR);
     try {
-      Preconditions
-          .checkState(inputDir.mkdirs(), "Could not create directory for downloading input file locally: %s", inputDir);
+      Preconditions.checkState(inputDir.mkdirs(), "Could not create directory for downloading input file locally: %s",
+          inputDir);
       Preconditions.checkState(segmentTarDir.mkdirs(), "Could not create directory for segment tar file: %s", inputDir);
 
       // Copy file to local working dir
@@ -128,10 +127,9 @@ public class FileIngestionHelper {
         // if a file with the same time range is received again
         batchConfigMapOverride.put(segmentNamePostfixProp, String.valueOf(System.currentTimeMillis()));
       }
-      BatchIngestionConfig batchIngestionConfigOverride =
-          new BatchIngestionConfig(Lists.newArrayList(batchConfigMapOverride),
-              IngestionConfigUtils.getBatchSegmentIngestionType(_tableConfig),
-              IngestionConfigUtils.getBatchSegmentIngestionFrequency(_tableConfig));
+      BatchIngestionConfig batchIngestionConfigOverride = new BatchIngestionConfig(
+          Lists.newArrayList(batchConfigMapOverride), IngestionConfigUtils.getBatchSegmentIngestionType(_tableConfig),
+          IngestionConfigUtils.getBatchSegmentIngestionFrequency(_tableConfig));
 
       // Get SegmentGeneratorConfig
       SegmentGeneratorConfig segmentGeneratorConfig =
@@ -148,9 +146,8 @@ public class FileIngestionHelper {
 
       // Upload segment
       IngestionConfig ingestionConfigOverride = new IngestionConfig(batchIngestionConfigOverride, null, null, null);
-      TableConfig tableConfigOverride =
-          new TableConfigBuilder(_tableConfig.getTableType()).setTableName(_tableConfig.getTableName())
-              .setIngestionConfig(ingestionConfigOverride).build();
+      TableConfig tableConfigOverride = new TableConfigBuilder(_tableConfig.getTableType())
+          .setTableName(_tableConfig.getTableName()).setIngestionConfig(ingestionConfigOverride).build();
       SegmentUploader segmentUploader = PluginManager.get().createInstance(SEGMENT_UPLOADER_CLASS);
       segmentUploader.init(tableConfigOverride);
       segmentUploader.uploadSegment(segmentTarFile.toURI(), _authContext);
@@ -169,8 +166,7 @@ public class FileIngestionHelper {
   /**
    * Copy the file from given URI to local file
    */
-  public static void copyURIToLocal(BatchConfig batchConfig, URI sourceFileURI, File destFile)
-      throws Exception {
+  public static void copyURIToLocal(BatchConfig batchConfig, URI sourceFileURI, File destFile) throws Exception {
     String sourceFileURIScheme = sourceFileURI.getScheme();
     if (!PinotFSFactory.isSchemeSupported(sourceFileURIScheme)) {
       PinotFSFactory.register(sourceFileURIScheme, batchConfig.getInputFsClassName(),
@@ -182,8 +178,7 @@ public class FileIngestionHelper {
   /**
    * Copy the file from the uploaded multipart to a local file
    */
-  public static void copyMultipartToLocal(FormDataMultiPart multiPart, File destFile)
-      throws IOException {
+  public static void copyMultipartToLocal(FormDataMultiPart multiPart, File destFile) throws IOException {
     FormDataBodyPart formDataBodyPart = multiPart.getFields().values().iterator().next().get(0);
     try (InputStream inputStream = formDataBodyPart.getValueAs(InputStream.class);
         OutputStream outputStream = new FileOutputStream(destFile)) {
@@ -197,7 +192,8 @@ public class FileIngestionHelper {
    * Enum to identify the source of ingestion file
    */
   private enum PayloadType {
-    URI, FILE
+    URI,
+    FILE
   }
 
   /**

@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory;
  *    The partitioned dimension should be frequently used in the “=”
  *    Skip the no dictionary columns
  */
-public class  BloomFilterRule extends AbstractRule {
+public class BloomFilterRule extends AbstractRule {
   private final Logger LOGGER = LoggerFactory.getLogger(BloomFilterRule.class);
   private final BloomFilterRuleParams _params;
   protected final BrokerRequestOptimizer _brokerRequestOptimizer = new BrokerRequestOptimizer();
@@ -71,8 +71,7 @@ public class  BloomFilterRule extends AbstractRule {
       String dimName = _input.intToColName(i);
       if (((weights[i] / totalWeight.get()) > _params.THRESHOLD_MIN_PERCENT_EQ_BLOOMFILTER)
           //The partitioned dimension should be frequently > P used
-          && (_input.getCardinality(dimName)
-          < _params.THRESHOLD_MAX_CARDINALITY_BLOOMFILTER)) { //The Cardinality < C (1 million for 1MB size)
+          && (_input.getCardinality(dimName) < _params.THRESHOLD_MAX_CARDINALITY_BLOOMFILTER)) { //The Cardinality < C (1 million for 1MB size)
         _output.getIndexConfig().getBloomFilterColumns().add(dimName);
       }
     }

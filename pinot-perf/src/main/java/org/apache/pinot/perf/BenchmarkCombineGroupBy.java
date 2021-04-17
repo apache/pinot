@@ -113,15 +113,14 @@ public class BenchmarkCombineGroupBy {
   }
 
   private Record getRecord() {
-    Object[] columns =
-        new Object[]{_d1.get(RANDOM.nextInt(_d1.size())), _d2.get(RANDOM.nextInt(_d2.size())), (double) RANDOM
-            .nextInt(1000), (double) RANDOM.nextInt(1000)};
+    Object[] columns = new Object[]{_d1.get(RANDOM.nextInt(_d1.size())), _d2
+        .get(RANDOM.nextInt(_d2.size())), (double) RANDOM.nextInt(1000), (double) RANDOM.nextInt(1000)};
     return new Record(columns);
   }
 
   private Pair<String, Object[]> getOriginalRecord() {
-    String stringKey = Joiner.on(GroupKeyGenerator.DELIMITER)
-        .join(_d1.get(RANDOM.nextInt(_d1.size())), _d2.get(RANDOM.nextInt(_d2.size())));
+    String stringKey = Joiner.on(GroupKeyGenerator.DELIMITER).join(_d1.get(RANDOM.nextInt(_d1.size())),
+        _d2.get(RANDOM.nextInt(_d2.size())));
     Object[] values = new Object[]{(double) RANDOM.nextInt(1000), (double) RANDOM.nextInt(1000)};
     return new Pair<>(stringKey, values);
   }
@@ -164,8 +163,7 @@ public class BenchmarkCombineGroupBy {
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
-  public void originalCombineGroupBy()
-      throws InterruptedException, TimeoutException, ExecutionException {
+  public void originalCombineGroupBy() throws InterruptedException, TimeoutException, ExecutionException {
 
     AtomicInteger numGroups = new AtomicInteger();
     int _interSegmentNumGroupsLimit = 200_000;
@@ -210,8 +208,7 @@ public class BenchmarkCombineGroupBy {
     List<Map<String, Object>> trimmedResults = aggregationGroupByTrimmingService.trimIntermediateResultsMap(resultsMap);
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     ChainedOptionsBuilder opt =
         new OptionsBuilder().include(BenchmarkCombineGroupBy.class.getSimpleName()).warmupTime(TimeValue.seconds(10))
             .warmupIterations(1).measurementTime(TimeValue.seconds(30)).measurementIterations(3).forks(1);

@@ -80,7 +80,7 @@ public class StPointFunctionTest extends BaseTransformFunctionTest {
   @DataProvider(name = "testIllegalArguments")
   public Object[][] testIllegalArguments() {
     return new Object[][]{new Object[]{String.format("ST_Point(%s)", DOUBLE_SV_COLUMN)}, new Object[]{String.format(
-        "ST_Point(%s, %s)", INT_MV_COLUMN, LONG_SV_COLUMN)}, new Object[]{String.format("st_Point(%s, %s)",
-        LONG_SV_COLUMN, INT_MV_COLUMN)}};
+        "ST_Point(%s, %s)", INT_MV_COLUMN,
+        LONG_SV_COLUMN)}, new Object[]{String.format("st_Point(%s, %s)", LONG_SV_COLUMN, INT_MV_COLUMN)}};
   }
 }

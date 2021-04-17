@@ -49,8 +49,7 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
    *
    * @param indexDirs a list of input segment directory paths
    */
-  public MultiplePinotSegmentRecordReader(List<File> indexDirs)
-      throws Exception {
+  public MultiplePinotSegmentRecordReader(List<File> indexDirs) throws Exception {
     this(indexDirs, null, null);
   }
 
@@ -65,8 +64,7 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
    * @param sortOrder a list of column names that represent the sorting order
    */
   public MultiplePinotSegmentRecordReader(List<File> indexDirs, @Nullable Schema schema,
-      @Nullable List<String> sortOrder)
-      throws Exception {
+      @Nullable List<String> sortOrder) throws Exception {
     // Initialize pinot segment record readers
     _pinotSegmentRecordReaders = new ArrayList<>(indexDirs.size());
     for (File file : indexDirs) {
@@ -158,8 +156,8 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
       return reuse;
     } else {
       // If there is no sorted column specified, simply concatenate the segments
-      for (int i = 0; i < _pinotSegmentRecordReaders.size();
-          i++, _currentReaderId = (_currentReaderId + 1) % _pinotSegmentRecordReaders.size()) {
+      for (int i = 0; i < _pinotSegmentRecordReaders.size(); i++, _currentReaderId =
+          (_currentReaderId + 1) % _pinotSegmentRecordReaders.size()) {
         PinotSegmentRecordReader currentReader = _pinotSegmentRecordReaders.get(_currentReaderId);
         if (currentReader.hasNext()) {
           return currentReader.next(reuse);
@@ -188,8 +186,7 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     for (PinotSegmentRecordReader recordReader : _pinotSegmentRecordReaders) {
       recordReader.close();
     }

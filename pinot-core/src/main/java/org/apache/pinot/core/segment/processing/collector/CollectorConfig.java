@@ -40,7 +40,8 @@ public class CollectorConfig {
   @JsonCreator
   private CollectorConfig(
       @JsonProperty(value = "collectorType", required = true) CollectorFactory.CollectorType collectorType,
-      @JsonProperty(value = "aggregatorTypeMap") Map<String, ValueAggregatorFactory.ValueAggregatorType> aggregatorTypeMap,
+      @JsonProperty(
+          value = "aggregatorTypeMap") Map<String, ValueAggregatorFactory.ValueAggregatorType> aggregatorTypeMap,
       @JsonProperty(value = "sortOrder") List<String> sortOrder) {
     _collectorType = collectorType;
     _aggregatorTypeMap = aggregatorTypeMap;

@@ -52,75 +52,75 @@ public class ControllerInstanceToggleTest {
   @Test
   public void testInstanceToggle() throws Exception {
     // Create an offline table
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(
-            ControllerTestUtils.MIN_NUM_REPLICAS).build();
-    ControllerTestUtils
-        .sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableCreate(), tableConfig.toJsonString());
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNumReplicas(ControllerTestUtils.MIN_NUM_REPLICAS).build();
+    ControllerTestUtils.sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableCreate(),
+        tableConfig.toJsonString());
     Assert.assertEquals(
-        ControllerTestUtils
-            .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-            .getPartitionSet()
-            .size(), 1);
+        ControllerTestUtils.getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(),
+            CommonConstants.Helix.BROKER_RESOURCE_INSTANCE).getPartitionSet().size(),
+        1);
     Assert.assertEquals(
-        ControllerTestUtils
-            .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-            .getInstanceSet(OFFLINE_TABLE_NAME)
-            .size(), ControllerTestUtils.NUM_BROKER_INSTANCES);
+        ControllerTestUtils.getHelixAdmin()
+            .getResourceIdealState(ControllerTestUtils.getHelixClusterName(),
+                CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
+            .getInstanceSet(OFFLINE_TABLE_NAME).size(),
+        ControllerTestUtils.NUM_BROKER_INSTANCES);
 
     // Add segments
     for (int i = 0; i < ControllerTestUtils.NUM_SERVER_INSTANCES; i++) {
       ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_TABLE_NAME,
           SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME), "downloadUrl");
       Assert.assertEquals(
-          ControllerTestUtils
-              .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(), OFFLINE_TABLE_NAME).getNumPartitions(), i + 1);
+          ControllerTestUtils.getHelixAdmin()
+              .getResourceIdealState(ControllerTestUtils.getHelixClusterName(), OFFLINE_TABLE_NAME).getNumPartitions(),
+          i + 1);
     }
 
     // Disable server instances
     int numEnabledInstances = ControllerTestUtils.NUM_SERVER_INSTANCES;
-    for (String instanceName : ControllerTestUtils
-        .getHelixAdmin().getInstancesInClusterWithTag(ControllerTestUtils.getHelixClusterName(), SERVER_TAG_NAME)) {
+    for (String instanceName : ControllerTestUtils.getHelixAdmin()
+        .getInstancesInClusterWithTag(ControllerTestUtils.getHelixClusterName(), SERVER_TAG_NAME)) {
       toggleInstanceState(instanceName, "disable");
       checkNumOnlineInstancesFromExternalView(OFFLINE_TABLE_NAME, --numEnabledInstances);
     }
 
     // Enable server instances
-    for (String instanceName : ControllerTestUtils
-        .getHelixAdmin().getInstancesInClusterWithTag(ControllerTestUtils.getHelixClusterName(), SERVER_TAG_NAME)) {
+    for (String instanceName : ControllerTestUtils.getHelixAdmin()
+        .getInstancesInClusterWithTag(ControllerTestUtils.getHelixClusterName(), SERVER_TAG_NAME)) {
       toggleInstanceState(instanceName, "ENABLE");
       checkNumOnlineInstancesFromExternalView(OFFLINE_TABLE_NAME, ++numEnabledInstances);
     }
 
     // Disable broker instances
-    for (String instanceName : ControllerTestUtils
-        .getHelixAdmin().getInstancesInClusterWithTag(ControllerTestUtils.getHelixClusterName(), BROKER_TAG_NAME)) {
+    for (String instanceName : ControllerTestUtils.getHelixAdmin()
+        .getInstancesInClusterWithTag(ControllerTestUtils.getHelixClusterName(), BROKER_TAG_NAME)) {
       toggleInstanceState(instanceName, "Disable");
       checkNumOnlineInstancesFromExternalView(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, --numEnabledInstances);
     }
 
     // Enable broker instances
-    for (String instanceName : ControllerTestUtils
-        .getHelixAdmin().getInstancesInClusterWithTag(ControllerTestUtils.getHelixClusterName(), BROKER_TAG_NAME)) {
+    for (String instanceName : ControllerTestUtils.getHelixAdmin()
+        .getInstancesInClusterWithTag(ControllerTestUtils.getHelixClusterName(), BROKER_TAG_NAME)) {
       toggleInstanceState(instanceName, "Enable");
       checkNumOnlineInstancesFromExternalView(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, ++numEnabledInstances);
     }
 
     // Delete table
-    ControllerTestUtils.sendDeleteRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableDelete(RAW_TABLE_NAME));
+    ControllerTestUtils
+        .sendDeleteRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableDelete(RAW_TABLE_NAME));
     Assert.assertEquals(
-        ControllerTestUtils
-            .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-            .getPartitionSet()
-            .size(), 0);
+        ControllerTestUtils.getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(),
+            CommonConstants.Helix.BROKER_RESOURCE_INSTANCE).getPartitionSet().size(),
+        0);
   }
 
   private void toggleInstanceState(String instanceName, String state) {
     // It may take time for an instance to toggle the state.
     TestUtils.waitForCondition(aVoid -> {
       try {
-        ControllerTestUtils
-            .sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forInstanceState(instanceName), state);
+        ControllerTestUtils.sendPostRequest(
+            ControllerTestUtils.getControllerRequestURLBuilder().forInstanceState(instanceName), state);
       } catch (IOException ioe) {
         // receive non-200 status code
         return false;
@@ -133,8 +133,8 @@ public class ControllerInstanceToggleTest {
       throws InterruptedException {
     long endTime = System.currentTimeMillis() + TIMEOUT_MS;
     while (System.currentTimeMillis() < endTime) {
-      ExternalView resourceExternalView = ControllerTestUtils
-          .getHelixAdmin().getResourceExternalView(ControllerTestUtils.getHelixClusterName(), resourceName);
+      ExternalView resourceExternalView = ControllerTestUtils.getHelixAdmin()
+          .getResourceExternalView(ControllerTestUtils.getHelixClusterName(), resourceName);
       Set<String> instanceSet = HelixHelper.getOnlineInstanceFromExternalView(resourceExternalView);
       if (instanceSet.size() == expectedNumOnlineInstances) {
         return;

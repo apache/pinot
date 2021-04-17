@@ -44,8 +44,7 @@ public class FixedBitSVForwardIndexReaderV2Test {
   private final int[] _lastSequentialDocIds = new int[NUM_DOC_IDS];
 
   @BeforeClass
-  public void setUp()
-      throws IOException {
+  public void setUp() throws IOException {
     FileUtils.forceMkdir(INDEX_DIR);
 
     for (int i = 0; i < 32; i++) {
@@ -65,14 +64,12 @@ public class FixedBitSVForwardIndexReaderV2Test {
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     FileUtils.deleteDirectory(INDEX_DIR);
   }
 
   @Test
-  public void testFixedBitIntReader()
-      throws Exception {
+  public void testFixedBitIntReader() throws Exception {
     int[] values = new int[NUM_VALUES];
     int[] dictIdBuffer = new int[NUM_VALUES];
     for (int numBits = 1; numBits <= 31; numBits++) {

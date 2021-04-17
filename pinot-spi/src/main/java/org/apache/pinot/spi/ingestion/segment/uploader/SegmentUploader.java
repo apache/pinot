@@ -35,16 +35,14 @@ public interface SegmentUploader {
    * Initializes the {@link SegmentUploader}
    * @param tableConfig The table config for the segment upload
    */
-  void init(TableConfig tableConfig)
-      throws Exception;
+  void init(TableConfig tableConfig) throws Exception;
 
   /**
    * Uploads the segment tar file to the cluster
    * @param segmentTarFile URI of segment tar file
    * @param authContext auth details required to upload pinot segment to controller
    */
-  void uploadSegment(URI segmentTarFile, @Nullable AuthContext authContext)
-      throws Exception;
+  void uploadSegment(URI segmentTarFile, @Nullable AuthContext authContext) throws Exception;
 
   /**
    * Uploads the segments from the segmentDir to the cluster.
@@ -52,6 +50,5 @@ public interface SegmentUploader {
    * @param segmentDir URI of directory containing segment tar files
    * @param authContext auth details required to upload pinot segment to controller
    */
-  void uploadSegmentsFromDir(URI segmentDir, @Nullable AuthContext authContext)
-      throws Exception;
+  void uploadSegmentsFromDir(URI segmentDir, @Nullable AuthContext authContext) throws Exception;
 }

@@ -19,5 +19,7 @@
 package org.apache.pinot.controller.api.events;
 
 public enum SchemaEventType {
-  CREATE, UPDATE, DELETE
+  CREATE,
+  UPDATE,
+  DELETE
 }

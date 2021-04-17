@@ -35,8 +35,7 @@ public abstract class TraceCallable<V> implements Callable<V> {
   }
 
   @Override
-  public V call()
-      throws Exception {
+  public V call() throws Exception {
     if (_parentTraceEntry != null) {
       TraceContext.registerThreadToRequest(_parentTraceEntry);
     }
@@ -49,6 +48,5 @@ public abstract class TraceCallable<V> implements Callable<V> {
     }
   }
 
-  public abstract V callJob()
-      throws Exception;
+  public abstract V callJob() throws Exception;
 }

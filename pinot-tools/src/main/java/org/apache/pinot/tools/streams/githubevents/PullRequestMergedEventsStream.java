@@ -62,8 +62,7 @@ public class PullRequestMergedEventsStream {
   private StreamDataProducer _producer;
 
   public PullRequestMergedEventsStream(String schemaFilePath, String topicName, String kafkaBrokerList,
-      String personalAccessToken)
-      throws Exception {
+      String personalAccessToken) throws Exception {
 
     _service = Executors.newFixedThreadPool(2);
     try {
@@ -91,14 +90,12 @@ public class PullRequestMergedEventsStream {
     _producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     String personalAccessToken = args[0];
     String schemaFile = args[1];
     String topic = "pullRequestMergedEvent";
-    PullRequestMergedEventsStream stream =
-        new PullRequestMergedEventsStream(schemaFile, topic, KafkaStarterUtils.DEFAULT_KAFKA_BROKER,
-            personalAccessToken);
+    PullRequestMergedEventsStream stream = new PullRequestMergedEventsStream(schemaFile, topic,
+        KafkaStarterUtils.DEFAULT_KAFKA_BROKER, personalAccessToken);
     stream.execute();
   }
 
@@ -121,8 +118,7 @@ public class PullRequestMergedEventsStream {
   /**
    * Shuts down the stream.
    */
-  public void shutdown()
-      throws IOException, InterruptedException {
+  public void shutdown() throws IOException, InterruptedException {
     printStatus(Quickstart.Color.GREEN, "***** Shutting down pullRequestMergedEvents Stream *****");
     _keepStreaming = false;
     Thread.sleep(3000L);
@@ -135,8 +131,7 @@ public class PullRequestMergedEventsStream {
   /**
    * Publishes the message to the kafka topic
    */
-  private void publish(GenericRecord message)
-      throws IOException {
+  private void publish(GenericRecord message) throws IOException {
     if (!_keepStreaming) {
       return;
     }
@@ -187,14 +182,12 @@ public class PullRequestMergedEventsStream {
               Thread.sleep(sleepMs);
               break;
             case 401: // Unauthorized
-              printStatus(Quickstart.Color.YELLOW,
-                  "Unauthorized call to GitHub events API. Status message: " + githubAPIResponse.statusMessage
-                      + ". Exiting.");
+              printStatus(Quickstart.Color.YELLOW, "Unauthorized call to GitHub events API. Status message: "
+                  + githubAPIResponse.statusMessage + ". Exiting.");
               return;
             default: // Unknown status code
-              printStatus(Quickstart.Color.YELLOW,
-                  "Unknown status code " + githubAPIResponse.statusCode + " statusMessage "
-                      + githubAPIResponse.statusMessage + ". Retry in 10s");
+              printStatus(Quickstart.Color.YELLOW, "Unknown status code " + githubAPIResponse.statusCode
+                  + " statusMessage " + githubAPIResponse.statusMessage + ". Retry in 10s");
               Thread.sleep(SLEEP_MILLIS);
           }
         } catch (Exception e) {
@@ -216,8 +209,7 @@ public class PullRequestMergedEventsStream {
    * Converts PullRequestMergedEvent to GenericRecord
    * @param event
    */
-  private GenericRecord convertToPullRequestMergedGenericRecord(JsonNode event)
-      throws IOException {
+  private GenericRecord convertToPullRequestMergedGenericRecord(JsonNode event) throws IOException {
     GenericRecord genericRecord = null;
     String type = event.get("type").asText();
 

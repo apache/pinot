@@ -62,8 +62,7 @@ public class TestUtils {
    * @param dirs Directories to be cleared
    * @throws IOException
    */
-  public static void ensureDirectoriesExistAndEmpty(@Nonnull File... dirs)
-      throws IOException {
+  public static void ensureDirectoriesExistAndEmpty(@Nonnull File... dirs) throws IOException {
     for (File dir : dirs) {
       FileUtils.deleteDirectory(dir);
       Assert.assertTrue(dir.mkdirs());

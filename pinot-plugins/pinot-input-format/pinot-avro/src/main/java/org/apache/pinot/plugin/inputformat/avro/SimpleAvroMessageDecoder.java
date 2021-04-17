@@ -53,8 +53,7 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   private GenericData.Record _avroRecordToReuse;
 
   @Override
-  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
-      throws Exception {
+  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName) throws Exception {
     Preconditions.checkState(props.containsKey(SCHEMA), "Avro schema must be provided");
     _avroSchema = new org.apache.avro.Schema.Parser().parse(props.get(SCHEMA));
     _datumReader = new GenericDatumReader<>(_avroSchema);

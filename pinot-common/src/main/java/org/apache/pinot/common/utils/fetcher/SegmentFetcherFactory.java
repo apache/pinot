@@ -58,13 +58,11 @@ public class SegmentFetcherFactory {
   /**
    * Initializes the segment fetcher factory. This method should only be called once.
    */
-  public static void init(PinotConfiguration config)
-      throws Exception {
+  public static void init(PinotConfiguration config) throws Exception {
     getInstance().initInternal(config);
   }
 
-  private void initInternal(PinotConfiguration config)
-      throws Exception {
+  private void initInternal(PinotConfiguration config) throws Exception {
     _httpSegmentFetcher.init(config); // directly, without sub-namespace
     _pinotFSSegmentFetcher.init(config); // directly, without sub-namespace
 
@@ -128,21 +126,18 @@ public class SegmentFetcherFactory {
   /**
    * Fetches a segment from URI location to local.
    */
-  public static void fetchSegmentToLocal(URI uri, File dest)
-      throws Exception {
+  public static void fetchSegmentToLocal(URI uri, File dest) throws Exception {
     getInstance().fetchSegmentToLocalInternal(uri, dest);
   }
 
   /**
    * Fetches a segment from URI location to local.
    */
-  public static void fetchSegmentToLocal(String uri, File dest)
-      throws Exception {
+  public static void fetchSegmentToLocal(String uri, File dest) throws Exception {
     getInstance().fetchSegmentToLocalInternal(new URI(uri), dest);
   }
 
-  private void fetchSegmentToLocalInternal(URI uri, File dest)
-      throws Exception {
+  private void fetchSegmentToLocalInternal(URI uri, File dest) throws Exception {
     getSegmentFetcher(uri.getScheme()).fetchSegmentToLocal(uri, dest);
   }
 
@@ -151,13 +146,11 @@ public class SegmentFetcherFactory {
    * @param uri remote segment location
    * @param dest local file
    */
-  public static void fetchAndDecryptSegmentToLocal(String uri, File dest, String crypterName)
-      throws Exception {
+  public static void fetchAndDecryptSegmentToLocal(String uri, File dest, String crypterName) throws Exception {
     getInstance().fetchAndDecryptSegmentToLocalInternal(uri, dest, crypterName);
   }
 
-  private void fetchAndDecryptSegmentToLocalInternal(String uri, File dest, String crypterName)
-      throws Exception {
+  private void fetchAndDecryptSegmentToLocalInternal(String uri, File dest, String crypterName) throws Exception {
     if (crypterName == null) {
       fetchSegmentToLocal(uri, dest);
     } else {

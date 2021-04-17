@@ -82,8 +82,7 @@ public class BenchmarkStringDictionary {
   }
 
   @TearDown
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     _onHeapDictionary.close();
     _offHeapDictionary.close();
     _memoryManager.close();
@@ -117,10 +116,9 @@ public class BenchmarkStringDictionary {
   }
 
   @Benchmark
-  public int offHeapStringDictionaryWrite()
-      throws IOException {
-    try (StringOffHeapMutableDictionary offHeapDictionary = new StringOffHeapMutableDictionary(CARDINALITY,
-        CARDINALITY / 10, _memoryManager, null, _maxValueLength / 2)) {
+  public int offHeapStringDictionaryWrite() throws IOException {
+    try (StringOffHeapMutableDictionary offHeapDictionary =
+        new StringOffHeapMutableDictionary(CARDINALITY, CARDINALITY / 10, _memoryManager, null, _maxValueLength / 2)) {
       int value = 0;
       for (String stringValue : _values) {
         value += offHeapDictionary.index(stringValue);
@@ -130,8 +128,7 @@ public class BenchmarkStringDictionary {
   }
 
   @Benchmark
-  public int onHeapStringDictionaryWrite()
-      throws IOException {
+  public int onHeapStringDictionaryWrite() throws IOException {
     try (StringOnHeapMutableDictionary onHeapDictionary = new StringOnHeapMutableDictionary()) {
       int value = 0;
       for (String stringValue : _values) {
@@ -141,8 +138,7 @@ public class BenchmarkStringDictionary {
     }
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     ChainedOptionsBuilder opt = new OptionsBuilder().include(BenchmarkStringDictionary.class.getSimpleName());
     new Runner(opt.build()).run();
   }

@@ -109,8 +109,8 @@ public class KafkaLowLevelStreamConfig {
   public String toString() {
     return "KafkaLowLevelStreamConfig{" + "_kafkaTopicName='" + _kafkaTopicName + '\'' + ", _bootstrapHosts='"
         + _bootstrapHosts + '\'' + ", _kafkaBufferSize='" + _kafkaBufferSize + '\'' + ", _kafkaSocketTimeout='"
-        + _kafkaSocketTimeout + '\'' + ", _kafkaFetcherSizeBytes='" + _kafkaFetcherSizeBytes + '\'' + ", _kafkaFetcherMinBytes='"
-        + _kafkaFetcherMinBytes + '\'' + '}';
+        + _kafkaSocketTimeout + '\'' + ", _kafkaFetcherSizeBytes='" + _kafkaFetcherSizeBytes + '\''
+        + ", _kafkaFetcherMinBytes='" + _kafkaFetcherMinBytes + '\'' + '}';
   }
 
   @Override
@@ -125,12 +125,12 @@ public class KafkaLowLevelStreamConfig {
 
     KafkaLowLevelStreamConfig that = (KafkaLowLevelStreamConfig) o;
 
-    return EqualityUtils.isEqual(_kafkaTopicName, that._kafkaTopicName) && EqualityUtils
-        .isEqual(_bootstrapHosts, that._bootstrapHosts) && EqualityUtils
-        .isEqual(_kafkaBufferSize, that._kafkaBufferSize) && EqualityUtils
-        .isEqual(_kafkaSocketTimeout, that._kafkaSocketTimeout) && EqualityUtils
-        .isEqual(_kafkaFetcherSizeBytes, that._kafkaFetcherSizeBytes) && EqualityUtils
-        .isEqual(_kafkaFetcherMinBytes, that._kafkaFetcherMinBytes);
+    return EqualityUtils.isEqual(_kafkaTopicName, that._kafkaTopicName)
+        && EqualityUtils.isEqual(_bootstrapHosts, that._bootstrapHosts)
+        && EqualityUtils.isEqual(_kafkaBufferSize, that._kafkaBufferSize)
+        && EqualityUtils.isEqual(_kafkaSocketTimeout, that._kafkaSocketTimeout)
+        && EqualityUtils.isEqual(_kafkaFetcherSizeBytes, that._kafkaFetcherSizeBytes)
+        && EqualityUtils.isEqual(_kafkaFetcherMinBytes, that._kafkaFetcherMinBytes);
   }
 
   @Override

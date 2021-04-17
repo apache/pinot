@@ -31,8 +31,7 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 public class DefaultMetadataExtractor implements MetadataExtractor {
 
   @Override
-  public SegmentMetadata extractMetadata(File tarredSegmentFile, File unzippedSegmentDir)
-      throws Exception {
+  public SegmentMetadata extractMetadata(File tarredSegmentFile, File unzippedSegmentDir) throws Exception {
     // NOTE: While there is TarGzCompressionUtils.untarOneFile(), we use untar() here to unpack all files in the segment
     //       in order to ensure the segment is not corrupted.
     File indexDir = TarGzCompressionUtils.untar(tarredSegmentFile, unzippedSegmentDir).get(0);

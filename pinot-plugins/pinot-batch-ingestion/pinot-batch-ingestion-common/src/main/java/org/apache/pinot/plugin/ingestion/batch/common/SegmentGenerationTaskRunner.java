@@ -70,8 +70,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
     _taskSpec = taskSpec;
   }
 
-  public String run()
-      throws Exception {
+  public String run() throws Exception {
     TableConfig tableConfig = _taskSpec.getTableConfig();
     String tableName = tableConfig.getTableName();
     Schema schema = _taskSpec.getSchema();

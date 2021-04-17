@@ -113,13 +113,11 @@ public abstract class SegmentDirectory implements Closeable {
     return new SegmentLocalFSDirectory(directory, readMode);
   }
 
-  public static SegmentMetadataImpl loadSegmentMetadata(File directory)
-      throws IOException, ConfigurationException {
+  public static SegmentMetadataImpl loadSegmentMetadata(File directory) throws IOException, ConfigurationException {
     return SegmentLocalFSDirectory.loadSegmentMetadata(directory);
   }
 
-  public abstract void reloadMetadata()
-      throws Exception;
+  public abstract void reloadMetadata() throws Exception;
 
   /**
    * Get the path/URL for the directory
@@ -141,8 +139,7 @@ public abstract class SegmentDirectory implements Closeable {
      * @return a bytebuffer-like buffer holding index data
      * @throws IOException
      */
-    public abstract PinotDataBuffer getIndexFor(String column, ColumnIndexType type)
-        throws IOException;
+    public abstract PinotDataBuffer getIndexFor(String column, ColumnIndexType type) throws IOException;
 
     public abstract boolean hasIndexFor(String column, ColumnIndexType type);
 
@@ -184,8 +181,7 @@ public abstract class SegmentDirectory implements Closeable {
      */
     public abstract void removeIndex(String columnName, ColumnIndexType indexType);
 
-    public abstract void save()
-        throws IOException;
+    public abstract void save() throws IOException;
 
     public SegmentDirectory toSegmentDirectory() {
       return SegmentDirectory.this;
@@ -200,16 +196,14 @@ public abstract class SegmentDirectory implements Closeable {
    *   is already locked for writes
    * @throws IOException
    */
-  public abstract Reader createReader()
-      throws IOException, ConfigurationException;
+  public abstract Reader createReader() throws IOException, ConfigurationException;
 
   /**
    * Create Writer for the directory
    * @return Writer object on success. null if the directory has active readers
    * @throws IOException
    */
-  public abstract Writer createWriter()
-      throws IOException;
+  public abstract Writer createWriter() throws IOException;
 
   public abstract String toString();
 

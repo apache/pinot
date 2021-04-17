@@ -169,8 +169,7 @@ public class PartitionFunctionTest {
     // 10 values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
     // Applied org.apache.kafka.common.utils.Utils::murmur2 to those values and stored in expectedMurmurValues
     int[] expectedMurmurValues =
-        new int[]{-1044832774, -594851693, 1441878663, 1766739604, 1034724141, -296671913, 443511156, 1483601453,
-            1819695080, -931669296};
+        new int[]{-1044832774, -594851693, 1441878663, 1766739604, 1034724141, -296671913, 443511156, 1483601453, 1819695080, -931669296};
 
     long seed = 100;
     Random random = new Random(seed);

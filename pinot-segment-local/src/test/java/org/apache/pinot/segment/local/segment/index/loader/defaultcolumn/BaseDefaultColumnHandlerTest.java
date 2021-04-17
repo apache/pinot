@@ -50,17 +50,15 @@ public class BaseDefaultColumnHandlerTest {
   private SegmentDirectory.Writer writer;
 
   @BeforeMethod
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     INDEX_DIR = Files.createTempDirectory(SegmentMetadataImplTest.class.getName() + "_segmentDir").toFile();
 
     final String filePath =
         TestUtils.getFileFromResourceUrl(SegmentMetadataImplTest.class.getClassLoader().getResource(AVRO_DATA));
 
     // intentionally changed this to TimeUnit.Hours to make it non-default for testing
-    final SegmentGeneratorConfig config = SegmentTestUtils
-        .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch", TimeUnit.HOURS,
-            "testTable");
+    final SegmentGeneratorConfig config = SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(
+        new File(filePath), INDEX_DIR, "daysSinceEpoch", TimeUnit.HOURS, "testTable");
     config.setSegmentNamePostfix("1");
     config.setTimeColumnName("daysSinceEpoch");
     // The segment generation code in SegmentColumnarIndexCreator will throw

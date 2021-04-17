@@ -41,16 +41,14 @@ public class ORCRecordReaderTest extends AbstractRecordReaderTest {
   private final File _dataFile = new File(_tempDir, "data.orc");
 
   @Override
-  protected RecordReader createRecordReader()
-      throws Exception {
+  protected RecordReader createRecordReader() throws Exception {
     ORCRecordReader orcRecordReader = new ORCRecordReader();
     orcRecordReader.init(_dataFile, _sourceFields, null);
     return orcRecordReader;
   }
 
   @Override
-  protected void writeRecordsToFile(List<Map<String, Object>> recordsToWrite)
-      throws Exception {
+  protected void writeRecordsToFile(List<Map<String, Object>> recordsToWrite) throws Exception {
     TypeDescription schema = TypeDescription.fromString(
         "struct<dim_sv_int:int,dim_sv_long:bigint,dim_sv_float:float,dim_sv_double:double,dim_sv_string:string,dim_mv_int:array<int>,dim_mv_long:array<bigint>,dim_mv_float:array<float>,dim_mv_double:array<double>,dim_mv_string:array<string>,met_int:int,met_long:bigint,met_float:float,met_double:double,extra_field:struct<f1:int,f2:int>>");
     Writer writer = OrcFile.createWriter(new Path(_dataFile.getAbsolutePath()),

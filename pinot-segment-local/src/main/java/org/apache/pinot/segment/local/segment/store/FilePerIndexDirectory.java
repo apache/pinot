@@ -40,15 +40,13 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public PinotDataBuffer getBuffer(String column, ColumnIndexType type)
-      throws IOException {
+  public PinotDataBuffer getBuffer(String column, ColumnIndexType type) throws IOException {
     IndexKey key = new IndexKey(column, type);
     return getReadBufferFor(key);
   }
 
   @Override
-  public PinotDataBuffer newBuffer(String column, ColumnIndexType type, long sizeBytes)
-      throws IOException {
+  public PinotDataBuffer newBuffer(String column, ColumnIndexType type, long sizeBytes) throws IOException {
     IndexKey key = new IndexKey(column, type);
     return getWriteBufferFor(key, sizeBytes);
   }
@@ -60,8 +58,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     for (PinotDataBuffer dataBuffer : indexBuffers.values()) {
       dataBuffer.close();
     }
@@ -78,25 +75,22 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     return true;
   }
 
-  private PinotDataBuffer getReadBufferFor(IndexKey key)
-      throws IOException {
+  private PinotDataBuffer getReadBufferFor(IndexKey key) throws IOException {
     if (indexBuffers.containsKey(key)) {
       return indexBuffers.get(key);
     }
 
     File file = getFileFor(key.name, key.type);
     if (!file.exists()) {
-      throw new RuntimeException(
-          "Could not find index for column: " + key.name + ", type: " + key.type + ", segment: " + segmentDirectory
-              .toString());
+      throw new RuntimeException("Could not find index for column: " + key.name + ", type: " + key.type + ", segment: "
+          + segmentDirectory.toString());
     }
     PinotDataBuffer buffer = mapForReads(file, key.type.toString() + ".reader");
     indexBuffers.put(key, buffer);
     return buffer;
   }
 
-  private PinotDataBuffer getWriteBufferFor(IndexKey key, long sizeBytes)
-      throws IOException {
+  private PinotDataBuffer getWriteBufferFor(IndexKey key, long sizeBytes) throws IOException {
     if (indexBuffers.containsKey(key)) {
       return indexBuffers.get(key);
     }
@@ -144,8 +138,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     return new File(segmentDirectory, filename);
   }
 
-  private PinotDataBuffer mapForWrites(File file, long sizeBytes, String context)
-      throws IOException {
+  private PinotDataBuffer mapForWrites(File file, long sizeBytes, String context) throws IOException {
     Preconditions.checkNotNull(file);
     Preconditions.checkArgument(sizeBytes >= 0 && sizeBytes < Integer.MAX_VALUE,
         "File size must be less than 2GB, file: " + file);
@@ -156,8 +149,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     return PinotDataBuffer.mapFile(file, false, 0, sizeBytes, ByteOrder.BIG_ENDIAN, allocationContext);
   }
 
-  private PinotDataBuffer mapForReads(File file, String context)
-      throws IOException {
+  private PinotDataBuffer mapForReads(File file, String context) throws IOException {
     Preconditions.checkNotNull(file);
     Preconditions.checkNotNull(context);
     Preconditions.checkArgument(file.exists(), "File: " + file + " must exist");

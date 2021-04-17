@@ -137,9 +137,8 @@ public class TokenSchedulerGroup extends AbstractSchedulerGroup {
   }
 
   public String toString() {
-    return String
-        .format(" {%s:[%d,%d,%d,%d,%d]},", name(), getAvailableTokens(), numPending(), numRunning(), getThreadsInUse(),
-            totalReservedThreads());
+    return String.format(" {%s:[%d,%d,%d,%d,%d]},", name(), getAvailableTokens(), numPending(), numRunning(),
+        getThreadsInUse(), totalReservedThreads());
   }
 
   // callers must synchronize access to this method
@@ -162,8 +161,8 @@ public class TokenSchedulerGroup extends AbstractSchedulerGroup {
         // allowing light users to have better chance at scheduling. Without linear decay,
         // groups with high request rate will win more often putting light users at disadvantage.
         for (; nextTokenTime <= currentTimeMs; nextTokenTime += tokenLifetimeMs) {
-          availableTokens = (int) (ALPHA * tokenLifetimeMs * numTokensPerMs + (1 - ALPHA) * (availableTokens
-              - tokenLifetimeMs * threads));
+          availableTokens = (int) (ALPHA * tokenLifetimeMs * numTokensPerMs
+              + (1 - ALPHA) * (availableTokens - tokenLifetimeMs * threads));
         }
         lastTokenTimeMs = nextTokenTime - tokenLifetimeMs;
         availableTokens -= (currentTimeMs - lastTokenTimeMs) * threads;

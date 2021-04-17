@@ -97,8 +97,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
   private static final String SKILLS_TEXT_COL_MULTI_TERM_NAME = "SKILLS_TEXT_COL_1";
   private static final String SKILLS_TEXT_NO_RAW_NAME = "SKILLS_TEXT_COL_2";
   private static final String INT_COL_NAME = "INT_COL";
-  private static final List<String> RAW_TEXT_INDEX_COLUMNS = Arrays
-      .asList(QUERY_LOG_TEXT_COL_NAME, SKILLS_TEXT_COL_NAME, SKILLS_TEXT_COL_MULTI_TERM_NAME, SKILLS_TEXT_NO_RAW_NAME);
+  private static final List<String> RAW_TEXT_INDEX_COLUMNS = Arrays.asList(QUERY_LOG_TEXT_COL_NAME,
+      SKILLS_TEXT_COL_NAME, SKILLS_TEXT_COL_MULTI_TERM_NAME, SKILLS_TEXT_NO_RAW_NAME);
   private static final List<String> DICT_TEXT_INDEX_COLUMNS = Arrays.asList(SKILLS_TEXT_COL_DICT_NAME);
   private static final int INT_BASE_VALUE = 1000;
 
@@ -123,8 +123,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     buildSegment();
@@ -151,8 +150,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  private void buildSegment()
-      throws Exception {
+  private void buildSegment() throws Exception {
     List<GenericRow> rows = createTestData();
 
     List<FieldConfig> fieldConfigs = new ArrayList<>(RAW_TEXT_INDEX_COLUMNS.size() + DICT_TEXT_INDEX_COLUMNS.size());
@@ -191,8 +189,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     }
   }
 
-  private List<GenericRow> createTestData()
-      throws Exception {
+  private List<GenericRow> createTestData() throws Exception {
     List<GenericRow> rows = new ArrayList<>();
 
     // read the skills file
@@ -243,8 +240,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
    * Both selection and aggregation queries are used.
    */
   @Test
-  public void testTextSearch()
-      throws Exception {
+  public void testTextSearch() throws Exception {
     // TEST 1: phrase query
     // Search in QUERY_TEXT_COL to look for documents where each document MUST contain phrase "SELECT dimensionCol2"
     // as is. In other words, we are trying to find all "SELECT dimensionCol2" style queries. The expected result size
@@ -814,8 +810,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
    * the execution of text match filters with other filters.
    */
   @Test
-  public void testTextSearchWithAdditionalFilter()
-      throws Exception {
+  public void testTextSearchWithAdditionalFilter() throws Exception {
     // TEST 1: combine an index based doc id iterator (text_match) with scan based doc id iterator (range >= ) using AND
     List<Serializable[]> expected = new ArrayList<>();
     expected.add(
@@ -1035,8 +1030,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
    * for near realtime text search.
    */
   @Test
-  public void testLuceneRealtimeWithSearcherManager()
-      throws Exception {
+  public void testLuceneRealtimeWithSearcherManager() throws Exception {
     // create and open an index writer
     File indexFile = new File(INDEX_DIR.getPath() + "/realtime-test1.index");
     Directory indexDirectory = FSDirectory.open(indexFile.toPath());
@@ -1205,8 +1199,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
    * added to the index.
    */
   @Test
-  public void testLuceneRealtimeWithoutSearcherManager()
-      throws Exception {
+  public void testLuceneRealtimeWithoutSearcherManager() throws Exception {
     // create and open an index writer
     File indexFile = new File(INDEX_DIR.getPath() + "/realtime-test2.index");
     Directory indexDirectory = FSDirectory.open(indexFile.toPath());
@@ -1256,8 +1249,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testMultiThreadedLuceneRealtime()
-      throws Exception {
+  public void testMultiThreadedLuceneRealtime() throws Exception {
     File indexFile = new File(INDEX_DIR.getPath() + "/realtime-test3.index");
     Directory indexDirectory = FSDirectory.open(indexFile.toPath());
     StandardAnalyzer standardAnalyzer = new StandardAnalyzer();
@@ -1380,8 +1372,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
    */
 
   private void testTextSearchSelectQueryHelper(String query, int expectedResultSize, boolean compareGrepOutput,
-      List<Serializable[]> expectedResults)
-      throws Exception {
+      List<Serializable[]> expectedResults) throws Exception {
     SelectionOnlyOperator operator = getOperatorForPqlQuery(query);
     IntermediateResultsBlock operatorResult = operator.nextBlock();
     List<Object[]> resultset = (List<Object[]>) operatorResult.getSelectionResult();
@@ -1405,8 +1396,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     }
   }
 
-  private void verifySearchOutputWithGrepResults(List<Object[]> actualResultSet)
-      throws Exception {
+  private void verifySearchOutputWithGrepResults(List<Object[]> actualResultSet) throws Exception {
     URL resourceUrl = getClass().getClassLoader().getResource("data/text_search_data/group_by_grep_results.out");
     File file = new File(resourceUrl.getFile());
     InputStream inputStream = new FileInputStream(file);

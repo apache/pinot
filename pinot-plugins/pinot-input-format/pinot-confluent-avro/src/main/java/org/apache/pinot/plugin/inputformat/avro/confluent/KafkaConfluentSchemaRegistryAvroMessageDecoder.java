@@ -57,7 +57,6 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
   public RestService createRestService(String schemaRegistryUrl, Map<String, String> configs) {
     RestService restService = new RestService(schemaRegistryUrl);
 
-
     ConfigDef configDef = new ConfigDef();
     SslConfigs.addClientSslSupport(configDef);
     Map<String, ConfigDef.ConfigKey> configKeyMap = configDef.configKeys();
@@ -77,7 +76,6 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
       }
     }
 
-
     if (!sslConfigs.isEmpty()) {
       SslFactory sslFactory = new SslFactory(Mode.CLIENT);
       sslFactory.configure(sslConfigs);
@@ -87,14 +85,11 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
   }
 
   @Override
-  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
-      throws Exception {
+  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName) throws Exception {
     checkState(props.containsKey(SCHEMA_REGISTRY_REST_URL), "Missing required property '%s'", SCHEMA_REGISTRY_REST_URL);
     String schemaRegistryUrl = props.get(SCHEMA_REGISTRY_REST_URL);
     SchemaRegistryClient schemaRegistryClient =
-            new CachedSchemaRegistryClient(
-                    createRestService(schemaRegistryUrl, props),
-                    1000, props);
+        new CachedSchemaRegistryClient(createRestService(schemaRegistryUrl, props), 1000, props);
 
     _deserializer = new KafkaAvroDeserializer(schemaRegistryClient);
     Preconditions.checkNotNull(topicName, "Topic must be provided");

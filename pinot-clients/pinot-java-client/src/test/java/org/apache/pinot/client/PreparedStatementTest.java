@@ -37,7 +37,8 @@ public class PreparedStatementTest {
   public void testPreparedStatementEscaping() {
     // Create a prepared statement that has to quote a string appropriately
     Connection connection = ConnectionFactory.fromHostList("dummy");
-    PreparedStatement preparedStatement = connection.prepareStatement(new Request("sql", "SELECT foo FROM bar WHERE baz = ?"));
+    PreparedStatement preparedStatement =
+        connection.prepareStatement(new Request("sql", "SELECT foo FROM bar WHERE baz = ?"));
     preparedStatement.setString(0, "'hello'");
     preparedStatement.execute();
 
@@ -60,29 +61,25 @@ public class PreparedStatementTest {
     private String _lastQuery;
 
     @Override
-    public BrokerResponse executeQuery(String brokerAddress, String query)
-        throws PinotClientException {
+    public BrokerResponse executeQuery(String brokerAddress, String query) throws PinotClientException {
       _lastQuery = query;
       return BrokerResponse.empty();
     }
 
     @Override
-    public Future<BrokerResponse> executeQueryAsync(String brokerAddress, String query)
-        throws PinotClientException {
+    public Future<BrokerResponse> executeQueryAsync(String brokerAddress, String query) throws PinotClientException {
       _lastQuery = query;
       return null;
     }
 
     @Override
-    public BrokerResponse executeQuery(String brokerAddress, Request request)
-        throws PinotClientException {
+    public BrokerResponse executeQuery(String brokerAddress, Request request) throws PinotClientException {
       _lastQuery = request.getQuery();
       return BrokerResponse.empty();
     }
 
     @Override
-    public Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
-        throws PinotClientException {
+    public Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request) throws PinotClientException {
       _lastQuery = request.getQuery();
       return null;
     }
@@ -92,8 +89,7 @@ public class PreparedStatementTest {
     }
 
     @Override
-    public void close()
-        throws PinotClientException {
+    public void close() throws PinotClientException {
 
     }
   }

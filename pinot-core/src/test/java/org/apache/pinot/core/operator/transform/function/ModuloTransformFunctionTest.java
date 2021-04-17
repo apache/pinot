@@ -49,8 +49,7 @@ public class ModuloTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        RequestContextUtils.getExpression(String.format("mod(%s,%s)", FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("mod(%s,%s)", FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ModuloTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -58,8 +57,7 @@ public class ModuloTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        RequestContextUtils.getExpression(String.format("mod(%s,%s)", DOUBLE_SV_COLUMN, STRING_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("mod(%s,%s)", DOUBLE_SV_COLUMN, STRING_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ModuloTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -75,14 +73,14 @@ public class ModuloTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = RequestContextUtils.getExpression(String
-        .format("mod(mod(mod(mod(mod(12,%s),%s),mod(mod(%s,%s),0.34)),%s),%s)", STRING_SV_COLUMN, DOUBLE_SV_COLUMN,
-            FLOAT_SV_COLUMN, LONG_SV_COLUMN, INT_SV_COLUMN, DOUBLE_SV_COLUMN));
+    expression =
+        RequestContextUtils.getExpression(String.format("mod(mod(mod(mod(mod(12,%s),%s),mod(mod(%s,%s),0.34)),%s),%s)",
+            STRING_SV_COLUMN, DOUBLE_SV_COLUMN, FLOAT_SV_COLUMN, LONG_SV_COLUMN, INT_SV_COLUMN, DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ModuloTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = (((((12d % Double.parseDouble(_stringSVValues[i])) % _doubleSVValues[i]) % (
-          ((double) _floatSVValues[i] % (double) _longSVValues[i]) % 0.34)) % (double) _intSVValues[i])
+      expectedValues[i] = (((((12d % Double.parseDouble(_stringSVValues[i])) % _doubleSVValues[i])
+          % (((double) _floatSVValues[i] % (double) _longSVValues[i]) % 0.34)) % (double) _intSVValues[i])
           % _doubleSVValues[i]);
     }
     testTransformFunction(transformFunction, expectedValues);
@@ -97,7 +95,7 @@ public class ModuloTransformFunctionTest extends BaseTransformFunctionTest {
   @DataProvider(name = "testIllegalArguments")
   public Object[][] testIllegalArguments() {
     return new Object[][]{new Object[]{String.format("mod(%s)", INT_SV_COLUMN)}, new Object[]{String.format(
-        "mod(%s, %s)", INT_MV_COLUMN, LONG_SV_COLUMN)}, new Object[]{String.format("mod(%s, %s)", LONG_SV_COLUMN,
-        INT_MV_COLUMN)}};
+        "mod(%s, %s)", INT_MV_COLUMN,
+        LONG_SV_COLUMN)}, new Object[]{String.format("mod(%s, %s)", LONG_SV_COLUMN, INT_MV_COLUMN)}};
   }
 }

@@ -52,11 +52,11 @@ public class SchemaResponse {
     return new SchemaResponse();
   }
 
-  public String getSchemaName(){
+  public String getSchemaName() {
     return _schemaName;
   }
 
-  public JsonNode getDimensions(){
+  public JsonNode getDimensions() {
     return _dimensions;
   }
 
@@ -64,7 +64,9 @@ public class SchemaResponse {
     return _metrics;
   }
 
-  public JsonNode getDateTimeFieldSpecs() { return  _dateTimeFieldSpecs; }
+  public JsonNode getDateTimeFieldSpecs() {
+    return _dateTimeFieldSpecs;
+  }
 
   public static class SchemaResponseFuture extends ControllerResponseFuture<SchemaResponse> {
     private final ObjectReader OBJECT_READER = new ObjectMapper().reader();
@@ -74,8 +76,7 @@ public class SchemaResponse {
     }
 
     @Override
-    public SchemaResponse get(long timeout, TimeUnit unit)
-        throws ExecutionException {
+    public SchemaResponse get(long timeout, TimeUnit unit) throws ExecutionException {
       String response = getStringResponse(timeout, unit);
       try {
         JsonNode jsonResponse = OBJECT_READER.readTree(response);
@@ -87,6 +88,5 @@ public class SchemaResponse {
       return null;
     }
   }
-
 
 }

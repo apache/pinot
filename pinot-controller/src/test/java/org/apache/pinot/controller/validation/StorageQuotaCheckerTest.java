@@ -58,28 +58,24 @@ public class StorageQuotaCheckerTest {
     _storageQuotaChecker = new StorageQuotaChecker(_tableConfig, _tableSizeReader, _controllerMetrics, true);
   }
 
-  private boolean isSegmentWithinQuota()
-      throws InvalidConfigException {
-    return _storageQuotaChecker
-        .isSegmentStorageWithinQuota(SEGMENT_NAME, SEGMENT_SIZE_IN_BYTES, 1000).isSegmentWithinQuota;
+  private boolean isSegmentWithinQuota() throws InvalidConfigException {
+    return _storageQuotaChecker.isSegmentStorageWithinQuota(SEGMENT_NAME, SEGMENT_SIZE_IN_BYTES,
+        1000).isSegmentWithinQuota;
   }
 
   @Test
-  public void testNoQuota()
-      throws InvalidConfigException {
+  public void testNoQuota() throws InvalidConfigException {
     _tableConfig.setQuotaConfig(null);
     assertTrue(isSegmentWithinQuota());
   }
 
   @Test
-  public void testNoStorageQuotaConfig()
-      throws InvalidConfigException {
+  public void testNoStorageQuotaConfig() throws InvalidConfigException {
     _tableConfig.setQuotaConfig(new QuotaConfig(null, null));
     assertTrue(isSegmentWithinQuota());
   }
 
-  public void mockTableSizeResult(long tableSizeInBytes, int numMissingSegments)
-      throws InvalidConfigException {
+  public void mockTableSizeResult(long tableSizeInBytes, int numMissingSegments) throws InvalidConfigException {
     TableSizeReader.TableSubTypeSizeDetails tableSizeResult = new TableSizeReader.TableSubTypeSizeDetails();
     tableSizeResult.estimatedSizeInBytes = tableSizeInBytes;
     tableSizeResult.segments = Collections.emptyMap();
@@ -88,8 +84,7 @@ public class StorageQuotaCheckerTest {
   }
 
   @Test
-  public void testWithinQuota()
-      throws InvalidConfigException {
+  public void testWithinQuota() throws InvalidConfigException {
     _tableConfig.setQuotaConfig(new QuotaConfig("2.8K", null));
 
     // No response from server, should pass without updating metrics

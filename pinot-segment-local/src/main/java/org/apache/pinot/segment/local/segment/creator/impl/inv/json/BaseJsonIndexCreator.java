@@ -71,8 +71,7 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   int _nextFlattenedDocId;
   int _maxValueLength;
 
-  BaseJsonIndexCreator(File indexDir, String columnName)
-      throws IOException {
+  BaseJsonIndexCreator(File indexDir, String columnName) throws IOException {
     _indexFile = new File(indexDir, columnName + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
     _tempDir = new File(indexDir, columnName + TEMP_DIR_SUFFIX);
     if (_tempDir.exists()) {
@@ -85,19 +84,17 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   }
 
   @Override
-  public void add(String jsonString)
-      throws IOException {
+  public void add(String jsonString) throws IOException {
     addFlattenedRecords(JsonUtils.flatten(JsonUtils.stringToJsonNode(jsonString)));
   }
 
   /**
    * Adds the flattened records for the next document.
    */
-  void addFlattenedRecords(List<Map<String, String>> records)
-      throws IOException {
+  void addFlattenedRecords(List<Map<String, String>> records) throws IOException {
     int numRecords = records.size();
-    Preconditions
-        .checkState(_nextFlattenedDocId + numRecords > 0, "Got more than %s flattened records", Integer.MAX_VALUE);
+    Preconditions.checkState(_nextFlattenedDocId + numRecords > 0, "Got more than %s flattened records",
+        Integer.MAX_VALUE);
     _numFlattenedRecordsList.add(numRecords);
     for (Map<String, String> record : records) {
       for (Map.Entry<String, String> entry : record.entrySet()) {
@@ -127,8 +124,7 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
    * Generates the index file based on _maxValueLength, _dictionaryFile, _invertedIndexFile, _numFlattenedRecordsList,
    * _nextFlattenedDocId.
    */
-  void generateIndexFile()
-      throws IOException {
+  void generateIndexFile() throws IOException {
     ByteBuffer headerBuffer = ByteBuffer.allocate(HEADER_LENGTH);
     headerBuffer.putInt(VERSION);
     headerBuffer.putInt(_maxValueLength);
@@ -166,8 +162,7 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     FileUtils.deleteDirectory(_tempDir);
   }
 }

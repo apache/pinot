@@ -67,8 +67,7 @@ public class IntermediateIndexContainer implements Closeable {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     String column = _fieldSpec.getName();
     try {
       _forwardIndex.close();

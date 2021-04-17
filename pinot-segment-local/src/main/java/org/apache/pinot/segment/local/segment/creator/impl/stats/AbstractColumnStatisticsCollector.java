@@ -65,8 +65,8 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
 
     String partitionFunctionName = statsCollectorConfig.getPartitionFunctionName(column);
     int numPartitions = statsCollectorConfig.getNumPartitions(column);
-    partitionFunction = (partitionFunctionName != null) ? PartitionFunctionFactory
-        .getPartitionFunction(partitionFunctionName, numPartitions) : null;
+    partitionFunction = (partitionFunctionName != null)
+        ? PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions) : null;
 
     this.numPartitions = statsCollectorConfig.getNumPartitions(column);
     if (this.partitionFunction != null) {

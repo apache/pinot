@@ -83,8 +83,7 @@ public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizerTest {
   @Test
   public void testEqualityAndInMerge() {
     // a = 1 OR a IN (2,3,4) -> a IN (1,2,3,4)
-    testHelper("select * from a where a = 1 OR a IN (2,3,4,31)",
-        "select * from a where a IN (1,2,3,31,4)");
+    testHelper("select * from a where a = 1 OR a IN (2,3,4,31)", "select * from a where a IN (1,2,3,31,4)");
   }
 
   @Test
@@ -108,7 +107,8 @@ public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizerTest {
   }
 
   private String filterQueryTreeForQuery(String query) {
-    BrokerRequest brokerRequest = BROKER_REQUEST_OPTIMIZER.optimize(COMPILER.compileToBrokerRequest(query), null /* timeColumn */);
+    BrokerRequest brokerRequest =
+        BROKER_REQUEST_OPTIMIZER.optimize(COMPILER.compileToBrokerRequest(query), null /* timeColumn */);
     return RequestUtils.generateFilterQueryTree(brokerRequest).toString();
   }
 
@@ -329,8 +329,10 @@ public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizerTest {
     testHelper(queryToOptimize, goodQuery);
 
     // nested rewrite
-    queryToOptimize = "SELECT * FROM foo WHERE (a IN (1, 2, 3, 4) AND (c = 20 OR c = 30 OR c = 40 OR b > 20)) OR (a > 7 AND a < 20 AND b IN (2))";
-    goodQuery = "SELECT * FROM foo WHERE (a IN (1, 2, 3, 4) AND (c IN (20, 30, 40) OR b > 20)) OR (a > 7 AND a < 20 AND b = 2)";
+    queryToOptimize =
+        "SELECT * FROM foo WHERE (a IN (1, 2, 3, 4) AND (c = 20 OR c = 30 OR c = 40 OR b > 20)) OR (a > 7 AND a < 20 AND b IN (2))";
+    goodQuery =
+        "SELECT * FROM foo WHERE (a IN (1, 2, 3, 4) AND (c IN (20, 30, 40) OR b > 20)) OR (a > 7 AND a < 20 AND b = 2)";
     testHelper(queryToOptimize, goodQuery);
   }
 
@@ -446,7 +448,8 @@ public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizerTest {
     }
   }
 
-  private void compareLeafOperators(List<FilterQueryTree> childrenThatAreLeafOperators1, List<FilterQueryTree> childrenThatAreLeafOperators2) {
+  private void compareLeafOperators(List<FilterQueryTree> childrenThatAreLeafOperators1,
+      List<FilterQueryTree> childrenThatAreLeafOperators2) {
     Assert.assertNotNull(childrenThatAreLeafOperators1);
     Assert.assertNotNull(childrenThatAreLeafOperators2);
     Assert.assertEquals(childrenThatAreLeafOperators1.size(), childrenThatAreLeafOperators2.size());

@@ -52,9 +52,9 @@ public class RollupCollector implements Collector {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
         if (fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC) {
-          valueSize ++;
+          valueSize++;
         } else {
-          keySize ++;
+          keySize++;
         }
       }
     }

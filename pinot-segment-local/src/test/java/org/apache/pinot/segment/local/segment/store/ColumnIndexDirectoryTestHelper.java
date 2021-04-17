@@ -51,8 +51,7 @@ public class ColumnIndexDirectoryTestHelper {
     return buf;
   }
 
-  static void verifyMultipleReads(ColumnIndexDirectory columnDirectory, String column, int numIter)
-      throws Exception {
+  static void verifyMultipleReads(ColumnIndexDirectory columnDirectory, String column, int numIter) throws Exception {
     for (int i = 0; i < numIter; i++) {
       // NOTE: PinotDataBuffer is tracked in the ColumnIndexDirectory. No need to close it here.
       PinotDataBuffer buf = ColumnIndexDirectoryTestHelper.getIndexBuffer(columnDirectory, column, i);
@@ -83,37 +82,32 @@ public class ColumnIndexDirectoryTestHelper {
     Mockito.when(meta.getSegmentVersion()).thenReturn(version);
     Mockito.when(meta.getDictionaryFileName(ArgumentMatchers.anyString())).thenAnswer(new Answer<String>() {
       @Override
-      public String answer(InvocationOnMock invocationOnMock)
-          throws Throwable {
+      public String answer(InvocationOnMock invocationOnMock) throws Throwable {
         return invocationOnMock.getArguments()[0] + ".dict";
       }
     });
     Mockito.when(meta.getForwardIndexFileName(ArgumentMatchers.anyString())).thenAnswer(new Answer<String>() {
       @Override
-      public String answer(InvocationOnMock invocationOnMock)
-          throws Throwable {
+      public String answer(InvocationOnMock invocationOnMock) throws Throwable {
         return invocationOnMock.getArguments()[0] + ".fwd";
       }
     });
 
     Mockito.when(meta.getBitmapInvertedIndexFileName(ArgumentMatchers.anyString())).thenAnswer(new Answer<String>() {
       @Override
-      public String answer(InvocationOnMock invocationOnMock)
-          throws Throwable {
+      public String answer(InvocationOnMock invocationOnMock) throws Throwable {
         return invocationOnMock.getArguments()[0] + ".ii";
       }
     });
     Mockito.when(meta.getBloomFilterFileName(ArgumentMatchers.anyString())).thenAnswer(new Answer<String>() {
       @Override
-      public String answer(InvocationOnMock invocationOnMock)
-          throws Throwable {
+      public String answer(InvocationOnMock invocationOnMock) throws Throwable {
         return invocationOnMock.getArguments()[0] + ".bloom";
       }
     });
     Mockito.when(meta.getNullValueVectorFileName(ArgumentMatchers.anyString())).thenAnswer(new Answer<String>() {
       @Override
-      public String answer(InvocationOnMock invocationOnMock)
-          throws Throwable {
+      public String answer(InvocationOnMock invocationOnMock) throws Throwable {
         return invocationOnMock.getArguments()[0] + ".nullvalue";
       }
     });

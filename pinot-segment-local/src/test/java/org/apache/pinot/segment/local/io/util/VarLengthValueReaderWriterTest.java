@@ -41,20 +41,17 @@ public class VarLengthValueReaderWriterTest {
   private static final int NUM_VALUES = 1000;
 
   @BeforeClass
-  public void setUp()
-      throws IOException {
+  public void setUp() throws IOException {
     FileUtils.forceMkdir(TEMP_DIR);
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 
   @Test
-  public void testEmptyDictionary()
-      throws IOException {
+  public void testEmptyDictionary() throws IOException {
     File dictionaryFile = new File(TEMP_DIR, "empty");
     VarLengthValueWriter writer = new VarLengthValueWriter(dictionaryFile, 0);
     writer.close();
@@ -67,8 +64,7 @@ public class VarLengthValueReaderWriterTest {
   }
 
   @Test
-  public void testSingleValueDictionary()
-      throws IOException {
+  public void testSingleValueDictionary() throws IOException {
     File dictionaryFile = new File(TEMP_DIR, "single");
     String value = RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH);
     byte[] valueBytes = StringUtils.encodeUtf8(value);
@@ -87,8 +83,7 @@ public class VarLengthValueReaderWriterTest {
   }
 
   @Test
-  public void testMultiValueDictionary()
-      throws IOException {
+  public void testMultiValueDictionary() throws IOException {
     File dictionaryFile = new File(TEMP_DIR, "multi");
     String[] values = new String[NUM_VALUES];
     byte[][] valueBytesArray = new byte[NUM_VALUES][];

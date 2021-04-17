@@ -61,16 +61,14 @@ public class JSONRecordExtractorTest extends AbstractRecordExtractorTest {
   @Override
   protected Set<String> getSourceFields() {
     return Sets.newHashSet(NULL_FIELD, INT_FIELD, LONG_FIELD, DOUBLE_FIELD, STRING_FIELD, INT_ARRAY_FIELD,
-        DOUBLE_ARRAY_FIELD, STRING_ARRAY_FIELD, COMPLEX_ARRAY_1_FIELD, COMPLEX_ARRAY_2_FIELD, MAP_1_FIELD,
-        MAP_2_FIELD);
+        DOUBLE_ARRAY_FIELD, STRING_ARRAY_FIELD, COMPLEX_ARRAY_1_FIELD, COMPLEX_ARRAY_2_FIELD, MAP_1_FIELD, MAP_2_FIELD);
   }
 
   /**
    * Create a JSONRecordReader
    */
   @Override
-  protected RecordReader createRecordReader(Set<String> fieldsToRead)
-      throws IOException {
+  protected RecordReader createRecordReader(Set<String> fieldsToRead) throws IOException {
     JSONRecordReader recordReader = new JSONRecordReader();
     recordReader.init(_dataFile, fieldsToRead, null);
     return recordReader;
@@ -80,8 +78,7 @@ public class JSONRecordExtractorTest extends AbstractRecordExtractorTest {
    * Create a JSON input file using the input records
    */
   @Override
-  protected void createInputFile()
-      throws IOException {
+  protected void createInputFile() throws IOException {
     try (FileWriter fileWriter = new FileWriter(_dataFile)) {
       for (Map<String, Object> inputRecord : _inputRecords) {
         ObjectNode jsonRecord = JsonUtils.newObjectNode();

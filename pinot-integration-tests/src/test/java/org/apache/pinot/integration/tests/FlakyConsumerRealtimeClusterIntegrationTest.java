@@ -57,8 +57,7 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
     }
 
     @Override
-    public void start()
-        throws Exception {
+    public void start() throws Exception {
       _streamLevelConsumer.start();
     }
 
@@ -89,8 +88,7 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
     }
 
     @Override
-    public void shutdown()
-        throws Exception {
+    public void shutdown() throws Exception {
       _streamLevelConsumer.shutdown();
     }
   }

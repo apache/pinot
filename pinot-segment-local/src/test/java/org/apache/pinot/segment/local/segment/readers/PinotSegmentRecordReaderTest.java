@@ -57,8 +57,7 @@ public class PinotSegmentRecordReaderTest {
   private static String TIME = "t";
 
   @BeforeClass
-  public void setup()
-      throws Exception {
+  public void setup() throws Exception {
     Schema schema = createPinotSchema();
     TableConfig tableConfig = createTableConfig();
     String segmentName = "pinotSegmentRecordReaderTest";
@@ -70,14 +69,9 @@ public class PinotSegmentRecordReaderTest {
   }
 
   private Schema createPinotSchema() {
-    return new Schema.SchemaBuilder()
-        .setSchemaName("schema")
-        .addSingleValueDimension(D_SV_1, DataType.STRING)
-        .addMultiValueDimension(D_MV_1, DataType.STRING)
-        .addMetric(M1, DataType.INT)
-        .addMetric(M2, DataType.FLOAT)
-        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, TIME), null)
-        .build();
+    return new Schema.SchemaBuilder().setSchemaName("schema").addSingleValueDimension(D_SV_1, DataType.STRING)
+        .addMultiValueDimension(D_MV_1, DataType.STRING).addMetric(M1, DataType.INT).addMetric(M2, DataType.FLOAT)
+        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, TIME), null).build();
   }
 
   private TableConfig createTableConfig() {
@@ -85,8 +79,7 @@ public class PinotSegmentRecordReaderTest {
   }
 
   @Test
-  public void testPinotSegmentRecordReader()
-      throws Exception {
+  public void testPinotSegmentRecordReader() throws Exception {
     List<GenericRow> outputRows = new ArrayList<>();
 
     try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(_segmentIndexDir)) {
@@ -109,14 +102,13 @@ public class PinotSegmentRecordReaderTest {
   }
 
   @Test
-  public void testPinotSegmentRecordReaderSortedColumn()
-      throws Exception {
+  public void testPinotSegmentRecordReaderSortedColumn() throws Exception {
     List<GenericRow> outputRows = new ArrayList<>();
     List<String> sortOrder = new ArrayList<>();
     sortOrder.add(D_SV_1);
 
-    try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(_segmentIndexDir, null,
-        sortOrder)) {
+    try (PinotSegmentRecordReader pinotSegmentRecordReader =
+        new PinotSegmentRecordReader(_segmentIndexDir, null, sortOrder)) {
       while (pinotSegmentRecordReader.hasNext()) {
         GenericRow row = pinotSegmentRecordReader.next();
         outputRows.add(row);

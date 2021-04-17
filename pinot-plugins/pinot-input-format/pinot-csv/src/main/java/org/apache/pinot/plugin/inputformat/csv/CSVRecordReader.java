@@ -103,8 +103,7 @@ public class CSVRecordReader implements RecordReader {
     _recordExtractor.init(fieldsToRead, recordExtractorConfig);
   }
 
-  private void init()
-      throws IOException {
+  private void init() throws IOException {
     _parser = _format.parse(RecordReaderUtils.getBufferedReader(_dataFile));
     _iterator = _parser.iterator();
   }
@@ -127,15 +126,13 @@ public class CSVRecordReader implements RecordReader {
   }
 
   @Override
-  public void rewind()
-      throws IOException {
+  public void rewind() throws IOException {
     _parser.close();
     init();
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _parser.close();
   }
 }

@@ -48,8 +48,7 @@ public class SegmentFetcherFactoryTest {
   }
 
   @Test(dependsOnMethods = "testDefaultSegmentFetcherFactory")
-  public void testCustomizedSegmentFetcherFactory()
-      throws Exception {
+  public void testCustomizedSegmentFetcherFactory() throws Exception {
     Map<String, Object> properties = new HashMap<>();
     properties.put("foo", "bar");
     properties.put("protocols", Arrays.asList(HTTP_PROTOCOL, HTTPS_PROTOCOL, TEST_PROTOCOL, "foo"));
@@ -108,15 +107,13 @@ public class SegmentFetcherFactoryTest {
     }
 
     @Override
-    public void fetchSegmentToLocal(URI uri, File dest)
-        throws Exception {
+    public void fetchSegmentToLocal(URI uri, File dest) throws Exception {
       assertEquals(uri, new URI(TEST_URI));
       _fetchFileToLocalCalled++;
     }
 
     @Override
-    public void fetchSegmentToLocal(List<URI> uri, File dest)
-        throws Exception {
+    public void fetchSegmentToLocal(List<URI> uri, File dest) throws Exception {
       throw new UnsupportedOperationException();
     }
   }

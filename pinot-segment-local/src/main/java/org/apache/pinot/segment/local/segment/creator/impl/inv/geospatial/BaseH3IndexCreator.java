@@ -82,8 +82,7 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
 
   int _nextDocId;
 
-  BaseH3IndexCreator(File indexDir, String columnName, H3IndexResolution resolution)
-      throws IOException {
+  BaseH3IndexCreator(File indexDir, String columnName, H3IndexResolution resolution) throws IOException {
     _indexFile = new File(indexDir, columnName + V1Constants.Indexes.H3_INDEX_FILE_EXTENSION);
     _tempDir = new File(indexDir, columnName + TEMP_DIR_SUFFIX);
     if (_tempDir.exists()) {
@@ -102,8 +101,7 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
   }
 
   @Override
-  public void add(Geometry geometry)
-      throws IOException {
+  public void add(Geometry geometry) throws IOException {
     Preconditions.checkState(geometry instanceof Point, "H3 index can only be applied to Point, got: %s",
         geometry.getGeometryType());
     Coordinate coordinate = geometry.getCoordinate();
@@ -120,8 +118,7 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
   /**
    * Writes the bitmap to the temporary index files for the given H3 id.
    */
-  void add(long h3Id, BitmapDataProvider bitmap)
-      throws IOException {
+  void add(long h3Id, BitmapDataProvider bitmap) throws IOException {
     _dictionaryStream.writeLong(h3Id);
     _bitmapOffsetStream.writeInt(_bitmapValueStream.size());
     bitmap.serialize(_bitmapValueStream);
@@ -131,8 +128,7 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
    * Generates the final index file from the temporary index files. Should be called after all the bitmaps are added to
    * the temporary index files.
    */
-  void generateIndexFile()
-      throws IOException {
+  void generateIndexFile() throws IOException {
     // Write the end offset of the last bitmap
     _bitmapOffsetStream.writeInt(_bitmapValueStream.size());
 
@@ -158,8 +154,7 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _dictionaryStream.close();
     _bitmapOffsetStream.close();
     _bitmapValueStream.close();

@@ -57,8 +57,8 @@ public class SegmentAssignmentUtilsTest {
         instancesAssigned.add(instances.get(assignedInstanceId));
         assignedInstanceId = (assignedInstanceId + 1) % numInstances;
       }
-      currentAssignment
-          .put(segmentName, SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
+      currentAssignment.put(segmentName,
+          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
     }
 
     // There should be 100 segments assigned
@@ -116,8 +116,8 @@ public class SegmentAssignmentUtilsTest {
     // }
     int newNumInstances = numInstances - 5;
     newInstances = SegmentAssignmentTestUtils.getNameList(INSTANCE_NAME_PREFIX, newNumInstances);
-    newAssignment = SegmentAssignmentUtils
-        .rebalanceTableWithHelixAutoRebalanceStrategy(currentAssignment, newInstances, NUM_REPLICAS);
+    newAssignment = SegmentAssignmentUtils.rebalanceTableWithHelixAutoRebalanceStrategy(currentAssignment, newInstances,
+        NUM_REPLICAS);
     // There should be 100 segments assigned
     assertEquals(newAssignment.size(), numSegments);
     // Each segment should have 3 replicas
@@ -147,8 +147,8 @@ public class SegmentAssignmentUtilsTest {
     // }
     newNumInstances = numInstances + 5;
     newInstances = SegmentAssignmentTestUtils.getNameList(INSTANCE_NAME_PREFIX, newNumInstances);
-    newAssignment = SegmentAssignmentUtils
-        .rebalanceTableWithHelixAutoRebalanceStrategy(currentAssignment, newInstances, NUM_REPLICAS);
+    newAssignment = SegmentAssignmentUtils.rebalanceTableWithHelixAutoRebalanceStrategy(currentAssignment, newInstances,
+        NUM_REPLICAS);
     // There should be 100 segments assigned
     assertEquals(newAssignment.size(), numSegments);
     // Each segment should have 3 replicas
@@ -176,8 +176,8 @@ public class SegmentAssignmentUtilsTest {
     // }
     String newInstanceNamePrefix = "i_";
     newInstances = SegmentAssignmentTestUtils.getNameList(newInstanceNamePrefix, numInstances);
-    newAssignment = SegmentAssignmentUtils
-        .rebalanceTableWithHelixAutoRebalanceStrategy(currentAssignment, newInstances, NUM_REPLICAS);
+    newAssignment = SegmentAssignmentUtils.rebalanceTableWithHelixAutoRebalanceStrategy(currentAssignment, newInstances,
+        NUM_REPLICAS);
     // There should be 100 segments assigned
     assertEquals(newAssignment.size(), numSegments);
     // Each segment should have 3 replicas
@@ -257,9 +257,8 @@ public class SegmentAssignmentUtilsTest {
     Arrays.fill(expectedNumSegmentsAssignedPerInstance, numSegmentsPerInstance);
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Current assignment should already be balanced
-    assertEquals(SegmentAssignmentUtils
-            .rebalanceReplicaGroupBasedTable(currentAssignment, instancePartitions, partitionIdToSegmentsMap),
-        currentAssignment);
+    assertEquals(SegmentAssignmentUtils.rebalanceReplicaGroupBasedTable(currentAssignment, instancePartitions,
+        partitionIdToSegmentsMap), currentAssignment);
 
     // Replace instance_0 with instance_9, instance_4 with instance_10
     // {
@@ -328,8 +327,8 @@ public class SegmentAssignmentUtilsTest {
       newInstancePartitions.setInstances(0, replicaGroupId, newInstancesForReplicaGroup);
       newInstances.addAll(newInstancesForReplicaGroup);
     }
-    newAssignment = SegmentAssignmentUtils
-        .rebalanceReplicaGroupBasedTable(currentAssignment, newInstancePartitions, partitionIdToSegmentsMap);
+    newAssignment = SegmentAssignmentUtils.rebalanceReplicaGroupBasedTable(currentAssignment, newInstancePartitions,
+        partitionIdToSegmentsMap);
     // There should be 90 segments assigned
     assertEquals(newAssignment.size(), numSegments);
     // Each segment should have 3 replicas
@@ -369,8 +368,8 @@ public class SegmentAssignmentUtilsTest {
       }
       newInstancePartitions.setInstances(0, replicaGroupId, newInstancesForReplicaGroup);
     }
-    newAssignment = SegmentAssignmentUtils
-        .rebalanceReplicaGroupBasedTable(currentAssignment, newInstancePartitions, partitionIdToSegmentsMap);
+    newAssignment = SegmentAssignmentUtils.rebalanceReplicaGroupBasedTable(currentAssignment, newInstancePartitions,
+        partitionIdToSegmentsMap);
     // There should be 90 segments assigned
     assertEquals(newAssignment.size(), numSegments);
     // Each segment should have 3 replicas
@@ -407,8 +406,8 @@ public class SegmentAssignmentUtilsTest {
       }
       newInstancePartitions.setInstances(0, replicaGroupId, instancesForReplicaGroup);
     }
-    newAssignment = SegmentAssignmentUtils
-        .rebalanceReplicaGroupBasedTable(currentAssignment, newInstancePartitions, partitionIdToSegmentsMap);
+    newAssignment = SegmentAssignmentUtils.rebalanceReplicaGroupBasedTable(currentAssignment, newInstancePartitions,
+        partitionIdToSegmentsMap);
     // There should be 90 segments assigned
     assertEquals(newAssignment.size(), numSegments);
     // Each segment should have 3 replicas

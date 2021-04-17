@@ -110,10 +110,9 @@ public class StorageQuotaChecker {
 
     if (tableSubtypeSize.missingSegments > 0) {
       if (tableSubtypeSize.estimatedSizeInBytes > allowedStorageBytes) {
-        return failure(
-            "Table " + tableNameWithType + " already over quota. Estimated size for all replicas is " + DataSizeUtils
-                .fromBytes(tableSubtypeSize.estimatedSizeInBytes) + ". Configured size for " + numReplicas + " is "
-                + DataSizeUtils.fromBytes(allowedStorageBytes));
+        return failure("Table " + tableNameWithType + " already over quota. Estimated size for all replicas is "
+            + DataSizeUtils.fromBytes(tableSubtypeSize.estimatedSizeInBytes) + ". Configured size for " + numReplicas
+            + " is " + DataSizeUtils.fromBytes(allowedStorageBytes));
       } else {
         return success("Missing size report for " + tableSubtypeSize.missingSegments
             + " segments. Bypassing storage quota check for " + tableNameWithType);

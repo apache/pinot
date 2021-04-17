@@ -55,8 +55,8 @@ public final class ListenerConfigUtil {
     // left blank
   }
 
-  public static final Set<String> SUPPORTED_PROTOCOLS = new HashSet<>(
-      Arrays.asList(CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL));
+  public static final Set<String> SUPPORTED_PROTOCOLS =
+      new HashSet<>(Arrays.asList(CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL));
 
   /**
    * Generates {@link ListenerConfig} instances based on the combination
@@ -79,8 +79,7 @@ public final class ListenerConfigUtil {
     return Arrays.stream(protocols)
         .peek(protocol -> Preconditions.checkArgument(SUPPORTED_PROTOCOLS.contains(protocol),
             "Unsupported protocol '%s' in config namespace '%s'", protocol, namespace))
-        .map(protocol -> buildListenerConfig(config, namespace, protocol, tlsDefaults))
-        .collect(Collectors.toList());
+        .map(protocol -> buildListenerConfig(config, namespace, protocol, tlsDefaults)).collect(Collectors.toList());
   }
 
   public static List<ListenerConfig> buildControllerConfigs(PinotConfiguration controllerConf) {
@@ -126,8 +125,8 @@ public final class ListenerConfigUtil {
 
     String adminApiPortString = serverConf.getProperty(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT);
     if (adminApiPortString != null) {
-      listeners.add(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, Integer.parseInt(adminApiPortString),
-          CommonConstants.HTTP_PROTOCOL, new TlsConfig()));
+      listeners.add(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST,
+          Integer.parseInt(adminApiPortString), CommonConstants.HTTP_PROTOCOL, new TlsConfig()));
     }
 
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(serverConf, CommonConstants.Server.SERVER_TLS_PREFIX);
@@ -147,8 +146,7 @@ public final class ListenerConfigUtil {
       TlsConfig tlsConfig) {
     String protocolNamespace = namespace + DOT_ACCESS_PROTOCOLS + "." + protocol;
 
-    return new ListenerConfig(protocol,
-        getHost(config.getProperty(protocolNamespace + ".host", DEFAULT_HOST)),
+    return new ListenerConfig(protocol, getHost(config.getProperty(protocolNamespace + ".host", DEFAULT_HOST)),
         getPort(config.getProperty(protocolNamespace + ".port")), protocol, tlsConfig);
   }
 
@@ -208,7 +206,7 @@ public final class ListenerConfigUtil {
     }
 
     return new SSLEngineConfigurator(sslContextConfigurator).setClientMode(false)
-        .setNeedClientAuth(tlsConfig.isClientAuthEnabled()).setEnabledProtocols(new String[] { "TLSv1.2" });
+        .setNeedClientAuth(tlsConfig.isClientAuthEnabled()).setEnabledProtocols(new String[]{"TLSv1.2"});
   }
 
   public static String toString(Collection<? extends ListenerConfig> listenerConfigs) {

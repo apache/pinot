@@ -32,8 +32,7 @@ public class BatchQuickstartWithMinion extends Quickstart {
     return 1;
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     PluginManager.get().init();
     new BatchQuickstartWithMinion().execute();
   }

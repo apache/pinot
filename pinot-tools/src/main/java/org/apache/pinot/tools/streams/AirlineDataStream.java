@@ -56,8 +56,7 @@ public class AirlineDataStream {
   int counter = 0;
   private StreamDataProducer producer;
 
-  public AirlineDataStream(Schema pinotSchema, TableConfig tableConfig, File avroFile)
-      throws Exception {
+  public AirlineDataStream(Schema pinotSchema, TableConfig tableConfig, File avroFile) throws Exception {
     this.pinotSchema = pinotSchema;
     this.timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     this.avroFile = avroFile;
@@ -82,8 +81,7 @@ public class AirlineDataStream {
     service.shutdown();
   }
 
-  private void createStream()
-      throws IOException {
+  private void createStream() throws IOException {
     if (keepIndexing) {
       avroDataStream = new DataFileStream<>(new FileInputStream(avroFile), new GenericDatumReader<>());
       return;
@@ -91,8 +89,7 @@ public class AirlineDataStream {
     avroDataStream = null;
   }
 
-  private void publish(GenericRecord message)
-      throws IOException {
+  private void publish(GenericRecord message) throws IOException {
     if (!keepIndexing) {
       avroDataStream.close();
       avroDataStream = null;

@@ -41,8 +41,7 @@ public class AzurePinotFSTest {
   private File _testFile;
 
   @BeforeMethod
-  public void setup()
-      throws IOException {
+  public void setup() throws IOException {
     _adlLocation =
         new File(System.getProperty("java.io.tmpdir"), AzurePinotFSTest.class.getSimpleName()).getAbsolutePath();
     FileUtils.deleteQuietly(new File(_adlLocation));
@@ -59,8 +58,7 @@ public class AzurePinotFSTest {
   }
 
   @Test
-  public void testFS()
-      throws Exception {
+  public void testFS() throws Exception {
     ADLStoreClient adlStoreClient = Mockito.mock(ADLStoreClient.class);
     ADLFileInputStream adlFileInputStream = Mockito.mock(ADLFileInputStream.class);
     Mockito.when(adlStoreClient.checkExists(_adlLocation)).thenReturn(true);

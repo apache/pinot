@@ -39,8 +39,7 @@ public class ResourceFinder {
    * @return InputStream containing file contents
    * @throws IOException
    */
-  public static InputStream openResource(URI uri)
-      throws IOException {
+  public static InputStream openResource(URI uri) throws IOException {
     File file = new File(uri);
     return new FileInputStream(file);
   }
@@ -53,8 +52,7 @@ public class ResourceFinder {
    * @return InputStream containing file contents
    * @throws IOException
    */
-  public static InputStream openResource(ClassLoader classLoader, String pathName)
-      throws IOException {
+  public static InputStream openResource(ClassLoader classLoader, String pathName) throws IOException {
     Path path = Paths.get(pathName);
     if (path.isAbsolute()) {
       return new FileInputStream(pathName);
@@ -71,8 +69,7 @@ public class ResourceFinder {
    * @return InputStream containing file contents
    * @throws IOException
    */
-  public static InputStream openResourceWithRelativePath(ClassLoader classLoader, String pathName)
-      throws IOException {
+  public static InputStream openResourceWithRelativePath(ClassLoader classLoader, String pathName) throws IOException {
     return classLoader.getResourceAsStream(pathName);
   }
 }

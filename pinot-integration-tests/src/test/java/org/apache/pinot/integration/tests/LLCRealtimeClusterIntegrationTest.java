@@ -74,10 +74,10 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   @Override
   public void startController() {
     Map<String, Object> properties = getDefaultControllerConfiguration();
-    
+
     properties.put(ControllerConf.ALLOW_HLC_TABLES, false);
     properties.put(ControllerConf.ENABLE_SPLIT_COMMIT, _enableSplitCommit);
-    
+
     startController(properties);
     enableResourceConfigForLeadControllerResource(_enableLeadControllerResource);
   }
@@ -98,8 +98,7 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
 
   @BeforeClass
   @Override
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     System.out.println(String.format(
         "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableSplitCommit: %s, enableLeadControllerResource: %s",
         RANDOM_SEED, _isDirectAlloc, _isConsumerDirConfigured, _enableSplitCommit, _enableLeadControllerResource));
@@ -130,8 +129,7 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   }
 
   @Test
-  public void testInvertedIndexTriggering()
-      throws Exception {
+  public void testInvertedIndexTriggering() throws Exception {
     long numTotalDocs = getCountStarResult();
 
     JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
@@ -159,23 +157,20 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   }
 
   @Test(expectedExceptions = IOException.class)
-  public void testAddHLCTableShouldFail()
-      throws IOException {
+  public void testAddHLCTableShouldFail() throws IOException {
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
         .setStreamConfigs(Collections.singletonMap("stream.kafka.consumer.type", "HIGHLEVEL")).build();
     sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
   }
 
   @Test
-  public void testReload()
-      throws Exception {
+  public void testReload() throws Exception {
     testReload(false);
   }
 
   @Test
   @Override
-  public void testHardcodedServerPartitionedSqlQueries()
-      throws Exception {
+  public void testHardcodedServerPartitionedSqlQueries() throws Exception {
     super.testHardcodedServerPartitionedSqlQueries();
   }
 }

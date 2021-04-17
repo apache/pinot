@@ -46,8 +46,7 @@ public class LuceneFSTIndexReader implements TextIndexReader {
   private final PinotBufferIndexInput _dataBufferIndexInput;
   private final FST<Long> _readFST;
 
-  public LuceneFSTIndexReader(PinotDataBuffer pinotDataBuffer)
-      throws IOException {
+  public LuceneFSTIndexReader(PinotDataBuffer pinotDataBuffer) throws IOException {
     this._dataBuffer = pinotDataBuffer;
     this._dataBufferIndexInput = new PinotBufferIndexInput(this._dataBuffer, 0L, this._dataBuffer.size());
 
@@ -75,8 +74,7 @@ public class LuceneFSTIndexReader implements TextIndexReader {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     // Do Nothing
   }
 }

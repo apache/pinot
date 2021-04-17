@@ -152,8 +152,10 @@ public class ClusterIntegrationTestUtils {
       }
 
       h2Connection.prepareCall("DROP TABLE IF EXISTS " + tableName).execute();
-      h2Connection.prepareCall("CREATE TABLE " + tableName + "(" + StringUtil
-          .join(",", h2FieldNameAndTypes.toArray(new String[h2FieldNameAndTypes.size()])) + ")").execute();
+      h2Connection
+          .prepareCall("CREATE TABLE " + tableName + "("
+              + StringUtil.join(",", h2FieldNameAndTypes.toArray(new String[h2FieldNameAndTypes.size()])) + ")")
+          .execute();
     }
 
     // Insert Avro records into H2 table
@@ -202,9 +204,9 @@ public class ClusterIntegrationTestUtils {
    * @return Whether the given Avro field type is a single value type (non-NULL)
    */
   private static boolean isSingleValueAvroFieldType(Schema.Type avroFieldType) {
-    return (avroFieldType == Schema.Type.BOOLEAN) || (avroFieldType == Schema.Type.INT) || (avroFieldType
-        == Schema.Type.LONG) || (avroFieldType == Schema.Type.FLOAT) || (avroFieldType == Schema.Type.DOUBLE) || (
-        avroFieldType == Schema.Type.STRING);
+    return (avroFieldType == Schema.Type.BOOLEAN) || (avroFieldType == Schema.Type.INT)
+        || (avroFieldType == Schema.Type.LONG) || (avroFieldType == Schema.Type.FLOAT)
+        || (avroFieldType == Schema.Type.DOUBLE) || (avroFieldType == Schema.Type.STRING);
   }
 
   /**
@@ -247,8 +249,7 @@ public class ClusterIntegrationTestUtils {
    * @param tarDir Output directory for the tarred segments
    */
   public static void buildSegmentsFromAvro(List<File> avroFiles, TableConfig tableConfig,
-      org.apache.pinot.spi.data.Schema schema, int baseSegmentIndex, File segmentDir, File tarDir)
-      throws Exception {
+      org.apache.pinot.spi.data.Schema schema, int baseSegmentIndex, File segmentDir, File tarDir) throws Exception {
     int numAvroFiles = avroFiles.size();
     if (numAvroFiles == 1) {
       buildSegmentFromAvro(avroFiles.get(0), tableConfig, schema, baseSegmentIndex, segmentDir, tarDir);
@@ -281,8 +282,7 @@ public class ClusterIntegrationTestUtils {
    * @param tarDir Output directory for the tarred segments
    */
   public static void buildSegmentFromAvro(File avroFile, TableConfig tableConfig,
-      org.apache.pinot.spi.data.Schema schema, int segmentIndex, File segmentDir, File tarDir)
-      throws Exception {
+      org.apache.pinot.spi.data.Schema schema, int segmentIndex, File segmentDir, File tarDir) throws Exception {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setInputFilePath(avroFile.getPath());
     segmentGeneratorConfig.setOutDir(segmentDir.getPath());
@@ -314,8 +314,7 @@ public class ClusterIntegrationTestUtils {
    * @throws Exception
    */
   public static void pushAvroIntoKafka(List<File> avroFiles, String kafkaBroker, String kafkaTopic,
-      int maxNumKafkaMessagesPerBatch, @Nullable byte[] header, @Nullable String partitionColumn)
-      throws Exception {
+      int maxNumKafkaMessagesPerBatch, @Nullable byte[] header, @Nullable String partitionColumn) throws Exception {
     Properties properties = new Properties();
     properties.put("metadata.broker.list", kafkaBroker);
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
@@ -404,7 +403,6 @@ public class ClusterIntegrationTestUtils {
     }
   }
 
-
   /**
    * Push random generated
    *
@@ -420,8 +418,7 @@ public class ClusterIntegrationTestUtils {
   @SuppressWarnings("unused")
   public static void pushRandomAvroIntoKafka(File avroFile, String kafkaBroker, String kafkaTopic,
       int numKafkaMessagesToPush, int maxNumKafkaMessagesPerBatch, @Nullable byte[] header,
-      @Nullable String partitionColumn)
-      throws Exception {
+      @Nullable String partitionColumn) throws Exception {
     Properties properties = new Properties();
     properties.put("metadata.broker.list", kafkaBroker);
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
@@ -534,8 +531,7 @@ public class ClusterIntegrationTestUtils {
    */
   public static void testPqlQuery(String pinotQuery, String brokerUrl,
       org.apache.pinot.client.Connection pinotConnection, @Nullable List<String> sqlQueries,
-      @Nullable Connection h2Connection)
-      throws Exception {
+      @Nullable Connection h2Connection) throws Exception {
     testPqlQuery(pinotQuery, brokerUrl, pinotConnection, sqlQueries, h2Connection, null);
   }
 
@@ -557,8 +553,7 @@ public class ClusterIntegrationTestUtils {
    */
   public static void testPqlQuery(String pinotQuery, String brokerUrl,
       org.apache.pinot.client.Connection pinotConnection, @Nullable List<String> sqlQueries,
-      @Nullable Connection h2Connection, @Nullable Map<String, String> headers)
-      throws Exception {
+      @Nullable Connection h2Connection, @Nullable Map<String, String> headers) throws Exception {
     // Use broker response for metadata check, connection response for value check
     PinotQueryRequest pinotBrokerQueryRequest = new PinotQueryRequest(CommonConstants.Broker.Request.PQL, pinotQuery);
     JsonNode pinotResponse = ClusterTest.postQuery(pinotBrokerQueryRequest, brokerUrl, headers);
@@ -581,9 +576,8 @@ public class ClusterIntegrationTestUtils {
       int numAggregationResults = pinotResultSetGroup.getResultSetCount();
       int numSqlQueries = sqlQueries.size();
       if (numAggregationResults != numSqlQueries) {
-        String failureMessage =
-            "Number of aggregation results: " + numAggregationResults + " does not match number of SQL queries: "
-                + numSqlQueries;
+        String failureMessage = "Number of aggregation results: " + numAggregationResults
+            + " does not match number of SQL queries: " + numSqlQueries;
         failure(pinotQuery, sqlQueries, failureMessage);
       }
 
@@ -705,9 +699,8 @@ public class ClusterIntegrationTestUtils {
               String pinotValue = pinotGroupByResultSet.getString(groupIndex);
               double actualValue = Double.parseDouble(pinotValue);
               if (!DoubleMath.fuzzyEquals(actualValue, expectedValue, 1.0)) {
-                String failureMessage =
-                    "Value: " + aggregationIndex + " does not match, expected: " + h2Value + ", got: " + pinotValue
-                        + ", for group: " + groupKey;
+                String failureMessage = "Value: " + aggregationIndex + " does not match, expected: " + h2Value
+                    + ", got: " + pinotValue + ", for group: " + groupKey;
                 failure(pinotQuery, sqlQueries, failureMessage);
               }
             }
@@ -778,8 +771,7 @@ public class ClusterIntegrationTestUtils {
    * @throws Exception
    */
   static void testSqlQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
-      @Nullable List<String> sqlQueries, @Nullable Connection h2Connection)
-      throws Exception {
+      @Nullable List<String> sqlQueries, @Nullable Connection h2Connection) throws Exception {
     testSqlQuery(pinotQuery, brokerUrl, pinotConnection, sqlQueries, h2Connection, null);
   }
 
@@ -867,9 +859,8 @@ public class ClusterIntegrationTestUtils {
           // Fuzzy compare expected value and actual value
           boolean error = fuzzyCompare(h2Value, brokerValue, connectionValue);
           if (error) {
-            String failureMessage =
-                "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
-                    + ", got client value:" + connectionValue;
+            String failureMessage = "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: "
+                + brokerValue + ", got client value:" + connectionValue;
             failure(pinotQuery, Lists.newArrayList(sqlQuery), failureMessage);
           }
         }
@@ -890,9 +881,8 @@ public class ClusterIntegrationTestUtils {
                 String connectionValue = resultTableResultSet.getString(i, c);
                 boolean error = fuzzyCompare(h2Value, brokerValue, connectionValue);
                 if (error) {
-                  String failureMessage =
-                      "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
-                          + ", got client value:" + connectionValue;
+                  String failureMessage = "Value: " + c + " does not match, expected: " + h2Value
+                      + ", got broker value: " + brokerValue + ", got client value:" + connectionValue;
                   failure(pinotQuery, Lists.newArrayList(sqlQuery), failureMessage);
                 }
               }
@@ -910,8 +900,8 @@ public class ClusterIntegrationTestUtils {
     if (brokerRequest.getSelections() != null) {
       return true;
     }
-    if (brokerRequest.getAggregationsInfo() != null && brokerRequest.getAggregationsInfo().get(0).getAggregationType()
-        .equalsIgnoreCase("DISTINCT")) {
+    if (brokerRequest.getAggregationsInfo() != null
+        && brokerRequest.getAggregationsInfo().get(0).getAggregationType().equalsIgnoreCase("DISTINCT")) {
       return true;
     }
     return false;
@@ -924,8 +914,7 @@ public class ClusterIntegrationTestUtils {
   }
 
   private static int getH2ExpectedValues(Set<String> expectedValues, List<String> expectedOrderByValues,
-      ResultSet h2ResultSet, ResultSetMetaData h2MetaData, Collection<String> orderByColumns)
-      throws SQLException {
+      ResultSet h2ResultSet, ResultSetMetaData h2MetaData, Collection<String> orderByColumns) throws SQLException {
     Map<String, String> reusableExpectedValueMap = new HashMap<>();
     Map<String, List<String>> reusableMultiValuesMap = new HashMap<>();
     List<String> reusableColumnOrder = new ArrayList<>();
@@ -950,8 +939,8 @@ public class ClusterIntegrationTestUtils {
 
         // Handle multi-value columns
         int length = columnName.length();
-        if (length > H2_MULTI_VALUE_SUFFIX_LENGTH && columnName
-            .substring(length - H2_MULTI_VALUE_SUFFIX_LENGTH, length - 1).equals("__MV")) {
+        if (length > H2_MULTI_VALUE_SUFFIX_LENGTH
+            && columnName.substring(length - H2_MULTI_VALUE_SUFFIX_LENGTH, length - 1).equals("__MV")) {
           // Multi-value column
           String multiValueColumnName = columnName.substring(0, length - H2_MULTI_VALUE_SUFFIX_LENGTH);
           List<String> multiValue = reusableMultiValuesMap.get(multiValueColumnName);
@@ -997,8 +986,7 @@ public class ClusterIntegrationTestUtils {
   private static void comparePinotResultsWithExpectedValues(Set<String> expectedValues,
       List<String> expectedOrderByValues, org.apache.pinot.client.ResultSet connectionResultSet,
       Collection<String> orderByColumns, String pinotQuery, List<String> sqlQueries, int h2NumRows,
-      long pinotNumRecordsSelected)
-      throws IOException, SQLException {
+      long pinotNumRecordsSelected) throws IOException, SQLException {
 
     int pinotNumRows = connectionResultSet.getRowCount();
     // No record selected in H2
@@ -1094,8 +1082,8 @@ public class ClusterIntegrationTestUtils {
 
   private static String removeTrailingZeroForNumber(String value, String type) {
     // remove trailing zero after decimal point to compare decimal numbers with h2 data
-    if (type == null || type.toUpperCase().equals("FLOAT") || type.toUpperCase().equals("DOUBLE") || type.toUpperCase()
-        .equals("BIGINT")) {
+    if (type == null || type.toUpperCase().equals("FLOAT") || type.toUpperCase().equals("DOUBLE")
+        || type.toUpperCase().equals("BIGINT")) {
       try {
         return (new BigDecimal(value)).stripTrailingZeros().toPlainString();
       } catch (NumberFormatException e) {
@@ -1126,8 +1114,8 @@ public class ClusterIntegrationTestUtils {
       double expectedValue = Double.parseDouble(h2Value);
       double actualValueBroker = Double.parseDouble(brokerValue);
       double actualValueConnection = Double.parseDouble(connectionValue);
-      if (!DoubleMath.fuzzyEquals(actualValueBroker, expectedValue, 1.0) || !DoubleMath
-          .fuzzyEquals(actualValueConnection, expectedValue, 1.0)) {
+      if (!DoubleMath.fuzzyEquals(actualValueBroker, expectedValue, 1.0)
+          || !DoubleMath.fuzzyEquals(actualValueConnection, expectedValue, 1.0)) {
         error = true;
       }
     } else {

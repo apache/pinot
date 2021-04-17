@@ -33,7 +33,7 @@ import org.apache.pinot.segment.spi.index.reader.MutableDictionary;
  * can be fetched by the dictionary id returned.
  */
 public abstract class BaseOnHeapMutableDictionary implements MutableDictionary {
-  private static final int SHIFT_OFFSET = 13;  // INITIAL_DICTIONARY_SIZE = 8192
+  private static final int SHIFT_OFFSET = 13; // INITIAL_DICTIONARY_SIZE = 8192
   private static final int INITIAL_DICTIONARY_SIZE = 1 << SHIFT_OFFSET;
   private static final int MASK = 0xFFFFFFFF >>> (Integer.SIZE - SHIFT_OFFSET);
 
@@ -55,8 +55,7 @@ public abstract class BaseOnHeapMutableDictionary implements MutableDictionary {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
   }
 
   /**

@@ -54,8 +54,7 @@ public class KafkaPartitionLevelConsumerTest {
   private String _kafkaBrokerAddress;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     _kafkaCluster = new MiniKafkaCluster("0");
     _kafkaCluster.start();
     _kafkaBrokerAddress = _kafkaCluster.getKafkaServerAddress();
@@ -83,16 +82,14 @@ public class KafkaPartitionLevelConsumerTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     _kafkaCluster.deleteTopic(TEST_TOPIC_1);
     _kafkaCluster.deleteTopic(TEST_TOPIC_2);
     _kafkaCluster.close();
   }
 
   @Test
-  public void testBuildConsumer()
-      throws Exception {
+  public void testBuildConsumer() throws Exception {
     String streamType = "kafka";
     String streamKafkaTopicName = "theTopic";
     String streamKafkaBrokerList = _kafkaBrokerAddress;
@@ -121,10 +118,10 @@ public class KafkaPartitionLevelConsumerTest {
         kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaSocketTimeout());
 
     // test parsing values
-    Assert
-        .assertEquals(10000, kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaFetcherSizeBytes());
-    Assert
-        .assertEquals(20000, kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaFetcherMinBytes());
+    Assert.assertEquals(10000,
+        kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaFetcherSizeBytes());
+    Assert.assertEquals(20000,
+        kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaFetcherMinBytes());
 
     // test user defined values
     streamConfigMap.put("stream.kafka.buffer.size", "100");
@@ -170,8 +167,7 @@ public class KafkaPartitionLevelConsumerTest {
   }
 
   @Test
-  public void testFetchMessages()
-      throws Exception {
+  public void testFetchMessages() throws Exception {
     String streamType = "kafka";
     String streamKafkaTopicName = "theTopic";
     String streamKafkaBrokerList = _kafkaBrokerAddress;
@@ -195,14 +191,12 @@ public class KafkaPartitionLevelConsumerTest {
   }
 
   @Test
-  public void testFetchOffsets()
-      throws Exception {
+  public void testFetchOffsets() throws Exception {
     testFetchOffsets(TEST_TOPIC_1);
     testFetchOffsets(TEST_TOPIC_2);
   }
 
-  private void testFetchOffsets(String topic)
-      throws Exception {
+  private void testFetchOffsets(String topic) throws Exception {
     String streamType = "kafka";
     String streamKafkaBrokerList = _kafkaBrokerAddress;
     String streamKafkaConsumerType = "simple";
@@ -222,22 +216,26 @@ public class KafkaPartitionLevelConsumerTest {
     for (int partition = 0; partition < numPartitions; partition++) {
       KafkaStreamMetadataProvider kafkaStreamMetadataProvider =
           new KafkaStreamMetadataProvider(clientId, streamConfig, partition);
-      Assert.assertEquals(new LongMsgOffset(0).compareTo(kafkaStreamMetadataProvider
-          .fetchStreamPartitionOffset(new OffsetCriteria.OffsetCriteriaBuilder().withOffsetSmallest(), 10000)), 0);
-      Assert.assertEquals(new LongMsgOffset(NUM_MSG_PRODUCED_PER_PARTITION).compareTo(kafkaStreamMetadataProvider
-          .fetchStreamPartitionOffset(new OffsetCriteria.OffsetCriteriaBuilder().withOffsetLargest(), 10000)), 0);
+      Assert
+          .assertEquals(
+              new LongMsgOffset(0).compareTo(kafkaStreamMetadataProvider
+                  .fetchStreamPartitionOffset(new OffsetCriteria.OffsetCriteriaBuilder().withOffsetSmallest(), 10000)),
+              0);
+      Assert
+          .assertEquals(
+              new LongMsgOffset(NUM_MSG_PRODUCED_PER_PARTITION).compareTo(kafkaStreamMetadataProvider
+                  .fetchStreamPartitionOffset(new OffsetCriteria.OffsetCriteriaBuilder().withOffsetLargest(), 10000)),
+              0);
     }
   }
 
   @Test
-  public void testConsumer()
-      throws Exception {
+  public void testConsumer() throws Exception {
     testConsumer(TEST_TOPIC_1);
     testConsumer(TEST_TOPIC_2);
   }
 
-  private void testConsumer(String topic)
-      throws TimeoutException {
+  private void testConsumer(String topic) throws TimeoutException {
     String streamType = "kafka";
     String streamKafkaBrokerList = _kafkaBrokerAddress;
     String streamKafkaConsumerType = "simple";

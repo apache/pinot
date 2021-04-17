@@ -123,8 +123,7 @@ public class DateTruncTransformFunctionTest {
   }
 
   @Test
-  public void testPrestoCompatibleDateTimeConversionTransformFunction()
-      throws Exception {
+  public void testPrestoCompatibleDateTimeConversionTransformFunction() throws Exception {
     Schema schemaTimeFieldSpec = new Schema.SchemaBuilder()
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COLUMN), null).build();
     testDateTrunc(schemaTimeFieldSpec);
@@ -134,8 +133,7 @@ public class DateTruncTransformFunctionTest {
     testDateTrunc(schemaDateTimeFieldSpec);
   }
 
-  private void testDateTrunc(Schema schema)
-      throws Exception {
+  private void testDateTrunc(Schema schema) throws Exception {
 
     DateTime result = TIMESTAMP;
     result = result.withMillisOfSecond(0);

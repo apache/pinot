@@ -25,13 +25,18 @@
 package org.apache.pinot.plugin.inputformat.thrift;
 
 @SuppressWarnings({"cast", "rawtypes", "serial", "unchecked", "unused"})
-public class NestedType implements org.apache.thrift.TBase<NestedType, NestedType._Fields>, java.io.Serializable, Cloneable, Comparable<NestedType> {
-  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("NestedType");
+public class NestedType implements org.apache.thrift.TBase<NestedType, NestedType._Fields>, java.io.Serializable,
+    Cloneable, Comparable<NestedType> {
+  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC =
+      new org.apache.thrift.protocol.TStruct("NestedType");
 
-  private static final org.apache.thrift.protocol.TField NESTED_STRING_FIELD_FIELD_DESC = new org.apache.thrift.protocol.TField("nestedStringField", org.apache.thrift.protocol.TType.STRING, (short)1);
-  private static final org.apache.thrift.protocol.TField NESTED_INT_FIELD_FIELD_DESC = new org.apache.thrift.protocol.TField("nestedIntField", org.apache.thrift.protocol.TType.I32, (short)2);
+  private static final org.apache.thrift.protocol.TField NESTED_STRING_FIELD_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("nestedStringField", org.apache.thrift.protocol.TType.STRING, (short) 1);
+  private static final org.apache.thrift.protocol.TField NESTED_INT_FIELD_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("nestedIntField", org.apache.thrift.protocol.TType.I32, (short) 2);
 
-  private static final org.apache.thrift.scheme.SchemeFactory STANDARD_SCHEME_FACTORY = new NestedTypeStandardSchemeFactory();
+  private static final org.apache.thrift.scheme.SchemeFactory STANDARD_SCHEME_FACTORY =
+      new NestedTypeStandardSchemeFactory();
   private static final org.apache.thrift.scheme.SchemeFactory TUPLE_SCHEME_FACTORY = new NestedTypeTupleSchemeFactory();
 
   public @org.apache.thrift.annotation.Nullable java.lang.String nestedStringField; // required
@@ -39,10 +44,11 @@ public class NestedType implements org.apache.thrift.TBase<NestedType, NestedTyp
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
-    NESTED_STRING_FIELD((short)1, "nestedStringField"),
-    NESTED_INT_FIELD((short)2, "nestedIntField");
+    NESTED_STRING_FIELD((short) 1, "nestedStringField"),
+    NESTED_INT_FIELD((short) 2, "nestedIntField");
 
-    private static final java.util.Map<java.lang.String, _Fields> byName = new java.util.HashMap<java.lang.String, _Fields>();
+    private static final java.util.Map<java.lang.String, _Fields> byName =
+        new java.util.HashMap<java.lang.String, _Fields>();
 
     static {
       for (_Fields field : java.util.EnumSet.allOf(_Fields.class)) {
@@ -55,7 +61,7 @@ public class NestedType implements org.apache.thrift.TBase<NestedType, NestedTyp
      */
     @org.apache.thrift.annotation.Nullable
     public static _Fields findByThriftId(int fieldId) {
-      switch(fieldId) {
+      switch (fieldId) {
         case 1: // NESTED_STRING_FIELD
           return NESTED_STRING_FIELD;
         case 2: // NESTED_INT_FIELD
@@ -71,7 +77,8 @@ public class NestedType implements org.apache.thrift.TBase<NestedType, NestedTyp
      */
     public static _Fields findByThriftIdOrThrow(int fieldId) {
       _Fields fields = findByThriftId(fieldId);
-      if (fields == null) throw new java.lang.IllegalArgumentException("Field " + fieldId + " doesn't exist!");
+      if (fields == null)
+        throw new java.lang.IllegalArgumentException("Field " + fieldId + " doesn't exist!");
       return fields;
     }
 
@@ -105,11 +112,16 @@ public class NestedType implements org.apache.thrift.TBase<NestedType, NestedTyp
   private byte __isset_bitfield = 0;
   public static final java.util.Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
-    java.util.Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new java.util.EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.NESTED_STRING_FIELD, new org.apache.thrift.meta_data.FieldMetaData("nestedStringField", org.apache.thrift.TFieldRequirementType.REQUIRED,
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
-    tmpMap.put(_Fields.NESTED_INT_FIELD, new org.apache.thrift.meta_data.FieldMetaData("nestedIntField", org.apache.thrift.TFieldRequirementType.REQUIRED,
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32)));
+    java.util.Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap =
+        new java.util.EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
+    tmpMap.put(_Fields.NESTED_STRING_FIELD,
+        new org.apache.thrift.meta_data.FieldMetaData("nestedStringField",
+            org.apache.thrift.TFieldRequirementType.REQUIRED,
+            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
+    tmpMap.put(_Fields.NESTED_INT_FIELD,
+        new org.apache.thrift.meta_data.FieldMetaData("nestedIntField",
+            org.apache.thrift.TFieldRequirementType.REQUIRED,
+            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32)));
     metaDataMap = java.util.Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(NestedType.class, metaDataMap);
   }
@@ -117,10 +129,7 @@ public class NestedType implements org.apache.thrift.TBase<NestedType, NestedTyp
   public NestedType() {
   }
 
-  public NestedType(
-    java.lang.String nestedStringField,
-    int nestedIntField)
-  {
+  public NestedType(java.lang.String nestedStringField, int nestedIntField) {
     this();
     this.nestedStringField = nestedStringField;
     this.nestedIntField = nestedIntField;
@@ -199,21 +208,21 @@ public class NestedType implements org.apache.thrift.TBase<NestedType, NestedTyp
 
   public void setFieldValue(_Fields field, @org.apache.thrift.annotation.Nullable java.lang.Object value) {
     switch (field) {
-    case NESTED_STRING_FIELD:
-      if (value == null) {
-        unsetNestedStringField();
-      } else {
-        setNestedStringField((java.lang.String)value);
-      }
-      break;
+      case NESTED_STRING_FIELD:
+        if (value == null) {
+          unsetNestedStringField();
+        } else {
+          setNestedStringField((java.lang.String) value);
+        }
+        break;
 
-    case NESTED_INT_FIELD:
-      if (value == null) {
-        unsetNestedIntField();
-      } else {
-        setNestedIntField((java.lang.Integer)value);
-      }
-      break;
+      case NESTED_INT_FIELD:
+        if (value == null) {
+          unsetNestedIntField();
+        } else {
+          setNestedIntField((java.lang.Integer) value);
+        }
+        break;
 
     }
   }
@@ -221,11 +230,11 @@ public class NestedType implements org.apache.thrift.TBase<NestedType, NestedTyp
   @org.apache.thrift.annotation.Nullable
   public java.lang.Object getFieldValue(_Fields field) {
     switch (field) {
-    case NESTED_STRING_FIELD:
-      return getNestedStringField();
+      case NESTED_STRING_FIELD:
+        return getNestedStringField();
 
-    case NESTED_INT_FIELD:
-      return getNestedIntField();
+      case NESTED_INT_FIELD:
+        return getNestedIntField();
 
     }
     throw new java.lang.IllegalStateException();
@@ -238,10 +247,10 @@ public class NestedType implements org.apache.thrift.TBase<NestedType, NestedTyp
     }
 
     switch (field) {
-    case NESTED_STRING_FIELD:
-      return isSetNestedStringField();
-    case NESTED_INT_FIELD:
-      return isSetNestedIntField();
+      case NESTED_STRING_FIELD:
+        return isSetNestedStringField();
+      case NESTED_INT_FIELD:
+        return isSetNestedIntField();
     }
     throw new java.lang.IllegalStateException();
   }
@@ -251,7 +260,7 @@ public class NestedType implements org.apache.thrift.TBase<NestedType, NestedTyp
     if (that == null)
       return false;
     if (that instanceof NestedType)
-      return this.equals((NestedType)that);
+      return this.equals((NestedType) that);
     return false;
   }
 
@@ -351,7 +360,8 @@ public class NestedType implements org.apache.thrift.TBase<NestedType, NestedTyp
       sb.append(this.nestedStringField);
     }
     first = false;
-    if (!first) sb.append(", ");
+    if (!first)
+      sb.append(", ");
     sb.append("nestedIntField:");
     sb.append(this.nestedIntField);
     first = false;
@@ -362,7 +372,8 @@ public class NestedType implements org.apache.thrift.TBase<NestedType, NestedTyp
   public void validate() throws org.apache.thrift.TException {
     // check for required fields
     if (nestedStringField == null) {
-      throw new org.apache.thrift.protocol.TProtocolException("Required field 'nestedStringField' was not present! Struct: " + toString());
+      throw new org.apache.thrift.protocol.TProtocolException(
+          "Required field 'nestedStringField' was not present! Struct: " + toString());
     }
     // alas, we cannot check 'nestedIntField' because it's a primitive and you chose the non-beans generator.
     // check for sub-struct validity
@@ -394,11 +405,11 @@ public class NestedType implements org.apache.thrift.TBase<NestedType, NestedTyp
 
   private static class NestedTypeStandardScheme extends org.apache.thrift.scheme.StandardScheme<NestedType> {
 
-    public void read(org.apache.thrift.protocol.TProtocol iprot, NestedType struct) throws org.apache.thrift.TException {
+    public void read(org.apache.thrift.protocol.TProtocol iprot, NestedType struct)
+        throws org.apache.thrift.TException {
       org.apache.thrift.protocol.TField schemeField;
       iprot.readStructBegin();
-      while (true)
-      {
+      while (true) {
         schemeField = iprot.readFieldBegin();
         if (schemeField.type == org.apache.thrift.protocol.TType.STOP) {
           break;
@@ -429,12 +440,14 @@ public class NestedType implements org.apache.thrift.TBase<NestedType, NestedTyp
 
       // check for required fields of primitive type, which can't be checked in the validate method
       if (!struct.isSetNestedIntField()) {
-        throw new org.apache.thrift.protocol.TProtocolException("Required field 'nestedIntField' was not found in serialized data! Struct: " + toString());
+        throw new org.apache.thrift.protocol.TProtocolException(
+            "Required field 'nestedIntField' was not found in serialized data! Struct: " + toString());
       }
       struct.validate();
     }
 
-    public void write(org.apache.thrift.protocol.TProtocol oprot, NestedType struct) throws org.apache.thrift.TException {
+    public void write(org.apache.thrift.protocol.TProtocol oprot, NestedType struct)
+        throws org.apache.thrift.TException {
       struct.validate();
 
       oprot.writeStructBegin(STRUCT_DESC);
@@ -461,7 +474,8 @@ public class NestedType implements org.apache.thrift.TBase<NestedType, NestedTyp
   private static class NestedTypeTupleScheme extends org.apache.thrift.scheme.TupleScheme<NestedType> {
 
     @Override
-    public void write(org.apache.thrift.protocol.TProtocol prot, NestedType struct) throws org.apache.thrift.TException {
+    public void write(org.apache.thrift.protocol.TProtocol prot, NestedType struct)
+        throws org.apache.thrift.TException {
       org.apache.thrift.protocol.TTupleProtocol oprot = (org.apache.thrift.protocol.TTupleProtocol) prot;
       oprot.writeString(struct.nestedStringField);
       oprot.writeI32(struct.nestedIntField);
@@ -478,6 +492,7 @@ public class NestedType implements org.apache.thrift.TBase<NestedType, NestedTyp
   }
 
   private static <S extends org.apache.thrift.scheme.IScheme> S scheme(org.apache.thrift.protocol.TProtocol proto) {
-    return (org.apache.thrift.scheme.StandardScheme.class.equals(proto.getScheme()) ? STANDARD_SCHEME_FACTORY : TUPLE_SCHEME_FACTORY).getScheme();
+    return (org.apache.thrift.scheme.StandardScheme.class.equals(proto.getScheme()) ? STANDARD_SCHEME_FACTORY
+        : TUPLE_SCHEME_FACTORY).getScheme();
   }
 }

@@ -44,8 +44,7 @@ public class BenchmarkRealtimeConsumptionSpeed extends BaseClusterIntegrationTes
     System.exit(0);
   }
 
-  private void runBenchmark()
-      throws Exception {
+  private void runBenchmark() throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
     // Start the Pinot cluster
@@ -67,9 +66,9 @@ public class BenchmarkRealtimeConsumptionSpeed extends BaseClusterIntegrationTes
     // Generate ROW_COUNT rows and write them into Kafka
     new Thread(() -> {
       try {
-        ClusterIntegrationTestUtils
-            .pushRandomAvroIntoKafka(avroFile, KafkaStarterUtils.DEFAULT_KAFKA_BROKER, getKafkaTopic(), ROW_COUNT,
-                getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
+        ClusterIntegrationTestUtils.pushRandomAvroIntoKafka(avroFile, KafkaStarterUtils.DEFAULT_KAFKA_BROKER,
+            getKafkaTopic(), ROW_COUNT, getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(),
+            getPartitionColumn());
       } catch (Exception e) {
         // Ignored
       }

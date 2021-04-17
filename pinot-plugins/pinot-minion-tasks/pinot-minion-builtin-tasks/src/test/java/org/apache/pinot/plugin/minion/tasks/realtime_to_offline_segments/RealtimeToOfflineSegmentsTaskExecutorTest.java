@@ -85,8 +85,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
   private List<File> _segmentIndexDirListSDF;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTimeColumnName(T).build();
@@ -95,30 +94,26 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     TableConfig tableConfigWithPartitioning =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_WITH_PARTITIONING).setTimeColumnName(T)
             .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap)).build();
-    TableConfig tableConfigWithSortedCol =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_WITH_SORTED_COL).setTimeColumnName(T)
-            .setSortedColumn(D1).build();
-    TableConfig tableConfigEpochHours =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_EPOCH_HOURS).setTimeColumnName(T_TRX)
-            .setSortedColumn(D1).setIngestionConfig(
-            new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig(T_TRX, "toEpochHours(t)")))).build();
-    TableConfig tableConfigSDF =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_SDF).setTimeColumnName(T_TRX)
-            .setSortedColumn(D1).setIngestionConfig(
-            new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig(T_TRX, "toDateTime(t, 'yyyyMMddHH')"))))
-            .build();
-    Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING)
-            .addMetric(M1, FieldSpec.DataType.INT)
-            .addDateTime(T, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
-    Schema schemaEpochHours =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING)
-            .addMetric(M1, FieldSpec.DataType.INT)
-            .addDateTime(T_TRX, FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS").build();
-    Schema schemaSDF =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING)
-            .addMetric(M1, FieldSpec.DataType.INT)
-            .addDateTime(T_TRX, FieldSpec.DataType.INT, "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMddHH", "1:HOURS").build();
+    TableConfig tableConfigWithSortedCol = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME_WITH_SORTED_COL).setTimeColumnName(T).setSortedColumn(D1).build();
+    TableConfig tableConfigEpochHours = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_EPOCH_HOURS)
+        .setTimeColumnName(T_TRX).setSortedColumn(D1)
+        .setIngestionConfig(
+            new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig(T_TRX, "toEpochHours(t)"))))
+        .build();
+    TableConfig tableConfigSDF = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_SDF)
+        .setTimeColumnName(T_TRX).setSortedColumn(D1).setIngestionConfig(new IngestionConfig(null, null, null,
+            Lists.newArrayList(new TransformConfig(T_TRX, "toDateTime(t, 'yyyyMMddHH')"))))
+        .build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension(D1, FieldSpec.DataType.STRING).addMetric(M1, FieldSpec.DataType.INT)
+        .addDateTime(T, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+    Schema schemaEpochHours = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension(D1, FieldSpec.DataType.STRING).addMetric(M1, FieldSpec.DataType.INT)
+        .addDateTime(T_TRX, FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS").build();
+    Schema schemaSDF = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension(D1, FieldSpec.DataType.STRING).addMetric(M1, FieldSpec.DataType.INT)
+        .addDateTime(T_TRX, FieldSpec.DataType.INT, "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMddHH", "1:HOURS").build();
 
     List<String> d1 = Lists.newArrayList("foo", "bar", "foo", "foo", "bar");
     List<List<GenericRow>> rows = new ArrayList<>(NUM_SEGMENTS);
@@ -187,7 +182,8 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     ZkHelixPropertyStore<ZNRecord> helixPropertyStore = Mockito.mock(ZkHelixPropertyStore.class);
     Mockito.when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME, null, AccessOption.PERSISTENT))
         .thenReturn(TableConfigUtils.toZNRecord(tableConfig));
-    Mockito.when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME_WITH_PARTITIONING, null, AccessOption.PERSISTENT))
+    Mockito
+        .when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME_WITH_PARTITIONING, null, AccessOption.PERSISTENT))
         .thenReturn(TableConfigUtils.toZNRecord(tableConfigWithPartitioning));
     Mockito.when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME_WITH_SORTED_COL, null, AccessOption.PERSISTENT))
         .thenReturn(TableConfigUtils.toZNRecord(tableConfigWithSortedCol));
@@ -209,8 +205,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
   }
 
   @Test
-  public void testConcat()
-      throws Exception {
+  public void testConcat() throws Exception {
     FileUtils.deleteQuietly(WORKING_DIR);
 
     RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor =
@@ -236,8 +231,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
   }
 
   @Test
-  public void testRollupDefault()
-      throws Exception {
+  public void testRollupDefault() throws Exception {
     FileUtils.deleteQuietly(WORKING_DIR);
 
     RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor =
@@ -264,8 +258,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
   }
 
   @Test
-  public void testRollupWithTimeTransformation()
-      throws Exception {
+  public void testRollupWithTimeTransformation() throws Exception {
     FileUtils.deleteQuietly(WORKING_DIR);
 
     RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor =
@@ -292,8 +285,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
   }
 
   @Test
-  public void testRollupWithMaxAggregation()
-      throws Exception {
+  public void testRollupWithMaxAggregation() throws Exception {
 
     FileUtils.deleteQuietly(WORKING_DIR);
 
@@ -326,8 +318,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
   }
 
   @Test
-  public void testTablePartitioning()
-      throws Exception {
+  public void testTablePartitioning() throws Exception {
     FileUtils.deleteQuietly(WORKING_DIR);
 
     RealtimeToOfflineSegmentsTaskExecutor realtimeToOfflineSegmentsTaskExecutor =
@@ -357,8 +348,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
   }
 
   @Test
-  public void testTableSortedColumn()
-      throws Exception {
+  public void testTableSortedColumn() throws Exception {
 
     FileUtils.deleteQuietly(WORKING_DIR);
 
@@ -385,8 +375,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
   }
 
   @Test
-  public void testTimeFormatEpochHours()
-      throws Exception {
+  public void testTimeFormatEpochHours() throws Exception {
 
     FileUtils.deleteQuietly(WORKING_DIR);
 
@@ -414,8 +403,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
   }
 
   @Test
-  public void testTimeFormatSDF()
-      throws Exception {
+  public void testTimeFormatSDF() throws Exception {
 
     FileUtils.deleteQuietly(WORKING_DIR);
 
@@ -443,8 +431,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 }

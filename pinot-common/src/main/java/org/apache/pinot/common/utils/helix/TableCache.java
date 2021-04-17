@@ -164,8 +164,7 @@ public class TableCache {
     }
   }
 
-  private void putTableConfig(ZNRecord znRecord)
-      throws IOException {
+  private void putTableConfig(ZNRecord znRecord) throws IOException {
     TableConfig tableConfig = TableConfigUtils.fromZNRecord(znRecord);
     String tableNameWithType = tableConfig.getTableName();
     _tableConfigMap.put(tableNameWithType, tableConfig);
@@ -212,8 +211,7 @@ public class TableCache {
     }
   }
 
-  private void putSchema(ZNRecord znRecord)
-      throws IOException {
+  private void putSchema(ZNRecord znRecord) throws IOException {
     Schema schema = SchemaUtils.fromZNRecord(znRecord);
     String rawTableName = schema.getSchemaName();
     if (_caseInsensitive) {

@@ -200,9 +200,9 @@ public class PinotHelixTaskResourceManager {
 
     String taskType = pinotTaskConfigs.get(0).getTaskType();
     String parentTaskName = TASK_PREFIX + taskType + TASK_NAME_SEPARATOR + System.currentTimeMillis();
-    LOGGER
-        .info("Submitting parent task: {} of type: {} with {} child task configs: {} to Minion instances with tag: {}",
-            parentTaskName, taskType, numChildTasks, pinotTaskConfigs, minionInstanceTag);
+    LOGGER.info(
+        "Submitting parent task: {} of type: {} with {} child task configs: {} to Minion instances with tag: {}",
+        parentTaskName, taskType, numChildTasks, pinotTaskConfigs, minionInstanceTag);
     List<TaskConfig> helixTaskConfigs = new ArrayList<>(numChildTasks);
     for (int i = 0; i < numChildTasks; i++) {
       PinotTaskConfig pinotTaskConfig = pinotTaskConfigs.get(i);

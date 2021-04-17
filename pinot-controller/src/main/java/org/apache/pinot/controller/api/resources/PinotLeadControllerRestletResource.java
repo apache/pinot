@@ -82,8 +82,8 @@ public class PinotLeadControllerRestletResource {
       String partitionName = LeadControllerUtils.generatePartitionName(partitionId);
       String participantInstanceId =
           getParticipantInstanceIdFromExternalView(leadControllerResourceExternalView, partitionName);
-      leadControllerEntryMap
-          .putIfAbsent(partitionName, new LeadControllerEntry(participantInstanceId, new ArrayList<>()));
+      leadControllerEntryMap.putIfAbsent(partitionName,
+          new LeadControllerEntry(participantInstanceId, new ArrayList<>()));
     }
 
     // Assigns all the tables to the relevant partitions.
@@ -133,8 +133,8 @@ public class PinotLeadControllerRestletResource {
   }
 
   private ExternalView getLeadControllerResourceExternalView(HelixManager helixManager) {
-    return helixManager.getClusterManagmentTool()
-        .getResourceExternalView(helixManager.getClusterName(), Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+    return helixManager.getClusterManagmentTool().getResourceExternalView(helixManager.getClusterName(),
+        Helix.LEAD_CONTROLLER_RESOURCE_NAME);
   }
 
   private String getParticipantInstanceIdFromExternalView(ExternalView leadControllerResourceExternalView,

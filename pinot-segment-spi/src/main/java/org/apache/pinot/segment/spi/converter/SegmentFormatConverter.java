@@ -27,6 +27,5 @@ import java.io.File;
  */
 public interface SegmentFormatConverter {
 
-  void convert(File indexSegmentDir)
-      throws Exception;
+  void convert(File indexSegmentDir) throws Exception;
 }

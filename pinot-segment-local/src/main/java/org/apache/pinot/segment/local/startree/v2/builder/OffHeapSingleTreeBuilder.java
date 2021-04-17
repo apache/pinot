@@ -63,15 +63,14 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
    * @throws FileNotFoundException
    */
   public OffHeapSingleTreeBuilder(StarTreeV2BuilderConfig builderConfig, File outputDir, ImmutableSegment segment,
-      Configuration metadataProperties)
-      throws FileNotFoundException {
+      Configuration metadataProperties) throws FileNotFoundException {
     super(builderConfig, outputDir, segment, metadataProperties);
     _segmentRecordFile = new File(_outputDir, SEGMENT_RECORD_FILE_NAME);
-    Preconditions
-        .checkState(!_segmentRecordFile.exists(), "Segment record file: " + _segmentRecordFile + " already exists");
+    Preconditions.checkState(!_segmentRecordFile.exists(),
+        "Segment record file: " + _segmentRecordFile + " already exists");
     _starTreeRecordFile = new File(_outputDir, STAR_TREE_RECORD_FILE_NAME);
-    Preconditions
-        .checkState(!_starTreeRecordFile.exists(), "Star-tree record file: " + _starTreeRecordFile + " already exists");
+    Preconditions.checkState(!_starTreeRecordFile.exists(),
+        "Star-tree record file: " + _starTreeRecordFile + " already exists");
     _starTreeRecordOutputStream = new BufferedOutputStream(new FileOutputStream(_starTreeRecordFile));
     _starTreeRecordOffsets = new ArrayList<>();
     _starTreeRecordOffsets.add(0L);
@@ -154,44 +153,39 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
   }
 
   @Override
-  void appendRecord(Record record)
-      throws IOException {
+  void appendRecord(Record record) throws IOException {
     byte[] bytes = serializeStarTreeRecord(record);
     _starTreeRecordOutputStream.write(bytes);
     _starTreeRecordOffsets.add(_starTreeRecordOffsets.get(_numDocs) + bytes.length);
   }
 
   @Override
-  Record getStarTreeRecord(int docId)
-      throws IOException {
+  Record getStarTreeRecord(int docId) throws IOException {
     ensureBufferReadable(docId);
     return deserializeStarTreeRecord(_starTreeRecordBuffer, _starTreeRecordOffsets.get(docId));
   }
 
   @Override
-  int getDimensionValue(int docId, int dimensionId)
-      throws IOException {
+  int getDimensionValue(int docId, int dimensionId) throws IOException {
     ensureBufferReadable(docId);
     return _starTreeRecordBuffer.getInt(_starTreeRecordOffsets.get(docId) + dimensionId * Integer.BYTES);
   }
 
-  private void ensureBufferReadable(int docId)
-      throws IOException {
+  private void ensureBufferReadable(int docId) throws IOException {
     if (_numReadableStarTreeRecords <= docId) {
       _starTreeRecordOutputStream.flush();
       if (_starTreeRecordBuffer != null) {
         _starTreeRecordBuffer.close();
       }
-      _starTreeRecordBuffer = PinotDataBuffer
-          .mapFile(_starTreeRecordFile, true, 0, _starTreeRecordOffsets.get(_numDocs), PinotDataBuffer.NATIVE_ORDER,
-              "OffHeapSingleTreeBuilder: star-tree record buffer");
+      _starTreeRecordBuffer =
+          PinotDataBuffer.mapFile(_starTreeRecordFile, true, 0, _starTreeRecordOffsets.get(_numDocs),
+              PinotDataBuffer.NATIVE_ORDER, "OffHeapSingleTreeBuilder: star-tree record buffer");
       _numReadableStarTreeRecords = _numDocs;
     }
   }
 
   @Override
-  Iterator<Record> sortAndAggregateSegmentRecords(int numDocs)
-      throws IOException {
+  Iterator<Record> sortAndAggregateSegmentRecords(int numDocs) throws IOException {
     // Write all dimensions for segment records into the buffer, and sort all records using an int array
     PinotDataBuffer dataBuffer;
     long bufferSize = (long) numDocs * _numDimensions * Integer.BYTES;
@@ -199,8 +193,8 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
       dataBuffer = PinotDataBuffer.mapFile(_segmentRecordFile, false, 0, bufferSize, PinotDataBuffer.NATIVE_ORDER,
           "OffHeapSingleTreeBuilder: segment record buffer");
     } else {
-      dataBuffer = PinotDataBuffer
-          .allocateDirect(bufferSize, PinotDataBuffer.NATIVE_ORDER, "OffHeapSingleTreeBuilder: segment record buffer");
+      dataBuffer = PinotDataBuffer.allocateDirect(bufferSize, PinotDataBuffer.NATIVE_ORDER,
+          "OffHeapSingleTreeBuilder: segment record buffer");
     }
     int[] sortedDocIds = new int[numDocs];
     for (int i = 0; i < numDocs; i++) {
@@ -268,8 +262,7 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
   }
 
   @Override
-  Iterator<Record> generateRecordsForStarNode(int startDocId, int endDocId, int dimensionId)
-      throws IOException {
+  Iterator<Record> generateRecordsForStarNode(int startDocId, int endDocId, int dimensionId) throws IOException {
     ensureBufferReadable(endDocId);
 
     // Sort all records using an int array
@@ -340,8 +333,7 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     super.close();
     _starTreeRecordBuffer.close();
     _starTreeRecordOutputStream.close();

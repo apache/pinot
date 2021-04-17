@@ -87,8 +87,7 @@ public class RawIndexConverter {
    * TODO: support V3 format
    */
   public RawIndexConverter(String rawTableName, File originalIndexDir, File convertedIndexDir,
-      @Nullable String columnsToConvert)
-      throws Exception {
+      @Nullable String columnsToConvert) throws Exception {
     FileUtils.copyDirectory(originalIndexDir, convertedIndexDir);
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
     indexLoadingConfig.setSegmentVersion(SegmentVersion.v1);
@@ -102,8 +101,7 @@ public class RawIndexConverter {
     _columnsToConvert = columnsToConvert;
   }
 
-  public boolean convert()
-      throws Exception {
+  public boolean convert() throws Exception {
     String segmentName = _originalSegmentMetadata.getName();
     LOGGER.info("Start converting segment: {} in table: {}", segmentName, _rawTableName);
 
@@ -147,9 +145,9 @@ public class RawIndexConverter {
       _convertedProperties.save();
 
       // Update creation metadata with new computed CRC and original segment creation time
-      SegmentIndexCreationDriverImpl
-          .persistCreationMeta(_convertedIndexDir, CrcUtils.forAllFilesInFolder(_convertedIndexDir).computeCrc(),
-              _originalSegmentMetadata.getIndexCreationTime());
+      SegmentIndexCreationDriverImpl.persistCreationMeta(_convertedIndexDir,
+          CrcUtils.forAllFilesInFolder(_convertedIndexDir).computeCrc(),
+          _originalSegmentMetadata.getIndexCreationTime());
 
       LOGGER.info("{} columns converted for segment: {} in table: {}", columnsToConvert.size(), segmentName,
           _rawTableName);
@@ -182,8 +180,7 @@ public class RawIndexConverter {
     return rawIndexSize <= dictionaryBasedIndexSize * CONVERSION_THRESHOLD;
   }
 
-  private void convertColumn(FieldSpec fieldSpec)
-      throws Exception {
+  private void convertColumn(FieldSpec fieldSpec) throws Exception {
     String columnName = fieldSpec.getName();
     LOGGER.info("Converting column: {}", columnName);
 
@@ -204,9 +201,10 @@ public class RawIndexConverter {
     FieldSpec.DataType dataType = fieldSpec.getDataType();
     int numDocs = _originalSegmentMetadata.getTotalDocs();
     int lengthOfLongestEntry = _originalSegmentMetadata.getColumnMetadataFor(columnName).getColumnMaxLength();
-    try (ForwardIndexCreator rawIndexCreator = SegmentColumnarIndexCreator
-        .getRawIndexCreatorForColumn(_convertedIndexDir, ChunkCompressionType.SNAPPY, columnName, dataType, numDocs,
-            lengthOfLongestEntry, false, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
+    try (
+        ForwardIndexCreator rawIndexCreator = SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(
+            _convertedIndexDir, ChunkCompressionType.SNAPPY, columnName, dataType, numDocs, lengthOfLongestEntry, false,
+            BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
         ForwardIndexReaderContext readerContext = reader.createContext()) {
       switch (dataType) {
         case INT:

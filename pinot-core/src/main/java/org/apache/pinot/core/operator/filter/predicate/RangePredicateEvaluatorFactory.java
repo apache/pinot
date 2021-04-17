@@ -167,7 +167,8 @@ public class RangePredicateEvaluatorFactory {
     }
   }
 
-  private static final class UnsortedDictionaryBasedRangePredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
+  private static final class UnsortedDictionaryBasedRangePredicateEvaluator
+      extends BaseDictionaryBasedPredicateEvaluator {
     // When the cardinality of the column is lower than this threshold, pre-calculate the matching dictionary ids;
     // otherwise, fetch the value when evaluating each dictionary id.
     // TODO: Tune this threshold
@@ -187,9 +188,8 @@ public class RangePredicateEvaluatorFactory {
       if (cardinality < DICT_ID_SET_BASED_CARDINALITY_THRESHOLD) {
         _dictIdSetBased = true;
         _rawValueBasedEvaluator = null;
-        _matchingDictIdSet = dictionary
-            .getDictIdsInRange(rangePredicate.getLowerBound(), rangePredicate.getUpperBound(),
-                rangePredicate.isLowerInclusive(), rangePredicate.isUpperInclusive());
+        _matchingDictIdSet = dictionary.getDictIdsInRange(rangePredicate.getLowerBound(),
+            rangePredicate.getUpperBound(), rangePredicate.isLowerInclusive(), rangePredicate.isUpperInclusive());
         int numMatchingDictIds = _matchingDictIdSet.size();
         if (numMatchingDictIds == 0) {
           _alwaysFalse = true;

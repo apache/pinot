@@ -92,8 +92,7 @@ public class VarByteSVMutableForwardIndex implements MutableForwardIndex {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _byteArrayStore.close();
   }
 }

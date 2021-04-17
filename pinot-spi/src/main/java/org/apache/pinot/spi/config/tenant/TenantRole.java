@@ -19,5 +19,7 @@
 package org.apache.pinot.spi.config.tenant;
 
 public enum TenantRole {
-  SERVER, BROKER, MINION
+  SERVER,
+  BROKER,
+  MINION
 }

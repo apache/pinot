@@ -36,8 +36,7 @@ public class AvroUtilsTest {
   String AVRO_SCHEMA = "fake_avro_schema.avsc";
 
   @Test
-  public void testGetPinotSchemaFromAvroSchemaNullFieldTypeMap()
-      throws IOException {
+  public void testGetPinotSchemaFromAvroSchemaNullFieldTypeMap() throws IOException {
     org.apache.avro.Schema avroSchema =
         new org.apache.avro.Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(AVRO_SCHEMA));
     Schema inferredPinotSchema = AvroUtils.getPinotSchemaFromAvroSchema(avroSchema, null, null);
@@ -49,14 +48,12 @@ public class AvroUtilsTest {
   }
 
   @Test
-  public void testGetPinotSchemaFromAvroSchemaWithFieldTypeMap()
-      throws IOException {
+  public void testGetPinotSchemaFromAvroSchemaWithFieldTypeMap() throws IOException {
     org.apache.avro.Schema avroSchema =
         new org.apache.avro.Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(AVRO_SCHEMA));
-    Map<String, FieldSpec.FieldType> fieldSpecMap =
-        new ImmutableMap.Builder<String, FieldSpec.FieldType>().put("d1", FieldType.DIMENSION)
-            .put("d2", FieldType.DIMENSION).put("d3", FieldType.DIMENSION).put("hoursSinceEpoch", FieldType.TIME)
-            .put("m1", FieldType.METRIC).put("m2", FieldType.METRIC).build();
+    Map<String, FieldSpec.FieldType> fieldSpecMap = new ImmutableMap.Builder<String, FieldSpec.FieldType>()
+        .put("d1", FieldType.DIMENSION).put("d2", FieldType.DIMENSION).put("d3", FieldType.DIMENSION)
+        .put("hoursSinceEpoch", FieldType.TIME).put("m1", FieldType.METRIC).put("m2", FieldType.METRIC).build();
     Schema inferredPinotSchema = AvroUtils.getPinotSchemaFromAvroSchema(avroSchema, fieldSpecMap, TimeUnit.HOURS);
     Schema expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING)
         .addSingleValueDimension("d2", DataType.LONG).addSingleValueDimension("d3", DataType.STRING)
@@ -64,10 +61,9 @@ public class AvroUtilsTest {
         .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, "hoursSinceEpoch"), null).build();
     Assert.assertEquals(expectedSchema, inferredPinotSchema);
 
-    fieldSpecMap =
-        new ImmutableMap.Builder<String, FieldSpec.FieldType>().put("d1", FieldType.DIMENSION)
-            .put("d2", FieldType.DIMENSION).put("d3", FieldType.DIMENSION).put("hoursSinceEpoch", FieldType.DATE_TIME)
-            .put("m1", FieldType.METRIC).put("m2", FieldType.METRIC).build();
+    fieldSpecMap = new ImmutableMap.Builder<String, FieldSpec.FieldType>().put("d1", FieldType.DIMENSION)
+        .put("d2", FieldType.DIMENSION).put("d3", FieldType.DIMENSION).put("hoursSinceEpoch", FieldType.DATE_TIME)
+        .put("m1", FieldType.METRIC).put("m2", FieldType.METRIC).build();
     inferredPinotSchema = AvroUtils.getPinotSchemaFromAvroSchema(avroSchema, fieldSpecMap, TimeUnit.HOURS);
     expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING)
         .addSingleValueDimension("d2", DataType.LONG).addSingleValueDimension("d3", DataType.STRING)

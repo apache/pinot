@@ -67,8 +67,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
   private static final String TIER_B_NAME = "tierB";
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     startZk();
     startController();
     addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
@@ -84,8 +83,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
    * 5. Remove (disable) servers and rebalance
    */
   @Test
-  public void testRebalance()
-      throws Exception {
+  public void testRebalance() throws Exception {
     int numServers = 3;
     for (int i = 0; i < numServers; i++) {
       addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, true);
@@ -147,8 +145,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(instancePartitions.getNumReplicaGroups(), 1);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     // Math.abs("testTable_OFFLINE".hashCode()) % 6 = 2
-    assertEquals(instancePartitions.getInstances(0, 0), Arrays
-        .asList(SERVER_INSTANCE_ID_PREFIX + 2, SERVER_INSTANCE_ID_PREFIX + 3, SERVER_INSTANCE_ID_PREFIX + 4,
+    assertEquals(instancePartitions.getInstances(0, 0),
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 2, SERVER_INSTANCE_ID_PREFIX + 3, SERVER_INSTANCE_ID_PREFIX + 4,
             SERVER_INSTANCE_ID_PREFIX + 5, SERVER_INSTANCE_ID_PREFIX + 0, SERVER_INSTANCE_ID_PREFIX + 1));
 
     // Segments should be moved to the new added servers
@@ -273,8 +271,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(instancePartitions.getNumReplicaGroups(), 1);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     // Math.abs("testTable_OFFLINE".hashCode()) % 6 = 2
-    assertEquals(instancePartitions.getInstances(0, 0), Arrays
-        .asList(SERVER_INSTANCE_ID_PREFIX + 2, SERVER_INSTANCE_ID_PREFIX + 3, SERVER_INSTANCE_ID_PREFIX + 4,
+    assertEquals(instancePartitions.getInstances(0, 0),
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 2, SERVER_INSTANCE_ID_PREFIX + 3, SERVER_INSTANCE_ID_PREFIX + 4,
             SERVER_INSTANCE_ID_PREFIX + 5, SERVER_INSTANCE_ID_PREFIX + 0, SERVER_INSTANCE_ID_PREFIX + 1));
 
     // Segment assignment should not change as it is already balanced
@@ -324,17 +322,15 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
    * 3. add tier config and run rebalance - should see changed assignment
    */
   @Test
-  public void testRebalanceWithTiers()
-      throws Exception {
+  public void testRebalanceWithTiers() throws Exception {
     int numServers = 3;
     for (int i = 0; i < numServers; i++) {
       addFakeServerInstanceToAutoJoinHelixCluster(NO_TIER_NAME + "_" + SERVER_INSTANCE_ID_PREFIX + i, false);
     }
     _helixResourceManager.createServerTenant(new Tenant(TenantRole.SERVER, NO_TIER_NAME, numServers, numServers, 0));
 
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TIERED_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
-            .setServerTenant(NO_TIER_NAME).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TIERED_TABLE_NAME)
+        .setNumReplicas(NUM_REPLICAS).setServerTenant(NO_TIER_NAME).build();
     // Create the table
     _helixResourceManager.addTable(tableConfig);
 
@@ -374,10 +370,10 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
 
     // add tier config
     tableConfig.setTierConfigsList(Lists.newArrayList(
-        new TierConfig(TIER_A_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "7d",
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, TIER_A_NAME + "_OFFLINE"),
+        new TierConfig(TIER_A_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "7d", TierFactory.PINOT_SERVER_STORAGE_TYPE,
+            TIER_A_NAME + "_OFFLINE"),
         new TierConfig(TIER_B_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "15d",
-            TierFactory.PINOT_SERVER_STORAGE_TYPE,  TIER_B_NAME + "_OFFLINE")));
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, TIER_B_NAME + "_OFFLINE")));
     _helixResourceManager.updateTableConfig(tableConfig);
 
     // rebalance should change assignment

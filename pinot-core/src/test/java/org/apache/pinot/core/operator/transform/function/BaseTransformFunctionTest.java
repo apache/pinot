@@ -100,8 +100,7 @@ public abstract class BaseTransformFunctionTest {
   protected ProjectionBlock _projectionBlock;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteQuietly(new File(INDEX_DIR_PATH));
     DecimalFormat df = new DecimalFormat("0", DecimalFormatSymbols.getInstance(Locale.ENGLISH));
     df.setMaximumFractionDigits(340); // 340 = DecimalFormat.DOUBLE_FRACTION_DIGITS

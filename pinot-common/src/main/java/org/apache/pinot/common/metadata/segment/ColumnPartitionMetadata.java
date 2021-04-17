@@ -78,8 +78,8 @@ public class ColumnPartitionMetadata {
     }
     if (obj instanceof ColumnPartitionMetadata) {
       ColumnPartitionMetadata that = (ColumnPartitionMetadata) obj;
-      return _functionName.equals(that._functionName) && _numPartitions == that._numPartitions && _partitions
-          .equals(that._partitions);
+      return _functionName.equals(that._functionName) && _numPartitions == that._numPartitions
+          && _partitions.equals(that._partitions);
     }
     return false;
   }
@@ -141,8 +141,7 @@ public class ColumnPartitionMetadata {
     private static final char LEGACY_PARTITION_DELIMITER = ',';
 
     @Override
-    public ColumnPartitionMetadata deserialize(JsonParser p, DeserializationContext ctxt)
-        throws IOException {
+    public ColumnPartitionMetadata deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
       JsonNode jsonMetadata = p.getCodec().readTree(p);
       Set<Integer> partitions = new HashSet<>();
       JsonNode jsonPartitions = jsonMetadata.get(PARTITIONS_KEY);

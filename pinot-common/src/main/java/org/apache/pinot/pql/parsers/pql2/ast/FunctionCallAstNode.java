@@ -93,8 +93,8 @@ public class FunctionCallAstNode extends BaseAstNode {
 
       // TODO: Remove all distinct special-casing.
       // DISTINCT(*) is not supported yet. User has to specify each column that should participate in DISTINCT
-      if (_name.equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName()) && children.size() == 1 && children
-          .get(0) instanceof StarExpressionAstNode) {
+      if (_name.equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName()) && children.size() == 1
+          && children.get(0) instanceof StarExpressionAstNode) {
         throw new Pql2CompilationException(
             "Syntax error: Pinot currently does not support DISTINCT with *. Please specify each column name as argument to DISTINCT function");
       }

@@ -48,9 +48,8 @@ public class SingleValueFixedByteRawIndexCreator implements ForwardIndexCreator 
    * @param valueType Type of the values
    * @throws IOException
    */
-  public SingleValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType,
-      String column, int totalDocs, DataType valueType)
-      throws IOException {
+  public SingleValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
+      int totalDocs, DataType valueType) throws IOException {
     this(baseIndexDir, compressionType, column, totalDocs, valueType, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
   }
 
@@ -65,13 +64,11 @@ public class SingleValueFixedByteRawIndexCreator implements ForwardIndexCreator 
    * @param writerVersion writer format version
    * @throws IOException
    */
-  public SingleValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType,
-      String column, int totalDocs, DataType valueType, int writerVersion)
-      throws IOException {
+  public SingleValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
+      int totalDocs, DataType valueType, int writerVersion) throws IOException {
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
-    _indexWriter =
-        new FixedByteChunkSVForwardIndexWriter(file, compressionType, totalDocs, NUM_DOCS_PER_CHUNK, valueType.size(),
-            writerVersion);
+    _indexWriter = new FixedByteChunkSVForwardIndexWriter(file, compressionType, totalDocs, NUM_DOCS_PER_CHUNK,
+        valueType.size(), writerVersion);
     _valueType = valueType;
   }
 
@@ -111,8 +108,7 @@ public class SingleValueFixedByteRawIndexCreator implements ForwardIndexCreator 
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _indexWriter.close();
   }
 }

@@ -47,8 +47,7 @@ public class SegmentCommitterFactory {
   }
 
   public SegmentCommitter createSegmentCommitter(boolean isSplitCommit, SegmentCompletionProtocol.Request.Params params,
-      String controllerVipUrl)
-      throws URISyntaxException {
+      String controllerVipUrl) throws URISyntaxException {
     if (!isSplitCommit) {
       return new DefaultSegmentCommitter(LOGGER, _protocolHandler, params);
     }

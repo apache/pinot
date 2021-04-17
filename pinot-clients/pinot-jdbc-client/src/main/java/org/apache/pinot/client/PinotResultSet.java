@@ -97,15 +97,13 @@ public class PinotResultSet extends AbstractBaseResultSet {
     }
   }
 
-  protected void validateState()
-      throws SQLException {
+  protected void validateState() throws SQLException {
     if (isClosed()) {
       throw new SQLException("Not possible to operate on closed or empty result sets");
     }
   }
 
-  protected void validateColumn(int columnIndex)
-      throws SQLException {
+  protected void validateColumn(int columnIndex) throws SQLException {
     validateState();
     _wasNull = false;
     if (columnIndex > _totalColumns) {
@@ -114,8 +112,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
   }
 
   @Override
-  public boolean absolute(int row)
-      throws SQLException {
+  public boolean absolute(int row) throws SQLException {
     validateState();
 
     if (row >= 0 && row < _totalRows) {
@@ -130,24 +127,21 @@ public class PinotResultSet extends AbstractBaseResultSet {
   }
 
   @Override
-  public void afterLast()
-      throws SQLException {
+  public void afterLast() throws SQLException {
     validateState();
 
     _currentRow = _totalRows;
   }
 
   @Override
-  public void beforeFirst()
-      throws SQLException {
+  public void beforeFirst() throws SQLException {
     validateState();
 
     _currentRow = -1;
   }
 
   @Override
-  public void close()
-      throws SQLException {
+  public void close() throws SQLException {
     _resultSet = null;
     _totalRows = 0;
     _currentRow = -1;
@@ -156,8 +150,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
   }
 
   @Override
-  public int findColumn(String columnLabel)
-      throws SQLException {
+  public int findColumn(String columnLabel) throws SQLException {
     if (_columns.containsKey(columnLabel)) {
       return _columns.get(columnLabel);
     } else {
@@ -166,15 +159,13 @@ public class PinotResultSet extends AbstractBaseResultSet {
   }
 
   @Override
-  public ResultSetMetaData getMetaData()
-      throws SQLException {
+  public ResultSetMetaData getMetaData() throws SQLException {
     validateState();
     return new PinotResultMetadata(_totalColumns, _columns, _columnDataTypes);
   }
 
   @Override
-  public boolean first()
-      throws SQLException {
+  public boolean first() throws SQLException {
     validateState();
 
     _currentRow = 0;
@@ -182,16 +173,14 @@ public class PinotResultSet extends AbstractBaseResultSet {
   }
 
   @Override
-  public InputStream getAsciiStream(int columnIndex)
-      throws SQLException {
+  public InputStream getAsciiStream(int columnIndex) throws SQLException {
     String value = getString(columnIndex);
     InputStream in = new ByteArrayInputStream(value.getBytes(StandardCharsets.US_ASCII));
     return in;
   }
 
   @Override
-  public BigDecimal getBigDecimal(int columnIndex, int scale)
-      throws SQLException {
+  public BigDecimal getBigDecimal(int columnIndex, int scale) throws SQLException {
     try {
       String value = getString(columnIndex);
       BigDecimal bigDecimal = new BigDecimal(value).setScale(scale);
@@ -202,15 +191,13 @@ public class PinotResultSet extends AbstractBaseResultSet {
   }
 
   @Override
-  public boolean getBoolean(int columnIndex)
-      throws SQLException {
+  public boolean getBoolean(int columnIndex) throws SQLException {
     validateColumn(columnIndex);
     return Boolean.parseBoolean(_resultSet.getString(_currentRow, columnIndex - 1));
   }
 
   @Override
-  public byte[] getBytes(int columnIndex)
-      throws SQLException {
+  public byte[] getBytes(int columnIndex) throws SQLException {
     try {
       String value = getString(columnIndex);
       return Hex.decodeHex(value.toCharArray());
@@ -220,16 +207,14 @@ public class PinotResultSet extends AbstractBaseResultSet {
   }
 
   @Override
-  public Reader getCharacterStream(int columnIndex)
-      throws SQLException {
+  public Reader getCharacterStream(int columnIndex) throws SQLException {
     InputStream in = getUnicodeStream(columnIndex);
     Reader reader = new InputStreamReader(in, StandardCharsets.UTF_8);
     return reader;
   }
 
   @Override
-  public Date getDate(int columnIndex, Calendar cal)
-      throws SQLException {
+  public Date getDate(int columnIndex, Calendar cal) throws SQLException {
     try {
       String value = getString(columnIndex);
       return DateTimeUtils.getDateFromString(value, cal);
@@ -239,55 +224,48 @@ public class PinotResultSet extends AbstractBaseResultSet {
   }
 
   @Override
-  public double getDouble(int columnIndex)
-      throws SQLException {
+  public double getDouble(int columnIndex) throws SQLException {
     validateColumn(columnIndex);
 
     return _resultSet.getDouble(_currentRow, columnIndex - 1);
   }
 
   @Override
-  public float getFloat(int columnIndex)
-      throws SQLException {
+  public float getFloat(int columnIndex) throws SQLException {
     validateColumn(columnIndex);
 
     return _resultSet.getFloat(_currentRow, columnIndex - 1);
   }
 
   @Override
-  public int getInt(int columnIndex)
-      throws SQLException {
+  public int getInt(int columnIndex) throws SQLException {
     validateColumn(columnIndex);
 
     return _resultSet.getInt(_currentRow, columnIndex - 1);
   }
 
   @Override
-  public long getLong(int columnIndex)
-      throws SQLException {
+  public long getLong(int columnIndex) throws SQLException {
     validateColumn(columnIndex);
 
     return _resultSet.getLong(_currentRow, columnIndex - 1);
   }
 
   @Override
-  public int getRow()
-      throws SQLException {
+  public int getRow() throws SQLException {
     validateState();
 
     return _currentRow;
   }
 
   @Override
-  public short getShort(int columnIndex)
-      throws SQLException {
+  public short getShort(int columnIndex) throws SQLException {
     Integer value = getInt(columnIndex);
     return value.shortValue();
   }
 
   @Override
-  public String getString(int columnIndex)
-      throws SQLException {
+  public String getString(int columnIndex) throws SQLException {
     validateColumn(columnIndex);
 
     String val = _resultSet.getString(_currentRow, columnIndex - 1);
@@ -299,8 +277,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
   }
 
   @Override
-  public Object getObject(int columnIndex)
-      throws SQLException {
+  public Object getObject(int columnIndex) throws SQLException {
 
     String dataType = _columnDataTypes.getOrDefault(columnIndex, "");
 
@@ -329,8 +306,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
   }
 
   @Override
-  public <T> T getObject(int columnIndex, Class<T> type)
-      throws SQLException {
+  public <T> T getObject(int columnIndex, Class<T> type) throws SQLException {
     Object value = getObject(columnIndex);
 
     try {
@@ -341,8 +317,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
   }
 
   @Override
-  public <T> T getObject(String columnLabel, Class<T> type)
-      throws SQLException {
+  public <T> T getObject(String columnLabel, Class<T> type) throws SQLException {
     return super.getObject(columnLabel, type);
   }
 
@@ -355,8 +330,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
   }
 
   @Override
-  public Time getTime(int columnIndex, Calendar cal)
-      throws SQLException {
+  public Time getTime(int columnIndex, Calendar cal) throws SQLException {
     try {
       String value = getString(columnIndex);
       return DateTimeUtils.getTimeFromString(value, cal);
@@ -366,8 +340,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
   }
 
   @Override
-  public Timestamp getTimestamp(int columnIndex, Calendar cal)
-      throws SQLException {
+  public Timestamp getTimestamp(int columnIndex, Calendar cal) throws SQLException {
     try {
       String value = getString(columnIndex);
       return DateTimeUtils.getTimestampFromString(value, cal);
@@ -377,8 +350,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
   }
 
   @Override
-  public URL getURL(int columnIndex)
-      throws SQLException {
+  public URL getURL(int columnIndex) throws SQLException {
     try {
       URL url = new URL(getString(columnIndex));
       return url;
@@ -388,54 +360,47 @@ public class PinotResultSet extends AbstractBaseResultSet {
   }
 
   @Override
-  public InputStream getUnicodeStream(int columnIndex)
-      throws SQLException {
+  public InputStream getUnicodeStream(int columnIndex) throws SQLException {
     String value = getString(columnIndex);
     InputStream in = new ByteArrayInputStream(value.getBytes(StandardCharsets.UTF_8));
     return in;
   }
 
   @Override
-  public boolean isAfterLast()
-      throws SQLException {
+  public boolean isAfterLast() throws SQLException {
     validateState();
 
     return (_currentRow >= _totalRows);
   }
 
   @Override
-  public boolean isBeforeFirst()
-      throws SQLException {
+  public boolean isBeforeFirst() throws SQLException {
     validateState();
 
     return (_currentRow < 0);
   }
 
   @Override
-  public boolean isClosed()
-      throws SQLException {
+  public boolean isClosed() throws SQLException {
     return _closed;
   }
 
   @Override
-  public boolean isFirst()
-      throws SQLException {
+  public boolean isFirst() throws SQLException {
     validateState();
 
     return _currentRow == 0;
   }
 
   @Override
-  public boolean isLast()
-      throws SQLException {
+  public boolean isLast() throws SQLException {
     validateState();
 
     return _currentRow == _totalRows - 1;
   }
 
   @Override
-  public boolean last()
-      throws SQLException {
+  public boolean last() throws SQLException {
     validateState();
 
     _currentRow = _totalRows - 1;
@@ -443,8 +408,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
   }
 
   @Override
-  public boolean next()
-      throws SQLException {
+  public boolean next() throws SQLException {
     validateState();
 
     _currentRow++;
@@ -453,8 +417,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
   }
 
   @Override
-  public boolean previous()
-      throws SQLException {
+  public boolean previous() throws SQLException {
     validateState();
 
     if (!isBeforeFirst()) {
@@ -465,8 +428,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
   }
 
   @Override
-  public boolean relative(int rows)
-      throws SQLException {
+  public boolean relative(int rows) throws SQLException {
     validateState();
     int nextRow = _currentRow + rows;
     if (nextRow >= 0 && nextRow < _totalRows) {
@@ -477,8 +439,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
   }
 
   @Override
-  public boolean wasNull()
-      throws SQLException {
+  public boolean wasNull() throws SQLException {
     return _wasNull;
   }
 }

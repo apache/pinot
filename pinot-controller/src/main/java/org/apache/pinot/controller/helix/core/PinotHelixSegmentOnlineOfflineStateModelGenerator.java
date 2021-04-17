@@ -159,6 +159,6 @@ public class PinotHelixSegmentOnlineOfflineStateModelGenerator {
         stateTransitionPriorityList);
 
     throw new RuntimeException("This state model should not be used");
-//    return new StateModelDefinition(record);
+    //    return new StateModelDefinition(record);
   }
 }

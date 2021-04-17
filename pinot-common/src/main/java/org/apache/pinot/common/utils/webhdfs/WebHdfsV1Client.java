@@ -77,9 +77,10 @@ public class WebHdfsV1Client {
       LOGGER.info("Trying to send request: {}.", firstPutReqString);
       int firstResponseCode = _httpClient.executeMethod(firstPutReq);
       if (firstResponseCode != 307) {
-        LOGGER.error(String.format("Failed to execute the first PUT request to upload segment to webhdfs: %s. "
-                + "Expected response code 307, but get %s. Response body: %s", firstPutReqString, firstResponseCode,
-            firstPutReq.getResponseBodyAsString()));
+        LOGGER.error(String.format(
+            "Failed to execute the first PUT request to upload segment to webhdfs: %s. "
+                + "Expected response code 307, but get %s. Response body: %s",
+            firstPutReqString, firstResponseCode, firstPutReq.getResponseBodyAsString()));
         return false;
       }
     } catch (Exception e) {
@@ -101,15 +102,15 @@ public class WebHdfsV1Client {
       LOGGER.info("Trying to send request: {}.", redirectedReqString);
       int redirectedResponseCode = _httpClient.executeMethod(redirectedReq);
       if (redirectedResponseCode != 201) {
-        LOGGER.error(String.format("Failed to execute the redirected PUT request to upload segment to webhdfs: %s. "
-                + "Expected response code 201, but get %s. Response: %s", redirectedReqString, redirectedResponseCode,
-            redirectedReq.getResponseBodyAsString()));
+        LOGGER.error(String.format(
+            "Failed to execute the redirected PUT request to upload segment to webhdfs: %s. "
+                + "Expected response code 201, but get %s. Response: %s",
+            redirectedReqString, redirectedResponseCode, redirectedReq.getResponseBodyAsString()));
       }
       return true;
     } catch (IOException e) {
-      LOGGER.error(String
-              .format("Failed to execute the redirected request to upload segment to webhdfs: %s.", redirectedReqString),
-          e);
+      LOGGER.error(String.format("Failed to execute the redirected request to upload segment to webhdfs: %s.",
+          redirectedReqString), e);
       return false;
     } finally {
       redirectedReq.releaseConnection();

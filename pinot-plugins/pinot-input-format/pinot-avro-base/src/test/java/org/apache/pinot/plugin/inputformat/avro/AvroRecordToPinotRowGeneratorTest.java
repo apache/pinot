@@ -33,8 +33,7 @@ import org.testng.annotations.Test;
 public class AvroRecordToPinotRowGeneratorTest {
 
   @Test
-  public void testIncomingTimeColumn()
-      throws Exception {
+  public void testIncomingTimeColumn() throws Exception {
     List<Schema.Field> avroFields =
         Collections.singletonList(new Schema.Field("incomingTime", Schema.create(Schema.Type.LONG), null, null));
     Schema avroSchema = Schema.createRecord(avroFields);

@@ -118,8 +118,8 @@ public class LeadControllerManager {
     LOGGER.info("Add Partition: {} to LeadControllerManager", partitionName);
     int partitionId = LeadControllerUtils.extractPartitionId(partitionName);
     _leadForPartitions.add(partitionId);
-    _controllerMetrics
-        .setValueOfGlobalGauge(ControllerGauge.CONTROLLER_LEADER_PARTITION_COUNT, _leadForPartitions.size());
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.CONTROLLER_LEADER_PARTITION_COUNT,
+        _leadForPartitions.size());
   }
 
   /**
@@ -130,8 +130,8 @@ public class LeadControllerManager {
     LOGGER.info("Remove Partition: {} from LeadControllerManager", partitionName);
     int partitionId = LeadControllerUtils.extractPartitionId(partitionName);
     _leadForPartitions.remove(partitionId);
-    _controllerMetrics
-        .setValueOfGlobalGauge(ControllerGauge.CONTROLLER_LEADER_PARTITION_COUNT, _leadForPartitions.size());
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.CONTROLLER_LEADER_PARTITION_COUNT,
+        _leadForPartitions.size());
   }
 
   /**

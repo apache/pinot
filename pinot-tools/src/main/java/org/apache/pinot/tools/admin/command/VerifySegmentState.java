@@ -44,10 +44,12 @@ public class VerifySegmentState extends AbstractBaseCommand implements Command {
   @Option(name = "-clusterName", required = true, metaVar = "<String>", usage = "Helix cluster name")
   String clusterName;
 
-  @Option(name = "-tablePrefix", required = false, metaVar = "<String>", usage = "Table name prefix. (Ex: myTable, my or myTable_OFFLINE)")
+  @Option(name = "-tablePrefix", required = false, metaVar = "<String>",
+      usage = "Table name prefix. (Ex: myTable, my or myTable_OFFLINE)")
   String tablePrefix = "";
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean help = false;
 
   public boolean getHelp() {
@@ -55,8 +57,7 @@ public class VerifySegmentState extends AbstractBaseCommand implements Command {
   }
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
     ZKHelixAdmin helixAdmin = new ZKHelixAdmin(zkAddress);
     List<String> resourcesInCluster = helixAdmin.getResourcesInCluster(clusterName);
 
@@ -99,8 +100,8 @@ public class VerifySegmentState extends AbstractBaseCommand implements Command {
           Map<String, String> segmentIdealState = idealEntry.getValue();
           // try to format consistently for tool based parsing
           if (!mapFieldsFromEV.containsKey(segmentName)) {
-            LOGGER
-                .info("Segment: {} idealstate: {} is MISSING in external view: {}", segmentName, segmentIdealState, "");
+            LOGGER.info("Segment: {} idealstate: {} is MISSING in external view: {}", segmentName, segmentIdealState,
+                "");
           }
           Map<String, String> segmentExternalView = mapFieldsFromEV.get(segmentName);
 
@@ -121,8 +122,7 @@ public class VerifySegmentState extends AbstractBaseCommand implements Command {
     return "Compares helix IdealState and ExternalView for specified table prefixes";
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     VerifySegmentState verifier = new VerifySegmentState();
     CmdLineParser cmdLineParser = new CmdLineParser(verifier);
     try {

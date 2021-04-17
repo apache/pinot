@@ -91,14 +91,12 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
   }
 
   @Override
-  public void handleDataChange(String dataPath, Object data)
-      throws Exception {
+  public void handleDataChange(String dataPath, Object data) throws Exception {
     refresh();
   }
 
   @Override
-  public void handleDataDeleted(String dataPath)
-      throws Exception {
+  public void handleDataDeleted(String dataPath) throws Exception {
     refresh();
   }
 }

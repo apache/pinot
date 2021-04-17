@@ -75,8 +75,7 @@ public class JsonFunctions {
    * Convert Map to Json String
    */
   @ScalarFunction
-  public static String toJsonMapStr(Map map)
-      throws JsonProcessingException {
+  public static String toJsonMapStr(Map map) throws JsonProcessingException {
     return JsonUtils.objectToString(map);
   }
 
@@ -84,8 +83,7 @@ public class JsonFunctions {
    * Convert object to Json String
    */
   @ScalarFunction
-  public static String jsonFormat(Object object)
-      throws JsonProcessingException {
+  public static String jsonFormat(Object object) throws JsonProcessingException {
     return JsonUtils.objectToString(object);
   }
 
@@ -104,8 +102,7 @@ public class JsonFunctions {
    * Extract object array based on Json path
    */
   @ScalarFunction
-  public static Object[] jsonPathArray(Object object, String jsonPath)
-      throws JsonProcessingException {
+  public static Object[] jsonPathArray(Object object, String jsonPath) throws JsonProcessingException {
     if (object instanceof String) {
       return convertObjectToArray(JsonPath.read((String) object, jsonPath));
     }
@@ -128,8 +125,7 @@ public class JsonFunctions {
    * Extract from Json with path to String
    */
   @ScalarFunction
-  public static String jsonPathString(Object object, String jsonPath)
-      throws JsonProcessingException {
+  public static String jsonPathString(Object object, String jsonPath) throws JsonProcessingException {
     Object jsonValue = jsonPath(object, jsonPath);
     if (jsonValue instanceof String) {
       return (String) jsonValue;

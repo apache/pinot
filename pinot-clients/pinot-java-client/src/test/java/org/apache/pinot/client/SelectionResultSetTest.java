@@ -26,6 +26,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
 
+
 public class SelectionResultSetTest {
 
   private JsonNode mockSelectionResults;
@@ -34,8 +35,7 @@ public class SelectionResultSetTest {
 
   @BeforeMethod
   public void setUp() throws Exception {
-    String jsonString =
-        "{\"results\":[[\"r1c1\",\"r1c2\"]], \"columns\":[\"column1\", \"column2\"]}";
+    String jsonString = "{\"results\":[[\"r1c1\",\"r1c2\"]], \"columns\":[\"column1\", \"column2\"]}";
     ObjectMapper objectMapper = new ObjectMapper();
     mockSelectionResults = objectMapper.readTree(jsonString);
     selectionResultSetUnderTest = new SelectionResultSet(mockSelectionResults);

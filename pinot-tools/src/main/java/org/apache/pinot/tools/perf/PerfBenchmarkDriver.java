@@ -166,8 +166,7 @@ public class PerfBenchmarkDriver {
     }
   }
 
-  public void run()
-      throws Exception {
+  public void run() throws Exception {
     startZookeeper();
     startController();
     startBroker();
@@ -178,8 +177,7 @@ public class PerfBenchmarkDriver {
     postQueries();
   }
 
-  private void startZookeeper()
-      throws Exception {
+  private void startZookeeper() throws Exception {
     if (!_conf.isStartZookeeper()) {
       LOGGER.info("Skipping start zookeeper step. Assumes zookeeper is already started.");
       return;
@@ -212,8 +210,7 @@ public class PerfBenchmarkDriver {
     return conf;
   }
 
-  private void startBroker()
-      throws Exception {
+  private void startBroker() throws Exception {
     if (!_conf.shouldStartBroker()) {
       LOGGER.info("Skipping start broker step. Assumes broker is already started.");
       return;
@@ -229,8 +226,7 @@ public class PerfBenchmarkDriver {
     new HelixBrokerStarter(new PinotConfiguration(properties), _clusterName, _zkAddress).start();
   }
 
-  private void startServer()
-      throws Exception {
+  private void startServer() throws Exception {
     if (!_conf.shouldStartServer()) {
       LOGGER.info("Skipping start server step. Assumes server is already started.");
       return;
@@ -252,8 +248,7 @@ public class PerfBenchmarkDriver {
     helixServerStarter.start();
   }
 
-  private void startHelixResourceManager()
-      throws Exception {
+  private void startHelixResourceManager() throws Exception {
     if (_conf.shouldStartController()) {
       // helix resource manager is already available at this time if controller is started
       _helixResourceManager = _controllerStarter.getHelixResourceManager();
@@ -299,8 +294,7 @@ public class PerfBenchmarkDriver {
     }
   }
 
-  private void configureResources()
-      throws Exception {
+  private void configureResources() throws Exception {
     if (!_conf.isConfigureResources()) {
       LOGGER.info("Skipping configure resources step.");
       return;
@@ -309,8 +303,7 @@ public class PerfBenchmarkDriver {
     configureTable(tableName);
   }
 
-  public void configureTable(String tableName)
-      throws Exception {
+  public void configureTable(String tableName) throws Exception {
     configureTable(tableName, null, null);
   }
 
@@ -330,8 +323,8 @@ public class PerfBenchmarkDriver {
    * @param segmentMetadata segment metadata.
    */
   public void addSegment(String tableNameWithType, SegmentMetadata segmentMetadata) {
-    _helixResourceManager
-        .addNewSegment(tableNameWithType, segmentMetadata, "http://" + _controllerAddress + "/" + segmentMetadata.getName());
+    _helixResourceManager.addNewSegment(tableNameWithType, segmentMetadata,
+        "http://" + _controllerAddress + "/" + segmentMetadata.getName());
   }
 
   public static void waitForExternalViewUpdate(String zkAddress, final String clusterName, long timeoutInMilliseconds) {
@@ -341,15 +334,14 @@ public class PerfBenchmarkDriver {
     Set<String> tableAndBrokerResources = new HashSet<>();
     for (String resourceName : allResourcesInCluster) {
       // Only check table resources and broker resource
-      if (TableNameBuilder.isTableResource(resourceName) || resourceName
-          .equals(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)) {
+      if (TableNameBuilder.isTableResource(resourceName)
+          || resourceName.equals(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)) {
         tableAndBrokerResources.add(resourceName);
       }
     }
 
-    StrictMatchExternalViewVerifier verifier =
-        new StrictMatchExternalViewVerifier.Builder(clusterName).setZkAddr(zkAddress)
-            .setResources(tableAndBrokerResources).build();
+    StrictMatchExternalViewVerifier verifier = new StrictMatchExternalViewVerifier.Builder(clusterName)
+        .setZkAddr(zkAddress).setResources(tableAndBrokerResources).build();
 
     boolean success = verifier.verify(timeoutInMilliseconds);
     if (success) {
@@ -357,8 +349,7 @@ public class PerfBenchmarkDriver {
     }
   }
 
-  private void postQueries()
-      throws Exception {
+  private void postQueries() throws Exception {
     if (!_conf.isRunQueries()) {
       LOGGER.info("Skipping run queries step.");
       return;
@@ -380,18 +371,15 @@ public class PerfBenchmarkDriver {
     }
   }
 
-  public JsonNode postQuery(String query)
-      throws Exception {
+  public JsonNode postQuery(String query) throws Exception {
     return postQuery(_conf.getDialect(), query, null);
   }
 
-  public JsonNode postQuery(String query, String optimizationFlags)
-          throws Exception {
+  public JsonNode postQuery(String query, String optimizationFlags) throws Exception {
     return postQuery(_conf.getDialect(), query, optimizationFlags);
   }
 
-  public JsonNode postQuery(String dialect, String query, String optimizationFlags)
-      throws Exception {
+  public JsonNode postQuery(String dialect, String query, String optimizationFlags) throws Exception {
     ObjectNode requestJson = JsonUtils.newObjectNode();
     requestJson.put(dialect, query);
 
@@ -408,16 +396,16 @@ public class PerfBenchmarkDriver {
     URLConnection conn = new URL(queryUrl).openConnection();
     conn.setDoOutput(true);
 
-    try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(),
-      StandardCharsets.UTF_8))) {
+    try (BufferedWriter writer =
+        new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(), StandardCharsets.UTF_8))) {
       String requestString = requestJson.toString();
       writer.write(requestString);
       writer.flush();
 
       try {
         StringBuilder stringBuilder = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(),
-                StandardCharsets.UTF_8))) {
+        try (BufferedReader reader =
+            new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
           String line;
           while ((line = reader.readLine()) != null) {
             stringBuilder.append(line);
@@ -458,8 +446,7 @@ public class PerfBenchmarkDriver {
    * @throws Exception
    */
   public static PerfBenchmarkDriver startComponents(boolean isStartZookeeper, boolean isStartController,
-      boolean isStartBroker, boolean isStartServer, @Nullable String serverDataDir)
-      throws Exception {
+      boolean isStartBroker, boolean isStartServer, @Nullable String serverDataDir) throws Exception {
     PerfBenchmarkDriverConf conf = new PerfBenchmarkDriverConf();
     conf.setStartZookeeper(isStartZookeeper);
     conf.setStartController(isStartController);
@@ -471,8 +458,7 @@ public class PerfBenchmarkDriver {
     return driver;
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     PluginManager.get().init();
     PerfBenchmarkDriverConf conf = (PerfBenchmarkDriverConf) new Yaml().load(new FileInputStream(args[0]));
     PerfBenchmarkDriver perfBenchmarkDriver = new PerfBenchmarkDriver(conf);

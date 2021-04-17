@@ -65,8 +65,7 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   }
 
   @Override
-  public void start()
-      throws Exception {
+  public void start() throws Exception {
     consumerAndIterator = KafkaConsumerManager.acquireConsumerAndIteratorForConfig(_kafkaHighLevelStreamConfig);
     kafkaIterator = consumerAndIterator.getIterator();
     consumer = consumerAndIterator.getConsumer();
@@ -107,8 +106,7 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   }
 
   @Override
-  public void shutdown()
-      throws Exception {
+  public void shutdown() throws Exception {
     if (consumerAndIterator != null) {
       kafkaIterator = null;
       consumer = null;

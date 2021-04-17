@@ -25,8 +25,7 @@ import org.testng.annotations.Test;
 
 public class StGeometryTypeFunctionTest extends GeoFunctionTest {
   @Test
-  public void testGeometryType()
-      throws Exception {
+  public void testGeometryType() throws Exception {
     assertType("Point (1 4)", "Point");
     assertType("LINESTRING (1 1, 2 2)", "LineString");
     assertType("POLYGON ((1 1, 1 4, 4 4, 4 1, 1 1))'))", "Polygon");
@@ -36,8 +35,7 @@ public class StGeometryTypeFunctionTest extends GeoFunctionTest {
     assertType("GEOMETRYCOLLECTION(POINT(4 6),LINESTRING(4 6, 7 10))", "GeometryCollection");
   }
 
-  private void assertType(String wkt, String type)
-      throws Exception {
+  private void assertType(String wkt, String type) throws Exception {
     // assert geometry
     assertStringFunction(String.format("ST_GeometryType(ST_GeomFromText(%s))))", STRING_SV_COLUMN), new String[]{type},
         Arrays.asList(new GeoFunctionTest.Column(STRING_SV_COLUMN, FieldSpec.DataType.STRING, new String[]{wkt})));

@@ -45,8 +45,8 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     // Check that there are exact 2 arguments
-    Preconditions
-        .checkArgument(arguments.size() == 2, "Exact 2 arguments are required for binary operator transform function");
+    Preconditions.checkArgument(arguments.size() == 2,
+        "Exact 2 arguments are required for binary operator transform function");
     _leftTransformFunction = arguments.get(0);
     _rightTransformFunction = arguments.get(1);
     _leftDataType = _leftTransformFunction.getResultMetadata().getDataType();

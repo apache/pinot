@@ -38,7 +38,10 @@ public class BloomFilterIdSet implements IdSet {
 
   private enum FunnelType {
     // DO NOT change the ids as the ser/de relies on them
-    INT((byte) 0), LONG((byte) 1), STRING((byte) 2), BYTES((byte) 3);
+    INT((byte) 0),
+    LONG((byte) 1),
+    STRING((byte) 2),
+    BYTES((byte) 3);
 
     private final byte _id;
 
@@ -166,8 +169,7 @@ public class BloomFilterIdSet implements IdSet {
   }
 
   @Override
-  public byte[] toBytes()
-      throws IOException {
+  public byte[] toBytes() throws IOException {
     // NOTE: No need to close the stream.
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(_serializedSizeInBytes);
     byteArrayOutputStream.write(Type.BLOOM_FILTER.getId());
@@ -180,8 +182,7 @@ public class BloomFilterIdSet implements IdSet {
    * Deserializes the BloomFilterIdSet from a ByteBuffer.
    * <p>NOTE: The ByteBuffer does not include the IdSet.Type byte.
    */
-  static BloomFilterIdSet fromByteBuffer(ByteBuffer byteBuffer)
-      throws IOException {
+  static BloomFilterIdSet fromByteBuffer(ByteBuffer byteBuffer) throws IOException {
     Preconditions.checkArgument(byteBuffer.hasArray(),
         "Cannot deserialize BloomFilter from ByteBuffer not backed by an accessible byte array");
     // Count the IdSet.Type byte
@@ -210,9 +211,8 @@ public class BloomFilterIdSet implements IdSet {
         throw new IllegalStateException();
     }
     // NOTE: No need to close the stream.
-    BloomFilter bloomFilter = BloomFilter.readFrom(
-        new ByteArrayInputStream(byteBuffer.array(), byteBuffer.arrayOffset() + byteBuffer.position(),
-            byteBuffer.remaining()), funnel);
+    BloomFilter bloomFilter = BloomFilter.readFrom(new ByteArrayInputStream(byteBuffer.array(),
+        byteBuffer.arrayOffset() + byteBuffer.position(), byteBuffer.remaining()), funnel);
     return new BloomFilterIdSet(funnelType, bloomFilter, serializedSizeInBytes);
   }
 

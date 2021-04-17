@@ -55,10 +55,10 @@ public class LuceneTextIndexCreator implements TextIndexCreator {
 
   private int _nextDocId = 0;
 
-  public static final CharArraySet ENGLISH_STOP_WORDS_SET = new CharArraySet(Arrays
-      .asList("a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into", "is", "it", "no",
-          "not", "of", "on", "or", "such", "that", "the", "their", "then", "than", "there", "these", "they", "this",
-          "to", "was", "will", "with", "those"), true);
+  public static final CharArraySet ENGLISH_STOP_WORDS_SET =
+      new CharArraySet(Arrays.asList("a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into",
+          "is", "it", "no", "not", "of", "on", "or", "such", "that", "the", "their", "then", "than", "there", "these",
+          "they", "this", "to", "was", "will", "with", "those"), true);
 
   /**
    * Called by {@link SegmentColumnarIndexCreator}
@@ -145,8 +145,7 @@ public class LuceneTextIndexCreator implements TextIndexCreator {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     try {
       // based on the commit flag set in IndexWriterConfig, this will decide to commit or not
       _indexWriter.close();

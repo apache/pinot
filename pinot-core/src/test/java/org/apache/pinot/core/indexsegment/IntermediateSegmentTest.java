@@ -61,8 +61,7 @@ public class IntermediateSegmentTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "IntermediateSegmentTest");
 
   @BeforeMethod
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
@@ -77,8 +76,7 @@ public class IntermediateSegmentTest {
   }
 
   @Test(dataProvider = "segmentCreationTestCases")
-  public void testOfflineSegmentCreationFromDifferentWays(String inputFile)
-      throws Exception {
+  public void testOfflineSegmentCreationFromDifferentWays(String inputFile) throws Exception {
     // Get resource file path.
     URL resource = getClass().getClassLoader().getResource(inputFile);
     assertNotNull(resource);
@@ -172,8 +170,7 @@ public class IntermediateSegmentTest {
   }
 
   private void ingestDataToIntermediateSegment(SegmentGeneratorConfig segmentGeneratorConfig,
-      IntermediateSegment intermediateSegment)
-      throws IOException {
+      IntermediateSegment intermediateSegment) throws IOException {
     AvroRecordReader avroRecordReader = new AvroRecordReader();
     avroRecordReader.init(new File(segmentGeneratorConfig.getInputFilePath()), null, null);
 
@@ -185,8 +182,7 @@ public class IntermediateSegmentTest {
     }
   }
 
-  private static Schema createSchema(String inputFile)
-      throws IOException {
+  private static Schema createSchema(String inputFile) throws IOException {
     Schema schema;
     if (AVRO_DATA_SV.equals(inputFile)) {
       schema = new Schema.SchemaBuilder().setSchemaName("testTable").addMetric("column1", FieldSpec.DataType.INT)

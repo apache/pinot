@@ -57,8 +57,7 @@ public class OffHeapMutableBytesStoreTest {
   }
 
   @Test
-  public void testAdd()
-      throws Exception {
+  public void testAdd() throws Exception {
     try (OffHeapMutableBytesStore offHeapMutableBytesStore = new OffHeapMutableBytesStore(_memoryManager, null)) {
       for (int i = 0; i < NUM_VALUES; i++) {
         Assert.assertEquals(offHeapMutableBytesStore.add(_values[i]), i);
@@ -67,8 +66,7 @@ public class OffHeapMutableBytesStoreTest {
   }
 
   @Test
-  public void testGet()
-      throws Exception {
+  public void testGet() throws Exception {
     try (OffHeapMutableBytesStore offHeapMutableBytesStore = new OffHeapMutableBytesStore(_memoryManager, null)) {
       for (int i = 0; i < NUM_VALUES; i++) {
         offHeapMutableBytesStore.add(_values[i]);
@@ -81,8 +79,7 @@ public class OffHeapMutableBytesStoreTest {
   }
 
   @Test
-  public void testEqualsValueAt()
-      throws Exception {
+  public void testEqualsValueAt() throws Exception {
     try (OffHeapMutableBytesStore offHeapMutableBytesStore = new OffHeapMutableBytesStore(_memoryManager, null)) {
       for (int i = 0; i < NUM_VALUES; i++) {
         offHeapMutableBytesStore.add(_values[i]);
@@ -99,8 +96,7 @@ public class OffHeapMutableBytesStoreTest {
   }
 
   @Test
-  public void concurrentReadWrite()
-      throws Exception {
+  public void concurrentReadWrite() throws Exception {
     int numReaders = 4;
     ExecutorService executorService = Executors.newFixedThreadPool(numReaders + 1);
     List<Future> futures = new ArrayList<>(numReaders + 1);

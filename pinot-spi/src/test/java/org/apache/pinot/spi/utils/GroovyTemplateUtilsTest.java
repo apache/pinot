@@ -38,8 +38,7 @@ import org.yaml.snakeyaml.Yaml;
 public class GroovyTemplateUtilsTest {
 
   @Test
-  public void testDefaultRenderTemplate()
-      throws IOException, ClassNotFoundException {
+  public void testDefaultRenderTemplate() throws IOException, ClassNotFoundException {
     Date today = new Date(Instant.now().toEpochMilli());
     Date yesterday = new Date(Instant.now().minus(1, ChronoUnit.DAYS).toEpochMilli());
     SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
@@ -49,8 +48,7 @@ public class GroovyTemplateUtilsTest {
   }
 
   @Test
-  public void testRenderTemplateWithGivenContextMap()
-      throws IOException, ClassNotFoundException {
+  public void testRenderTemplateWithGivenContextMap() throws IOException, ClassNotFoundException {
     Map<String, Object> contextMap = new HashMap<>();
     contextMap.put("first_date_2020", "2020-01-01");
     contextMap.put("name", "xiang");
@@ -72,8 +70,7 @@ public class GroovyTemplateUtilsTest {
   }
 
   @Test
-  public void testIngestionJobTemplate()
-      throws IOException, ClassNotFoundException {
+  public void testIngestionJobTemplate() throws IOException, ClassNotFoundException {
     InputStream resourceAsStream =
         GroovyTemplateUtils.class.getClassLoader().getResourceAsStream("ingestion_job_spec_template.yaml");
     String yamlTemplate = IOUtils.toString(resourceAsStream);

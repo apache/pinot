@@ -36,8 +36,7 @@ public class PinotDataBitSetV2Test {
   }
 
   @Test
-  public void testBit2Encoded()
-      throws Exception {
+  public void testBit2Encoded() throws Exception {
     int cardinality = 3;
     int rows = 10000;
     int[] forwardIndex = new int[rows];
@@ -174,8 +173,7 @@ public class PinotDataBitSetV2Test {
   }
 
   @Test
-  public void testBit4Encoded()
-      throws Exception {
+  public void testBit4Encoded() throws Exception {
     int cardinality = 11;
     int rows = 10000;
     int[] forwardIndex = new int[rows];
@@ -281,8 +279,7 @@ public class PinotDataBitSetV2Test {
   }
 
   @Test
-  public void testBit8Encoded()
-      throws Exception {
+  public void testBit8Encoded() throws Exception {
     int cardinality = 190;
     int rows = 10000;
     int[] forwardIndex = new int[rows];
@@ -350,8 +347,7 @@ public class PinotDataBitSetV2Test {
   }
 
   @Test
-  public void testBit16Encoded()
-      throws Exception {
+  public void testBit16Encoded() throws Exception {
     int cardinality = 40000;
     int rows = 100000;
     int[] forwardIndex = new int[rows];

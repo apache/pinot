@@ -31,12 +31,10 @@ public interface JsonIndexCreator extends Closeable {
   /**
    * Adds the next json value.
    */
-  void add(String jsonString)
-      throws IOException;
+  void add(String jsonString) throws IOException;
 
   /**
    * Seals the index and flushes it to disk.
    */
-  void seal()
-      throws IOException;
+  void seal() throws IOException;
 }

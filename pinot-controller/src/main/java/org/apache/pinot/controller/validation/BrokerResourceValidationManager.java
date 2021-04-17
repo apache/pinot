@@ -40,7 +40,8 @@ public class BrokerResourceValidationManager extends ControllerPeriodicTask<Brok
   public BrokerResourceValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerMetrics controllerMetrics) {
     super("BrokerResourceValidationManager", config.getBrokerResourceValidationFrequencyInSeconds(),
-        config.getBrokerResourceValidationInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager, controllerMetrics);
+        config.getBrokerResourceValidationInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
+        controllerMetrics);
   }
 
   @Override
@@ -59,8 +60,8 @@ public class BrokerResourceValidationManager extends ControllerPeriodicTask<Brok
     }
 
     // Rebuild broker resource
-    Set<String> brokerInstances = _pinotHelixResourceManager
-        .getAllInstancesForBrokerTenant(context._instanceConfigs, tableConfig.getTenantConfig().getBroker());
+    Set<String> brokerInstances = _pinotHelixResourceManager.getAllInstancesForBrokerTenant(context._instanceConfigs,
+        tableConfig.getTenantConfig().getBroker());
     _pinotHelixResourceManager.rebuildBrokerResource(tableNameWithType, brokerInstances);
   }
 

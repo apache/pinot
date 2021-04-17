@@ -26,7 +26,9 @@ import org.apache.pinot.spi.data.FieldSpec;
  */
 public class ValueAggregatorFactory {
   public enum ValueAggregatorType {
-    SUM, MAX, MIN
+    SUM,
+    MAX,
+    MIN
   }
 
   private ValueAggregatorFactory() {

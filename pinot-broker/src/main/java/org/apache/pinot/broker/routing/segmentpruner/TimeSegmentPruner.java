@@ -74,8 +74,8 @@ public class TimeSegmentPruner implements SegmentPruner {
     _propertyStore = propertyStore;
     _segmentZKMetadataPathPrefix = ZKMetadataProvider.constructPropertyStorePathForResource(_tableNameWithType) + "/";
     _timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
-    Preconditions
-        .checkNotNull(_timeColumn, "Time column must be configured in table config for table: %s", _tableNameWithType);
+    Preconditions.checkNotNull(_timeColumn, "Time column must be configured in table config for table: %s",
+        _tableNameWithType);
 
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
     Preconditions.checkNotNull(schema, "Failed to find schema for table: %s", _tableNameWithType);

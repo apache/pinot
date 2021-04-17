@@ -28,6 +28,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.V1Constants;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
+
 /**
  * Used to persist the null bitmap on disk. This is used by SegmentCreator
  * while indexing rows.
@@ -42,8 +43,7 @@ public class NullValueVectorCreator implements Closeable {
     _nullBitmap = new MutableRoaringBitmap();
   }
 
-  public void seal()
-      throws IOException {
+  public void seal() throws IOException {
     try (DataOutputStream outputStream = new DataOutputStream(new FileOutputStream(_nullValueVectorFile))) {
       _nullBitmap.serialize(outputStream);
     }

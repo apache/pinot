@@ -116,7 +116,11 @@ public class ServiceStatus {
   }
 
   public enum Status {
-    NOT_STARTED, STARTING, GOOD, BAD, SHUTTING_DOWN
+    NOT_STARTED,
+    STARTING,
+    GOOD,
+    BAD,
+    SHUTTING_DOWN
   }
 
   /**
@@ -251,7 +255,8 @@ public class ServiceStatus {
    * Service status callback that compares ideal state with another Helix state. Used to share most of the logic between
    * the ideal state/external view comparison and ideal state/current state comparison.
    */
-  private static abstract class IdealStateMatchServiceStatusCallback<T extends HelixProperty> implements ServiceStatusCallback {
+  private static abstract class IdealStateMatchServiceStatusCallback<T extends HelixProperty>
+      implements ServiceStatusCallback {
 
     final String _clusterName;
     final String _instanceName;
@@ -325,10 +330,10 @@ public class ServiceStatus {
           // Resource is done starting up, remove it from the set
           _resourceIterator.remove();
         } else {
-          _statusDescription = String
-              .format("%s, waitingFor=%s, resource=%s, numResourcesLeft=%d, numTotalResources=%d, minStartCount=%d,",
-                  statusDescriptionPair._description, getMatchName(), resourceName, _resourcesToMonitor.size(),
-                  _numTotalResourcesToMonitor, _minResourcesStartCount);
+          _statusDescription = String.format(
+              "%s, waitingFor=%s, resource=%s, numResourcesLeft=%d, numTotalResources=%d, minStartCount=%d,",
+              statusDescriptionPair._description, getMatchName(), resourceName, _resourcesToMonitor.size(),
+              _numTotalResourcesToMonitor, _minResourcesStartCount);
 
           return statusDescriptionPair._status;
         }
@@ -365,8 +370,8 @@ public class ServiceStatus {
       if (_resourcesToMonitor.isEmpty()) {
         _statusDescription = STATUS_DESCRIPTION_NONE;
       } else {
-        _statusDescription = String
-            .format("waitingFor=%s, numResourcesLeft=%d, numTotalResources=%d, minStartCount=%d, resourceList=%s",
+        _statusDescription =
+            String.format("waitingFor=%s, numResourcesLeft=%d, numTotalResources=%d, minStartCount=%d, resourceList=%s",
                 getMatchName(), _resourcesToMonitor.size(), _numTotalResourcesToMonitor, _minResourcesStartCount,
                 getResourceListAsString());
         LOGGER.info("Instance {} returning GOOD because {}", _instanceName, _statusDescription);
@@ -407,8 +412,8 @@ public class ServiceStatus {
             LOGGER.error(String.format("Resource: %s, partition: %s is in ERROR state", resourceName, partitionName));
           } else {
             HelixProperty.Stat stat = helixState.getStat();
-            String description = String
-                .format("partition=%s, expected=%s, found=%s, creationTime=%d, modifiedTime=%d, version=%d",
+            String description =
+                String.format("partition=%s, expected=%s, found=%s, creationTime=%d, modifiedTime=%d, version=%d",
                     partitionName, idealStateStatus, currentStateStatus, stat != null ? stat.getCreationTime() : -1,
                     stat != null ? stat.getModifiedTime() : -1, stat != null ? stat.getVersion() : -1);
             return new StatusDescriptionPair(Status.STARTING, description);
@@ -445,7 +450,8 @@ public class ServiceStatus {
    * external view and current state. This callback considers the ERROR state in the current view to be equivalent to
    * the ideal state value.
    */
-  public static class IdealStateAndCurrentStateMatchServiceStatusCallback extends IdealStateMatchServiceStatusCallback<CurrentState> {
+  public static class IdealStateAndCurrentStateMatchServiceStatusCallback
+      extends IdealStateMatchServiceStatusCallback<CurrentState> {
     private static final String MATCH_NAME = "CurrentStateMatch";
 
     public IdealStateAndCurrentStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
@@ -486,7 +492,8 @@ public class ServiceStatus {
    * external view and ideal state. This callback considers the ERROR state in the external view to be equivalent to the
    * ideal state value.
    */
-  public static class IdealStateAndExternalViewMatchServiceStatusCallback extends IdealStateMatchServiceStatusCallback<ExternalView> {
+  public static class IdealStateAndExternalViewMatchServiceStatusCallback
+      extends IdealStateMatchServiceStatusCallback<ExternalView> {
     private static final String MATCH_NAME = "ExternalViewMatch";
 
     public IdealStateAndExternalViewMatchServiceStatusCallback(HelixManager helixManager, String clusterName,

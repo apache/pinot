@@ -91,8 +91,7 @@ public class LiteralOnlyBrokerRequestTest {
   }
 
   @Test
-  public void testBrokerRequestHandler()
-      throws Exception {
+  public void testBrokerRequestHandler() throws Exception {
     SingleConnectionBrokerRequestHandler requestHandler =
         new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), null, ACCESS_CONTROL_FACTORY, null, null,
             new BrokerMetrics("", PinotMetricUtils.getPinotMetricsRegistry(), true, Collections.emptySet()), null);
@@ -118,8 +117,7 @@ public class LiteralOnlyBrokerRequestTest {
   }
 
   @Test
-  public void testBrokerRequestHandlerWithAsFunction()
-      throws Exception {
+  public void testBrokerRequestHandlerWithAsFunction() throws Exception {
     SingleConnectionBrokerRequestHandler requestHandler =
         new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), null, ACCESS_CONTROL_FACTORY, null, null,
             new BrokerMetrics("", PinotMetricUtils.getPinotMetricsRegistry(), true, Collections.emptySet()), null);

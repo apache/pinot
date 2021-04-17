@@ -59,8 +59,7 @@ public class MergeRollupSegmentConverter {
     _rollupPreAggregateType = rollupPreAggregateType;
   }
 
-  public List<File> convert()
-      throws Exception {
+  public List<File> convert() throws Exception {
     // Convert the input segments based on merge type
     List<File> convertedSegments;
     switch (_mergeType) {
@@ -83,12 +82,10 @@ public class MergeRollupSegmentConverter {
    * Concatenates input segments using the segment converter.
    * @return a list of concatenated segments
    */
-  private List<File> concatenateSegments()
-      throws Exception {
-    SegmentConverter concatenateSegmentConverter =
-        new SegmentConverter.Builder().setTableName(_tableName).setSegmentName(_segmentName)
-            .setInputIndexDirs(_inputIndexDirs).setWorkingDir(_workingDir).setRecordTransformer((row) -> row)
-            .setTableConfig(_tableConfig).build();
+  private List<File> concatenateSegments() throws Exception {
+    SegmentConverter concatenateSegmentConverter = new SegmentConverter.Builder().setTableName(_tableName)
+        .setSegmentName(_segmentName).setInputIndexDirs(_inputIndexDirs).setWorkingDir(_workingDir)
+        .setRecordTransformer((row) -> row).setTableConfig(_tableConfig).build();
 
     return concatenateSegmentConverter.convertSegment();
   }
@@ -98,8 +95,7 @@ public class MergeRollupSegmentConverter {
    * @param schema input schema
    * @return a list of rolled-up segments
    */
-  private List<File> rollupSegments(Schema schema)
-      throws Exception {
+  private List<File> rollupSegments(Schema schema) throws Exception {
     // Compute group by columns for roll-up preparation (all dimensions + date time columns + time column)
     List<String> groupByColumns = new ArrayList<>();
     for (DimensionFieldSpec dimensionFieldSpec : schema.getDimensionFieldSpecs()) {
@@ -120,11 +116,10 @@ public class MergeRollupSegmentConverter {
     // Initialize roll-up record aggregator
     RecordAggregator rollupRecordAggregator = new RollupRecordAggregator(schema, _rollupPreAggregateType);
 
-    SegmentConverter rollupSegmentConverter =
-        new SegmentConverter.Builder().setTableName(_tableName).setSegmentName(_segmentName)
-            .setInputIndexDirs(_inputIndexDirs).setWorkingDir(_workingDir).setRecordTransformer(rollupRecordTransformer)
-            .setRecordAggregator(rollupRecordAggregator).setGroupByColumns(groupByColumns).setTableConfig(_tableConfig)
-            .build();
+    SegmentConverter rollupSegmentConverter = new SegmentConverter.Builder().setTableName(_tableName)
+        .setSegmentName(_segmentName).setInputIndexDirs(_inputIndexDirs).setWorkingDir(_workingDir)
+        .setRecordTransformer(rollupRecordTransformer).setRecordAggregator(rollupRecordAggregator)
+        .setGroupByColumns(groupByColumns).setTableConfig(_tableConfig).build();
 
     return rollupSegmentConverter.convertSegment();
   }

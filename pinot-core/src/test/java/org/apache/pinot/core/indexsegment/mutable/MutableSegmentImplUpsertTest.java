@@ -52,8 +52,7 @@ public class MutableSegmentImplUpsertTest {
   private static PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
 
   @BeforeClass
-  public void setup()
-      throws Exception {
+  public void setup() throws Exception {
     URL schemaResourceUrl = this.getClass().getClassLoader().getResource(SCHEMA_FILE_PATH);
     URL dataResourceUrl = this.getClass().getClassLoader().getResource(DATA_FILE_PATH);
     _schema = Schema.fromFile(new File(schemaResourceUrl.getFile()));
@@ -64,13 +63,12 @@ public class MutableSegmentImplUpsertTest {
     _partitionUpsertMetadataManager =
         new TableUpsertMetadataManager("testTable_REALTIME", Mockito.mock(ServerMetrics.class))
             .getOrCreatePartitionManager(0);
-    _mutableSegmentImpl = MutableSegmentImplTestUtils
-        .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
-            false, true, new UpsertConfig(UpsertConfig.Mode.FULL), "secondsSinceEpoch",
-            _partitionUpsertMetadataManager);
+    _mutableSegmentImpl = MutableSegmentImplTestUtils.createMutableSegmentImpl(_schema, Collections.emptySet(),
+        Collections.emptySet(), Collections.emptySet(), false, true, new UpsertConfig(UpsertConfig.Mode.FULL),
+        "secondsSinceEpoch", _partitionUpsertMetadataManager);
     GenericRow reuse = new GenericRow();
-    try (RecordReader recordReader = RecordReaderFactory
-        .getRecordReader(FileFormat.JSON, jsonFile, _schema.getColumnNames(), null)) {
+    try (RecordReader recordReader =
+        RecordReaderFactory.getRecordReader(FileFormat.JSON, jsonFile, _schema.getColumnNames(), null)) {
       while (recordReader.hasNext()) {
         recordReader.next(reuse);
         GenericRow transformedRow = _recordTransformer.transform(reuse);

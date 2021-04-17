@@ -52,19 +52,16 @@ public interface RecordReader extends Closeable, Serializable {
   /**
    * Get the next record.
    */
-  GenericRow next()
-      throws IOException;
+  GenericRow next() throws IOException;
 
   /**
    * Get the next record. Re-use the given row if possible to reduce garbage.
    * <p>The passed in row should be returned by previous call to {@link #next()}.
    */
-  GenericRow next(GenericRow reuse)
-      throws IOException;
+  GenericRow next(GenericRow reuse) throws IOException;
 
   /**
    * Rewind the reader to start reading from the first record again.
    */
-  void rewind()
-      throws IOException;
+  void rewind() throws IOException;
 }

@@ -67,16 +67,14 @@ public class PinotSegmentConverterTest {
       .addSingleValueDimension(BYTES_SV_COLUMN, DataType.BYTES).addMultiValueDimension(INT_MV_COLUMN, DataType.INT)
       .addMultiValueDimension(LONG_MV_COLUMN, DataType.LONG).addMultiValueDimension(FLOAT_MV_COLUMN, DataType.FLOAT)
       .addMultiValueDimension(DOUBLE_MV_COLUMN, DataType.DOUBLE)
-      .addMultiValueDimension(STRING_MV_COLUMN, DataType.STRING).
-          build();
+      .addMultiValueDimension(STRING_MV_COLUMN, DataType.STRING).build();
   private static final TableConfig TABLE_CONFIG =
       new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
 
   private String _segmentDir;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
 
     GenericRow record = new GenericRow();
@@ -105,8 +103,7 @@ public class PinotSegmentConverterTest {
   }
 
   @Test
-  public void testAvroConverter()
-      throws Exception {
+  public void testAvroConverter() throws Exception {
     File outputFile = new File(TEMP_DIR, "segment.avro");
     PinotSegmentToAvroConverter avroConverter = new PinotSegmentToAvroConverter(_segmentDir, outputFile.getPath());
     avroConverter.convert();
@@ -132,12 +129,10 @@ public class PinotSegmentConverterTest {
   }
 
   @Test
-  public void testCsvConverter()
-      throws Exception {
+  public void testCsvConverter() throws Exception {
     File outputFile = new File(TEMP_DIR, "segment.csv");
-    PinotSegmentToCsvConverter csvConverter =
-        new PinotSegmentToCsvConverter(_segmentDir, outputFile.getPath(), CSVRecordReaderConfig.DEFAULT_DELIMITER,
-            CSVRecordReaderConfig.DEFAULT_MULTI_VALUE_DELIMITER, true);
+    PinotSegmentToCsvConverter csvConverter = new PinotSegmentToCsvConverter(_segmentDir, outputFile.getPath(),
+        CSVRecordReaderConfig.DEFAULT_DELIMITER, CSVRecordReaderConfig.DEFAULT_MULTI_VALUE_DELIMITER, true);
     csvConverter.convert();
 
     try (CSVRecordReader recordReader = new CSVRecordReader()) {
@@ -161,8 +156,7 @@ public class PinotSegmentConverterTest {
   }
 
   @Test
-  public void testJsonConverter()
-      throws Exception {
+  public void testJsonConverter() throws Exception {
     File outputFile = new File(TEMP_DIR, "segment.json");
     PinotSegmentToJsonConverter jsonConverter = new PinotSegmentToJsonConverter(_segmentDir, outputFile.getPath());
     jsonConverter.convert();
@@ -188,8 +182,7 @@ public class PinotSegmentConverterTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 }

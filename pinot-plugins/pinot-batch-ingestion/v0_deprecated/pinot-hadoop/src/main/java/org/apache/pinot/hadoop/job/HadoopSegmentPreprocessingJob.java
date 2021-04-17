@@ -91,8 +91,7 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
     super(properties);
   }
 
-  public void run()
-      throws Exception {
+  public void run() throws Exception {
     if (!_enablePreprocessing) {
       _logger.info("Pre-processing job is disabled.");
       return;
@@ -207,8 +206,8 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
     SegmentPartitionConfig segmentPartitionConfig = _tableConfig.getIndexingConfig().getSegmentPartitionConfig();
     if (segmentPartitionConfig != null) {
       Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
-      Preconditions
-          .checkArgument(columnPartitionMap.size() <= 1, "There should be at most 1 partition setting in the table.");
+      Preconditions.checkArgument(columnPartitionMap.size() <= 1,
+          "There should be at most 1 partition setting in the table.");
       if (columnPartitionMap.size() == 1) {
         _partitionColumn = columnPartitionMap.keySet().iterator().next();
         _numPartitions = segmentPartitionConfig.getNumPartitions(_partitionColumn);
@@ -240,9 +239,9 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
     Map<String, String> customConfigsMap = tableCustomConfig.getCustomConfigs();
     if (customConfigsMap != null && customConfigsMap.containsKey(InternalConfigConstants.PREPROCESS_NUM_FILES)) {
       _numOutputFiles = Integer.parseInt(customConfigsMap.get(InternalConfigConstants.PREPROCESS_NUM_FILES));
-      Preconditions.checkState(_numOutputFiles > 0, String
-          .format("The value of %s should be positive! Current value: %s", InternalConfigConstants.PREPROCESS_NUM_FILES,
-              _numOutputFiles));
+      Preconditions.checkState(_numOutputFiles > 0,
+          String.format("The value of %s should be positive! Current value: %s",
+              InternalConfigConstants.PREPROCESS_NUM_FILES, _numOutputFiles));
     } else {
       _numOutputFiles = 0;
     }
@@ -254,16 +253,16 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
       return;
     }
     Map<String, String> customConfigsMap = tableCustomConfig.getCustomConfigs();
-    if (customConfigsMap != null && customConfigsMap
-        .containsKey(InternalConfigConstants.PARTITION_MAX_RECORDS_PER_FILE)) {
+    if (customConfigsMap != null
+        && customConfigsMap.containsKey(InternalConfigConstants.PARTITION_MAX_RECORDS_PER_FILE)) {
       int maxNumRecords =
           Integer.parseInt(customConfigsMap.get(InternalConfigConstants.PARTITION_MAX_RECORDS_PER_FILE));
       Preconditions.checkArgument(maxNumRecords > 0,
           "The value of " + InternalConfigConstants.PARTITION_MAX_RECORDS_PER_FILE
               + " should be positive. Current value: " + maxNumRecords);
       _logger.info("Setting {} to {}", InternalConfigConstants.PARTITION_MAX_RECORDS_PER_FILE, maxNumRecords);
-      job.getConfiguration()
-          .set(InternalConfigConstants.PARTITION_MAX_RECORDS_PER_FILE, Integer.toString(maxNumRecords));
+      job.getConfiguration().set(InternalConfigConstants.PARTITION_MAX_RECORDS_PER_FILE,
+          Integer.toString(maxNumRecords));
     }
   }
 
@@ -273,8 +272,7 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
    * @return Input schema
    * @throws IOException exception when accessing to IO
    */
-  private Schema getSchema(Path inputPathDir)
-      throws IOException {
+  private Schema getSchema(Path inputPathDir) throws IOException {
     FileSystem fs = FileSystem.get(new Configuration());
     Schema avroSchema = null;
     for (FileStatus fileStatus : fs.listStatus(inputPathDir)) {
@@ -331,8 +329,7 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
   }
 
   @Override
-  protected org.apache.pinot.spi.data.Schema getSchema()
-      throws IOException {
+  protected org.apache.pinot.spi.data.Schema getSchema() throws IOException {
     try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
       if (controllerRestApi != null) {
         return controllerRestApi.getSchema();
@@ -351,8 +348,7 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
   protected void addAdditionalJobProperties(Job job) {
   }
 
-  private void setTableConfigAndSchema()
-      throws IOException {
+  private void setTableConfigAndSchema() throws IOException {
     _tableConfig = getTableConfig();
     _pinotTableSchema = getSchema();
 
@@ -360,8 +356,7 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
     Preconditions.checkState(_pinotTableSchema != null, "Schema cannot be null");
   }
 
-  private void setValidationConfigs(Job job, Path path)
-      throws IOException {
+  private void setValidationConfigs(Job job, Path path) throws IOException {
     SegmentsValidationAndRetentionConfig validationConfig = _tableConfig.getValidationConfig();
 
     // TODO: Serialize and deserialize validation config by creating toJson and fromJson
@@ -376,19 +371,17 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
         DateTimeFieldSpec dateTimeFieldSpec = _pinotTableSchema.getSpecForTimeColumn(timeColumnName);
         if (dateTimeFieldSpec != null) {
           DateTimeFormatSpec formatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
-          job.getConfiguration()
-              .set(InternalConfigConstants.SEGMENT_TIME_TYPE, formatSpec.getColumnUnit().toString());
-          job.getConfiguration()
-              .set(InternalConfigConstants.SEGMENT_TIME_FORMAT, formatSpec.getTimeFormat().toString());
-          job.getConfiguration()
-              .set(InternalConfigConstants.SEGMENT_TIME_SDF_PATTERN, formatSpec.getSDFPattern());
+          job.getConfiguration().set(InternalConfigConstants.SEGMENT_TIME_TYPE, formatSpec.getColumnUnit().toString());
+          job.getConfiguration().set(InternalConfigConstants.SEGMENT_TIME_FORMAT,
+              formatSpec.getTimeFormat().toString());
+          job.getConfiguration().set(InternalConfigConstants.SEGMENT_TIME_SDF_PATTERN, formatSpec.getSDFPattern());
         }
       }
       job.getConfiguration().set(InternalConfigConstants.SEGMENT_PUSH_FREQUENCY,
           IngestionConfigUtils.getBatchSegmentIngestionFrequency(_tableConfig));
       try (DataFileStream<GenericRecord> dataStreamReader = getAvroReader(path)) {
-        job.getConfiguration()
-            .set(InternalConfigConstants.TIME_COLUMN_VALUE, dataStreamReader.next().get(timeColumnName).toString());
+        job.getConfiguration().set(InternalConfigConstants.TIME_COLUMN_VALUE,
+            dataStreamReader.next().get(timeColumnName).toString());
       }
     }
   }
@@ -419,8 +412,7 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
     job.setOutputValueClass(NullWritable.class);
   }
 
-  private void setSchemaParams(Job job, Schema avroSchema)
-      throws IOException {
+  private void setSchemaParams(Job job, Schema avroSchema) throws IOException {
     AvroMultipleOutputs.addNamedOutput(job, "avro", AvroKeyOutputFormat.class, avroSchema);
     AvroMultipleOutputs.setCountersEnabled(job, true);
     // Use LazyOutputFormat to avoid creating empty files.

@@ -35,8 +35,7 @@ import static org.testng.Assert.assertTrue;
 public class DataTableUtilsTest {
 
   @Test
-  public void testBuildEmptyDataTable()
-      throws IOException {
+  public void testBuildEmptyDataTable() throws IOException {
     // Selection
     QueryContext queryContext =
         QueryContextConverterUtils.getQueryContextFromPQL("SELECT * FROM table WHERE foo = 'bar'");

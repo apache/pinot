@@ -28,15 +28,13 @@ import org.testng.annotations.Test;
 
 public class MinionInstancesCleanupTaskTest extends ControllerTest {
   @BeforeClass
-  public void setup()
-      throws Exception {
+  public void setup() throws Exception {
     startZk();
     startController();
   }
 
   @Test
-  public void testMinionInstancesCleanupTask()
-      throws Exception {
+  public void testMinionInstancesCleanupTask() throws Exception {
     MinionInstancesCleanupTask minionInstancesCleanupTask = _controllerStarter.getMinionInstancesCleanupTask();
     minionInstancesCleanupTask.runTask();
     Assert.assertEquals(

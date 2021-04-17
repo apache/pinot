@@ -48,8 +48,8 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
 
   @Test
   public void testBinaryOperatorTransformFunction() {
-    ExpressionContext expression = RequestContextUtils
-        .getExpression(String.format("%s(%s, %d)", getFuncName(), INT_SV_COLUMN, _intSVValues[0]));
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("%s(%s, %d)", getFuncName(), INT_SV_COLUMN, _intSVValues[0]));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertEquals(transformFunction.getName(), getFuncName().toLowerCase());
     int[] expectedIntValues = new int[NUM_ROWS];
@@ -58,8 +58,8 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
     }
     testTransformFunction(transformFunction, expectedIntValues);
 
-    expression = RequestContextUtils
-        .getExpression(String.format("%s(%s, %d)", getFuncName(), LONG_SV_COLUMN, _longSVValues[0]));
+    expression =
+        RequestContextUtils.getExpression(String.format("%s(%s, %d)", getFuncName(), LONG_SV_COLUMN, _longSVValues[0]));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     int[] expectedLongValues = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -103,8 +103,7 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
 
   @DataProvider(name = "testIllegalArguments")
   public Object[][] testIllegalArguments() {
-    return new Object[][]{new Object[]{String.format("%s(%s)", getFuncName(),
-        INT_SV_COLUMN)}, new Object[]{String.format("%s(%s, %s, %s)", getFuncName(), LONG_SV_COLUMN, INT_SV_COLUMN,
-        STRING_SV_COLUMN)}};
+    return new Object[][]{new Object[]{String.format("%s(%s)", getFuncName(), INT_SV_COLUMN)}, new Object[]{String
+        .format("%s(%s, %s, %s)", getFuncName(), LONG_SV_COLUMN, INT_SV_COLUMN, STRING_SV_COLUMN)}};
   }
 }

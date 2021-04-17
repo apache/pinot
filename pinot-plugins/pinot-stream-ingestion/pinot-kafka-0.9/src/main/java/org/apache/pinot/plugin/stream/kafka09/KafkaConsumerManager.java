@@ -61,8 +61,8 @@ public class KafkaConsumerManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaConsumerManager.class);
   private static final Long IN_USE = -1L;
   private static final long CONSUMER_SHUTDOWN_DELAY_MILLIS = TimeUnit.SECONDS.toMillis(60); // One minute
-  private static final Map<ImmutableTriple<String, String, String>, ConsumerAndIterator>
-      CONSUMER_AND_ITERATOR_FOR_CONFIG_KEY = new HashMap<>();
+  private static final Map<ImmutableTriple<String, String, String>, ConsumerAndIterator> CONSUMER_AND_ITERATOR_FOR_CONFIG_KEY =
+      new HashMap<>();
   private static final IdentityHashMap<ConsumerAndIterator, Long> CONSUMER_RELEASE_TIME = new IdentityHashMap<>();
 
   public static ConsumerAndIterator acquireConsumerAndIteratorForConfig(
@@ -93,8 +93,8 @@ public class KafkaConsumerManager {
 
       // Create the iterator (can only be done once per consumer)
       ConsumerIterator<byte[], byte[]> iterator =
-          consumer.createMessageStreams(kafkaHighLevelStreamConfig.getTopicMap(1)).
-              get(kafkaHighLevelStreamConfig.getKafkaTopicName()).get(0).iterator();
+          consumer.createMessageStreams(kafkaHighLevelStreamConfig.getTopicMap(1))
+              .get(kafkaHighLevelStreamConfig.getKafkaTopicName()).get(0).iterator();
 
       // Mark both the consumer and iterator as acquired
       ConsumerAndIterator consumerAndIterator = new ConsumerAndIterator(consumer, iterator);
@@ -150,8 +150,8 @@ public class KafkaConsumerManager {
                   configIterator.remove();
                   CONSUMER_RELEASE_TIME.remove(consumerAndIterator);
                 } else {
-                  LOGGER
-                      .info("Not releasing consumer/iterator {}, it has been reacquired", consumerAndIterator.getId());
+                  LOGGER.info("Not releasing consumer/iterator {}, it has been reacquired",
+                      consumerAndIterator.getId());
                 }
               }
             }
@@ -176,8 +176,8 @@ public class KafkaConsumerManager {
           try {
             consumerAndIterator.getConsumer().shutdown();
           } catch (Exception e) {
-            LOGGER
-                .warn("Caught exception while shutting down Kafka consumer with id {}", consumerAndIterator.getId(), e);
+            LOGGER.warn("Caught exception while shutting down Kafka consumer with id {}", consumerAndIterator.getId(),
+                e);
           }
           consumerIterator.remove();
         }

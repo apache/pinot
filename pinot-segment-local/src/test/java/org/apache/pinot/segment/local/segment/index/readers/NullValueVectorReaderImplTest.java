@@ -35,8 +35,7 @@ public class NullValueVectorReaderImplTest {
   private static final String COLUMN_NAME = "test";
 
   @BeforeClass
-  public void setup()
-      throws IOException {
+  public void setup() throws IOException {
     if (TEMP_DIR.exists()) {
       FileUtils.deleteQuietly(TEMP_DIR);
     }
@@ -49,8 +48,7 @@ public class NullValueVectorReaderImplTest {
   }
 
   @Test
-  public void testNullValueVectorReader()
-      throws IOException {
+  public void testNullValueVectorReader() throws IOException {
     Assert.assertEquals(TEMP_DIR.list().length, 1);
     File nullValueFile = new File(TEMP_DIR, TEMP_DIR.list()[0]);
     PinotDataBuffer buffer = PinotDataBuffer.loadBigEndianFile(nullValueFile);
@@ -61,8 +59,7 @@ public class NullValueVectorReaderImplTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 }

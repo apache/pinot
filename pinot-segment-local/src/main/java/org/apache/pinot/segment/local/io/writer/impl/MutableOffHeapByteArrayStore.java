@@ -90,7 +90,7 @@ public class MutableOffHeapByteArrayStore implements Closeable {
     private final int _size;
 
     private int _numValues = 0;
-    private int _availEndOffset;  // Exclusive
+    private int _availEndOffset; // Exclusive
 
     private Buffer(int size, int startIndex, PinotDataBufferMemoryManager memoryManager, String allocationContext) {
       LOGGER.info("Allocating byte array store buffer of size {} for: {}", size, allocationContext);
@@ -153,8 +153,7 @@ public class MutableOffHeapByteArrayStore implements Closeable {
     }
 
     @Override
-    public void close()
-        throws IOException {
+    public void close() throws IOException {
       // NOTE: DO NOT close the PinotDataBuffer here because it is tracked in the PinotDataBufferMemoryManager.
     }
   }
@@ -243,8 +242,7 @@ public class MutableOffHeapByteArrayStore implements Closeable {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     for (Buffer buffer : _buffers) {
       buffer.close();
     }

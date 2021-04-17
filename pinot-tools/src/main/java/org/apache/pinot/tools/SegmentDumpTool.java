@@ -42,8 +42,8 @@ import org.kohsuke.args4j.spi.StringArrayOptionHandler;
 
 public class SegmentDumpTool extends AbstractBaseCommand implements Command {
   @Argument
-  @Option(name = "-path", required = true, metaVar = "<string>", usage = "Path of the folder containing the segment"
-      + " file")
+  @Option(name = "-path", required = true, metaVar = "<string>",
+      usage = "Path of the folder containing the segment" + " file")
   private String _segmentDir = null;
 
   @Argument(index = 1, multiValued = true)
@@ -53,15 +53,13 @@ public class SegmentDumpTool extends AbstractBaseCommand implements Command {
   @Option(name = "-dumpStarTree")
   private boolean _dumpStarTree = false;
 
-  public void doMain(String[] args)
-      throws Exception {
+  public void doMain(String[] args) throws Exception {
     CmdLineParser parser = new CmdLineParser(this);
     parser.parseArgument(args);
     dump();
   }
 
-  private void dump()
-      throws Exception {
+  private void dump() throws Exception {
     PinotSegmentRecordReader reader = new PinotSegmentRecordReader(new File(_segmentDir));
     Schema schema = reader.getSchema();
     GenericRow reuse = new GenericRow();
@@ -127,8 +125,7 @@ public class SegmentDumpTool extends AbstractBaseCommand implements Command {
     }
   }
 
-  private void dumpStarTree()
-      throws Exception {
+  private void dumpStarTree() throws Exception {
     File segmentDir = new File(_segmentDir);
     IndexSegment indexSegment = ImmutableSegmentLoader.load(segmentDir, ReadMode.mmap);
 
@@ -148,8 +145,7 @@ public class SegmentDumpTool extends AbstractBaseCommand implements Command {
     indexSegment.destroy();
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     new SegmentDumpTool().doMain(args);
   }
 
@@ -158,8 +154,7 @@ public class SegmentDumpTool extends AbstractBaseCommand implements Command {
   }
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
     dump();
     return true;
   }

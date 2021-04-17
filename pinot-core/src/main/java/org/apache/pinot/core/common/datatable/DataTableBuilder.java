@@ -178,15 +178,14 @@ public class DataTableBuilder {
     _currentRowDataByteBuffer.putInt(dictId);
   }
 
-  public void setColumn(int colId, ByteArray value)
-      throws IOException {
+  public void setColumn(int colId, ByteArray value) throws IOException {
     // NOTE: Use String to store bytes value in DataTable V2 for backward-compatibility
     setColumn(colId, value.toHexString());
 
     /*
     TODO: Store bytes as variable size data instead of String. Make the change for the next version data table for
           backward-compatibility
-
+    
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     byte[] bytes = value.getBytes();
@@ -195,8 +194,7 @@ public class DataTableBuilder {
      */
   }
 
-  public void setColumn(int colId, Object value)
-      throws IOException {
+  public void setColumn(int colId, Object value) throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     int objectTypeValue = ObjectSerDeUtils.ObjectType.getObjectType(value).getValue();
@@ -206,8 +204,7 @@ public class DataTableBuilder {
     _variableSizeDataByteArrayOutputStream.write(bytes);
   }
 
-  public void setColumn(int colId, int[] values)
-      throws IOException {
+  public void setColumn(int colId, int[] values) throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     _currentRowDataByteBuffer.putInt(values.length);
@@ -216,8 +213,7 @@ public class DataTableBuilder {
     }
   }
 
-  public void setColumn(int colId, long[] values)
-      throws IOException {
+  public void setColumn(int colId, long[] values) throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     _currentRowDataByteBuffer.putInt(values.length);
@@ -226,8 +222,7 @@ public class DataTableBuilder {
     }
   }
 
-  public void setColumn(int colId, float[] values)
-      throws IOException {
+  public void setColumn(int colId, float[] values) throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     _currentRowDataByteBuffer.putInt(values.length);
@@ -236,8 +231,7 @@ public class DataTableBuilder {
     }
   }
 
-  public void setColumn(int colId, double[] values)
-      throws IOException {
+  public void setColumn(int colId, double[] values) throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     _currentRowDataByteBuffer.putInt(values.length);
@@ -246,8 +240,7 @@ public class DataTableBuilder {
     }
   }
 
-  public void setColumn(int colId, String[] values)
-      throws IOException {
+  public void setColumn(int colId, String[] values) throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     _currentRowDataByteBuffer.putInt(values.length);
@@ -271,14 +264,14 @@ public class DataTableBuilder {
     }
   }
 
-  public void finishRow()
-      throws IOException {
+  public void finishRow() throws IOException {
     _fixedSizeDataByteArrayOutputStream.write(_currentRowDataByteBuffer.array());
   }
 
   public DataTable build() {
-    return _version == VERSION_2 ? new DataTableImplV2(_numRows, _dataSchema, _reverseDictionaryMap,
-        _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray())
+    return _version == VERSION_2
+        ? new DataTableImplV2(_numRows, _dataSchema, _reverseDictionaryMap,
+            _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray())
         : new DataTableImplV3(_numRows, _dataSchema, _reverseDictionaryMap,
             _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray());
   }

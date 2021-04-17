@@ -72,8 +72,8 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     Context context = new Context();
     // Update realtime document counts only if certain time has passed after previous run
     long currentTimeMs = System.currentTimeMillis();
-    if (TimeUnit.MILLISECONDS.toSeconds(currentTimeMs - _lastUpdateRealtimeDocumentCountTimeMs)
-        >= _segmentLevelValidationIntervalInSeconds) {
+    if (TimeUnit.MILLISECONDS.toSeconds(
+        currentTimeMs - _lastUpdateRealtimeDocumentCountTimeMs) >= _segmentLevelValidationIntervalInSeconds) {
       LOGGER.info("Run segment-level validation");
       context._updateRealtimeDocumentCount = true;
       _lastUpdateRealtimeDocumentCountTimeMs = currentTimeMs;
@@ -108,7 +108,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     String realtimeTableName = tableConfig.getTableName();
     List<RealtimeSegmentZKMetadata> metadataList =
         _pinotHelixResourceManager.getRealtimeSegmentMetadata(realtimeTableName);
-    boolean countHLCSegments = true;  // false if this table has ONLY LLC segments (i.e. fully migrated)
+    boolean countHLCSegments = true; // false if this table has ONLY LLC segments (i.e. fully migrated)
     StreamConfig streamConfig =
         new StreamConfig(realtimeTableName, IngestionConfigUtils.getStreamConfigMap(tableConfig));
     if (streamConfig.hasLowLevelConsumerType() && !streamConfig.hasHighLevelConsumerType()) {

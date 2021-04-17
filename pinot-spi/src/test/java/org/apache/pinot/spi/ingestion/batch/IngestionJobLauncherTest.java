@@ -30,8 +30,7 @@ import org.testng.annotations.Test;
 public class IngestionJobLauncherTest {
 
   @Test
-  public void testIngestionJobLauncherWithTemplate()
-      throws IOException, ClassNotFoundException {
+  public void testIngestionJobLauncherWithTemplate() throws IOException, ClassNotFoundException {
     Map<String, Object> context =
         GroovyTemplateUtils.getTemplateContext(Arrays.asList("year=2020", "month=05", "day=06"));
     SegmentGenerationJobSpec spec = IngestionJobLauncher.getSegmentGenerationJobSpec(
@@ -42,8 +41,7 @@ public class IngestionJobLauncherTest {
   }
 
   @Test
-  public void testIngestionJobLauncherWithTemplateAndPropertyFile()
-      throws IOException, ClassNotFoundException {
+  public void testIngestionJobLauncherWithTemplateAndPropertyFile() throws IOException, ClassNotFoundException {
     SegmentGenerationJobSpec spec = IngestionJobLauncher.getSegmentGenerationJobSpec(
         GroovyTemplateUtils.class.getClassLoader().getResource("ingestion_job_spec_template.yaml").getFile(),
         GroovyTemplateUtils.class.getClassLoader().getResource("job.config").getFile(), null);
@@ -64,8 +62,7 @@ public class IngestionJobLauncherTest {
   }
 
   @Test
-  public void testIngestionJobLauncherWithJsonTemplate()
-      throws IOException, ClassNotFoundException {
+  public void testIngestionJobLauncherWithJsonTemplate() throws IOException, ClassNotFoundException {
     SegmentGenerationJobSpec spec = IngestionJobLauncher.getSegmentGenerationJobSpec(
         GroovyTemplateUtils.class.getClassLoader().getResource("ingestion_job_json_spec_template.json").getFile(),
         GroovyTemplateUtils.class.getClassLoader().getResource("job_json.config").getFile(), null);

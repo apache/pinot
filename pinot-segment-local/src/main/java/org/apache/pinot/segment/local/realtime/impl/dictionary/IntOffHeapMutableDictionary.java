@@ -229,8 +229,7 @@ public class IntOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
   }
 
   @Override
-  public void doClose()
-      throws IOException {
+  public void doClose() throws IOException {
     _dictIdToValue.close();
   }
 

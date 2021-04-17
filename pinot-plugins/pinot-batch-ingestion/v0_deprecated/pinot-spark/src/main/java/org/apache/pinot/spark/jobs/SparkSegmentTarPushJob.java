@@ -41,17 +41,16 @@ public class SparkSegmentTarPushJob extends SegmentTarPushJob {
 
   public SparkSegmentTarPushJob(Properties properties) {
     super(properties);
-    _enableParallelPush =
-        Boolean.parseBoolean(properties.getProperty(JobConfigConstants.ENABLE_PARALLEL_PUSH, JobConfigConstants.DEFAULT_ENABLE_PARALLEL_PUSH));
-    _pushJobParallelism =
-        Integer.parseInt(properties.getProperty(JobConfigConstants.PUSH_JOB_PARALLELISM, JobConfigConstants.DEFAULT_PUSH_JOB_PARALLELISM));
-    _pushJobRetry =
-        Integer.parseInt(properties.getProperty(JobConfigConstants.PUSH_JOB_RETRY, JobConfigConstants.DEFAULT_PUSH_JOB_RETRY));
+    _enableParallelPush = Boolean.parseBoolean(properties.getProperty(JobConfigConstants.ENABLE_PARALLEL_PUSH,
+        JobConfigConstants.DEFAULT_ENABLE_PARALLEL_PUSH));
+    _pushJobParallelism = Integer.parseInt(properties.getProperty(JobConfigConstants.PUSH_JOB_PARALLELISM,
+        JobConfigConstants.DEFAULT_PUSH_JOB_PARALLELISM));
+    _pushJobRetry = Integer
+        .parseInt(properties.getProperty(JobConfigConstants.PUSH_JOB_RETRY, JobConfigConstants.DEFAULT_PUSH_JOB_RETRY));
   }
 
   @Override
-  public void run()
-      throws Exception {
+  public void run() throws Exception {
     if (!_enableParallelPush) {
       super.run();
     } else {

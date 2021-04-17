@@ -49,8 +49,7 @@ public class PinotDataBitSetTest {
   }
 
   @Test
-  public void testReadWriteInt()
-      throws IOException {
+  public void testReadWriteInt() throws IOException {
     int numBitsPerValue = RANDOM.nextInt(10) + 1;
     int maxAllowedValue = 1 << numBitsPerValue;
     int numValues = 100;
@@ -98,8 +97,7 @@ public class PinotDataBitSetTest {
   }
 
   @Test
-  public void testSetUnsetBit()
-      throws IOException {
+  public void testSetUnsetBit() throws IOException {
     int dataBufferSize = RANDOM.nextInt(100) + 1;
     boolean[] bits = new boolean[dataBufferSize * Byte.SIZE];
     try (PinotDataBuffer dataBuffer = getEmptyDataBuffer(dataBufferSize);
@@ -125,8 +123,7 @@ public class PinotDataBitSetTest {
   }
 
   @Test
-  public void testGetNextSetBitOffset()
-      throws IOException {
+  public void testGetNextSetBitOffset() throws IOException {
     int[] setBitOffsets = new int[NUM_ITERATIONS];
     int bitOffset = RANDOM.nextInt(10);
     for (int i = 0; i < NUM_ITERATIONS; i++) {
@@ -142,16 +139,16 @@ public class PinotDataBitSetTest {
 
       // Test next set bit offset
       for (int i = 0; i < NUM_ITERATIONS - 1; i++) {
-        assertEquals(dataBitSet
-                .getNextSetBitOffset(setBitOffsets[i] + RANDOM.nextInt(setBitOffsets[i + 1] - setBitOffsets[i]) + 1),
-            setBitOffsets[i + 1]);
+        assertEquals(dataBitSet.getNextSetBitOffset(
+            setBitOffsets[i] + RANDOM.nextInt(setBitOffsets[i + 1] - setBitOffsets[i]) + 1), setBitOffsets[i + 1]);
       }
 
       // Test next nth set bit offset
       for (int i = 0; i < NUM_ITERATIONS - 100; i++) {
         int n = RANDOM.nextInt(100) + 1;
-        assertEquals(dataBitSet
-                .getNextNthSetBitOffset(setBitOffsets[i] + RANDOM.nextInt(setBitOffsets[i + 1] - setBitOffsets[i]) + 1, n),
+        assertEquals(
+            dataBitSet.getNextNthSetBitOffset(
+                setBitOffsets[i] + RANDOM.nextInt(setBitOffsets[i + 1] - setBitOffsets[i]) + 1, n),
             setBitOffsets[i + n]);
       }
     }

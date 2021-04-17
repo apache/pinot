@@ -84,9 +84,8 @@ public class DoubleGroupByResultHolderTest {
     resultHolder.ensureCapacity(MAX_CAPACITY);
     for (int i = INITIAL_CAPACITY; i < MAX_CAPACITY; i++) {
       double actual = resultHolder.getDoubleResult(i);
-      Assert.assertEquals(actual, DEFAULT_VALUE,
-          "Default Value mis-match: Actual: " + actual + " Expected: " + DEFAULT_VALUE + " Random seed: "
-              + RANDOM_SEED);
+      Assert.assertEquals(actual, DEFAULT_VALUE, "Default Value mis-match: Actual: " + actual + " Expected: "
+          + DEFAULT_VALUE + " Random seed: " + RANDOM_SEED);
 
       resultHolder.setValueForKey(i, _expected[i]);
     }

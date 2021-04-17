@@ -64,8 +64,8 @@ public class LineageEntry {
       return false;
     }
     LineageEntry that = (LineageEntry) o;
-    return _timestamp == that._timestamp && _segmentsFrom.equals(that._segmentsFrom) && _segmentsTo.equals(
-        that._segmentsTo) && _state == that._state;
+    return _timestamp == that._timestamp && _segmentsFrom.equals(that._segmentsFrom)
+        && _segmentsTo.equals(that._segmentsTo) && _state == that._state;
   }
 
   @Override

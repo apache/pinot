@@ -118,7 +118,7 @@ public class TransformExpressionTreeTest {
   }
 
   private static boolean equalsWithStandardExpressionTree(TransformExpressionTree expressionTree) {
-    return expressionTree.hashCode() == STANDARD_EXPRESSION_TREE.hashCode() && expressionTree
-        .equals(STANDARD_EXPRESSION_TREE) && expressionTree.toString().equals(STANDARD_EXPRESSION);
+    return expressionTree.hashCode() == STANDARD_EXPRESSION_TREE.hashCode()
+        && expressionTree.equals(STANDARD_EXPRESSION_TREE) && expressionTree.toString().equals(STANDARD_EXPRESSION);
   }
 }

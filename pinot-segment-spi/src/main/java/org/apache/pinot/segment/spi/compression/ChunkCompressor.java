@@ -36,6 +36,5 @@ public interface ChunkCompressor {
    *
    * @throws IOException
    */
-  int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed)
-      throws IOException;
+  int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed) throws IOException;
 }

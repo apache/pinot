@@ -85,8 +85,8 @@ public class DistinctAggregationFunction implements AggregationFunction<Object, 
 
   @Override
   public String getResultColumnName() {
-    return AggregationFunctionType.DISTINCT.getName().toLowerCase() + "(" + AggregationFunctionUtils
-        .concatArgs(_columns) + ")";
+    return AggregationFunctionType.DISTINCT.getName().toLowerCase() + "("
+        + AggregationFunctionUtils.concatArgs(_columns) + ")";
   }
 
   @Override

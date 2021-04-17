@@ -60,9 +60,9 @@ public class GitHubEventsQuickstart {
     _kafkaStarter.createTopic("pullRequestMergedEvents", KafkaStarterUtils.getTopicCreationProps(2));
   }
 
-  public void execute(String personalAccessToken)
-      throws Exception {
-    final File quickStartDataDir = new File(new File("githubEvents-" + System.currentTimeMillis()), "pullRequestMergedEvents");
+  public void execute(String personalAccessToken) throws Exception {
+    final File quickStartDataDir =
+        new File(new File("githubEvents-" + System.currentTimeMillis()), "pullRequestMergedEvents");
 
     if (!quickStartDataDir.exists()) {
       Preconditions.checkState(quickStartDataDir.mkdirs());

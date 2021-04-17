@@ -70,8 +70,8 @@ public class FlattenNestedPredicatesFilterQueryTreeOptimizer extends FilterQuery
     if (parent == null) {
       return;
     }
-    if (node.getOperator() == parent.getOperator() && (node.getOperator() == FilterOperator.OR
-        || node.getOperator() == FilterOperator.AND)) {
+    if (node.getOperator() == parent.getOperator()
+        && (node.getOperator() == FilterOperator.OR || node.getOperator() == FilterOperator.AND)) {
       // Move all of 'node's children one level up. If 'node' has no children left, remove it from parent's list.
       List<FilterQueryTree> children = node.getChildren();
       Iterator<FilterQueryTree> it = children.iterator();

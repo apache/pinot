@@ -118,9 +118,8 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
       Map<String, TaskState> incompleteTasks =
           TaskGeneratorUtils.getIncompleteTasks(taskType, realtimeTableName, _clusterInfoAccessor);
       if (!incompleteTasks.isEmpty()) {
-        LOGGER
-            .warn("Found incomplete tasks: {} for same table: {}. Skipping task generation.", incompleteTasks.keySet(),
-                realtimeTableName);
+        LOGGER.warn("Found incomplete tasks: {} for same table: {}. Skipping task generation.",
+            incompleteTasks.keySet(), realtimeTableName);
         continue;
       }
 
@@ -131,16 +130,15 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
       getCompletedSegmentsInfo(realtimeTableName, completedSegmentsMetadata, partitionToLatestCompletedSegmentName,
           allPartitions);
       if (completedSegmentsMetadata.isEmpty()) {
-        LOGGER
-            .info("No realtime-completed segments found for table: {}, skipping task generation: {}", realtimeTableName,
-                taskType);
+        LOGGER.info("No realtime-completed segments found for table: {}, skipping task generation: {}",
+            realtimeTableName, taskType);
         continue;
       }
       allPartitions.removeAll(partitionToLatestCompletedSegmentName.keySet());
       if (!allPartitions.isEmpty()) {
-        LOGGER
-            .info("Partitions: {} have no completed segments. Table: {} is not ready for {}. Skipping task generation.",
-                allPartitions, realtimeTableName, taskType);
+        LOGGER.info(
+            "Partitions: {} have no completed segments. Table: {} is not ready for {}. Skipping task generation.",
+            allPartitions, realtimeTableName, taskType);
         continue;
       }
 
@@ -258,18 +256,18 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
 
       if (metadata.getStatus().equals(Segment.Realtime.Status.DONE)) {
         completedSegmentsMetadataList.add(metadata);
-        latestLLCSegmentNameMap
-            .compute(llcSegmentName.getPartitionGroupId(), (partitionGroupId, latestLLCSegmentName) -> {
+        latestLLCSegmentNameMap.compute(llcSegmentName.getPartitionGroupId(),
+            (partitionGroupId, latestLLCSegmentName) -> {
               if (latestLLCSegmentName == null) {
                 return llcSegmentName;
               } else {
-            if (llcSegmentName.getSequenceNumber() > latestLLCSegmentName.getSequenceNumber()) {
-              return llcSegmentName;
-            } else {
-              return latestLLCSegmentName;
-            }
-          }
-        });
+                if (llcSegmentName.getSequenceNumber() > latestLLCSegmentName.getSequenceNumber()) {
+                  return llcSegmentName;
+                } else {
+                  return latestLLCSegmentName;
+                }
+              }
+            });
       }
     }
 

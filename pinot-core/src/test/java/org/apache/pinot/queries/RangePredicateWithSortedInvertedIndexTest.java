@@ -92,8 +92,7 @@ public class RangePredicateWithSortedInvertedIndexTest extends BaseQueriesTest {
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     buildSegment();
@@ -108,8 +107,7 @@ public class RangePredicateWithSortedInvertedIndexTest extends BaseQueriesTest {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  private void buildSegment()
-      throws Exception {
+  private void buildSegment() throws Exception {
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int rowIndex = 0; rowIndex < NUM_ROWS; rowIndex++) {
       GenericRow row = new GenericRow();
@@ -122,13 +120,11 @@ public class RangePredicateWithSortedInvertedIndexTest extends BaseQueriesTest {
       rows.add(row);
     }
 
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNoDictionaryColumns(Arrays.asList(M3))
-            .build();
-    Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING)
-            .addMetric(M1, FieldSpec.DataType.INT).addMetric(M2, FieldSpec.DataType.LONG)
-            .addMetric(M3, FieldSpec.DataType.INT).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNoDictionaryColumns(Arrays.asList(M3)).build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension(D1, FieldSpec.DataType.STRING).addMetric(M1, FieldSpec.DataType.INT)
+        .addMetric(M2, FieldSpec.DataType.LONG).addMetric(M3, FieldSpec.DataType.INT).build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
@@ -161,7 +157,8 @@ public class RangePredicateWithSortedInvertedIndexTest extends BaseQueriesTest {
     // test with sorted column without dictionary
     // FilterOperatorUtils code should correctly create scan operator for INT_COL_RAW
     // else this test will fail
-    query = "SELECT STRING_COL, INT_COL FROM testTable WHERE INT_COL >= 20000 AND INT_COL <= 23666 AND INT_COL_RAW <= 23666 LIMIT 100000";
+    query =
+        "SELECT STRING_COL, INT_COL FROM testTable WHERE INT_COL >= 20000 AND INT_COL <= 23666 AND INT_COL_RAW <= 23666 LIMIT 100000";
     pair = new Pairs.IntPair(20000, 23666);
     runQuery(query, 3667, Lists.newArrayList(pair), 2);
 

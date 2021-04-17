@@ -40,8 +40,7 @@ import org.testng.annotations.Test;
 public class AggregateMetricsClusterIntegrationTest extends BaseClusterIntegrationTestSet {
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
     // Start the Pinot cluster
@@ -57,11 +56,10 @@ public class AggregateMetricsClusterIntegrationTest extends BaseClusterIntegrati
     List<File> avroFiles = unpackAvroData(_tempDir);
 
     // Create and upload the schema and table config with reduced number of columns and aggregate metrics on
-    Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(getSchemaName()).addSingleValueDimension("Carrier", DataType.STRING)
-            .addSingleValueDimension("Origin", DataType.STRING).addMetric("AirTime", DataType.LONG)
-            .addMetric("ArrDelay", DataType.DOUBLE)
-            .addDateTime("DaysSinceEpoch", DataType.INT, "1:DAYS:EPOCH", "1:DAYS").build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(getSchemaName())
+        .addSingleValueDimension("Carrier", DataType.STRING).addSingleValueDimension("Origin", DataType.STRING)
+        .addMetric("AirTime", DataType.LONG).addMetric("ArrDelay", DataType.DOUBLE)
+        .addDateTime("DaysSinceEpoch", DataType.INT, "1:DAYS:EPOCH", "1:DAYS").build();
     addSchema(schema);
     TableConfig tableConfig = createRealtimeTableConfig(avroFiles.get(0));
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
@@ -106,8 +104,7 @@ public class AggregateMetricsClusterIntegrationTest extends BaseClusterIntegrati
   }
 
   @Test
-  public void testQueries()
-      throws Exception {
+  public void testQueries() throws Exception {
     String sql = "SELECT SUM(AirTime), SUM(ArrDelay) FROM mytable";
     testSqlQuery(sql, Collections.singletonList(sql));
     sql = "SELECT SUM(AirTime), DaysSinceEpoch FROM mytable GROUP BY DaysSinceEpoch ORDER BY SUM(AirTime) DESC";
@@ -117,8 +114,7 @@ public class AggregateMetricsClusterIntegrationTest extends BaseClusterIntegrati
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     dropRealtimeTable(getTableName());
     stopServer();
     stopBroker();

@@ -84,8 +84,7 @@ public class QueryComparisonConfig extends PropertiesConfiguration {
   private static final String DEFAULT_TIME_COLUMN_NAME = "daysSinceEpoch";
   private static final String DEFAULT_TIME_UNIT = "DAYS";
 
-  public QueryComparisonConfig(File file)
-      throws ConfigurationException {
+  public QueryComparisonConfig(File file) throws ConfigurationException {
     super(file);
   }
 

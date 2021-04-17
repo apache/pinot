@@ -52,8 +52,7 @@ public class BenchmarkPinotDataBuffer {
   private int _valueLength;
 
   @Benchmark
-  public int batchRead()
-      throws IOException {
+  public int batchRead() throws IOException {
     byte[] value = new byte[_valueLength];
     RANDOM.nextBytes(value);
 
@@ -72,8 +71,7 @@ public class BenchmarkPinotDataBuffer {
   }
 
   @Benchmark
-  public int nonBatchRead()
-      throws IOException {
+  public int nonBatchRead() throws IOException {
     byte[] value = new byte[_valueLength];
     RANDOM.nextBytes(value);
 
@@ -94,8 +92,7 @@ public class BenchmarkPinotDataBuffer {
   }
 
   @Benchmark
-  public int batchWrite()
-      throws IOException {
+  public int batchWrite() throws IOException {
     byte[] value = new byte[_valueLength];
     RANDOM.nextBytes(value);
 
@@ -112,8 +109,7 @@ public class BenchmarkPinotDataBuffer {
   }
 
   @Benchmark
-  public int nonBatchWrite()
-      throws IOException {
+  public int nonBatchWrite() throws IOException {
     byte[] value = new byte[_valueLength];
     RANDOM.nextBytes(value);
 
@@ -131,8 +127,7 @@ public class BenchmarkPinotDataBuffer {
     return sum;
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     ChainedOptionsBuilder opt = new OptionsBuilder().include(BenchmarkPinotDataBuffer.class.getSimpleName());
     new Runner(opt.build()).run();
   }

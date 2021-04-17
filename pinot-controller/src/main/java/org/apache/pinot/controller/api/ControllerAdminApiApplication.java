@@ -51,7 +51,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
 
     packages(RESOURCE_PACKAGE);
     // TODO See ControllerResponseFilter
-//    register(new LoggingFeature());
+    //    register(new LoggingFeature());
     register(JacksonFeature.class);
     register(MultiPartFeature.class);
     registerClasses(io.swagger.jaxrs.listing.ApiListingResource.class);
@@ -85,7 +85,8 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     // So, we setup specific handlers for static resource directory. index.html is served directly
     // by a jersey handler
 
-    _httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/"), "/index.html");
+    _httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/"),
+        "/index.html");
     _httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/js/"), "/js/");
   }
 
@@ -121,8 +122,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
   private class CorsFilter implements ContainerResponseFilter {
     @Override
     public void filter(ContainerRequestContext containerRequestContext,
-        ContainerResponseContext containerResponseContext)
-        throws IOException {
+        ContainerResponseContext containerResponseContext) throws IOException {
       containerResponseContext.getHeaders().add("Access-Control-Allow-Origin", "*");
     }
   }

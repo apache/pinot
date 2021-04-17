@@ -181,8 +181,7 @@ public class AvroRecordExtractorComplexTypesTest extends AbstractRecordExtractor
    * Create an AvroRecordReader
    */
   @Override
-  protected RecordReader createRecordReader(Set<String> fieldsToRead)
-      throws IOException {
+  protected RecordReader createRecordReader(Set<String> fieldsToRead) throws IOException {
     AvroRecordReader avroRecordReader = new AvroRecordReader();
     avroRecordReader.init(_dataFile, fieldsToRead, null);
     return avroRecordReader;
@@ -192,8 +191,7 @@ public class AvroRecordExtractorComplexTypesTest extends AbstractRecordExtractor
    * Create an Avro input file using the input records containing maps and record
    */
   @Override
-  protected void createInputFile()
-      throws IOException {
+  protected void createInputFile() throws IOException {
 
     try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
       fileWriter.create(avroSchema, _dataFile);

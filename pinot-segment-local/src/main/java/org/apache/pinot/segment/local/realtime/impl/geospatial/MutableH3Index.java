@@ -43,8 +43,7 @@ public class MutableH3Index implements H3IndexReader {
 
   private int _nextDocId;
 
-  public MutableH3Index(H3IndexResolution resolution)
-      throws IOException {
+  public MutableH3Index(H3IndexResolution resolution) throws IOException {
     _resolution = resolution;
     _lowestResolution = resolution.getLowestResolution();
   }

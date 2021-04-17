@@ -84,9 +84,8 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       HttpRequesterIdentity identity = (HttpRequesterIdentity) requesterIdentity;
 
       Collection<String> tokens = identity.getHttpHeaders().get(HEADER_AUTHORIZATION);
-      Optional<BasicAuthPrincipal> principalOpt =
-          tokens.stream().map(BasicAuthUtils::normalizeBase64Token).map(_token2principal::get).filter(Objects::nonNull)
-              .findFirst();
+      Optional<BasicAuthPrincipal> principalOpt = tokens.stream().map(BasicAuthUtils::normalizeBase64Token)
+          .map(_token2principal::get).filter(Objects::nonNull).findFirst();
 
       if (!principalOpt.isPresent()) {
         // no matching token? reject
@@ -94,8 +93,8 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       }
 
       BasicAuthPrincipal principal = principalOpt.get();
-      if (brokerRequest == null || !brokerRequest.isSetQuerySource() || !brokerRequest.getQuerySource()
-          .isSetTableName()) {
+      if (brokerRequest == null || !brokerRequest.isSetQuerySource()
+          || !brokerRequest.getQuerySource().isSetTableName()) {
         // no table restrictions? accept
         return true;
       }

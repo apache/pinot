@@ -70,16 +70,16 @@ public class PinotInstanceAssignmentRestletResource {
   @Path("/tables/{tableName}/instancePartitions")
   @ApiOperation(value = "Get the instance partitions")
   public Map<InstancePartitionsType, InstancePartitions> getInstancePartitions(
-      @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|CONSUMING|COMPLETED") @QueryParam("type") @Nullable InstancePartitionsType instancePartitionsType) {
+      @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName, @ApiParam(
+          value = "OFFLINE|CONSUMING|COMPLETED") @QueryParam("type") @Nullable InstancePartitionsType instancePartitionsType) {
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
 
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType != TableType.REALTIME) {
       if (instancePartitionsType == InstancePartitionsType.OFFLINE || instancePartitionsType == null) {
-        InstancePartitions offlineInstancePartitions = InstancePartitionsUtils
-            .fetchInstancePartitions(_resourceManager.getPropertyStore(),
+        InstancePartitions offlineInstancePartitions =
+            InstancePartitionsUtils.fetchInstancePartitions(_resourceManager.getPropertyStore(),
                 InstancePartitionsType.OFFLINE.getInstancePartitionsName(rawTableName));
         if (offlineInstancePartitions != null) {
           instancePartitionsMap.put(InstancePartitionsType.OFFLINE, offlineInstancePartitions);
@@ -88,16 +88,16 @@ public class PinotInstanceAssignmentRestletResource {
     }
     if (tableType != TableType.OFFLINE) {
       if (instancePartitionsType == InstancePartitionsType.CONSUMING || instancePartitionsType == null) {
-        InstancePartitions consumingInstancePartitions = InstancePartitionsUtils
-            .fetchInstancePartitions(_resourceManager.getPropertyStore(),
+        InstancePartitions consumingInstancePartitions =
+            InstancePartitionsUtils.fetchInstancePartitions(_resourceManager.getPropertyStore(),
                 InstancePartitionsType.CONSUMING.getInstancePartitionsName(rawTableName));
         if (consumingInstancePartitions != null) {
           instancePartitionsMap.put(InstancePartitionsType.CONSUMING, consumingInstancePartitions);
         }
       }
       if (instancePartitionsType == InstancePartitionsType.COMPLETED || instancePartitionsType == null) {
-        InstancePartitions completedInstancePartitions = InstancePartitionsUtils
-            .fetchInstancePartitions(_resourceManager.getPropertyStore(),
+        InstancePartitions completedInstancePartitions =
+            InstancePartitionsUtils.fetchInstancePartitions(_resourceManager.getPropertyStore(),
                 InstancePartitionsType.COMPLETED.getInstancePartitionsName(rawTableName));
         if (completedInstancePartitions != null) {
           instancePartitionsMap.put(InstancePartitionsType.COMPLETED, completedInstancePartitions);
@@ -120,19 +120,20 @@ public class PinotInstanceAssignmentRestletResource {
   @ApiOperation(value = "Assign server instances to a table")
   public Map<InstancePartitionsType, InstancePartitions> assignInstances(
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|CONSUMING|COMPLETED") @QueryParam("type") @Nullable InstancePartitionsType instancePartitionsType,
+      @ApiParam(
+          value = "OFFLINE|CONSUMING|COMPLETED") @QueryParam("type") @Nullable InstancePartitionsType instancePartitionsType,
       @ApiParam(value = "Whether to do dry-run") @DefaultValue("false") @QueryParam("dryRun") boolean dryRun) {
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
     List<InstanceConfig> instanceConfigs = _resourceManager.getAllHelixInstanceConfigs();
 
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-    if (tableType != TableType.REALTIME && (instancePartitionsType == InstancePartitionsType.OFFLINE
-        || instancePartitionsType == null)) {
+    if (tableType != TableType.REALTIME
+        && (instancePartitionsType == InstancePartitionsType.OFFLINE || instancePartitionsType == null)) {
       TableConfig offlineTableConfig = _resourceManager.getOfflineTableConfig(tableName);
       if (offlineTableConfig != null) {
         try {
-          if (InstanceAssignmentConfigUtils
-              .allowInstanceAssignment(offlineTableConfig, InstancePartitionsType.OFFLINE)) {
+          if (InstanceAssignmentConfigUtils.allowInstanceAssignment(offlineTableConfig,
+              InstancePartitionsType.OFFLINE)) {
             instancePartitionsMap.put(InstancePartitionsType.OFFLINE, new InstanceAssignmentDriver(offlineTableConfig)
                 .assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs));
           }
@@ -151,15 +152,15 @@ public class PinotInstanceAssignmentRestletResource {
         try {
           InstanceAssignmentDriver instanceAssignmentDriver = new InstanceAssignmentDriver(realtimeTableConfig);
           if (instancePartitionsType == InstancePartitionsType.CONSUMING || instancePartitionsType == null) {
-            if (InstanceAssignmentConfigUtils
-                .allowInstanceAssignment(realtimeTableConfig, InstancePartitionsType.CONSUMING)) {
+            if (InstanceAssignmentConfigUtils.allowInstanceAssignment(realtimeTableConfig,
+                InstancePartitionsType.CONSUMING)) {
               instancePartitionsMap.put(InstancePartitionsType.CONSUMING,
                   instanceAssignmentDriver.assignInstances(InstancePartitionsType.CONSUMING, instanceConfigs));
             }
           }
           if (instancePartitionsType == InstancePartitionsType.COMPLETED || instancePartitionsType == null) {
-            if (InstanceAssignmentConfigUtils
-                .allowInstanceAssignment(realtimeTableConfig, InstancePartitionsType.COMPLETED)) {
+            if (InstanceAssignmentConfigUtils.allowInstanceAssignment(realtimeTableConfig,
+                InstancePartitionsType.COMPLETED)) {
               instancePartitionsMap.put(InstancePartitionsType.COMPLETED,
                   instanceAssignmentDriver.assignInstances(InstancePartitionsType.COMPLETED, instanceConfigs));
             }
@@ -243,12 +244,12 @@ public class PinotInstanceAssignmentRestletResource {
   @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Remove the instance partitions")
   public SuccessResponse removeInstancePartitions(
-      @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|CONSUMING|COMPLETED") @QueryParam("type") @Nullable InstancePartitionsType instancePartitionsType) {
+      @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName, @ApiParam(
+          value = "OFFLINE|CONSUMING|COMPLETED") @QueryParam("type") @Nullable InstancePartitionsType instancePartitionsType) {
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-    if (tableType != TableType.REALTIME && (instancePartitionsType == InstancePartitionsType.OFFLINE
-        || instancePartitionsType == null)) {
+    if (tableType != TableType.REALTIME
+        && (instancePartitionsType == InstancePartitionsType.OFFLINE || instancePartitionsType == null)) {
       removeInstancePartitionsHelper(InstancePartitionsType.OFFLINE.getInstancePartitionsName(rawTableName));
     }
     if (tableType != TableType.OFFLINE) {
@@ -279,9 +280,12 @@ public class PinotInstanceAssignmentRestletResource {
   @ApiOperation(value = "Replace an instance in the instance partitions")
   public Map<InstancePartitionsType, InstancePartitions> replaceInstance(
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|CONSUMING|COMPLETED") @QueryParam("type") @Nullable InstancePartitionsType instancePartitionsType,
-      @ApiParam(value = "Old instance to be replaced", required = true) @QueryParam("oldInstanceId") String oldInstanceId,
-      @ApiParam(value = "New instance to replace with", required = true) @QueryParam("newInstanceId") String newInstanceId) {
+      @ApiParam(
+          value = "OFFLINE|CONSUMING|COMPLETED") @QueryParam("type") @Nullable InstancePartitionsType instancePartitionsType,
+      @ApiParam(value = "Old instance to be replaced",
+          required = true) @QueryParam("oldInstanceId") String oldInstanceId,
+      @ApiParam(value = "New instance to replace with",
+          required = true) @QueryParam("newInstanceId") String newInstanceId) {
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
         getInstancePartitions(tableName, instancePartitionsType);
     Iterator<InstancePartitions> iterator = instancePartitionsMap.values().iterator();

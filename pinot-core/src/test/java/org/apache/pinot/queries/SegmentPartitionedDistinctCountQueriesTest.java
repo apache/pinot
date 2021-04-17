@@ -113,8 +113,7 @@ public class SegmentPartitionedDistinctCountQueriesTest extends BaseQueriesTest 
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
 
     List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
@@ -160,16 +159,15 @@ public class SegmentPartitionedDistinctCountQueriesTest extends BaseQueriesTest 
     Operator operator = getOperatorForPqlQuery(query);
     assertTrue(operator instanceof DictionaryBasedAggregationOperator);
     IntermediateResultsBlock resultsBlock = ((DictionaryBasedAggregationOperator) operator).nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, 0, NUM_RECORDS);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, 0,
+        NUM_RECORDS);
     List<Object> aggregationResult = resultsBlock.getAggregationResult();
 
     operator = getOperatorForPqlQueryWithFilter(query);
     assertTrue(operator instanceof AggregationOperator);
     IntermediateResultsBlock resultsBlockWithFilter = ((AggregationOperator) operator).nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, 6 * NUM_RECORDS,
-            NUM_RECORDS);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0,
+        6 * NUM_RECORDS, NUM_RECORDS);
     List<Object> aggregationResultWithFilter = resultsBlockWithFilter.getAggregationResult();
 
     assertNotNull(aggregationResult);
@@ -185,12 +183,11 @@ public class SegmentPartitionedDistinctCountQueriesTest extends BaseQueriesTest 
       expectedResults[i] = Long.toString(4 * _expectedResult);
     }
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 0, 4 * NUM_RECORDS, expectedResults);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 0, 4 * NUM_RECORDS,
+        expectedResults);
     brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 4 * 6 * NUM_RECORDS, 4 * NUM_RECORDS,
-            expectedResults);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 4 * 6 * NUM_RECORDS,
+        4 * NUM_RECORDS, expectedResults);
   }
 
   @Test
@@ -202,9 +199,8 @@ public class SegmentPartitionedDistinctCountQueriesTest extends BaseQueriesTest 
     Operator operator = getOperatorForPqlQuery(query);
     assertTrue(operator instanceof AggregationGroupByOperator);
     IntermediateResultsBlock resultsBlock = ((AggregationGroupByOperator) operator).nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, 6 * NUM_RECORDS,
-            NUM_RECORDS);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0,
+        6 * NUM_RECORDS, NUM_RECORDS);
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     assertNotNull(aggregationGroupByResult);
     int numGroups = 0;
@@ -246,8 +242,7 @@ public class SegmentPartitionedDistinctCountQueriesTest extends BaseQueriesTest 
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     _indexSegment.destroy();
     FileUtils.deleteDirectory(INDEX_DIR);
   }

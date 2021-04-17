@@ -33,7 +33,8 @@ public final class DateTimeFieldSpec extends FieldSpec {
   private String _granularity;
 
   public enum TimeFormat {
-    EPOCH, SIMPLE_DATE_FORMAT
+    EPOCH,
+    SIMPLE_DATE_FORMAT
   }
 
   // Default constructor required by JSON de-serializer. DO NOT REMOVE.

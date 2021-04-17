@@ -51,8 +51,7 @@ public class MmapMemoryManagerTest {
   }
 
   @Test
-  public void testLargeBlocks()
-      throws Exception {
+  public void testLargeBlocks() throws Exception {
     final String segmentName = "someSegment";
     PinotDataBufferMemoryManager memoryManager = new MmapMemoryManager(_tmpDir, segmentName);
     final long s1 = 2 * MmapMemoryManager.getDefaultFileLength();
@@ -102,8 +101,7 @@ public class MmapMemoryManagerTest {
   }
 
   @Test
-  public void testSmallBlocksForSameColumn()
-      throws Exception {
+  public void testSmallBlocksForSameColumn() throws Exception {
     final String segmentName = "someSegment";
     PinotDataBufferMemoryManager memoryManager = new MmapMemoryManager(_tmpDir, segmentName);
     final long s1 = 500;
@@ -137,8 +135,7 @@ public class MmapMemoryManagerTest {
   }
 
   @Test
-  public void testCornerConditions()
-      throws Exception {
+  public void testCornerConditions() throws Exception {
     final String segmentName = "someSegment";
     PinotDataBufferMemoryManager memoryManager = new MmapMemoryManager(_tmpDir, segmentName);
     final long s1 = MmapMemoryManager.getDefaultFileLength() - 1;

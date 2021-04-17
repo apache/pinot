@@ -70,30 +70,26 @@ public class Pql2CompilerTest {
         COMPILER.compileToBrokerRequest("select * from vegetables where origin = 'Martha''s Vineyard'");
     Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "Martha's Vineyard");
     // Test PinotQuery
-    Assert.assertEquals(
-        brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall().getOperands().get(1).getLiteral()
-            .getStringValue(), "Martha's Vineyard");
+    Assert.assertEquals(brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall().getOperands().get(1)
+        .getLiteral().getStringValue(), "Martha's Vineyard");
 
     brokerRequest = COMPILER.compileToBrokerRequest("select * from vegetables where origin = 'Martha\"\"s Vineyard'");
     Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "Martha\"\"s Vineyard");
     // Test PinotQuery
-    Assert.assertEquals(
-        brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall().getOperands().get(1).getLiteral()
-            .getStringValue(), "Martha\"\"s Vineyard");
+    Assert.assertEquals(brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall().getOperands().get(1)
+        .getLiteral().getStringValue(), "Martha\"\"s Vineyard");
 
     brokerRequest = COMPILER.compileToBrokerRequest("select * from vegetables where origin = \"Martha\"\"s Vineyard\"");
     Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "Martha\"s Vineyard");
     // Test PinotQuery
-    Assert.assertEquals(
-        brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall().getOperands().get(1).getLiteral()
-            .getStringValue(), "Martha\"s Vineyard");
+    Assert.assertEquals(brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall().getOperands().get(1)
+        .getLiteral().getStringValue(), "Martha\"s Vineyard");
 
     brokerRequest = COMPILER.compileToBrokerRequest("select * from vegetables where origin = \"Martha''s Vineyard\"");
     Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "Martha''s Vineyard");
     // Test PinotQuery
-    Assert.assertEquals(
-        brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall().getOperands().get(1).getLiteral()
-            .getStringValue(), "Martha''s Vineyard");
+    Assert.assertEquals(brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall().getOperands().get(1)
+        .getLiteral().getStringValue(), "Martha''s Vineyard");
   }
 
   @Test
@@ -220,9 +216,8 @@ public class Pql2CompilerTest {
     Assert.assertEquals(brokerRequest.getGroupBy().getExpressions().get(0), "group_city");
     Assert.assertEquals(brokerRequest.getPinotQuery().getGroupByList().get(0).getIdentifier().getName(), "group_city");
     Assert.assertEquals(brokerRequest.getOrderBy().get(0).getColumn(), "sum(rsvp_count)");
-    Assert.assertEquals(
-        brokerRequest.getPinotQuery().getOrderByList().get(0).getFunctionCall().getOperands().get(0).getIdentifier()
-            .getName(), "sum(rsvp_count)");
+    Assert.assertEquals(brokerRequest.getPinotQuery().getOrderByList().get(0).getFunctionCall().getOperands().get(0)
+        .getIdentifier().getName(), "sum(rsvp_count)");
   }
 
   @Test
@@ -246,8 +241,8 @@ public class Pql2CompilerTest {
     } catch (Pql2CompilationException e) {
       // Expected
       Assert.assertTrue(e.getMessage().startsWith("1:30: "),
-          "Compilation exception should contain line and character for error message. Error message is " + e
-              .getMessage());
+          "Compilation exception should contain line and character for error message. Error message is "
+              + e.getMessage());
       return;
     }
 
@@ -324,9 +319,8 @@ public class Pql2CompilerTest {
         Collections.singletonList("attributes.address_city"));
 
     // Test PinotQuery
-    Assert.assertEquals(
-        brokerRequest.getPinotQuery().getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier()
-            .getName(), "attributes.age");
+    Assert.assertEquals(brokerRequest.getPinotQuery().getSelectList().get(0).getFunctionCall().getOperands().get(0)
+        .getIdentifier().getName(), "attributes.age");
     Assert.assertEquals(brokerRequest.getPinotQuery().getGroupByList().get(0).getIdentifier().getName(),
         "attributes.address_city");
   }
@@ -376,17 +370,14 @@ public class Pql2CompilerTest {
     Assert.assertEquals(selectFunctionList.get(0).getFunctionCall().getOperator(), "SUM");
     Assert.assertEquals(selectFunctionList.get(0).getFunctionCall().getOperands().size(), 1);
 
-    Assert
-        .assertEquals(selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
-            "ADD");
+    Assert.assertEquals(
+        selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "ADD");
     Assert.assertEquals(
         selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().size(), 2);
-    Assert.assertEquals(
-        selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
-            .getIdentifier().getName(), "foo");
-    Assert.assertEquals(
-        selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(1)
-            .getLiteral().getStringValue(), "bar");
+    Assert.assertEquals(selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands()
+        .get(0).getIdentifier().getName(), "foo");
+    Assert.assertEquals(selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands()
+        .get(1).getLiteral().getStringValue(), "bar");
     groupbyList = brokerRequest.getPinotQuery().getGroupByList();
     Assert.assertEquals(groupbyList.size(), 1);
     Assert.assertEquals(groupbyList.get(0).getFunctionCall().getOperator(), "SUB");
@@ -396,8 +387,7 @@ public class Pql2CompilerTest {
   }
 
   @Test
-  public void testConverter()
-      throws IOException {
+  public void testConverter() throws IOException {
     COMPILER.compileToBrokerRequest("Select * from T where a IN (1,2,2,3,4)");
 
     COMPILER.compileToBrokerRequest("SELECT MIN(div(DaysSinceEpoch,2)) FROM mytable");

@@ -77,8 +77,7 @@ public class RealtimeSegmentConverter {
     _fstIndexColumns = fstIndexColumns;
   }
 
-  public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics)
-      throws Exception {
+  public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics) throws Exception {
     // lets create a record reader
     RealtimeSegmentRecordReader reader = new RealtimeSegmentRecordReader(_realtimeSegmentImpl, _sortedColumn);
     SegmentGeneratorConfig genConfig = new SegmentGeneratorConfig(_tableConfig, _dataSchema);

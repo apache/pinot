@@ -43,21 +43,18 @@ public class FilePerIndexDirectoryTest {
   static final long ONE_GB = ONE_MB * ONE_KB;
 
   @BeforeMethod
-  public void setUp()
-      throws IOException {
+  public void setUp() throws IOException {
     TestUtils.ensureDirectoriesExistAndEmpty(TEMP_DIR);
     segmentMetadata = ColumnIndexDirectoryTestHelper.writeMetadata(SegmentVersion.v1);
   }
 
   @AfterMethod
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 
   @Test
-  public void testEmptyDirectory()
-      throws Exception {
+  public void testEmptyDirectory() throws Exception {
     Assert.assertEquals(0, TEMP_DIR.list().length, TEMP_DIR.list().toString());
     try (FilePerIndexDirectory fpiDir = new FilePerIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.heap);
         PinotDataBuffer buffer = fpiDir.newBuffer("col1", ColumnIndexType.DICTIONARY, 1024)) {
@@ -80,20 +77,17 @@ public class FilePerIndexDirectoryTest {
   }
 
   @Test
-  public void testMmapLargeBuffer()
-      throws Exception {
+  public void testMmapLargeBuffer() throws Exception {
     testMultipleRW(ReadMode.mmap, 6, 3L * ONE_MB);
   }
 
   @Test
-  public void testLargeRWDirectBuffer()
-      throws Exception {
+  public void testLargeRWDirectBuffer() throws Exception {
     testMultipleRW(ReadMode.heap, 6, 3L * ONE_MB);
   }
 
   @Test
-  public void testReadModeChange()
-      throws Exception {
+  public void testReadModeChange() throws Exception {
     // first verify it all works for one mode
     testMultipleRW(ReadMode.heap, 6, 100 * ONE_MB);
     try (ColumnIndexDirectory columnDirectory = new FilePerIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
@@ -101,8 +95,7 @@ public class FilePerIndexDirectoryTest {
     }
   }
 
-  private void testMultipleRW(ReadMode readMode, int numIter, long size)
-      throws Exception {
+  private void testMultipleRW(ReadMode readMode, int numIter, long size) throws Exception {
     try (FilePerIndexDirectory columnDirectory = new FilePerIndexDirectory(TEMP_DIR, segmentMetadata, readMode)) {
       ColumnIndexDirectoryTestHelper.performMultipleWrites(columnDirectory, "foo", size, numIter);
     }
@@ -113,8 +106,7 @@ public class FilePerIndexDirectoryTest {
   }
 
   @Test(expectedExceptions = RuntimeException.class)
-  public void testWriteExisting()
-      throws Exception {
+  public void testWriteExisting() throws Exception {
     try (FilePerIndexDirectory columnDirectory = new FilePerIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
       columnDirectory.newBuffer("column1", ColumnIndexType.DICTIONARY, 1024);
     }
@@ -124,16 +116,14 @@ public class FilePerIndexDirectoryTest {
   }
 
   @Test(expectedExceptions = RuntimeException.class)
-  public void testMissingIndex()
-      throws IOException {
+  public void testMissingIndex() throws IOException {
     try (FilePerIndexDirectory fpiDirectory = new FilePerIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
       fpiDirectory.getBuffer("noSuchColumn", ColumnIndexType.DICTIONARY);
     }
   }
 
   @Test
-  public void testHasIndex()
-      throws IOException {
+  public void testHasIndex() throws IOException {
     try (FilePerIndexDirectory fpiDirectory = new FilePerIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
       PinotDataBuffer buffer = fpiDirectory.newBuffer("foo", ColumnIndexType.DICTIONARY, 1024);
       buffer.putInt(0, 100);
@@ -142,8 +132,7 @@ public class FilePerIndexDirectoryTest {
   }
 
   @Test
-  public void testRemoveIndex()
-      throws IOException {
+  public void testRemoveIndex() throws IOException {
     try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
       fpi.newBuffer("col1", ColumnIndexType.FORWARD_INDEX, 1024);
       fpi.newBuffer("col2", ColumnIndexType.DICTIONARY, 100);

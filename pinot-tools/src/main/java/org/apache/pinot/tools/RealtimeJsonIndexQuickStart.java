@@ -39,14 +39,12 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
 public class RealtimeJsonIndexQuickStart {
   private StreamDataServerStartable _kafkaStarter;
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     PluginManager.get().init();
     new RealtimeJsonIndexQuickStart().execute();
   }
 
-  public void execute()
-      throws Exception {
+  public void execute() throws Exception {
     File quickstartTmpDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
     File baseDir = new File(quickstartTmpDir, "meetupRsvp");
     File dataDir = new File(baseDir, "data");
@@ -100,7 +98,8 @@ public class RealtimeJsonIndexQuickStart {
 
     printStatus(Color.YELLOW, "***** Realtime json-index quickstart setup complete *****");
 
-    String q1 = "select json_extract_scalar(event, '$.event_name', 'STRING') from meetupRsvp where json_match(\"group\", 'group_topics.topic_name=''Fitness''') limit 10";
+    String q1 =
+        "select json_extract_scalar(event, '$.event_name', 'STRING') from meetupRsvp where json_match(\"group\", 'group_topics.topic_name=''Fitness''') limit 10";
     printStatus(Color.YELLOW, "Events related to fitness");
     printStatus(Color.CYAN, "Query : " + q1);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));

@@ -62,10 +62,12 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
   @Option(name = "-dataFilePath", required = true, metaVar = "<string>", usage = "data file path.")
   private String _dataFilePath;
 
-  @Option(name = "-format", required = true, metaVar = "<AVRO/CSV/JSON/THRIFT/PARQUET/ORC>", usage = "Input data format.")
+  @Option(name = "-format", required = true, metaVar = "<AVRO/CSV/JSON/THRIFT/PARQUET/ORC>",
+      usage = "Input data format.")
   private FileFormat _format;
 
-  @Option(name = "-segmentNameGeneratorType", metaVar = "<FIXED/SIMPLE/NORMALIZED_DATE>", usage = "Segment name generator type, default to FIXED type.")
+  @Option(name = "-segmentNameGeneratorType", metaVar = "<FIXED/SIMPLE/NORMALIZED_DATE>",
+      usage = "Segment name generator type, default to FIXED type.")
   private String _segmentNameGeneratorType = BatchConfigProperties.SegmentNameGeneratorType.FIXED;
 
   @Option(name = "-table", required = true, metaVar = "<string>", usage = "Table name.")
@@ -83,10 +85,12 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
   @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
   private String _authToken;
 
-  @Option(name = "-tempDir", metaVar = "<string>", usage = "Temporary directory used to hold data during segment creation.")
+  @Option(name = "-tempDir", metaVar = "<string>",
+      usage = "Temporary directory used to hold data during segment creation.")
   private String _tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName()).getAbsolutePath();
 
-  @Option(name = "-additionalConfigs", metaVar = "<additional configs>", handler = StringArrayOptionHandler.class, usage = "Additional configs to be set.")
+  @Option(name = "-additionalConfigs", metaVar = "<additional configs>", handler = StringArrayOptionHandler.class,
+      usage = "Additional configs to be set.")
   private List<String> _additionalConfigs;
 
   @SuppressWarnings("FieldCanBeLocal")
@@ -176,9 +180,9 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
 
   @Override
   public String toString() {
-    String results = String
-        .format("InsertData -dataFilePath %s -format %s -table %s -controllerURI %s -user %s -password %s -tempDir %s",
-            _dataFilePath, _format, _table, _controllerURI, _user, "[hidden]", _tempDir);
+    String results = String.format(
+        "InsertData -dataFilePath %s -format %s -table %s -controllerURI %s -user %s -password %s -tempDir %s",
+        _dataFilePath, _format, _table, _controllerURI, _user, "[hidden]", _tempDir);
     if (_additionalConfigs != null) {
       results += " -additionalConfigs " + Arrays.toString(_additionalConfigs.toArray());
     }
@@ -201,8 +205,7 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
   }
 
   @Override
-  public boolean execute()
-      throws IOException {
+  public boolean execute() throws IOException {
     LOGGER.info("Executing command: {}", toString());
     Preconditions.checkArgument(_table != null, "'table' must be specified");
     Preconditions.checkArgument(_format != null, "'format' must be specified");
@@ -228,8 +231,7 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
     }
   }
 
-  private void initTempDir()
-      throws IOException {
+  private void initTempDir() throws IOException {
     File tempDir = new File(_tempDir);
     if (tempDir.exists()) {
       LOGGER.info("Deleting the existing 'tempDir': {}", tempDir);
@@ -310,10 +312,10 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
 
   private Map<String, String> getSegmentNameGeneratorConfig(String type, Map<String, String> additionalConfigs) {
     Map<String, String> segmentNameGeneratorConfig = new HashMap<>(additionalConfigs);
-    if ((BatchConfigProperties.SegmentNameGeneratorType.FIXED.equalsIgnoreCase(type)) && (!segmentNameGeneratorConfig
-        .containsKey(SEGMENT_NAME))) {
-      segmentNameGeneratorConfig
-          .put(SEGMENT_NAME, String.format("%s_%s", _table, DigestUtils.sha256Hex(_dataFilePath)));
+    if ((BatchConfigProperties.SegmentNameGeneratorType.FIXED.equalsIgnoreCase(type))
+        && (!segmentNameGeneratorConfig.containsKey(SEGMENT_NAME))) {
+      segmentNameGeneratorConfig.put(SEGMENT_NAME,
+          String.format("%s_%s", _table, DigestUtils.sha256Hex(_dataFilePath)));
     }
     return segmentNameGeneratorConfig;
   }

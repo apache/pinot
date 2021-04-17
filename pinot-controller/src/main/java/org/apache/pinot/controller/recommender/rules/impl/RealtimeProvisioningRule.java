@@ -62,8 +62,7 @@ public class RealtimeProvisioningRule extends AbstractRule {
   }
 
   @Override
-  public void run()
-      throws InvalidInputException {
+  public void run() throws InvalidInputException {
 
     if (_params == null) {
       // no realtime provisioning params provided; skip
@@ -79,18 +78,12 @@ public class RealtimeProvisioningRule extends AbstractRule {
     int[] numHours = _params.getNumHours();
 
     // run memory estimator
-    MemoryEstimator memoryEstimator =
-        new MemoryEstimator(tableConfig,
-            _input.getSchema(),
-            _input.getSchemaWithMetadata(),
-            (int) _input.getNumRecordsPerPush(), // TODO we may not want to use numRecordsPerPush as the numRows for the completed segment we are going to generate. A more fine-grained number is needed which we need to figure out how to capture.
-            ingestionRatePerPartition,
-            maxUsableHostMemoryByte,
-            _params.getRealtimeTableRetentionHours());
+    MemoryEstimator memoryEstimator = new MemoryEstimator(tableConfig, _input.getSchema(),
+        _input.getSchemaWithMetadata(), (int) _input.getNumRecordsPerPush(), // TODO we may not want to use numRecordsPerPush as the numRows for the completed segment we are going to generate. A more fine-grained number is needed which we need to figure out how to capture.
+        ingestionRatePerPartition, maxUsableHostMemoryByte, _params.getRealtimeTableRetentionHours());
     File statsFile = memoryEstimator.initializeStatsHistory();
-    runAndRethrowIOException(() -> memoryEstimator
-        .estimateMemoryUsed(statsFile, numHosts, numHours, totalConsumingPartitions,
-            _params.getRealtimeTableRetentionHours()));
+    runAndRethrowIOException(() -> memoryEstimator.estimateMemoryUsed(statsFile, numHosts, numHours,
+        totalConsumingPartitions, _params.getRealtimeTableRetentionHours()));
 
     // extract recommendations
     extractResults(memoryEstimator, numHosts, numHours, _output.getRealtimeProvisioningRecommendations());
@@ -181,7 +174,6 @@ public class RealtimeProvisioningRule extends AbstractRule {
 
   @FunctionalInterface
   private interface Func {
-    void run()
-        throws IOException;
+    void run() throws IOException;
   }
 }

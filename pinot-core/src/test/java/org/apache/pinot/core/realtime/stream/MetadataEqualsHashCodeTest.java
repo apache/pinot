@@ -31,7 +31,7 @@ import org.testng.annotations.Test;
 public class MetadataEqualsHashCodeTest {
   @Test
   public void testEqualsAndHashCode() {
-    EqualsVerifier.forClass(StreamConfig.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).
-        usingGetClass().verify();
+    EqualsVerifier.forClass(StreamConfig.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).usingGetClass()
+        .verify();
   }
 }

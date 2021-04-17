@@ -51,7 +51,8 @@ public class PinotFSBenchmarkDriver {
   private int _dataSizeInMBsForCopyTest;
 
   public PinotFSBenchmarkDriver(String mode, String configFilePath, String baseDirectoryUri, String localTempDir,
-      Integer numSegmentsForListFilesTest, Integer dataSizeInMBsForCopyTest, Integer numOps) throws ConfigurationException {
+      Integer numSegmentsForListFilesTest, Integer dataSizeInMBsForCopyTest, Integer numOps)
+      throws ConfigurationException {
     Configuration configuration = new PropertiesConfiguration(new File(configFilePath));
     PinotFSFactory.init(new PinotConfiguration(configuration));
     _mode = mode;
@@ -64,10 +65,12 @@ public class PinotFSBenchmarkDriver {
     _numOps = (numOps != null) ? numOps : DEFAULT_NUM_OPS;
     _dataSizeInMBsForCopyTest =
         (dataSizeInMBsForCopyTest != null) ? dataSizeInMBsForCopyTest : DEFAULT_DATA_SIZE_IN_MB_FOR_COPY_TEST;
-    LOGGER.info("PinotFS has been initialized sucessfully. (mode = {}, pinotFSClass = {}, configFile = {}, "
+    LOGGER.info(
+        "PinotFS has been initialized sucessfully. (mode = {}, pinotFSClass = {}, configFile = {}, "
             + "baseDirectoryUri = {}, localTempDir = {}, numSegmentsForListFilesTest = {}, "
-            + "dataSizeInMBsForCopyTest = {}, numOps = {})", _mode, _pinotFS.getClass().getSimpleName(), configFilePath,
-        baseDirectoryUri, _localTempDir, _numSegmentsForListFilesTest, _dataSizeInMBsForCopyTest, _numOps);
+            + "dataSizeInMBsForCopyTest = {}, numOps = {})",
+        _mode, _pinotFS.getClass().getSimpleName(), configFilePath, baseDirectoryUri, _localTempDir,
+        _numSegmentsForListFilesTest, _dataSizeInMBsForCopyTest, _numOps);
   }
 
   public void run() throws Exception {
@@ -133,8 +136,8 @@ public class PinotFSBenchmarkDriver {
         tmpFile.createNewFile();
         _pinotFS.copyFromLocalFile(tmpFile, combinePath(directoryUri, relativePath));
       }
-      LOGGER.info("Took {} ms to create {} segments for directory_{}",
-          System.currentTimeMillis() - prepareTime, numSegments, i);
+      LOGGER.info("Took {} ms to create {} segments for directory_{}", System.currentTimeMillis() - prepareTime,
+          numSegments, i);
       numSegments *= 10;
     }
 
@@ -166,8 +169,8 @@ public class PinotFSBenchmarkDriver {
       tmpFile.createNewFile();
       _pinotFS.copyFromLocalFile(tmpFile, combinePath(listTestUri, relativePath));
     }
-    LOGGER.info("Took {} ms to create {} segments.",
-        System.currentTimeMillis() - testStartTime, _numSegmentsForListFilesTest);
+    LOGGER.info("Took {} ms to create {} segments.", System.currentTimeMillis() - testStartTime,
+        _numSegmentsForListFilesTest);
 
     for (int i = 0; i < _numOps; i++) {
       long listFilesStart = System.currentTimeMillis();

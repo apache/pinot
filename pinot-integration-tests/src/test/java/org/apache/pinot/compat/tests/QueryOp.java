@@ -83,12 +83,12 @@ public class QueryOp extends BaseOp {
     }
   }
 
-  boolean verifyQueries(int generationNumber)
-      throws Exception {
+  boolean verifyQueries(int generationNumber) throws Exception {
     boolean testPassed = false;
 
-    try (BufferedReader queryReader = new BufferedReader(
-        new InputStreamReader(new FileInputStream(_queryFileName), StandardCharsets.UTF_8));
+    try (
+        BufferedReader queryReader =
+            new BufferedReader(new InputStreamReader(new FileInputStream(_queryFileName), StandardCharsets.UTF_8));
         BufferedReader expectedResultReader = new BufferedReader(
             new InputStreamReader(new FileInputStream(_expectedResultsFileName), StandardCharsets.UTF_8))) {
 

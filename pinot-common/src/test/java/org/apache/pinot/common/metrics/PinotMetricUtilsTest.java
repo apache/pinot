@@ -86,9 +86,9 @@ public class PinotMetricUtilsTest {
   @Test
   public void testMetricValue() {
     PinotMetricsRegistry registry = PinotMetricUtils.getPinotMetricsRegistry();
-    PinotMeter pinotMeter = PinotMetricUtils
-        .makePinotMeter(registry, PinotMetricUtils.makePinotMetricName(PinotMetricUtilsTest.class, "testMeter"),
-            "dummyEventType", TimeUnit.MILLISECONDS);
+    PinotMeter pinotMeter = PinotMetricUtils.makePinotMeter(registry,
+        PinotMetricUtils.makePinotMetricName(PinotMetricUtilsTest.class, "testMeter"), "dummyEventType",
+        TimeUnit.MILLISECONDS);
     pinotMeter.mark();
     Assert.assertEquals(pinotMeter.count(), 1L);
 

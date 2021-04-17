@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
 public class SegmentDeletionManager {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentDeletionManager.class);
-  private static final long MAX_DELETION_DELAY_SECONDS = 300L;  // Maximum of 5 minutes back-off to retry the deletion
+  private static final long MAX_DELETION_DELAY_SECONDS = 300L; // Maximum of 5 minutes back-off to retry the deletion
   private static final long DEFAULT_DELETION_DELAY_SECONDS = 2L;
 
   private final ScheduledExecutorService _executorService;
@@ -107,14 +107,14 @@ public class SegmentDeletionManager {
     }
 
     List<String> segmentsToDelete = new ArrayList<>(segmentIds.size()); // Has the segments that will be deleted
-    Set<String> segmentsToRetryLater = new HashSet<>(segmentIds.size());  // List of segments that we need to retry
+    Set<String> segmentsToRetryLater = new HashSet<>(segmentIds.size()); // List of segments that we need to retry
 
     try {
       for (String segmentId : segmentIds) {
         Map<String, String> segmentToInstancesMapFromExternalView = externalView.getStateMap(segmentId);
         Map<String, String> segmentToInstancesMapFromIdealStates = idealState.getInstanceStateMap(segmentId);
-        if ((segmentToInstancesMapFromExternalView == null || segmentToInstancesMapFromExternalView.isEmpty()) && (
-            segmentToInstancesMapFromIdealStates == null || segmentToInstancesMapFromIdealStates.isEmpty())) {
+        if ((segmentToInstancesMapFromExternalView == null || segmentToInstancesMapFromExternalView.isEmpty())
+            && (segmentToInstancesMapFromIdealStates == null || segmentToInstancesMapFromIdealStates.isEmpty())) {
           segmentsToDelete.add(segmentId);
         } else {
           segmentsToRetryLater.add(segmentId);

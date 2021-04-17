@@ -42,13 +42,16 @@ public class PinotFSSegmentUploaderTest {
   private static final int TIMEOUT_IN_MS = 100;
   private File _file;
   private LLCSegmentName _llcSegmentName;
+
   @BeforeClass
-  public void setUp()
-      throws URISyntaxException, IOException, HttpErrorStatusException {
+  public void setUp() throws URISyntaxException, IOException, HttpErrorStatusException {
     Map<String, Object> properties = new HashMap<>();
-    properties.put("class.hdfs", "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysSucceedPinotFS");
-    properties.put("class.timeout", "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysTimeoutPinotFS");
-    properties.put("class.existing", "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysExistPinotFS");
+    properties.put("class.hdfs",
+        "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysSucceedPinotFS");
+    properties.put("class.timeout",
+        "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysTimeoutPinotFS");
+    properties.put("class.existing",
+        "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysExistPinotFS");
     PinotFSFactory.init(new PinotConfiguration(properties));
     _file = FileUtils.getFile(FileUtils.getTempDirectory(), UUID.randomUUID().toString());
     _file.deleteOnExit();
@@ -59,14 +62,16 @@ public class PinotFSSegmentUploaderTest {
   public void testSuccessfulUpload() {
     SegmentUploader segmentUploader = new PinotFSSegmentUploader("hdfs://root", TIMEOUT_IN_MS);
     URI segmentURI = segmentUploader.uploadSegment(_file, _llcSegmentName);
-    Assert.assertTrue(segmentURI.toString().startsWith(StringUtil.join(File.separator,"hdfs://root", _llcSegmentName.getTableName(), _llcSegmentName.getSegmentName())));
+    Assert.assertTrue(segmentURI.toString().startsWith(StringUtil.join(File.separator, "hdfs://root",
+        _llcSegmentName.getTableName(), _llcSegmentName.getSegmentName())));
   }
 
   @Test
   public void testSegmentAlreadyExist() {
     SegmentUploader segmentUploader = new PinotFSSegmentUploader("existing://root", TIMEOUT_IN_MS);
     URI segmentURI = segmentUploader.uploadSegment(_file, _llcSegmentName);
-    Assert.assertTrue(segmentURI.toString().startsWith(StringUtil.join(File.separator,"existing://root", _llcSegmentName.getTableName(), _llcSegmentName.getSegmentName())));
+    Assert.assertTrue(segmentURI.toString().startsWith(StringUtil.join(File.separator, "existing://root",
+        _llcSegmentName.getTableName(), _llcSegmentName.getSegmentName())));
   }
 
   @Test
@@ -91,86 +96,72 @@ public class PinotFSSegmentUploaderTest {
     }
 
     @Override
-    public boolean mkdir(URI uri)
-        throws IOException {
+    public boolean mkdir(URI uri) throws IOException {
       return false;
     }
 
     @Override
-    public boolean delete(URI segmentUri, boolean forceDelete)
-        throws IOException {
+    public boolean delete(URI segmentUri, boolean forceDelete) throws IOException {
       return false;
     }
 
     @Override
-    public boolean doMove(URI srcUri, URI dstUri)
-        throws IOException {
+    public boolean doMove(URI srcUri, URI dstUri) throws IOException {
       return false;
     }
 
     @Override
-    public boolean copy(URI srcUri, URI dstUri)
-        throws IOException {
+    public boolean copy(URI srcUri, URI dstUri) throws IOException {
       return false;
     }
 
     @Override
-    public boolean exists(URI fileUri)
-        throws IOException {
+    public boolean exists(URI fileUri) throws IOException {
       return false;
     }
 
     @Override
-    public long length(URI fileUri)
-        throws IOException {
+    public long length(URI fileUri) throws IOException {
       return 0;
     }
 
     @Override
-    public String[] listFiles(URI fileUri, boolean recursive)
-        throws IOException {
+    public String[] listFiles(URI fileUri, boolean recursive) throws IOException {
       return new String[0];
     }
 
     @Override
-    public void copyToLocalFile(URI srcUri, File dstFile)
-        throws Exception {
+    public void copyToLocalFile(URI srcUri, File dstFile) throws Exception {
     }
 
     @Override
-    public void copyFromLocalFile(File srcFile, URI dstUri)
-        throws Exception {
+    public void copyFromLocalFile(File srcFile, URI dstUri) throws Exception {
     }
 
     @Override
-    public boolean isDirectory(URI uri)
-        throws IOException {
+    public boolean isDirectory(URI uri) throws IOException {
       return false;
     }
 
     @Override
-    public long lastModified(URI uri)
-        throws IOException {
+    public long lastModified(URI uri) throws IOException {
       return 0;
     }
 
     @Override
-    public boolean touch(URI uri)
-        throws IOException {
+    public boolean touch(URI uri) throws IOException {
       return false;
     }
 
     @Override
-    public InputStream open(URI uri)
-        throws IOException {
+    public InputStream open(URI uri) throws IOException {
       return null;
     }
   }
 
   public static class AlwaysTimeoutPinotFS extends AlwaysSucceedPinotFS {
     @Override
-    public void copyFromLocalFile(File srcFile, URI dstUri)
-        throws Exception {
+    public void copyFromLocalFile(File srcFile, URI dstUri) throws Exception {
       // Make sure the sleep time > the timeout threshold of uploader.
       Thread.sleep(TIMEOUT_IN_MS * 1000);
     }
@@ -178,8 +169,7 @@ public class PinotFSSegmentUploaderTest {
 
   public static class AlwaysExistPinotFS extends AlwaysSucceedPinotFS {
     @Override
-    public boolean exists(URI fileUri)
-        throws IOException {
+    public boolean exists(URI fileUri) throws IOException {
       return true;
     }
   }

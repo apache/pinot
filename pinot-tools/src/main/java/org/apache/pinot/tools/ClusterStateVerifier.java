@@ -53,8 +53,7 @@ public class ClusterStateVerifier extends PinotZKChanger {
     final ExecutorService executor = Executors.newSingleThreadExecutor();
     final Future<Boolean> future = executor.submit(new Callable<Boolean>() {
       @Override
-      public Boolean call()
-          throws Exception {
+      public Boolean call() throws Exception {
         return waitForClusterStable(tableNames, timeoutSec);
       }
     });

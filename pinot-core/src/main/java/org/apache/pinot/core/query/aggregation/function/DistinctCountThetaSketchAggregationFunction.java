@@ -77,7 +77,8 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
  * <p>E.g. DISTINCT_COUNT_THETA_SKETCH(col, 'nominalEntries=8192')
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class DistinctCountThetaSketchAggregationFunction extends BaseSingleInputAggregationFunction<List<Sketch>, Comparable> {
+public class DistinctCountThetaSketchAggregationFunction
+    extends BaseSingleInputAggregationFunction<List<Sketch>, Comparable> {
   private static final String SET_UNION = "SET_UNION";
   private static final String SET_INTERSECT = "SET_INTERSECT";
   private static final String SET_DIFF = "SET_DIFF";
@@ -130,8 +131,7 @@ public class DistinctCountThetaSketchAggregationFunction extends BaseSingleInput
             "Third to second last argument of DISTINCT_COUNT_THETA_SKETCH aggregation function must be literal (filter expression)");
         FilterContext filter;
         try {
-          filter =
-              RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterExpression.getLiteral()));
+          filter = RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterExpression.getLiteral()));
         } catch (SqlParseException e) {
           throw new IllegalArgumentException("Invalid filter expression: " + filterExpression.getLiteral());
         }
@@ -1061,8 +1061,8 @@ public class DistinctCountThetaSketchAggregationFunction extends BaseSingleInput
 
     if (expression.getType() == ExpressionContext.Type.IDENTIFIER) {
       int sketchId = extractSketchId(expression.getIdentifier());
-      Preconditions
-          .checkArgument(sketchId <= numFilters, "Sketch id: %s exceeds number of filters: %s", sketchId, numFilters);
+      Preconditions.checkArgument(sketchId <= numFilters, "Sketch id: %s exceeds number of filters: %s", sketchId,
+          numFilters);
       return sketchId == 0;
     }
 
@@ -1074,9 +1074,8 @@ public class DistinctCountThetaSketchAggregationFunction extends BaseSingleInput
     switch (functionName.toUpperCase()) {
       case SET_UNION:
       case SET_INTERSECT:
-        Preconditions
-            .checkArgument(numArguments >= 2, "SET_UNION and SET_INTERSECT should have at least 2 arguments, got: %s",
-                numArguments);
+        Preconditions.checkArgument(numArguments >= 2,
+            "SET_UNION and SET_INTERSECT should have at least 2 arguments, got: %s", numArguments);
         for (ExpressionContext argument : arguments) {
           includeDefaultSketch |= validatePostAggregationExpression(argument, numFilters);
         }
@@ -1097,8 +1096,8 @@ public class DistinctCountThetaSketchAggregationFunction extends BaseSingleInput
    * Extracts the sketch id from the identifier (e.g. $0 -> 0, $1 -> 1).
    */
   private static int extractSketchId(String identifier) {
-    Preconditions
-        .checkArgument(identifier.charAt(0) == '$', "Invalid identifier: %s, expecting $0, $1, etc.", identifier);
+    Preconditions.checkArgument(identifier.charAt(0) == '$', "Invalid identifier: %s, expecting $0, $1, etc.",
+        identifier);
     int sketchId = Integer.parseInt(identifier.substring(1));
     Preconditions.checkArgument(sketchId >= 0, "Invalid identifier: %s, expecting $0, $1, etc.", identifier);
     return sketchId;

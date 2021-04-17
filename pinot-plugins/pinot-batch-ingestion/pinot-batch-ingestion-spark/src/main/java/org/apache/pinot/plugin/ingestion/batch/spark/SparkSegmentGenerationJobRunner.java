@@ -102,8 +102,8 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         throw new RuntimeException("Missing property 'schemaURI' in 'tableSpec'");
       }
       PinotClusterSpec pinotClusterSpec = _spec.getPinotClusterSpecs()[0];
-      String schemaURI = SegmentGenerationUtils
-          .generateSchemaURI(pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
+      String schemaURI = SegmentGenerationUtils.generateSchemaURI(pinotClusterSpec.getControllerURI(),
+          _spec.getTableSpec().getTableName());
       _spec.getTableSpec().setSchemaURI(schemaURI);
     }
     if (_spec.getTableSpec().getTableConfigURI() == null) {
@@ -111,8 +111,8 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         throw new RuntimeException("Missing property 'tableConfigURI' in 'tableSpec'");
       }
       PinotClusterSpec pinotClusterSpec = _spec.getPinotClusterSpecs()[0];
-      String tableConfigURI = SegmentGenerationUtils
-          .generateTableConfigURI(pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
+      String tableConfigURI = SegmentGenerationUtils.generateTableConfigURI(pinotClusterSpec.getControllerURI(),
+          _spec.getTableSpec().getTableName());
       _spec.getTableSpec().setTableConfigURI(tableConfigURI);
     }
     if (_spec.getExecutionFrameworkSpec().getExtraConfigs() == null) {
@@ -121,8 +121,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
   }
 
   @Override
-  public void run()
-      throws Exception {
+  public void run() throws Exception {
     //init all file systems
     List<PinotFSSpec> pinotFSSpecs = _spec.getPinotFSSpecs();
     for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
@@ -153,8 +152,8 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         stagingDirURI = new File(stagingDir).toURI();
       }
       if (!outputDirURI.getScheme().equals(stagingDirURI.getScheme())) {
-        throw new RuntimeException(String
-            .format("The scheme of staging directory URI [%s] and output directory URI [%s] has to be same.",
+        throw new RuntimeException(
+            String.format("The scheme of staging directory URI [%s] and output directory URI [%s] has to be same.",
                 stagingDirURI, outputDirURI));
       }
       outputDirFS.mkdir(stagingDirURI);
@@ -236,20 +235,18 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
       }
       JavaRDD<String> pathRDD = sparkContext.parallelize(pathAndIdxList, jobParallelism);
 
-      final String pluginsInclude =
-          (sparkContext.getConf().contains(PLUGINS_INCLUDE_PROPERTY_NAME)) ? sparkContext.getConf()
-              .get(PLUGINS_INCLUDE_PROPERTY_NAME) : null;
+      final String pluginsInclude = (sparkContext.getConf().contains(PLUGINS_INCLUDE_PROPERTY_NAME))
+          ? sparkContext.getConf().get(PLUGINS_INCLUDE_PROPERTY_NAME) : null;
       final URI finalInputDirURI = inputDirURI;
       final URI finalOutputDirURI = (stagingDirURI == null) ? outputDirURI : stagingDirURI;
       // Prevent using lambda expression in Spark to avoid potential serialization exceptions, use inner function instead.
       pathRDD.foreach(new VoidFunction<String>() {
         @Override
-        public void call(String pathAndIdx)
-            throws Exception {
+        public void call(String pathAndIdx) throws Exception {
           PluginManager.get().init();
           for (PinotFSSpec pinotFSSpec : _spec.getPinotFSSpecs()) {
-            PinotFSFactory
-                .register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
+            PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(),
+                new PinotConfiguration(pinotFSSpec));
           }
           PinotFS finalOutputDirFS = PinotFSFactory.create(finalOutputDirURI.getScheme());
           String[] splits = pathAndIdx.split(" ");
@@ -323,12 +320,11 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
           LOGGER.info("Size for segment: {}, uncompressed: {}, compressed: {}", segmentName,
               DataSizeUtils.fromBytes(uncompressedSegmentSize), DataSizeUtils.fromBytes(compressedSegmentSize));
           //move segment to output PinotFS
-          URI outputSegmentTarURI =
-              SegmentGenerationUtils.getRelativeOutputPath(finalInputDirURI, inputFileURI, finalOutputDirURI)
-                  .resolve(segmentTarFileName);
+          URI outputSegmentTarURI = SegmentGenerationUtils
+              .getRelativeOutputPath(finalInputDirURI, inputFileURI, finalOutputDirURI).resolve(segmentTarFileName);
           LOGGER.info("Trying to move segment tar file from: [{}] to [{}]", localSegmentTarFile, outputSegmentTarURI);
-          if (!_spec.isOverwriteOutput() && PinotFSFactory.create(outputSegmentTarURI.getScheme())
-              .exists(outputSegmentTarURI)) {
+          if (!_spec.isOverwriteOutput()
+              && PinotFSFactory.create(outputSegmentTarURI.getScheme()).exists(outputSegmentTarURI)) {
             LOGGER.warn("Not overwrite existing output segment tar file: {}",
                 finalOutputDirFS.exists(outputSegmentTarURI));
           } else {
@@ -352,8 +348,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
     }
   }
 
-  protected void addDepsJarToDistributedCache(JavaSparkContext sparkContext, String depsJarDir)
-      throws IOException {
+  protected void addDepsJarToDistributedCache(JavaSparkContext sparkContext, String depsJarDir) throws IOException {
     if (depsJarDir != null) {
       URI depsJarDirURI = URI.create(depsJarDir);
       if (depsJarDirURI.getScheme() == null) {

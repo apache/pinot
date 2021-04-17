@@ -79,8 +79,8 @@ public class DefaultControllerRestApi implements ControllerRestApi {
             pushLocation, e);
       }
     }
-    String errorMessage = String
-        .format("Failed to get table config from push locations: %s for table: %s", _pushLocations, _rawTableName);
+    String errorMessage = String.format("Failed to get table config from push locations: %s for table: %s",
+        _pushLocations, _rawTableName);
     LOGGER.error(errorMessage);
     throw new RuntimeException(errorMessage);
   }
@@ -168,9 +168,9 @@ public class DefaultControllerRestApi implements ControllerRestApi {
       for (PushLocation pushLocation : _pushLocations) {
         LOGGER.info("Sending deleting segment URI: {} to location: {}", segmentUri, pushLocation);
         try {
-          SimpleHttpResponse response = _fileUploadDownloadClient.sendDeleteRequest(FileUploadDownloadClient
-              .getDeleteSegmentHttpUri(pushLocation.getHost(), pushLocation.getPort(), _rawTableName, segmentUri,
-                  "OFFLINE"));
+          SimpleHttpResponse response =
+              _fileUploadDownloadClient.sendDeleteRequest(FileUploadDownloadClient.getDeleteSegmentHttpUri(
+                  pushLocation.getHost(), pushLocation.getPort(), _rawTableName, segmentUri, "OFFLINE"));
           LOGGER.info("Response {}: {}", response.getStatusCode(), response.getResponse());
         } catch (Exception e) {
           LOGGER.error("Caught exception while deleting segment URI: {} to location: {}", segmentUri, pushLocation, e);
@@ -186,9 +186,9 @@ public class DefaultControllerRestApi implements ControllerRestApi {
     ObjectMapper objectMapper = new ObjectMapper();
     for (PushLocation pushLocation : _pushLocations) {
       try {
-        SimpleHttpResponse response = _fileUploadDownloadClient.sendGetRequest(FileUploadDownloadClient
-            .getRetrieveAllSegmentWithTableTypeHttpUri(pushLocation.getHost(), pushLocation.getPort(), _rawTableName,
-                tableType));
+        SimpleHttpResponse response =
+            _fileUploadDownloadClient.sendGetRequest(FileUploadDownloadClient.getRetrieveAllSegmentWithTableTypeHttpUri(
+                pushLocation.getHost(), pushLocation.getPort(), _rawTableName, tableType));
         JsonNode segmentList = getSegmentsFromJsonSegmentAPI(response.getResponse(), tableType);
         return objectMapper.convertValue(segmentList, ArrayList.class);
       } catch (Exception e) {
@@ -196,21 +196,18 @@ public class DefaultControllerRestApi implements ControllerRestApi {
             _rawTableName, pushLocation, e);
       }
     }
-    String errorMessage = String
-        .format("Failed to get a list of all segments from push locations: %s for table: %s", _pushLocations,
-            _rawTableName);
+    String errorMessage = String.format("Failed to get a list of all segments from push locations: %s for table: %s",
+        _pushLocations, _rawTableName);
     LOGGER.error(errorMessage);
     throw new RuntimeException(errorMessage);
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _fileUploadDownloadClient.close();
   }
 
-  private JsonNode getSegmentsFromJsonSegmentAPI(String json, String tableType)
-      throws Exception {
+  private JsonNode getSegmentsFromJsonSegmentAPI(String json, String tableType) throws Exception {
     return JsonUtils.stringToJsonNode(json).get(0).get(tableType);
   }
 }

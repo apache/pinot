@@ -52,16 +52,16 @@ public class QuantileDigest {
   private static final int MAX_BITS = 64;
   private static final double MAX_SIZE_FACTOR = 1.5;
 
-  private static final int HEADER_BYTE_SIZE = Double.BYTES  // Max error
-      + Double.BYTES                                        // Alpha
-      + Long.BYTES                                          // Landmark
-      + Long.BYTES                                          // Min
-      + Long.BYTES                                          // Max
-      + Integer.BYTES;                                      // Node count
-  private static final int NODE_BYTE_SIZE = Byte.BYTES      // Flags
-      + Byte.BYTES                                          // Level
-      + Long.BYTES                                          // Value
-      + Double.BYTES;                                       // Weight
+  private static final int HEADER_BYTE_SIZE = Double.BYTES // Max error
+      + Double.BYTES // Alpha
+      + Long.BYTES // Landmark
+      + Long.BYTES // Min
+      + Long.BYTES // Max
+      + Integer.BYTES; // Node count
+  private static final int NODE_BYTE_SIZE = Byte.BYTES // Flags
+      + Byte.BYTES // Level
+      + Long.BYTES // Value
+      + Double.BYTES; // Weight
 
   // needs to be such that Math.exp(alpha * seconds) does not grow too big
   static final long RESCALE_THRESHOLD_SECONDS = 50;
@@ -85,7 +85,8 @@ public class QuantileDigest {
   private int compressions = 0;
 
   private enum TraversalOrder {
-    FORWARD, REVERSE
+    FORWARD,
+    REVERSE
   }
 
   /**
@@ -853,10 +854,9 @@ public class QuantileDigest {
       builder.append("\tsubgraph level_" + entry.getKey() + " {\n").append("\t\trank = same;\n");
 
       for (Node node : entry.getValue()) {
-        builder.append(String
-            .format("\t\t%s [label=\"[%s..%s]@%s\\n%s\", shape=rect, style=filled,color=%s];\n", idFor(node),
-                node.getLowerBound(), node.getUpperBound(), node.level, node.weightedCount,
-                node.weightedCount > 0 ? "salmon2" : "white"));
+        builder.append(String.format("\t\t%s [label=\"[%s..%s]@%s\\n%s\", shape=rect, style=filled,color=%s];\n",
+            idFor(node), node.getLowerBound(), node.getUpperBound(), node.level, node.weightedCount,
+            node.weightedCount > 0 ? "salmon2" : "white"));
       }
 
       builder.append("\t}\n");
@@ -1024,9 +1024,9 @@ public class QuantileDigest {
         return false;
       }
       final Node other = (Node) obj;
-      return Objects.equal(this.weightedCount, other.weightedCount) && Objects.equal(this.level, other.level) && Objects
-          .equal(this.bits, other.bits) && Objects.equal(this.left, other.left) && Objects
-          .equal(this.right, other.right);
+      return Objects.equal(this.weightedCount, other.weightedCount) && Objects.equal(this.level, other.level)
+          && Objects.equal(this.bits, other.bits) && Objects.equal(this.left, other.left)
+          && Objects.equal(this.right, other.right);
     }
   }
 

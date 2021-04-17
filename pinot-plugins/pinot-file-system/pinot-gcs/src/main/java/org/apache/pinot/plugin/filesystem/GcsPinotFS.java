@@ -51,7 +51,8 @@ import static java.util.Objects.requireNonNull;
 import static joptsimple.internal.Strings.isNullOrEmpty;
 import static org.glassfish.jersey.internal.guava.Preconditions.checkArgument;
 
-public class GcsPinotFS  extends PinotFS {
+
+public class GcsPinotFS extends PinotFS {
   public static final String PROJECT_ID = "projectId";
   public static final String GCP_KEY = "gcpKey";
 
@@ -63,20 +64,15 @@ public class GcsPinotFS  extends PinotFS {
 
   @Override
   public void init(PinotConfiguration config) {
-    LOGGER.info("Configs are: {}, {}",
-            PROJECT_ID,
-            config.getProperty(PROJECT_ID));
+    LOGGER.info("Configs are: {}, {}", PROJECT_ID, config.getProperty(PROJECT_ID));
 
     checkArgument(!isNullOrEmpty(config.getProperty(PROJECT_ID)));
     checkArgument(!isNullOrEmpty(config.getProperty(GCP_KEY)));
     String projectId = config.getProperty(PROJECT_ID);
     String gcpKey = config.getProperty(GCP_KEY);
     try {
-      storage = StorageOptions.newBuilder()
-          .setProjectId(projectId)
-          .setCredentials(GoogleCredentials.fromStream(Files.newInputStream(Paths.get(gcpKey))))
-          .build()
-          .getService();
+      storage = StorageOptions.newBuilder().setProjectId(projectId)
+          .setCredentials(GoogleCredentials.fromStream(Files.newInputStream(Paths.get(gcpKey)))).build().getService();
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
@@ -95,6 +91,7 @@ public class GcsPinotFS  extends PinotFS {
       throw new IOException(e);
     }
   }
+
   private boolean isPathTerminatedByDelimiter(URI uri) {
     return uri.getPath().endsWith(DELIMITER);
   }
@@ -140,8 +137,8 @@ public class GcsPinotFS  extends PinotFS {
   }
 
   private boolean existsFile(URI uri) throws IOException {
-      Blob blob = getBlob(uri);
-      return existsBlob(blob);
+    Blob blob = getBlob(uri);
+    return existsBlob(blob);
   }
 
   /**
@@ -227,7 +224,7 @@ public class GcsPinotFS  extends PinotFS {
       }
     } catch (IOException e) {
       throw e;
-    } catch(Throwable t) {
+    } catch (Throwable t) {
       throw new IOException(t);
     }
   }
@@ -235,7 +232,7 @@ public class GcsPinotFS  extends PinotFS {
   @Override
   public boolean doMove(URI srcUri, URI dstUri) throws IOException {
     if (copy(srcUri, dstUri)) {
-      return  delete(srcUri, true);
+      return delete(srcUri, true);
     }
     return false;
   }
@@ -308,18 +305,18 @@ public class GcsPinotFS  extends PinotFS {
       if (recursive) {
         page = storage.list(fileUri.getHost(), Storage.BlobListOption.prefix(prefix));
       } else {
-        page = storage.list(fileUri.getHost(), Storage.BlobListOption.prefix(prefix), Storage.BlobListOption.currentDirectory());
+        page = storage.list(fileUri.getHost(), Storage.BlobListOption.prefix(prefix),
+            Storage.BlobListOption.currentDirectory());
       }
-      page.iterateAll()
-          .forEach(blob -> {
-            if (!blob.getName().equals(prefix)) {
-              try {
-                builder.add(new URI(SCHEME, fileUri.getHost(), DELIMITER + blob.getName(), null).toString());
-              } catch (URISyntaxException e) {
-                throw new RuntimeException(e);
-              }
-            }
-          });
+      page.iterateAll().forEach(blob -> {
+        if (!blob.getName().equals(prefix)) {
+          try {
+            builder.add(new URI(SCHEME, fileUri.getHost(), DELIMITER + blob.getName(), null).toString());
+          } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+          }
+        }
+      });
       String[] listedFiles = builder.build().toArray(new String[0]);
       LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.length, fileUri, recursive);
       return listedFiles;
@@ -368,10 +365,7 @@ public class GcsPinotFS  extends PinotFS {
     try {
       // Return true if folder was not explicitly created but is a prefix of one or more files.
       // Use lazy iterable iterateAll() and verify that the iterator has elements.
-      return getBucket(uri).list(Storage.BlobListOption.prefix(prefix))
-              .iterateAll()
-              .iterator()
-              .hasNext();
+      return getBucket(uri).list(Storage.BlobListOption.prefix(prefix)).iterateAll().iterator().hasNext();
     } catch (Throwable t) {
       throw new IOException(t);
     }

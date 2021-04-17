@@ -61,12 +61,17 @@ public class FieldConfig extends BaseJsonConfig {
 
   // If null, we will create dictionary encoded forward index by default
   public enum EncodingType {
-    RAW, DICTIONARY
+    RAW,
+    DICTIONARY
   }
 
   // If null, there won't be any index
   public enum IndexType {
-    INVERTED, SORTED, TEXT, FST, H3
+    INVERTED,
+    SORTED,
+    TEXT,
+    FST,
+    H3
   }
 
   public String getName() {

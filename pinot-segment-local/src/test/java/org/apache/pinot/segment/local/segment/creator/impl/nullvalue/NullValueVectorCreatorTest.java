@@ -34,8 +34,7 @@ public class NullValueVectorCreatorTest {
   private static final String NULL_VALUE_FILE = "test.bitmap.nullvalue";
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     if (TEMP_DIR.exists()) {
       FileUtils.deleteQuietly(TEMP_DIR);
     }
@@ -43,8 +42,7 @@ public class NullValueVectorCreatorTest {
   }
 
   @Test
-  public void testNullValueVectorCreation()
-      throws IOException {
+  public void testNullValueVectorCreation() throws IOException {
     NullValueVectorCreator creator = new NullValueVectorCreator(TEMP_DIR, COLUMN_NAME);
     for (int i = 0; i < 100; i++) {
       creator.setNull(i);
@@ -60,8 +58,7 @@ public class NullValueVectorCreatorTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 }

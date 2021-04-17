@@ -43,7 +43,8 @@ public class PinotServiceManagerHealthCheck {
   @Produces(MediaType.TEXT_PLAIN)
   @Path("health")
   @ApiOperation(value = "Checking Pinot Service health")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Pinot Starter is healthy"), @ApiResponse(code = 503, message = "Pinot Starter is not healthy")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Pinot Starter is healthy"), @ApiResponse(code = 503,
+      message = "Pinot Starter is not healthy")})
   public String getStarterHealth() {
     ServiceStatus.Status status = ServiceStatus.getServiceStatus();
     if (status == ServiceStatus.Status.GOOD) {
@@ -57,7 +58,8 @@ public class PinotServiceManagerHealthCheck {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/health/services")
   @ApiOperation(value = "Checking all services health for a service")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Pinot Service is healthy"), @ApiResponse(code = 503, message = "Pinot Service is not healthy")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Pinot Service is healthy"), @ApiResponse(code = 503,
+      message = "Pinot Service is not healthy")})
   public Map<String, Map<String, String>> getAllServicesHealth() {
     return ServiceStatus.getServiceStatusMap();
   }
@@ -66,7 +68,8 @@ public class PinotServiceManagerHealthCheck {
   @Produces(MediaType.TEXT_PLAIN)
   @Path("/health/services/{instanceName}")
   @ApiOperation(value = "Checking service health for an instance")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Pinot Instance is healthy"), @ApiResponse(code = 503, message = "Pinot Instance is not healthy")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Pinot Instance is healthy"), @ApiResponse(code = 503,
+      message = "Pinot Instance is not healthy")})
   public String getServiceHealth(
       @ApiParam(value = "Name of the Instance") @PathParam("instanceName") String instanceName) {
     ServiceStatus.Status status = ServiceStatus.getServiceStatus(instanceName);

@@ -42,7 +42,8 @@ public class PinotTenantRestletResourceTest {
   @Test
   public void testTableListForTenant() throws Exception {
     // Check that no tables on tenant works
-    String listTablesUrl = ControllerTestUtils.getControllerRequestURLBuilder().forTablesFromTenant(TagNameUtils.DEFAULT_TENANT_NAME);
+    String listTablesUrl =
+        ControllerTestUtils.getControllerRequestURLBuilder().forTablesFromTenant(TagNameUtils.DEFAULT_TENANT_NAME);
     JsonNode tableList = JsonUtils.stringToJsonNode(ControllerTestUtils.sendGetRequest(listTablesUrl));
     assertEquals(tableList.get("tables").size(), 0);
 

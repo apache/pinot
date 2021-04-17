@@ -74,8 +74,7 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
   private IndexSegment _upsertIndexSegment;
 
   @BeforeTest
-  public void buildSegment()
-      throws Exception {
+  public void buildSegment() throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     // Get resource file path.
@@ -118,14 +117,13 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
   }
 
   @BeforeClass
-  public void loadSegment()
-      throws Exception {
+  public void loadSegment() throws Exception {
     _indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
     ServerMetrics serverMetrics = Mockito.mock(ServerMetrics.class);
     _upsertIndexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
-    ((ImmutableSegmentImpl) _upsertIndexSegment)
-        .enableUpsert(new PartitionUpsertMetadataManager("testTable_REALTIME", 0, serverMetrics),
-            new ThreadSafeMutableRoaringBitmap());
+    ((ImmutableSegmentImpl) _upsertIndexSegment).enableUpsert(
+        new PartitionUpsertMetadataManager("testTable_REALTIME", 0, serverMetrics),
+        new ThreadSafeMutableRoaringBitmap());
   }
 
   @AfterClass
@@ -196,13 +194,13 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
   public Object[][] provideDataForIsFitChecks() {
     List<Object[]> entries = new ArrayList<>();
     entries.add(
-        new Object[]{"select count(*) from testTable", _indexSegment, true, false /* count* from metadata, even if star tree present */});
+        new Object[]{"select count(*) from testTable", _indexSegment, true, false /* count* from metadata, even if star tree present */ });
     entries.add(
-        new Object[]{"select min(daysSinceEpoch) from testTable", _indexSegment, false, true /* max (time column) from dictionary */});
+        new Object[]{"select min(daysSinceEpoch) from testTable", _indexSegment, false, true /* max (time column) from dictionary */ });
     entries.add(
         new Object[]{"select max(daysSinceEpoch),minmaxrange(daysSinceEpoch) from testTable", _indexSegment, false, true});
     entries.add(
-        new Object[]{"select count(*),max(daysSinceEpoch) from testTable", _indexSegment, false, false /* count* and max(time) from metadata*/});
+        new Object[]{"select count(*),max(daysSinceEpoch) from testTable", _indexSegment, false, false /* count* and max(time) from metadata*/ });
     entries.add(new Object[]{"select sum(column1) from testTable", _indexSegment, false, false});
     return entries.toArray(new Object[entries.size()][]);
   }

@@ -61,7 +61,8 @@ public abstract class AbstractRecordReaderTest {
     return records;
   }
 
-  protected static List<Object[]> generatePrimaryKeys(List<Map<String, Object>> records, List<String> primaryKeyColumns) {
+  protected static List<Object[]> generatePrimaryKeys(List<Map<String, Object>> records,
+      List<String> primaryKeyColumns) {
     List<Object[]> primaryKeys = Lists.newArrayList();
     for (Map<String, Object> record : records) {
       Object[] primaryKey = new Object[primaryKeyColumns.size()];
@@ -104,8 +105,7 @@ public abstract class AbstractRecordReaderTest {
   }
 
   protected void checkValue(RecordReader recordReader, List<Map<String, Object>> expectedRecordsMap,
-      List<Object[]> expectedPrimaryKeys)
-      throws Exception {
+      List<Object[]> expectedPrimaryKeys) throws Exception {
     for (int i = 0; i < expectedRecordsMap.size(); i++) {
       Map<String, Object> expectedRecord = expectedRecordsMap.get(i);
       GenericRow actualRecord = recordReader.next();
@@ -153,8 +153,7 @@ public abstract class AbstractRecordReaderTest {
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     if (_tempDir.exists()) {
       FileUtils.cleanDirectory(_tempDir);
     }
@@ -172,14 +171,12 @@ public abstract class AbstractRecordReaderTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     FileUtils.forceDelete(_tempDir);
   }
 
   @Test
-  public void testRecordReader()
-      throws Exception {
+  public void testRecordReader() throws Exception {
     checkValue(_recordReader, _records, _primaryKeys);
     _recordReader.rewind();
     checkValue(_recordReader, _records, _primaryKeys);
@@ -189,13 +186,11 @@ public abstract class AbstractRecordReaderTest {
    * @return an implementation of RecordReader
    * @throws Exception
    */
-  protected abstract RecordReader createRecordReader()
-      throws Exception;
+  protected abstract RecordReader createRecordReader() throws Exception;
 
   /**
    * Write records into a file
    * @throws Exception
    */
-  protected abstract void writeRecordsToFile(List<Map<String, Object>> recordsToWrite)
-      throws Exception;
+  protected abstract void writeRecordsToFile(List<Map<String, Object>> recordsToWrite) throws Exception;
 }

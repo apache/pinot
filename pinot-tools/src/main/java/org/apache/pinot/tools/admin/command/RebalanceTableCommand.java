@@ -40,28 +40,36 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
   @Option(name = "-clusterName", required = true, metaVar = "<String>", usage = "Name of the Pinot cluster")
   private String _clusterName;
 
-  @Option(name = "-tableName", required = true, metaVar = "<String>", usage = "Name of the table to rebalance (with type suffix, e.g. myTable_OFFLINE)")
+  @Option(name = "-tableName", required = true, metaVar = "<String>",
+      usage = "Name of the table to rebalance (with type suffix, e.g. myTable_OFFLINE)")
   private String _tableNameWithType;
 
-  @Option(name = "-dryRun", metaVar = "<boolean>", usage = "Whether to rebalance table in dry-run mode (just log the target assignment without applying changes to the cluster, false by default)")
+  @Option(name = "-dryRun", metaVar = "<boolean>",
+      usage = "Whether to rebalance table in dry-run mode (just log the target assignment without applying changes to the cluster, false by default)")
   private boolean _dryRun = false;
 
-  @Option(name = "-reassignInstances", metaVar = "<boolean>", usage = "Whether to reassign instances before reassigning segments (false by default)")
+  @Option(name = "-reassignInstances", metaVar = "<boolean>",
+      usage = "Whether to reassign instances before reassigning segments (false by default)")
   private boolean _reassignInstances = false;
 
-  @Option(name = "-includeConsuming", metaVar = "<boolean>", usage = "Whether to reassign CONSUMING segments for real-time table (false by default)")
+  @Option(name = "-includeConsuming", metaVar = "<boolean>",
+      usage = "Whether to reassign CONSUMING segments for real-time table (false by default)")
   private boolean _includeConsuming = false;
 
-  @Option(name = "-bootstrap", metaVar = "<boolean>", usage = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, reassign all segments in a round-robin fashion as if adding new segments to an empty table, false by default)")
+  @Option(name = "-bootstrap", metaVar = "<boolean>",
+      usage = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, reassign all segments in a round-robin fashion as if adding new segments to an empty table, false by default)")
   private boolean _bootstrap = false;
 
-  @Option(name = "-downtime", metaVar = "<boolean>", usage = "Whether to allow downtime for the rebalance (false by default)")
+  @Option(name = "-downtime", metaVar = "<boolean>",
+      usage = "Whether to allow downtime for the rebalance (false by default)")
   private boolean _downtime = false;
 
-  @Option(name = "-minAvailableReplicas", metaVar = "<int>", usage = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum number of replicas allowed to be unavailable if value is negative (1 by default)")
+  @Option(name = "-minAvailableReplicas", metaVar = "<int>",
+      usage = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum number of replicas allowed to be unavailable if value is negative (1 by default)")
   private int _minAvailableReplicas = 1;
 
-  @Option(name = "-bestEfforts", metaVar = "<boolean>", usage = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot be achieved, false by default)")
+  @Option(name = "-bestEfforts", metaVar = "<boolean>",
+      usage = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot be achieved, false by default)")
   private boolean _bestEfforts = false;
 
   @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message")
@@ -77,14 +85,12 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
   }
 
   @Override
-  public boolean execute()
-      throws Exception {
-    PinotTableRebalancer tableRebalancer =
-        new PinotTableRebalancer(_zkAddress, _clusterName, _dryRun, _reassignInstances, _includeConsuming, _bootstrap,
-            _downtime, _minAvailableReplicas, _bestEfforts);
+  public boolean execute() throws Exception {
+    PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(_zkAddress, _clusterName, _dryRun,
+        _reassignInstances, _includeConsuming, _bootstrap, _downtime, _minAvailableReplicas, _bestEfforts);
     RebalanceResult rebalanceResult = tableRebalancer.rebalance(_tableNameWithType);
-    LOGGER
-        .info("Got rebalance result: {} for table: {}", JsonUtils.objectToString(rebalanceResult), _tableNameWithType);
+    LOGGER.info("Got rebalance result: {} for table: {}", JsonUtils.objectToString(rebalanceResult),
+        _tableNameWithType);
     return rebalanceResult.getStatus() == RebalanceResult.Status.DONE;
   }
 

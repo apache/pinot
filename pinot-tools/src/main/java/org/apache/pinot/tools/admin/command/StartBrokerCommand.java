@@ -38,7 +38,8 @@ import org.slf4j.LoggerFactory;
  */
 public class StartBrokerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartBrokerCommand.class);
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
+      usage = "Print this message.")
   private boolean _help = false;
   @Option(name = "-brokerHost", required = false, metaVar = "<String>", usage = "host name for broker.")
   private String _brokerHost;
@@ -48,7 +49,8 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
   @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = "PinotCluster";
-  @Option(name = "-configFileName", required = false, metaVar = "<Config File Name>", usage = "Broker Starter Config file.", forbids = {"-brokerHost", "-brokerPort"})
+  @Option(name = "-configFileName", required = false, metaVar = "<Config File Name>",
+      usage = "Broker Starter Config file.", forbids = {"-brokerHost", "-brokerPort"})
   private String _configFileName;
   private HelixBrokerStarter _brokerStarter;
 
@@ -110,8 +112,7 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
   }
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
     try {
       LOGGER.info("Executing command: " + toString());
       StartServiceManagerCommand startServiceManagerCommand =
@@ -128,8 +129,7 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
     }
   }
 
-  private Map<String, Object> getBrokerConf()
-      throws ConfigurationException {
+  private Map<String, Object> getBrokerConf() throws ConfigurationException {
     Map<String, Object> properties = new HashMap<>();
     if (_configFileName != null) {
       properties.putAll(PinotConfigUtils.readConfigFromFile(_configFileName));

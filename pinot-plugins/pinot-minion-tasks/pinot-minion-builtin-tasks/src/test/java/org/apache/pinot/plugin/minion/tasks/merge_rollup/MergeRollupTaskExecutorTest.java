@@ -64,8 +64,7 @@ public class MergeRollupTaskExecutorTest {
   private List<File> _segmentIndexDirList;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(D1, FieldSpec.DataType.INT).build();
@@ -100,8 +99,7 @@ public class MergeRollupTaskExecutorTest {
   }
 
   @Test
-  public void testConvert()
-      throws Exception {
+  public void testConvert() throws Exception {
     MergeRollupTaskExecutor mergeRollupTaskExecutor = new MergeRollupTaskExecutor();
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.MergeRollupTask.MERGE_TYPE_KEY, MergeType.CONCATENATE.toString());
@@ -127,8 +125,7 @@ public class MergeRollupTaskExecutorTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 }

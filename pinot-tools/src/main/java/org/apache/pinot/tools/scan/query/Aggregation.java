@@ -112,9 +112,8 @@ public class Aggregation {
   }
 
   public ResultTable run() {
-    Projection projection =
-        new Projection(_immutableSegment, _metadata, _filteredDocIds, _projectionColumns, _dictionaryMap,
-            _addCountStar);
+    Projection projection = new Projection(_immutableSegment, _metadata, _filteredDocIds, _projectionColumns,
+        _dictionaryMap, _addCountStar);
     return aggregate(projection.run());
   }
 

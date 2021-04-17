@@ -93,8 +93,7 @@ public class HybridClusterIntegrationTestCommandLineRunner {
     System.exit(1);
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     int numArgs = args.length;
     if (!((numArgs == 6) || (numArgs == 7 && args[0].equals("--llc")))) {
       printUsage();
@@ -312,14 +311,12 @@ public class HybridClusterIntegrationTestCommandLineRunner {
     }
 
     @Override
-    protected long getCurrentCountStarResult()
-        throws Exception {
+    protected long getCurrentCountStarResult() throws Exception {
       return postQuery("SELECT COUNT(*) FROM " + getTableName()).get("aggregationResults").get(0).get("value").asLong();
     }
 
     @BeforeClass
-    public void setUp()
-        throws Exception {
+    public void setUp() throws Exception {
       if (!_enabled) {
         return;
       }
@@ -353,14 +350,13 @@ public class HybridClusterIntegrationTestCommandLineRunner {
       addTableConfig(createRealtimeTableConfig(_realtimeAvroFiles.get(0)));
 
       // Create and upload segments
-      ClusterIntegrationTestUtils
-          .buildSegmentsFromAvro(_offlineAvroFiles, offlineTableConfig, _schema, 0, _segmentDir, _tarDir);
+      ClusterIntegrationTestUtils.buildSegmentsFromAvro(_offlineAvroFiles, offlineTableConfig, _schema, 0, _segmentDir,
+          _tarDir);
       uploadSegments(getTableName(), _tarDir);
     }
 
     @Test
-    public void testQueriesFromQueryFile()
-        throws Exception {
+    public void testQueriesFromQueryFile() throws Exception {
       if (!_enabled) {
         return;
       }
@@ -382,9 +378,8 @@ public class HybridClusterIntegrationTestCommandLineRunner {
             waitForAllDocsLoaded(600_000L);
 
             // Run queries in multiple threads
-            ExecutorService executorService =
-                new ThreadPoolExecutor(4, 4, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(10),
-                    new ThreadPoolExecutor.CallerRunsPolicy());
+            ExecutorService executorService = new ThreadPoolExecutor(4, 4, 0L, TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<Runnable>(10), new ThreadPoolExecutor.CallerRunsPolicy());
             String query;
             while ((query = queryFileReader.readLine()) != null) {
               String currentQuery = query;
@@ -395,12 +390,11 @@ public class HybridClusterIntegrationTestCommandLineRunner {
                   try {
                     JsonNode actualResponse =
                         postQuery(new PinotQueryRequest("pql", currentQuery), "http://localhost:" + BROKER_PORT);
-                    if (QueryComparison.compareWithEmpty(actualResponse, expectedResponse)
-                        == QueryComparison.ComparisonStatus.FAILED) {
+                    if (QueryComparison.compareWithEmpty(actualResponse,
+                        expectedResponse) == QueryComparison.ComparisonStatus.FAILED) {
                       numFailedQueries.getAndIncrement();
-                      System.out.println(
-                          "Query comparison failed for query: " + currentQuery + "\nActual: " + actualResponse
-                              .toString() + "\nExpected: " + expectedResponse.toString());
+                      System.out.println("Query comparison failed for query: " + currentQuery + "\nActual: "
+                          + actualResponse.toString() + "\nExpected: " + expectedResponse.toString());
                     }
                   } catch (Exception e) {
                     numFailedQueries.getAndIncrement();
@@ -420,8 +414,7 @@ public class HybridClusterIntegrationTestCommandLineRunner {
     }
 
     @AfterClass
-    public void tearDown()
-        throws Exception {
+    public void tearDown() throws Exception {
       if (!_enabled) {
         return;
       }

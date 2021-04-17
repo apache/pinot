@@ -62,13 +62,13 @@ public final class PartitionerFactory {
         partitioner = new NoOpPartitioner();
         break;
       case ROUND_ROBIN:
-        Preconditions
-            .checkState(config.getNumPartitions() > 0, "Must provide numPartitions > 0 for ROUND_ROBIN partitioner");
+        Preconditions.checkState(config.getNumPartitions() > 0,
+            "Must provide numPartitions > 0 for ROUND_ROBIN partitioner");
         partitioner = new RoundRobinPartitioner(config.getNumPartitions());
         break;
       case COLUMN_VALUE:
-        Preconditions
-            .checkState(config.getColumnName() != null, "Must provide columnName for COLUMN_VALUE partitioner");
+        Preconditions.checkState(config.getColumnName() != null,
+            "Must provide columnName for COLUMN_VALUE partitioner");
         partitioner = new ColumnValuePartitioner(config.getColumnName());
         break;
       case TRANSFORM_FUNCTION:

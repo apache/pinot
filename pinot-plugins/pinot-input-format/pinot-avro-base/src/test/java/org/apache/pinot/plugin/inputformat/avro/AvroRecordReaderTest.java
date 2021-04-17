@@ -36,16 +36,14 @@ public class AvroRecordReaderTest extends AbstractRecordReaderTest {
   private final File _dataFile = new File(_tempDir, "data.avro");
 
   @Override
-  protected RecordReader createRecordReader()
-      throws Exception {
+  protected RecordReader createRecordReader() throws Exception {
     AvroRecordReader avroRecordReader = new AvroRecordReader();
     avroRecordReader.init(_dataFile, _sourceFields, null);
     return avroRecordReader;
   }
 
   @Override
-  protected void writeRecordsToFile(List<Map<String, Object>> recordsToWrite)
-      throws Exception {
+  protected void writeRecordsToFile(List<Map<String, Object>> recordsToWrite) throws Exception {
     Schema schema = AvroUtils.getAvroSchemaFromPinotSchema(getPinotSchema());
     final DatumWriter<GenericRecord> writer = new GenericDatumWriter<>(schema);
     try (DataFileWriter<GenericRecord> fileWriter = new DataFileWriter<>(writer)) {

@@ -50,8 +50,7 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   }
 
   @Override
-  public BrokerResponse executeQuery(String brokerAddress, String query)
-      throws PinotClientException {
+  public BrokerResponse executeQuery(String brokerAddress, String query) throws PinotClientException {
     try {
       return executeQueryAsync(brokerAddress, query).get();
     } catch (Exception e) {
@@ -84,9 +83,8 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
         _headers.forEach((k, v) -> requestBuilder.addHeader(k, v));
       }
 
-      final Future<Response> response =
-          requestBuilder.addHeader("Content-Type", "application/json; charset=utf-8").setBody(json.toString())
-              .execute();
+      final Future<Response> response = requestBuilder.addHeader("Content-Type", "application/json; charset=utf-8")
+          .setBody(json.toString()).execute();
 
       return new BrokerResponseFuture(response, request.getQuery(), url);
     } catch (Exception e) {
@@ -95,8 +93,7 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   }
 
   @Override
-  public BrokerResponse executeQuery(String brokerAddress, Request request)
-      throws PinotClientException {
+  public BrokerResponse executeQuery(String brokerAddress, Request request) throws PinotClientException {
     try {
       return executeQueryAsync(brokerAddress, request).get();
     } catch (Exception e) {
@@ -105,14 +102,12 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   }
 
   @Override
-  public Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
-      throws PinotClientException {
+  public Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request) throws PinotClientException {
     return executePinotQueryAsync(brokerAddress, request);
   }
 
   @Override
-  public void close()
-      throws PinotClientException {
+  public void close() throws PinotClientException {
     if (_httpClient.isClosed()) {
       throw new PinotClientException("Connection is already closed!");
     }
@@ -146,14 +141,12 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
     }
 
     @Override
-    public BrokerResponse get()
-        throws ExecutionException {
+    public BrokerResponse get() throws ExecutionException {
       return get(1000L, TimeUnit.DAYS);
     }
 
     @Override
-    public BrokerResponse get(long timeout, TimeUnit unit)
-        throws ExecutionException {
+    public BrokerResponse get(long timeout, TimeUnit unit) throws ExecutionException {
       try {
         LOGGER.debug("Sending query {} to {}", _query, _url);
 

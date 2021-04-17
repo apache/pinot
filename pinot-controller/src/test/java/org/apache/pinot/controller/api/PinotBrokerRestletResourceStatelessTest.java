@@ -36,8 +36,7 @@ public class PinotBrokerRestletResourceStatelessTest extends ControllerTest {
   private static final String TABLE_NAME_2 = "testTable2";
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     startZk();
     startController();
     addFakeServerInstancesToAutoJoinHelixCluster(1, true);
@@ -45,8 +44,7 @@ public class PinotBrokerRestletResourceStatelessTest extends ControllerTest {
         1);
   }
 
-  public void testGetBrokersHelper(String state, int onlineServers, int offlineServers)
-      throws Exception {
+  public void testGetBrokersHelper(String state, int onlineServers, int offlineServers) throws Exception {
     List<String> expectedBrokers = new ArrayList<>();
     if (state == null) {
       for (int i = 0; i < onlineServers + offlineServers; i++) {
@@ -81,9 +79,8 @@ public class PinotBrokerRestletResourceStatelessTest extends ControllerTest {
       Assert.assertTrue(tenantsMap.get("DefaultTenant").contains(expectedBroker));
     }
 
-    List<String> tenantBrokers = JsonUtils
-        .stringToObject(sendGetRequest(_controllerRequestURLBuilder.forBrokerTenantGet("DefaultTenant", state)),
-            List.class);
+    List<String> tenantBrokers = JsonUtils.stringToObject(
+        sendGetRequest(_controllerRequestURLBuilder.forBrokerTenantGet("DefaultTenant", state)), List.class);
     for (String expectedBroker : expectedBrokers) {
       Assert.assertTrue(tenantBrokers.contains(expectedBroker));
     }
@@ -101,27 +98,23 @@ public class PinotBrokerRestletResourceStatelessTest extends ControllerTest {
       Assert.assertTrue(tablesMap.get("testTable2").contains(expectedBroker));
     }
 
-    List<String> tableBrokers = JsonUtils
-        .stringToObject(sendGetRequest(_controllerRequestURLBuilder.forBrokerTableGet("testTable1", "OFFLINE", state)),
-            List.class);
+    List<String> tableBrokers = JsonUtils.stringToObject(
+        sendGetRequest(_controllerRequestURLBuilder.forBrokerTableGet("testTable1", "OFFLINE", state)), List.class);
     for (String expectedBroker : expectedBrokers) {
       Assert.assertTrue(tableBrokers.contains(expectedBroker));
     }
-    tableBrokers = JsonUtils
-        .stringToObject(sendGetRequest(_controllerRequestURLBuilder.forBrokerTableGet("testTable1", null, state)),
-            List.class);
+    tableBrokers = JsonUtils.stringToObject(
+        sendGetRequest(_controllerRequestURLBuilder.forBrokerTableGet("testTable1", null, state)), List.class);
     for (String expectedBroker : expectedBrokers) {
       Assert.assertTrue(tableBrokers.contains(expectedBroker));
     }
-    tableBrokers = JsonUtils
-        .stringToObject(sendGetRequest(_controllerRequestURLBuilder.forBrokerTableGet("testTable2", "OFFLINE", state)),
-            List.class);
+    tableBrokers = JsonUtils.stringToObject(
+        sendGetRequest(_controllerRequestURLBuilder.forBrokerTableGet("testTable2", "OFFLINE", state)), List.class);
     for (String expectedBroker : expectedBrokers) {
       Assert.assertTrue(tableBrokers.contains(expectedBroker));
     }
-    tableBrokers = JsonUtils
-        .stringToObject(sendGetRequest(_controllerRequestURLBuilder.forBrokerTableGet("testTable2", null, state)),
-            List.class);
+    tableBrokers = JsonUtils.stringToObject(
+        sendGetRequest(_controllerRequestURLBuilder.forBrokerTableGet("testTable2", null, state)), List.class);
     for (String expectedBroker : expectedBrokers) {
       Assert.assertTrue(tableBrokers.contains(expectedBroker));
     }
@@ -133,8 +126,7 @@ public class PinotBrokerRestletResourceStatelessTest extends ControllerTest {
   }
 
   @Test
-  public void testGetBrokers()
-      throws Exception {
+  public void testGetBrokers() throws Exception {
     addFakeBrokerInstancesToAutoJoinHelixCluster(10, true);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size(),
         10);
@@ -146,8 +138,8 @@ public class PinotBrokerRestletResourceStatelessTest extends ControllerTest {
         .addTable(new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_2).setNumReplicas(1).build());
 
     // Wait for the table addition
-    while (!_helixResourceManager.hasOfflineTable(TABLE_NAME_1) && !_helixResourceManager
-        .hasOfflineTable(TABLE_NAME_2)) {
+    while (!_helixResourceManager.hasOfflineTable(TABLE_NAME_1)
+        && !_helixResourceManager.hasOfflineTable(TABLE_NAME_2)) {
       Thread.sleep(100);
     }
 

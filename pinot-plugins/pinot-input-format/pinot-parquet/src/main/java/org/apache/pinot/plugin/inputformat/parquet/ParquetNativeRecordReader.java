@@ -62,9 +62,8 @@ public class ParquetNativeRecordReader implements RecordReader {
     _recordExtractor = new ParquetNativeRecordExtractor();
     _recordExtractor.init(fieldsToRead, null);
     _schema = _parquetMetadata.getFileMetaData().getSchema();
-    _parquetFileReader =
-        new ParquetFileReader(conf, _parquetMetadata.getFileMetaData(), _dataFilePath, _parquetMetadata.getBlocks(),
-            _schema.getColumns());
+    _parquetFileReader = new ParquetFileReader(conf, _parquetMetadata.getFileMetaData(), _dataFilePath,
+        _parquetMetadata.getBlocks(), _schema.getColumns());
     _pageReadStore = _parquetFileReader.readNextRowGroup();
     _columnIO = new ColumnIOFactory().getColumnIO(_schema);
     _parquetRecordReader = _columnIO.getRecordReader(_pageReadStore, new GroupRecordConverter(_schema));
@@ -94,14 +93,12 @@ public class ParquetNativeRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next()
-      throws IOException {
+  public GenericRow next() throws IOException {
     return next(new GenericRow());
   }
 
   @Override
-  public GenericRow next(GenericRow reuse)
-      throws IOException {
+  public GenericRow next(GenericRow reuse) throws IOException {
     _nextRecord = (Group) _parquetRecordReader.read();
     _recordExtractor.extract(_nextRecord, reuse);
     _currentPageIdx++;
@@ -109,21 +106,18 @@ public class ParquetNativeRecordReader implements RecordReader {
   }
 
   @Override
-  public void rewind()
-      throws IOException {
+  public void rewind() throws IOException {
     _parquetFileReader.close();
     Configuration conf = new Configuration();
-    _parquetFileReader =
-        new ParquetFileReader(conf, _parquetMetadata.getFileMetaData(), _dataFilePath, _parquetMetadata.getBlocks(),
-            _schema.getColumns());
+    _parquetFileReader = new ParquetFileReader(conf, _parquetMetadata.getFileMetaData(), _dataFilePath,
+        _parquetMetadata.getBlocks(), _schema.getColumns());
     _pageReadStore = _parquetFileReader.readNextRowGroup();
     _parquetRecordReader = _columnIO.getRecordReader(_pageReadStore, new GroupRecordConverter(_schema));
     _currentPageIdx = 0;
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _parquetFileReader.close();
   }
 }

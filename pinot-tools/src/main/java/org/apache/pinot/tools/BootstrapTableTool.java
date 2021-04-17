@@ -71,8 +71,7 @@ public class BootstrapTableTool {
     _authToken = authToken;
   }
 
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
     File setupTableTmpDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
     setupTableTmpDir.mkdirs();
 
@@ -95,9 +94,8 @@ public class BootstrapTableTool {
       tableCreationResult = bootstrapRealtimeTable(tableName, schemaFile, realtimeTableConfigFile);
     }
     if (!tableCreationResult) {
-      throw new RuntimeException(String
-          .format("Unable to find config files for table - %s, at location [%s] or [%s].", tableName,
-              offlineTableConfigFile.getAbsolutePath(), realtimeTableConfigFile.getAbsolutePath()));
+      throw new RuntimeException(String.format("Unable to find config files for table - %s, at location [%s] or [%s].",
+          tableName, offlineTableConfigFile.getAbsolutePath(), realtimeTableConfigFile.getAbsolutePath()));
     }
     return true;
   }
@@ -106,15 +104,14 @@ public class BootstrapTableTool {
       throws Exception {
     LOGGER.info("Adding realtime table {}", tableName);
     if (!createTable(schemaFile, realtimeTableConfigFile)) {
-      throw new RuntimeException(String
-          .format("Unable to create realtime table - %s from schema file [%s] and table conf file [%s].", tableName,
-              schemaFile, realtimeTableConfigFile));
+      throw new RuntimeException(
+          String.format("Unable to create realtime table - %s from schema file [%s] and table conf file [%s].",
+              tableName, schemaFile, realtimeTableConfigFile));
     }
     return true;
   }
 
-  private boolean createTable(File schemaFile, File tableConfigFile)
-      throws Exception {
+  private boolean createTable(File schemaFile, File tableConfigFile) throws Exception {
     return new AddTableCommand().setSchemaFile(schemaFile.getAbsolutePath())
         .setTableConfigFile(tableConfigFile.getAbsolutePath()).setControllerProtocol(_controllerProtocol)
         .setControllerHost(_controllerHost).setControllerPort(String.valueOf(_controllerPort)).setExecute(true)
@@ -122,8 +119,7 @@ public class BootstrapTableTool {
   }
 
   private boolean bootstrapOfflineTable(File setupTableTmpDir, String tableName, File schemaFile,
-      File offlineTableConfigFile, File ingestionJobSpecFile)
-      throws Exception {
+      File offlineTableConfigFile, File ingestionJobSpecFile) throws Exception {
     TableConfig tableConfig =
         JsonUtils.inputStreamToObject(new FileInputStream(offlineTableConfigFile), TableConfig.class);
     if (tableConfig.getIngestionConfig() != null
@@ -139,13 +135,13 @@ public class BootstrapTableTool {
     outputStream.close();
     boolean tableCreationResult = createTable(schemaFile, updatedTableConfigFile);
     if (!tableCreationResult) {
-      throw new RuntimeException(String
-          .format("Unable to create offline table - %s from schema file [%s] and table conf file [%s].", tableName,
-              schemaFile, offlineTableConfigFile));
+      throw new RuntimeException(
+          String.format("Unable to create offline table - %s from schema file [%s] and table conf file [%s].",
+              tableName, schemaFile, offlineTableConfigFile));
     }
     if (tableConfig.getTaskConfig() != null) {
-      final Map<String, String> scheduledTasks = _minionClient
-          .scheduleMinionTasks(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
+      final Map<String, String> scheduledTasks =
+          _minionClient.scheduleMinionTasks(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
               TableNameBuilder.OFFLINE.tableNameWithType(tableName));
       if (scheduledTasks.isEmpty()) {
         LOGGER.info("No scheduled tasks.");
@@ -190,8 +186,7 @@ public class BootstrapTableTool {
     return true;
   }
 
-  private void updatedTableConfig(TableConfig tableConfig, String tableName, File setupTableTmpDir)
-      throws Exception {
+  private void updatedTableConfig(TableConfig tableConfig, String tableName, File setupTableTmpDir) throws Exception {
     final List<Map<String, String>> batchConfigsMaps =
         tableConfig.getIngestionConfig().getBatchIngestionConfig().getBatchConfigMaps();
     for (Map<String, String> batchConfigsMap : batchConfigsMaps) {

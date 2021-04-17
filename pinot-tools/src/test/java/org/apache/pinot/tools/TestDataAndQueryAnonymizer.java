@@ -44,7 +44,8 @@ public class TestDataAndQueryAnonymizer {
 
   @Test
   public void testFilterColumnExtractor() throws Exception {
-    Set<String> filterColumns = PinotDataAndQueryAnonymizer.FilterColumnExtractor.extractColumnsUsedInFilter(getQueryDir(), ORIGINAL_QUERY_FILE_NAME);
+    Set<String> filterColumns = PinotDataAndQueryAnonymizer.FilterColumnExtractor
+        .extractColumnsUsedInFilter(getQueryDir(), ORIGINAL_QUERY_FILE_NAME);
     Assert.assertEquals(7, filterColumns.size());
     Assert.assertTrue(filterColumns.contains("C9"));
     Assert.assertTrue(filterColumns.contains("C10"));
@@ -84,7 +85,8 @@ public class TestDataAndQueryAnonymizer {
       }
     }
 
-    Set<String> filterColumns = PinotDataAndQueryAnonymizer.FilterColumnExtractor.extractColumnsUsedInFilter(pathToQueryDir, ORIGINAL_QUERY_FILE_NAME);
+    Set<String> filterColumns = PinotDataAndQueryAnonymizer.FilterColumnExtractor
+        .extractColumnsUsedInFilter(pathToQueryDir, ORIGINAL_QUERY_FILE_NAME);
     Set<String> timeColumns = new HashSet<>();
     // take 4 of 5 columns as time columns (data retained for these columns)
     // thus the query generator will use the predicate literal value as is
