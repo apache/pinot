@@ -108,12 +108,10 @@ public class GcsPinotFS  extends PinotFS {
   }
 
   private URI normalizeToDirectoryUri(URI uri) throws IOException {
-    LOGGER.info("uri schema {}, host {}, sanitizePath {}", uri.getScheme(), uri.getHost(), sanitizePath(uri.getPath() + DELIMITER));
     if (isPathTerminatedByDelimiter(uri)) {
       return uri;
     }
     try {
-      LOGGER.info("uri schema {}, host {}, sanitizePath {}", uri.getScheme(), uri.getHost(), sanitizePath(uri.getPath() + DELIMITER));
       return new URI(uri.getScheme(), uri.getHost() + "/", sanitizePath(uri.getPath() + DELIMITER), null);
     } catch (URISyntaxException e) {
       throw new IOException(e);
@@ -320,7 +318,7 @@ public class GcsPinotFS  extends PinotFS {
                 throw new RuntimeException(e);
               }
             }
-      });
+          });
       String[] listedFiles = builder.build().toArray(new String[0]);
       LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.length, fileUri, recursive);
       return listedFiles;
