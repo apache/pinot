@@ -141,8 +141,8 @@ public class GcsPinotFS  extends PinotFS {
   }
 
   private boolean existsFile(URI uri) throws IOException {
-    Blob blob = getBlob(uri);
-    return existsBlob(blob);
+      Blob blob = getBlob(uri);
+      return existsBlob(blob);
   }
 
   /**
@@ -266,10 +266,8 @@ public class GcsPinotFS  extends PinotFS {
       boolean copySucceeded = true;
       for (String directoryEntry : listFiles(srcUri, true)) {
         URI src = new URI(srcUri.getScheme(), srcUri.getHost(), directoryEntry, null);
-
         String relativeSrcPath = srcPath.relativize(Paths.get(directoryEntry)).toString();
         String dstPath = dstUri.resolve(relativeSrcPath).getPath();
-
         URI dst = new URI(dstUri.getScheme(), dstUri.getHost(), dstPath, null);
         copySucceeded &= copyFile(src, dst);
       }
@@ -314,15 +312,15 @@ public class GcsPinotFS  extends PinotFS {
         page = storage.list(fileUri.getHost(), Storage.BlobListOption.prefix(prefix), Storage.BlobListOption.currentDirectory());
       }
       page.iterateAll()
-              .forEach(blob -> {
-                if (!blob.getName().equals(prefix)) {
-                  try {
-                    builder.add(new URI(SCHEME, fileUri.getHost(), DELIMITER + blob.getName(), null).toString());
-                  } catch (URISyntaxException e) {
-                    throw new RuntimeException(e);
-                  }
-                }
-              });
+          .forEach(blob -> {
+            if (!blob.getName().equals(prefix)) {
+              try {
+                builder.add(new URI(SCHEME, fileUri.getHost(), DELIMITER + blob.getName(), null).toString());
+              } catch (URISyntaxException e) {
+                throw new RuntimeException(e);
+              }
+            }
+      });
       String[] listedFiles = builder.build().toArray(new String[0]);
       LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.length, fileUri, recursive);
       return listedFiles;
