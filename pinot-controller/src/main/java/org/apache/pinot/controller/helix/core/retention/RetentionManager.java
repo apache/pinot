@@ -113,7 +113,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       retentionStrategy = new TimeRetentionStrategy(TimeUnit.valueOf(retentionTimeUnit.toUpperCase()),
           Long.parseLong(retentionTimeValue));
     } catch (Exception e) {
-      LOGGER.warn("Invalid retention time: {} {} for table: {}, skip", retentionTimeUnit, retentionTimeValue);
+      LOGGER.warn("Invalid retention time: {} {} for table: {}, skip", retentionTimeUnit, retentionTimeValue, tableNameWithType);
       return;
     }
 
