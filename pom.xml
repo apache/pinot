@@ -1576,6 +1576,10 @@
               <order>,\#</order>
             </importOrder>
             <removeUnusedImports />
+            <eclipse>
+              <file>${pinot.root}/config/codestyle-eclipse.xml</file>
+              <version>4.10.0</version>
+            </eclipse>
           </java>
         </configuration>
       </plugin>
