@@ -108,7 +108,8 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
     List<Expression> operands = function.getOperands();
     if (function.getOperator().equals(FilterKind.AND.name())) {
       // If any of the literal operands are FALSE, then replace AND function with FALSE.
-      if (operands.stream().anyMatch(operand -> operand.getType() == ExpressionType.LITERAL && operand.getLiteral().equals(FALSE))) {
+      if (operands.stream()
+          .anyMatch(operand -> operand.getType() == ExpressionType.LITERAL && operand.getLiteral().equals(FALSE))) {
         return setExpressionToBoolean(expression, false);
       }
 
@@ -119,7 +120,8 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
       }
     } else if (function.getOperator().equals(FilterKind.OR.name())) {
       // If any of the literal operands are TRUE, then replace OR function with TRUE
-      if (operands.stream().anyMatch(operand -> operand.getType() == ExpressionType.LITERAL && operand.getLiteral().equals(TRUE))) {
+      if (operands.stream()
+          .anyMatch(operand -> operand.getType() == ExpressionType.LITERAL && operand.getLiteral().equals(TRUE))) {
         return setExpressionToBoolean(expression, true);
       }
 
