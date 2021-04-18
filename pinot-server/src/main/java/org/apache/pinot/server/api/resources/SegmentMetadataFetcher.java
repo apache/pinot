@@ -44,6 +44,7 @@ public class SegmentMetadataFetcher {
   private static final String INVERTED_INDEX = "inverted-index";
   private static final String NULL_VALUE_VECTOR_READER = "null-value-vector-reader";
   private static final String RANGE_INDEX = "range-index";
+  private static final String JSON_INDEX = "json-index";
 
   private static final String INDEX_NOT_AVAILABLE = "NO";
   private static final String INDEX_AVAILABLE = "YES";
@@ -126,6 +127,12 @@ public class SegmentMetadataFetcher {
         indexStatus.put(RANGE_INDEX, INDEX_NOT_AVAILABLE);
       } else {
         indexStatus.put(RANGE_INDEX, INDEX_AVAILABLE);
+      }
+
+      if (Objects.isNull(columnIndexContainer.getJsonIndex())){
+        indexStatus.put(JSON_INDEX, INDEX_NOT_AVAILABLE);
+      } else {
+        indexStatus.put(JSON_INDEX, INDEX_AVAILABLE);
       }
 
       columnIndexMap.put(entry.getKey(), indexStatus);
