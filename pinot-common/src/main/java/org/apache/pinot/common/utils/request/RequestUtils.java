@@ -126,6 +126,12 @@ public class RequestUtils {
     return expression;
   }
 
+  public static Expression getLiteralExpression(int value) {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setIntValue(value);
+    return expression;
+  }
+
   public static Expression getLiteralExpression(long value) {
     Expression expression = createNewLiteralExpression();
     expression.getLiteral().setLongValue(value);
@@ -151,7 +157,10 @@ public class RequestUtils {
   }
 
   public static Expression getLiteralExpression(Object object) {
-    if (object instanceof Integer || object instanceof Long) {
+    if (object instanceof Integer) {
+      return RequestUtils.getLiteralExpression(((Number) object).intValue());
+    }
+    if (object instanceof Long) {
       return RequestUtils.getLiteralExpression(((Number) object).longValue());
     }
     if (object instanceof Float || object instanceof Double) {
