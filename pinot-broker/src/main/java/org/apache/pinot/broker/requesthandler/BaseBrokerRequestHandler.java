@@ -324,6 +324,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // Prepare offline and real-time requests
     BrokerRequest offlineBrokerRequest = null;
     BrokerRequest realtimeBrokerRequest = null;
+    BrokerResponse earlyBrokerResponse = null;
     if ((offlineTableName != null) && (realtimeTableName != null)) {
       // Hybrid
       offlineBrokerRequest = getOfflineBrokerRequest(brokerRequest);
@@ -343,6 +344,15 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       optimize(brokerRequest, rawTableName);
       realtimeBrokerRequest = brokerRequest;
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.REALTIME);
+    }
+
+    // Check if response can be send without server query evaluation.
+    if (isResponsePossible(offlineBrokerRequest) && isResponsePossible(realtimeBrokerRequest)) {
+      BrokerResponse brokerResponse = BrokerResponseNative.empty();
+      logBrokerResponse(requestStatistics, requestId, query, compilationStartTimeNs, brokerRequest,
+          0, new ServerStats(), brokerResponse, System.nanoTime());
+
+      return brokerResponse;
     }
 
     // Calculate routing table for the query
@@ -428,6 +438,39 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED, 1);
     }
 
+    logBrokerResponse(requestStatistics, requestId, query, compilationStartTimeNs, brokerRequest,
+        numUnavailableSegments, serverStats, brokerResponse, executionEndTimeNs);
+    return brokerResponse;
+  }
+
+  /**
+   * Given a {@link BrokerRequest}, this function will determine if we can return a response without server-side query
+   * evaluation. Such a broker response will usually happen if the optimizer determines that the entire predicate
+   * evaluates to false.
+   */
+  private boolean isResponsePossible(BrokerRequest brokerRequest) {
+    if (brokerRequest == null) { return true;}
+
+    Expression filterExpression = brokerRequest.getPinotQuery().getFilterExpression();
+    if (filterExpression != null && filterExpression.getType().equals(ExpressionType.LITERAL) && filterExpression
+        .getLiteral().getSetField().equals(Literal._Fields.BOOL_VALUE)) {
+      if (filterExpression.getLiteral().getBoolValue()) {
+        // Optimizer determined that WHERE clause is redundant. Remove WHERE clause before server-side evaluation.
+        brokerRequest.getPinotQuery().setFilterExpression(null);
+        return false;
+      } else {
+        // WHERE clause evaluates to false, broker can return response without server-side query evaluation.
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /** Log {@link BrokerResponse} related information */
+  private void logBrokerResponse(RequestStatistics requestStatistics, long requestId, String query,
+      long compilationStartTimeNs, BrokerRequest brokerRequest, int numUnavailableSegments, ServerStats serverStats,
+      BrokerResponse brokerResponse, long executionEndTimeNs) {
     // Set total query processing time
     long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(executionEndTimeNs - compilationStartTimeNs);
     brokerResponse.setTimeUsedMs(totalTimeMs);
@@ -442,7 +485,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       // Table name might have been changed (with suffix _OFFLINE/_REALTIME appended)
       LOGGER.info("requestId={},table={},timeMs={},docs={}/{},entries={}/{},"
               + "segments(queried/processed/matched/consuming/unavailable):{}/{}/{}/{}/{},consumingFreshnessTimeMs={},"
-              + "servers={}/{},groupLimitReached={},brokerReduceTimeMs={},exceptions={},serverStats={},query={}", requestId,
+              + "servers={}/{},groupLimitReached={},brokerReduceTimeMs={},exceptions={},serverStats={},query={}",
+          requestId,
           brokerRequest.getQuerySource().getTableName(), totalTimeMs, brokerResponse.getNumDocsScanned(),
           brokerResponse.getTotalDocs(), brokerResponse.getNumEntriesScannedInFilter(),
           brokerResponse.getNumEntriesScannedPostFilter(), brokerResponse.getNumSegmentsQueried(),
@@ -468,7 +512,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       // Increment the count for dropped log
       _numDroppedLog.incrementAndGet();
     }
-    return brokerResponse;
   }
 
   /**

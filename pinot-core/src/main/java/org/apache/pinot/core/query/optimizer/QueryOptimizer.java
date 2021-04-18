@@ -31,12 +31,14 @@ import org.apache.pinot.core.query.optimizer.filter.FilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.FlattenAndOrFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.MergeEqInFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.MergeRangeFilterOptimizer;
+import org.apache.pinot.core.query.optimizer.filter.NumericalFilterOptimizer;
 import org.apache.pinot.spi.data.Schema;
 
 
 public class QueryOptimizer {
   private static final List<FilterOptimizer> FILTER_OPTIMIZERS = Arrays
-      .asList(new FlattenAndOrFilterOptimizer(), new MergeEqInFilterOptimizer(), new MergeRangeFilterOptimizer());
+      .asList(new FlattenAndOrFilterOptimizer(), new MergeEqInFilterOptimizer(), new MergeRangeFilterOptimizer(),
+          new NumericalFilterOptimizer());
 
   /**
    * Optimizes the given PQL query.
