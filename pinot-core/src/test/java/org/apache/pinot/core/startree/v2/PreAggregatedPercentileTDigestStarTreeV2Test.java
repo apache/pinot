@@ -21,8 +21,8 @@ package org.apache.pinot.core.startree.v2;
 import com.tdunning.math.stats.TDigest;
 import java.util.Random;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
-import org.apache.pinot.core.data.aggregator.PercentileTDigestValueAggregator;
-import org.apache.pinot.core.data.aggregator.ValueAggregator;
+import org.apache.pinot.segment.local.aggregator.PercentileTDigestValueAggregator;
+import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 import static org.testng.Assert.assertEquals;

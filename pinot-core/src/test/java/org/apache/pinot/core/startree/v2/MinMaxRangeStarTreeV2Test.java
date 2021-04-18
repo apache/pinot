@@ -19,10 +19,10 @@
 package org.apache.pinot.core.startree.v2;
 
 import java.util.Random;
+import org.apache.pinot.segment.local.aggregator.MinMaxRangeValueAggregator;
+import org.apache.pinot.segment.local.aggregator.ValueAggregator;
+import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.core.data.aggregator.MinMaxRangeValueAggregator;
-import org.apache.pinot.core.data.aggregator.ValueAggregator;
-import org.apache.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
 
 import static org.testng.Assert.assertEquals;
 

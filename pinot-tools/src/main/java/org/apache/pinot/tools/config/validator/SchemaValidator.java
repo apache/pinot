@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.tools.config.validator;
 
-import org.apache.pinot.core.util.SchemaUtils;
+import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.spi.data.Schema;
 
 

@@ -24,9 +24,9 @@ import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.lang.StringUtils;
 import org.apache.http.Header;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.NetUtil;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -137,7 +137,7 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
   public String run()
       throws Exception {
     if (_controllerHost == null) {
-      _controllerHost = NetUtil.getHostAddress();
+      _controllerHost = NetUtils.getHostAddress();
     }
     LOGGER.info("Executing command: " + toString());
     if (StringUtils.isEmpty(_config) && !_operation.equalsIgnoreCase("GET")) {

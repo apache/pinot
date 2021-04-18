@@ -76,9 +76,10 @@ type Props = {
   fetchSQLData: Function;
   tableSchema: TableData;
   selectedTable: string;
+  queryLoader: boolean;
 };
 
-const Sidebar = ({ tableList, fetchSQLData, tableSchema, selectedTable }: Props) => {
+const Sidebar = ({ tableList, fetchSQLData, tableSchema, selectedTable, queryLoader }: Props) => {
   const classes = useStyles();
 
   return (
@@ -104,7 +105,7 @@ const Sidebar = ({ tableList, fetchSQLData, tableSchema, selectedTable }: Props)
               showSearchBox={false}
             />
 
-            {tableSchema.records.length ? (
+            {!queryLoader && tableSchema.records.length ? (
               <CustomizedTables
                 title={`${selectedTable} schema`}
                 data={tableSchema}

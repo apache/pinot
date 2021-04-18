@@ -19,7 +19,6 @@
 package org.apache.pinot.broker.routing.segmentpruner;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;

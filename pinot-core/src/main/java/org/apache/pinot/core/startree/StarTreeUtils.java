@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.startree;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -30,26 +28,19 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.predicate.Predicate;
-import org.apache.pinot.core.segment.creator.impl.V1Constants;
-import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
-import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
-import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
-import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 
 
 @SuppressWarnings("rawtypes")
@@ -187,57 +178,5 @@ public class StarTreeUtils {
 
     // Check predicate columns
     return starTreeDimensions.containsAll(predicateColumns);
-  }
-
-  /**
-   * Returns {@code true} if the given star-tree builder configs do not match the star-tree metadata, in which case the
-   * existing star-trees need to be removed, {@code false} otherwise.
-   */
-  public static boolean shouldRemoveExistingStarTrees(List<StarTreeV2BuilderConfig> builderConfigs,
-      List<StarTreeV2Metadata> metadataList) {
-    int numStarTrees = builderConfigs.size();
-    if (metadataList.size() != numStarTrees) {
-      return true;
-    }
-    for (int i = 0; i < numStarTrees; i++) {
-      StarTreeV2BuilderConfig builderConfig = builderConfigs.get(i);
-      StarTreeV2Metadata metadata = metadataList.get(i);
-      if (!builderConfig.getDimensionsSplitOrder().equals(metadata.getDimensionsSplitOrder())) {
-        return true;
-      }
-      if (!builderConfig.getSkipStarNodeCreationForDimensions()
-          .equals(metadata.getSkipStarNodeCreationForDimensions())) {
-        return true;
-      }
-      if (!builderConfig.getFunctionColumnPairs().equals(metadata.getFunctionColumnPairs())) {
-        return true;
-      }
-      if (builderConfig.getMaxLeafRecords() != metadata.getMaxLeafRecords()) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
-   * Removes all the star-trees from the given segment.
-   */
-  public static void removeStarTrees(File indexDir)
-      throws Exception {
-    File segmentDirectory = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
-
-    // Remove the star-tree metadata
-    PropertiesConfiguration metadataProperties =
-        CommonsConfigurationUtils.fromFile(new File(segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
-    metadataProperties.subset(StarTreeV2Constants.MetadataKey.STAR_TREE_SUBSET).clear();
-    // Commons Configuration 1.10 does not support file path containing '%'.
-    // Explicitly providing the output stream for the file bypasses the problem.
-    try (FileOutputStream fileOutputStream = new FileOutputStream(metadataProperties.getFile())) {
-      metadataProperties.save(fileOutputStream);
-    }
-
-    // Remove the index file and index map file
-    FileUtils.forceDelete(new File(segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME));
-    FileUtils.forceDelete(new File(segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME));
   }
 }

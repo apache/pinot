@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 
 
 /**

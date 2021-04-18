@@ -23,11 +23,10 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map;
-
 import org.apache.commons.configuration.ConfigurationException;
-import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.services.ServiceRole;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
 import org.kohsuke.args4j.Option;
@@ -153,7 +152,7 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
       properties.putAll(PinotConfigUtils.generateControllerConf(_configFileName));
     } else {
       if (_controllerHost == null) {
-        _controllerHost = NetUtil.getHostAddress();
+        _controllerHost = NetUtils.getHostAddress();
       }
       properties.putAll(PinotConfigUtils
           .generateControllerConf(_zkAddress, _clusterName, _controllerHost, _controllerPort, _dataDir, _controllerMode,

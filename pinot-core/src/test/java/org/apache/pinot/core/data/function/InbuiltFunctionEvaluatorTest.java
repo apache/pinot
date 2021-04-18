@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.function;
 
 import java.util.Collections;
 import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.annotations.Test;
 

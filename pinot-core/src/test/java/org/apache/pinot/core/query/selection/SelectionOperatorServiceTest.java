@@ -26,10 +26,11 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.PriorityQueue;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -133,9 +134,9 @@ public class SelectionOperatorServiceTest {
     // For non 'SELECT *', should return selection columns as is
     DataSchema dataSchema = mock(DataSchema.class);
     List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(Arrays
-        .asList(QueryContextConverterUtils.getExpression("add(foo,'1')"),
-            QueryContextConverterUtils.getExpression("sub(bar,'2')"),
-            QueryContextConverterUtils.getExpression("foobar")), dataSchema);
+        .asList(RequestContextUtils.getExpression("add(foo,'1')"),
+            RequestContextUtils.getExpression("sub(bar,'2')"),
+            RequestContextUtils.getExpression("foobar")), dataSchema);
     assertEquals(selectionColumns, Arrays.asList("add(foo,'1')", "sub(bar,'2')", "foobar"));
 
     // 'SELECT *' should return columns (no transform expressions) in alphabetical order

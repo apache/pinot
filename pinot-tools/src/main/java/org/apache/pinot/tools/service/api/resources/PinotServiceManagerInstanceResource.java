@@ -19,17 +19,16 @@
 
 package org.apache.pinot.tools.service.api.resources;
 
-import static org.apache.pinot.common.utils.CommonConstants.Controller.CONFIG_OF_CONTROLLER_METRICS_PREFIX;
-import static org.apache.pinot.common.utils.CommonConstants.Controller.DEFAULT_METRICS_PREFIX;
-import static org.apache.pinot.tools.utils.PinotConfigUtils.TMP_DIR;
-import static org.apache.pinot.tools.utils.PinotConfigUtils.getAvailablePort;
-
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -41,23 +40,21 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-
 import org.apache.commons.configuration.Configuration;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.services.ServiceRole;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.service.PinotServiceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
-import io.swagger.annotations.ApiParam;
-import io.swagger.annotations.ApiResponse;
-import io.swagger.annotations.ApiResponses;
+import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONFIG_OF_CONTROLLER_METRICS_PREFIX;
+import static org.apache.pinot.spi.utils.CommonConstants.Controller.DEFAULT_METRICS_PREFIX;
+import static org.apache.pinot.tools.utils.PinotConfigUtils.TMP_DIR;
+import static org.apache.pinot.tools.utils.PinotConfigUtils.getAvailablePort;
 
 
 @Api(tags = "Startable")
@@ -165,7 +162,7 @@ public class PinotServiceManagerInstanceResource {
             Optional.ofNullable(properties.get(ControllerConf.CONTROLLER_HOST)).map(Object::toString).orElse(null);
         if (controllerHost == null) {
           try {
-            controllerHost = NetUtil.getHostAddress();
+            controllerHost = NetUtils.getHostAddress();
           } catch (Exception e) {
             controllerHost = "localhost";
           }
@@ -198,7 +195,7 @@ public class PinotServiceManagerInstanceResource {
         if (!properties.containsKey(CommonConstants.Broker.METRICS_CONFIG_PREFIX)) {
           String hostname;
           try {
-            hostname = NetUtil.getHostAddress();
+            hostname = NetUtils.getHostAddress();
           } catch (Exception e) {
             hostname = "localhost";
           }
@@ -211,7 +208,7 @@ public class PinotServiceManagerInstanceResource {
         if (!properties.containsKey(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST)) {
           String hostname;
           try {
-            hostname = NetUtil.getHostAddress();
+            hostname = NetUtils.getHostAddress();
           } catch (Exception e) {
             hostname = "localhost";
           }
@@ -250,7 +247,7 @@ public class PinotServiceManagerInstanceResource {
         if (!properties.containsKey(CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX_KEY)) {
           String hostname;
           try {
-            hostname = NetUtil.getHostAddress();
+            hostname = NetUtils.getHostAddress();
           } catch (Exception e) {
             hostname = "localhost";
           }

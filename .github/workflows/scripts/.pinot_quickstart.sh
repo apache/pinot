@@ -21,6 +21,10 @@
 # Print environment variables
 printenv
 
+# Check network
+ifconfig
+netstat -i
+
 # Java version
 java -version
 

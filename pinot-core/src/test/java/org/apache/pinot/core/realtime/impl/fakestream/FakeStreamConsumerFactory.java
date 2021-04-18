@@ -19,7 +19,7 @@
 package org.apache.pinot.core.realtime.impl.fakestream;
 
 import java.util.Set;
-import org.apache.pinot.core.util.IngestionUtils;
+import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;

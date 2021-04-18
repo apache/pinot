@@ -19,17 +19,15 @@
 package org.apache.pinot.server.starter.helix;
 
 import java.util.Optional;
-
 import org.apache.commons.configuration.ConfigurationException;
-import org.apache.http.auth.AUTH;
-import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.common.utils.CommonConstants.Server;
-import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.common.utils.CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI;
+import static org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI;
 
 
 /**

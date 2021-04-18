@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.spi.creator.name;
 
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
 
 
 /**

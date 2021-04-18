@@ -19,14 +19,11 @@
 package org.apache.pinot.tools.admin.command;
 
 import java.net.URI;
-import java.net.URL;
 import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpURL;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.NetUtil;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -67,7 +64,7 @@ public class ChangeTableState extends AbstractBaseAdminCommand implements Comman
   public boolean execute()
       throws Exception {
     if (_controllerHost == null) {
-      _controllerHost = NetUtil.getHostAddress();
+      _controllerHost = NetUtils.getHostAddress();
     }
 
     String stateValue = _state.toLowerCase();

@@ -27,17 +27,17 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.instance.InstanceType;
+import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.fail;
 
 
 /**
@@ -48,12 +48,14 @@ public class PinotInstanceRestletResourceTest {
   private static final long GET_CALL_TIMEOUT_MS = 10000;
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     ControllerTestUtils.setupClusterAndValidate();
   }
 
   @Test
-  public void testInstanceListingAndCreation() throws Exception {
+  public void testInstanceListingAndCreation()
+      throws Exception {
     // Check that there is only one CONTROLLER instance in the cluster
     String listInstancesUrl = ControllerTestUtils.getControllerRequestURLBuilder().forInstanceList();
 
@@ -85,7 +87,7 @@ public class PinotInstanceRestletResourceTest {
     Instance brokerInstance = new Instance("1.2.3.4", 1234, InstanceType.BROKER, null, null, 0, 0, false);
     ControllerTestUtils.sendPostRequest(createInstanceUrl, brokerInstance.toJsonString());
 
-    Instance serverInstance = new Instance("1.2.3.4", 2345, InstanceType.SERVER, null, null, 8090, 8091,false);
+    Instance serverInstance = new Instance("1.2.3.4", 2345, InstanceType.SERVER, null, null, 8090, 8091, false);
     ControllerTestUtils.sendPostRequest(createInstanceUrl, serverInstance.toJsonString());
 
     // Check that we have added two more instances
@@ -142,30 +144,34 @@ public class PinotInstanceRestletResourceTest {
 
     String newServerTag = "new-server-tag";
     Instance newServerInstance =
-        new Instance("1.2.3.4", 2345, InstanceType.SERVER, Collections.singletonList(newServerTag), null, 28090, 28091, true);
+        new Instance("1.2.3.4", 2345, InstanceType.SERVER, Collections.singletonList(newServerTag), null, 28090, 28091,
+            true);
     String serverInstanceId = "Server_1.2.3.4_2345";
     String serverInstanceUrl = ControllerTestUtils.getControllerRequestURLBuilder().forInstance(serverInstanceId);
     ControllerTestUtils.sendPutRequest(serverInstanceUrl, newServerInstance.toJsonString());
 
     checkInstanceInfo(brokerInstanceId, "Broker_1.2.3.4", 1234, new String[]{newBrokerTag}, null, null, false);
-    checkInstanceInfo(serverInstanceId, "Server_1.2.3.4", 2345, new String[]{newServerTag}, null, null, 28090, 28091, true);
+    checkInstanceInfo(serverInstanceId, "Server_1.2.3.4", 2345, new String[]{newServerTag}, null, null, 28090, 28091,
+        true);
 
     // Test Instance updateTags API
-    String brokerInstanceUpdateTagsUrl = ControllerTestUtils.getControllerRequestURLBuilder().forInstanceUpdateTags(brokerInstanceId,
-        Lists.newArrayList("tag_BROKER", "newTag_BROKER"));
+    String brokerInstanceUpdateTagsUrl = ControllerTestUtils.getControllerRequestURLBuilder()
+        .forInstanceUpdateTags(brokerInstanceId, Lists.newArrayList("tag_BROKER", "newTag_BROKER"));
     ControllerTestUtils.sendPutRequest(brokerInstanceUpdateTagsUrl);
-    String serverInstanceUpdateTagsUrl = ControllerTestUtils.getControllerRequestURLBuilder().forInstanceUpdateTags(serverInstanceId,
-        Lists.newArrayList("tag_REALTIME", "newTag_OFFLINE", "newTag_REALTIME"));
+    String serverInstanceUpdateTagsUrl = ControllerTestUtils.getControllerRequestURLBuilder()
+        .forInstanceUpdateTags(serverInstanceId,
+            Lists.newArrayList("tag_REALTIME", "newTag_OFFLINE", "newTag_REALTIME"));
     ControllerTestUtils.sendPutRequest(serverInstanceUpdateTagsUrl);
-    checkInstanceInfo(brokerInstanceId, "Broker_1.2.3.4", 1234, new String[]{"tag_BROKER", "newTag_BROKER"}, null,
-        null, false);
+    checkInstanceInfo(brokerInstanceId, "Broker_1.2.3.4", 1234, new String[]{"tag_BROKER", "newTag_BROKER"}, null, null,
+        false);
     checkInstanceInfo(serverInstanceId, "Server_1.2.3.4", 2345,
         new String[]{"tag_REALTIME", "newTag_OFFLINE", "newTag_REALTIME"}, null, null, 28090, 28091, true);
   }
 
   private void checkInstanceInfo(String instanceName, String hostName, int port, String[] tags, String[] pools,
       int[] poolValues, boolean queriesDisabled) {
-    checkInstanceInfo(instanceName, hostName, port, tags, pools, poolValues, Instance.NOT_SET_GRPC_PORT_VALUE, Instance.NOT_SET_ADMIN_PORT_VALUE, queriesDisabled);
+    checkInstanceInfo(instanceName, hostName, port, tags, pools, poolValues, Instance.NOT_SET_GRPC_PORT_VALUE,
+        Instance.NOT_SET_ADMIN_PORT_VALUE, queriesDisabled);
   }
 
   private void checkInstanceInfo(String instanceName, String hostName, int port, String[] tags, String[] pools,
@@ -175,16 +181,19 @@ public class PinotInstanceRestletResourceTest {
       @Override
       public Boolean apply(@Nullable Void aVoid) {
         try {
-          String getResponse = ControllerTestUtils.sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder().forInstance(instanceName));
+          String getResponse = ControllerTestUtils
+              .sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder().forInstance(instanceName));
           JsonNode instance = JsonUtils.stringToJsonNode(getResponse);
           boolean result =
               (instance.get("instanceName") != null) && (instance.get("instanceName").asText().equals(instanceName))
                   && (instance.get("hostName") != null) && (instance.get("hostName").asText().equals(hostName)) && (
                   instance.get("port") != null) && (instance.get("port").asText().equals(String.valueOf(port)))
                   && (instance.get("enabled").asBoolean()) && (instance.get("tags") != null) && (
-                  instance.get("tags").size() == tags.length) && (instance.get("grpcPort").asText().equals(String.valueOf(grpcPort))
-                  && (instance.get("queriesDisabled") == null && !queriesDisabled ||
-                  instance.get("queriesDisabled") != null && instance.get("queriesDisabled").asBoolean() == queriesDisabled));
+                  instance.get("tags").size() == tags.length) && (
+                  instance.get("grpcPort").asText().equals(String.valueOf(grpcPort)) && (
+                      instance.get("queriesDisabled") == null && !queriesDisabled
+                          || instance.get("queriesDisabled") != null
+                          && instance.get("queriesDisabled").asBoolean() == queriesDisabled));
 
           for (int i = 0; i < tags.length; i++) {
             result = result && instance.get("tags").get(i).asText().equals(tags[i]);

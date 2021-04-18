@@ -34,8 +34,8 @@ import org.apache.helix.task.TaskConfig;
 import org.apache.helix.task.TaskDriver;
 import org.apache.helix.task.TaskState;
 import org.apache.helix.task.WorkflowConfig;
-import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

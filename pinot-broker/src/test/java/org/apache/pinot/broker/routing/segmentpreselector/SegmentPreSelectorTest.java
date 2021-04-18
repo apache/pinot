@@ -35,7 +35,7 @@ import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
 
 
 public class SegmentPreSelectorTest {

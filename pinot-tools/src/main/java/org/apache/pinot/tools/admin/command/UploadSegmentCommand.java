@@ -24,10 +24,10 @@ import java.net.URI;
 import java.util.Collections;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.message.BasicNameValuePair;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -136,7 +136,7 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
   public boolean execute()
       throws Exception {
     if (_controllerHost == null) {
-      _controllerHost = NetUtil.getHostAddress();
+      _controllerHost = NetUtils.getHostAddress();
     }
 
     // Create a temporary working directory.
