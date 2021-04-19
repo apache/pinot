@@ -19,10 +19,14 @@
 
 package org.apache.pinot.controller.recommender.rules.impl;
 
+import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.controller.recommender.io.ConfigManager;
 import org.apache.pinot.controller.recommender.io.InputManager;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -33,7 +37,8 @@ public class AggregateMetricsRuleTest {
   @Test
   public void testRun()
       throws Exception {
-    InputManager input = createInput("select sum(a), sum(b), sum(c) from tableT", "select sum(a) from tableT2");
+    Set<String> metrics = ImmutableSet.of("a", "b", "c");
+    InputManager input = createInput(metrics, "select sum(a), sum(b), sum(c) from tableT", "select sum(a) from tableT2");
     ConfigManager output = new ConfigManager();
     AggregateMetricsRule rule = new AggregateMetricsRule(input, output);
     rule.run();
@@ -43,7 +48,8 @@ public class AggregateMetricsRuleTest {
   @Test
   public void testRun_nonAggregate()
       throws Exception {
-    InputManager input = createInput("select sum(a), sum(b), sum(c) from tableT", "select sum(a), b from tableT2");
+    Set<String> metrics = ImmutableSet.of("a", "b", "c");
+    InputManager input = createInput(metrics, "select sum(a), sum(b), sum(c) from tableT", "select sum(a), b from tableT2");
     ConfigManager output = new ConfigManager();
     AggregateMetricsRule rule = new AggregateMetricsRule(input, output);
     rule.run();
@@ -53,7 +59,41 @@ public class AggregateMetricsRuleTest {
   @Test
   public void testRun_nonAggregate_withNonSumFunction()
       throws Exception {
-    InputManager input = createInput("select sum(a), sum(b), max(c) from tableT");
+    Set<String> metrics = ImmutableSet.of("a", "b", "c");
+    InputManager input = createInput(metrics, "select sum(a), sum(b), max(c) from tableT");
+    ConfigManager output = new ConfigManager();
+    AggregateMetricsRule rule = new AggregateMetricsRule(input, output);
+    rule.run();
+    assertFalse(output.isAggregateMetrics());
+  }
+
+  @Test
+  public void testRun_nonMetricColumnInSum()
+      throws Exception {
+    Set<String> metrics = ImmutableSet.of("a", "b", "c");
+    InputManager input = createInput(metrics, "select sum(a), sum(b), sum(X) from tableT");
+    ConfigManager output = new ConfigManager();
+    AggregateMetricsRule rule = new AggregateMetricsRule(input, output);
+    rule.run();
+    assertFalse(output.isAggregateMetrics());
+  }
+
+  @Test
+  public void testRun_complexExpressionInSum_withMetricColumns()
+      throws Exception {
+    Set<String> metrics = ImmutableSet.of("a", "b", "c");
+    InputManager input = createInput(metrics, "select sum(a), sum(b), sum(2 * a + 3 * b + c) from tableT");
+    ConfigManager output = new ConfigManager();
+    AggregateMetricsRule rule = new AggregateMetricsRule(input, output);
+    rule.run();
+    assertTrue(output.isAggregateMetrics());
+  }
+
+  @Test
+  public void testRun_complexExpressionInSum_withSomeNonMetricColumns()
+      throws Exception {
+    Set<String> metrics = ImmutableSet.of("a", "b", "c");
+    InputManager input = createInput(metrics, "select sum(a), sum(b), sum(2 * a + 3 * b + X) from tableT");
     ConfigManager output = new ConfigManager();
     AggregateMetricsRule rule = new AggregateMetricsRule(input, output);
     rule.run();
@@ -63,7 +103,8 @@ public class AggregateMetricsRuleTest {
   @Test
   public void testRun_offlineTable()
       throws Exception {
-    InputManager input = createInput("select sum(a), sum(b), sum(c) from tableT");
+    Set<String> metrics = ImmutableSet.of("a", "b", "c");
+    InputManager input = createInput(metrics, "select sum(a), sum(b), sum(c) from tableT");
     input.setTableType("OFFLINE");
     ConfigManager output = new ConfigManager();
     AggregateMetricsRule rule = new AggregateMetricsRule(input, output);
@@ -72,7 +113,7 @@ public class AggregateMetricsRuleTest {
   }
 
 
-  private InputManager createInput(String... queries)
+  private InputManager createInput(Set<String> metricNames, String... queries)
       throws Exception {
     InputManager input = new InputManager();
     Map<String, Double> queryWithWeight = new HashMap<>();
@@ -81,6 +122,7 @@ public class AggregateMetricsRuleTest {
     }
     input.setQueryWeightMap(queryWithWeight);
     input.setTableType("Realtime");
+    metricNames.forEach(metric -> input.getSchema().addField(new MetricFieldSpec(metric, FieldSpec.DataType.INT)));
     input.init();
     return input;
   }
