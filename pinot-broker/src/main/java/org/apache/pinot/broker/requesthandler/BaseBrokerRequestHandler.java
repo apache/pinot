@@ -324,7 +324,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // Prepare offline and real-time requests
     BrokerRequest offlineBrokerRequest = null;
     BrokerRequest realtimeBrokerRequest = null;
-    BrokerResponse earlyBrokerResponse = null;
     if ((offlineTableName != null) && (realtimeTableName != null)) {
       // Hybrid
       offlineBrokerRequest = getOfflineBrokerRequest(brokerRequest);
@@ -445,8 +444,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   /**
    * Given a {@link BrokerRequest}, this function will determine if we can return a response without server-side query
-   * evaluation. Such a broker response will usually happen if the optimizer determines that the entire predicate
-   * evaluates to false.
+   * evaluation. This usually happens when the optimizer determines that the entire WHERE clause evaluates to false.
    */
   private boolean isResponsePossible(BrokerRequest brokerRequest) {
     if (brokerRequest == null) { return true;}

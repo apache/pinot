@@ -33,27 +33,28 @@ import org.apache.pinot.spi.data.Schema;
 
 /**
  * Numerical expressions of form "column = literal" or "column != literal" can compare a column of one datatype
- * (say INT) with a literal of different datatype (say DOUBLE) can not be evaluated on the Server. Hence, this class
- * will rewrite such expressions into an equivalent expression whose LHS and RHS are of the same datatype.
+ * (say INT) with a literal of different datatype (say DOUBLE). These expressions can not be evaluated on the Server.
+ * Hence, we rewrite such expressions into an equivalent expression whose LHS and RHS are of the same datatype.
  *
  * Simple predicate examples:
  *  1) WHERE "intColumn = 5.0"  gets rewritten to "WHERE intColumn = 5"
  *  2) WHERE "intColumn != 5.0" gets rewritten to "WHERE intColumn != 5"
- *  3) WHERE "intColumn = 5.5"  gets rewritten to "WHERE false" because 5.5 will never match any value in an INT column.
+ *  3) WHERE "intColumn = 5.5"  gets rewritten to "WHERE false" because INT values can not match 5.5.
+ *  4) WHERE "intColumn = 3000000000 gets rewritten to "WHERE false" because INT values can not match 3000000000.
+ *  5) WHERE "intColumn != 3000000000 gets rewritten to "WHERE true" becuase INT values always not equal to 3000000000.
  *
  * Compound predicate examples:
- *  4) WHERE "intColumn1 = 5.5 AND intColumn2 = intColumn3"
+ *  6) WHERE "intColumn1 = 5.5 AND intColumn2 = intColumn3"
  *       rewrite to "WHERE false AND intColumn2 = intColumn3"
  *       rewrite to "WHERE intColumn2 = intColumn3"
- *  5) WHERE "intColumn1 != 5.5 OR intColumn2 = intColumn3"
+ *  7) WHERE "intColumn1 != 5.5 OR intColumn2 = intColumn3"
  *       rewrite to "WHERE true OR intColumn2 = intColumn3"
  *       rewrite to "WHERE true"
  *       rewrite to query without any WHERE clause.
  *
- * Short-circuit evaluation:
- * In the 3rd example above, the entire predicate has been rewritten into "false". This basically means that the query
- * will not return any data if it is evaluated on the server side, so its better that the Broker itself returns an empty
- * result back to client instead of sending the query to brokers for evaluation.
+ * When entire predicate gets rewritten to false (Example 3 above), the query will not return any data. Hence, it is
+ * better for the Broker itself to return an empty response rather than sending the query to servers for further
+ * evaluation.
  */
 public class NumericalFilterOptimizer implements FilterOptimizer {
 
@@ -82,7 +83,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
       // recursively traverse the expression tree to see if we find an EQUALS function to rewrite.
       operands.forEach(operand -> optimize(operand, schema));
 
-      // Process the current node to clean up any operands that got set to true/false literal.
+      // We have rewritten the child operands, so rewrite the parent if needed.
       return optimizeCurrent(expression);
     }
 
@@ -174,6 +175,10 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
     return expression;
   }
 
+  /**
+   * Rewrite expressions of form "column = literal" or "column != literal" to ensure that RHS literal is the same
+   * datatype as LHS column.
+   */
   private Expression rewrite(Expression equals, Expression lhs, Expression rhs, Schema schema) {
     // Get expression operator
     boolean result = equals.getFunctionCall().getOperator().equals(FilterKind.NOT_EQUALS.name());

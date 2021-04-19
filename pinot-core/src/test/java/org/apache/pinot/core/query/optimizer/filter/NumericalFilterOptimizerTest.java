@@ -60,8 +60,6 @@ public class NumericalFilterOptimizerTest {
     PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
     OPTIMIZER.optimize(pinotQuery, SCHEMA);
 
-    // "intColumn = 5.5" should have been rewritten to "false" literal since an INT column can never have a decimal
-    // value.
     Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
         "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
   }
@@ -73,8 +71,6 @@ public class NumericalFilterOptimizerTest {
     PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
     OPTIMIZER.optimize(pinotQuery, SCHEMA);
 
-    // "intColumn = 5.5" should have been rewritten to "false" literal since an INT column can never have a decimal
-    // value.
     Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
         "Expression(type:FUNCTION, functionCall:Function(operator:NOT_EQUALS, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:intColumn)), Expression(type:LITERAL, literal:<Literal intValue:5>)]))");
   }
@@ -86,8 +82,28 @@ public class NumericalFilterOptimizerTest {
     PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
     OPTIMIZER.optimize(pinotQuery, SCHEMA);
 
-    // "intColumn = 5.5" should have been rewritten to "false" literal since an INT column can never have a decimal
-    // value.
+    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
+        "Expression(type:LITERAL, literal:<Literal boolValue:true>)");
+  }
+
+  @Test
+  public void testEqualsIntColumnWithOutOfDomainValue() {
+    BrokerRequest sqlBrokerRequest =
+        SQL_COMPILER.compileToBrokerRequest("SELECT * FROM testTable WHERE intColumn = 5000000000");
+    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
+    OPTIMIZER.optimize(pinotQuery, SCHEMA);
+
+    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
+        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
+  }
+
+  @Test
+  public void testNotEqualsIntColumnWithOutOfDomainValue() {
+    BrokerRequest sqlBrokerRequest =
+        SQL_COMPILER.compileToBrokerRequest("SELECT * FROM testTable WHERE intColumn != 5000000000");
+    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
+    OPTIMIZER.optimize(pinotQuery, SCHEMA);
+
     Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
         "Expression(type:LITERAL, literal:<Literal boolValue:true>)");
   }
