@@ -47,8 +47,8 @@ import org.apache.pinot.spi.data.Schema;
  *  6) WHERE "intColumn1 = 5.5 AND intColumn2 = intColumn3"
  *       rewrite to "WHERE false AND intColumn2 = intColumn3"
  *       rewrite to "WHERE intColumn2 = intColumn3"
- *  7) WHERE "intColumn1 != 5.5 OR intColumn2 = intColumn3"
- *       rewrite to "WHERE true OR intColumn2 = intColumn3"
+ *  7) WHERE "intColumn1 != 5.5 OR intColumn2 = 5000000000" (5000000000 is out of bounds for integer column)
+ *       rewrite to "WHERE true OR false"
  *       rewrite to "WHERE true"
  *       rewrite to query without any WHERE clause.
  *
