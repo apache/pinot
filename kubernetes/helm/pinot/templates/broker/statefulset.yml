@@ -66,6 +66,11 @@ spec:
         env:
           - name: JAVA_OPTS
             value: "{{ .Values.broker.jvmOpts }} -Dlog4j2.configurationFile={{ .Values.broker.log4j2ConfFile }} -Dplugins.dir={{ .Values.broker.pluginsDir }}"
+{{- if .Values.broker.extraEnv }}
+{{ toYaml .Values.broker.extraEnv | indent 10 }}
+{{- end }}
+        envFrom:
+{{ toYaml .Values.broker.envFrom | indent 10 }}
         ports:
           - containerPort: {{ .Values.broker.port }}
             protocol: TCP

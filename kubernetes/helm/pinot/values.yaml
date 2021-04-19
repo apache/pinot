@@ -42,7 +42,6 @@ controller:
   data:
     dir: /var/pinot/controller/data
 
-
   vip:
     enabled: false
     host: pinot-controller
@@ -80,6 +79,10 @@ controller:
 
   updateStrategy:
     type: RollingUpdate
+
+  envFrom: []
+
+  extraEnv: []
 
   # Extra configs will be appended to pinot-controller.conf file
   extra:
@@ -129,6 +132,10 @@ broker:
 
   updateStrategy:
     type: RollingUpdate
+
+  envFrom: []
+
+  extraEnv: []
 
   # Extra configs will be appended to pinot-broker.conf file
   extra:
@@ -183,6 +190,10 @@ server:
   updateStrategy:
     type: RollingUpdate
 
+  envFrom: []
+
+  extraEnv: []
+
   # Extra configs will be appended to pinot-server.conf file
   extra:
     configs: |-
@@ -232,6 +243,10 @@ minion:
 
   updateStrategy:
     type: RollingUpdate
+
+  envFrom: []
+
+  extraEnv: []
 
   # Extra configs will be appended to pinot-minion.conf file
   extra:
