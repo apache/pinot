@@ -68,11 +68,13 @@ public class GcsPinotFS  extends PinotFS {
     try {
       StorageOptions.Builder storageBuilder = StorageOptions.newBuilder();
       if (!isNullOrEmpty(config.getProperty(PROJECT_ID)) && !isNullOrEmpty(config.getProperty(GCP_KEY))) {
+        LOGGER.info("Configs are: {}, {}", PROJECT_ID, config.getProperty(PROJECT_ID));
         String projectId = config.getProperty(PROJECT_ID);
         String gcpKey = config.getProperty(GCP_KEY);
         storageBuilder.setProjectId(projectId);
         credentials = GoogleCredentials.fromStream(Files.newInputStream(Paths.get(gcpKey)));
       } else {
+        LOGGER.info("Configs using default credential");
         credentials = GoogleCredentials.getApplicationDefault();
       }
       storage = storageBuilder.setCredentials(credentials).build().getService();
