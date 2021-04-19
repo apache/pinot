@@ -80,9 +80,20 @@ controller:
   updateStrategy:
     type: RollingUpdate
 
+  # Use envFrom to define all of the ConfigMap or Secret data as container environment variables.
+  # ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#configure-all-key-value-pairs-in-a-configmap-as-container-environment-variables
+  # ref: https://kubernetes.io/docs/tasks/inject-data-application/distribute-credentials-secure/#configure-all-key-value-pairs-in-a-secret-as-container-environment-variables
   envFrom: []
+  #  - configMapRef:
+  #      name: special-config
+  #  - secretRef:
+  #      name: test-secret
 
+  # Use extraEnv to add individual key value pairs as container environment variables.
+  # ref: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/
   extraEnv: []
+  #  - name: PINOT_CUSTOM_ENV
+  #    value: custom-value
 
   # Extra configs will be appended to pinot-controller.conf file
   extra:
@@ -133,9 +144,20 @@ broker:
   updateStrategy:
     type: RollingUpdate
 
+  # Use envFrom to define all of the ConfigMap or Secret data as container environment variables.
+  # ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#configure-all-key-value-pairs-in-a-configmap-as-container-environment-variables
+  # ref: https://kubernetes.io/docs/tasks/inject-data-application/distribute-credentials-secure/#configure-all-key-value-pairs-in-a-secret-as-container-environment-variables
   envFrom: []
+  #  - configMapRef:
+  #      name: special-config
+  #  - secretRef:
+  #      name: test-secret
 
+  # Use extraEnv to add individual key value pairs as container environment variables.
+  # ref: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/
   extraEnv: []
+  #  - name: PINOT_CUSTOM_ENV
+  #    value: custom-value
 
   # Extra configs will be appended to pinot-broker.conf file
   extra:
@@ -190,9 +212,20 @@ server:
   updateStrategy:
     type: RollingUpdate
 
+  # Use envFrom to define all of the ConfigMap or Secret data as container environment variables.
+  # ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#configure-all-key-value-pairs-in-a-configmap-as-container-environment-variables
+  # ref: https://kubernetes.io/docs/tasks/inject-data-application/distribute-credentials-secure/#configure-all-key-value-pairs-in-a-secret-as-container-environment-variables
   envFrom: []
+  #  - configMapRef:
+  #      name: special-config
+  #  - secretRef:
+  #      name: test-secret
 
+  # Use extraEnv to add individual key value pairs as container environment variables.
+  # ref: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/
   extraEnv: []
+  #  - name: PINOT_CUSTOM_ENV
+  #    value: custom-value
 
   # Extra configs will be appended to pinot-server.conf file
   extra:
@@ -244,9 +277,20 @@ minion:
   updateStrategy:
     type: RollingUpdate
 
+  # Use envFrom to define all of the ConfigMap or Secret data as container environment variables.
+  # ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#configure-all-key-value-pairs-in-a-configmap-as-container-environment-variables
+  # ref: https://kubernetes.io/docs/tasks/inject-data-application/distribute-credentials-secure/#configure-all-key-value-pairs-in-a-secret-as-container-environment-variables
   envFrom: []
+  #  - configMapRef:
+  #      name: special-config
+  #  - secretRef:
+  #      name: test-secret
 
+  # Use extraEnv to add individual key value pairs as container environment variables.
+  # ref: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/
   extraEnv: []
+  #  - name: PINOT_CUSTOM_ENV
+  #    value: custom-value
 
   # Extra configs will be appended to pinot-minion.conf file
   extra:
