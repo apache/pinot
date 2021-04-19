@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.plugin.stream.kinesis;
 
+import com.google.common.base.Preconditions;
 import java.util.Map;
 import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.stream.StreamConfigProperties;
 import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
 
@@ -32,37 +32,39 @@ public class KinesisConfig {
   public static final String SHARD_ITERATOR_TYPE = "shard-iterator-type";
   public static final String AWS_REGION = "aws-region";
   public static final String MAX_RECORDS_TO_FETCH = "max-records-to-fetch";
-  public static final String DEFAULT_AWS_REGION = "us-central-1";
+  // TODO: this is a starting point, until a better default is figured out
   public static final String DEFAULT_MAX_RECORDS = "20";
   public static final String DEFAULT_SHARD_ITERATOR_TYPE = ShardIteratorType.LATEST.toString();
-  private final Map<String, String> _props;
+
+  private final String _streamTopicName;
+  private final String _awsRegion;
+  private final int _numMaxRecordsToFetch;
+  private final ShardIteratorType _shardIteratorType;
 
   public KinesisConfig(StreamConfig streamConfig) {
-    _props = streamConfig.getStreamConfigsMap();
+    Map<String, String> props = streamConfig.getStreamConfigsMap();
+    _streamTopicName = streamConfig.getTopicName();
+    _awsRegion = props.get(AWS_REGION);
+    Preconditions.checkNotNull(_awsRegion, "Must provide 'aws-region' in stream config for table: %s",
+        streamConfig.getTableNameWithType());
+    _numMaxRecordsToFetch = Integer.parseInt(props.getOrDefault(MAX_RECORDS_TO_FETCH, DEFAULT_MAX_RECORDS));
+    _shardIteratorType =
+        ShardIteratorType.fromValue(props.getOrDefault(SHARD_ITERATOR_TYPE, DEFAULT_SHARD_ITERATOR_TYPE));
   }
 
-  public KinesisConfig(Map<String, String> props) {
-    _props = props;
-  }
-
-  public String getStream() {
-    return _props
-        .get(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_TOPIC_NAME));
+  public String getStreamTopicName() {
+    return _streamTopicName;
   }
 
   public String getAwsRegion() {
-    return _props.getOrDefault(AWS_REGION, DEFAULT_AWS_REGION);
+    return _awsRegion;
   }
 
-  public Integer maxRecordsToFetch() {
-    return Integer.parseInt(_props.getOrDefault(MAX_RECORDS_TO_FETCH, DEFAULT_MAX_RECORDS));
+  public int getNumMaxRecordsToFetch() {
+    return _numMaxRecordsToFetch;
   }
 
   public ShardIteratorType getShardIteratorType() {
-    return ShardIteratorType.fromValue(_props.getOrDefault(SHARD_ITERATOR_TYPE, DEFAULT_SHARD_ITERATOR_TYPE));
-  }
-
-  public void setMaxRecordsToFetch(int maxRecordsToFetch){
-    _props.put(MAX_RECORDS_TO_FETCH, String.valueOf(maxRecordsToFetch));
+    return _shardIteratorType;
   }
 }

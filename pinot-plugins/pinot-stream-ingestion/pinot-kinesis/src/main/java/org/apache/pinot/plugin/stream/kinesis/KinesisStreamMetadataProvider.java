@@ -46,6 +46,7 @@ import software.amazon.awssdk.services.kinesis.model.Shard;
  * A {@link StreamMetadataProvider} implementation for the Kinesis stream
  */
 public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
+  private static final String SHARD_ID_PREFIX = "shardId-";
   private final KinesisConnectionHandler _kinesisConnectionHandler;
   private final StreamConsumerFactory _kinesisStreamConsumerFactory;
   private final String _clientId;
@@ -53,7 +54,7 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
 
   public KinesisStreamMetadataProvider(String clientId, StreamConfig streamConfig) {
     KinesisConfig kinesisConfig = new KinesisConfig(streamConfig);
-    _kinesisConnectionHandler = new KinesisConnectionHandler(kinesisConfig.getStream(), kinesisConfig.getAwsRegion());
+    _kinesisConnectionHandler = new KinesisConnectionHandler(kinesisConfig.getStreamTopicName(), kinesisConfig.getAwsRegion());
     _kinesisStreamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
     _clientId = clientId;
     _fetchTimeoutMs = streamConfig.getFetchTimeoutMillis();
@@ -61,7 +62,6 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
 
   public KinesisStreamMetadataProvider(String clientId, StreamConfig streamConfig,
       KinesisConnectionHandler kinesisConnectionHandler, StreamConsumerFactory streamConsumerFactory) {
-    KinesisConfig kinesisConfig = new KinesisConfig(streamConfig);
     _kinesisConnectionHandler = kinesisConnectionHandler;
     _kinesisStreamConsumerFactory = streamConsumerFactory;
     _clientId = clientId;
@@ -89,7 +89,7 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
       List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis)
       throws IOException, TimeoutException {
 
-    List<PartitionGroupMetadata> newPartitionGroupMetadatas = new ArrayList<>();
+    List<PartitionGroupMetadata> newPartitionGroupMetadataList = new ArrayList<>();
 
     Map<String, Shard> shardIdToShardMap = _kinesisConnectionHandler.getShards().stream()
         .collect(Collectors.toMap(Shard::shardId, s -> s, (s1, s2) -> s1));
@@ -121,7 +121,7 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
       } else { // Segment IN_PROGRESS
         newStartOffset = currentPartitionGroupConsumptionStatus.getStartOffset();
       }
-      newPartitionGroupMetadatas.add(
+      newPartitionGroupMetadataList.add(
           new PartitionGroupMetadata(currentPartitionGroupConsumptionStatus.getPartitionGroupId(), newStartOffset));
     }
 
@@ -141,10 +141,10 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
         shardToSequenceNumberMap.put(newShardId, newShard.sequenceNumberRange().startingSequenceNumber());
         newStartOffset = new KinesisPartitionGroupOffset(shardToSequenceNumberMap);
         int partitionGroupId = getPartitionGroupIdFromShardId(newShardId);
-        newPartitionGroupMetadatas.add(new PartitionGroupMetadata(partitionGroupId, newStartOffset));
+        newPartitionGroupMetadataList.add(new PartitionGroupMetadata(partitionGroupId, newStartOffset));
       }
     }
-    return newPartitionGroupMetadatas;
+    return newPartitionGroupMetadataList;
   }
 
   /**
@@ -152,7 +152,7 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
    * e.g. "shardId-000000000001" becomes 1
    */
   private int getPartitionGroupIdFromShardId(String shardId) {
-    String shardIdNum = StringUtils.stripStart(StringUtils.removeStart(shardId, "shardId-"), "0");
+    String shardIdNum = StringUtils.stripStart(StringUtils.removeStart(shardId, SHARD_ID_PREFIX), "0");
     return shardIdNum.isEmpty() ? 0 : Integer.parseInt(shardIdNum);
   }
 

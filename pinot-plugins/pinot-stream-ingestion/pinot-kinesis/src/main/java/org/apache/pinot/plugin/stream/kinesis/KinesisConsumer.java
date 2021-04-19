@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.stream.kinesis;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -47,25 +48,26 @@ import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
  * A {@link PartitionGroupConsumer} implementation for the Kinesis stream
  */
 public class KinesisConsumer extends KinesisConnectionHandler implements PartitionGroupConsumer {
-  private final Logger LOG = LoggerFactory.getLogger(KinesisConsumer.class);
-  private final String _stream;
-  private final int _maxRecords;
+  private static final Logger LOGGER = LoggerFactory.getLogger(KinesisConsumer.class);
+  private final String _streamTopicName;
+  private final int _numMaxRecordsToFetch;
   private final ExecutorService _executorService;
   private final ShardIteratorType _shardIteratorType;
 
   public KinesisConsumer(KinesisConfig kinesisConfig) {
-    super(kinesisConfig.getStream(), kinesisConfig.getAwsRegion());
-    _stream = kinesisConfig.getStream();
-    _maxRecords = kinesisConfig.maxRecordsToFetch();
+    super(kinesisConfig.getStreamTopicName(), kinesisConfig.getAwsRegion());
+    _streamTopicName = kinesisConfig.getStreamTopicName();
+    _numMaxRecordsToFetch = kinesisConfig.getNumMaxRecordsToFetch();
     _shardIteratorType = kinesisConfig.getShardIteratorType();
     _executorService = Executors.newSingleThreadExecutor();
   }
 
+  @VisibleForTesting
   public KinesisConsumer(KinesisConfig kinesisConfig, KinesisClient kinesisClient) {
-    super(kinesisConfig.getStream(), kinesisConfig.getAwsRegion(), kinesisClient);
+    super(kinesisConfig.getStreamTopicName(), kinesisConfig.getAwsRegion(), kinesisClient);
     _kinesisClient = kinesisClient;
-    _stream = kinesisConfig.getStream();
-    _maxRecords = kinesisConfig.maxRecordsToFetch();
+    _streamTopicName = kinesisConfig.getStreamTopicName();
+    _numMaxRecordsToFetch = kinesisConfig.getNumMaxRecordsToFetch();
     _shardIteratorType = kinesisConfig.getShardIteratorType();
     _executorService = Executors.newSingleThreadExecutor();
   }
@@ -97,8 +99,8 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
         createConnection();
       }
 
-      //TODO: iterate upon all the shardIds in the map
-      // Okay for now, since we have assumed that every partition group contains a single shard
+      // TODO: iterate upon all the shardIds in the map
+      //  Okay for now, since we have assumed that every partition group contains a single shard
       Map.Entry<String, String> shardToSequenceNum =
           kinesisStartCheckpoint.getShardToStartSequenceMap().entrySet().iterator().next();
       String shardIterator = getShardIterator(shardToSequenceNum.getKey(), shardToSequenceNum.getValue());
@@ -126,7 +128,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
             break;
           }
 
-          if (recordList.size() >= _maxRecords) {
+          if (recordList.size() >= _numMaxRecordsToFetch) {
             break;
           }
         }
@@ -142,24 +144,24 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
 
       return new KinesisRecordsBatch(recordList, shardToSequenceNum.getKey(), isEndOfShard);
     } catch (IllegalStateException e) {
-      LOG.warn("Illegal state exception, connection is broken", e);
+      LOGGER.warn("Illegal state exception, connection is broken", e);
       return handleException(kinesisStartCheckpoint, recordList);
     } catch (ProvisionedThroughputExceededException e) {
-      LOG.warn("The request rate for the stream is too high", e);
+      LOGGER.warn("The request rate for the stream is too high", e);
       return handleException(kinesisStartCheckpoint, recordList);
     } catch (ExpiredIteratorException e) {
-      LOG.warn("ShardIterator expired while trying to fetch records", e);
+      LOGGER.warn("ShardIterator expired while trying to fetch records", e);
       return handleException(kinesisStartCheckpoint, recordList);
     } catch (ResourceNotFoundException | InvalidArgumentException e) {
       // aws errors
-      LOG.error("Encountered AWS error while attempting to fetch records", e);
+      LOGGER.error("Encountered AWS error while attempting to fetch records", e);
       return handleException(kinesisStartCheckpoint, recordList);
     } catch (KinesisException e) {
-      LOG.warn("Encountered unknown unrecoverable AWS exception", e);
+      LOGGER.warn("Encountered unknown unrecoverable AWS exception", e);
       throw new RuntimeException(e);
     } catch (Throwable e) {
       // non transient errors
-      LOG.error("Unknown fetchRecords exception", e);
+      LOGGER.error("Unknown fetchRecords exception", e);
       throw new RuntimeException(e);
     }
   }
@@ -176,11 +178,12 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
   }
 
   private String getShardIterator(String shardId, String sequenceNumber) {
-
     GetShardIteratorRequest.Builder requestBuilder =
-        GetShardIteratorRequest.builder().streamName(_stream).shardId(shardId).shardIteratorType(_shardIteratorType);
+        GetShardIteratorRequest.builder().streamName(_streamTopicName).shardId(shardId)
+            .shardIteratorType(_shardIteratorType);
 
-    if (sequenceNumber != null && _shardIteratorType.toString().contains("SEQUENCE")) {
+    if (sequenceNumber != null && (_shardIteratorType.equals(ShardIteratorType.AT_SEQUENCE_NUMBER) || _shardIteratorType
+        .equals(ShardIteratorType.AFTER_SEQUENCE_NUMBER))) {
       requestBuilder = requestBuilder.startingSequenceNumber(sequenceNumber);
     }
 

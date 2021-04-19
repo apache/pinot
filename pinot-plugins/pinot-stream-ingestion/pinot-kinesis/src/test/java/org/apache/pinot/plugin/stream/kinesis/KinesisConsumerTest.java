@@ -22,6 +22,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.easymock.Capture;
 import org.testng.Assert;
@@ -44,6 +46,8 @@ import static org.easymock.EasyMock.replay;
 
 
 public class KinesisConsumerTest {
+  private static final String STREAM_TYPE = "kinesis";
+  private static final String TABLE_NAME_WITH_TYPE = "kinesisTest_REALTIME";
   private static final String STREAM_NAME = "kinesis-test";
   private static final String AWS_REGION = "us-west-2";
   public static final int TIMEOUT = 1000;
@@ -51,6 +55,7 @@ public class KinesisConsumerTest {
   public static final String DUMMY_RECORD_PREFIX = "DUMMY_RECORD-";
   public static final String PARTITION_KEY_PREFIX = "PARTITION_KEY-";
   public static final String PLACEHOLDER = "DUMMY";
+  public static final int MAX_RECORDS_TO_FETCH = 20;
 
   private static KinesisConnectionHandler kinesisConnectionHandler;
   private static StreamConsumerFactory streamConsumerFactory;
@@ -59,11 +64,21 @@ public class KinesisConsumerTest {
 
   private KinesisConfig getKinesisConfig() {
     Map<String, String> props = new HashMap<>();
-    props.put("stream.kinesis.topic.name", STREAM_NAME);
+    props.put(StreamConfigProperties.STREAM_TYPE, STREAM_TYPE);
+    props.put(StreamConfigProperties
+            .constructStreamProperty(StreamConfigProperties.STREAM_TYPE, StreamConfigProperties.STREAM_TOPIC_NAME),
+        STREAM_NAME);
+    props.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+        StreamConfig.ConsumerType.LOWLEVEL.toString());
+    props.put(StreamConfigProperties
+            .constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
+        KinesisConsumerFactory.class.getName());
+    props.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_DECODER_CLASS),
+        "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder");
     props.put(KinesisConfig.AWS_REGION, AWS_REGION);
-    props.put(KinesisConfig.MAX_RECORDS_TO_FETCH, "10");
+    props.put(KinesisConfig.MAX_RECORDS_TO_FETCH, String.valueOf(MAX_RECORDS_TO_FETCH));
     props.put(KinesisConfig.SHARD_ITERATOR_TYPE, ShardIteratorType.AT_SEQUENCE_NUMBER.toString());
-    return new KinesisConfig(props);
+    return new KinesisConfig(new StreamConfig(TABLE_NAME_WITH_TYPE, props));
   }
 
   @BeforeMethod
@@ -116,7 +131,6 @@ public class KinesisConsumerTest {
 
   @Test
   public void testBasicConsumerWithMaxRecordsLimit() {
-    int maxRecordsLimit = 20;
     Capture<GetRecordsRequest> getRecordsRequestCapture = Capture.newInstance();
     Capture<GetShardIteratorRequest> getShardIteratorRequestCapture = Capture.newInstance();
 
@@ -132,7 +146,6 @@ public class KinesisConsumerTest {
     replay(kinesisClient);
 
     KinesisConfig kinesisConfig = getKinesisConfig();
-    kinesisConfig.setMaxRecordsToFetch(maxRecordsLimit);
     KinesisConsumer kinesisConsumer = new KinesisConsumer(kinesisConfig, kinesisClient);
 
     Map<String, String> shardToSequenceMap = new HashMap<>();
@@ -140,7 +153,7 @@ public class KinesisConsumerTest {
     KinesisPartitionGroupOffset kinesisPartitionGroupOffset = new KinesisPartitionGroupOffset(shardToSequenceMap);
     KinesisRecordsBatch kinesisRecordsBatch = kinesisConsumer.fetchMessages(kinesisPartitionGroupOffset, null, TIMEOUT);
 
-    Assert.assertEquals(kinesisRecordsBatch.getMessageCount(), maxRecordsLimit);
+    Assert.assertEquals(kinesisRecordsBatch.getMessageCount(), MAX_RECORDS_TO_FETCH);
 
     for (int i = 0; i < NUM_RECORDS; i++) {
       Assert.assertEquals(baToString(kinesisRecordsBatch.getMessageAtIndex(i)), DUMMY_RECORD_PREFIX + i);
@@ -149,7 +162,6 @@ public class KinesisConsumerTest {
 
   @Test
   public void testBasicConsumerWithChildShard() {
-    int maxRecordsLimit = 20;
 
     List<ChildShard> shardList = new ArrayList<>();
     shardList.add(ChildShard.builder().shardId(PLACEHOLDER).parentShards("0").build());
@@ -169,7 +181,6 @@ public class KinesisConsumerTest {
     replay(kinesisClient);
 
     KinesisConfig kinesisConfig = getKinesisConfig();
-    kinesisConfig.setMaxRecordsToFetch(maxRecordsLimit);
     KinesisConsumer kinesisConsumer = new KinesisConsumer(kinesisConfig, kinesisClient);
 
     Map<String, String> shardToSequenceMap = new HashMap<>();
