@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.common;
 
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
 public interface BlockMetadata {

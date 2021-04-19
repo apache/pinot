@@ -106,4 +106,3 @@ public class HeaderAdder implements ContainerRequestFilter {
     }
   }
 }
-

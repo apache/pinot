@@ -24,9 +24,9 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.LiveInstance;
 import org.apache.helix.model.ResourceConfig;
-import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -21,16 +21,15 @@ package org.apache.pinot.core.data.manager;
 import java.io.File;
 import java.util.List;
 import java.util.Set;
-
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
+import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -132,4 +131,9 @@ public interface InstanceDataManager {
    * Returns the Helix property store.
    */
   ZkHelixPropertyStore<ZNRecord> getPropertyStore();
+
+  /**
+   * Returns the segment uploader, which uploads a llc segment to the destination place and returns the url of uploaded segment file. Servers utilize segment uploader to upload llc segment to segment store.
+   */
+  SegmentUploader getSegmentUploader();
 }

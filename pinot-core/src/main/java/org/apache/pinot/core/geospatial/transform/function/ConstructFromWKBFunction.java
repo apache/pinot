@@ -19,22 +19,21 @@
 package org.apache.pinot.core.geospatial.transform.function;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.geospatial.serde.GeometrySerializer;
+import java.util.List;
+import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.segment.local.utils.GeometrySerializer;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.io.WKBReader;
-
-import java.util.List;
-import java.util.Map;
 
 
 /**

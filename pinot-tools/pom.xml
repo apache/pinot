@@ -25,7 +25,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.7.0-SNAPSHOT</version>
+    <version>0.8.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-tools</artifactId>
@@ -54,6 +54,10 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-broker</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-minion</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -114,6 +118,16 @@
       <scope>runtime</scope>
     </dependency>
     <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-minion-builtin-tasks</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-yammer</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
       <groupId>commons-cli</groupId>
       <artifactId>commons-cli</artifactId>
     </dependency>
@@ -149,10 +163,6 @@
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-math3</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-minion</artifactId>
     </dependency>
     <dependency>
       <groupId>org.mockito</groupId>
@@ -302,8 +312,7 @@
               <mainClass>org.apache.pinot.tools.Quickstart</mainClass>
               <name>quick-start-batch</name>
               <jvmSettings>
-                <initialMemorySize>1G</initialMemorySize>
-                <maxMemorySize>1G</maxMemorySize>
+                <initialMemorySize>4G</initialMemorySize>
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
                 </extraArguments>
@@ -313,8 +322,7 @@
               <mainClass>org.apache.pinot.tools.HybridQuickstart</mainClass>
               <name>quick-start-hybrid</name>
               <jvmSettings>
-                <initialMemorySize>1G</initialMemorySize>
-                <maxMemorySize>1G</maxMemorySize>
+                <initialMemorySize>4G</initialMemorySize>
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
                 </extraArguments>
@@ -324,8 +332,7 @@
               <mainClass>org.apache.pinot.tools.RealtimeQuickStart</mainClass>
               <name>quick-start-streaming</name>
               <jvmSettings>
-                <initialMemorySize>1G</initialMemorySize>
-                <maxMemorySize>1G</maxMemorySize>
+                <initialMemorySize>4G</initialMemorySize>
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
                 </extraArguments>
@@ -335,8 +342,7 @@
               <mainClass>org.apache.pinot.tools.BatchQuickstartWithMinion</mainClass>
               <name>quick-start-batch-with-minion</name>
               <jvmSettings>
-                <initialMemorySize>1G</initialMemorySize>
-                <maxMemorySize>1G</maxMemorySize>
+                <initialMemorySize>4G</initialMemorySize>
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
                 </extraArguments>
@@ -346,8 +352,7 @@
               <mainClass>org.apache.pinot.tools.UpsertQuickStart</mainClass>
               <name>quick-start-upsert-streaming</name>
               <jvmSettings>
-                <initialMemorySize>1G</initialMemorySize>
-                <maxMemorySize>1G</maxMemorySize>
+                <initialMemorySize>4G</initialMemorySize>
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
                 </extraArguments>
@@ -357,8 +362,7 @@
               <mainClass>org.apache.pinot.tools.JsonIndexQuickStart</mainClass>
               <name>quick-start-json-index-batch</name>
               <jvmSettings>
-                <initialMemorySize>1G</initialMemorySize>
-                <maxMemorySize>1G</maxMemorySize>
+                <initialMemorySize>4G</initialMemorySize>
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
                 </extraArguments>
@@ -368,8 +372,7 @@
               <mainClass>org.apache.pinot.tools.RealtimeJsonIndexQuickStart</mainClass>
               <name>quick-start-json-index-streaming</name>
               <jvmSettings>
-                <initialMemorySize>1G</initialMemorySize>
-                <maxMemorySize>1G</maxMemorySize>
+                <initialMemorySize>4G</initialMemorySize>
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
                 </extraArguments>

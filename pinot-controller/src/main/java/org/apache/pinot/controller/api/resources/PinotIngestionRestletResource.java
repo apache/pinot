@@ -25,6 +25,7 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import java.io.File;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Map;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -46,6 +47,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
@@ -116,8 +118,7 @@ public class PinotIngestionRestletResource {
       + "\n Example usage (query params need encoding):" + "\n```"
       + "\ncurl -X POST -F file=@data.json -H \"Content-Type: multipart/form-data\" \"http://localhost:9000/ingestFromFile?tableNameWithType=foo_OFFLINE&"
       + "\nbatchConfigMapStr={" + "\n  \"inputFormat\":\"csv\"," + "\n  \"recordReader.prop.delimiter\":\"|\""
-      + "\n}\" "
-      + "\n```")
+      + "\n}\" " + "\n```")
   public void ingestFromFile(
       @ApiParam(value = "Name of the table to upload the file to", required = true) @QueryParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Batch config Map as json string. Must pass inputFormat, and optionally record reader properties. e.g. {\"inputFormat\":\"json\"}", required = true) @QueryParam("batchConfigMapStr") String batchConfigMapStr,
@@ -191,8 +192,21 @@ public class PinotIngestionRestletResource {
     Schema schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
 
     FileIngestionHelper fileIngestionHelper =
-        new FileIngestionHelper(tableConfig, schema, batchConfig, _controllerConf.getControllerHost(),
-            Integer.parseInt(_controllerConf.getControllerPort()), new File(_controllerConf.getDataDir(), UPLOAD_DIR));
+        new FileIngestionHelper(tableConfig, schema, batchConfig, getControllerUri(),
+            new File(_controllerConf.getDataDir(), UPLOAD_DIR), getAuthToken());
     return fileIngestionHelper.buildSegmentAndPush(payload);
+  }
+
+  private String getAuthToken() {
+    return _controllerConf
+        .getProperty(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY + ".auth.token");
+  }
+
+  private URI getControllerUri() {
+    try {
+      return new URI(_controllerConf.generateVipUrl());
+    } catch (URISyntaxException e) {
+      throw new IllegalStateException("Controller VIP uri is invalid", e);
+    }
   }
 }

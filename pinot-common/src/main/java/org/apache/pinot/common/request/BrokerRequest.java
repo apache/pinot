@@ -2549,4 +2549,3 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
     return (org.apache.thrift.scheme.StandardScheme.class.equals(proto.getScheme()) ? STANDARD_SCHEME_FACTORY : TUPLE_SCHEME_FACTORY).getScheme();
   }
 }
-

@@ -24,10 +24,10 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.function.DateTimeUtils;
 import org.apache.pinot.common.function.TimeZoneKey;
-import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.joda.time.DateTimeField;
 
 /**

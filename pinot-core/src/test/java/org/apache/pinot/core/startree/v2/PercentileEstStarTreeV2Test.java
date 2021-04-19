@@ -19,16 +19,17 @@
 package org.apache.pinot.core.startree.v2;
 
 import java.util.Random;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.core.data.aggregator.PercentileEstValueAggregator;
-import org.apache.pinot.core.data.aggregator.ValueAggregator;
 import org.apache.pinot.core.query.aggregation.function.PercentileEstAggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.customobject.QuantileDigest;
+import org.apache.pinot.segment.local.aggregator.PercentileEstValueAggregator;
+import org.apache.pinot.segment.local.aggregator.ValueAggregator;
+import org.apache.pinot.segment.local.customobject.QuantileDigest;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 import static org.testng.Assert.assertEquals;
 
 
 public class PercentileEstStarTreeV2Test extends BaseStarTreeV2Test<Object, QuantileDigest> {
+  private static final int MAX_VALUE = 10000;
 
   @Override
   ValueAggregator<Object, QuantileDigest> getValueAggregator() {
@@ -42,14 +43,14 @@ public class PercentileEstStarTreeV2Test extends BaseStarTreeV2Test<Object, Quan
 
   @Override
   Object getRandomRawValue(Random random) {
-    return random.nextLong();
+    return random.nextInt(MAX_VALUE);
   }
 
   @Override
   void assertAggregatedValue(QuantileDigest starTreeResult, QuantileDigest nonStarTreeResult) {
-    double delta = Long.MAX_VALUE * PercentileEstAggregationFunction.DEFAULT_MAX_ERROR * 2;
+    double delta = MAX_VALUE * PercentileEstAggregationFunction.DEFAULT_MAX_ERROR;
     for (int i = 0; i <= 100; i++) {
-      assertEquals(starTreeResult.getQuantile(i / 100), nonStarTreeResult.getQuantile(i / 100), delta);
+      assertEquals(starTreeResult.getQuantile(i / 100.0), nonStarTreeResult.getQuantile(i / 100.0), delta);
     }
   }
 }

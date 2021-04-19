@@ -22,10 +22,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import org.apache.pinot.common.utils.Pairs;
 import org.apache.pinot.core.common.BlockDocIdIterator;
-import org.apache.pinot.core.common.Constants;
 import org.apache.pinot.core.operator.docidsets.SortedDocIdSet;
+import org.apache.pinot.segment.spi.Constants;
+import org.apache.pinot.spi.utils.Pairs;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;

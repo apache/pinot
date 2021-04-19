@@ -20,7 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.Collections;
 import java.util.List;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.ExpressionContext;
 
 
 /**

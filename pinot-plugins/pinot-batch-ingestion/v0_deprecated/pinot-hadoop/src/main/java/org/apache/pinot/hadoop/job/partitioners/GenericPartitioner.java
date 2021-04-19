@@ -23,7 +23,7 @@ import org.apache.avro.mapred.AvroValue;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.Partitioner;
-import org.apache.pinot.core.data.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

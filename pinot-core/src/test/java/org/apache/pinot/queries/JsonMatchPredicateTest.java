@@ -27,21 +27,21 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.data.readers.GenericRowRecordReader;
-import org.apache.pinot.core.indexsegment.IndexSegment;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -280,6 +280,37 @@ public class JsonMatchPredicateTest extends BaseQueriesTest {
     Assert.assertEquals(iterator.next()[0], "pluto");
     Assert.assertTrue(iterator.hasNext());
     Assert.assertEquals(iterator.next()[0], "goofy");
+  }
+
+  /** Evaluate json_extract_scalar over string column that does not contain valid json data. */
+  @Test
+  public void testJsonExtractScalarAgainstInvalidJson() {
+    // json_extract_scalar throws exception since we are trying to parse a non-JSON string.
+    Operator operator1 = getOperatorForSqlQuery(
+        "select count(*) FROM testTable WHERE json_extract_scalar(stringColumn, '$.name.first', 'INT') = 0");
+    try {
+      IntermediateResultsBlock block1 = (IntermediateResultsBlock) operator1.nextBlock();
+      Assert.fail("Expected query to fail with Exception.");
+    } catch (RuntimeException re) {
+      // JSON parsing exception expected.
+    }
+
+    // JSON data is stored in columns of type STRING, so there is nothing preventing the column from storing bad json
+    // string. Bad JSON string in columns will cause json_extract_scalar to throw an exception which would terminate
+    // query processing. However, when json_extract_scalar is used within the WHERE clause, we should return the
+    // default value instead of throwing exception. This will allow the predicate to be evaluated to either true or
+    // false and hence allow the query to complete successfully. Returning default value from json_extract_scalar is
+    // an undocumented feature. Ideally, json_extract_scalar should return NULL when it encounters bad JSON. However,
+    // NULL support is currently pending, so this is the best we can do.
+    Operator operator2 = getOperatorForSqlQuery(
+        "select count(*) FROM testTable WHERE json_extract_scalar(stringColumn, '$.name.first', 'INT', 0) = 0");
+
+    IntermediateResultsBlock block2 = (IntermediateResultsBlock) operator2.nextBlock();
+    Collection<Object[]> rows = block2.getSelectionResult();
+
+    // None of the values in stringColumn are valid JSON. Hence, json_extract_scalar should default to '0' for all rows
+    // and count returned by the query should be 9 (same as number of rows in the table).
+    Assert.assertEquals(block2.getAggregationResult().get(0), 9L);
   }
 
   @AfterClass

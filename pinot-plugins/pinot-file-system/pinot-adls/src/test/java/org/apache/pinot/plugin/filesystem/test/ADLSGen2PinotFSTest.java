@@ -126,7 +126,7 @@ public class ADLSGen2PinotFSTest {
     when(_mockServiceClient.createFileSystem(MOCK_FILE_SYSTEM_NAME)).thenReturn(_mockFileSystemClient);
     when(_mockFileSystemClient.getProperties()).thenThrow(_mockDataLakeStorageException);
     when(_mockDataLakeStorageException.getStatusCode()).thenReturn(404);
-    when(_mockDataLakeStorageException.getErrorCode()).thenReturn("FilesystemNotFound");
+    when(_mockDataLakeStorageException.getErrorCode()).thenReturn("ContainerNotFound");
 
     final DataLakeFileSystemClient actual =
         _adlsGen2PinotFsUnderTest.getOrCreateClientWithFileSystem(_mockServiceClient, MOCK_FILE_SYSTEM_NAME);

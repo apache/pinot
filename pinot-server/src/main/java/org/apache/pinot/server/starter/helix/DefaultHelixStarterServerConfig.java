@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.server.starter.helix;
 
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

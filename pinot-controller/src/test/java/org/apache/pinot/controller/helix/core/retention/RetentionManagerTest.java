@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.retention;
 
-import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -29,7 +28,7 @@ import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
@@ -37,10 +36,11 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import org.apache.pinot.controller.helix.core.SegmentDeletionManager;
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
-import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.joda.time.Duration;
@@ -72,7 +72,7 @@ public class RetentionManagerTest {
     for (int i = 0; i < numOlderSegments; ++i) {
       SegmentMetadata segmentMetadata = mockSegmentMetadata(pastTimeStamp, pastTimeStamp, timeUnit);
       OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
-      ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata);
+      ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata, CommonConstants.Segment.SegmentType.OFFLINE);
       metadataList.add(offlineSegmentZKMetadata);
       removedSegments.add(offlineSegmentZKMetadata.getSegmentName());
     }
@@ -81,7 +81,7 @@ public class RetentionManagerTest {
       SegmentMetadata segmentMetadata =
           mockSegmentMetadata(dayAfterTomorrowTimeStamp, dayAfterTomorrowTimeStamp, timeUnit);
       OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
-      ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata);
+      ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata, CommonConstants.Segment.SegmentType.OFFLINE);
       metadataList.add(offlineSegmentZKMetadata);
     }
     final TableConfig tableConfig = createOfflineTableConfig();
@@ -95,7 +95,7 @@ public class RetentionManagerTest {
     when(pinotHelixResourceManager.getOfflineSegmentMetadata(OFFLINE_TABLE_NAME)).thenReturn(metadataList);
 
     ControllerConf conf = new ControllerConf();
-    ControllerMetrics controllerMetrics = new ControllerMetrics(new MetricsRegistry());
+    ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     conf.setRetentionControllerFrequencyInSeconds(0);
     conf.setDeletedSegmentsRetentionInDays(0);
     RetentionManager retentionManager =
@@ -221,7 +221,7 @@ public class RetentionManagerTest {
     when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
 
     ControllerConf conf = new ControllerConf();
-    ControllerMetrics controllerMetrics = new ControllerMetrics(new MetricsRegistry());
+    ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     conf.setRetentionControllerFrequencyInSeconds(0);
     conf.setDeletedSegmentsRetentionInDays(0);
     RetentionManager retentionManager =

@@ -231,8 +231,8 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "schemas", schemaName);
   }
 
-  public String forSegmentDownload(String tableName, String segmentName) {
-    return URIUtils.constructDownloadUrl(_baseUrl, tableName, segmentName);
+  public String forSegmentDownload(String tableNameWithType, String segmentName) {
+    return URIUtils.constructDownloadUrl(_baseUrl, tableNameWithType, segmentName);
   }
 
   public String forSegmentDelete(String tableName, String segmentName) {
@@ -249,6 +249,10 @@ public class ControllerRequestURLBuilder {
 
   public String forListAllSegments(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "segments");
+  }
+
+  public String forSegmentMetadata(String tableName, String segmentName) {
+    return StringUtil.join("/", _baseUrl, "segments", tableName, segmentName, "metadata");
   }
 
   public String forListAllCrcInformationForTable(String tableName) {

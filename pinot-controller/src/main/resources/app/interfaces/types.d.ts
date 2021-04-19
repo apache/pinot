@@ -76,6 +76,8 @@ declare module 'Models' {
   export type IdealState = {
     OFFLINE: Object | null;
     REALTIME: Object | null;
+    code?: number;
+    error?: string;
   };
 
   export type QueryTables = {
@@ -117,6 +119,8 @@ declare module 'Models' {
     numGroupsLimitReached: boolean
     partialResponse?: number
     minConsumingFreshnessTimeMs: number
+    offlineThreadCpuTimeNs: number
+    realtimeThreadCpuTimeNs: number
   };
 
   export type ClusterName = {

@@ -39,10 +39,11 @@ public class Server2ControllerSegmentUploader implements SegmentUploader {
   private final String _segmentName;
   private final int _segmentUploadRequestTimeoutMs;
   private final ServerMetrics _serverMetrics;
+  private final String _authToken;
 
   public Server2ControllerSegmentUploader(Logger segmentLogger, FileUploadDownloadClient fileUploadDownloadClient,
       String controllerSegmentUploadCommitUrl, String segmentName, int segmentUploadRequestTimeoutMs,
-      ServerMetrics serverMetrics)
+      ServerMetrics serverMetrics, String authToken)
       throws URISyntaxException {
     _segmentLogger = segmentLogger;
     _fileUploadDownloadClient = fileUploadDownloadClient;
@@ -50,10 +51,11 @@ public class Server2ControllerSegmentUploader implements SegmentUploader {
     _segmentName = segmentName;
     _segmentUploadRequestTimeoutMs = segmentUploadRequestTimeoutMs;
     _serverMetrics = serverMetrics;
+    _authToken = authToken;
   }
 
   @Override
-  public URI uploadSegment(File segmentFile,  LLCSegmentName segmentName) {
+  public URI uploadSegment(File segmentFile, LLCSegmentName segmentName) {
     SegmentCompletionProtocol.Response response = uploadSegmentToController(segmentFile);
     if (response.getStatus() == SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS) {
       try {
@@ -69,8 +71,8 @@ public class Server2ControllerSegmentUploader implements SegmentUploader {
     SegmentCompletionProtocol.Response response;
     try {
       String responseStr = _fileUploadDownloadClient
-          .uploadSegment(_controllerSegmentUploadCommitUrl, _segmentName, segmentFile, null, null,
-              _segmentUploadRequestTimeoutMs).getResponse();
+          .uploadSegment(_controllerSegmentUploadCommitUrl, _segmentName, segmentFile,
+              FileUploadDownloadClient.makeAuthHeader(_authToken), null, _segmentUploadRequestTimeoutMs).getResponse();
       response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       _segmentLogger.info("Controller response {} for {}", response.toJsonString(), _controllerSegmentUploadCommitUrl);
       if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {

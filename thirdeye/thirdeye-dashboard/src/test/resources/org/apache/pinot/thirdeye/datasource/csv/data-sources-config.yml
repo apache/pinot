@@ -1,4 +1,0 @@
-dataSourceConfigs:
-  - className: org.apache.pinot.thirdeye.datasource.csv.CSVThirdEyeDataSource
-    properties:
-        business: business.csv

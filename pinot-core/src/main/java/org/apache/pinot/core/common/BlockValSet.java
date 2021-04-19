@@ -19,7 +19,7 @@
 package org.apache.pinot.core.common;
 
 import javax.annotation.Nullable;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 

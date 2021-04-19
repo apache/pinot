@@ -19,7 +19,7 @@
 #
 
 # A script that does rolling upgrade of Pinot components
-# from one version to the other given 2 commit hashes. It first builds  
+# from one version to the other given 2 commit hashes. It first builds
 # Pinot in the 2 given directories and then upgrades in the following order:
 # Controller -> Broker -> Server
 #
@@ -34,61 +34,62 @@
 #  and run all the scripts in the directory in alpha order, one script at each
 #  "stage" of upgrade.
 #
-#  We may modify to choose a minimal run in which the same set of operatons are run 
+#  We may modify to choose a minimal run in which the same set of operations are run
 #  between any two component upgrades/rollbacks -- this may consist of adding
 #  one more segment to table, adding some more rows to the stream topic, and
 #  running some queries with the new data.
 
-# get a temporary directory in case the workingDir is not provided by user   
-TMP_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')
 
-COMPAT_TESTER_PATH="pinot-integration-tests/target/pinot-integration-tests-pkg/bin/pinot-compat-test-runner.sh"
-
-# get usage of the script 
+# get usage of the script
 function usage() {
   command=$1
-  echo "Usage: $command olderCommit newerCommit [workingDir]"
+  echo "Usage: $command [workingDir]"
   exit 1
 }
 
-# cleanup the temporary directory when exiting the script
-function cleanup() {
-  if [ -n "$TMP_DIR" ] && [ -d "$TMP_DIR" ] && [ "$workingDir" = "$TMP_DIR" ] ; then
-    echo "The temporary directory $TMP_DIR needs to be cleaned up."
-  fi
+function waitForZkReady() {
+  # TODO: check ZK to be ready instead of sleep
+  sleep 60
+  echo "zookeeper is ready"
 }
 
-# This function builds Pinot given a specific commit hash and target directory
-function checkoutAndBuild() {
-  commitHash=$1
-  targetDir=$2
-  
-  pushd "$targetDir" || exit 1
-  git init
-  git remote add origin https://github.com/apache/incubator-pinot
-  git fetch --depth 1 origin "$commitHash"
-  git checkout FETCH_HEAD
-  mvn install package -DskipTests -Pbin-dist
-  popd || exit 1
+function waitForControllerReady() {
+  # TODO: check Controller to be ready instead of sleep
+  sleep 60
+  echo "controller is ready"
 }
 
-# Given a component and directory, start that version of the specific component 
+function waitForKafkaReady() {
+  # TODO: check kafka to be ready instead of sleep
+  sleep 10
+  echo "kafka is ready"
+}
+
+function waitForClusterReady() {
+  # TODO: check cluster to be ready instead of sleep
+  sleep 2
+  echo "Cluster ready."
+}
+# Given a component and directory, start that version of the specific component
 function startService() {
   serviceName=$1
   dirName=$2
-  # Upon start, save the pid of the process for a component into a file in /tmp/{component}.pid, which is then used to stop it
+  # Upon start, save the pid of the process for a component into a file in /working_dir/{component}.pid, which is then used to stop it
   pushd "$dirName"/pinot-tools/target/pinot-tools-pkg/bin  || exit 1
   if [ "$serviceName" = "zookeeper" ]; then
-    sh -c 'echo $$ > $0/zookeeper.pid; exec ./pinot-admin.sh StartZookeeper' "${dirName}" &
-  elif [ "$serviceName" = "controller" ]; then 
-    sh -c 'echo $$ > $0/controller.pid; exec ./pinot-admin.sh StartController' "${dirName}" &
+    sh -c 'rm -rf ${0}/zkdir'
+    sh -c 'echo $$ > $0/zookeeper.pid; exec ./pinot-admin.sh StartZookeeper -dataDir ${0}/zkdir > ${0}/zookeeper.log 2>&1' "${dirName}" &
+  elif [ "$serviceName" = "controller" ]; then
+    sh -c 'echo $$ > $0/controller.pid; exec ./pinot-admin.sh StartController > ${0}/controller.log 2>&1' "${dirName}" &
   elif [ "$serviceName" = "broker" ]; then
-    sh -c 'echo $$ > $0/broker.pid; exec ./pinot-admin.sh StartBroker' "${dirName}" &
+    sh -c 'echo $$ > $0/broker.pid; exec ./pinot-admin.sh StartBroker > ${0}/broker.log 2>&1' "${dirName}" &
   elif [ "$serviceName" = "server" ]; then
-    sh -c 'echo $$ > $0/server.pid; exec ./pinot-admin.sh StartServer' "${dirName}" &
+    sh -c 'echo $$ > $0/server.pid; exec ./pinot-admin.sh StartServer > ${0}/server.log 2>&1' "${dirName}" &
   elif [ "$serviceName" = "kafka" ]; then
-    sh -c 'echo $$ > $0/kafka.pid; exec ./pinot-admin.sh StartKafka -zkAddress localhost:2181/kafka' "${dirName}" &
+    sh -c 'echo $$ > $0/kafka.pid; exec ./pinot-admin.sh StartKafka -zkAddress localhost:2181/kafka > ${0}/kafka.log 2>&1' "${dirName}" &
   fi
+
+  echo "${serviceName} started"
   popd || exit 1
 }
 
@@ -96,7 +97,7 @@ function startService() {
 function stopService() {
   serviceName=$1
   dirName=$2
-  if [ -f "${dirName}/${serviceName}".pid ]; then 
+  if [ -f "${dirName}/${serviceName}".pid ]; then
     servicePid=$(<"${dirName}/${serviceName}".pid)
     rm "${dirName}/${serviceName}".pid
     if [ -n "$servicePid" ]; then
@@ -105,17 +106,24 @@ function stopService() {
   else
     echo "Pid file ${dirName}/${serviceName}.pid  not found. Failed to stop component ${serviceName}"
   fi
+  echo "${serviceName} stopped"
 }
 
 # Starts a Pinot cluster given a specific target directory
 function startServices() {
   dirName=$1
   startService zookeeper "$dirName"
+  # Controller depends on zookeeper, if not wait zookeeper to be ready, controller will crash.
+  waitForZkReady
   startService controller "$dirName"
+  # Broker depends on controller, if not wait controller to be ready, broker will crash.
+  waitForControllerReady
   startService broker "$dirName"
   startService server "$dirName"
   startService kafka "$dirName"
+  waitForKafkaReady
   echo "Cluster started."
+  waitForClusterReady
 }
 
 # Stops the currently running Pinot cluster
@@ -127,7 +135,7 @@ function stopServices() {
   stopService zookeeper "$dirName"
   stopService kafka "$dirName"
   echo "Cluster stopped."
-} 
+}
 
 # Setup the path and classpath prefix for compatibility tester executable
 function setupCompatTester() {
@@ -142,103 +150,52 @@ function setupCompatTester() {
 # Main
 #
 
-# cleanp the temporary directory when the bash script exits 
-trap cleanup EXIT
-
-setupCompatTester
-
-###############################################################################
-# XXX BEGIN Temporary
-# While the individual components are under development, it is useful to start
-# zookeeper, controler, broker, server and kafka outside of this command and
-# debug as needed.
-#
-# Start the components as follows (or in debugger, if debugging)
-#
-#   rm -rf /tmp/zkdir && ${PINOT_ADMIN_CMD} StartZookeeper -dataDir /tmp/zkdir
-#   ${PINOT_ADMIN_CMD} StartController
-#   ${PINOT_ADMIN_CMD} StartBroker
-#   ${PINOT_ADMIN_CMD} StartKafka -zkAddress localhost:2181
-#
-# To compile the compat tester command alone, do the following:
-#   cd incubator-pinot
-#   mvn clean install -DskipTests
-#   mvn -pl pinot-integration-tests  package -DskipTests
-#
-if [ $# -ne 1 ]; then echo "Usage: $0 <yaml-file-name> (Be sure to start all components)"; exit 1; fi
-${COMPAT_TESTER} $1; if [ $? -ne 0 ]; then echo "Command failed"; exit 1; fi
-exit 0
-# XXX END Temporary
-##############################################################################
-
-if [ $# -lt 2 ] || [ $# -gt 3 ] ; then
+if [ $# -ne 1 ] ; then
   usage compCheck
 fi
 
-# get arguments
-olderCommit=$1
-newerCommit=$2 
-
-if [ -n "$3" ]; then
-  workingDir=$3
-  if [ -d "$workingDir" ]; then
-    echo "Directory ${workingDir} already exists. Use a new directory."
-    exit 1
-  fi
-else
-  # use the temp directory in case workingDir is not provided
-  workingDir=$TMP_DIR
-fi
+COMPAT_TESTER_PATH="pinot-integration-tests/target/pinot-integration-tests-pkg/bin/pinot-compat-test-runner.sh"
 
 # create subdirectories for given commits
+workingDir=$1
 oldTargetDir="$workingDir"/oldTargetDir
 newTargetDir="$workingDir"/newTargetDir
 
-if ! mkdir -p "$oldTargetDir"; then
-  echo "Failed to create target directory ${oldTargetDir}"
-  exit 1
-fi
-if ! mkdir -p "$newTargetDir"; then
-  echo "Failed to create target directory ${newTargetDir}"
-  exit 1
-fi
-
-# Building targets
-echo "Building the old version ... "
-checkoutAndBuild "$olderCommit" "$oldTargetDir"
-echo "Building the new version ..."
-checkoutAndBuild "$newerCommit" "$newTargetDir"
+setupCompatTester
 
 # check that the default ports are open
-if [ "$(lsof -t -i:8097 -s TCP:LISTEN)" ] || [ "$(lsof -t -i:8098 -sTCP:LISTEN)" ] || [ "$(lsof -t -i:8099 -sTCP:LISTEN)" ] || 
+if [ "$(lsof -t -i:8097 -s TCP:LISTEN)" ] || [ "$(lsof -t -i:8098 -sTCP:LISTEN)" ] || [ "$(lsof -t -i:8099 -sTCP:LISTEN)" ] ||
      [ "$(lsof -t -i:9000 -sTCP:LISTEN)" ] || [ "$(lsof -t -i:2181 -sTCP:LISTEN)" ]; then
   echo "Cannot start the components since the default ports are not open. Check any existing process that may be using the default ports."
   exit 1
 fi
 
+
 # Setup initial cluster with olderCommit and do rolling upgrade
 startServices "$oldTargetDir"
-#$COMPAT_TESTER pre-controller-upgrade.yaml; if [ $? -ne 0 ]; then exit 1; fi
+#$COMPAT_TESTER pre-controller-upgrade.yaml 1; if [ $? -ne 0 ]; then exit 1; fi
 stopService controller "$oldTargetDir"
 startService controller "$newTargetDir"
-#$COMPAT_TESTER pre-broker-upgrade.yaml; if [ $? -ne 0 ]; then exit 1; fi
+waitForControllerReady
+#$COMPAT_TESTER pre-broker-upgrade.yaml 2; if [ $? -ne 0 ]; then exit 1; fi
 stopService broker "$oldTargetDir"
 startService broker "$newTargetDir"
-#$COMPAT_TESTER pre-server-upgrade.yaml; if [ $? -ne 0 ]; then exit 1; fi
+#$COMPAT_TESTER pre-server-upgrade.yaml 3; if [ $? -ne 0 ]; then exit 1; fi
 stopService server "$oldTargetDir"
 startService server "$newTargetDir"
-#$COMPAT_TESTER post-server-upgrade.yaml; if [ $? -ne 0 ]; then exit 1; fi
+#$COMPAT_TESTER post-server-upgrade.yaml 4; if [ $? -ne 0 ]; then exit 1; fi
 
-# Upgrade complated, now do a rollback
+# Upgrade completed, now do a rollback
 stopService server "$newTargetDir"
 startService server "$oldTargetDir"
-#$COMPAT_TESTER post-server-rollback.yaml; if [ $? -ne 0 ]; then exit 1; fi
+#$COMPAT_TESTER post-server-rollback.yaml 5; if [ $? -ne 0 ]; then exit 1; fi
 stopService broker "$newTargetDir"
 startService broker "$oldTargetDir"
-#$COMPAT_TESTER post-broker-rollback.yaml; if [ $? -ne 0 ]; then exit 1; fi
+#$COMPAT_TESTER post-broker-rollback.yaml 6; if [ $? -ne 0 ]; then exit 1; fi
 stopService controller "$newTargetDir"
 startService controller "$oldTargetDir"
-#$COMPAT_TESTER post-controller-rollback.yaml; if [ $? -ne 0 ]; then exit 1; fi
+waitForControllerReady
+#$COMPAT_TESTER post-controller-rollback.yaml 7; if [ $? -ne 0 ]; then exit 1; fi
 stopServices "$oldTargetDir"
 
 exit 0

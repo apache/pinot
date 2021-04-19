@@ -21,7 +21,7 @@ package org.apache.pinot.core.util;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 
 
 /**

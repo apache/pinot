@@ -18,8 +18,13 @@
  */
 package org.apache.pinot.common.utils;
 
+import java.net.URI;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -64,5 +69,28 @@ public class URIUtilsTest {
       String randomString = RandomStringUtils.random(random.nextInt(maxPartLength + 1));
       assertEquals(URIUtils.decode(URIUtils.encode(randomString)), randomString);
     }
+  }
+
+  @Test
+  public void testBuildURI() {
+    URI uri = URIUtils.buildURI("http", "foo", "bar", Collections.emptyMap());
+    Assert.assertEquals(uri.toString(), "http://foo/bar");
+
+    uri = URIUtils.buildURI("http", "foo:8080", "bar/moo", Collections.emptyMap());
+    Assert.assertEquals(uri.toString(), "http://foo:8080/bar/moo");
+    Assert.assertEquals(uri.getHost(), "foo");
+    Assert.assertEquals(uri.getPort(), 8080);
+
+    // test that params get encoded
+    Map<String, String> params = new HashMap<>();
+    params.put("stringParam", "aString");
+    params.put("stringParamNeedsEncoding", "{\"format\":\"JSON\",\"timeout\":1000}");
+    uri = URIUtils.buildURI("http", "foo", "bar", params);
+    Assert.assertEquals(uri.toString(), "http://foo/bar?stringParam=aString&stringParamNeedsEncoding=" + URIUtils
+        .encode("{\"format\":\"JSON\",\"timeout\":1000}"));
+
+    // test that path gets encoded
+    uri = URIUtils.buildURI("http", "foo", "bar%moo{}", Collections.emptyMap());
+    Assert.assertEquals(uri.toString(), "http://foo/" + URIUtils.encode("bar%moo{}"));
   }
 }

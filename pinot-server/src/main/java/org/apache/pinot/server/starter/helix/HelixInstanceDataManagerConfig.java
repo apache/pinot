@@ -19,14 +19,15 @@
 package org.apache.pinot.server.starter.helix;
 
 import java.util.Optional;
-
 import org.apache.commons.configuration.ConfigurationException;
-import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.common.utils.CommonConstants.Server;
-import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI;
 
 
 /**
@@ -60,6 +61,8 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public static final String SEGMENT_FORMAT_VERSION = "segment.format.version";
   // Key of whether to enable reloading consuming segments
   public static final String INSTANCE_RELOAD_CONSUMING_SEGMENT = "reload.consumingSegment";
+  // Key of the auth token
+  public static final String AUTH_TOKEN = "auth.token";
 
   // Key of how many parallel realtime segments can be built.
   // A value of <= 0 indicates unlimited.
@@ -147,6 +150,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   @Override
+  public String getSegmentStoreUri() {
+    return _instanceDataManagerConfiguration.getProperty(CONFIG_OF_SEGMENT_STORE_URI);
+  }
+
+  @Override
   public ReadMode getReadMode() {
     return ReadMode.valueOf(_instanceDataManagerConfiguration.getProperty(READ_MODE));
   }
@@ -192,6 +200,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   public int getMaxParallelSegmentBuilds() {
     return _instanceDataManagerConfiguration.getProperty(MAX_PARALLEL_SEGMENT_BUILDS, 0);
+  }
+
+  @Override
+  public String getAuthToken() {
+    return _instanceDataManagerConfiguration.getProperty(AUTH_TOKEN);
   }
 
   @Override

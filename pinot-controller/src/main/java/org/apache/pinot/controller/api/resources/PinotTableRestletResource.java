@@ -34,6 +34,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -50,6 +51,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.config.tuner.TableConfigTunerRegistry;
+import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -65,7 +67,7 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.recommender.RecommenderDriver;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.util.ReplicationUtils;
-import org.apache.pinot.core.util.TableConfigUtils;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -420,9 +422,32 @@ public class PinotTableRestletResource {
       String msg = String.format("Invalid table config json string: %s", tableConfigStr);
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
+    return validateConfig(tableConfig, _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig));
+  }
 
+  @POST
+  @Path("/tables/validateTableAndSchema")
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Validate table config for a table along with specified schema", notes =
+      "Validate given table config and schema. If specified schema is null, attempt to retrieve schema using the "
+          + "table name. This API returns the table config that matches the one you get from 'GET /tables/{tableName}'."
+          + " This allows us to validate table config before apply.")
+  public String validateTableAndSchema(TableAndSchemaConfig tableSchemaConfig) {
+    TableConfig tableConfig = tableSchemaConfig.getTableConfig();
+    Schema schema = tableSchemaConfig.getSchema();
+    if (schema == null) {
+      schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
+    }
+    return validateConfig(tableSchemaConfig.getTableConfig(), schema);
+  }
+
+  private String validateConfig(TableConfig tableConfig, Schema schema) {
     try {
-      Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
+      if (schema == null) {
+        throw new SchemaNotFoundException("Got empty schema");
+      }
+
       TableConfigUtils.validate(tableConfig, schema);
       ObjectNode tableConfigValidateStr = JsonUtils.newObjectNode();
       if (tableConfig.getTableType() == TableType.OFFLINE) {
@@ -497,23 +522,20 @@ public class PinotTableRestletResource {
 
       if (quotaConfig == null) {
         // set a default storage quota
-        tableConfig.setQuotaConfig(
-            new QuotaConfig(maxAllowedSize, null));
-        LOGGER.info("Assigning default storage quota ({}) for dimension table: {}",
-            maxAllowedSize, tableConfig.getTableName());
+        tableConfig.setQuotaConfig(new QuotaConfig(maxAllowedSize, null));
+        LOGGER.info("Assigning default storage quota ({}) for dimension table: {}", maxAllowedSize,
+            tableConfig.getTableName());
       } else {
         if (quotaConfig.getStorage() == null) {
           // set a default storage quota and keep the RPS value
-          tableConfig.setQuotaConfig(
-              new QuotaConfig(maxAllowedSize, quotaConfig.getMaxQueriesPerSecond()));
-          LOGGER.info("Assigning default storage quota ({}) for dimension table: {}",
-              maxAllowedSize, tableConfig.getTableName());
+          tableConfig.setQuotaConfig(new QuotaConfig(maxAllowedSize, quotaConfig.getMaxQueriesPerSecond()));
+          LOGGER.info("Assigning default storage quota ({}) for dimension table: {}", maxAllowedSize,
+              tableConfig.getTableName());
         } else {
           if (quotaConfig.getStorageInBytes() > maxAllowedSizeInBytes) {
-            throw new PinotHelixResourceManager.InvalidTableConfigException(
-                String.format("Invalid storage quota: %d, max allowed size: %d",
-                    quotaConfig.getStorageInBytes(), maxAllowedSizeInBytes)
-            );
+            throw new PinotHelixResourceManager.InvalidTableConfigException(String
+                .format("Invalid storage quota: %d, max allowed size: %d", quotaConfig.getStorageInBytes(),
+                    maxAllowedSizeInBytes));
           }
         }
       }
@@ -650,8 +672,7 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Get current table state", notes = "Get current table state")
   public String getTableState(
       @ApiParam(value = "Name of the table to get its state", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "realtime|offline", required = true) @QueryParam("type") String tableTypeStr
-  ) {
+      @ApiParam(value = "realtime|offline", required = true) @QueryParam("type") String tableTypeStr) {
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
     try {
       ObjectNode data = JsonUtils.newObjectNode();
@@ -671,14 +692,14 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
     ObjectNode ret = JsonUtils.newObjectNode();
-    if ((tableTypeStr == null || TableType.OFFLINE.name().equalsIgnoreCase(tableTypeStr))
-        && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
+    if ((tableTypeStr == null || TableType.OFFLINE.name().equalsIgnoreCase(tableTypeStr)) && _pinotHelixResourceManager
+        .hasOfflineTable(tableName)) {
       String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
       TableStats tableStats = _pinotHelixResourceManager.getTableStats(tableNameWithType);
       ret.set(TableType.OFFLINE.name(), JsonUtils.objectToJsonNode(tableStats));
     }
-    if ((tableTypeStr == null || TableType.REALTIME.name().equalsIgnoreCase(tableTypeStr))
-        && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+    if ((tableTypeStr == null || TableType.REALTIME.name().equalsIgnoreCase(tableTypeStr)) && _pinotHelixResourceManager
+        .hasRealtimeTable(tableName)) {
       String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
       TableStats tableStats = _pinotHelixResourceManager.getTableStats(tableNameWithType);
       ret.set(TableType.REALTIME.name(), JsonUtils.objectToJsonNode(tableStats));

@@ -21,17 +21,19 @@ package org.apache.pinot.core.segment.processing.framework;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.core.segment.processing.partitioner.ColumnValuePartitioner;
 import org.apache.pinot.core.segment.processing.partitioner.NoOpPartitioner;
-import org.apache.pinot.core.segment.processing.partitioner.Partitioner;
-import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
+import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
 import org.apache.pinot.core.segment.processing.partitioner.RoundRobinPartitioner;
 import org.apache.pinot.core.segment.processing.partitioner.TableConfigPartitioner;
 import org.apache.pinot.core.segment.processing.partitioner.TransformFunctionPartitioner;
+import org.apache.pinot.segment.spi.partition.Partitioner;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 /**
@@ -158,11 +160,11 @@ public class PartitionerTest {
     }
     partitionerConfig =
         new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
-            .setTransformFunction("bad function").build();
+            .setTransformFunction("badFunction()").build();
     try {
       PartitionerFactory.getPartitioner(partitionerConfig);
       fail("Should not create TRANSFORM_FUNCTION Partitioner for invalid transform function");
-    } catch (IllegalArgumentException e) {
+    } catch (IllegalStateException e) {
       // expected
     }
 

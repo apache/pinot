@@ -32,13 +32,13 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.client.ResultSetGroup;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
@@ -60,9 +60,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
   // Default settings
   private static final String DEFAULT_PQL_QUERY_FILE_NAME =
-      "On_Time_On_Time_Performance_2014_100k_subset.test_queries_500";
+      "On_Time_On_Time_Performance_2014_100k_subset.test_queries_200.pql";
   private static final String DEFAULT_SQL_QUERY_FILE_NAME =
-      "On_Time_On_Time_Performance_2014_100k_subset.test_queries_500.sql";
+      "On_Time_On_Time_Performance_2014_100k_subset.test_queries_200.sql";
   private static final int DEFAULT_NUM_QUERIES_TO_GENERATE = 100;
   private static final int DEFAULT_MAX_NUM_QUERIES_TO_SKIP_IN_QUERY_FILE = 200;
 

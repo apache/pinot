@@ -18,18 +18,18 @@
  */
 package org.apache.pinot.minion.metrics;
 
-import com.yammer.metrics.core.MetricsRegistry;
 import org.apache.pinot.common.metrics.AbstractMetrics;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 public class MinionMetrics extends AbstractMetrics<MinionQueryPhase, MinionMeter, MinionGauge, MinionTimer> {
 
-  public MinionMetrics(MetricsRegistry metricsRegistry) {
+  public MinionMetrics(PinotMetricsRegistry metricsRegistry) {
     this(CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX, metricsRegistry);
   }
 
-  public MinionMetrics(String prefix, MetricsRegistry metricsRegistry) {
+  public MinionMetrics(String prefix, PinotMetricsRegistry metricsRegistry) {
     super(prefix, metricsRegistry, MinionMetrics.class);
   }
 

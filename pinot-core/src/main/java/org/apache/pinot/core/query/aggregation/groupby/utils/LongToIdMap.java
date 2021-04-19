@@ -58,4 +58,9 @@ public class LongToIdMap extends BaseValueToIdMap {
   public String getString(int id) {
     return Long.toString(getLong(id));
   }
+
+  @Override
+  public Object get(int id) {
+    return getLong(id);
+  }
 }

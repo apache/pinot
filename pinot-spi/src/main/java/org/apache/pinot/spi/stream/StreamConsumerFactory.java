@@ -19,7 +19,6 @@
 package org.apache.pinot.spi.stream;
 
 import java.util.Set;
-import org.apache.pinot.spi.data.Schema;
 
 
 /**
@@ -73,4 +72,13 @@ public abstract class StreamConsumerFactory {
   public StreamPartitionMsgOffsetFactory createStreamMsgOffsetFactory() {
     return new LongMsgOffsetFactory();
   }
+
+  /**
+   * Creates a partition group consumer, which can fetch messages from a partition group
+   */
+  public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
+      PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
+    return createPartitionLevelConsumer(clientId, partitionGroupConsumptionStatus.getPartitionGroupId());
+  }
+
 }

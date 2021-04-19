@@ -20,11 +20,11 @@ package org.apache.pinot.core.plan;
 
 import com.google.common.base.Preconditions;
 import java.util.List;
-import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.streaming.StreamingSelectionOnlyOperator;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.segment.spi.IndexSegment;
 
 
 /**

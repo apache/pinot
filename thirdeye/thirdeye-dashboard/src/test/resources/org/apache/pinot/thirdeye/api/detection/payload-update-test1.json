@@ -1,2 +1,0 @@
-{"dataset-configuration": "timeColumn: time_update",
-  "data":{"columns":["time_update","online_metric"],"rows":[["20200325","68"],["20200428","67"],["20200422","63"]]}}

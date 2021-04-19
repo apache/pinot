@@ -19,7 +19,6 @@
 package org.apache.pinot.broker.api;
 
 import com.google.common.collect.Multimap;
-import java.security.Principal;
 
 
 /**

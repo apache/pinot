@@ -21,7 +21,6 @@ package org.apache.pinot.spi.crypt;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;

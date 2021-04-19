@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
@@ -34,7 +35,12 @@ import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
  */
 public final class IngestionConfigUtils {
   public static final String DOT_SEPARATOR = ".";
+  private static final String DEFAULT_SEGMENT_NAME_GENERATOR_TYPE =
+      BatchConfigProperties.SegmentNameGeneratorType.SIMPLE;
   private static final String DEFAULT_PUSH_MODE = "tar";
+  private static final int DEFAULT_PUSH_ATTEMPTS = 5;
+  private static final int DEFAULT_PUSH_PARALLELISM = 1;
+  private static final long DEFAULT_PUSH_RETRY_INTERVAL_MILLIS = 1000L;
 
   /**
    * Fetches the streamConfig from the given realtime table.
@@ -107,12 +113,36 @@ public final class IngestionConfigUtils {
     return getConfigMapWithPrefix(batchConfigMap, BatchConfigProperties.RECORD_READER_PROP_PREFIX + DOT_SEPARATOR);
   }
 
+  /**
+   * Fetch the properties which belong to segment name generator, by removing the identifier prefix
+   */
+  public static Map<String, String> getSegmentNameGeneratorProps(Map<String, String> batchConfigMap) {
+    return getConfigMapWithPrefix(batchConfigMap,
+        BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX + DOT_SEPARATOR);
+  }
+
   public static PinotConfiguration getInputFsProps(Map<String, String> batchConfigMap) {
-    return new PinotConfiguration(getPropsWithPrefix(batchConfigMap, BatchConfigProperties.INPUT_FS_PROP_PREFIX + DOT_SEPARATOR));
+    return new PinotConfiguration(
+        getPropsWithPrefix(batchConfigMap, BatchConfigProperties.INPUT_FS_PROP_PREFIX + DOT_SEPARATOR));
   }
 
   public static PinotConfiguration getOutputFsProps(Map<String, String> batchConfigMap) {
-    return new PinotConfiguration(getPropsWithPrefix(batchConfigMap, BatchConfigProperties.OUTPUT_FS_PROP_PREFIX + DOT_SEPARATOR));
+    return new PinotConfiguration(
+        getPropsWithPrefix(batchConfigMap, BatchConfigProperties.OUTPUT_FS_PROP_PREFIX + DOT_SEPARATOR));
+  }
+
+  /**
+   * Extracts entries where keys start with given prefix
+   */
+  public static Map<String, String> extractPropsMatchingPrefix(Map<String, String> batchConfigMap, String prefix) {
+    Map<String, String> propsMatchingPrefix = new HashMap<>();
+    for (Map.Entry<String, String> entry : batchConfigMap.entrySet()) {
+      String key = entry.getKey();
+      if (key.startsWith(prefix)) {
+        propsMatchingPrefix.put(key, entry.getValue());
+      }
+    }
+    return propsMatchingPrefix;
   }
 
   public static Map<String, Object> getPropsWithPrefix(Map<String, String> batchConfigMap, String prefix) {
@@ -134,11 +164,51 @@ public final class IngestionConfigUtils {
     return props;
   }
 
+  /**
+   * Extracts the segment name generator type from the batchConfigMap, or returns default value if not found
+   */
+  public static String getSegmentNameGeneratorType(Map<String, String> batchConfigMap) {
+    return batchConfigMap
+        .getOrDefault(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE, DEFAULT_SEGMENT_NAME_GENERATOR_TYPE);
+  }
+
+  /**
+   * Extracts the push mode from the batchConfigMap, or returns default value if not found
+   */
   public static String getPushMode(Map<String, String> batchConfigMap) {
-    String pushMode = batchConfigMap.get(BatchConfigProperties.PUSH_MODE);
-    if (pushMode == null) {
-      pushMode = DEFAULT_PUSH_MODE;
+    return batchConfigMap.getOrDefault(BatchConfigProperties.PUSH_MODE, DEFAULT_PUSH_MODE);
+  }
+
+  /**
+   * Extracts the push attempts from the batchConfigMap, or returns default value if not found
+   */
+  public static int getPushAttempts(Map<String, String> batchConfigMap) {
+    String pushAttempts = batchConfigMap.get(BatchConfigProperties.PUSH_ATTEMPTS);
+    if (StringUtils.isNumeric(pushAttempts)) {
+      return Integer.parseInt(pushAttempts);
     }
-    return pushMode;
+    return DEFAULT_PUSH_ATTEMPTS;
+  }
+
+  /**
+   * Extracts the push parallelism from the batchConfigMap, or returns default value if not found
+   */
+  public static int getPushParallelism(Map<String, String> batchConfigMap) {
+    String pushParallelism = batchConfigMap.get(BatchConfigProperties.PUSH_PARALLELISM);
+    if (StringUtils.isNumeric(pushParallelism)) {
+      return Integer.parseInt(pushParallelism);
+    }
+    return DEFAULT_PUSH_PARALLELISM;
+  }
+
+  /**
+   * Extracts the push return interval millis from the batchConfigMap, or returns default value if not found
+   */
+  public static long getPushRetryIntervalMillis(Map<String, String> batchConfigMap) {
+    String pushRetryIntervalMillis = batchConfigMap.get(BatchConfigProperties.PUSH_RETRY_INTERVAL_MILLIS);
+    if (StringUtils.isNumeric(pushRetryIntervalMillis)) {
+      return Long.parseLong(pushRetryIntervalMillis);
+    }
+    return DEFAULT_PUSH_RETRY_INTERVAL_MILLIS;
   }
 }

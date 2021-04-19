@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -167,9 +168,63 @@ public class GenericRow implements Serializable {
     }
     if (obj instanceof GenericRow) {
       GenericRow that = (GenericRow) obj;
-      return _fieldToValueMap.equals(that._fieldToValueMap) && _nullValueFields.equals(that._nullValueFields);
+      if (!_nullValueFields.containsAll(that._nullValueFields) || !that._nullValueFields
+          .containsAll(_nullValueFields)) {
+        return false;
+      }
+      return compareMap(_fieldToValueMap, that._fieldToValueMap);
     }
     return false;
+  }
+
+  private boolean compareMap(Map<String, Object> thisMap, Map<String, Object> thatMap) {
+    if (thisMap.size() == thatMap.size()) {
+      for (String key : thisMap.keySet()) {
+        Object fieldValue = thisMap.get(key);
+        Object thatFieldValue = thatMap.get(key);
+        if (fieldValue == null) {
+          if (thatFieldValue != null) {
+            return false;
+          }
+        } else if (!fieldValue.equals(thatFieldValue)) {
+          if (fieldValue instanceof Map && thatFieldValue instanceof Map) {
+            return compareMap((Map<String, Object>) fieldValue, (Map<String, Object>) thatFieldValue);
+          }
+          if ((fieldValue instanceof byte[]) && (thatFieldValue instanceof byte[])) {
+            return Arrays.equals((byte[]) fieldValue, (byte[]) thatFieldValue);
+          }
+          if (fieldValue.getClass().isArray() && thatFieldValue.getClass().isArray()) {
+            return compareArray((Object[]) fieldValue, (Object[]) thatFieldValue);
+          }
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  private boolean compareArray(Object[] fieldValue, Object[] thatFieldValue) {
+    for (int i = 0; i < fieldValue.length; i++) {
+      if (fieldValue[i] instanceof Map) {
+        if (!(thatFieldValue[i] instanceof Map)) {
+          return false;
+        }
+        if (!compareMap((Map<String, Object>) fieldValue[i], (Map<String, Object>) thatFieldValue[i])) {
+          return false;
+        }
+        continue;
+      }
+      if (fieldValue[i].getClass().isArray()) {
+        if (!compareArray((Object[]) fieldValue[i], (Object[]) thatFieldValue[i])) {
+          return false;
+        }
+        continue;
+      }
+      if (!fieldValue[i].equals(thatFieldValue[i])) {
+        return false;
+      }
+    }
+    return true;
   }
 
   @Override

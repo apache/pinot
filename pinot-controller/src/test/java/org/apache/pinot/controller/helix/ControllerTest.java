@@ -60,7 +60,6 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -75,15 +74,17 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 
-import static org.apache.pinot.common.utils.CommonConstants.Helix.Instance.*;
-import static org.apache.pinot.common.utils.CommonConstants.Helix.*;
-import static org.apache.pinot.common.utils.CommonConstants.Server.*;
-import static org.testng.Assert.*;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.*;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.Instance.ADMIN_PORT_KEY;
+import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 
 
 public abstract class ControllerTest {
@@ -93,6 +94,7 @@ public abstract class ControllerTest {
       new File(FileUtils.getTempDirectoryPath(), "test-controller-" + System.currentTimeMillis()).getAbsolutePath();
   protected static final String BROKER_INSTANCE_ID_PREFIX = "Broker_localhost_";
   protected static final String SERVER_INSTANCE_ID_PREFIX = "Server_localhost_";
+  protected static final String MINION_INSTANCE_ID_PREFIX = "Minion_localhost_";
 
   protected final List<HelixManager> _fakeInstanceHelixManagers = new ArrayList<>();
 
@@ -381,6 +383,77 @@ public abstract class ControllerTest {
     }
   }
 
+  protected void addFakeMinionInstancesToAutoJoinHelixCluster(int numInstances)
+      throws Exception {
+    for (int i = 0; i < numInstances; i++) {
+      addFakeMinionInstanceToAutoJoinHelixCluster(MINION_INSTANCE_ID_PREFIX + i);
+    }
+  }
+
+  protected void addFakeMinionInstanceToAutoJoinHelixCluster(String instanceId)
+      throws Exception {
+    HelixManager helixManager =
+        HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
+            ZkStarter.DEFAULT_ZK_STR);
+    helixManager.getStateMachineEngine()
+        .registerStateModelFactory(FakeMinionResourceOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
+            FakeMinionResourceOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
+    helixManager.connect();
+    HelixAdmin helixAdmin = helixManager.getClusterManagmentTool();
+    helixAdmin.addInstanceTag(getHelixClusterName(), instanceId, UNTAGGED_MINION_INSTANCE);
+    _fakeInstanceHelixManagers.add(helixManager);
+  }
+
+  public static class FakeMinionResourceOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
+    private static final String STATE_MODEL_DEF = "MinionResourceOnlineOfflineStateModel";
+    private static final FakeMinionResourceOnlineOfflineStateModelFactory FACTORY_INSTANCE =
+        new FakeMinionResourceOnlineOfflineStateModelFactory();
+    private static final FakeMinionResourceOnlineOfflineStateModel STATE_MODEL_INSTANCE =
+        new FakeMinionResourceOnlineOfflineStateModel();
+
+    private FakeMinionResourceOnlineOfflineStateModelFactory() {
+    }
+
+    @Override
+    public StateModel createNewStateModel(String resourceName, String partitionName) {
+      return STATE_MODEL_INSTANCE;
+    }
+
+    @SuppressWarnings("unused")
+    @StateModelInfo(states = "{'OFFLINE', 'ONLINE', 'DROPPED'}", initialState = "OFFLINE")
+    public static class FakeMinionResourceOnlineOfflineStateModel extends StateModel {
+      private static final Logger LOGGER = LoggerFactory.getLogger(FakeMinionResourceOnlineOfflineStateModel.class);
+
+      private FakeMinionResourceOnlineOfflineStateModel() {
+      }
+
+      @Transition(from = "OFFLINE", to = "ONLINE")
+      public void onBecomeOnlineFromOffline(Message message, NotificationContext context) {
+        LOGGER.debug("onBecomeOnlineFromOffline(): {}", message);
+      }
+
+      @Transition(from = "OFFLINE", to = "DROPPED")
+      public void onBecomeDroppedFromOffline(Message message, NotificationContext context) {
+        LOGGER.debug("onBecomeDroppedFromOffline(): {}", message);
+      }
+
+      @Transition(from = "ONLINE", to = "OFFLINE")
+      public void onBecomeOfflineFromOnline(Message message, NotificationContext context) {
+        LOGGER.debug("onBecomeOfflineFromOnline(): {}", message);
+      }
+
+      @Transition(from = "ONLINE", to = "DROPPED")
+      public void onBecomeDroppedFromOnline(Message message, NotificationContext context) {
+        LOGGER.debug("onBecomeDroppedFromOnline(): {}", message);
+      }
+
+      @Transition(from = "ERROR", to = "OFFLINE")
+      public void onBecomeOfflineFromError(Message message, NotificationContext context) {
+        LOGGER.debug("onBecomeOfflineFromError(): {}", message);
+      }
+    }
+  }
+
   protected void stopFakeInstances() {
     for (HelixManager helixManager : _fakeInstanceHelixManagers) {
       helixManager.disconnect();
@@ -459,6 +532,11 @@ public abstract class ControllerTest {
         _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType(tableName)));
   }
 
+  protected void dropAllSegments(String tableName, TableType tableType) throws IOException {
+    sendDeleteRequest(
+        _controllerRequestURLBuilder.forSegmentDeleteAllAPI(tableName, tableType.toString()));
+  }
+
   protected void reloadOfflineTable(String tableName) throws IOException {
     sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, TableType.OFFLINE.name()), null);
   }
@@ -512,12 +590,24 @@ public abstract class ControllerTest {
     return constructResponse(new URL(urlString).openStream());
   }
 
+  public static String sendGetRequest(String urlString, Map<String, String> headers) throws IOException {
+    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
+    httpConnection.setRequestMethod("GET");
+    if (headers != null) {
+      for (String key : headers.keySet()) {
+        httpConnection.setRequestProperty(key, headers.get(key));
+      }
+    }
+
+    return constructResponse(httpConnection.getInputStream());
+  }
+
   public static String sendGetRequestRaw(String urlString) throws IOException {
     return IOUtils.toString(new URL(urlString).openStream());
   }
 
   public static String sendPostRequest(String urlString, String payload) throws IOException {
-    return sendPostRequest(urlString, payload, Collections.EMPTY_MAP);
+    return sendPostRequest(urlString, payload, Collections.emptyMap());
   }
 
   public static String sendPostRequest(String urlString, String payload, Map<String, String> headers)
@@ -543,9 +633,18 @@ public abstract class ControllerTest {
   }
 
   public static String sendPutRequest(String urlString, String payload) throws IOException {
+    return sendPutRequest(urlString, payload, Collections.emptyMap());
+  }
+
+  public static String sendPutRequest(String urlString, String payload, Map<String, String> headers) throws IOException {
     HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
     httpConnection.setDoOutput(true);
     httpConnection.setRequestMethod("PUT");
+    if (headers != null) {
+      for (String key : headers.keySet()) {
+        httpConnection.setRequestProperty(key, headers.get(key));
+      }
+    }
 
     try (BufferedWriter writer = new BufferedWriter(
         new OutputStreamWriter(httpConnection.getOutputStream(), StandardCharsets.UTF_8))) {
@@ -556,6 +655,7 @@ public abstract class ControllerTest {
     return constructResponse(httpConnection.getInputStream());
   }
 
+  // NOTE: does not support headers
   public static String sendPutRequest(String urlString) throws IOException {
     HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
     httpConnection.setDoOutput(true);
@@ -564,10 +664,18 @@ public abstract class ControllerTest {
   }
 
   public static String sendDeleteRequest(String urlString) throws IOException {
+    return sendDeleteRequest(urlString, Collections.emptyMap());
+  }
+
+  public static String sendDeleteRequest(String urlString, Map<String, String> headers) throws IOException {
     HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
     httpConnection.setRequestMethod("DELETE");
+    if (headers != null) {
+      for (String key : headers.keySet()) {
+        httpConnection.setRequestProperty(key, headers.get(key));
+      }
+    }
     httpConnection.connect();
-
     return constructResponse(httpConnection.getInputStream());
   }
 
@@ -583,21 +691,39 @@ public abstract class ControllerTest {
   }
 
   public static PostMethod sendMultipartPostRequest(String url, String body) throws IOException {
+    return sendMultipartPostRequest(url, body, Collections.emptyMap());
+  }
+
+  public static PostMethod sendMultipartPostRequest(String url, String body, Map<String, String> headers) throws IOException {
     HttpClient httpClient = new HttpClient();
     PostMethod postMethod = new PostMethod(url);
     // our handlers ignore key...so we can put anything here
     Part[] parts = {new StringPart("body", body)};
     postMethod.setRequestEntity(new MultipartRequestEntity(parts, postMethod.getParams()));
+    if (headers != null) {
+      for (String key : headers.keySet()) {
+        postMethod.addRequestHeader(key, headers.get(key));
+      }
+    }
     httpClient.executeMethod(postMethod);
     return postMethod;
   }
 
   public static PutMethod sendMultipartPutRequest(String url, String body) throws IOException {
+    return sendMultipartPutRequest(url, body, Collections.emptyMap());
+  }
+
+  public static PutMethod sendMultipartPutRequest(String url, String body, Map<String, String> headers) throws IOException {
     HttpClient httpClient = new HttpClient();
     PutMethod putMethod = new PutMethod(url);
     // our handlers ignore key...so we can put anything here
     Part[] parts = {new StringPart("body", body)};
     putMethod.setRequestEntity(new MultipartRequestEntity(parts, putMethod.getParams()));
+    if (headers != null) {
+      for (String key : headers.keySet()) {
+        putMethod.addRequestHeader(key, headers.get(key));
+      }
+    }
     httpClient.executeMethod(putMethod);
     return putMethod;
   }

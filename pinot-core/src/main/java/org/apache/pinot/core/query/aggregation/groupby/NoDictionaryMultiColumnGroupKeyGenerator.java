@@ -24,17 +24,17 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.Arrays;
 import java.util.Iterator;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.query.aggregation.groupby.utils.ValueToIdMap;
 import org.apache.pinot.core.query.aggregation.groupby.utils.ValueToIdMapFactory;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
-import org.apache.pinot.core.util.FixedIntArray;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.FixedIntArray;
 
 
 /**
@@ -284,8 +284,13 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   }
 
   @Override
-  public Iterator<GroupKey> getUniqueGroupKeys() {
+  public Iterator<GroupKey> getGroupKeys() {
     return new GroupKeyIterator();
+  }
+
+  @Override
+  public Iterator<StringGroupKey> getStringGroupKeys() {
+    return new StringGroupKeyIterator();
   }
 
   /**
@@ -331,11 +336,11 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   }
 
   /**
-   * Iterator for {Group-Key, Group-id) pair.
+   * Iterator for {@link GroupKey}.
    */
   private class GroupKeyIterator implements Iterator<GroupKey> {
-    final ObjectIterator<Object2IntMap.Entry<FixedIntArray>> _iterator;
-    final GroupKey _groupKey;
+    private final ObjectIterator<Object2IntMap.Entry<FixedIntArray>> _iterator;
+    private final GroupKey _groupKey;
 
     public GroupKeyIterator() {
       _iterator = _groupKeyMap.object2IntEntrySet().fastIterator();
@@ -349,6 +354,50 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
 
     @Override
     public GroupKey next() {
+      Object2IntMap.Entry<FixedIntArray> entry = _iterator.next();
+      _groupKey._groupId = entry.getIntValue();
+      _groupKey._keys = buildKeysFromIds(entry.getKey());
+      return _groupKey;
+    }
+
+    @Override
+    public void remove() {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  private Object[] buildKeysFromIds(FixedIntArray keyList) {
+    Object[] keys = new Object[_numGroupByExpressions];
+    int[] dictIds = keyList.elements();
+    for (int i = 0; i < _numGroupByExpressions; i++) {
+      if (_dictionaries[i] != null) {
+        keys[i] = _dictionaries[i].getInternal(dictIds[i]);
+      } else {
+        keys[i] = _onTheFlyDictionaries[i].get(dictIds[i]);
+      }
+    }
+    return keys;
+  }
+
+  /**
+   * Iterator for {@link StringGroupKey}.
+   */
+  private class StringGroupKeyIterator implements Iterator<StringGroupKey> {
+    private final ObjectIterator<Object2IntMap.Entry<FixedIntArray>> _iterator;
+    private final StringGroupKey _groupKey;
+
+    public StringGroupKeyIterator() {
+      _iterator = _groupKeyMap.object2IntEntrySet().fastIterator();
+      _groupKey = new StringGroupKey();
+    }
+
+    @Override
+    public boolean hasNext() {
+      return _iterator.hasNext();
+    }
+
+    @Override
+    public StringGroupKey next() {
       Object2IntMap.Entry<FixedIntArray> entry = _iterator.next();
       _groupKey._groupId = entry.getIntValue();
       _groupKey._stringKey = buildStringKeyFromIds(entry.getKey());

@@ -45,7 +45,7 @@ import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
-import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.glassfish.jersey.server.ManagedAsync;
 import org.slf4j.Logger;
@@ -63,11 +63,18 @@ public class PinotClientRequest {
   @Inject
   private BrokerMetrics brokerMetrics;
 
+  /**
+   * Legacy API to query Pinot using PQL (Pinot Query Language) syntax
+   * and semantics. This API is deprecated and PQL is no longer supported
+   * by Pinot. The API will be removed in the next release. Please use
+   * the standard SQL syntax (API /query/sql) to query Pinot.
+   */
+  @Deprecated
   @GET
   @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
   @Path("query")
-  @ApiOperation(value = "Querying pinot")
+  @ApiOperation(value = "Querying pinot using PQL")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Query response"), @ApiResponse(code = 500, message = "Internal Server Error")})
   public void processQueryGet(
       // Query param "bql" is for backward compatibility
@@ -93,11 +100,18 @@ public class PinotClientRequest {
     }
   }
 
+  /**
+   * Legacy API to query Pinot using PQL (Pinot Query Language) syntax
+   * and semantics. This API is deprecated and PQL is no longer supported
+   * by Pinot. The API will be removed in the next release. Please use
+   * the standard SQL syntax (API /query/sql) to query Pinot.
+   */
+  @Deprecated
   @POST
   @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
   @Path("query")
-  @ApiOperation(value = "Querying pinot")
+  @ApiOperation(value = "Querying pinot using PQL")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Query response"), @ApiResponse(code = 500, message = "Internal Server Error")})
   public void processQueryPost(String query, @Suspended AsyncResponse asyncResponse,
       @Context org.glassfish.grizzly.http.server.Request requestContext) {

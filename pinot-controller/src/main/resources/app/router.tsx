@@ -28,6 +28,7 @@ import SegmentDetails from './pages/SegmentDetails';
 import InstanceDetails from './pages/InstanceDetails';
 import ZookeeperPage from './pages/ZookeeperPage';
 import SchemaPageDetails from './pages/SchemaPageDetails';
+import LoginPage from './pages/LoginPage';
 
 export default [
   { path: '/', Component: HomePage },
@@ -47,4 +48,5 @@ export default [
   { path: '/instance/:instanceName/table/:tableName', Component: TenantPageDetails },
   { path: '/instance/:instanceName/table/:tableName/:segmentName', Component: SegmentDetails },
   { path: '/zookeeper', Component: ZookeeperPage },
+  { path: '/login', Component: LoginPage },
 ];

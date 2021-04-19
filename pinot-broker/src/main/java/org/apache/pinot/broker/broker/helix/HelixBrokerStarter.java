@@ -19,14 +19,12 @@
 package org.apache.pinot.broker.broker.helix;
 
 import com.google.common.collect.ImmutableList;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixConstants.ChangeType;
@@ -53,11 +51,7 @@ import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.metrics.MetricsHelper;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.CommonConstants.Broker;
-import org.apache.pinot.common.utils.CommonConstants.Helix;
-import org.apache.pinot.common.utils.NetUtil;
+import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.TableCache;
@@ -66,8 +60,13 @@ import org.apache.pinot.core.transport.TlsConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.core.util.TlsUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,7 +91,7 @@ public class HelixBrokerStarter implements ServiceStartable {
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private HelixDataAccessor _helixDataAccessor;
 
-  private MetricsRegistry _metricsRegistry;
+  private PinotMetricsRegistry _metricsRegistry;
   private BrokerMetrics _brokerMetrics;
   private RoutingManager _routingManager;
   private AccessControlFactory _accessControlFactory;
@@ -121,8 +120,8 @@ public class HelixBrokerStarter implements ServiceStartable {
     _zkServers = zkServer.replaceAll("\\s+", "");
 
     if (brokerHost == null) {
-      brokerHost = _brokerConf.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtil
-          .getHostnameOrAddress() : NetUtil.getHostAddress();
+      brokerHost = _brokerConf.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils
+          .getHostnameOrAddress() : NetUtils.getHostAddress();
     }
 
     _brokerId = _brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY,
@@ -226,9 +225,9 @@ public class HelixBrokerStarter implements ServiceStartable {
 
     LOGGER.info("Setting up broker request handler");
     // Set up metric registry and broker metrics
-    _metricsRegistry = new MetricsRegistry();
-    MetricsHelper.initializeMetrics(_brokerConf.subset(Broker.METRICS_CONFIG_PREFIX));
-    MetricsHelper.registerMetricsRegistry(_metricsRegistry);
+    PinotConfiguration metricsConfiguration = _brokerConf.subset(Broker.METRICS_CONFIG_PREFIX);
+    PinotMetricUtils.init(metricsConfiguration);
+    _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
     _brokerMetrics = new BrokerMetrics(
         _brokerConf.getProperty(Broker.CONFIG_OF_METRICS_NAME_PREFIX, Broker.DEFAULT_METRICS_NAME_PREFIX),
         _metricsRegistry,
@@ -394,7 +393,7 @@ public class HelixBrokerStarter implements ServiceStartable {
     return _spectatorHelixManager;
   }
 
-  public MetricsRegistry getMetricsRegistry() {
+  public PinotMetricsRegistry getMetricsRegistry() {
     return _metricsRegistry;
   }
 

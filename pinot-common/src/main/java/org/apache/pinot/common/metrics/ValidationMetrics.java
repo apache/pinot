@@ -19,28 +19,28 @@
 package org.apache.pinot.common.metrics;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.yammer.metrics.core.Gauge;
-import com.yammer.metrics.core.MetricName;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.spi.metrics.PinotGauge;
+import org.apache.pinot.spi.metrics.PinotMetricName;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 
 /**
  * Validation metrics utility class, which contains the glue code to publish metrics.
  */
 public class ValidationMetrics {
-  private final MetricsRegistry _metricsRegistry;
+  private final PinotMetricsRegistry _metricsRegistry;
   private final Map<String, Long> _gaugeValues = new HashMap<>();
-  private final Set<MetricName> _metricNames = new HashSet<>();
+  private final Set<PinotMetricName> _metricNames = new HashSet<>();
 
   /**
    * A simple gauge that returns whatever last value was stored in the _gaugeValues hash map.
    */
-  private class StoredValueGauge extends Gauge<Long> {
+  private class StoredValueGauge implements PinotGauge<Long> {
     private final String key;
 
     public StoredValueGauge(String key) {
@@ -51,13 +51,23 @@ public class ValidationMetrics {
     public Long value() {
       return _gaugeValues.get(key);
     }
+
+    @Override
+    public Object getGauge() {
+      return PinotMetricUtils.makePinotGauge(avoid -> value()).getGauge();
+    }
+
+    @Override
+    public Object getMetric() {
+      return getGauge();
+    }
   }
 
   /**
    * A simple gauge that returns the difference in hours between the current system time and the value stored in the
    * _gaugeValues hash map.
    */
-  private class CurrentTimeMillisDeltaGaugeHours extends Gauge<Double> {
+  private class CurrentTimeMillisDeltaGaugeHours implements PinotGauge<Double> {
     private final String key;
 
     private final double MILLIS_PER_HOUR = TimeUnit.MILLISECONDS.convert(1, TimeUnit.HOURS);
@@ -76,22 +86,32 @@ public class ValidationMetrics {
         return Double.MIN_VALUE;
       }
     }
+
+    @Override
+    public Object getMetric() {
+      return getGauge();
+    }
+
+    @Override
+    public Object getGauge() {
+      return PinotMetricUtils.makePinotGauge(avoid -> value()).getGauge();
+    }
   }
 
   private interface GaugeFactory<T> {
-    Gauge<T> buildGauge(final String key);
+    PinotGauge<T> buildGauge(final String key);
   }
 
   private class StoredValueGaugeFactory implements GaugeFactory<Long> {
     @Override
-    public Gauge<Long> buildGauge(final String key) {
+    public PinotGauge<Long> buildGauge(final String key) {
       return new StoredValueGauge(key);
     }
   }
 
   private class CurrentTimeMillisDeltaGaugeHoursFactory implements GaugeFactory<Double> {
     @Override
-    public Gauge<Double> buildGauge(final String key) {
+    public PinotGauge<Double> buildGauge(final String key) {
       return new CurrentTimeMillisDeltaGaugeHours(key);
     }
   }
@@ -105,7 +125,7 @@ public class ValidationMetrics {
    *
    * @param metricsRegistry The metrics registry used to store all the gauges.
    */
-  public ValidationMetrics(MetricsRegistry metricsRegistry) {
+  public ValidationMetrics(PinotMetricsRegistry metricsRegistry) {
     _metricsRegistry = metricsRegistry;
   }
 
@@ -184,15 +204,15 @@ public class ValidationMetrics {
     return "pinot.controller." + resource + "." + gaugeName;
   }
 
-  private MetricName makeMetricName(final String gaugeName) {
-    return new MetricName(ValidationMetrics.class, gaugeName);
+  private PinotMetricName makeMetricName(final String gaugeName) {
+    return PinotMetricUtils.makePinotMetricName(ValidationMetrics.class, gaugeName);
   }
 
-  private void makeGauge(final String gaugeName, final MetricName metricName, final GaugeFactory<?> gaugeFactory,
+  private void makeGauge(final String gaugeName, final PinotMetricName metricName, final GaugeFactory<?> gaugeFactory,
       final long value) {
     if (!_gaugeValues.containsKey(gaugeName)) {
       _gaugeValues.put(gaugeName, value);
-      MetricsHelper.newGauge(_metricsRegistry, metricName, gaugeFactory.buildGauge(gaugeName));
+      PinotMetricUtils.makeGauge(_metricsRegistry, metricName, gaugeFactory.buildGauge(gaugeName));
       _metricNames.add(metricName);
     } else {
       _gaugeValues.put(gaugeName, value);
@@ -203,8 +223,8 @@ public class ValidationMetrics {
    * Unregisters all validation metrics.
    */
   public void unregisterAllMetrics() {
-    for (MetricName metricName : _metricNames) {
-      MetricsHelper.removeMetric(_metricsRegistry, metricName);
+    for (PinotMetricName metricName : _metricNames) {
+      PinotMetricUtils.removeMetric(_metricsRegistry, metricName);
     }
 
     _metricNames.clear();

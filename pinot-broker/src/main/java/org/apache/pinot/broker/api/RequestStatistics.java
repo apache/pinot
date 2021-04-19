@@ -43,6 +43,8 @@ public class RequestStatistics {
   private long _numSegmentsQueried;
   private long _numSegmentsProcessed;
   private long _numSegmentsMatched;
+  private long _offlineThreadCpuTimeNs;
+  private long _realtimeThreadCpuTimeNs;
   private int _numServersQueried;
   private int _numServersResponded;
   private boolean _isNumGroupsLimitReached;
@@ -108,6 +110,8 @@ public class RequestStatistics {
     _numServersResponded = brokerResponse.getNumServersResponded();
     _isNumGroupsLimitReached = brokerResponse.isNumGroupsLimitReached();
     _numExceptions = brokerResponse.getExceptionsSize();
+    _offlineThreadCpuTimeNs = brokerResponse.getOfflineThreadCpuTimeNs();
+    _realtimeThreadCpuTimeNs = brokerResponse.getRealtimeThreadCpuTimeNs();
   }
 
   public void setBrokerId(String brokerId) {
@@ -192,6 +196,14 @@ public class RequestStatistics {
 
   public int getNumServersResponded() {
     return _numServersResponded;
+  }
+
+  public long getOfflineThreadCpuTimeNs() {
+    return _offlineThreadCpuTimeNs;
+  }
+
+  public long getRealtimeThreadCpuTimeNs() {
+    return _realtimeThreadCpuTimeNs;
   }
 
   public boolean isNumGroupsLimitReached() {

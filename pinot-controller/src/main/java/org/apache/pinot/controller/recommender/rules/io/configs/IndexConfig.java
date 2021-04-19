@@ -80,6 +80,10 @@ public class IndexConfig {
         return _isSortedColumnOverwritten;
     }
 
+    public void setSortedColumnOverwritten(boolean sortedColumnOverwritten) {
+        _isSortedColumnOverwritten = sortedColumnOverwritten;
+    }
+
     public Set<String> getVariedLengthDictionaryColumns() {
         return _variedLengthDictionaryColumns;
     }

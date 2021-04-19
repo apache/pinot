@@ -32,7 +32,6 @@ import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.LeadControllerManager;
@@ -42,6 +41,7 @@ import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -1160,7 +1160,9 @@ public class SegmentCompletionManager {
      * @return true if winner picked, false otherwise.
      */
     private boolean isWinnerPicked(String preferredInstance, long now, final String stopReason) {
-      if (SegmentCompletionProtocol.REASON_ROW_LIMIT.equals(stopReason) && _commitStateMap.size() == 1) {
+      if ((SegmentCompletionProtocol.REASON_ROW_LIMIT.equals(stopReason)
+          || SegmentCompletionProtocol.REASON_END_OF_PARTITION_GROUP.equals(stopReason))
+          && _commitStateMap.size() == 1) {
         _winner = preferredInstance;
         _winningOffset = _commitStateMap.get(preferredInstance);
         return true;

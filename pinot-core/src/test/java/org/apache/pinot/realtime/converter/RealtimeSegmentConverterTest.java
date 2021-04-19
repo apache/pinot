@@ -25,14 +25,14 @@ import java.io.File;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
-import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
-import org.apache.pinot.core.realtime.converter.RealtimeSegmentConverter;
-import org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig;
-import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
-import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
+import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.segment.local.realtime.converter.RealtimeSegmentConverter;
+import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
+import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
+import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
+import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -57,7 +57,8 @@ public class RealtimeSegmentConverterTest {
   private static final String MV_INT_COLUMN = "mv_col";
   private static final String DATE_TIME_COLUMN = "date_time_col";
 
-  private static final File TMP_DIR = new File(FileUtils.getTempDirectory(), RealtimeSegmentConverterTest.class.getName());
+  private static final File TMP_DIR =
+      new File(FileUtils.getTempDirectory(), RealtimeSegmentConverterTest.class.getName());
 
   public void setup() {
     Preconditions.checkState(TMP_DIR.mkdirs());
@@ -80,23 +81,22 @@ public class RealtimeSegmentConverterTest {
       throws Exception {
 
     File tmpDir = new File(TMP_DIR, "tmp_" + System.currentTimeMillis());
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName(DATE_TIME_COLUMN)
-        .setInvertedIndexColumns(Lists.newArrayList(STRING_COLUMN1)).setSortedColumn(LONG_COLUMN1)
-        .setRangeIndexColumns(Lists.newArrayList(STRING_COLUMN2))
-        .setNoDictionaryColumns(Lists.newArrayList(LONG_COLUMN2)).setVarLengthDictionaryColumns(Lists.newArrayList(STRING_COLUMN3))
-        .setOnHeapDictionaryColumns(Lists.newArrayList(LONG_COLUMN3)).build();
-    Schema schema = new Schema.SchemaBuilder()
-        .addSingleValueDimension(STRING_COLUMN1, FieldSpec.DataType.STRING)
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName(DATE_TIME_COLUMN)
+            .setInvertedIndexColumns(Lists.newArrayList(STRING_COLUMN1)).setSortedColumn(LONG_COLUMN1)
+            .setRangeIndexColumns(Lists.newArrayList(STRING_COLUMN2))
+            .setNoDictionaryColumns(Lists.newArrayList(LONG_COLUMN2))
+            .setVarLengthDictionaryColumns(Lists.newArrayList(STRING_COLUMN3))
+            .setOnHeapDictionaryColumns(Lists.newArrayList(LONG_COLUMN3)).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(STRING_COLUMN1, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_COLUMN2, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_COLUMN3, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_COLUMN4, FieldSpec.DataType.STRING)
         .addSingleValueDimension(LONG_COLUMN1, FieldSpec.DataType.LONG)
         .addSingleValueDimension(LONG_COLUMN2, FieldSpec.DataType.LONG)
         .addSingleValueDimension(LONG_COLUMN3, FieldSpec.DataType.LONG)
-        .addMultiValueDimension(MV_INT_COLUMN, FieldSpec.DataType.INT)
-        .addMetric(LONG_COLUMN4, FieldSpec.DataType.LONG)
-        .addDateTime(DATE_TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
-        .build();
+        .addMultiValueDimension(MV_INT_COLUMN, FieldSpec.DataType.INT).addMetric(LONG_COLUMN4, FieldSpec.DataType.LONG)
+        .addDateTime(DATE_TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
 
     String tableNameWithType = tableConfig.getTableName();
     String segmentName = "testTable__0__0__123456";
@@ -104,13 +104,12 @@ public class RealtimeSegmentConverterTest {
 
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
         new RealtimeSegmentConfig.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
-            .setStreamName(tableNameWithType).setSchema(schema).setTimeColumnName(DATE_TIME_COLUMN)
-            .setCapacity(1000).setAvgNumMultiValues(3)
-            .setNoDictionaryColumns(Sets.newHashSet(LONG_COLUMN2))
+            .setStreamName(tableNameWithType).setSchema(schema).setTimeColumnName(DATE_TIME_COLUMN).setCapacity(1000)
+            .setAvgNumMultiValues(3).setNoDictionaryColumns(Sets.newHashSet(LONG_COLUMN2))
             .setVarLengthDictionaryColumns(Sets.newHashSet(STRING_COLUMN3))
             .setInvertedIndexColumns(Sets.newHashSet(STRING_COLUMN1))
-            .setRealtimeSegmentZKMetadata(getRealtimeSegmentZKMetadata(segmentName))
-            .setOffHeap(true).setMemoryManager(new DirectMemoryManager(segmentName))
+            .setRealtimeSegmentZKMetadata(getRealtimeSegmentZKMetadata(segmentName)).setOffHeap(true)
+            .setMemoryManager(new DirectMemoryManager(segmentName))
             .setStatsHistory(RealtimeSegmentStatsHistory.deserialzeFrom(new File(tmpDir, "stats")))
             .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath());
 
@@ -119,10 +118,9 @@ public class RealtimeSegmentConverterTest {
 
     File outputDir = new File(tmpDir, "outputDir");
     RealtimeSegmentConverter converter =
-        new RealtimeSegmentConverter(mutableSegmentImpl, outputDir.getAbsolutePath(), schema,
-            tableNameWithType, tableConfig, segmentName, indexingConfig.getSortedColumn().get(0),
-            indexingConfig.getInvertedIndexColumns(), null, null, indexingConfig.getNoDictionaryColumns(),
-            indexingConfig.getVarLengthDictionaryColumns(), false);
+        new RealtimeSegmentConverter(mutableSegmentImpl, outputDir.getAbsolutePath(), schema, tableNameWithType,
+            tableConfig, segmentName, indexingConfig.getSortedColumn().get(0), indexingConfig.getInvertedIndexColumns(),
+            null, null, indexingConfig.getNoDictionaryColumns(), indexingConfig.getVarLengthDictionaryColumns(), false);
 
     converter.build(SegmentVersion.v3, null);
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(new File(outputDir, segmentName));

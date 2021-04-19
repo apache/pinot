@@ -27,15 +27,16 @@ TEMPLATE_BASEDIR="$TEMP_DIR/generator"
 CONTROLLER_HOST="localhost"
 CONTROLLER_PORT="9000"
 
-USAGE="$(basename "$0") [-h] [-a PATH] [-c HOST:PORT] [-j PATH] TEMPLATE_NAME [TABLE_NAME]
+USAGE="$(basename "$0") [-h] [-a PATH] [-c HOST:PORT] [-j PATH] [-n ROWS] TEMPLATE_NAME [TABLE_NAME]
 
   where:
       -h  show this help text
       -a  set pinot-admin path for segement creation
       -c  set the controller host and port (default: 'localhost:9000')
-      -j  set jar path for resource extraction"
+      -j  set jar path for resource extraction
+      -n  number of rows to generate. (optional)"
 
-while getopts ':ha:c:j:' OPTION; do
+while getopts ':ha:c:j:n:' OPTION; do
   case "$OPTION" in
     h) echo "$USAGE"
        exit
@@ -48,6 +49,8 @@ while getopts ':ha:c:j:' OPTION; do
        esac
        ;;
     j) JAR_PATH="$OPTARG"
+       ;;
+    n) NUM_RECORDS="$OPTARG"
        ;;
     :) printf "missing argument for -%s\n" "$OPTARG" >&2
        echo "$USAGE" >&2
@@ -71,6 +74,20 @@ TABLE_NAME="$2"
 if [ -z "$TABLE_NAME" ]; then
   echo "No table name specified. Defaulting to '$TEMPLATE_NAME'"
   TABLE_NAME=$TEMPLATE_NAME
+fi
+
+if [ -z "$NUM_RECORDS" ]; then
+  if [ "$TEMPLATE_NAME" = "simpleWebsite" ]; then
+    NUM_RECORDS=354780
+  fi
+  if [ "$TEMPLATE_NAME" = "complexWebsite" ]; then
+    NUM_RECORDS=631152
+  fi
+
+  if [ -z "$NUM_RECORDS" ]; then
+    echo "No row count specified and no defaults available. (Does the template exist?) Aborting."
+    exit 1
+  fi
 fi
 
 DATA_DIR="${TEMP_DIR:?}/${TEMPLATE_NAME}"
@@ -97,9 +114,14 @@ sed -i -e "s/\"tableName\": \"$TEMPLATE_NAME\"/\"tableName\": \"$TABLE_NAME\"/g"
 sed -i -e "s/\"schemaName\": \"$TEMPLATE_NAME\"/\"schemaName\": \"$TABLE_NAME\"/g" "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_config.json"
 sed -i -e "s/\"schemaName\": \"$TEMPLATE_NAME\"/\"schemaName\": \"$TABLE_NAME\"/g" "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json"
 
+NUM_RECORDS=354780
+if [ "$TEMPLATE_NAME" = "complexWebsite" ]; then
+  NUM_RECORDS=631152
+fi
+
 echo "Generating data for ${TEMPLATE_NAME} in ${DATA_DIR}"
 JAVA_OPTS="" ${ADMIN_PATH} GenerateData \
--numFiles 1 -numRecords 631152  -format csv \
+-numFiles 1 -numRecords $NUM_RECORDS -format csv \
 -schemaFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json" \
 -schemaAnnotationFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_generator.json" \
 -outDir "$DATA_DIR"

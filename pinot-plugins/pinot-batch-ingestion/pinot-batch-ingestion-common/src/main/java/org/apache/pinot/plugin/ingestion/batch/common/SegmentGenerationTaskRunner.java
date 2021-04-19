@@ -23,12 +23,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.core.segment.name.FixedSegmentNameGenerator;
-import org.apache.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
-import org.apache.pinot.core.segment.name.SegmentNameGenerator;
-import org.apache.pinot.core.segment.name.SimpleSegmentNameGenerator;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.creator.name.FixedSegmentNameGenerator;
+import org.apache.pinot.segment.spi.creator.name.NormalizedDateSegmentNameGenerator;
+import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
+import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -60,9 +60,11 @@ public class SegmentGenerationTaskRunner implements Serializable {
   public static final String EXCLUDE_SEQUENCE_ID = "exclude.sequence.id";
 
   // Assign sequence ids to input files based at each local directory level
-  public static final String LOCAL_DIRECTORY_SEQUENCE_ID = "local.directory.sequence.id";
+  @Deprecated
+  public static final String DEPRECATED_USE_LOCAL_DIRECTORY_SEQUENCE_ID = "local.directory.sequence.id";
+  public static final String USE_GLOBAL_DIRECTORY_SEQUENCE_ID = "use.global.directory.sequence.id";
 
-  private SegmentGenerationTaskSpec _taskSpec;
+  private final SegmentGenerationTaskSpec _taskSpec;
 
   public SegmentGenerationTaskRunner(SegmentGenerationTaskSpec taskSpec) {
     _taskSpec = taskSpec;
@@ -101,6 +103,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
     segmentGeneratorConfig.setRecordReaderPath(_taskSpec.getRecordReaderSpec().getClassName());
     segmentGeneratorConfig.setInputFilePath(_taskSpec.getInputFilePath());
     segmentGeneratorConfig.setCustomProperties(_taskSpec.getCustomProperties());
+    segmentGeneratorConfig.setFailOnEmptySegment(_taskSpec.isFailOnEmptySegment());
 
     //build segment
     SegmentIndexCreationDriverImpl segmentIndexCreationDriver = new SegmentIndexCreationDriverImpl();

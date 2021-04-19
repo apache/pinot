@@ -22,10 +22,10 @@ import io.grpc.stub.StreamObserver;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.proto.Server;
-import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 
 

@@ -18,11 +18,9 @@
     under the License.
 
 -->
-# Contribution Guidelines
+# [Contribution Guidelines](https://docs.pinot.apache.org/developers/developers-and-contributors/contribution-guidelines)
 
-
-
-Before you begin to contribute, make sure you have reviewed [Dev Environment Setup](https://pinot.readthedocs.io/en/latest/dev_env.html#dev-setup) and [Code Modules and Organization](https://pinot.readthedocs.io/en/latest/code_modules.html#code-modules) sections and that you have created your own fork of the pinot source code.
+Before you begin to contribute, make sure you have reviewed [Dev Environment Setup](https://docs.pinot.apache.org/developers/developers-and-contributors/code-setup) and [Code Modules and Organization](https://docs.pinot.apache.org/developers/developers-and-contributors/code-modules-and-organization) sections and that you have created your own fork of the pinot source code.
 
 ### Create a design document
 
@@ -32,7 +30,7 @@ If your change is relatively minor, you can skip this step. If you are adding ne
 
 ### Create an issue for the change
 
-Create a Pinot issue [here](https://github.com/apache/incubator-pinot/issues) for the change you would like to make. Provide information on why the change is needed and how you plan to address it. Use the conversations on the issue as a way to validate assumptions and the right way to proceed. Be sure to review sections on [Backward and Forward compatibility changes](https://pinot.readthedocs.io/en/latest/contribution_guidelines.html#compatibility-changes) and [External libraries](https://pinot.readthedocs.io/en/latest/contribution_guidelines.html#external-libs).
+Create a Pinot issue [here](https://github.com/apache/incubator-pinot/issues) for the change you would like to make. Provide information on why the change is needed and how you plan to address it. Use the conversations on the issue as a way to validate assumptions and the right way to proceed. Be sure to review sections on [Backward and Forward compatibility changes](https://docs.pinot.apache.org/developers/developers-and-contributors/contribution-guidelines#backward-and-forward-compatibility-changes) and [External libraries](https://docs.pinot.apache.org/developers/developers-and-contributors/contribution-guidelines#external-libraries).
 
 If you have a design document, please refer to the design documents in your Issue. You may even want to create multiple issues depending on the extent of your change.
 
@@ -76,7 +74,7 @@ Please ensure your code is adequately documented. Some things to consider for do
 #### Exceptions and Exception-Handling
 
 * Where possible, throw specific exceptions, preferably checked exceptions, so the callers can easily determine what the erroneous conditions that need to be handled are.
-* Avoid catching broad exceptions \(ie, `catch (Exception e)` blocks, except for when this is in the run\(\) method of a thread/runnable.
+* Avoid catching broad exceptions (i.e., `catch (Exception e)` blocks), except for when this is in the `run()` method of a thread/runnable.
 
 Current Pinot code does not strictly adhere to this, but we would like to change this over time and adopt best practices around exception handling.
 
@@ -91,17 +89,17 @@ If you are making any changes to state stored, either in Zookeeper or in segment
 
 Be cautious about pulling in external dependencies. You will need to consider multiple things when faced with a need to pull in a new library.
 
-* What capability is the addition of the library providing you with? Can existing libraries provide this functionality \(may be with a little bit of effort\)?
+* What capability is the addition of the library providing you with? Can existing libraries provide this functionality (may be with a little bit of effort)?
 * Is the external library maintained by an active community of contributors?
-* What are the licensing terms for the library. For more information about handling licenses, see [License Headers for newly added files](https://pinot.readthedocs.io/en/latest/contribution_guidelines.html#handling-licenses).
-* Are you adding the library to [Foundational modules](https://pinot.readthedocs.io/en/latest/code_modules.html#pinot-foundation) modules? This will affect the rest of the Pinot code base. If the new library pulls in a lot of transitive dependencies, then we might encounter unexpected issues with multiple classes in the classpath. These issues are hard to catch with tests as the order of loading the libraries at runtime matters. If you absolutely need the support, consider adding it via extension modules, see [Extension modules](https://pinot.readthedocs.io/en/latest/code_modules.html#extension-modules).
+* What are the licensing terms for the library. For more information about handling licenses, see [License Headers for newly added files](https://docs.pinot.apache.org/developers/developers-and-contributors/contribution-guidelines#license-headers-for-newly-added-files).
+* Are you adding the library to [Foundational modules](https://docs.pinot.apache.org/developers/developers-and-contributors/code-modules-and-organization#foundational-modules)? This will affect the rest of the Pinot code base. If the new library pulls in a lot of transitive dependencies, then we might encounter unexpected issues with multiple classes in the classpath. These issues are hard to catch with tests as the order of loading the libraries at runtime matters. If you absolutely need the support, consider adding it via extension modules, see [Extension modules](https://docs.pinot.apache.org/developers/developers-and-contributors/code-modules-and-organization#extension-modules).
 
 #### Testing your changes
 
 Automated tests are always recommended for contributions. Make sure you write tests so that:
 
 1. You verify the correctness of your contribution. This serves as proof to you as well as the reviewers.
-2. You future proof your contributions against code refactors or other changes. While this may not always be possible \(see [Testing Guidelines](https://pinot.readthedocs.io/en/latest/contribution_guidelines.html#testing-guidelines)\), its a good goal to aim for.
+2. You future proof your contributions against code refactors or other changes. While this may not always be possible (see [Testing Guidelines](https://docs.pinot.apache.org/developers/developers-and-contributors/contribution-guidelines#testing-guidelines), it's a good goal to aim for.
 
 Identify a list of tests for the changes you have made. Depending on the scope of changes, you may need one or more of the following tests:
 
@@ -111,7 +109,7 @@ Identify a list of tests for the changes you have made. Depending on the scope o
 
 * Integration Tests
 
-  Add integration tests to cover End-to-End paths without relying on _mocking_ \(see note below\). You `MUST` add integration tests for REST APIs, and must include tests that cover different error codes; i.e., 200 OK, 4xx or 5xx errors that are explicit contracts of the API.
+  Add integration tests to cover End-to-End paths without relying on _mocking_ (see note below). You `MUST` add integration tests for REST APIs, and must include tests that cover different error codes; i.e., 200 OK, 4xx or 5xx errors that are explicit contracts of the API.
 
 #### Testing Guidelines
 
@@ -119,11 +117,7 @@ Identify a list of tests for the changes you have made. Depending on the scope o
 
   Use [Mockito](https://site.mockito.org/) to mock classes to control specific behaviors - e.g., simulate various error conditions.
 
-{% hint style="info" %}
-**Note**
-
-DO NOT use advanced mock libraries such as [PowerMock](https://github.com/powermock/powermock). They make bytecode level changes to allow tests for static/private members but this typically results in other tools like jacoco to fail. They also promote incorrect implementation choices that make it harder to test additional changes. When faced with a choice to use PowerMock or advanced mocking options, you might either need to refactor the code to work better with mocking or you actually need to write an integration test instead of a unit test.
-{% endhint %}
+  **DO NOT** use advanced mock libraries such as [PowerMock](https://github.com/powermock/powermock). They make bytecode level changes to allow tests for static/private members but this typically results in other tools like jacoco to fail. They also promote incorrect implementation choices that make it harder to test additional changes. When faced with a choice to use PowerMock or advanced mocking options, you might either need to refactor the code to work better with mocking or you actually need to write an integration test instead of a unit test.
 
 * **Validate assumptions in tests**
 
@@ -157,7 +151,7 @@ Once you determine the code you are pulling in adhere to the guidelines above, g
 
 If attention to the licensing terms in not paid early on, they will be caught much later in the process, when we prepare to make a new release. Updating code at that time to work with the right libraries at that time might require bigger refactoring changes and delay the release process.
 
-### Creating a Pull Request \(PR\)
+### Creating a Pull Request (PR)
 
 * **Verifying code-style**
 
@@ -228,7 +222,4 @@ $ git push origin <your issue branch>
 
 Usually for new features, functionalities, API changes, documentation update is required to keep users up to date and keep track of our development.
 
-Please follow this link to [Update Document](update-document.md) accordingly.
-
-
-
+Please follow this link to [Update Document](https://docs.pinot.apache.org/developers/developers-and-contributors/update-document) accordingly.

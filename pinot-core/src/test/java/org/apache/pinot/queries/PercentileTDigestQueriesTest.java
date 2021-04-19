@@ -34,19 +34,18 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.GroupByResult;
-import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.core.data.readers.GenericRowRecordReader;
-import org.apache.pinot.core.indexsegment.IndexSegment;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
-import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -55,6 +54,7 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -174,7 +174,7 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
     assertTDigest((TDigest) aggregationResult.get(1), doubleList0);
     assertTDigest((TDigest) aggregationResult.get(2), doubleList0);
 
-    DoubleList doubleList3 = (DoubleList)aggregationResult.get(3);
+    DoubleList doubleList3 = (DoubleList) aggregationResult.get(3);
     Collections.sort(doubleList3);
     Assert.assertEquals(doubleList3, doubleList0);
     assertTDigest((TDigest) aggregationResult.get(4), doubleList0);
@@ -211,17 +211,17 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
     Assert.assertNotNull(groupByResult);
     Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupByResult.getGroupKeyIterator();
     while (groupKeyIterator.hasNext()) {
-      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-      DoubleList doubleList0 = (DoubleList) groupByResult.getResultForKey(groupKey, 0);
+      int groupId = groupKeyIterator.next()._groupId;
+      DoubleList doubleList0 = (DoubleList) groupByResult.getResultForGroupId(0, groupId);
       Collections.sort(doubleList0);
-      assertTDigest((TDigest) groupByResult.getResultForKey(groupKey, 1), doubleList0);
-      assertTDigest((TDigest) groupByResult.getResultForKey(groupKey, 2), doubleList0);
+      assertTDigest((TDigest) groupByResult.getResultForGroupId(1, groupId), doubleList0);
+      assertTDigest((TDigest) groupByResult.getResultForGroupId(2, groupId), doubleList0);
 
-      DoubleList doubleList3 = (DoubleList) groupByResult.getResultForKey(groupKey, 3);
+      DoubleList doubleList3 = (DoubleList) groupByResult.getResultForGroupId(3, groupId);
       Collections.sort(doubleList3);
       Assert.assertEquals(doubleList3, doubleList0);
-      assertTDigest((TDigest) groupByResult.getResultForKey(groupKey, 4), doubleList0);
-      assertTDigest((TDigest) groupByResult.getResultForKey(groupKey, 5), doubleList0);
+      assertTDigest((TDigest) groupByResult.getResultForGroupId(4, groupId), doubleList0);
+      assertTDigest((TDigest) groupByResult.getResultForGroupId(5, groupId), doubleList0);
     }
   }
 

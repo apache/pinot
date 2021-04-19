@@ -21,12 +21,12 @@ package org.apache.pinot.tools.admin.command;
 import java.io.File;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.util.HashMap;
 import java.util.Map;
-
 import org.apache.commons.configuration.ConfigurationException;
-import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.services.ServiceRole;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
 import org.kohsuke.args4j.Option;
@@ -58,6 +58,8 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
   private String _configFileName;
   // This can be set via the set method, or via config file input.
   private boolean _tenantIsolation = true;
+
+  private Map<String, Object> _configOverrides = new HashMap<>();
 
   @Override
   public boolean getHelp() {
@@ -91,6 +93,11 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
 
   public StartControllerCommand setClusterName(String clusterName) {
     _clusterName = clusterName;
+    return this;
+  }
+
+  public StartControllerCommand setConfigOverrides(Map<String, Object> configs) {
+    _configOverrides = configs;
     return this;
   }
 
@@ -140,16 +147,19 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
 
   private Map<String, Object> getControllerConf()
       throws ConfigurationException, SocketException, UnknownHostException {
-    Map<String, Object> properties;
+    Map<String, Object> properties = new HashMap<>();
     if (_configFileName != null) {
-      properties = PinotConfigUtils.generateControllerConf(_configFileName);
+      properties.putAll(PinotConfigUtils.generateControllerConf(_configFileName));
     } else {
       if (_controllerHost == null) {
-        _controllerHost = NetUtil.getHostAddress();
+        _controllerHost = NetUtils.getHostAddress();
       }
-      properties = PinotConfigUtils
+      properties.putAll(PinotConfigUtils
           .generateControllerConf(_zkAddress, _clusterName, _controllerHost, _controllerPort, _dataDir, _controllerMode,
-              _tenantIsolation);
+              _tenantIsolation));
+    }
+    if (_configOverrides != null) {
+      properties.putAll(_configOverrides);
     }
     return properties;
   }

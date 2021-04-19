@@ -19,7 +19,7 @@
 package org.apache.pinot.core.common;
 
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.core.query.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.EarlyTerminationException;
 
 
 public interface Operator<T extends Block> {

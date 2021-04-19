@@ -103,14 +103,15 @@ public class AggregationDataTableReducer implements DataTableReducer {
     }
     Serializable[] finalResults = new Serializable[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
-      finalResults[i] = AggregationFunctionUtils
-          .getSerializableValue(_aggregationFunctions[i].extractFinalResult(intermediateResults[i]));
+      AggregationFunction aggregationFunction = _aggregationFunctions[i];
+      finalResults[i] = aggregationFunction.getFinalResultColumnType()
+          .convert(aggregationFunction.extractFinalResult(intermediateResults[i]));
     }
 
     if (_responseFormatSql) {
       brokerResponseNative.setResultTable(reduceToResultTable(finalResults));
     } else {
-      brokerResponseNative.setAggregationResults(reduceToAggregationResults(finalResults, dataSchema));
+      brokerResponseNative.setAggregationResults(reduceToAggregationResults(finalResults, dataSchema.getColumnNames()));
     }
   }
 
@@ -120,26 +121,32 @@ public class AggregationDataTableReducer implements DataTableReducer {
   private ResultTable reduceToResultTable(Object[] finalResults) {
     PostAggregationHandler postAggregationHandler =
         new PostAggregationHandler(_queryContext, getPrePostAggregationDataSchema());
-    DataSchema resultTableSchema = postAggregationHandler.getResultDataSchema();
-    Object[] resultRow = postAggregationHandler.getResult(finalResults);
-    return new ResultTable(resultTableSchema, Collections.singletonList(resultRow));
+    DataSchema dataSchema = postAggregationHandler.getResultDataSchema();
+    Object[] row = postAggregationHandler.getResult(finalResults);
+    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+    int numColumns = columnDataTypes.length;
+    for (int i = 0; i < numColumns; i++) {
+      row[i] = columnDataTypes[i].format(row[i]);
+    }
+    return new ResultTable(dataSchema, Collections.singletonList(row));
   }
 
   /**
    * Sets aggregation results into AggregationResults
    */
-  private List<AggregationResult> reduceToAggregationResults(Serializable[] finalResults, DataSchema dataSchema) {
+  private List<AggregationResult> reduceToAggregationResults(Serializable[] finalResults, String[] columnNames) {
     int numAggregationFunctions = _aggregationFunctions.length;
     List<AggregationResult> aggregationResults = new ArrayList<>(numAggregationFunctions);
     if (_preserveType) {
       for (int i = 0; i < numAggregationFunctions; i++) {
-        aggregationResults.add(new AggregationResult(dataSchema.getColumnName(i), finalResults[i]));
+        aggregationResults.add(new AggregationResult(columnNames[i],
+            _aggregationFunctions[i].getFinalResultColumnType().format(finalResults[i])));
       }
     } else {
       // Format the values into strings
       for (int i = 0; i < numAggregationFunctions; i++) {
-        aggregationResults.add(
-            new AggregationResult(dataSchema.getColumnName(i), AggregationFunctionUtils.formatValue(finalResults[i])));
+        aggregationResults.add(new AggregationResult(columnNames[i], AggregationFunctionUtils
+            .formatValue(_aggregationFunctions[i].getFinalResultColumnType().format(finalResults[i]))));
       }
     }
     return aggregationResults;

@@ -19,15 +19,13 @@
 package org.apache.pinot.server.starter;
 
 import com.google.common.base.Preconditions;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.LongAccumulator;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.function.FunctionRegistry;
-import org.apache.pinot.common.metrics.MetricsHelper;
+import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
@@ -40,6 +38,8 @@ import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.core.util.TlsUtils;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,9 +67,9 @@ public class ServerInstance {
     LOGGER.info("Initializing server instance");
 
     LOGGER.info("Initializing server metrics");
-    MetricsHelper.initializeMetrics(serverConf.getMetricsConfig());
-    MetricsRegistry metricsRegistry = new MetricsRegistry();
-    MetricsHelper.registerMetricsRegistry(metricsRegistry);
+    PinotConfiguration metricsConfiguration = serverConf.getMetricsConfig();
+    PinotMetricUtils.init(metricsConfiguration);
+    PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
     _serverMetrics =
         new ServerMetrics(serverConf.getMetricsPrefix(), metricsRegistry, serverConf.emitTableLevelMetrics(),
             serverConf.getAllowedTablesForEmittingMetrics());

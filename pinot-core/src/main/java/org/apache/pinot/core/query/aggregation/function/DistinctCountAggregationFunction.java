@@ -25,15 +25,15 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.PeekableIntIterator;
@@ -290,47 +290,8 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
     if (intermediateResult2.isEmpty()) {
       return intermediateResult1;
     }
-    if (intermediateResult1.getClass() == intermediateResult2.getClass()) {
-      // Both results are of the same type, directly merge
-      intermediateResult1.addAll(intermediateResult2);
-      return intermediateResult1;
-    } else {
-      // TODO: Remove this part after releasing 0.5.0
-      // The results are not of the same type. This can happen when servers are getting upgraded, and some servers are
-      // still running the old code and store hash codes in the set. For backward-compatibility, we convert the values
-      // into hash codes and insert them into the hash code set.
-      IntOpenHashSet hashCodeSet;
-      Set valueSet;
-      if (intermediateResult1 instanceof IntOpenHashSet) {
-        hashCodeSet = (IntOpenHashSet) intermediateResult1;
-        valueSet = intermediateResult2;
-      } else {
-        hashCodeSet = (IntOpenHashSet) intermediateResult2;
-        valueSet = intermediateResult1;
-      }
-      if (valueSet instanceof LongOpenHashSet) {
-        LongOpenHashSet longSet = (LongOpenHashSet) valueSet;
-        for (long value : longSet) {
-          hashCodeSet.add(Long.hashCode(value));
-        }
-      } else if (valueSet instanceof FloatOpenHashSet) {
-        FloatOpenHashSet floatSet = (FloatOpenHashSet) valueSet;
-        for (float value : floatSet) {
-          hashCodeSet.add(Float.hashCode(value));
-        }
-      } else if (valueSet instanceof DoubleOpenHashSet) {
-        DoubleOpenHashSet doubleSet = (DoubleOpenHashSet) valueSet;
-        for (double value : doubleSet) {
-          hashCodeSet.add(Double.hashCode(value));
-        }
-      } else {
-        // STRING and BYTES
-        for (Object value : valueSet) {
-          hashCodeSet.add(value.hashCode());
-        }
-      }
-      return hashCodeSet;
-    }
+    intermediateResult1.addAll(intermediateResult2);
+    return intermediateResult1;
   }
 
   @Override

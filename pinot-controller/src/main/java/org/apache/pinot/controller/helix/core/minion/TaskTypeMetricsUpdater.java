@@ -34,17 +34,21 @@ public class TaskTypeMetricsUpdater implements IZkDataListener {
   }
 
   @Override
-  public void handleDataChange(String dataPath, Object data)
-      throws Exception {
+  public void handleDataChange(String dataPath, Object data) {
+    updateMetrics();
+  }
+
+  @Override
+  public void handleDataDeleted(String dataPath) {
+    updateMetrics();
+  }
+
+  private void updateMetrics() {
     try {
       _pinotTaskManager.reportMetrics(_taskType);
     } catch (Exception e) {
       LOGGER.error("Failed to update metrics for task type {}", _taskType, e);
       throw e;
     }
-  }
-
-  @Override
-  public void handleDataDeleted(String dataPath) {
   }
 }

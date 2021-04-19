@@ -31,7 +31,7 @@ import org.apache.pinot.controller.api.resources.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.controller.validation.StorageQuotaChecker;
-import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.joda.time.Interval;

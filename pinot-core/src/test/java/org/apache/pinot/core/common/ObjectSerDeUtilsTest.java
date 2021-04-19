@@ -29,9 +29,9 @@ import java.util.Random;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.core.query.aggregation.function.PercentileEstAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
-import org.apache.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
-import org.apache.pinot.core.query.aggregation.function.customobject.QuantileDigest;
+import org.apache.pinot.segment.local.customobject.AvgPair;
+import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
+import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;

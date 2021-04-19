@@ -20,8 +20,8 @@ package org.apache.pinot.tools.scan.query;
 
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.utils.CommonConstants.Query.Range;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.spi.utils.CommonConstants.Query.Range;
 
 
 public class RangePredicateFilter implements PredicateFilter {

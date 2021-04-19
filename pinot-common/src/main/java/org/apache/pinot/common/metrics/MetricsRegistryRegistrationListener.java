@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.common.metrics;
 
-import com.yammer.metrics.core.MetricsRegistry;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 
 /**
- * Interface to implement operations that occur whenever a new MetricsRegistry is registered with the MetricsHelper.
+ * Interface to implement operations that occur whenever a new MetricsRegistry is registered with the PinotMetricUtils.
  *
  */
 public interface MetricsRegistryRegistrationListener {
-  public void onMetricsRegistryRegistered(MetricsRegistry metricsRegistry);
+  void onMetricsRegistryRegistered(PinotMetricsRegistry metricsRegistry);
 }

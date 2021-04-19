@@ -24,8 +24,12 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.controller.ControllerTestUtils;
+import org.apache.pinot.controller.api.resources.TableAndSchemaConfig;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.core.common.MinionConstants;
@@ -59,30 +63,25 @@ public class PinotTableRestletResourceTest {
   private String _createTableUrl;
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     ControllerTestUtils.setupClusterAndValidate();
 
     _createTableUrl = ControllerTestUtils.getControllerRequestURLBuilder().forTableCreate();
-    _offlineBuilder.setTableName(OFFLINE_TABLE_NAME)
-        .setTimeColumnName("timeColumn")
-        .setTimeType("DAYS")
-        .setRetentionTimeUnit("DAYS")
-        .setRetentionTimeValue("5");
+    _offlineBuilder.setTableName(OFFLINE_TABLE_NAME).setTimeColumnName("timeColumn").setTimeType("DAYS")
+        .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5");
 
     // add schema for realtime table
     ControllerTestUtils.addDummySchema(REALTIME_TABLE_NAME);
     StreamConfig streamConfig = FakeStreamConfigUtils.getDefaultHighLevelStreamConfigs();
-    _realtimeBuilder.setTableName(REALTIME_TABLE_NAME)
-        .setTimeColumnName("timeColumn")
-        .setTimeType("DAYS")
-        .setRetentionTimeUnit("DAYS")
-        .setRetentionTimeValue("5")
-        .setSchemaName(REALTIME_TABLE_NAME)
+    _realtimeBuilder.setTableName(REALTIME_TABLE_NAME).setTimeColumnName("timeColumn").setTimeType("DAYS")
+        .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5").setSchemaName(REALTIME_TABLE_NAME)
         .setStreamConfigs(streamConfig.getStreamConfigsMap());
   }
 
   @Test
-  public void testCreateTable() throws Exception {
+  public void testCreateTable()
+      throws Exception {
     // Create an OFFLINE table with an invalid name which should fail
     // NOTE: Set bad table name inside table config builder is not allowed, so have to set in json node
     TableConfig offlineTableConfig = _offlineBuilder.build();
@@ -222,12 +221,14 @@ public class PinotTableRestletResourceTest {
   }
 
   @Test
-  public void testTableMinReplication() throws Exception {
+  public void testTableMinReplication()
+      throws Exception {
     testTableMinReplicationInternal("minReplicationOne", 1);
     testTableMinReplicationInternal("minReplicationTwo", ControllerTestUtils.NUM_SERVER_INSTANCES);
   }
 
-  private void testTableMinReplicationInternal(String tableName, int tableReplication) throws Exception {
+  private void testTableMinReplicationInternal(String tableName, int tableReplication)
+      throws Exception {
     String tableJSONConfigString =
         _offlineBuilder.setTableName(tableName).setNumReplicas(tableReplication).build().toJsonString();
     ControllerTestUtils.sendPostRequest(_createTableUrl, tableJSONConfigString);
@@ -252,15 +253,17 @@ public class PinotTableRestletResourceTest {
   }
 
   @Test
-  public void testDimTableStorageQuotaConstraints() throws Exception {
+  public void testDimTableStorageQuotaConstraints()
+      throws Exception {
     // Controller assigns default quota if none provided
     String tableName = "myDimTable_basic";
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(tableName).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-        .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(tableName).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
     ControllerTestUtils.addSchema(schema);
 
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(tableName).setIsDimTable(true).build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setIsDimTable(true).build();
     ControllerTestUtils.sendPostRequest(_createTableUrl, tableConfig.toJsonString());
     tableConfig = getTableConfig(tableName, "OFFLINE");
     Assert.assertEquals(tableConfig.getQuotaConfig().getStorage(),
@@ -268,11 +271,11 @@ public class PinotTableRestletResourceTest {
 
     // Controller throws exception if quote exceed configured max value
     tableName = "myDimTable_broken";
-    schema = new Schema.SchemaBuilder().setSchemaName(tableName).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-        .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+    schema =
+        new Schema.SchemaBuilder().setSchemaName(tableName).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
     ControllerTestUtils.addSchema(schema);
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(tableName).setIsDimTable(true)
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setIsDimTable(true)
         .setQuotaConfig(new QuotaConfig("500G", null)).build();
     try {
       ControllerTestUtils.sendPostRequest(_createTableUrl, tableConfig.toJsonString());
@@ -283,25 +286,28 @@ public class PinotTableRestletResourceTest {
 
     // Successful creation with proper quota
     tableName = "myDimTable_good";
-    schema = new Schema.SchemaBuilder().setSchemaName(tableName).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-        .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+    schema =
+        new Schema.SchemaBuilder().setSchemaName(tableName).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
     ControllerTestUtils.addSchema(schema);
     String goodQuota = "100M";
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(tableName).setIsDimTable(true)
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setIsDimTable(true)
         .setQuotaConfig(new QuotaConfig(goodQuota, null)).build();
     ControllerTestUtils.sendPostRequest(_createTableUrl, tableConfig.toJsonString());
     tableConfig = getTableConfig(tableName, "OFFLINE");
     Assert.assertEquals(tableConfig.getQuotaConfig().getStorage(), goodQuota);
   }
 
-  private TableConfig getTableConfig(String tableName, String tableType) throws Exception {
-    String tableConfigString = ControllerTestUtils.sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableGet(tableName));
+  private TableConfig getTableConfig(String tableName, String tableType)
+      throws Exception {
+    String tableConfigString =
+        ControllerTestUtils.sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableGet(tableName));
     return JsonUtils.jsonNodeToObject(JsonUtils.stringToJsonNode(tableConfigString).get(tableType), TableConfig.class);
   }
 
   @Test
-  public void testUpdateTableConfig() throws Exception {
+  public void testUpdateTableConfig()
+      throws Exception {
     String tableName = "updateTC";
     String tableConfigString = _offlineBuilder.setTableName(tableName).setNumReplicas(2).build().toJsonString();
     ControllerTestUtils.sendPostRequest(_createTableUrl, tableConfigString);
@@ -313,8 +319,9 @@ public class PinotTableRestletResourceTest {
     tableConfig.getValidationConfig().setRetentionTimeUnit("HOURS");
     tableConfig.getValidationConfig().setRetentionTimeValue("10");
 
-    JsonNode jsonResponse = JsonUtils.stringToJsonNode(
-        ControllerTestUtils.sendPutRequest(ControllerTestUtils.getControllerRequestURLBuilder().forUpdateTableConfig(tableName), tableConfig.toJsonString()));
+    JsonNode jsonResponse = JsonUtils.stringToJsonNode(ControllerTestUtils
+        .sendPutRequest(ControllerTestUtils.getControllerRequestURLBuilder().forUpdateTableConfig(tableName),
+            tableConfig.toJsonString()));
     Assert.assertTrue(jsonResponse.has("status"));
 
     TableConfig modifiedConfig = getTableConfig(tableName, "OFFLINE");
@@ -332,7 +339,9 @@ public class PinotTableRestletResourceTest {
 
     QuotaConfig quota = new QuotaConfig("10G", "100.0");
     tableConfig.setQuotaConfig(quota);
-    ControllerTestUtils.sendPutRequest(ControllerTestUtils.getControllerRequestURLBuilder().forUpdateTableConfig(tableName), tableConfig.toJsonString());
+    ControllerTestUtils
+        .sendPutRequest(ControllerTestUtils.getControllerRequestURLBuilder().forUpdateTableConfig(tableName),
+            tableConfig.toJsonString());
     modifiedConfig = getTableConfig(tableName, "REALTIME");
     Assert.assertNotNull(modifiedConfig.getQuotaConfig());
     Assert.assertEquals(modifiedConfig.getQuotaConfig().getStorage(), "10G");
@@ -343,7 +352,9 @@ public class PinotTableRestletResourceTest {
       // table does not exist
       ObjectNode tableConfigJson = (ObjectNode) tableConfig.toJsonNode();
       tableConfigJson.put(TableConfig.TABLE_NAME_KEY, "noSuchTable_REALTIME");
-      ControllerTestUtils.sendPutRequest(ControllerTestUtils.getControllerRequestURLBuilder().forUpdateTableConfig("noSuchTable"), tableConfigJson.toString());
+      ControllerTestUtils
+          .sendPutRequest(ControllerTestUtils.getControllerRequestURLBuilder().forUpdateTableConfig("noSuchTable"),
+              tableConfigJson.toString());
     } catch (Exception e) {
       Assert.assertTrue(e instanceof FileNotFoundException);
       notFoundException = true;
@@ -352,35 +363,36 @@ public class PinotTableRestletResourceTest {
   }
 
   @Test(expectedExceptions = FileNotFoundException.class)
-  public void rebalanceNonExistentTable() throws Exception {
+  public void rebalanceNonExistentTable()
+      throws Exception {
     ControllerTestUtils.sendPostRequest(
         ControllerTestUtils.getControllerRequestURLBuilder().forTableRebalance(OFFLINE_TABLE_NAME, "realtime"), null);
   }
 
   @Test
-  public void rebalanceTableWithoutSegments() throws Exception {
+  public void rebalanceTableWithoutSegments()
+      throws Exception {
     // Create the table
     ControllerTestUtils.sendPostRequest(_createTableUrl, _offlineBuilder.build().toJsonString());
 
     // Rebalance should return status NO_OP
-    RebalanceResult rebalanceResult = JsonUtils.stringToObject(
-        ControllerTestUtils.sendPostRequest(
-            ControllerTestUtils.getControllerRequestURLBuilder().forTableRebalance(OFFLINE_TABLE_NAME, "offline"), null),
+    RebalanceResult rebalanceResult = JsonUtils.stringToObject(ControllerTestUtils.sendPostRequest(
+        ControllerTestUtils.getControllerRequestURLBuilder().forTableRebalance(OFFLINE_TABLE_NAME, "offline"), null),
         RebalanceResult.class);
     Assert.assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
   }
 
   @Test
-  public void testDeleteTable() throws IOException {
+  public void testDeleteTable()
+      throws IOException {
     // Case 1: Create a REALTIME table and delete it directly w/o using query param.
     TableConfig realtimeTableConfig = _realtimeBuilder.setTableName("table0").build();
     String creationResponse = ControllerTestUtils.sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
     Assert.assertEquals(creationResponse, "{\"status\":\"Table table0_REALTIME succesfully added\"}");
 
     // Delete realtime table using REALTIME suffix.
-    String deleteResponse =
-        ControllerTestUtils
-            .sendDeleteRequest(StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "table0_REALTIME"));
+    String deleteResponse = ControllerTestUtils.sendDeleteRequest(
+        StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "table0_REALTIME"));
     Assert.assertEquals(deleteResponse, "{\"status\":\"Tables: [table0_REALTIME] deleted\"}");
 
     // Case 2: Create an offline table and delete it directly w/o using query param.
@@ -389,8 +401,8 @@ public class PinotTableRestletResourceTest {
     Assert.assertEquals(creationResponse, "{\"status\":\"Table table0_OFFLINE succesfully added\"}");
 
     // Delete offline table using OFFLINE suffix.
-    deleteResponse = ControllerTestUtils
-        .sendDeleteRequest(StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "table0_OFFLINE"));
+    deleteResponse = ControllerTestUtils.sendDeleteRequest(
+        StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "table0_OFFLINE"));
     Assert.assertEquals(deleteResponse, "{\"status\":\"Tables: [table0_OFFLINE] deleted\"}");
 
     // Case 3: Create REALTIME and OFFLINE tables and delete both of them.
@@ -417,27 +429,25 @@ public class PinotTableRestletResourceTest {
 
     // The conflict between param type and table name suffix causes no table being deleted.
     try {
-      ControllerTestUtils.sendDeleteRequest(StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "table2_OFFLINE?type=realtime"));
+      ControllerTestUtils.sendDeleteRequest(StringUtil
+          .join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "table2_OFFLINE?type=realtime"));
       Assert.fail("Deleting a realtime table with OFFLINE suffix.");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof IOException);
     }
 
-    deleteResponse =
-        ControllerTestUtils
-            .sendDeleteRequest(StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "table2?type=realtime"));
+    deleteResponse = ControllerTestUtils.sendDeleteRequest(
+        StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "table2?type=realtime"));
     Assert.assertEquals(deleteResponse, "{\"status\":\"Tables: [table2_REALTIME] deleted\"}");
 
-    deleteResponse =
-        ControllerTestUtils
-            .sendDeleteRequest(StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "table2?type=offline"));
+    deleteResponse = ControllerTestUtils.sendDeleteRequest(
+        StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "table2?type=offline"));
     Assert.assertEquals(deleteResponse, "{\"status\":\"Tables: [table2_OFFLINE] deleted\"}");
 
     // Case 5: Delete a non-existent table and expect a bad request expection.
     try {
-      deleteResponse =
-          ControllerTestUtils
-              .sendDeleteRequest(StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "no_such_table_OFFLINE"));
+      deleteResponse = ControllerTestUtils.sendDeleteRequest(
+          StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "no_such_table_OFFLINE"));
       Assert.fail("Deleting a non-existing table should fail.");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof IOException);
@@ -452,19 +462,18 @@ public class PinotTableRestletResourceTest {
     creationResponse = ControllerTestUtils.sendPostRequest(_createTableUrl, offlineConfig3.toJsonString());
     Assert.assertEquals(creationResponse, "{\"status\":\"Table table3_OFFLINE succesfully added\"}");
 
-    deleteResponse =
-        ControllerTestUtils
-            .sendDeleteRequest(StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "table3_REALTIME?type=realtime"));
+    deleteResponse = ControllerTestUtils.sendDeleteRequest(
+        StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "table3_REALTIME?type=realtime"));
     Assert.assertEquals(deleteResponse, "{\"status\":\"Tables: [table3_REALTIME] deleted\"}");
 
-    deleteResponse =
-        ControllerTestUtils
-            .sendDeleteRequest(StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "table3_OFFLINE?type=offline"));
+    deleteResponse = ControllerTestUtils.sendDeleteRequest(
+        StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "table3_OFFLINE?type=offline"));
     Assert.assertEquals(deleteResponse, "{\"status\":\"Tables: [table3_OFFLINE] deleted\"}");
   }
 
   @Test
-  public void testCheckTableState() throws IOException {
+  public void testCheckTableState()
+      throws IOException {
 
     // Create a valid REALTIME table
     TableConfig realtimeTableConfig = _realtimeBuilder.setTableName("testTable").build();
@@ -477,21 +486,20 @@ public class PinotTableRestletResourceTest {
     Assert.assertEquals(creationResponse, "{\"status\":\"Table testTable_OFFLINE succesfully added\"}");
 
     // Case 1: Check table state with specifying tableType as realtime should return 1 [enabled]
-    String realtimeStateResponse =
-        ControllerTestUtils
-            .sendGetRequest(StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "testTable", "state?type=realtime"));
+    String realtimeStateResponse = ControllerTestUtils.sendGetRequest(StringUtil
+        .join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "testTable", "state?type=realtime"));
     Assert.assertEquals(realtimeStateResponse, "{\"state\":\"enabled\"}");
 
     // Case 2: Check table state with specifying tableType as offline should return 1 [enabled]
-    String offlineStateResponse =
-        ControllerTestUtils
-            .sendGetRequest(StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "testTable", "state?type=offline"));
+    String offlineStateResponse = ControllerTestUtils.sendGetRequest(StringUtil
+        .join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "testTable", "state?type=offline"));
     Assert.assertEquals(offlineStateResponse, "{\"state\":\"enabled\"}");
 
     // Case 3: Request table state with invalid type should return bad request
     try {
-      ControllerTestUtils.sendGetRequest(
-          StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "testTable", "state?type=non_valid_type"));
+      ControllerTestUtils.sendGetRequest(StringUtil
+          .join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "testTable",
+              "state?type=non_valid_type"));
       Assert.fail("Requesting with invalid type should fail");
     } catch (Exception e) {
       // Expected 400 Bad Request
@@ -501,8 +509,8 @@ public class PinotTableRestletResourceTest {
     // Case 4: Request state for non-existent table should return not found
     boolean notFoundException = false;
     try {
-      ControllerTestUtils.sendGetRequest(
-          StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "table_not_exist", "state?type=offline"));
+      ControllerTestUtils.sendGetRequest(StringUtil
+          .join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "table_not_exist", "state?type=offline"));
       Assert.fail("Requesting state for non-existent table should fail");
     } catch (Exception e) {
       // Expected 404 Not Found
@@ -510,6 +518,90 @@ public class PinotTableRestletResourceTest {
     }
 
     Assert.assertTrue(notFoundException);
+  }
+
+  @Test
+  public void testValidate()
+      throws IOException {
+    String tableName = "verificationTest";
+    // Create a dummy schema
+    ControllerTestUtils.addDummySchema(tableName);
+
+    // Create a valid OFFLINE table config
+    TableConfig offlineTableConfig =
+        _offlineBuilder.setTableName(tableName).setInvertedIndexColumns(Arrays.asList("dimA", "dimB")).build();
+
+    try {
+      ControllerTestUtils
+          .sendPostRequest(StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "validate"),
+              offlineTableConfig.toJsonString());
+    } catch (IOException e) {
+      Assert.fail("Valid table config with existing schema validation should succeed.");
+    }
+
+    // Create an invalid OFFLINE table config
+    offlineTableConfig =
+        _offlineBuilder.setTableName(tableName).setInvertedIndexColumns(Arrays.asList("invalidColA", "invalidColB"))
+            .build();
+
+    try {
+      ControllerTestUtils
+          .sendPostRequest(StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "validate"),
+              offlineTableConfig.toJsonString());
+      Assert.fail("Validation of an invalid table config should fail.");
+    } catch (IOException e) {
+      // Expected 400 Bad Request
+      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+    }
+  }
+
+  @Test
+  public void testValidateTableAndSchema()
+      throws IOException {
+    String tableName = "verificationTestTableAndSchema";
+    // Create a dummy schema
+    Schema schema = ControllerTestUtils.createDummySchema(tableName);
+
+    // Create a valid OFFLINE table config
+    TableConfig offlineTableConfig =
+        _offlineBuilder.setTableName(tableName).setInvertedIndexColumns(Arrays.asList("dimA", "dimB")).build();
+    TableAndSchemaConfig tableAndSchemaConfig = new TableAndSchemaConfig(offlineTableConfig, schema);
+    Map<String, String> headerMap = new HashMap<>();
+    headerMap.put("Content-Type", "application/json");
+
+    try {
+      ControllerTestUtils.sendPostRequest(
+          StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "validateTableAndSchema"),
+          tableAndSchemaConfig.toJsonString(), headerMap);
+    } catch (IOException e) {
+      Assert.fail("Valid table config and schema validation should succeed.");
+    }
+
+    // Add a dummy schema to Pinot
+    ControllerTestUtils.addDummySchema(tableName);
+    tableAndSchemaConfig = new TableAndSchemaConfig(offlineTableConfig, null);
+    try {
+      ControllerTestUtils.sendPostRequest(
+          StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "validateTableAndSchema"),
+          tableAndSchemaConfig.toJsonString(), headerMap);
+    } catch (IOException e) {
+      Assert.fail("Valid table config and existing schema validation should succeed.");
+    }
+
+    // Create an invalid table config
+    offlineTableConfig =
+        _offlineBuilder.setTableName(tableName).setInvertedIndexColumns(Arrays.asList("invalidColA", "invalidColB"))
+            .build();
+    tableAndSchemaConfig = new TableAndSchemaConfig(offlineTableConfig, schema);
+    try {
+      ControllerTestUtils.sendPostRequest(
+          StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "validateTableAndSchema"),
+          tableAndSchemaConfig.toJsonString(), headerMap);
+      Assert.fail("Validation of an invalid table config and schema should fail.");
+    } catch (IOException e) {
+      // Expected
+      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+    }
   }
 
   @AfterClass

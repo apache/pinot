@@ -22,11 +22,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
-import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.parsers.CompilerConstants;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.EqualityUtils;
 
 

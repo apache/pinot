@@ -24,7 +24,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.core.query.utils.Pair;
+import org.apache.pinot.spi.utils.Pair;
 
 
 public class QueryResponse {

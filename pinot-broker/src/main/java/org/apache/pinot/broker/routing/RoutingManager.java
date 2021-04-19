@@ -53,12 +53,12 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -272,14 +272,14 @@ public class RoutingManager implements ClusterChangeHandler {
 
   private static boolean isInstanceEnabled(ZNRecord instanceConfigZNRecord) {
     if ("false"
-        .equals(instanceConfigZNRecord.getSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_ENABLED.name()))) {
+        .equalsIgnoreCase(instanceConfigZNRecord.getSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_ENABLED.name()))) {
       return false;
     }
-    if ("true".equals(instanceConfigZNRecord.getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS))) {
+    if ("true".equalsIgnoreCase(instanceConfigZNRecord.getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS))) {
       return false;
     }
     //noinspection RedundantIfStatement
-    if ("true".equals(instanceConfigZNRecord.getSimpleField(CommonConstants.Helix.QUERIES_DISABLED))) {
+    if ("true".equalsIgnoreCase(instanceConfigZNRecord.getSimpleField(CommonConstants.Helix.QUERIES_DISABLED))) {
       return false;
     }
     return true;
