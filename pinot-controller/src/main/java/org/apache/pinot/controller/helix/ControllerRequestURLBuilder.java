@@ -340,4 +340,8 @@ public class ControllerRequestURLBuilder {
   public String forClusterConfigs() {
     return StringUtil.join("/", _baseUrl, "cluster/configs");
   }
+
+  public String forAppConfigs() {
+    return StringUtil.join("/", _baseUrl, "appconfigs");
+  }
 }

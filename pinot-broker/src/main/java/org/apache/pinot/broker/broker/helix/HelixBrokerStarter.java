@@ -256,7 +256,8 @@ public class HelixBrokerStarter implements ServiceStartable {
     }
 
     LOGGER.info("Starting broker admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
-    _brokerAdminApplication = new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics);
+    _brokerAdminApplication =
+        new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf);
     _brokerAdminApplication.start(_listenerConfigs);
 
     LOGGER.info("Initializing cluster change mediator");

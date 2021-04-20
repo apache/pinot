@@ -49,6 +49,8 @@ import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.server.api.access.AllowAllAccessFactory;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.helix.AdminApiApplication;
+import org.apache.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.ReadMode;
@@ -122,7 +124,8 @@ public abstract class BaseResourceTest {
     setUpSegment(realtimeTableName, null, "default", _realtimeIndexSegments);
     setUpSegment(offlineTableName, null, "default", _offlineIndexSegments);
 
-    _adminApiApplication = new AdminApiApplication(serverInstance, new AllowAllAccessFactory());
+    PinotConfiguration serverConf = DefaultHelixStarterServerConfig.loadDefaultServerConf();
+    _adminApiApplication = new AdminApiApplication(serverInstance, new AllowAllAccessFactory(), serverConf);
     _adminApiApplication.start(Collections.singletonList(
         new ListenerConfig(CommonConstants.HTTP_PROTOCOL, "0.0.0.0", CommonConstants.Server.DEFAULT_ADMIN_API_PORT,
             CommonConstants.HTTP_PROTOCOL, new TlsConfig())));
