@@ -66,6 +66,11 @@ spec:
         env:
           - name: JAVA_OPTS
             value: "{{ .Values.minion.jvmOpts }} -Dlog4j2.configurationFile={{ .Values.minion.log4j2ConfFile }} -Dplugins.dir={{ .Values.minion.pluginsDir }}"
+{{- if .Values.minion.extraEnv }}
+{{ toYaml .Values.minion.extraEnv | indent 10 }}
+{{- end }}
+        envFrom:
+{{ toYaml .Values.minion.envFrom | indent 10 }}
         ports:
           - containerPort: {{ .Values.minion.port }}
             protocol: TCP
