@@ -32,7 +32,7 @@ public abstract class ArrayBaseTransformFunctionTest extends BaseTransformFuncti
   @Test
   public void testArrayTransformFunction() {
     ExpressionContext expression =
-        RequestContextUtils.getExpression(String.format("%s(%s)", getFunctionName(), INT_MV_COLUMN));
+        RequestContextUtils.getExpressionFromSQL(String.format("%s(%s)", getFunctionName(), INT_MV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertEquals(transformFunction.getClass().getName(), getArrayFunctionClass().getName());
     Assert.assertEquals(transformFunction.getName(), getFunctionName());
@@ -76,7 +76,7 @@ public abstract class ArrayBaseTransformFunctionTest extends BaseTransformFuncti
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 

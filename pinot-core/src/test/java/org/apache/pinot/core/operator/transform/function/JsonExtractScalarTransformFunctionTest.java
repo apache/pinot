@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Random;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
-import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -40,7 +39,7 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
   @Test(dataProvider = "testJsonPathTransformFunctionArguments")
   public void testJsonPathTransformFunction(String expressionStr, FieldSpec.DataType resultsDataType,
       boolean isSingleValue) {
-    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
     Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
@@ -102,7 +101,20 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
   @DataProvider(name = "testJsonPathTransformFunctionArguments")
   public Object[][] testJsonPathTransformFunctionArguments() {
     //@formatter:off
-    return new Object[][]{new Object[]{"jsonExtractScalar(json,'$.intSV','INT')", FieldSpec.DataType.INT, true}, new Object[]{"jsonExtractScalar(json,'$.intMV','INT_ARRAY')", FieldSpec.DataType.INT, false}, new Object[]{"jsonExtractScalar(json,'$.longSV','LONG')", FieldSpec.DataType.LONG, true}, new Object[]{"jsonExtractScalar(json,'$.floatSV','FLOAT')", FieldSpec.DataType.FLOAT, true}, new Object[]{"jsonExtractScalar(json,'$.doubleSV','DOUBLE')", FieldSpec.DataType.DOUBLE, true}, new Object[]{"jsonExtractScalar(json,'$.stringSV','STRING')", FieldSpec.DataType.STRING, true}, new Object[]{"json_extract_scalar(json,'$.intSV','INT', '0')", FieldSpec.DataType.INT, true}, new Object[]{"json_extract_scalar(json,'$.intMV','INT_ARRAY', ['0'])", FieldSpec.DataType.INT, false}, new Object[]{"json_extract_scalar(json,'$.longSV','LONG', '0')", FieldSpec.DataType.LONG, true}, new Object[]{"json_extract_scalar(json,'$.floatSV','FLOAT', '0.0')", FieldSpec.DataType.FLOAT, true}, new Object[]{"json_extract_scalar(json,'$.doubleSV','DOUBLE', '0.0')", FieldSpec.DataType.DOUBLE, true}, new Object[]{"json_extract_scalar(json,'$.stringSV','STRING', 'null')", FieldSpec.DataType.STRING, true}};
+    return new Object[][]{
+        new Object[]{"jsonExtractScalar(json,'$.intSV','INT')", FieldSpec.DataType.INT, true},
+        new Object[]{"jsonExtractScalar(json,'$.intMV','INT_ARRAY')", FieldSpec.DataType.INT, false},
+        new Object[]{"jsonExtractScalar(json,'$.longSV','LONG')", FieldSpec.DataType.LONG, true},
+        new Object[]{"jsonExtractScalar(json,'$.floatSV','FLOAT')", FieldSpec.DataType.FLOAT, true},
+        new Object[]{"jsonExtractScalar(json,'$.doubleSV','DOUBLE')", FieldSpec.DataType.DOUBLE, true},
+        new Object[]{"jsonExtractScalar(json,'$.stringSV','STRING')", FieldSpec.DataType.STRING, true},
+        new Object[]{"json_extract_scalar(json,'$.intSV','INT', '0')", FieldSpec.DataType.INT, true},
+        new Object[]{"json_extract_scalar(json,'$.intMV','INT_ARRAY', '0')", FieldSpec.DataType.INT, false},
+        new Object[]{"json_extract_scalar(json,'$.longSV','LONG', '0')", FieldSpec.DataType.LONG, true},
+        new Object[]{"json_extract_scalar(json,'$.floatSV','FLOAT', '0.0')", FieldSpec.DataType.FLOAT, true},
+        new Object[]{"json_extract_scalar(json,'$.doubleSV','DOUBLE', '0.0')", FieldSpec.DataType.DOUBLE, true},
+        new Object[]{"json_extract_scalar(json,'$.stringSV','STRING', 'null')", FieldSpec.DataType.STRING, true}
+    };
     //@formatter:on
   }
 
@@ -110,7 +122,7 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
   public void testJsonPathTransformFunctionWithPredicate() {
     String jsonPathExpressionStr =
         String.format("jsonExtractScalar(json,'[?($.stringSV==''%s'')]','STRING')", _stringSVValues[0]);
-    ExpressionContext expression = RequestContextUtils.getExpression(jsonPathExpressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(jsonPathExpressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
     Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
@@ -140,7 +152,7 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
   @Test
   public void testJsonPathTransformFunctionForIntMV() {
     ExpressionContext expression =
-        RequestContextUtils.getExpression("jsonExtractScalar(json,'$.intMV','INT_ARRAY')");
+        RequestContextUtils.getExpressionFromSQL("jsonExtractScalar(json,'$.intMV','INT_ARRAY')");
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
     Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
@@ -156,7 +168,7 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
   @Test
   public void testJsonPathTransformFunctionForLong() {
     ExpressionContext expression =
-        RequestContextUtils.getExpression("jsonExtractScalar(json,'$.longSV','LONG')");
+        RequestContextUtils.getExpressionFromSQL("jsonExtractScalar(json,'$.longSV','LONG')");
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
     Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
@@ -169,7 +181,7 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
   @Test
   public void testJsonPathTransformFunctionForFloat() {
     ExpressionContext expression =
-        RequestContextUtils.getExpression("jsonExtractScalar(json,'$.floatSV','FLOAT')");
+        RequestContextUtils.getExpressionFromSQL("jsonExtractScalar(json,'$.floatSV','FLOAT')");
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
     Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
@@ -182,7 +194,7 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
   @Test
   public void testJsonPathTransformFunctionForDouble() {
     ExpressionContext expression =
-        RequestContextUtils.getExpression("jsonExtractScalar(json,'$.doubleSV','DOUBLE')");
+        RequestContextUtils.getExpressionFromSQL("jsonExtractScalar(json,'$.doubleSV','DOUBLE')");
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
     Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
@@ -195,7 +207,7 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
   @Test
   public void testJsonPathTransformFunctionForString() {
     ExpressionContext expression =
-        RequestContextUtils.getExpression("jsonExtractScalar(json,'$.stringSV','STRING')");
+        RequestContextUtils.getExpressionFromSQL("jsonExtractScalar(json,'$.stringSV','STRING')");
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
     Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
@@ -208,8 +220,8 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
   @Test
   public void testJsonPathKeyTransformFunction() {
     ExpressionContext expression = (new Random(System.currentTimeMillis()).nextBoolean()) ? RequestContextUtils
-        .getExpression("jsonExtractKey(json,'$.*')")
-        : RequestContextUtils.getExpression("json_extract_key(json,'$.*')");
+        .getExpressionFromSQL("jsonExtractKey(json,'$.*')")
+        : RequestContextUtils.getExpressionFromSQL("json_extract_key(json,'$.*')");
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonExtractKeyTransformFunction);
     Assert.assertEquals(transformFunction.getName(), JsonExtractKeyTransformFunction.FUNCTION_NAME);
@@ -228,35 +240,39 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 
   @Test(dataProvider = "testParsingIllegalQueries", expectedExceptions = {SqlCompilationException.class})
   public void testParsingIllegalQueries(String expressionStr) {
-    QueryContextConverterUtils.getQueryContextFromSQL(String.format("SELECT %s FROM myTable", expressionStr));
+    RequestContextUtils.getExpressionFromSQL(expressionStr);
   }
 
   @DataProvider(name = "testIllegalArguments")
   public Object[][] testIllegalArguments() {
     //@formatter:off
-    return new Object[][]{new Object[]{String.format("jsonExtractScalar(%s)",
-        JSON_COLUMN)}, new Object[]{"jsonExtractScalar(5,'$.store.book[0].author','$.store.book[0].author')"}, new Object[]{String.format(
-        "jsonExtractScalar(%s,'$.store.book[0].author')", INT_MV_COLUMN)}, new Object[]{String.format(
-        "jsonExtractScalar(%s,'$.store.book[0].author')", STRING_SV_COLUMN)}, new Object[]{String.format(
-        "jsonExtractScalar(%s,'$.store.book[0].author', 'STRINGARRAY')", STRING_SV_COLUMN)}, new Object[]{String.format(
-        "jsonExtractScalar(%s,%s,'$.store.book[0].author', 'String','abc')", JSON_COLUMN, INT_SV_COLUMN)}};
+    return new Object[][]{
+        new Object[]{"jsonExtractScalar(5,'$.store.book[0].author','$.store.book[0].author')"},
+        new Object[]{String.format("jsonExtractScalar(%s,'$.store.book[0].author','$.store.book[0].author')", INT_SV_COLUMN)},
+        new Object[]{String.format("jsonExtractScalar(%s,'$.store.book[0].author','$.store.book[0].author')", INT_MV_COLUMN)},
+        new Object[]{String.format("jsonExtractScalar(%s,'$.store.book[0].author', 'STRINGARRAY')", STRING_SV_COLUMN)}
+    };
     //@formatter:on
   }
 
   @DataProvider(name = "testParsingIllegalQueries")
   public Object[][] testParsingIllegalQueries() {
     //@formatter:off
-    return new Object[][]{new Object[]{String.format("jsonExtractScalar(%s, \"$.store.book[0].author\", 'String')",
-        JSON_COLUMN)}, new Object[]{String.format("jsonExtractScalar(%s, '$.store.book[0].author', \"String\")",
-        JSON_COLUMN)}, new Object[]{String.format("json_extract_scalar(%s, \"$.store.book[0].author\", 'String','abc')",
-        JSON_COLUMN)}, new Object[]{String.format("jsonExtractKey(%s, \"$.*\")",
-        JSON_COLUMN)}, new Object[]{String.format("json_extract_key(%s, \"$.*\")", JSON_COLUMN)}};
+    return new Object[][]{
+        new Object[]{String.format("jsonExtractScalar(%s)", JSON_COLUMN)},
+        new Object[]{String.format("jsonExtractScalar(%s,'$.store.book[0].author')", JSON_COLUMN)},
+        new Object[]{String.format("jsonExtractScalar(%s,%s,'$.store.book[0].author', 'String','abc')", JSON_COLUMN, INT_SV_COLUMN)},
+        new Object[]{String.format("jsonExtractScalar(%s, \"$.store.book[0].author\", 'String')", JSON_COLUMN)},
+        new Object[]{String.format("jsonExtractScalar(%s, '$.store.book[0].author', \"String\")", JSON_COLUMN)},
+        new Object[]{String.format("json_extract_scalar(%s, \"$.store.book[0].author\", 'String','abc')", JSON_COLUMN)},
+        new Object[]{String.format("jsonExtractKey(%s, \"$.*\")", JSON_COLUMN)},
+        new Object[]{String.format("json_extract_key(%s, \"$.*\")", JSON_COLUMN)}};
     //@formatter:on
   }
 }

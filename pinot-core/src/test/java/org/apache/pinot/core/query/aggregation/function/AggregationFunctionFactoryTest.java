@@ -33,7 +33,7 @@ import static org.testng.Assert.assertTrue;
 public class AggregationFunctionFactoryTest {
   private static final String ARGUMENT = "(column)";
   private static final QueryContext DUMMY_QUERY_CONTEXT =
-      QueryContextConverterUtils.getQueryContextFromPQL("SELECT * FROM testTable");
+      QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable");
 
   @Test
   public void testGetAggregationFunction() {
@@ -317,13 +317,13 @@ public class AggregationFunctionFactoryTest {
   }
 
   private FunctionContext getFunction(String functionName, String args) {
-    return RequestContextUtils.getExpression(functionName + args).getFunction();
+    return RequestContextUtils.getExpressionFromSQL(functionName + args).getFunction();
   }
 
   @Test
   public void testAggregationFunctionWithMultipleArgs() {
     QueryContext queryContext =
-        QueryContextConverterUtils.getQueryContextFromPQL("SELECT distinct(column1, column2, column3) FROM testTable");
+        QueryContextConverterUtils.getQueryContextFromSQL("SELECT DISTINCT column1, column2, column3 FROM testTable");
     AggregationFunction aggregationFunction = AggregationFunctionFactory
         .getAggregationFunction(queryContext.getSelectExpressions().get(0).getFunction(), queryContext);
     assertTrue(aggregationFunction instanceof DistinctAggregationFunction);

@@ -34,8 +34,7 @@ import static org.testng.Assert.assertEquals;
 public class PredicateTest {
 
   @Test
-  public void testSerDe()
-      throws Exception {
+  public void testSerDe() {
     // EqPredicate
     assertEquals(testSerDe("foo\t= 123"), "foo = '123'");
     assertEquals(testSerDe("foo='123'"), "foo = '123'");
@@ -91,8 +90,7 @@ public class PredicateTest {
    * Tests that the serialized predicate can be parsed and converted back to the same predicate, and returns the
    * serialized predicate (standardized string representation of the predicate expression).
    */
-  private String testSerDe(String predicateExpression)
-      throws Exception {
+  private String testSerDe(String predicateExpression) {
     // Parse and convert the string predicate expression into Predicate
     Expression thriftExpression = CalciteSqlParser.compileToExpression(predicateExpression);
     FilterContext filter = RequestContextUtils.getFilter(thriftExpression);

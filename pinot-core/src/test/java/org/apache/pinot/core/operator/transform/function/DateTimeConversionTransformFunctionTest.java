@@ -32,7 +32,7 @@ public class DateTimeConversionTransformFunctionTest extends BaseTransformFuncti
   @Test
   public void testDateTimeConversionTransformFunction() {
     // NOTE: functionality of DateTimeConverter is covered in DateTimeConverterTest
-    ExpressionContext expression = RequestContextUtils.getExpression(
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(
         String.format("dateTimeConvert(%s,'1:MILLISECONDS:EPOCH','1:MINUTES:EPOCH','1:MINUTES')", TIME_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof DateTimeConversionTransformFunction);
@@ -54,7 +54,7 @@ public class DateTimeConversionTransformFunctionTest extends BaseTransformFuncti
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 

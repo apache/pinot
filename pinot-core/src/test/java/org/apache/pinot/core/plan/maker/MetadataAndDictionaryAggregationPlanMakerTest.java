@@ -141,7 +141,7 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
   @Test(dataProvider = "testPlanMakerDataProvider")
   public void testPlanMaker(String query, Class<? extends PlanNode> planNodeClass,
       Class<? extends PlanNode> upsertPlanNodeClass) {
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(query);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
     PlanNode planNode = PLAN_MAKER.makeSegmentPlanNode(_indexSegment, queryContext);
     assertTrue(planNodeClass.isInstance(planNode));
     PlanNode upsertPlanNode = PLAN_MAKER.makeSegmentPlanNode(_upsertIndexSegment, queryContext);
@@ -186,7 +186,7 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
   @Test(dataProvider = "isFitForPlanDataProvider")
   public void testIsFitFor(String query, IndexSegment indexSegment, boolean expectedIsFitForMetadata,
       boolean expectedIsFitForDictionary) {
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(query);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
     assertEquals(InstancePlanMakerImplV2.isFitForMetadataBasedPlan(queryContext), expectedIsFitForMetadata);
     assertEquals(InstancePlanMakerImplV2.isFitForDictionaryBasedPlan(queryContext, indexSegment),
         expectedIsFitForDictionary);

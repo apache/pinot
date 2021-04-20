@@ -103,7 +103,7 @@ public class IngestionUtilsTest {
     // inbuilt functions
     schema = new Schema();
     dimensionFieldSpec = new DimensionFieldSpec("hoursSinceEpoch", FieldSpec.DataType.LONG, true);
-    dimensionFieldSpec.setTransformFunction("toEpochHours(timestamp)");
+    dimensionFieldSpec.setTransformFunction("toEpochHours(\"timestamp\")");
     schema.addField(dimensionFieldSpec);
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(null, schema));
     Assert.assertEquals(extract.size(), 2);
@@ -112,7 +112,7 @@ public class IngestionUtilsTest {
     // inbuilt functions with literal
     schema = new Schema();
     dimensionFieldSpec = new DimensionFieldSpec("tenMinutesSinceEpoch", FieldSpec.DataType.LONG, true);
-    dimensionFieldSpec.setTransformFunction("toEpochMinutesBucket(timestamp, 10)");
+    dimensionFieldSpec.setTransformFunction("toEpochMinutesBucket(\"timestamp\", 10)");
     schema.addField(dimensionFieldSpec);
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(null, schema));
     Assert.assertEquals(extract.size(), 2);
@@ -122,7 +122,7 @@ public class IngestionUtilsTest {
     schema = new Schema();
     DateTimeFieldSpec dateTimeFieldSpec =
         new DateTimeFieldSpec("date", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd", "1:DAYS");
-    dateTimeFieldSpec.setTransformFunction("toDateTime(timestamp, 'yyyy-MM-dd')");
+    dateTimeFieldSpec.setTransformFunction("toDateTime(\"timestamp\", 'yyyy-MM-dd')");
     schema.addField(dateTimeFieldSpec);
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(null, schema));
     Assert.assertEquals(extract.size(), 2);

@@ -35,7 +35,8 @@ import org.testng.annotations.Test;
 
 
 public class CombinePlanNodeTest {
-  private final QueryContext _queryContext = QueryContextConverterUtils.getQueryContextFromPQL("SELECT * FROM table");
+  private final QueryContext _queryContext =
+      QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable");
   private final ExecutorService _executorService = Executors.newFixedThreadPool(10);
 
   /**
@@ -107,8 +108,7 @@ public class CombinePlanNodeTest {
     }
     CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, _queryContext, _executorService,
         System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS,
-        InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, null,
-        InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD);
+        InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, null, InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD);
     try {
       combinePlanNode.run();
     } catch (RuntimeException e) {

@@ -43,7 +43,7 @@ public class StPointFunctionTest extends BaseTransformFunctionTest {
 
   @Test
   public void testStPointLiteralFunction() {
-    ExpressionContext expression = RequestContextUtils.getExpression(String.format("ST_Point(20,10, 1)"));
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL("ST_Point(20,10, 1)");
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     byte[][] expectedValues = new byte[NUM_ROWS][];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -56,7 +56,7 @@ public class StPointFunctionTest extends BaseTransformFunctionTest {
 
   private void testStPointFunction(int isGeography) {
     ExpressionContext expression = RequestContextUtils
-        .getExpression(String.format("ST_Point(%s,%s, %d)", DOUBLE_SV_COLUMN, DOUBLE_SV_COLUMN, isGeography));
+        .getExpressionFromSQL(String.format("ST_Point(%s,%s, %d)", DOUBLE_SV_COLUMN, DOUBLE_SV_COLUMN, isGeography));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof StPointFunction);
     Assert.assertEquals(transformFunction.getName(), StPointFunction.FUNCTION_NAME);
@@ -73,7 +73,7 @@ public class StPointFunctionTest extends BaseTransformFunctionTest {
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 

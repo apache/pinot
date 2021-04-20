@@ -33,7 +33,7 @@ public class ValueInTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test(dataProvider = "testValueInTransformFunction")
   public void testValueInTransformFunction(String expressionStr) {
-    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ValueInTransformFunction);
     Assert.assertEquals(transformFunction.getName(), ValueInTransformFunction.FUNCTION_NAME);
@@ -76,7 +76,7 @@ public class ValueInTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 
