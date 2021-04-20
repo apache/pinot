@@ -34,6 +34,7 @@ import org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.apache.spark.SparkContext;
@@ -118,6 +119,11 @@ public class SparkSegmentUriPushJobRunner implements IngestionJobRunner, Seriali
         public void call(String segmentUri)
             throws Exception {
           try {
+            PluginManager.get().init();
+            for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
+              PinotFSFactory
+                  .register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
+            }
             SegmentPushUtils.sendSegmentUris(_spec, Arrays.asList(segmentUri));
           } catch (RetriableOperationException | AttemptsExceededException e) {
             throw new RuntimeException(e);
