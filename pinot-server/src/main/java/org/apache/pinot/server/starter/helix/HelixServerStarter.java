@@ -69,6 +69,7 @@ import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.ServerQueriesDisabledTracker;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.environmentprovider.PinotEnvironmentProviderFactory;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.services.ServiceRole;
@@ -83,6 +84,8 @@ import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.common.utils.CommonConstants.Server.*;
 
 
 /**
@@ -107,6 +110,13 @@ import org.slf4j.LoggerFactory;
 public class HelixServerStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixServerStarter.class);
 
+  private HelixManager _helixManager;
+  private HelixAdmin _helixAdmin;
+  private ServerInstance _serverInstance;
+  private AdminApiApplication _adminApiApplication;
+  private ServerQueriesDisabledTracker _serverQueriesDisabledTracker;
+  private RealtimeLuceneIndexRefreshState _realtimeLuceneIndexRefreshState;
+
   private final String _helixClusterName;
   private final String _zkAddress;
   private final PinotConfiguration _serverConf;
@@ -115,15 +125,8 @@ public class HelixServerStarter implements ServiceStartable {
   private final int _port;
   private final String _instanceId;
   private final HelixConfigScope _instanceConfigScope;
-  private HelixManager _helixManager;
-  private HelixAdmin _helixAdmin;
-  private ServerInstance _serverInstance;
-  private AdminApiApplication _adminApiApplication;
-  private ServerQueriesDisabledTracker _serverQueriesDisabledTracker;
-  private RealtimeLuceneIndexRefreshState _realtimeLuceneIndexRefreshState;
 
-  public HelixServerStarter(String helixClusterName, String zkAddress, PinotConfiguration serverConf)
-      throws Exception {
+  public HelixServerStarter(String helixClusterName, String zkAddress, PinotConfiguration serverConf) throws Exception {
     _helixClusterName = helixClusterName;
     _zkAddress = zkAddress;
     // Make a clone so that changes to the config won't propagate to the caller
@@ -146,7 +149,6 @@ public class HelixServerStarter implements ServiceStartable {
         new HelixConfigScopeBuilder(ConfigScopeProperty.PARTICIPANT, _helixClusterName).forParticipant(_instanceId)
             .build();
 
-    // Enable/disable thread CPU time measurement through instance config.
     ThreadTimer.setThreadCpuTimeMeasurementEnabled(_serverConf
         .getProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
             Server.DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT));
@@ -338,6 +340,10 @@ public class HelixServerStarter implements ServiceStartable {
     LOGGER.info("Initializing server instance and registering state model factory");
     Utils.logVersions();
     ControllerLeaderLocator.create(_helixManager);
+
+    // Invoke Pinot Environment Provider's Init method to register the environment provider
+    PinotEnvironmentProviderFactory.init(_serverConf.subset(PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY));
+
     ServerSegmentCompletionProtocolHandler
         .init(_serverConf.subset(SegmentCompletionProtocol.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
     ServerConf serverInstanceConfig = DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(_serverConf);
@@ -468,8 +474,7 @@ public class HelixServerStarter implements ServiceStartable {
 
     long endTimeMs =
         startTimeMs + _serverConf.getProperty(Server.CONFIG_OF_SHUTDOWN_TIMEOUT_MS, Server.DEFAULT_SHUTDOWN_TIMEOUT_MS);
-    if (_serverConf
-        .getProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK, Server.DEFAULT_SHUTDOWN_ENABLE_QUERY_CHECK)) {
+    if (_serverConf.getProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK, Server.DEFAULT_SHUTDOWN_ENABLE_QUERY_CHECK)) {
       shutdownQueryCheck(endTimeMs);
     }
     _helixManager.disconnect();
@@ -676,4 +681,5 @@ public class HelixServerStarter implements ServiceStartable {
       throws Exception {
     startDefault();
   }
+
 }
