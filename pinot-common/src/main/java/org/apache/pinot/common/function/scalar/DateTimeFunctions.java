@@ -19,6 +19,7 @@
 package org.apache.pinot.common.function.scalar;
 
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.function.DateTimePatternHandler;
 import org.apache.pinot.common.function.DateTimeUtils;
@@ -277,6 +278,15 @@ public class DateTimeFunctions {
   @ScalarFunction
   public static long now() {
     return System.currentTimeMillis();
+  }
+
+  /**
+   * Return time as epoch millis before the given period (represented by as an ISO8601 formatted String).
+   */
+  @ScalarFunction
+  public static long ago(String periodString) {
+    Duration period = Duration.parse(periodString);
+    return System.currentTimeMillis() - period.toMillis();
   }
 
   /**

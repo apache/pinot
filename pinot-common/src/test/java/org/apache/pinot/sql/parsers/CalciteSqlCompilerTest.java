@@ -1714,12 +1714,32 @@ public class CalciteSqlCompilerTest {
     long result = expression.getLiteral().getLongValue();
     Assert.assertTrue(result >= lowerBound && result <= upperBound);
 
+    long ONE_HOUR_IN_MS = TimeUnit.HOURS.toMillis(1);
+
     lowerBound = TimeUnit.MILLISECONDS.toHours(System.currentTimeMillis()) + 1;
     expression = CalciteSqlParser.compileToExpression("to_epoch_hours(now() + 3600000)");
     Assert.assertNotNull(expression.getFunctionCall());
     expression = CalciteSqlParser.invokeCompileTimeFunctionExpression(expression);
     Assert.assertNotNull(expression.getLiteral());
     upperBound = TimeUnit.MILLISECONDS.toHours(System.currentTimeMillis()) + 1;
+    result = expression.getLiteral().getLongValue();
+    Assert.assertTrue(result >= lowerBound && result <= upperBound);
+
+    lowerBound = System.currentTimeMillis() - ONE_HOUR_IN_MS;
+    expression = CalciteSqlParser.compileToExpression("ago('PT1H')");
+    Assert.assertNotNull(expression.getFunctionCall());
+    expression = CalciteSqlParser.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertNotNull(expression.getLiteral());
+    upperBound = System.currentTimeMillis() - ONE_HOUR_IN_MS;
+    result = expression.getLiteral().getLongValue();
+    Assert.assertTrue(result >= lowerBound && result <= upperBound);
+
+    lowerBound = System.currentTimeMillis() + ONE_HOUR_IN_MS;
+    expression = CalciteSqlParser.compileToExpression("ago('PT-1H')");
+    Assert.assertNotNull(expression.getFunctionCall());
+    expression = CalciteSqlParser.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertNotNull(expression.getLiteral());
+    upperBound = System.currentTimeMillis() + ONE_HOUR_IN_MS;
     result = expression.getLiteral().getLongValue();
     Assert.assertTrue(result >= lowerBound && result <= upperBound);
 
