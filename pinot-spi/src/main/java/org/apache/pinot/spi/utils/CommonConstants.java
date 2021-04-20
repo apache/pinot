@@ -386,6 +386,9 @@ public class CommonConstants {
      * E.g. null (auth disabled), "Basic abcdef..." (basic auth), "Bearer 123def..." (oauth2)
      */
     public static final String CONFIG_OF_TASK_AUTH_TOKEN = "task.auth.token";
+    public static final String CONFIG_OF_ADMIN_API_PORT = "pinot.minion.adminapi.port";
+    public static final String MINION_TLS_PREFIX = "pinot.minion.tls";
+    public static final int DEFAULT_ADMIN_API_PORT = 6500;
   }
 
   public static class Segment {
