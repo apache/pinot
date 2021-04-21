@@ -797,23 +797,6 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   /**
-   * Controller periodic task uses this endpoint to ask servers to upload committed llc segment to segment store if missing.
-   * @param uri The uri to ask servers to upload segment to segment store
-   * @return the uploaded segment download url from segment store
-   * @throws URISyntaxException
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
-  public String uploadToSegmentStore(String uri)
-      throws URISyntaxException, IOException, HttpErrorStatusException {
-    RequestBuilder requestBuilder = RequestBuilder.post(new URI(uri)).setVersion(HttpVersion.HTTP_1_1);
-    setTimeout(requestBuilder, DEFAULT_SOCKET_TIMEOUT_MS);
-    // sendRequest checks the response status code
-    SimpleHttpResponse response = sendRequest(requestBuilder.build());
-    return response.getResponse();
-  }
-
-  /**
    * Send segment uri.
    *
    * Note: table name has to be set as a parameter.

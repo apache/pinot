@@ -20,7 +20,9 @@ package org.apache.pinot.controller.helix.core.realtime;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -41,15 +43,23 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.http.HttpVersion;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.methods.RequestBuilder;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.util.EntityUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.StringUtil;
@@ -100,6 +110,8 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Server.SegmentCompletionProtocol.DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS;
+
 
 /**
  * Segment manager for LLC real-time table.
@@ -145,10 +157,11 @@ public class PinotLLCRealtimeSegmentManager {
   private final Lock[] _idealStateUpdateLocks;
   private final TableConfigCache _tableConfigCache;
   private final FlushThresholdUpdateManager _flushThresholdUpdateManager;
-  private final FileUploadDownloadClient _fileUploadDownloadClient;
+  private final CloseableHttpClient _httpClient;
 
   private volatile boolean _isStopping = false;
   private AtomicInteger _numCompletingSegments = new AtomicInteger(0);
+  private Random _rand = new Random();
 
   public PinotLLCRealtimeSegmentManager(PinotHelixResourceManager helixResourceManager, ControllerConf controllerConf,
       ControllerMetrics controllerMetrics) {
@@ -168,12 +181,12 @@ public class PinotLLCRealtimeSegmentManager {
     }
     _tableConfigCache = new TableConfigCache(_propertyStore);
     _flushThresholdUpdateManager = new FlushThresholdUpdateManager();
-    _fileUploadDownloadClient = initFileUploadDownloadClient();
+    _httpClient = initHttpClient();
   }
 
   @VisibleForTesting
-  FileUploadDownloadClient initFileUploadDownloadClient() {
-    return new FileUploadDownloadClient();
+  CloseableHttpClient initHttpClient() {
+    return HttpClientBuilder.create().build();
   }
 
   public boolean getIsSplitCommitEnabled() {
@@ -1267,17 +1280,16 @@ public class PinotLLCRealtimeSegmentManager {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
     String realtimeTableName = tableConfig.getTableName();
-    // Get the latest segment ZK metadata for each partition
-    Map<Integer, LLCRealtimeSegmentZKMetadata> llcSegmentZKMetadataMap =
-        getLatestSegmentZKMetadataMap(realtimeTableName);
+    // Get all the LLC segment ZK metadata for this table
+    List<LLCRealtimeSegmentZKMetadata> segmentZKMetadataList = ZKMetadataProvider.getLLCRealtimeSegmentZKMetadataListForTable(_propertyStore, realtimeTableName);
 
     // Iterate through llc segments and upload missing segment store copy by following steps:
     //  1. Ask servers which have online segment replica to upload to segment store. Servers return segment store download url after successful uploading.
     //  2. Update the llc segment ZK metadata by adding segment store download url.
-    for (LLCRealtimeSegmentZKMetadata segmentZKMetadata : llcSegmentZKMetadataMap.values()) {
+    for (LLCRealtimeSegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
       String segmentName = segmentZKMetadata.getSegmentName();
       // Only fix the committed llc segment without segment store copy
-      if (LLCSegmentName.isLowLevelConsumerSegmentName(segmentName) && segmentZKMetadata.getStatus() == Status.DONE && (segmentZKMetadata.getDownloadUrl() == null || segmentZKMetadata.getDownloadUrl().isEmpty())) {
+      if (segmentZKMetadata.getStatus() == Status.DONE && (segmentZKMetadata.getDownloadUrl() == null || segmentZKMetadata.getDownloadUrl().isEmpty() || segmentZKMetadata.getDownloadUrl().equals(CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD))) {
         try {
           if (!isExceededMaxSegmentCompletionTime(realtimeTableName, segmentName, getCurrentTimeMs())) {
             continue;
@@ -1293,10 +1305,10 @@ public class PinotLLCRealtimeSegmentManager {
           }
 
           // Randomly ask one server to upload
-          Random r = new Random();
-          URI uri = peerSegmentURIs.get(r.nextInt(peerSegmentURIs.size()));
-          String segmentDownloadUrl = _fileUploadDownloadClient.uploadToSegmentStore(StringUtil
-              .join("/", uri.toString(), "upload"));
+          URI uri = peerSegmentURIs.get(_rand.nextInt(peerSegmentURIs.size()));
+          String serverUploadRequestUrl = StringUtil.join("/", uri.toString(), "upload");
+          LOGGER.info("Ask server to upload llc segment to segment store by this path: {}", serverUploadRequestUrl);
+          String segmentDownloadUrl = uploadLLCSegmentByServer(serverUploadRequestUrl);
 
           // Update the segment ZK metadata to include segment download url
           if (segmentDownloadUrl == null || segmentDownloadUrl.isEmpty()) {
@@ -1311,5 +1323,33 @@ public class PinotLLCRealtimeSegmentManager {
         }
       }
     }
+  }
+
+  /**
+   * Helper function to ask server to upload llc segment to segment store
+   */
+  private String uploadLLCSegmentByServer(String serverUploadRequestUrl)
+      throws URISyntaxException, IOException, HttpErrorStatusException {
+    HttpUriRequest request = buildServerUploadRequest(serverUploadRequestUrl);
+    try (CloseableHttpResponse response = _httpClient.execute(request)) {
+      int statusCode = response.getStatusLine().getStatusCode();
+      String responseStr = response.getEntity() == null ? "" : EntityUtils.toString(response.getEntity());
+      if (statusCode >= 300) {
+        StringBuilder errorMsgBuilder = new StringBuilder(String.format("Failed to ask server to upload LLC segment to segment store by url: %s. ", serverUploadRequestUrl));
+        if (!responseStr.isEmpty()) {
+          errorMsgBuilder.append(responseStr);
+        }
+        throw new HttpErrorStatusException(errorMsgBuilder.toString(), statusCode);
+      }
+
+      return responseStr;
+    }
+  }
+
+  @VisibleForTesting
+  HttpUriRequest buildServerUploadRequest(String serverUploadRequestUrl)
+      throws URISyntaxException {
+    RequestConfig requestConfig = RequestConfig.custom().setSocketTimeout(DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS).build();
+    return RequestBuilder.post(new URI(serverUploadRequestUrl)).setVersion(HttpVersion.HTTP_1_1).setConfig(requestConfig).build();
   }
 }
