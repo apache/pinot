@@ -46,4 +46,12 @@ public class PinotQueryParserFactory {
   public static BrokerRequest parsePinotQueryRequest(PinotQueryRequest pinotQueryRequest) {
     return get(pinotQueryRequest.getQueryFormat()).compileToBrokerRequest(pinotQueryRequest.getQuery());
   }
+
+  public static BrokerRequest parseSQLQuery(String query) {
+    return CALCITE_SQL_COMPILER.compileToBrokerRequest(query);
+  }
+
+  public static BrokerRequest parsePQLQuery(String query) {
+    return PQL_2_COMPILER.compileToBrokerRequest(query);
+  }
 }

@@ -33,6 +33,7 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
@@ -133,6 +134,12 @@ public class BrokerReduceService {
     long realtimeThreadCpuTimeNs = 0L;
     boolean numGroupsLimitReached = false;
 
+    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
+    Map<String, String> queryOptions =
+        pinotQuery != null ? pinotQuery.getQueryOptions() : brokerRequest.getQueryOptions();
+    boolean enableTrace =
+        queryOptions != null && Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE));
+
     // Cache a data schema from data tables (try to cache one with data rows associated with it).
     DataSchema cachedDataSchema = null;
 
@@ -144,7 +151,7 @@ public class BrokerReduceService {
       Map<String, String> metadata = dataTable.getMetadata();
 
       // Reduce on trace info.
-      if (brokerRequest.isEnableTrace()) {
+      if (enableTrace) {
         brokerResponseNative.getTraceInfo()
             .put(entry.getKey().getHostname(), metadata.get(MetadataKey.TRACE_INFO.getName()));
       }
