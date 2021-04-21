@@ -1,0 +1,64 @@
+{
+  "schema":{
+    "schemaName": "tableSchema",
+    "dimensionFieldSpecs": [
+      {
+        "name": "a",
+        "dataType": "INT",
+        "cardinality":20,
+        "numValuesPerEntry":1
+      }
+    ],
+    "metricFieldSpecs": [
+      {
+        "name": "k",
+        "dataType": "DOUBLE",
+        "cardinality":1000,
+        "numValuesPerEntry":1,
+        "averageLength" : 100
+      },
+      {
+        "name": "l",
+        "dataType": "STRING",
+        "cardinality":1000,
+        "numValuesPerEntry":1,
+        "averageLength" : 10
+      },
+      {
+        "name": "m",
+        "dataType": "BYTES",
+        "cardinality":1000,
+        "numValuesPerEntry":1,
+        "averageLength" : 25
+      }
+    ],
+    "dateTimeFieldSpecs": [
+      {
+        "name": "t",
+        "dataType": "INT",
+        "format": "1:DAYS:EPOCH",
+        "granularity": "1:DAYS",
+        "cardinality": 1000
+      }
+    ]
+  },
+  "queriesWithWeights":{
+    "select sum(k) from tableName where a in (2,4)": 1,
+    "select sum(l), sum(m) from tableName where a in (1,3)": 1,
+    "select sum(2 * k + 3 * l - 4 / m) from tableName where a = 5": 1
+  },
+  "qps": 150,
+  "numMessagesPerSecInKafkaTopic":1000,
+  "numRecordsPerPush":10000,
+  "tableType": "HYBRID",
+  "latencySLA": 500,
+  "rulesToExecute": {
+    "recommendAggregateMetrics": true
+  },
+  "overWrittenConfigs": {
+    "indexConfig": {
+      "invertedIndexColumns": ["a","b"],
+      "rangeIndexColumns": ["f"]
+    }
+  }
+}
