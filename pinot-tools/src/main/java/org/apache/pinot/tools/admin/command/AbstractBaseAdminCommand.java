@@ -88,10 +88,11 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
     conn.setRequestMethod(requestMethod);
     conn.setDoOutput(true);
     if (payload != null) {
-      final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(),
-          StandardCharsets.UTF_8));
-      writer.write(payload, 0, payload.length());
-      writer.flush();
+      try (final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(),
+          StandardCharsets.UTF_8))) {
+        writer.write(payload, 0, payload.length());
+        writer.flush();
+      }
     }
 
     try {
