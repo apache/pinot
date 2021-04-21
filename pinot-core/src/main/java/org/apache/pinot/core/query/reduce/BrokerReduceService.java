@@ -28,7 +28,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
@@ -250,9 +249,9 @@ public class BrokerReduceService {
           .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER, numEntriesScannedInFilter);
       brokerMetrics
           .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER, numEntriesScannedPostFilter);
-      brokerMetrics.addValueToTableGauge(rawTableName, BrokerGauge.OFFLINE_THREAD_CPU_TIME_NS, offlineThreadCpuTimeNs);
+      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.OFFLINE_THREAD_CPU_TIME_NS, offlineThreadCpuTimeNs, TimeUnit.NANOSECONDS);
       brokerMetrics
-          .addValueToTableGauge(rawTableName, BrokerGauge.REALTIME_THREAD_CPU_TIME_NS, realtimeThreadCpuTimeNs);
+          .addTimedTableValue(rawTableName, BrokerTimer.REALTIME_THREAD_CPU_TIME_NS, realtimeThreadCpuTimeNs, TimeUnit.NANOSECONDS);
       if (numConsumingSegmentsProcessed > 0 && minConsumingFreshnessTimeMs > 0) {
         brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.FRESHNESS_LAG_MS,
             System.currentTimeMillis() - minConsumingFreshnessTimeMs, TimeUnit.MILLISECONDS);

@@ -29,7 +29,9 @@ public enum ServerTimer implements AbstractMetrics.Timer {
   // metric tracking the freshness lag for consuming segments
   FRESHNESS_LAG_MS("freshnessLagMs", false),
 
-  NETTY_CONNECTION_SEND_RESPONSE_LATENCY("nettyConnection", true);
+  NETTY_CONNECTION_SEND_RESPONSE_LATENCY("nettyConnection", true),
+  // Query cost (thread cpu time) for query processing on server
+  EXECUTION_THREAD_CPU_TIME_NS("nanoseconds", false);
 
   private final String timerName;
   private final boolean global;
