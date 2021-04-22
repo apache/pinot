@@ -108,8 +108,6 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.utils.CommonConstants.Server.SegmentCompletionProtocol.DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS;
-
 
 /**
  * Segment manager for LLC real-time table.
@@ -142,6 +140,7 @@ public class PinotLLCRealtimeSegmentManager {
    * The segment will be eligible for repairs by the validation manager, if the time  exceeds this value
    */
   private static final long MAX_SEGMENT_COMPLETION_TIME_MILLIS = 300_000L; // 5 MINUTES
+  private static final Random RANDOM = new Random();
 
   private final HelixAdmin _helixAdmin;
   private final HelixManager _helixManager;
@@ -159,7 +158,6 @@ public class PinotLLCRealtimeSegmentManager {
 
   private volatile boolean _isStopping = false;
   private AtomicInteger _numCompletingSegments = new AtomicInteger(0);
-  private Random _rand = new Random();
 
   public PinotLLCRealtimeSegmentManager(PinotHelixResourceManager helixResourceManager, ControllerConf controllerConf,
       ControllerMetrics controllerMetrics) {
@@ -259,6 +257,12 @@ public class PinotLLCRealtimeSegmentManager {
       }
     }
     LOGGER.info("Wait completed: Number of completing segments = {}", _numCompletingSegments.get());
+
+    try {
+      _httpClient.close();
+    } catch (IOException e) {
+      LOGGER.error("Failed to close http client.");
+    }
   }
 
   /**
@@ -1303,13 +1307,13 @@ public class PinotLLCRealtimeSegmentManager {
           }
 
           // Randomly ask one server to upload
-          URI uri = peerSegmentURIs.get(_rand.nextInt(peerSegmentURIs.size()));
+          URI uri = peerSegmentURIs.get(RANDOM.nextInt(peerSegmentURIs.size()));
           String serverUploadRequestUrl = StringUtil.join("/", uri.toString(), "upload");
           LOGGER.info("Ask server to upload llc segment to segment store by this path: {}", serverUploadRequestUrl);
           String segmentDownloadUrl = uploadLLCSegmentByServer(serverUploadRequestUrl);
 
           // Update the segment ZK metadata to include segment download url
-          if (segmentDownloadUrl == null || segmentDownloadUrl.isEmpty()) {
+          if (segmentDownloadUrl.isEmpty()) {
             LOGGER.error("Failed to upload segment {} to segment store: no segment download url is returned from server.", segmentName);
             continue;
           }
@@ -1347,7 +1351,7 @@ public class PinotLLCRealtimeSegmentManager {
   @VisibleForTesting
   HttpUriRequest buildServerUploadRequest(String serverUploadRequestUrl)
       throws URISyntaxException {
-    RequestConfig requestConfig = RequestConfig.custom().setSocketTimeout(DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS).build();
+    RequestConfig requestConfig = RequestConfig.custom().setSocketTimeout(CommonConstants.Server.SegmentCompletionProtocol.DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS).build();
     return RequestBuilder.post(new URI(serverUploadRequestUrl)).setVersion(HttpVersion.HTTP_1_1).setConfig(requestConfig).build();
   }
 }
