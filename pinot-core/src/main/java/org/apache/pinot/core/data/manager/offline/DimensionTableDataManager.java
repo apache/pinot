@@ -116,7 +116,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
       _logger.info("Successfully removed segment {} and reloaded lookup table: {}", segmentName, getTableName());
     } catch (Exception e) {
       throw new RuntimeException(String
-          .format("Error reloading lookup table after segment remove (%s) for table: %s", segmentName, getTableName()),
+          .format("Error reloading lookup table after segment remove '%s' for table: '%s'", segmentName, getTableName()),
           e);
     }
   }
