@@ -192,6 +192,9 @@ public class GcsPinotFS  extends PinotFS {
       if (path.equals(DELIMITER)) {
         return true;
       }
+      if (isDirectory(uri)) {
+        return true;
+      }
       Blob blob = getBucket(uri).create(normalizeToDirectoryPrefix(uri), new byte[0]);
       return blob.exists();
     } catch (Throwable t) {
