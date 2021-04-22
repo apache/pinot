@@ -22,10 +22,10 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.Arrays;
 import java.util.List;
-import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.spi.utils.ReadMode;
 
 
 public class DictionaryDumper {

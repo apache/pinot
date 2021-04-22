@@ -31,8 +31,8 @@ import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
-import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -116,7 +116,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
       _logger.info("Successfully removed segment {} and reloaded lookup table: {}", segmentName, getTableName());
     } catch (Exception e) {
       throw new RuntimeException(String
-          .format("Error reloading lookup table after segment remove ({}) for table: {}", segmentName, getTableName()),
+          .format("Error reloading lookup table after segment remove '%s' for table: '%s'", segmentName, getTableName()),
           e);
     }
   }

@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import static org.apache.pinot.common.utils.CommonConstants.Helix.PINOT_SERVICE_ROLE;
-
 import java.io.File;
 import java.net.SocketException;
 import java.net.UnknownHostException;
@@ -32,10 +30,9 @@ import java.util.Map.Entry;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.services.ServiceRole;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.service.PinotServiceManager;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
@@ -43,6 +40,8 @@ import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.spi.StringArrayOptionHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.PINOT_SERVICE_ROLE;
 
 
 /**

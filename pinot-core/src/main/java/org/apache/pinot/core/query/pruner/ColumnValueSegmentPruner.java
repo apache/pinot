@@ -19,15 +19,16 @@
 package org.apache.pinot.core.query.pruner;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.core.query.exception.BadQueryRequestException;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.FilterContext;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.predicate.EqPredicate;
+import org.apache.pinot.common.request.context.predicate.InPredicate;
+import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.predicate.EqPredicate;
-import org.apache.pinot.core.query.request.context.predicate.Predicate;
-import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
@@ -35,6 +36,8 @@ import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 
 /**
@@ -59,8 +62,12 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class ColumnValueSegmentPruner implements SegmentPruner {
 
+  public static final String IN_PREDICATE_THRESHOLD = "inpredicate.threshold";
+  private int _inPredicateThreshold;
+
   @Override
   public void init(PinotConfiguration config) {
+    _inPredicateThreshold = config.getProperty(IN_PREDICATE_THRESHOLD, Server.DEFAULT_VALUE_PRUNER_IN_PREDICATE_THRESHOLD);
   }
 
   @Override
@@ -102,6 +109,8 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
           return pruneEqPredicate(segment, (EqPredicate) predicate, dataSourceCache);
         } else if (predicateType == Predicate.Type.RANGE) {
           return pruneRangePredicate(segment, (RangePredicate) predicate, dataSourceCache);
+        } else if (predicateType == Predicate.Type.IN) {
+          return pruneInPredicate(segment, (InPredicate) predicate, dataSourceCache);
         } else {
           return false;
         }
@@ -128,17 +137,8 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
     Comparable value = convertValue(eqPredicate.getValue(), dataSourceMetadata.getDataType());
 
     // Check min/max value
-    Comparable minValue = dataSourceMetadata.getMinValue();
-    if (minValue != null) {
-      if (value.compareTo(minValue) < 0) {
-        return true;
-      }
-    }
-    Comparable maxValue = dataSourceMetadata.getMaxValue();
-    if (maxValue != null) {
-      if (value.compareTo(maxValue) > 0) {
-        return true;
-      }
+    if (!checkMinMaxRange(dataSourceMetadata, value)) {
+      return true;
     }
 
     // Check column partition
@@ -236,6 +236,54 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
     }
 
     return false;
+  }
+
+  /**
+   * For IN predicate, segment will not be pruned if the size of values is greater than threshold
+   * Prune the segment based on: Column min/max value
+   * @return true if the segment can be pruned
+   * otherwise false if size of values > threshold or any of the value is greater than min value or smaller than max value of segment
+   */
+  private boolean pruneInPredicate(IndexSegment segment, InPredicate inPredicate, Map<String, DataSource> dataSourceCache) {
+    String column = inPredicate.getLhs().getIdentifier();
+    DataSource dataSource = dataSourceCache.computeIfAbsent(column, segment::getDataSource);
+    // NOTE: Column must exist after DataSchemaSegmentPruner
+    assert dataSource != null;
+    DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
+    List<String> values = inPredicate.getValues();
+    //check max threshold value
+    if (values.size() > _inPredicateThreshold) {
+      return false;
+    }
+
+    for (String value : values) {
+      Comparable inValue = convertValue(value, dataSourceMetadata.getDataType());
+      if (checkMinMaxRange(dataSourceMetadata, inValue)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Check if the comparable value is within min/max range
+   * @return true if the value is greater than min value or value is smaller than max value
+   * otherwise false
+   */
+  private boolean checkMinMaxRange(DataSourceMetadata dataSourceMetadata, Comparable value) {
+    Comparable minValue = dataSourceMetadata.getMinValue();
+    if (minValue != null) {
+      if (value.compareTo(minValue) < 0) {
+        return false;
+      }
+    }
+    Comparable maxValue = dataSourceMetadata.getMaxValue();
+    if (maxValue != null) {
+      if (value.compareTo(maxValue) > 0) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private static Comparable convertValue(String stringValue, DataType dataType) {

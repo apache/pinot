@@ -34,8 +34,8 @@ import org.apache.commons.lang3.StringUtils;
 /**
  * Class for partition related column metadata:
  * <ul>
- *   <li>Partition function</li>
- *   <li>Number of total partitions</li>
+ *   <li>The name of the Partition function used to map the column values to their partitions</li>
+ *   <li>Total number of partitions</li>
  *   <li>Set of partitions the column contains</li>
  * </ul>
  */

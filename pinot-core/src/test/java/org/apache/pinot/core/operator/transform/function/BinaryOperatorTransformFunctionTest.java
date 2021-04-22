@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import org.apache.pinot.core.query.exception.BadQueryRequestException;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -48,8 +48,8 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
 
   @Test
   public void testBinaryOperatorTransformFunction() {
-    ExpressionContext expression = QueryContextConverterUtils
-        .getExpression(String.format("%s(%s, %d)", getFuncName(), INT_SV_COLUMN, _intSVValues[0]));
+    ExpressionContext expression = RequestContextUtils
+        .getExpressionFromSQL(String.format("%s(%s, %d)", getFuncName(), INT_SV_COLUMN, _intSVValues[0]));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertEquals(transformFunction.getName(), getFuncName().toLowerCase());
     int[] expectedIntValues = new int[NUM_ROWS];
@@ -58,8 +58,8 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
     }
     testTransformFunction(transformFunction, expectedIntValues);
 
-    expression = QueryContextConverterUtils
-        .getExpression(String.format("%s(%s, %d)", getFuncName(), LONG_SV_COLUMN, _longSVValues[0]));
+    expression = RequestContextUtils
+        .getExpressionFromSQL(String.format("%s(%s, %d)", getFuncName(), LONG_SV_COLUMN, _longSVValues[0]));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     int[] expectedLongValues = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -67,8 +67,8 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
     }
     testTransformFunction(transformFunction, expectedLongValues);
 
-    expression = QueryContextConverterUtils
-        .getExpression(String.format("%s(%s, %f)", getFuncName(), FLOAT_SV_COLUMN, _floatSVValues[0]));
+    expression = RequestContextUtils
+        .getExpressionFromSQL(String.format("%s(%s, %f)", getFuncName(), FLOAT_SV_COLUMN, _floatSVValues[0]));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     int[] expectedFloatValues = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -76,8 +76,8 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
     }
     testTransformFunction(transformFunction, expectedFloatValues);
 
-    expression = QueryContextConverterUtils
-        .getExpression(String.format("%s(%s, %.20f)", getFuncName(), DOUBLE_SV_COLUMN, _doubleSVValues[0]));
+    expression = RequestContextUtils
+        .getExpressionFromSQL(String.format("%s(%s, %.20f)", getFuncName(), DOUBLE_SV_COLUMN, _doubleSVValues[0]));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     int[] expectedDoubleValues = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -85,8 +85,8 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
     }
     testTransformFunction(transformFunction, expectedDoubleValues);
 
-    expression = QueryContextConverterUtils
-        .getExpression(String.format("%s(%s, '%s')", getFuncName(), STRING_SV_COLUMN, _stringSVValues[0]));
+    expression = RequestContextUtils
+        .getExpressionFromSQL(String.format("%s(%s, '%s')", getFuncName(), STRING_SV_COLUMN, _stringSVValues[0]));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     int[] expectedStringValues = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -97,7 +97,7 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    ExpressionContext expression = QueryContextConverterUtils.getExpression(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 

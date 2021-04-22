@@ -22,12 +22,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -187,7 +187,7 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
     }
 
     if (_controllerHost == null) {
-      _controllerHost = NetUtil.getHostAddress();
+      _controllerHost = NetUtils.getHostAddress();
     }
     _controllerAddress = _controllerProtocol + "://" + _controllerHost + ":" + _controllerPort;
 

@@ -19,7 +19,7 @@
 package org.apache.pinot.tools.scan.query;
 
 import java.util.ArrayList;
-import org.apache.pinot.core.query.utils.Pair;
+import org.apache.pinot.spi.utils.Pair;
 
 
 public class MinFunction extends AggregationFunc {

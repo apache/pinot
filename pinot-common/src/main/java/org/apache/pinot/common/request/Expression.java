@@ -723,4 +723,3 @@ public class Expression implements org.apache.thrift.TBase<Expression, Expressio
     return (org.apache.thrift.scheme.StandardScheme.class.equals(proto.getScheme()) ? STANDARD_SCHEME_FACTORY : TUPLE_SCHEME_FACTORY).getScheme();
   }
 }
-

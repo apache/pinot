@@ -21,8 +21,8 @@ package org.apache.pinot.segment.spi.creator;
 import java.io.Serializable;
 import java.util.Set;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.Constants;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 
 
 public class ColumnIndexCreationInfo implements Serializable {

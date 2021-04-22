@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.CmdLineParser;
@@ -62,7 +62,7 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
   @Option(name = "-timeoutInSeconds", required = false, metaVar = "<int>", usage = "Timeout in seconds for batch load (default 60).")
   private int _timeoutInSeconds = 60;
 
-  @Option(name = "-tableNames", required = false, metaVar = "<String>", usage = "Comma separated table names to be loaded (non-batch load).")
+  @Option(name = "-tableNames", required = false, metaVar = "<String>", usage = "Comma separated table names with types to be loaded (non-batch load).")
   private String _tableNames;
 
   @Option(name = "-invertedIndexColumns", required = false, metaVar = "<String>", usage = "Comma separated inverted index columns to be created (non-batch load).")

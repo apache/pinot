@@ -20,13 +20,13 @@ package org.apache.pinot.core.operator.filter.predicate;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
-import org.apache.pinot.core.query.request.context.predicate.Predicate;
-import org.apache.pinot.core.util.fst.RegexpMatcher;
+import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.segment.local.utils.fst.RegexpMatcher;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
-import static org.apache.pinot.core.query.request.context.predicate.Predicate.Type.REGEXP_LIKE;
+import static org.apache.pinot.common.request.context.predicate.Predicate.Type.REGEXP_LIKE;
 
 
 /**

@@ -243,6 +243,9 @@ public class JsonUtils {
    * </pre>
    */
   public static List<Map<String, String>> flatten(JsonNode node) {
+    if (node.isNull()) {
+      return Collections.emptyList();
+    }
     Preconditions.checkState(!node.isValueNode(), "Cannot flatten value node: %s", node);
 
     if (node.isArray()) {

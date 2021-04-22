@@ -27,8 +27,11 @@ import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.*;
-import static org.testng.Assert.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.testng.Assert.assertEquals;
 
 
 public class BoundedAccountingExecutorTest {
@@ -104,8 +107,8 @@ public class BoundedAccountingExecutorTest {
     // have not yet gotten to execute running.decrementAndGet(), but the pending jobs have already
     // done the increment. So, we need to wait until we check the running counter to equal the
     // pending jobs.
-    TestUtils.waitForCondition(aVoid -> running.get() == pendingJobs,
-        10_000, "Invalid number of running jobs" + running.get());
+    TestUtils.waitForCondition(aVoid -> running.get() == pendingJobs, 10_000,
+        "Invalid number of running jobs" + running.get());
 
     // Now that there are no jobs running, we can let the new ones in.
     // All the pending jobs will wait on the validationBarrier after we let them pass
@@ -115,4 +118,3 @@ public class BoundedAccountingExecutorTest {
     syncer.validationBarrier.await();
   }
 }
-

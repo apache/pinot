@@ -808,4 +808,3 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
     return (org.apache.thrift.scheme.StandardScheme.class.equals(proto.getScheme()) ? STANDARD_SCHEME_FACTORY : TUPLE_SCHEME_FACTORY).getScheme();
   }
 }
-

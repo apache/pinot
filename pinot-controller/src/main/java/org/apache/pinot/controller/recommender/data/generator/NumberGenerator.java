@@ -20,12 +20,8 @@ package org.apache.pinot.controller.recommender.data.generator;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Random;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**

@@ -20,7 +20,6 @@ package org.apache.pinot.spi.crypt;
 
 import java.io.File;
 import java.io.IOException;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;

@@ -22,6 +22,7 @@ import java.io.Serializable;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -32,18 +33,17 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
-import org.apache.pinot.core.util.ArrayCopyUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -141,21 +141,31 @@ public class SelectionOperatorUtils {
    * Expands {@code 'SELECT *'} to all columns (excluding transform functions) within {@link DataSchema} with
    * alphabetical order if applies.
    */
-  public static List<String> getSelectionColumns(List<ExpressionContext> selectExpressions, DataSchema dataSchema) {
+  public static List<String> getSelectionColumns(QueryContext queryContext, DataSchema dataSchema) {
+    List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
     int numSelectExpressions = selectExpressions.size();
     if (numSelectExpressions == 1 && selectExpressions.get(0).equals(IDENTIFIER_STAR)) {
       String[] columnNames = dataSchema.getColumnNames();
       int numColumns = columnNames.length;
 
-      // Note: The data schema might be generated from DataTableBuilder.buildEmptyDataTable(), where for 'SELECT *' it
+      // NOTE: The data schema might be generated from DataTableBuilder.buildEmptyDataTable(), where for 'SELECT *' it
       //       contains a single column "*". In such case, return as is to build the empty selection result.
       if (numColumns == 1 && columnNames[0].equals("*")) {
         return Collections.singletonList("*");
       }
 
+      // Directly return all columns for selection-only queries
+      // NOTE: Order-by expressions are ignored for queries with LIMIT 0
+      List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+      if (orderByExpressions == null || queryContext.getLimit() == 0) {
+        return Arrays.asList(columnNames);
+      }
+
+      // Exclude transform functions from the returned columns and sort
+      // NOTE: Do not parse the column because it might contain SQL reserved words
       List<String> allColumns = new ArrayList<>(numColumns);
       for (String column : columnNames) {
-        if (QueryContextConverterUtils.getExpression(column).getType() == ExpressionContext.Type.IDENTIFIER) {
+        if (column.indexOf('(') == -1) {
           allColumns.add(column);
         }
       }

@@ -30,22 +30,8 @@ import org.apache.pinot.spi.utils.ByteArray;
  * Data table is used to transfer data from server to broker.
  */
 public interface DataTable {
+  // TODO: remove this when we stop supporting DataTable V2.
   String EXCEPTION_METADATA_KEY = "Exception";
-  String NUM_DOCS_SCANNED_METADATA_KEY = "numDocsScanned";
-  String NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY = "numEntriesScannedInFilter";
-  String NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY = "numEntriesScannedPostFilter";
-  String NUM_SEGMENTS_QUERIED = "numSegmentsQueried";
-  String NUM_SEGMENTS_PROCESSED = "numSegmentsProcessed";
-  String NUM_SEGMENTS_MATCHED = "numSegmentsMatched";
-  String NUM_CONSUMING_SEGMENTS_PROCESSED = "numConsumingSegmentsProcessed";
-  String MIN_CONSUMING_FRESHNESS_TIME_MS = "minConsumingFreshnessTimeMs";
-  String TOTAL_DOCS_METADATA_KEY = "totalDocs";
-  String NUM_GROUPS_LIMIT_REACHED_KEY = "numGroupsLimitReached";
-  String TIME_USED_MS_METADATA_KEY = "timeUsedMs";
-  String TRACE_INFO_METADATA_KEY = "traceInfo";
-  String REQUEST_ID_METADATA_KEY = "requestId";
-  String NUM_RESIZES_METADATA_KEY = "numResizes";
-  String RESIZE_TIME_MS_METADATA_KEY = "resizeTimeMs";
 
   void addException(ProcessingException processingException);
 

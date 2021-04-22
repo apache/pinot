@@ -119,6 +119,8 @@ declare module 'Models' {
     numGroupsLimitReached: boolean
     partialResponse?: number
     minConsumingFreshnessTimeMs: number
+    offlineThreadCpuTimeNs: number
+    realtimeThreadCpuTimeNs: number
   };
 
   export type ClusterName = {

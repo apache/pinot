@@ -26,7 +26,7 @@ import java.util.Map;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.CommonConstants.Query.Request;
+import org.apache.pinot.spi.utils.CommonConstants.Query.Request;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TCompactProtocol;

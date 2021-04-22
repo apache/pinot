@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import org.apache.pinot.core.query.exception.BadQueryRequestException;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -32,7 +32,7 @@ public abstract class ArrayBaseTransformFunctionTest extends BaseTransformFuncti
   @Test
   public void testArrayTransformFunction() {
     ExpressionContext expression =
-        QueryContextConverterUtils.getExpression(String.format("%s(%s)", getFunctionName(), INT_MV_COLUMN));
+        RequestContextUtils.getExpressionFromSQL(String.format("%s(%s)", getFunctionName(), INT_MV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertEquals(transformFunction.getClass().getName(), getArrayFunctionClass().getName());
     Assert.assertEquals(transformFunction.getName(), getFunctionName());
@@ -76,7 +76,7 @@ public abstract class ArrayBaseTransformFunctionTest extends BaseTransformFuncti
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    ExpressionContext expression = QueryContextConverterUtils.getExpression(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 

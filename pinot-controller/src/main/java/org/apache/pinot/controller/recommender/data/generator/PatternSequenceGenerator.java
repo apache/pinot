@@ -18,9 +18,8 @@
  */
 package org.apache.pinot.controller.recommender.data.generator;
 
-import org.apache.commons.configuration.PropertyConverter;
-
 import java.util.Map;
+import org.apache.commons.configuration.PropertyConverter;
 
 /**
  * PatternSequenceGenerator produces a series of sequentially increasing (decreasing) numbers, optionally with a fixed

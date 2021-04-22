@@ -25,10 +25,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
@@ -92,7 +92,8 @@ public class FakeStreamConfigUtils {
   /**
    * Unpacks avro tar file
    */
-  static List<File> unpackAvroTarFile(File outputDir) throws Exception {
+  static List<File> unpackAvroTarFile(File outputDir)
+      throws Exception {
     if (outputDir.exists()) {
       FileUtils.deleteDirectory(outputDir);
     }
@@ -110,7 +111,8 @@ public class FakeStreamConfigUtils {
   /**
    * Gets pinot schema
    */
-  static Schema getPinotSchema() throws IOException {
+  static Schema getPinotSchema()
+      throws IOException {
     File schemaFile = getResourceFile(PINOT_SCHEMA_FILE);
     return Schema.fromFile(schemaFile);
   }
@@ -134,11 +136,10 @@ public class FakeStreamConfigUtils {
    */
   public static StreamConfig getDefaultLowLevelStreamConfigs(int numPartitions) {
     Map<String, String> streamConfigMap = getDefaultStreamConfigs();
-    streamConfigMap.put(
-        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-        StreamConfig.ConsumerType.LOWLEVEL.toString());
-    streamConfigMap.put(
-        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, NUM_PARTITIONS_KEY),
+    streamConfigMap
+        .put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+            StreamConfig.ConsumerType.LOWLEVEL.toString());
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, NUM_PARTITIONS_KEY),
         String.valueOf(numPartitions));
 
     return new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
@@ -156,9 +157,9 @@ public class FakeStreamConfigUtils {
    */
   public static StreamConfig getDefaultHighLevelStreamConfigs() {
     Map<String, String> streamConfigMap = getDefaultStreamConfigs();
-    streamConfigMap.put(
-        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-        StreamConfig.ConsumerType.HIGHLEVEL.toString());
+    streamConfigMap
+        .put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+            StreamConfig.ConsumerType.HIGHLEVEL.toString());
 
     return new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
   }
@@ -166,18 +167,19 @@ public class FakeStreamConfigUtils {
   private static Map<String, String> getDefaultStreamConfigs() {
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, STREAM_TYPE);
-    streamConfigMap.put(
-        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_TOPIC_NAME),
-        TOPIC_NAME);
-    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE,
-        StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), CONSUMER_FACTORY_CLASS);
-    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE,
-        StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), OFFSET_CRITERIA);
-    streamConfigMap.put(
-        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_DECODER_CLASS),
-        DECODER_CLASS);
-    streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS,
-        Integer.toString(SEGMENT_FLUSH_THRESHOLD_ROWS));
+    streamConfigMap
+        .put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_TOPIC_NAME),
+            TOPIC_NAME);
+    streamConfigMap.put(StreamConfigProperties
+            .constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
+        CONSUMER_FACTORY_CLASS);
+    streamConfigMap.put(StreamConfigProperties
+        .constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), OFFSET_CRITERIA);
+    streamConfigMap
+        .put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_DECODER_CLASS),
+            DECODER_CLASS);
+    streamConfigMap
+        .put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, Integer.toString(SEGMENT_FLUSH_THRESHOLD_ROWS));
     return streamConfigMap;
   }
 }

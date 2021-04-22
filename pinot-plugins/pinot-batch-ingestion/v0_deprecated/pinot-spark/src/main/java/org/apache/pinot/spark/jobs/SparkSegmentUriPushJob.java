@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.spark.jobs;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Properties;
 import org.apache.hadoop.fs.Path;
 import org.apache.pinot.ingestion.common.ControllerRestApi;
 import org.apache.pinot.ingestion.common.JobConfigConstants;
@@ -25,11 +29,6 @@ import org.apache.pinot.ingestion.jobs.SegmentUriPushJob;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Properties;
 
 
 public class SparkSegmentUriPushJob extends SegmentUriPushJob {

@@ -780,4 +780,3 @@ public class QueryType implements org.apache.thrift.TBase<QueryType, QueryType._
     return (org.apache.thrift.scheme.StandardScheme.class.equals(proto.getScheme()) ? STANDARD_SCHEME_FACTORY : TUPLE_SCHEME_FACTORY).getScheme();
   }
 }
-

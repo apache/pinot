@@ -20,8 +20,8 @@ package org.apache.pinot.core.operator;
 
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.query.exception.EarlyTerminationException;
 import org.apache.pinot.core.util.trace.TraceContext;
+import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
