@@ -232,6 +232,7 @@ server:
     configs: |-
       pinot.set.instance.id.to.hostname=true
       pinot.server.instance.realtime.alloc.offheap=true
+      pinot.server.instance.currentDataTableVersion=2
 
 minion:
   name: minion
