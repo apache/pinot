@@ -1291,7 +1291,7 @@ public class PinotLLCRealtimeSegmentManager {
     for (LLCRealtimeSegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
       String segmentName = segmentZKMetadata.getSegmentName();
       // Only fix the committed llc segment without segment store copy
-      if (segmentZKMetadata.getStatus() == Status.DONE && (segmentZKMetadata.getDownloadUrl() == null || segmentZKMetadata.getDownloadUrl().isEmpty() || segmentZKMetadata.getDownloadUrl().equals(CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD))) {
+      if (segmentZKMetadata.getStatus() == Status.DONE && segmentZKMetadata.getDownloadUrl().equals(CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD)) {
         try {
           if (!isExceededMaxSegmentCompletionTime(realtimeTableName, segmentName, getCurrentTimeMs())) {
             continue;

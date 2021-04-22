@@ -963,8 +963,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     instanceConfigMap.put(CommonConstants.Helix.Instance.ADMIN_PORT_KEY, adminPort);
     when(helixAdmin.getConfig(any(HelixConfigScope.class), any(List.class))).thenReturn(instanceConfigMap);
 
-    // Change 1st segment status to be DONE but without segment download url. Verify later the download url is fixed after upload success.
+    // Change 1st segment status to be DONE, but with default peer download url. Verify later the download url is fixed after upload success.
     segmentsZKMetadata.get(0).setStatus(Status.DONE);
+    segmentsZKMetadata.get(0).setDownloadUrl(CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
     // set up the external view for 1st segment
     String instance_0 = "instance_0";
     externalView.setState(segmentsZKMetadata.get(0).getSegmentName(), instance_0, "ONLINE");
@@ -985,8 +986,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     when(response_0.getEntity()).thenReturn(httpEntity_0);
     when(segmentManager._mockedHttpClient.execute(request_0)).thenReturn(response_0);
 
-    // Change 2nd segment status to be DONE but without segment download url. Verify later the download url is still empty after upload failure.
+    // Change 2nd segment status to be DONE, but with default peer download url. Verify later the download url isn't fixed after upload failure.
     segmentsZKMetadata.get(1).setStatus(Status.DONE);
+    segmentsZKMetadata.get(1).setDownloadUrl(CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
     // set up the external view for 2nd segment
     String instance_1 = "instance_1";
     externalView.setState(segmentsZKMetadata.get(1).getSegmentName(), instance_1, "ONLINE");
@@ -1005,8 +1007,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     when(response_1.getEntity()).thenReturn(null);
     when(segmentManager._mockedHttpClient.execute(request_1)).thenReturn(response_1);
 
-    // Change 3rd segment status to be DONE but without segment download url. Verify later the download url is still empty because no ONLINE replica found in any server.
+    // Change 3rd segment status to be DONE, but with default peer download url. Verify later the download url isn't fixed because no ONLINE replica found in any server.
     segmentsZKMetadata.get(2).setStatus(Status.DONE);
+    segmentsZKMetadata.get(2).setDownloadUrl(CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
     // set up the external view for 3rd segment
     String instance_2 = "instance_2";
     externalView.setState(segmentsZKMetadata.get(2).getSegmentName(), instance_2, "OFFLINE");
@@ -1025,8 +1028,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._exceededMaxSegmentCompletionTime = true;
     segmentManager.uploadToSegmentStoreIfMissing(segmentManager._tableConfig);
     assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentsZKMetadata.get(0).getSegmentName(), null).getDownloadUrl(), segmentDownloadUrl);
-    assertNull(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentsZKMetadata.get(1).getSegmentName(), null).getDownloadUrl());
-    assertNull(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentsZKMetadata.get(2).getSegmentName(), null).getDownloadUrl());
+    assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentsZKMetadata.get(1).getSegmentName(), null).getDownloadUrl(), CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
+    assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentsZKMetadata.get(2).getSegmentName(), null).getDownloadUrl(), CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
     assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentsZKMetadata.get(3).getSegmentName(), null).getDownloadUrl(), defaultDownloadUrl);
     assertNull(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentsZKMetadata.get(4).getSegmentName(), null).getDownloadUrl());
   }
