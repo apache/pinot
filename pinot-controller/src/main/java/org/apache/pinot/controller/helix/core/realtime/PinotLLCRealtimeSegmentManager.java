@@ -1279,9 +1279,12 @@ public class PinotLLCRealtimeSegmentManager {
    * @see <a href="https://cwiki.apache.org/confluence/display/PINOT/By-passing+deep-store+requirement+for+Realtime+segment+completion#BypassingdeepstorerequirementforRealtimesegmentcompletion-Failurecasesandhandling">By-passing deep-store requirement for Realtime segment completion:Failure cases and handling</a>
    */
   public void uploadToSegmentStoreIfMissing(TableConfig tableConfig) {
-    Preconditions.checkState(!_isStopping, "Segment manager is stopping");
-
     String realtimeTableName = tableConfig.getTableName();
+    if (_isStopping) {
+      LOGGER.info("Skipped fixing segment store copy of LLC segments for table {}, because segment manager is stopping.", realtimeTableName);
+      return;
+    }
+
     // Get all the LLC segment ZK metadata for this table
     List<LLCRealtimeSegmentZKMetadata> segmentZKMetadataList = ZKMetadataProvider.getLLCRealtimeSegmentZKMetadataListForTable(_propertyStore, realtimeTableName);
 
@@ -1302,6 +1305,7 @@ public class PinotLLCRealtimeSegmentManager {
           List<URI> peerSegmentURIs = PeerServerSegmentFinder
               .getPeerServerURIs(segmentName, CommonConstants.HTTP_PROTOCOL, _helixManager);
           if (peerSegmentURIs.isEmpty()) {
+            _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.NUMBER_LLC_SEGMENTS_DEEP_STORE_UPLOAD_FIX_ERROR, 1L);
             LOGGER.error("Failed to upload segment {} to segment store because no online replica is found", segmentName);
             continue;
           }
@@ -1309,18 +1313,20 @@ public class PinotLLCRealtimeSegmentManager {
           // Randomly ask one server to upload
           URI uri = peerSegmentURIs.get(RANDOM.nextInt(peerSegmentURIs.size()));
           String serverUploadRequestUrl = StringUtil.join("/", uri.toString(), "upload");
-          LOGGER.info("Ask server to upload llc segment to segment store by this path: {}", serverUploadRequestUrl);
+          LOGGER.info("Ask server to upload llc segment {} to segment store by this path: {}", segmentName, serverUploadRequestUrl);
           String segmentDownloadUrl = uploadLLCSegmentByServer(serverUploadRequestUrl);
 
           // Update the segment ZK metadata to include segment download url
           if (segmentDownloadUrl.isEmpty()) {
+            _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.NUMBER_LLC_SEGMENTS_DEEP_STORE_UPLOAD_FIX_ERROR, 1L);
             LOGGER.error("Failed to upload segment {} to segment store: no segment download url is returned from server.", segmentName);
             continue;
           }
           segmentZKMetadata.setDownloadUrl(segmentDownloadUrl);
           persistSegmentZKMetadata(realtimeTableName, segmentZKMetadata, -1);
-          LOGGER.info("Successfully uploaded llc segment {} to segment store", segmentName);
+          LOGGER.info("Successfully uploaded llc segment {} to segment store with download url: {}", segmentName, segmentDownloadUrl);
         } catch (Exception e) {
+          _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.NUMBER_LLC_SEGMENTS_DEEP_STORE_UPLOAD_FIX_ERROR, 1L);
           LOGGER.error("Failed to upload segment {} to segment store", segmentName, e);
         }
       }
