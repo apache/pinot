@@ -20,7 +20,6 @@ package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;

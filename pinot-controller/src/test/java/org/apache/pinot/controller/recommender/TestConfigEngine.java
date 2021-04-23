@@ -370,14 +370,25 @@ public class TestConfigEngine {
     testRealtimeProvisioningRule("recommenderInput/RealtimeProvisioningInput_dateTimeColumn.json");
   }
 
+  @Test
+  void testAggregateMetricsRule() throws Exception {
+    ConfigManager output = runRecommenderDriver("recommenderInput/AggregateMetricsRuleInput.json");
+    assertTrue(output.isAggregateMetrics());
+  }
+
   private void testRealtimeProvisioningRule(String fileName) throws Exception {
-    String input = readInputToStr(fileName);
-    String output = RecommenderDriver.run(input);
-    ConfigManager configManager = objectMapper.readValue(output, ConfigManager.class);
-    Map<String, Map<String, String>> recommendations = configManager.getRealtimeProvisioningRecommendations();
+    ConfigManager output = runRecommenderDriver(fileName);
+    Map<String, Map<String, String>> recommendations = output.getRealtimeProvisioningRecommendations();
     assertRealtimeProvisioningRecommendation(recommendations.get(OPTIMAL_SEGMENT_SIZE));
     assertRealtimeProvisioningRecommendation(recommendations.get(CONSUMING_MEMORY_PER_HOST));
     assertRealtimeProvisioningRecommendation(recommendations.get(TOTAL_MEMORY_USED_PER_HOST));
+  }
+
+  private ConfigManager runRecommenderDriver(String fileName)
+      throws IOException, InvalidInputException {
+    String input = readInputToStr(fileName);
+    String output = RecommenderDriver.run(input);
+    return objectMapper.readValue(output, ConfigManager.class);
   }
 
   private void assertRealtimeProvisioningRecommendation(Map<String, String> matrix) {

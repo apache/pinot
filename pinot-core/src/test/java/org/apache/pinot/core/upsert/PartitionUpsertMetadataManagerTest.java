@@ -23,8 +23,9 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
-import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager.RecordInfo;
+import org.apache.pinot.segment.local.realtime.impl.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.upsert.RecordLocation;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.mockito.Mockito;
@@ -44,17 +45,17 @@ public class PartitionUpsertMetadataManagerTest {
   public void testAddSegment() {
     PartitionUpsertMetadataManager upsertMetadataManager =
         new PartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Mockito.mock(ServerMetrics.class));
-    Map<PrimaryKey, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
+    Map<PrimaryKey, RecordLocation> recordLocationMap = upsertMetadataManager.getPrimaryKeyToRecordLocationMap();
 
     // Add the first segment
     String segment1 = getSegmentName(1);
-    List<RecordInfo> recordInfoList1 = new ArrayList<>();
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(0), 0, 100));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(1), 1, 100));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(2), 2, 100));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(0), 3, 80));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(1), 4, 120));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(0), 5, 100));
+    List<PartitionUpsertMetadataManager.RecordInfo> recordInfoList1 = new ArrayList<>();
+    recordInfoList1.add(new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(0), 0, 100));
+    recordInfoList1.add(new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(1), 1, 100));
+    recordInfoList1.add(new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(2), 2, 100));
+    recordInfoList1.add(new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(0), 3, 80));
+    recordInfoList1.add(new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(1), 4, 120));
+    recordInfoList1.add(new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(0), 5, 100));
     ThreadSafeMutableRoaringBitmap validDocIds1 =
         upsertMetadataManager.addSegment(segment1, recordInfoList1.iterator());
     // segment1: 0 -> {5, 100}, 1 -> {4, 120}, 2 -> {2, 100}
@@ -65,12 +66,12 @@ public class PartitionUpsertMetadataManagerTest {
 
     // Add the second segment
     String segment2 = getSegmentName(2);
-    List<RecordInfo> recordInfoList2 = new ArrayList<>();
-    recordInfoList2.add(new RecordInfo(getPrimaryKey(0), 0, 100));
-    recordInfoList2.add(new RecordInfo(getPrimaryKey(1), 1, 100));
-    recordInfoList2.add(new RecordInfo(getPrimaryKey(2), 2, 120));
-    recordInfoList2.add(new RecordInfo(getPrimaryKey(3), 3, 80));
-    recordInfoList2.add(new RecordInfo(getPrimaryKey(0), 4, 80));
+    ArrayList<PartitionUpsertMetadataManager.RecordInfo> recordInfoList2 = new ArrayList<>();
+    recordInfoList2.add(new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(0), 0, 100));
+    recordInfoList2.add(new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(1), 1, 100));
+    recordInfoList2.add(new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(2), 2, 120));
+    recordInfoList2.add(new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(3), 3, 80));
+    recordInfoList2.add(new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(0), 4, 80));
     ThreadSafeMutableRoaringBitmap validDocIds2 =
         upsertMetadataManager.addSegment(segment2, recordInfoList2.iterator());
     // segment1: 1 -> {4, 120}
@@ -131,15 +132,15 @@ public class PartitionUpsertMetadataManagerTest {
   public void testUpdateRecord() {
     PartitionUpsertMetadataManager upsertMetadataManager =
         new PartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Mockito.mock(ServerMetrics.class));
-    Map<PrimaryKey, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
+    Map<PrimaryKey, RecordLocation> recordLocationMap = upsertMetadataManager.getPrimaryKeyToRecordLocationMap();
 
     // Add the first segment
     // segment1: 0 -> {0, 100}, 1 -> {1, 120}, 2 -> {2, 100}
     String segment1 = getSegmentName(1);
-    List<RecordInfo> recordInfoList1 = new ArrayList<>();
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(0), 0, 100));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(1), 1, 120));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(2), 2, 100));
+    List<PartitionUpsertMetadataManager.RecordInfo> recordInfoList1 = new ArrayList<>();
+    recordInfoList1.add(new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(0), 0, 100));
+    recordInfoList1.add(new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(1), 1, 120));
+    recordInfoList1.add(new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(2), 2, 100));
     ThreadSafeMutableRoaringBitmap validDocIds1 =
         upsertMetadataManager.addSegment(segment1, recordInfoList1.iterator());
 
@@ -147,7 +148,8 @@ public class PartitionUpsertMetadataManagerTest {
     String segment2 = getSegmentName(2);
     ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
 
-    upsertMetadataManager.updateRecord(segment2, new RecordInfo(getPrimaryKey(3), 0, 100), validDocIds2);
+    upsertMetadataManager
+        .updateRecord(segment2, new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(3), 0, 100), validDocIds2);
     // segment1: 0 -> {0, 100}, 1 -> {1, 120}, 2 -> {2, 100}
     // segment2: 3 -> {0, 100}
     checkRecordLocation(recordLocationMap, 0, segment1, 0, 100);
@@ -157,7 +159,8 @@ public class PartitionUpsertMetadataManagerTest {
     assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1, 2});
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0});
 
-    upsertMetadataManager.updateRecord(segment2, new RecordInfo(getPrimaryKey(2), 1, 120), validDocIds2);
+    upsertMetadataManager
+        .updateRecord(segment2, new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(2), 1, 120), validDocIds2);
     // segment1: 0 -> {0, 100}, 1 -> {1, 120}
     // segment2: 2 -> {1, 120}, 3 -> {0, 100}
     checkRecordLocation(recordLocationMap, 0, segment1, 0, 100);
@@ -167,7 +170,8 @@ public class PartitionUpsertMetadataManagerTest {
     assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
 
-    upsertMetadataManager.updateRecord(segment2, new RecordInfo(getPrimaryKey(1), 2, 100), validDocIds2);
+    upsertMetadataManager
+        .updateRecord(segment2, new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(1), 2, 100), validDocIds2);
     // segment1: 0 -> {0, 100}, 1 -> {1, 120}
     // segment2: 2 -> {1, 120}, 3 -> {0, 100}
     checkRecordLocation(recordLocationMap, 0, segment1, 0, 100);
@@ -177,7 +181,8 @@ public class PartitionUpsertMetadataManagerTest {
     assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
 
-    upsertMetadataManager.updateRecord(segment2, new RecordInfo(getPrimaryKey(0), 3, 100), validDocIds2);
+    upsertMetadataManager
+        .updateRecord(segment2, new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(0), 3, 100), validDocIds2);
     // segment1: 1 -> {1, 120}
     // segment2: 0 -> {3, 100}, 2 -> {1, 120}, 3 -> {0, 100}
     checkRecordLocation(recordLocationMap, 0, segment2, 3, 100);
@@ -192,21 +197,21 @@ public class PartitionUpsertMetadataManagerTest {
   public void testRemoveSegment() {
     PartitionUpsertMetadataManager upsertMetadataManager =
         new PartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Mockito.mock(ServerMetrics.class));
-    Map<PrimaryKey, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
+    Map<PrimaryKey, RecordLocation> recordLocationMap = upsertMetadataManager.getPrimaryKeyToRecordLocationMap();
 
     // Add 2 segments
     // segment1: 0 -> {0, 100}, 1 -> {1, 100}
     // segment2: 2 -> {0, 100}, 3 -> {0, 100}
     String segment1 = getSegmentName(1);
-    List<RecordInfo> recordInfoList1 = new ArrayList<>();
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(0), 0, 100));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(1), 1, 100));
+    List<PartitionUpsertMetadataManager.RecordInfo> recordInfoList1 = new ArrayList<>();
+    recordInfoList1.add(new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(0), 0, 100));
+    recordInfoList1.add(new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(1), 1, 100));
     ThreadSafeMutableRoaringBitmap validDocIds1 =
         upsertMetadataManager.addSegment(segment1, recordInfoList1.iterator());
     String segment2 = getSegmentName(2);
-    List<RecordInfo> recordInfoList2 = new ArrayList<>();
-    recordInfoList2.add(new RecordInfo(getPrimaryKey(2), 0, 100));
-    recordInfoList2.add(new RecordInfo(getPrimaryKey(3), 1, 100));
+    List<PartitionUpsertMetadataManager.RecordInfo> recordInfoList2 = new ArrayList<>();
+    recordInfoList2.add(new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(2), 0, 100));
+    recordInfoList2.add(new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(3), 1, 100));
     ThreadSafeMutableRoaringBitmap validDocIds2 =
         upsertMetadataManager.addSegment(segment2, recordInfoList2.iterator());
 

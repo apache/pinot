@@ -71,7 +71,8 @@ public class RealtimeProvisioningRule extends AbstractRule {
     }
 
     // prepare input to memory estimator
-    TableConfig tableConfig = createTableConfig(_output.getIndexConfig(), _input.getSchema());
+    TableConfig tableConfig =
+        createTableConfig(_output.getIndexConfig(), _input.getSchema(), _output.isAggregateMetrics());
     long maxUsableHostMemoryByte = DataSizeUtils.toBytes(_params.getMaxUsableHostMemory());
     int totalConsumingPartitions = _params.getNumPartitions() * _params.getNumReplicas();
     int ingestionRatePerPartition = (int) _input.getNumMessagesPerSecInKafkaTopic() / _params.getNumPartitions();
@@ -96,7 +97,7 @@ public class RealtimeProvisioningRule extends AbstractRule {
     extractResults(memoryEstimator, numHosts, numHours, _output.getRealtimeProvisioningRecommendations());
   }
 
-  private TableConfig createTableConfig(IndexConfig indexConfig, Schema schema) {
+  private TableConfig createTableConfig(IndexConfig indexConfig, Schema schema, boolean aggregateMetrics) {
     TableConfigBuilder tableConfigBuilder = new TableConfigBuilder(TableType.REALTIME);
     tableConfigBuilder.setTableName(schema.getSchemaName());
     tableConfigBuilder.setLoadMode("MMAP");
@@ -109,7 +110,9 @@ public class RealtimeProvisioningRule extends AbstractRule {
     setIfNotEmpty(indexConfig.getOnHeapDictionaryColumns(), tableConfigBuilder::setOnHeapDictionaryColumns);
     setIfNotEmpty(indexConfig.getVariedLengthDictionaryColumns(), tableConfigBuilder::setVarLengthDictionaryColumns);
 
-    return tableConfigBuilder.build();
+    TableConfig tableConfig = tableConfigBuilder.build();
+    tableConfig.getIndexingConfig().setAggregateMetrics(aggregateMetrics);
+    return tableConfig;
   }
 
   private void setIfNotEmpty(String colName, Consumer<String> func) {

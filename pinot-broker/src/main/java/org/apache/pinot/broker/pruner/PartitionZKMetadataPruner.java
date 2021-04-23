@@ -26,7 +26,7 @@ import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
+import org.apache.pinot.segment.local.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 
 

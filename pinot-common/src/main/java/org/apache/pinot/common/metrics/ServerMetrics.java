@@ -22,8 +22,8 @@ import java.util.Collection;
 import java.util.Collections;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
-import static org.apache.pinot.common.utils.CommonConstants.Server.DEFAULT_ENABLE_TABLE_LEVEL_METRICS;
-import static org.apache.pinot.common.utils.CommonConstants.Server.DEFAULT_METRICS_PREFIX;
+import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_ENABLE_TABLE_LEVEL_METRICS;
+import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_METRICS_PREFIX;
 
 
 /**

@@ -21,8 +21,8 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.Base64;
 import java.util.List;
 import org.apache.datasketches.theta.Sketch;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 

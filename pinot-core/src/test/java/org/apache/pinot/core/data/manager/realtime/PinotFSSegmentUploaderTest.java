@@ -26,7 +26,6 @@ import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -186,4 +185,3 @@ public class PinotFSSegmentUploaderTest {
   }
 
 }
-

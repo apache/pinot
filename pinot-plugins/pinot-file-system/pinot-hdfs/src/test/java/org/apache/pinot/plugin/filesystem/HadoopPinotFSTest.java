@@ -21,7 +21,6 @@ package org.apache.pinot.plugin.filesystem;
 
 import java.io.IOException;
 import java.net.URI;
-
 import org.apache.hadoop.fs.Path;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.Assert;

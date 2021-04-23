@@ -18,7 +18,17 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.math.IntRange;
+import org.apache.pinot.controller.recommender.data.generator.DataGenerator;
+import org.apache.pinot.controller.recommender.data.generator.DataGeneratorSpec;
+import org.apache.pinot.controller.recommender.data.generator.SchemaAnnotation;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
@@ -29,20 +39,9 @@ import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.Command;
-import org.apache.pinot.controller.recommender.data.generator.DataGenerator;
-import org.apache.pinot.controller.recommender.data.generator.DataGeneratorSpec;
-import org.apache.pinot.controller.recommender.data.generator.SchemaAnnotation;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 
 /**

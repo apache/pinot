@@ -18,14 +18,11 @@
  */
 package org.apache.pinot.tools.service;
 
-import static org.apache.pinot.tools.utils.PinotConfigUtils.getAvailablePort;
-
+import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
-import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
@@ -34,11 +31,12 @@ import org.apache.pinot.server.starter.helix.HelixServerStarter;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.service.api.resources.PinotInstanceStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.collect.ImmutableList;
+import static org.apache.pinot.tools.utils.PinotConfigUtils.getAvailablePort;
 
 
 /**
@@ -74,7 +72,7 @@ public class PinotServiceManager {
     }
     _port = port;
     if (hostname == null || hostname.isEmpty()) {
-      hostname = NetUtil.getHostnameOrAddress();
+      hostname = NetUtils.getHostnameOrAddress();
     }
     _instanceId = String.format("ServiceManager_%s_%d", hostname, port);
   }

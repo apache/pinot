@@ -21,13 +21,13 @@ package org.apache.pinot.controller.helix;
 import java.io.IOException;
 import java.util.Set;
 import org.apache.helix.model.ExternalView;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -70,7 +70,7 @@ public class ControllerInstanceToggleTest {
 
     // Add segments
     for (int i = 0; i < ControllerTestUtils.NUM_SERVER_INSTANCES; i++) {
-      ControllerTestUtils.getHelixResourceManager().addNewSegment(RAW_TABLE_NAME,
+      ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_TABLE_NAME,
           SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME), "downloadUrl");
       Assert.assertEquals(
           ControllerTestUtils

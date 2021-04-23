@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.geospatial.transform.function;
 
-import org.apache.pinot.core.geospatial.GeometryUtils;
+import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.locationtech.jts.geom.GeometryFactory;
 
 

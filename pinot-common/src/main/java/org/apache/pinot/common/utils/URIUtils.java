@@ -26,6 +26,7 @@ import java.net.URLEncoder;
 import java.util.Map;
 import java.util.StringJoiner;
 import org.apache.http.client.utils.URIBuilder;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 public class URIUtils {

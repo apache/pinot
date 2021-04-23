@@ -44,6 +44,7 @@ public class RecommenderConstants {
     public static final boolean DEFAULT_RECOMMEND_INVERTED_SORTED_INDEX_JOINT = true;
     public static final boolean DEFAULT_RECOMMEND_BLOOM_FILTER = true;
     public static final boolean DEFAULT_RECOMMEND_NO_DICTIONARY_ONHEAP_DICTIONARY_JOINT = true;
+    public static final boolean DEFAULT_RECOMMEND_AGGREGATE_METRICS = true;
     public static final boolean DEFAULT_RECOMMEND_REALTIME_PROVISIONING = true;
   }
 

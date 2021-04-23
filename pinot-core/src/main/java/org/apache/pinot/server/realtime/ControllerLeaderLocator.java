@@ -25,9 +25,9 @@ import java.util.Set;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.MasterSlaveSMD;
-import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.pql.parsers.utils.Pair;
+import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

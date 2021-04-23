@@ -18,11 +18,17 @@
  */
 package org.apache.pinot.plugin.filesystem;
 
-import static com.google.common.base.Preconditions.checkState;
-import static java.util.Objects.requireNonNull;
-import static joptsimple.internal.Strings.isNullOrEmpty;
-import static org.glassfish.jersey.internal.guava.Preconditions.checkArgument;
-
+import com.google.api.gax.paging.Page;
+import com.google.auth.Credentials;
+import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.WriteChannel;
+import com.google.cloud.storage.Blob;
+import com.google.cloud.storage.Bucket;
+import com.google.cloud.storage.CopyWriter;
+import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.StorageException;
+import com.google.cloud.storage.StorageOptions;
+import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -35,23 +41,15 @@ import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.api.gax.paging.Page;
-import com.google.auth.oauth2.GoogleCredentials;
-import com.google.cloud.WriteChannel;
-import com.google.cloud.storage.Blob;
-import com.google.cloud.storage.Bucket;
-import com.google.cloud.storage.CopyWriter;
-import com.google.cloud.storage.Storage;
-import com.google.cloud.storage.StorageException;
-import com.google.cloud.storage.StorageOptions;
-import com.google.common.collect.ImmutableList;
+import static com.google.common.base.Preconditions.checkState;
+import static java.util.Objects.requireNonNull;
+import static joptsimple.internal.Strings.isNullOrEmpty;
 
 public class GcsPinotFS  extends PinotFS {
   public static final String PROJECT_ID = "projectId";
@@ -65,20 +63,21 @@ public class GcsPinotFS  extends PinotFS {
 
   @Override
   public void init(PinotConfiguration config) {
-    LOGGER.info("Configs are: {}, {}",
-            PROJECT_ID,
-            config.getProperty(PROJECT_ID));
+    Credentials credentials;
 
-    checkArgument(!isNullOrEmpty(config.getProperty(PROJECT_ID)));
-    checkArgument(!isNullOrEmpty(config.getProperty(GCP_KEY)));
-    String projectId = config.getProperty(PROJECT_ID);
-    String gcpKey = config.getProperty(GCP_KEY);
     try {
-      storage = StorageOptions.newBuilder()
-          .setProjectId(projectId)
-          .setCredentials(GoogleCredentials.fromStream(Files.newInputStream(Paths.get(gcpKey))))
-          .build()
-          .getService();
+      StorageOptions.Builder storageBuilder = StorageOptions.newBuilder();
+      if (!isNullOrEmpty(config.getProperty(PROJECT_ID)) && !isNullOrEmpty(config.getProperty(GCP_KEY))) {
+        LOGGER.info("Configs are: {}, {}", PROJECT_ID, config.getProperty(PROJECT_ID));
+        String projectId = config.getProperty(PROJECT_ID);
+        String gcpKey = config.getProperty(GCP_KEY);
+        storageBuilder.setProjectId(projectId);
+        credentials = GoogleCredentials.fromStream(Files.newInputStream(Paths.get(gcpKey)));
+      } else {
+        LOGGER.info("Configs using default credential");
+        credentials = GoogleCredentials.getApplicationDefault();
+      }
+      storage = storageBuilder.setCredentials(credentials).build().getService();
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
@@ -191,6 +190,9 @@ public class GcsPinotFS  extends PinotFS {
       String path = normalizeToDirectoryPrefix(uri);
       // Bucket root directory already exists and cannot be created
       if (path.equals(DELIMITER)) {
+        return true;
+      }
+      if (isDirectory(uri)) {
         return true;
       }
       Blob blob = getBucket(uri).create(normalizeToDirectoryPrefix(uri), new byte[0]);

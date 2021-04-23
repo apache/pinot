@@ -20,9 +20,11 @@ package org.apache.pinot.core.query.request.context.predicate;
 
 import java.util.List;
 import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.FilterContext;
-import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.Test;
 
@@ -32,8 +34,7 @@ import static org.testng.Assert.assertEquals;
 public class PredicateTest {
 
   @Test
-  public void testSerDe()
-      throws Exception {
+  public void testSerDe() {
     // EqPredicate
     assertEquals(testSerDe("foo\t= 123"), "foo = '123'");
     assertEquals(testSerDe("foo='123'"), "foo = '123'");
@@ -77,7 +78,7 @@ public class PredicateTest {
     String predicateExpression = rangePredicate.toString();
     assertEquals(predicateExpression, "(foo >= '123' AND foo < '456')");
     Expression thriftExpression = CalciteSqlParser.compileToExpression(predicateExpression);
-    FilterContext filter = QueryContextConverterUtils.getFilter(thriftExpression);
+    FilterContext filter = RequestContextUtils.getFilter(thriftExpression);
     assertEquals(filter.getType(), FilterContext.Type.AND);
     List<FilterContext> children = filter.getChildren();
     assertEquals(children.size(), 2);
@@ -89,11 +90,10 @@ public class PredicateTest {
    * Tests that the serialized predicate can be parsed and converted back to the same predicate, and returns the
    * serialized predicate (standardized string representation of the predicate expression).
    */
-  private String testSerDe(String predicateExpression)
-      throws Exception {
+  private String testSerDe(String predicateExpression) {
     // Parse and convert the string predicate expression into Predicate
     Expression thriftExpression = CalciteSqlParser.compileToExpression(predicateExpression);
-    FilterContext filter = QueryContextConverterUtils.getFilter(thriftExpression);
+    FilterContext filter = RequestContextUtils.getFilter(thriftExpression);
     assertEquals(filter.getType(), FilterContext.Type.PREDICATE);
     Predicate predicate = filter.getPredicate();
 
@@ -102,7 +102,7 @@ public class PredicateTest {
 
     // Deserialize and compare
     thriftExpression = CalciteSqlParser.compileToExpression(predicateExpression);
-    filter = QueryContextConverterUtils.getFilter(thriftExpression);
+    filter = RequestContextUtils.getFilter(thriftExpression);
     assertEquals(filter.getType(), FilterContext.Type.PREDICATE);
     assertEquals(filter.getPredicate(), predicate);
 

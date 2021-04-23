@@ -20,6 +20,7 @@
 package org.apache.pinot.core.util;
 
 import java.net.URI;
+import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

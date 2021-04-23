@@ -20,16 +20,11 @@ package org.apache.pinot.tools.admin.command;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.ArrayList;
 import java.util.Collections;
-
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.common.utils.NetUtil;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -136,7 +131,7 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
   public boolean execute()
       throws Exception {
     if (_controllerHost == null) {
-      _controllerHost = NetUtil.getHostAddress();
+      _controllerHost = NetUtils.getHostAddress();
     }
 
     if (!_exec) {
