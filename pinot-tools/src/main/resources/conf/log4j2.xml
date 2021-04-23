@@ -20,20 +20,31 @@
 
 -->
 <Configuration>
+
+  <Properties>
+    <Property name="LOG_ROOT">logs</Property>
+    <Property name="LOG_PATTERN">%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Property>
+    <Property name="PINOT_COMPONENT">all</Property>
+  </Properties>
   <Appenders>
     <Console name="console" target="SYSTEM_OUT" />
+    <RollingFile name="pinotLog" fileName="${env:LOG_ROOT}/pinot-${env:PINOT_COMPONENT}.log"
+                 filePattern="${env:LOG_ROOT}/pinot-${env:PINOT_COMPONENT}.log.%i.gz" immediateFlush="false">
+      <PatternLayout pattern="${env:LOG_PATTERN}"/>
+      <Policies>
+        <SizeBasedTriggeringPolicy size="19500KB" />
+      </Policies>
+      <DefaultRolloverStrategy max="10"/>
+    </RollingFile>
   </Appenders>
   <Loggers>
     <Root level="info" additivity="false">
-      <AppenderRef ref="console"/>
+      <AppenderRef ref="pinotLog"/>
+      <AppenderRef ref="console" level="error"/>
     </Root>
-    <Logger name="org.apache.pinot" level="info" additivity="false"/>
-    <Logger name="org.apache.pinot.tools" level="info" additivity="false">
+    <Logger name="org.apache.pinot.tools.admin" level="info" additivity="false">
       <AppenderRef ref="console"/>
     </Logger>
     <AsyncLogger name="org.reflections" level="error" additivity="false"/>
-    <AsyncLogger name="org.apache.pinot.spi.plugin" level="error" additivity="false">
-      <AppenderRef ref="console"/>
-    </AsyncLogger>
   </Loggers>
 </Configuration>
