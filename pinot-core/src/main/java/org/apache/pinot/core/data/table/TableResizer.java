@@ -18,14 +18,10 @@
  */
 package org.apache.pinot.core.data.table;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.PriorityQueue;
+
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.apache.pinot.common.utils.DataSchema;
@@ -140,13 +136,17 @@ public class TableResizer {
     int numRecordsToEvict = recordsMap.size() - trimToSize;
     if (numRecordsToEvict > 0) {
       // TODO: compare the performance of converting to IntermediateRecord vs keeping Record, in cases where we do not need to extract final results
+      IntermediateRecord[] recordArray = convertToTrimArray(recordsMap, trimToSize, _intermediateRecordComparator);
       if (numRecordsToEvict < trimToSize) {
         // num records to evict is smaller than num records to retain
         // make PQ of records to evict
-        PriorityQueue<IntermediateRecord> priorityQueue =
-            convertToIntermediateRecordsPQ(recordsMap, numRecordsToEvict, _intermediateRecordComparator);
-        for (IntermediateRecord evictRecord : priorityQueue) {
-          recordsMap.remove(evictRecord._key);
+//        PriorityQueue<IntermediateRecord> priorityQueue =
+//            convertToIntermediateRecordsPQ(recordsMap, numRecordsToEvict, _intermediateRecordComparator);
+//        for (IntermediateRecord evictRecord : priorityQueue) {
+//          recordsMap.remove(evictRecord._key);
+//        }
+        for (int i = 0; i < trimToSize; ++i) {
+          recordsMap.remove(recordArray[i]._key);
         }
         return recordsMap;
       } else {
@@ -162,11 +162,14 @@ public class TableResizer {
           // invoked by SimpleIndexedTable
           trimmedRecordsMap = new HashMap<>();
         }
-        Comparator<IntermediateRecord> comparator = _intermediateRecordComparator.reversed();
-        PriorityQueue<IntermediateRecord> priorityQueue =
-            convertToIntermediateRecordsPQ(recordsMap, trimToSize, comparator);
-        for (IntermediateRecord recordToRetain : priorityQueue) {
-          trimmedRecordsMap.put(recordToRetain._key, recordsMap.get(recordToRetain._key));
+//        Comparator<IntermediateRecord> comparator = _intermediateRecordComparator;
+//        PriorityQueue<IntermediateRecord> priorityQueue =
+//            convertToIntermediateRecordsPQ(recordsMap, trimToSize, comparator);
+//        for (IntermediateRecord recordToRetain : priorityQueue) {
+//          trimmedRecordsMap.put(recordToRetain._key, recordsMap.get(recordToRetain._key));
+//        }
+        for (int i = 0; i < trimToSize; ++i) {
+          trimmedRecordsMap.put(recordArray[i]._key, recordsMap.get(recordArray[i]._key));
         }
         return trimmedRecordsMap;
       }
@@ -192,6 +195,81 @@ public class TableResizer {
     return priorityQueue;
   }
 
+  private IntermediateRecord[] convertToTrimArray(Map<Key, Record> recordMap, int trimSize,
+                                                  Comparator<IntermediateRecord> comparator) {
+    IntermediateRecord[] recordArray = new IntermediateRecord[recordMap.size()];
+    int index = 0;
+    for (Map.Entry<Key, Record> entry: recordMap.entrySet()) {
+      recordArray[index] = getIntermediateRecord(entry.getKey(), entry.getValue());
+      ++index;
+    }
+    quickSortSmallestK(recordArray, 0, recordArray.length - 1, trimSize, comparator);
+
+    // The entire array is returned but a pivot is set at array[trimSize-1]
+    return recordArray;
+  }
+  @VisibleForTesting
+  static void quickSort(IntermediateRecord[] recordArray, int left, int right,
+                         Comparator<IntermediateRecord> comparator) {
+    if (left < right) {
+      Random random_num = new Random();
+      int pivot_index = left + random_num.nextInt(right - left);
+
+      pivot_index = partition(recordArray, left, right, pivot_index, comparator);
+      quickSort(recordArray, left, pivot_index - 1, comparator);
+      quickSort(recordArray, pivot_index + 1, right, comparator);
+    }
+  }
+  @VisibleForTesting
+  static void quickSortSmallestK(IntermediateRecord[] recordArray, int left, int right, int k,
+                                 Comparator<IntermediateRecord> comparator) {
+    if (right <= left) return;
+    Random random_num = new Random();
+    int pivot_index = left + random_num.nextInt(right - left);
+    //pivot_index = left;
+
+    pivot_index = partition(recordArray, left, right, pivot_index, comparator);
+
+    if (pivot_index > k - 1) {
+      // target pivot is in the left partition
+      quickSortSmallestK(recordArray, left, pivot_index - 1, k, comparator);
+    } else if (pivot_index < k - 1) {
+      // target pivot is in the right partition
+      quickSortSmallestK(recordArray, pivot_index + 1, right, k, comparator);
+    }
+    // else pivot_index is the target
+  }
+
+  private static int partition(IntermediateRecord[] recordArray, int left, int right, int pivot_index,
+                               Comparator<IntermediateRecord> comparator) {
+    swap(recordArray, pivot_index, left);
+    IntermediateRecord pivot = recordArray[left];
+    pivot_index = left;
+    int i = left - 1;
+    int j = right + 1;
+    while (i < j) {
+      do {
+        ++i;
+      } while ((i <= right) && (comparator.compare(recordArray[i], pivot) <= 0));
+
+      do {
+        --j;
+      } while ((j >= left) && (comparator.compare(pivot, recordArray[j]) < 0));
+
+      if (i < j) {
+        swap(recordArray, i, j);
+      }
+    }
+    swap(recordArray, pivot_index, j);
+    return j;
+  }
+
+  private static final <T> void swap (T[] array, int i, int j) {
+    T temp = array[i];
+    array[i] = array[j];
+    array[j] = temp;
+  }
+
   /**
    * Sorts the recordsMap using a priority queue and returns a sorted list of records
    * This method is to be called from IndexedTable::finish, if both resize and sort is needed
@@ -203,12 +281,22 @@ public class TableResizer {
     }
     int numRecordsToRetain = Math.min(numRecords, trimToSize);
     // make PQ of sorted records to retain
-    PriorityQueue<IntermediateRecord> priorityQueue = convertToIntermediateRecordsPQ(recordsMap, numRecordsToRetain, _intermediateRecordComparator.reversed());
+//    PriorityQueue<IntermediateRecord> priorityQueue = convertToIntermediateRecordsPQ(recordsMap, numRecordsToRetain, _intermediateRecordComparator.reversed());
+//    Record[] sortedArray = new Record[numRecordsToRetain];
+//    while (!priorityQueue.isEmpty()) {
+//      IntermediateRecord intermediateRecord = priorityQueue.poll();
+//      Record record = recordsMap.get(intermediateRecord._key);
+//      sortedArray[--numRecordsToRetain] = record;
+//    }
+    IntermediateRecord[] recordArray = convertToTrimArray(recordsMap, numRecordsToRetain, _intermediateRecordComparator);
+    // sort left partition
+    // TODO: keep original array or trim it. Which is better?
+    //IntermediateRecord[] trimmedArray = Arrays.copyOfRange(recordArray, 0, numRecordsToRetain);
+    quickSort(recordArray, 0, numRecordsToRetain - 1, _intermediateRecordComparator);
     Record[] sortedArray = new Record[numRecordsToRetain];
-    while (!priorityQueue.isEmpty()) {
-      IntermediateRecord intermediateRecord = priorityQueue.poll();
-      Record record = recordsMap.get(intermediateRecord._key);
-      sortedArray[--numRecordsToRetain] = record;
+    for (int i = 0; i < numRecordsToRetain; ++i) {
+      Record record = recordsMap.get(recordArray[i]._key);
+      sortedArray[i] = record;
     }
     return Arrays.asList(sortedArray);
   }
@@ -223,7 +311,8 @@ public class TableResizer {
    * 3. Inside the values, the columns should be ordered by the order by sequence
    * 4. For order by on aggregations, final results should extracted if the intermediate result is non-comparable
    */
-  private static class IntermediateRecord {
+  @VisibleForTesting
+  static class IntermediateRecord {
     final Key _key;
     final Comparable[] _values;
 
