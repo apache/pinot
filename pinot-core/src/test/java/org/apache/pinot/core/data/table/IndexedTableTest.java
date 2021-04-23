@@ -18,10 +18,7 @@
  */
 package org.apache.pinot.core.data.table;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -132,6 +129,44 @@ public class IndexedTableTest {
     testNonConcurrent(indexedTable, mergeTable);
     indexedTable.finish(true);
     checkSurvivors(indexedTable, survivors);
+  }
+
+  @Test(invocationCount = 100)
+  public void testQuickSelect(){
+    Random random = new Random();
+    //int[] array = random.ints(100, 10,100000).toArray();
+    int[] array = {0, 1, 2, 3, 4};
+    int numRecordsToRetain = 3;
+
+    TableResizer.IntermediateRecord[] intermediateRecords = new TableResizer.IntermediateRecord[array.length];
+    for (int i = 0; i < array.length; ++i) {
+      Key key = new Key(new Integer[]{array[i]});
+      Record record = new Record(new Integer[]{array[i]+1});
+      Comparable[] intermediateRecordValues = new Comparable[]{array[i]};
+      intermediateRecords[i] = new TableResizer.IntermediateRecord(key, intermediateRecordValues);
+    }
+    TableResizer.IntermediateRecord[] copies = Arrays.copyOf(intermediateRecords, intermediateRecords.length);
+
+    Comparator comparator = Comparator.naturalOrder();
+    Comparator<TableResizer.IntermediateRecord> keyComparator = (o1, o2) -> {
+        int result = comparator.compare(o1._values[0], o2._values[0]);
+        if (result != 0) {
+          return result;
+        }
+      return 0;
+    };
+
+    TableResizer.quickSortSmallestK(intermediateRecords, 0, intermediateRecords.length-1, numRecordsToRetain, keyComparator);
+    TableResizer.IntermediateRecord[] trimmedArray = Arrays.copyOfRange(intermediateRecords, 0, numRecordsToRetain);
+    TableResizer.quickSort(trimmedArray, 0, numRecordsToRetain - 1, keyComparator);
+    Arrays.sort(copies, keyComparator);
+    for (int i = 0; i < trimmedArray.length; ++i) {
+      if (!copies[i]._key.equals(trimmedArray[i]._key)) {
+        System.out.println(1);
+      }
+      Assert.assertTrue(copies[i]._key.equals(trimmedArray[i]._key));
+    }
+
   }
 
   @DataProvider(name = "initDataProvider")
