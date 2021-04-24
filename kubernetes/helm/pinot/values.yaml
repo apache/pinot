@@ -21,16 +21,52 @@
 
 image:
   repository: apachepinot/pinot
-  tag: latest
+  tag: latest # release-0.7.1
   pullPolicy: IfNotPresent
 
 cluster:
   name: pinot-quickstart
 
+imagePullSecrets: []
+
+terminationGracePeriodSeconds: 30
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+probes:
+  initialDelaySeconds: 60
+  periodSeconds: 10
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+# ------------------------------------------------------------------------------
+# Pinot Controller:
+# ------------------------------------------------------------------------------
 controller:
   name: controller
-  port: 9000
   replicaCount: 1
+  podManagementPolicy: Parallel
+  podSecurityContext: {}
+    # fsGroup: 2000
+  securityContext: {}
+
+  probes:
+    endpoint: "/health"
+    livenessEnabled: false
+    readinessEnabled: false
 
   persistence:
     enabled: true
@@ -54,18 +90,22 @@ controller:
 
   service:
     annotations: {}
-    clusterIP: ""
+    clusterIP: "None"
     externalIPs: []
     loadBalancerIP: ""
     loadBalancerSourceRanges: []
     type: ClusterIP
     port: 9000
     nodePort: ""
+    protocol: TCP
+    gcpInternalLB: false
+    name: controller
 
   external:
     enabled: true
     type: LoadBalancer
     port: 9000
+    gcpInternalLB: false
 
   resources: {}
 
@@ -101,12 +141,16 @@ controller:
       pinot.set.instance.id.to.hostname=true
       controller.task.scheduler.enabled=true
 
+# ------------------------------------------------------------------------------
+# Pinot Broker:
+# ------------------------------------------------------------------------------
 broker:
   name: broker
-
-  port: 8099
-
   replicaCount: 1
+  podManagementPolicy: Parallel
+  podSecurityContext: {}
+    # fsGroup: 2000
+  securityContext: {}
 
   jvmOpts: "-Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCApplicationStoppedTime -XX:+PrintGCApplicationConcurrentTime -Xloggc:/opt/pinot/gc-pinot-broker.log"
 
@@ -116,19 +160,28 @@ broker:
   routingTable:
     builderClass: random
 
+  probes:
+    endpoint: "/health"
+    livenessEnabled: true
+    readinessEnabled: true
+
   service:
     annotations: {}
-    clusterIP: ""
+    clusterIP: "None"
     externalIPs: []
     loadBalancerIP: ""
     loadBalancerSourceRanges: []
     type: ClusterIP
+    protocol: TCP
+    gcpInternalLB: false
     port: 8099
+    name: broker
     nodePort: ""
 
   external:
     enabled: true
     type: LoadBalancer
+    gcpInternalLB: false
     port: 8099
 
   resources: {}
@@ -164,14 +217,21 @@ broker:
     configs: |-
       pinot.set.instance.id.to.hostname=true
 
+# ------------------------------------------------------------------------------
+# Pinot Server:
+# ------------------------------------------------------------------------------
 server:
   name: server
-
-  ports:
-    netty: 8098
-    admin: 8097
-
   replicaCount: 1
+  podManagementPolicy: Parallel
+  podSecurityContext: {}
+    # fsGroup: 2000
+  securityContext: {}
+
+  probes:
+    endpoint: "/health"
+    livenessEnabled: false
+    readinessEnabled: false
 
   dataDir: /var/pinot/server/data/index
   segmentTarDir: /var/pinot/server/data/segment
@@ -196,8 +256,14 @@ server:
     loadBalancerIP: ""
     loadBalancerSourceRanges: []
     type: ClusterIP
-    port: 8098
+    nettyPort: 8098
+    nettyPortName: netty
+    adminPort: 8097
+    adminExposePort: 80
+    adminPortName: admin
     nodePort: ""
+    protocol: TCP
+    gcpInternalLB: false
 
   resources: {}
 
@@ -234,12 +300,21 @@ server:
       pinot.server.instance.realtime.alloc.offheap=true
       pinot.server.instance.currentDataTableVersion=2
 
+# ------------------------------------------------------------------------------
+# Pinot Minion:
+# ------------------------------------------------------------------------------
 minion:
   name: minion
-
-  port: 9514
-
   replicaCount: 1
+  podManagementPolicy: Parallel
+  podSecurityContext: {}
+    # fsGroup: 2000
+  securityContext: {}
+
+  probes:
+    endpoint: "/health"
+    livenessEnabled: false
+    readinessEnabled: false
 
   dataDir: /var/pinot/minion/data
   jvmOpts: "-Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCApplicationStoppedTime -XX:+PrintGCApplicationConcurrentTime -Xloggc:/opt/pinot/gc-pinot-minion.log"
@@ -264,6 +339,9 @@ minion:
     type: ClusterIP
     port: 9514
     nodePort: ""
+    protocol: TCP
+    gcpInternalLB: false
+    name: minion
 
   resources: {}
 
@@ -300,6 +378,8 @@ minion:
 
 # ------------------------------------------------------------------------------
 # Zookeeper:
+# NOTE: IN PRODUCTION USE CASES, IT's BEST TO USE ZOOKEEPER K8S OPERATOR
+# ref: https://github.com/pravega/zookeeper-operator#install-the-operator
 # ------------------------------------------------------------------------------
 
 zookeeper:

@@ -22,31 +22,31 @@ kind: StatefulSet
 metadata:
   name: {{ include "pinot.broker.fullname" . }}
   labels:
-    app: {{ include "pinot.name" . }}
-    chart: {{ include "pinot.chart" . }}
-    component: {{ .Values.broker.name }}
-    release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
+    {{- include "pinot.brokerLabels" . | nindent 4 }}
 spec:
   selector:
     matchLabels:
-      app: {{ include "pinot.name" . }}
-      release: {{ .Release.Name }}
-      component: {{ .Values.broker.name }}
+      {{- include "pinot.brokerMatchLabels" . | nindent 6 }}
   serviceName: {{ template "pinot.broker.headless" . }}
   replicas: {{ .Values.broker.replicaCount }}
   updateStrategy:
     type: {{ .Values.broker.updateStrategy.type }}
-  podManagementPolicy: Parallel
+  podManagementPolicy: {{ .Values.broker.podManagementPolicy }}
   template:
     metadata:
       labels:
-        app: {{ include "pinot.name" . }}
-        release: {{ .Release.Name }}
-        component: {{ .Values.broker.name }}
+        {{- include "pinot.brokerLabels" . | nindent 8 }}
       annotations:
 {{ toYaml .Values.broker.podAnnotations | indent 8 }}
     spec:
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      serviceAccountName: {{ include "pinot.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.broker.podSecurityContext | nindent 8 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       nodeSelector:
 {{ toYaml .Values.broker.nodeSelector | indent 8 }}
       affinity:
@@ -55,6 +55,8 @@ spec:
 {{ toYaml .Values.broker.tolerations | indent 8 }}
       containers:
       - name: broker
+        securityContext:
+          {{- toYaml .Values.broker.securityContext | nindent 10 }}
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args: [
@@ -72,21 +74,28 @@ spec:
         envFrom:
 {{ toYaml .Values.broker.envFrom | indent 10 }}
         ports:
-          - containerPort: {{ .Values.broker.port }}
-            protocol: TCP
+          - containerPort: {{ .Values.broker.service.port }}
+            protocol: {{ .Values.broker.service.protocol }}
+            name: {{ .Values.broker.service.name }}
         volumeMounts:
           - name: config
             mountPath: /var/pinot/broker/config
+        {{- if .Values.broker.probes.livenessEnabled }}
         livenessProbe:
-          initialDelaySeconds: 60
+          initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}
+          periodSeconds: {{ .Values.probes.periodSeconds }}
           httpGet:
-            path: /health
-            port: {{ .Values.broker.port }}
+            path: {{ .Values.broker.probes.endpoint }}
+            port: {{ .Values.broker.service.port }}
+        {{- end }}
+        {{- if .Values.broker.probes.livenessEnabled }}
         readinessProbe:
-          initialDelaySeconds: 60
+          initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}
+          periodSeconds: {{ .Values.probes.periodSeconds }}
           httpGet:
-            path: /health
-            port: {{ .Values.broker.port }}
+            path: {{ .Values.broker.probes.endpoint }}
+            port: {{ .Values.broker.service.port }}
+        {{- end }}
         resources:
 {{ toYaml .Values.broker.resources | indent 12 }}
       restartPolicy: Always

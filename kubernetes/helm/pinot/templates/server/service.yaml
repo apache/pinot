@@ -21,18 +21,22 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "pinot.server.fullname" . }}
+  {{- if .Values.server.service.gcpInternalLB }}
+  annotations:
+    cloud.google.com/load-balancer-type: Internal
+  {{- end }}
   labels:
-    app: {{ include "pinot.name" . }}
-    chart: {{ include "pinot.chart" . }}
-    component: {{ .Values.server.name }}
-    release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
+    {{- include "pinot.serverLabels" . | nindent 4 }}
 spec:
-  type: ClusterIP
+  type: {{ .Values.server.service.type }}
   ports:
     # [pod_name].[service_name].[namespace].svc.cluster.local
-    - port: {{ .Values.server.service.port }}
+    - name: {{ .Values.server.service.nettyPortName }}
+      port: {{ .Values.server.service.nettyPort }}
+      protocol: {{ .Values.server.service.protocol }}
+    - name: {{ .Values.server.service.adminPortName }}
+      port: {{ .Values.server.service.adminExposePort }}
+      targetPort: {{ .Values.server.service.adminPort }}
+      protocol: {{ .Values.server.service.protocol }}
   selector:
-    app: {{ include "pinot.name" . }}
-    release: {{ .Release.Name }}
-    component: {{ .Values.server.name }}
+    {{- include "pinot.serverMatchLabels" . | nindent 4 }}
