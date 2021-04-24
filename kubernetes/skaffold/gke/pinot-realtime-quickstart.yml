@@ -27,10 +27,10 @@ spec:
     spec:
       containers:
         - name: loading-data-to-kafka
-          image: apachepinot/pinot:0.3.0-SNAPSHOT
+          image: apachepinot/pinot:release-0.7.1
           args: [ "StreamAvroIntoKafka", "-avroFile", "examples/stream/airlineStats/sample_data/airlineStats_data.avro", "-kafkaTopic", "flights-realtime", "-kafkaBrokerList", "kafka:9092", "-zkAddress", "zookeeper:2181" ]
         - name: pinot-add-example-realtime-table
-          image: apachepinot/pinot:0.3.0-SNAPSHOT
+          image: apachepinot/pinot:release-0.7.1
           args: [ "AddTable", "-schemaFile", "examples/stream/airlineStats/airlineStats_schema.json", "-tableConfigFile", "examples/stream/airlineStats/docker/airlineStats_realtime_table_config.json", "-controllerHost", "pinot-controller", "-controllerPort", "9000", "-exec" ]
       restartPolicy: OnFailure
       nodeSelector:
