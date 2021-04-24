@@ -22,4 +22,5 @@
 # Pinot Quickstart on Kubernetes with Helm
 Please refer to this doc:
 
+
 [Running Pinot in Kubernetes](<https://docs.pinot.apache.org/basics/getting-started/kubernetes-quickstart>)
