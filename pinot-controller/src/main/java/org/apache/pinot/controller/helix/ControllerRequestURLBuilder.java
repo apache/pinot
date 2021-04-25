@@ -231,6 +231,30 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "schemas", schemaName);
   }
 
+  public String forPinotConfigCreate() {
+    return StringUtil.join("/", _baseUrl, "configs");
+  }
+
+  public String forPinotConfigGet(String configName) {
+    return StringUtil.join("/", _baseUrl, "configs", configName);
+  }
+
+  public String forPinotConfigsList() {
+    return StringUtil.join("/", _baseUrl, "configs");
+  }
+
+  public String forPinotConfigUpdate(String configName) {
+    return StringUtil.join("/", _baseUrl, "configs", configName);
+  }
+
+  public String forPinotConfigDelete(String configName) {
+    return StringUtil.join("/", _baseUrl, "configs", configName);
+  }
+
+  public String forPinotConfigValidate() {
+    return StringUtil.join("/", _baseUrl, "configs", "validate");
+  }
+
   public String forSegmentDownload(String tableNameWithType, String segmentName) {
     return URIUtils.constructDownloadUrl(_baseUrl, tableNameWithType, segmentName);
   }

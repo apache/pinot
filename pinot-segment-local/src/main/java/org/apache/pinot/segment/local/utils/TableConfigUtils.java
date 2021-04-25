@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import java.util.HashSet;
@@ -29,31 +31,42 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
+import org.apache.pinot.common.config.tuner.TableConfigTunerRegistry;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.core.util.ReplicationUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
+import org.apache.pinot.spi.config.table.TunerConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.config.table.tuner.TableConfigTuner;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.quartz.CronScheduleBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -61,6 +74,10 @@ import org.apache.pinot.spi.utils.TimeUtils;
  * FIXME: Merge this TableConfigUtils with the TableConfigUtils from pinot-common when merging of modules is done
  */
 public final class TableConfigUtils {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(TableConfigUtils.class);
+  private static final String SEGMENT_GENERATION_AND_PUSH_TASK_TYPE = "SegmentGenerationAndPushTask";
+  private static final String SCHEDULE_KEY = "schedule";
 
   private TableConfigUtils() {
   }
@@ -87,6 +104,7 @@ public final class TableConfigUtils {
     validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
     validateFieldConfigList(tableConfig.getFieldConfigList(), tableConfig.getIndexingConfig(), schema);
     validateUpsertConfig(tableConfig, schema);
+    validateTaskConfigs(tableConfig);
   }
 
   /**
@@ -107,7 +125,7 @@ public final class TableConfigUtils {
    * - Valid segmentPushType
    * - Valid retentionTimeUnit
    */
-  public static void validateRetentionConfig(TableConfig tableConfig) {
+  private static void validateRetentionConfig(TableConfig tableConfig) {
     SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();
     String tableName = tableConfig.getTableName();
 
@@ -190,6 +208,7 @@ public final class TableConfigUtils {
    * 5. checks for source fields used in destination columns
    * 6. ingestion type for dimension tables
    */
+  @VisibleForTesting
   public static void validateIngestionConfig(TableConfig tableConfig, @Nullable Schema schema) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
 
@@ -282,6 +301,22 @@ public final class TableConfigUtils {
     }
   }
 
+  private static void validateTaskConfigs(TableConfig tableConfig) {
+    TableTaskConfig taskConfig = tableConfig.getTaskConfig();
+    if (taskConfig != null && taskConfig.isTaskTypeEnabled(SEGMENT_GENERATION_AND_PUSH_TASK_TYPE)) {
+      Map<String, String> taskTypeConfig = taskConfig.getConfigsForTaskType(SEGMENT_GENERATION_AND_PUSH_TASK_TYPE);
+      if (taskTypeConfig != null && taskTypeConfig.containsKey(SCHEDULE_KEY)) {
+        String cronExprStr = taskTypeConfig.get(SCHEDULE_KEY);
+        try {
+          CronScheduleBuilder.cronSchedule(cronExprStr);
+        } catch (Exception e) {
+          throw new IllegalStateException(
+              String.format("SegmentGenerationAndPushTask contains an invalid cron schedule: %s", cronExprStr), e);
+        }
+      }
+    }
+  }
+
   /**
    * Validates the upsert-related configurations
    *  - check table type is realtime
@@ -289,6 +324,7 @@ public final class TableConfigUtils {
    *  - strict replica-group is configured for routing type
    *  - consumer type must be low-level
    */
+  @VisibleForTesting
   public static void validateUpsertConfig(TableConfig tableConfig, Schema schema) {
     if (tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE) {
       return;
@@ -579,5 +615,125 @@ public final class TableConfigUtils {
       return indexingColumns.stream().filter(v -> !v.isEmpty()).collect(Collectors.toList());
     }
     return null;
+  }
+
+  /**
+   * Apply TunerConfig to the tableConfig
+   */
+  public static void applyTunerConfig(TableConfig tableConfig, Schema schema) {
+    TunerConfig tunerConfig = tableConfig.getTunerConfig();
+    if (tunerConfig != null && tunerConfig.getName() != null && !tunerConfig.getName().isEmpty()) {
+      TableConfigTuner tuner = TableConfigTunerRegistry.getTuner(tunerConfig.getName());
+      tuner.init(tunerConfig, schema);
+      tuner.apply(tableConfig);
+    }
+  }
+
+  /**
+   * Ensure that the table config has the minimum number of replicas set as per cluster configs.
+   * If is doesn't, set the required amount of replication in the table config
+   */
+  public static void ensureMinReplicas(TableConfig tableConfig, int defaultTableMinReplicas) {
+    // For self-serviced cluster, ensure that the tables are created with at least min replication factor irrespective
+    // of table configuration value
+    SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();
+    boolean verifyReplicasPerPartition;
+    boolean verifyReplication;
+
+    try {
+      verifyReplicasPerPartition = ReplicationUtils.useReplicasPerPartition(tableConfig);
+      verifyReplication = ReplicationUtils.useReplication(tableConfig);
+    } catch (Exception e) {
+      throw new IllegalStateException(String.format("Invalid tableIndexConfig or streamConfig: %s", e.getMessage()), e);
+    }
+
+    if (verifyReplication) {
+      int requestReplication;
+      try {
+        requestReplication = segmentsConfig.getReplicationNumber();
+        if (requestReplication < defaultTableMinReplicas) {
+          LOGGER.info("Creating table with minimum replication factor of: {} instead of requested replication: {}",
+              defaultTableMinReplicas, requestReplication);
+          segmentsConfig.setReplication(String.valueOf(defaultTableMinReplicas));
+        }
+      } catch (NumberFormatException e) {
+        throw new IllegalStateException("Invalid replication number", e);
+      }
+    }
+
+    if (verifyReplicasPerPartition) {
+      String replicasPerPartitionStr = segmentsConfig.getReplicasPerPartition();
+      if (replicasPerPartitionStr == null) {
+        throw new IllegalStateException("Field replicasPerPartition needs to be specified");
+      }
+      try {
+        int replicasPerPartition = Integer.parseInt(replicasPerPartitionStr);
+        if (replicasPerPartition < defaultTableMinReplicas) {
+          LOGGER.info(
+              "Creating table with minimum replicasPerPartition of: {} instead of requested replicasPerPartition: {}",
+              defaultTableMinReplicas, replicasPerPartition);
+          segmentsConfig.setReplicasPerPartition(String.valueOf(defaultTableMinReplicas));
+        }
+      } catch (NumberFormatException e) {
+        throw new IllegalStateException("Invalid value for replicasPerPartition: '" + replicasPerPartitionStr + "'", e);
+      }
+    }
+  }
+
+  /**
+   * Ensure the table config has storage quota set as per cluster configs.
+   * If it doesn't, set the quota config into the table config
+   */
+  public static void ensureStorageQuotaConstraints(TableConfig tableConfig, String maxAllowedSize) {
+    // Dim tables must adhere to cluster level storage size limits
+    if (tableConfig.isDimTable()) {
+      QuotaConfig quotaConfig = tableConfig.getQuotaConfig();
+      long maxAllowedSizeInBytes = DataSizeUtils.toBytes(maxAllowedSize);
+
+      if (quotaConfig == null) {
+        // set a default storage quota
+        tableConfig.setQuotaConfig(new QuotaConfig(maxAllowedSize, null));
+        LOGGER.info("Assigning default storage quota ({}) for dimension table: {}", maxAllowedSize,
+            tableConfig.getTableName());
+      } else {
+        if (quotaConfig.getStorage() == null) {
+          // set a default storage quota and keep the RPS value
+          tableConfig.setQuotaConfig(new QuotaConfig(maxAllowedSize, quotaConfig.getMaxQueriesPerSecond()));
+          LOGGER.info("Assigning default storage quota ({}) for dimension table: {}", maxAllowedSize,
+              tableConfig.getTableName());
+        } else {
+          if (quotaConfig.getStorageInBytes() > maxAllowedSizeInBytes) {
+            throw new IllegalStateException(String
+                .format("Invalid storage quota: %d, max allowed size: %d", quotaConfig.getStorageInBytes(),
+                    maxAllowedSizeInBytes));
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Consistency checks across the offline and realtime counterparts of a hybrid table
+   */
+  public static void verifyHybridTableConfigs(String rawTableName, TableConfig offlineTableConfig,
+      TableConfig realtimeTableConfig) {
+    if (offlineTableConfig == null || realtimeTableConfig == null) {
+      return;
+    }
+
+    LOGGER.info("Validating realtime and offline configs for the hybrid table: {}", rawTableName);
+    String offlineRawTableName = TableNameBuilder.extractRawTableName(offlineTableConfig.getTableName());
+    String realtimeRawTableName = TableNameBuilder.extractRawTableName(realtimeTableConfig.getTableName());
+    Preconditions.checkState(offlineRawTableName.equals(realtimeRawTableName),
+        "Raw table name for offline table: %s does not match raw table name for realtime table: %s");
+    SegmentsValidationAndRetentionConfig offlineSegmentConfig = offlineTableConfig.getValidationConfig();
+    SegmentsValidationAndRetentionConfig realtimeSegmentConfig = realtimeTableConfig.getValidationConfig();
+    String offlineTimeColumnName = offlineSegmentConfig.getTimeColumnName();
+    String realtimeTimeColumnName = realtimeSegmentConfig.getTimeColumnName();
+    if (!Objects.equal(realtimeTimeColumnName, offlineTimeColumnName)) {
+      throw new IllegalStateException(String.format(
+          "Time column names are different for table: %s! Offline time column name: %s. Realtime time column name: %s",
+          offlineRawTableName, offlineTimeColumnName, realtimeTimeColumnName));
+    }
   }
 }
