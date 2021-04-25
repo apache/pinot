@@ -26,6 +26,7 @@ import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.mutable.MutableInt;
+import org.apache.commons.math3.analysis.function.Exp;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -126,6 +127,12 @@ public class RequestUtils {
     return expression;
   }
 
+  public static Expression getLiteralExpression(boolean value) {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setBoolValue(value);
+    return expression;
+  }
+
   public static Expression getLiteralExpression(int value) {
     Expression expression = createNewLiteralExpression();
     expression.getLiteral().setIntValue(value);
@@ -157,10 +164,7 @@ public class RequestUtils {
   }
 
   public static Expression getLiteralExpression(Object object) {
-    if (object instanceof Integer) {
-      return RequestUtils.getLiteralExpression(((Number) object).intValue());
-    }
-    if (object instanceof Long) {
+    if (object instanceof Long || object instanceof Integer) {
       return RequestUtils.getLiteralExpression(((Number) object).longValue());
     }
     if (object instanceof Float || object instanceof Double) {

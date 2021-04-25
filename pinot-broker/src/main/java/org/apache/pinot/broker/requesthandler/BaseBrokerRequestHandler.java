@@ -103,6 +103,7 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRequestHandler.class);
   private static final String IN_SUBQUERY = "inSubquery";
+  private static final Literal FALSE = Literal.boolValue(false);
 
   protected final PinotConfiguration _config;
   protected final RoutingManager _routingManager;
@@ -348,8 +349,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // Check if response can be send without server query evaluation.
     if (isResponsePossible(offlineBrokerRequest) && isResponsePossible(realtimeBrokerRequest)) {
       BrokerResponse brokerResponse = BrokerResponseNative.empty();
-      logBrokerResponse(requestStatistics, requestId, query, compilationStartTimeNs, brokerRequest,
-          0, new ServerStats(), brokerResponse, System.nanoTime());
+      logBrokerResponse(requestStatistics, requestId, query, compilationStartTimeNs, brokerRequest, 0,
+          new ServerStats(), brokerResponse, System.nanoTime());
 
       return brokerResponse;
     }
@@ -444,25 +445,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   /**
    * Given a {@link BrokerRequest}, this function will determine if we can return a response without server-side query
-   * evaluation. This usually happens when the optimizer determines that the entire WHERE clause evaluates to false.
+   * evaluation. This happens when the optimizer determines that the entire WHERE clause evaluates to false.
    */
   private boolean isResponsePossible(BrokerRequest brokerRequest) {
-    if (brokerRequest == null) { return true;}
-
-    Expression filterExpression = brokerRequest.getPinotQuery().getFilterExpression();
-    if (filterExpression != null && filterExpression.getType().equals(ExpressionType.LITERAL) && filterExpression
-        .getLiteral().getSetField().equals(Literal._Fields.BOOL_VALUE)) {
-      if (filterExpression.getLiteral().getBoolValue()) {
-        // Optimizer determined that WHERE clause is redundant. Remove WHERE clause before server-side evaluation.
-        brokerRequest.getPinotQuery().setFilterExpression(null);
-        return false;
-      } else {
-        // WHERE clause evaluates to false, broker can return response without server-side query evaluation.
-        return true;
-      }
-    }
-
-    return false;
+    return brokerRequest == null || brokerRequest.getPinotQuery() == null || brokerRequest.getPinotQuery()
+        .getFilterExpression().equals(FALSE);
   }
 
   /** Log {@link BrokerResponse} related information */

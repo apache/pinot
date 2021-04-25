@@ -26,9 +26,11 @@ import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -58,8 +60,8 @@ import org.apache.pinot.spi.data.Schema;
  */
 public class NumericalFilterOptimizer implements FilterOptimizer {
 
-  private static final Literal TRUE = Literal.boolValue(true);
-  private static final Literal FALSE = Literal.boolValue(false);
+  private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
+  private static final Expression FALSE = RequestUtils.getLiteralExpression(false);
 
   @Override
   public FilterQueryTree optimize(FilterQueryTree filterQueryTree, @Nullable Schema schema) {
@@ -109,25 +111,23 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
     List<Expression> operands = function.getOperands();
     if (function.getOperator().equals(FilterKind.AND.name())) {
       // If any of the literal operands are FALSE, then replace AND function with FALSE.
-      if (operands.stream()
-          .anyMatch(operand -> operand.getType() == ExpressionType.LITERAL && operand.getLiteral().equals(FALSE))) {
+      if (operands.stream().anyMatch(operand -> operand.equals(FALSE))) {
         return setExpressionToBoolean(expression, false);
       }
 
       // Remove all Literal operands that are TRUE.
-      operands.removeIf(x -> x.getType() == ExpressionType.LITERAL && x.getLiteral().getBoolValue());
+      operands.removeIf(x -> x.equals(TRUE));
       if (operands.size() == 0) {
         return setExpressionToBoolean(expression, true);
       }
     } else if (function.getOperator().equals(FilterKind.OR.name())) {
       // If any of the literal operands are TRUE, then replace OR function with TRUE
-      if (operands.stream()
-          .anyMatch(operand -> operand.getType() == ExpressionType.LITERAL && operand.getLiteral().equals(TRUE))) {
+      if (operands.stream().anyMatch(operand -> operand.equals(TRUE))) {
         return setExpressionToBoolean(expression, true);
       }
 
       // Remove all Literal operands that are FALSE.
-      operands.removeIf(x -> x.getType() == ExpressionType.LITERAL && !x.getLiteral().getBoolValue());
+      operands.removeIf(x -> x.equals(FALSE));
       if (operands.size() == 0) {
         return setExpressionToBoolean(expression, false);
       }
