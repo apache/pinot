@@ -231,28 +231,28 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "schemas", schemaName);
   }
 
-  public String forPinotConfigCreate() {
-    return StringUtil.join("/", _baseUrl, "configs");
+  public String forTableConfigsCreate() {
+    return StringUtil.join("/", _baseUrl, "tableConfigs");
   }
 
-  public String forPinotConfigGet(String configName) {
-    return StringUtil.join("/", _baseUrl, "configs", configName);
+  public String forTableConfigsGet(String configName) {
+    return StringUtil.join("/", _baseUrl, "tableConfigs", configName);
   }
 
-  public String forPinotConfigsList() {
-    return StringUtil.join("/", _baseUrl, "configs");
+  public String forTableConfigsList() {
+    return StringUtil.join("/", _baseUrl, "tableConfigs");
   }
 
-  public String forPinotConfigUpdate(String configName) {
-    return StringUtil.join("/", _baseUrl, "configs", configName);
+  public String forTableConfigsUpdate(String configName) {
+    return StringUtil.join("/", _baseUrl, "tableConfigs", configName);
   }
 
-  public String forPinotConfigDelete(String configName) {
-    return StringUtil.join("/", _baseUrl, "configs", configName);
+  public String forTableConfigsDelete(String configName) {
+    return StringUtil.join("/", _baseUrl, "tableConfigs", configName);
   }
 
-  public String forPinotConfigValidate() {
-    return StringUtil.join("/", _baseUrl, "configs", "validate");
+  public String forTableConfigsValidate() {
+    return StringUtil.join("/", _baseUrl, "tableConfigs", "validate");
   }
 
   public String forSegmentDownload(String tableNameWithType, String segmentName) {

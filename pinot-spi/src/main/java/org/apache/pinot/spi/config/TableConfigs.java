@@ -29,44 +29,44 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 /**
  * Wrapper for all configs of a table, which include the offline table config, realtime table config and schema.
- * This helps look at and operate on the pinot configs as a whole unit.
+ * This helps look at and operate on the pinot table configs as a whole unit.
  */
-public class PinotConfig {
-  private final String _configName;
-  private final TableConfig _offlineTableConfig;
-  private final TableConfig _realtimeTableConfig;
+public class TableConfigs extends BaseJsonConfig {
+  private final String _tableName;
   private final Schema _schema;
+  private final TableConfig _offline;
+  private final TableConfig _realtime;
 
   @JsonCreator
-  public PinotConfig(@JsonProperty(value = "configName", required = true) String configName,
-      @JsonProperty(value = "offlineTableConfig") @Nullable TableConfig offlineTableConfig,
-      @JsonProperty(value = "realtimeTableConfig") @Nullable TableConfig realtimeTableConfig,
-      @JsonProperty(value = "schema", required = true) Schema schema) {
-    _configName = configName;
-    _offlineTableConfig = offlineTableConfig;
-    _realtimeTableConfig = realtimeTableConfig;
+  public TableConfigs(@JsonProperty(value = "tableName", required = true) String tableName,
+      @JsonProperty(value = "schema", required = true) Schema schema,
+      @JsonProperty(value = "offline") @Nullable TableConfig offline,
+      @JsonProperty(value = "realtime") @Nullable TableConfig realtime) {
+    _tableName = tableName;
+    _offline = offline;
+    _realtime = realtime;
     _schema = schema;
   }
 
-  public String getConfigName() {
-    return _configName;
-  }
-
-  @Nullable
-  public TableConfig getOfflineTableConfig() {
-    return _offlineTableConfig;
-  }
-
-  @Nullable
-  public TableConfig getRealtimeTableConfig() {
-    return _realtimeTableConfig;
+  public String getTableName() {
+    return _tableName;
   }
 
   public Schema getSchema() {
     return _schema;
   }
 
-  public String toJsonString() {
+  @Nullable
+  public TableConfig getOffline() {
+    return _offline;
+  }
+
+  @Nullable
+  public TableConfig getRealtime() {
+    return _realtime;
+  }
+
+  public String toPrettyJsonString() {
     try {
       return JsonUtils.objectToPrettyString(this);
     } catch (JsonProcessingException e) {

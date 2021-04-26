@@ -50,7 +50,7 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
-import org.apache.pinot.spi.config.PinotConfig;
+import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -60,14 +60,14 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Endpoints for CRUD of PinotConfig.
- * PinotConfig is a group of the offline table config, realtime table config and schema.
+ * Endpoints for CRUD of {@link TableConfigs}.
+ * {@link TableConfigs} is a group of the offline table config, realtime table config and schema for the same tableName.
  */
-@Api(tags = Constants.CONFIG_TAG)
+@Api(tags = Constants.TABLE_TAG)
 @Path("/")
-public class PinotConfigRestletResource {
+public class TableConfigsRestletResource {
 
-  public static org.slf4j.Logger LOGGER = LoggerFactory.getLogger(PinotConfigRestletResource.class);
+  public static org.slf4j.Logger LOGGER = LoggerFactory.getLogger(TableConfigsRestletResource.class);
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -83,14 +83,14 @@ public class PinotConfigRestletResource {
   AccessControlUtils _accessControlUtils = new AccessControlUtils();
 
   /**
-   * List all PinotConfigs, where each PinotConfig is a group of the offline table config, realtime table config and schema.
+   * List all {@link TableConfigs}, where each is a group of the offline table config, realtime table config and schema for the same tableName.
    * This is equivalent to a list of all raw table names
    */
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/configs")
+  @Path("/tableConfigs")
   @Authenticate(AccessType.READ)
-  @ApiOperation(value = "Lists all pinot configs in cluster", notes = "Lists all pinot configs in cluster")
+  @ApiOperation(value = "Lists all TableConfigs in cluster", notes = "Lists all TableConfigs in cluster")
   public String listConfigs() {
     try {
       List<String> rawTableNames = _pinotHelixResourceManager.getAllRawTables();
@@ -107,50 +107,50 @@ public class PinotConfigRestletResource {
   }
 
   /**
-   * Gets the PinotConfig for the provided config name, by fetching the offline table config for configName_OFFLINE,
-   * realtime table config for configName_REALTIME and schema for configName
+   * Gets the {@link TableConfigs} for the provided raw tableName, by fetching the offline table config for tableName_OFFLINE,
+   * realtime table config for tableName_REALTIME and schema for tableName
    */
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/configs/{configName}")
+  @Path("/tableConfigs/{tableName}")
   @Authenticate(AccessType.READ)
-  @ApiOperation(value = "Get the pinot config for a given configName", notes = "Get the pinot config for a given configName")
+  @ApiOperation(value = "Get the TableConfigs for a given raw tableName", notes = "Get the TableConfigs for a given raw tableName")
   public String getConfig(
-      @ApiParam(value = "Config name", required = true) @PathParam("configName") String configName) {
+      @ApiParam(value = "Raw table name", required = true) @PathParam("tableName") String tableName) {
 
     try {
-      Schema schema = _pinotHelixResourceManager.getSchema(configName);
-      TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(configName);
-      TableConfig realtimeTableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(configName);
-      PinotConfig config = new PinotConfig(configName, offlineTableConfig, realtimeTableConfig, schema);
-      return config.toJsonString();
+      Schema schema = _pinotHelixResourceManager.getSchema(tableName);
+      TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName);
+      TableConfig realtimeTableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
+      TableConfigs config = new TableConfigs(tableName, schema, offlineTableConfig, realtimeTableConfig);
+      return config.toPrettyJsonString();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 
   /**
-   * Creates a PinotConfig using the configStr, by creating the schema from PinotConfig,
-   * followed by the realtimeTableConfig and offlineTableConfig as applicable.
-   * Validated the configs before applying.
+   * Creates a {@link TableConfigs} using the <code>tableConfigsStr</code>, by creating the schema,
+   * followed by the realtime tableConfig and offline tableConfig as applicable, from the {@link TableConfigs}.
+   * Validates the configs before applying.
    */
   @POST
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/configs")
-  @ApiOperation(value = "Create the PinotConfig using the configStr json", notes = "Create the PinotConfig using the configStr json")
-  public SuccessResponse addConfig(String configStr, @Context HttpHeaders httpHeaders, @Context Request request) {
-    PinotConfig pinotConfig;
+  @Path("/tableConfigs")
+  @ApiOperation(value = "Add the TableConfigs using the tableConfigsStr json", notes = "Add the TableConfigs using the tableConfigsStr json")
+  public SuccessResponse addConfig(String tableConfigsStr, @Context HttpHeaders httpHeaders, @Context Request request) {
+    TableConfigs tableConfigs;
     try {
-      pinotConfig = JsonUtils.stringToObject(configStr, PinotConfig.class);
-      validateConfig(pinotConfig);
+      tableConfigs = JsonUtils.stringToObject(tableConfigsStr, TableConfigs.class);
+      validateConfig(tableConfigs);
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, String.format("Invalid config. %s", e.getMessage()),
+      throw new ControllerApplicationException(LOGGER, String.format("Invalid TableConfigs. %s", e.getMessage()),
           Response.Status.BAD_REQUEST, e);
     }
 
-    TableConfig offlineTableConfig = pinotConfig.getOfflineTableConfig();
-    TableConfig realtimeTableConfig = pinotConfig.getRealtimeTableConfig();
-    Schema schema = pinotConfig.getSchema();
+    TableConfig offlineTableConfig = tableConfigs.getOffline();
+    TableConfig realtimeTableConfig = tableConfigs.getRealtime();
+    Schema schema = tableConfigs.getSchema();
 
     try {
       String endpointUrl = request.getRequestURL().toString();
@@ -176,12 +176,12 @@ public class PinotConfigRestletResource {
         LOGGER.info("Added realtime table config: {}", realtimeTableConfig.getTableName());
       }
 
-      return new SuccessResponse("Config " + pinotConfig.getConfigName() + " successfully added");
+      return new SuccessResponse("TableConfigs " + tableConfigs.getTableName() + " successfully added");
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_ADD_ERROR, 1L);
       if (e instanceof PinotHelixResourceManager.InvalidTableConfigException) {
         throw new ControllerApplicationException(LOGGER,
-            String.format("Invalid config: %s", pinotConfig.getConfigName()), Response.Status.BAD_REQUEST, e);
+            String.format("Invalid TableConfigs: %s", tableConfigs.getTableName()), Response.Status.BAD_REQUEST, e);
       } else if (e instanceof PinotHelixResourceManager.TableAlreadyExistsException) {
         throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
       } else {
@@ -191,118 +191,118 @@ public class PinotConfigRestletResource {
   }
 
   /**
-   * Deletes the PinotConfig by deleting the schema configName, the offline table config for configName_OFFLINE and
-   * the realtime table config for configName_REALTIME
+   * Deletes the {@link TableConfigs} by deleting the schema tableName, the offline table config for tableName_OFFLINE and
+   * the realtime table config for tableName_REALTIME
    */
   @DELETE
-  @Path("/configs/{configName}")
+  @Path("/tableConfigs/{tableName}")
   @Authenticate(AccessType.DELETE)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Delete the pinot config", notes = "Delete the pinot config")
+  @ApiOperation(value = "Delete the TableConfigs", notes = "Delete the TableConfigs")
   public SuccessResponse deleteConfig(
-      @ApiParam(value = "Config name", required = true) @PathParam("configName") String configName) {
+      @ApiParam(value = "TableConfigs name i.e. raw table name", required = true) @PathParam("tableName") String tableName) {
 
     try {
-      _pinotHelixResourceManager.deleteRealtimeTable(configName);
-      LOGGER.info("Deleted realtime table: {}", configName);
-      _pinotHelixResourceManager.deleteOfflineTable(configName);
-      LOGGER.info("Deleted offline table: {}", configName);
-      Schema schema = _pinotHelixResourceManager.getSchema(configName);
+      _pinotHelixResourceManager.deleteRealtimeTable(tableName);
+      LOGGER.info("Deleted realtime table: {}", tableName);
+      _pinotHelixResourceManager.deleteOfflineTable(tableName);
+      LOGGER.info("Deleted offline table: {}", tableName);
+      Schema schema = _pinotHelixResourceManager.getSchema(tableName);
       if (schema != null) {
         _pinotHelixResourceManager.deleteSchema(schema);
       }
-      LOGGER.info("Deleted schema: {}", configName);
-      return new SuccessResponse("Deleted config: " + configName);
+      LOGGER.info("Deleted schema: {}", tableName);
+      return new SuccessResponse("Deleted TableConfigs: " + tableName);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 
   /**
-   * Updated the PinotConfig by updating the schema configName,
-   * then updating the offlineTableConfig or creating a new one if it doesn't already exist in the cluster,
-   * then updating the realtimeTableConfig or creating a new one if it doesn't already exist in the cluster.
+   * Updated the {@link TableConfigs} by updating the schema tableName,
+   * then updating the offline tableConfig or creating a new one if it doesn't already exist in the cluster,
+   * then updating the realtime tableConfig or creating a new one if it doesn't already exist in the cluster.
    */
   @PUT
-  @Path("/configs/{configName}")
+  @Path("/tableConfigs/{tableName}")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Update the pinot config provided by the configStr json", notes = "Update the pinot config")
+  @ApiOperation(value = "Update the TableConfigs provided by the tableConfigsStr json", notes = "Update the TableConfigs provided by the tableConfigsStr json")
   public SuccessResponse updateConfig(
-      @ApiParam(value = "Config name", required = true) @PathParam("configName") String configName,
+      @ApiParam(value = "TableConfigs name i.e. raw table name", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Reload the table if the new schema is backward compatible") @DefaultValue("false") @QueryParam("reload") boolean reload,
-      String configStr)
+      String tableConfigsStr)
       throws Exception {
-    PinotConfig pinotConfig;
+    TableConfigs tableConfigs;
     try {
-      pinotConfig = JsonUtils.stringToObject(configStr, PinotConfig.class);
-      Preconditions.checkState(pinotConfig.getConfigName().equals(configName),
-          "configName in pinotConfig: %s must match provided configName: %s", pinotConfig.getConfigName(), configName);
-      validateConfig(pinotConfig);
+      tableConfigs = JsonUtils.stringToObject(tableConfigsStr, TableConfigs.class);
+      Preconditions.checkState(tableConfigs.getTableName().equals(tableName),
+          "'tableName' in TableConfigs: %s must match provided tableName: %s", tableConfigs.getTableName(), tableName);
+      validateConfig(tableConfigs);
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, String.format("Invalid config: %s", configName),
+      throw new ControllerApplicationException(LOGGER, String.format("Invalid TableConfigs: %s", tableName),
           Response.Status.BAD_REQUEST, e);
     }
 
-    TableConfig offlineTableConfig = pinotConfig.getOfflineTableConfig();
-    TableConfig realtimeTableConfig = pinotConfig.getRealtimeTableConfig();
-    Schema schema = pinotConfig.getSchema();
+    TableConfig offlineTableConfig = tableConfigs.getOffline();
+    TableConfig realtimeTableConfig = tableConfigs.getRealtime();
+    Schema schema = tableConfigs.getSchema();
 
     try {
       _pinotHelixResourceManager.updateSchema(schema, reload);
-      LOGGER.info("Updated schema: {}", configName);
+      LOGGER.info("Updated schema: {}", tableName);
 
       if (offlineTableConfig != null) {
         tuneConfig(offlineTableConfig, schema);
-        if (_pinotHelixResourceManager.hasOfflineTable(configName)) {
+        if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
           _pinotHelixResourceManager.updateTableConfig(offlineTableConfig);
-          LOGGER.info("Updated offline table config: {}", configName);
+          LOGGER.info("Updated offline table config: {}", tableName);
         } else {
           _pinotHelixResourceManager.addTable(offlineTableConfig);
-          LOGGER.info("Created offline table config: {}", configName);
+          LOGGER.info("Created offline table config: {}", tableName);
         }
         if (realtimeTableConfig != null) {
           tuneConfig(realtimeTableConfig, schema);
-          if (_pinotHelixResourceManager.hasRealtimeTable(configName)) {
+          if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
             _pinotHelixResourceManager.updateTableConfig(realtimeTableConfig);
-            LOGGER.info("Updated realtime table config: {}", configName);
+            LOGGER.info("Updated realtime table config: {}", tableName);
           } else {
             _pinotHelixResourceManager.addTable(realtimeTableConfig);
-            LOGGER.info("Created realtime table config: {}", configName);
+            LOGGER.info("Created realtime table config: {}", tableName);
           }
         }
       }
     } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER,
-          String.format("Invalid config for: %s, %s", configName, e.getMessage()), Response.Status.BAD_REQUEST, e);
+          String.format("Invalid TableConfigs for: %s, %s", tableName, e.getMessage()), Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER,
-          String.format("Failed to update config for: %s, %s", configName, e.getMessage()),
+          String.format("Failed to update TableConfigs for: %s, %s", tableName, e.getMessage()),
           Response.Status.INTERNAL_SERVER_ERROR, e);
     }
 
-    return new SuccessResponse("Config updated for " + configName);
+    return new SuccessResponse("TableConfigs updated for " + tableName);
   }
 
   /**
-   * Validates the pinot config as provided in the configStr json, by validating the schema,
+   * Validates the {@link TableConfigs} as provided in the tableConfigsStr json, by validating the schema,
    * the realtime table config and the offline table config
    */
   @POST
-  @Path("/configs/validate")
+  @Path("/tableConfigs/validate")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Validate the pinot config", notes = "Validate the pinot config")
-  public String validateConfig(String configStr) {
-    PinotConfig pinotConfig;
+  @ApiOperation(value = "Validate the TableConfigs", notes = "Validate the TableConfigs")
+  public String validateConfig(String tableConfigsStr) {
+    TableConfigs tableConfigs;
     try {
-      pinotConfig = JsonUtils.stringToObject(configStr, PinotConfig.class);
+      tableConfigs = JsonUtils.stringToObject(tableConfigsStr, TableConfigs.class);
     } catch (IOException e) {
-      throw new ControllerApplicationException(LOGGER, String.format("Invalid pinot config json string: %s", configStr),
+      throw new ControllerApplicationException(LOGGER, String.format("Invalid TableConfigs json string: %s", tableConfigsStr),
           Response.Status.BAD_REQUEST, e);
     }
-    return validateConfig(pinotConfig);
+    return validateConfig(tableConfigs);
   }
 
   private void tuneConfig(TableConfig tableConfig, Schema schema) {
@@ -311,42 +311,42 @@ public class PinotConfigRestletResource {
     TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
   }
 
-  private String validateConfig(PinotConfig pinotConfig) {
-    String configName = pinotConfig.getConfigName();
-    TableConfig offlineTableConfig = pinotConfig.getOfflineTableConfig();
-    TableConfig realtimeTableConfig = pinotConfig.getRealtimeTableConfig();
-    Schema schema = pinotConfig.getSchema();
+  private String validateConfig(TableConfigs tableConfigs) {
+    String tableName = tableConfigs.getTableName();
+    TableConfig offlineTableConfig = tableConfigs.getOffline();
+    TableConfig realtimeTableConfig = tableConfigs.getRealtime();
+    Schema schema = tableConfigs.getSchema();
     try {
       Preconditions.checkState(offlineTableConfig != null || realtimeTableConfig != null,
-          "Must provide at least one of realtimeTableConfig or offlineTableConfig for adding config: %s", configName);
-      Preconditions.checkState(schema != null, "Must provide schema for adding config: %s", configName);
-      Preconditions.checkState(!configName.isEmpty(), "configName cannot be empty in PinotConfig");
+          "Must provide at least one of 'realtime' or 'offline' table configs for adding TableConfigs: %s", tableName);
+      Preconditions.checkState(schema != null, "Must provide 'schema' for adding TableConfigs: %s", tableName);
+      Preconditions.checkState(!tableName.isEmpty(), "'tableName' cannot be empty in TableConfigs");
 
       Preconditions
-          .checkState(configName.equals(schema.getSchemaName()), "ConfigName: %s must be equal to schemaName: %s",
-              configName, schema.getSchemaName());
+          .checkState(tableName.equals(schema.getSchemaName()), "'tableName': %s must be equal to 'schemaName' from 'schema': %s",
+              tableName, schema.getSchemaName());
       SchemaUtils.validate(schema);
 
       if (offlineTableConfig != null) {
         String rawTableName = TableNameBuilder.extractRawTableName(offlineTableConfig.getTableName());
-        Preconditions.checkState(rawTableName.equals(configName),
-            "Name in offlineTableConfig: %s must be equal to configName: %s", rawTableName, configName);
+        Preconditions.checkState(rawTableName.equals(tableName),
+            "Name in 'offline' table config: %s must be equal to 'tableName': %s", rawTableName, tableName);
         TableConfigUtils.validateTableName(offlineTableConfig);
         TableConfigUtils.validate(offlineTableConfig, schema);
       }
       if (realtimeTableConfig != null) {
         String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableConfig.getTableName());
-        Preconditions.checkState(rawTableName.equals(configName),
-            "Name in realtimeTableConfig: %s must be equal to configName: %s", rawTableName, configName);
+        Preconditions.checkState(rawTableName.equals(tableName),
+            "Name in 'realtime' table config: %s must be equal to 'tableName': %s", rawTableName, tableName);
         TableConfigUtils.validateTableName(realtimeTableConfig);
         TableConfigUtils.validate(realtimeTableConfig, schema);
       }
-      TableConfigUtils.verifyHybridTableConfigs(configName, offlineTableConfig, realtimeTableConfig);
+      TableConfigUtils.verifyHybridTableConfigs(tableName, offlineTableConfig, realtimeTableConfig);
 
-      return pinotConfig.toJsonString();
+      return tableConfigs.toPrettyJsonString();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
-          String.format("Invalid config: %s. %s", configName, e.getMessage()), Response.Status.BAD_REQUEST, e);
+          String.format("Invalid TableConfigs: %s. %s", tableName, e.getMessage()), Response.Status.BAD_REQUEST, e);
     }
   }
 
