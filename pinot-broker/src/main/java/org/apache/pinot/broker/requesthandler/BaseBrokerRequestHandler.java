@@ -448,8 +448,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * evaluation. This happens when the optimizer determines that the entire WHERE clause evaluates to false.
    */
   private boolean isResponsePossible(BrokerRequest brokerRequest) {
-    return brokerRequest == null || brokerRequest.getPinotQuery() == null || brokerRequest.getPinotQuery()
-        .getFilterExpression().equals(FALSE);
+    return brokerRequest == null || brokerRequest.getPinotQuery() == null || (
+        brokerRequest.getPinotQuery().getFilterExpression() != null && brokerRequest.getPinotQuery()
+            .getFilterExpression().equals(FALSE));
   }
 
   /** Log {@link BrokerResponse} related information */
