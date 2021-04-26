@@ -486,9 +486,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           .decode(messagesAndOffsets.getMessageAtIndex(index), messagesAndOffsets.getMessageOffsetAtIndex(index),
               messagesAndOffsets.getMessageLengthAtIndex(index), reuse);
       if (decodedRow != null) {
-        decodedRow = _complexTypeTransformer.transform(decodedRow);
-
         try {
+          if (_complexTypeTransformer != null) {
+            decodedRow = _complexTypeTransformer.transform(decodedRow);
+          }
           if (decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
             for (Object singleRow : (Collection) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
               GenericRow transformedRow = _recordTransformer.transform((GenericRow) singleRow);
@@ -1250,7 +1251,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
 
     // Create complex type transformer
-    _complexTypeTransformer = new ComplexTypeTransformer(Arrays.asList("group.group_topics"));
+    _complexTypeTransformer =
+        ComplexTypeTransformer.isComplexTypeHandlingEnabled(tableConfig) ? new ComplexTypeTransformer(tableConfig)
+            : null;
 
     // Acquire semaphore to create stream consumers
     try {

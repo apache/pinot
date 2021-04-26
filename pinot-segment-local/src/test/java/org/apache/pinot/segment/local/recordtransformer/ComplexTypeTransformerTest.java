@@ -11,7 +11,6 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-
 public class ComplexTypeTransformerTest {
   @Test
   public void testFlattenMap() {

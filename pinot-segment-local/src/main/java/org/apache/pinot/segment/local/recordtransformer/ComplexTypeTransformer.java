@@ -8,6 +8,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.ComplexTypeHandlingConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -15,10 +17,31 @@ public class ComplexTypeTransformer implements RecordTransformer {
   private static final CharSequence DELIMITER = ".";
   private final List<String> _collectionsToUnnest;
 
+  public ComplexTypeTransformer(TableConfig tableConfig) {
+    if (tableConfig.getIngestionConfig() != null
+        && tableConfig.getIngestionConfig().getComplexTypeHandlingConfig() != null) {
+      _collectionsToUnnest =
+          tableConfig.getIngestionConfig().getComplexTypeHandlingConfig().getUnnestConfig() != null ? tableConfig
+              .getIngestionConfig().getComplexTypeHandlingConfig().getUnnestConfig() : new ArrayList<>();
+    } else {
+      _collectionsToUnnest = new ArrayList<>();
+    }
+  }
+
   @VisibleForTesting
   public ComplexTypeTransformer(List<String> unnestCollections) {
     _collectionsToUnnest = new ArrayList<>(unnestCollections);
     Collections.sort(_collectionsToUnnest);
+  }
+
+  public static boolean isComplexTypeHandlingEnabled(TableConfig tableConfig) {
+    if (tableConfig.getIngestionConfig() == null
+        || tableConfig.getIngestionConfig().getComplexTypeHandlingConfig() == null
+        || tableConfig.getIngestionConfig().getComplexTypeHandlingConfig().getMode() == null) {
+      return false;
+    }
+    return tableConfig.getIngestionConfig().getComplexTypeHandlingConfig().getMode()
+        != ComplexTypeHandlingConfig.Mode.NONE;
   }
 
   @Nullable
@@ -54,7 +77,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
       list.add(record);
       return;
     } else if (value instanceof Collection) {
-      if(((Collection) value).isEmpty()){
+      if (((Collection) value).isEmpty()) {
         // use the record itself
         list.add(record);
       } else {
@@ -64,7 +87,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
         }
       }
     } else if (value.getClass().isArray()) {
-      if(((Object[]) value).length == 0){
+      if (((Object[]) value).length == 0) {
         // use the record itself
         list.add(record);
       } else {
@@ -101,11 +124,11 @@ public class ComplexTypeTransformer implements RecordTransformer {
           mapColumns.add(flattenName);
         }
         record = flattenMap(record, mapColumns);
-      } else if (record.getValue(column) instanceof Collection) {
+      } else if (record.getValue(column) instanceof Collection && _collectionsToUnnest.contains(column)) {
         for (Object inner : (Collection) record.getValue(column)) {
           if (inner instanceof Map) {
             Map<String, Object> innerMap = (Map<String, Object>) inner;
-            flattenMap(innerMap, new HashSet<>(innerMap.keySet()));
+            flattenMap(column, innerMap, new HashSet<>(innerMap.keySet()));
           }
         }
       }
@@ -113,7 +136,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
     return record;
   }
 
-  private void flattenMap(Map<String, Object> map, Collection<String> fields) {
+  private void flattenMap(String path, Map<String, Object> map, Collection<String> fields) {
     for (String field : fields) {
       if (map.get(field) instanceof Map) {
         Map<String, Object> innerMap = (Map<String, Object>) map.remove(field);
@@ -123,13 +146,13 @@ public class ComplexTypeTransformer implements RecordTransformer {
           innerMapFields.add(concat(field, innerEntry.getKey()));
         }
         if (!innerMapFields.isEmpty()) {
-          flattenMap(map, innerMapFields);
+          flattenMap(concat(path, field), map, innerMapFields);
         }
-      } else if (map.get(field) instanceof Collection) {
+      } else if (map.get(field) instanceof Collection && _collectionsToUnnest.contains(concat(path, field))) {
         for (Object inner : (Collection) map.get(field)) {
           if (inner instanceof Map) {
             Map<String, Object> innerMap = (Map<String, Object>) inner;
-            flattenMap(innerMap, new HashSet<>(innerMap.keySet()));
+            flattenMap(concat(path, field), innerMap, new HashSet<>(innerMap.keySet()));
           }
         }
       }

@@ -1,0 +1,40 @@
+{
+  "schemaName": "meetupRsvp",
+  "dimensionFieldSpecs": [
+    {
+      "name": "group_json",
+      "dataType": "STRING",
+      "maxLength": 2147483647
+    },
+    {
+      "name": "group.group_topics.urlkey",
+      "dataType": "STRING"
+    },
+    {
+      "name": "group.group_topics.topic_name",
+      "dataType": "STRING"
+    },
+    {
+      "name": "group.group_id",
+      "dataType": "LONG"
+    },
+    {
+      "name": "rsvp_id",
+      "dataType": "LONG"
+    }
+  ],
+  "metricFieldSpecs": [
+    {
+      "name": "guests",
+      "dataType": "INT"
+    }
+  ],
+  "dateTimeFieldSpecs": [
+    {
+      "name": "mtime",
+      "dataType": "LONG",
+      "format": "1:MILLISECONDS:EPOCH",
+      "granularity": "1:MILLISECONDS"
+    }
+  ]
+}

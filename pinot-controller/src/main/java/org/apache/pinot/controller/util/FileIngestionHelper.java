@@ -147,7 +147,7 @@ public class FileIngestionHelper {
       TarGzCompressionUtils.createTarGzFile(new File(outputDir, segmentName), segmentTarFile);
 
       // Upload segment
-      IngestionConfig ingestionConfigOverride = new IngestionConfig(batchIngestionConfigOverride, null, null, null);
+      IngestionConfig ingestionConfigOverride = new IngestionConfig(batchIngestionConfigOverride, null, null, null, null);
       TableConfig tableConfigOverride =
           new TableConfigBuilder(_tableConfig.getTableType()).setTableName(_tableConfig.getTableName())
               .setIngestionConfig(ingestionConfigOverride).build();

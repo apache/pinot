@@ -142,7 +142,9 @@ public class GenericRow implements Serializable {
    * @return a deep copy of the object.
    */
   private Object copy(Object value) {
-    if (value instanceof Map) {
+    if (value == null) {
+      return null;
+    } else if (value instanceof Map) {
       Map<String, Object> map = new HashMap<>();
       for (String key : ((Map<String, Object>) value).keySet()) {
         map.put(key, copy(((Map<String, Object>) value).get(key)));
