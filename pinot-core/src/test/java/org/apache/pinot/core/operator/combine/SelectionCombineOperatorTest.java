@@ -60,7 +60,7 @@ import static org.testng.Assert.assertTrue;
  * Test for {@link SelectionOnlyCombineOperator} and {@link SelectionOrderByCombineOperator}.
  */
 public class SelectionCombineOperatorTest {
-  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "SelectionCombineEarlyTerminationTest");
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "SelectionCombineOperatorTest");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME_PREFIX = "testSegment_";
 
@@ -223,15 +223,14 @@ public class SelectionCombineOperatorTest {
   }
 
   private IntermediateResultsBlock getCombineResult(String query) {
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(query);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
     List<PlanNode> planNodes = new ArrayList<>(NUM_SEGMENTS);
     for (IndexSegment indexSegment : _indexSegments) {
       planNodes.add(PLAN_MAKER.makeSegmentPlanNode(indexSegment, queryContext));
     }
     CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, EXECUTOR,
         System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS,
-        InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, null,
-        InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD);
+        InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, null, InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD);
     return combinePlanNode.run().nextBlock();
   }
 

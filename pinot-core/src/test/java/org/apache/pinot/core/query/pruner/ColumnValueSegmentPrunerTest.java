@@ -60,45 +60,47 @@ public class ColumnValueSegmentPrunerTest {
     when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
 
     // Equality predicate
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column = 0"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column = 10"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column = 20"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column = 30"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 0"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 10"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 20"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 30"));
     // Range predicate
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column < 10"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column <= 10"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column >= 10"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column > 20"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column BETWEEN 20 AND 30"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column BETWEEN 30 AND 40"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column BETWEEN 10 AND 10"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column BETWEEN 20 AND 20"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column < 10"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column <= 10"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column >= 10"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column > 20"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column BETWEEN 20 AND 30"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column BETWEEN 30 AND 40"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column BETWEEN 10 AND 10"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column BETWEEN 20 AND 20"));
     // Invalid range predicate
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column BETWEEN 20 AND 10"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column BETWEEN 30 AND 20"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column BETWEEN 20 AND 10"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column BETWEEN 30 AND 20"));
     // In Predicate
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column IN (0)"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column IN (0, 5, 8)"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column IN (21, 30)"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column IN (10)"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column IN (5, 10, 15)"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (0)"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (0, 5, 8)"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (21, 30)"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (10)"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (5, 10, 15)"));
     //although the segment can be pruned, it will not be pruned as the size of values is greater than threshold
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column IN (0, 1, 2, 3, 4, 5, 6, 7, 8, 9)"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column IN (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)"));
+    assertFalse(
+        runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (0, 1, 2, 3, 4, 5, 6, 7, 8, 9)"));
+    assertFalse(
+        runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)"));
     // AND operator
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column = 0 AND column > 10"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column > 0 AND column < 10"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column >= 0 AND column <= 10"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column > 20 AND column < 10"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column >= 20 AND column < 30"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column > 0 AND column BETWEEN 0 AND 10"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 0 AND column > 10"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column > 0 AND column < 10"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column >= 0 AND column <= 10"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column > 20 AND column < 10"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column >= 20 AND column < 30"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column > 0 AND column BETWEEN 0 AND 10"));
     // OR operator
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column = 0 OR column > 10"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column = 0 OR column < 10"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column >= 0 OR column <= 10"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column > 30 OR column < 10"));
-    assertTrue(
-        runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column BETWEEN 0 AND 5 OR column BETWEEN 30 AND 35"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 0 OR column > 10"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 0 OR column < 10"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column >= 0 OR column <= 10"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column > 30 OR column < 10"));
+    assertTrue(runPruner(indexSegment,
+        "SELECT COUNT(*) FROM testTable WHERE column BETWEEN 0 AND 5 OR column BETWEEN 30 AND 35"));
   }
 
   @Test
@@ -116,23 +118,23 @@ public class ColumnValueSegmentPrunerTest {
     when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
 
     // Equality predicate
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column = 0"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column = 10"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column = 2"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column = 7"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 0"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 10"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 2"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 7"));
     // AND operator
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column = 0 AND column = 2"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column >= 0 AND column = 10"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column = 2 AND column > 0"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column <= 10 AND column = 7"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 0 AND column = 2"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column >= 0 AND column = 10"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 2 AND column > 0"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column <= 10 AND column = 7"));
     // OR operator
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column = 0 OR column = 2"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column = 0 OR column < 10"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM table WHERE column = 0 OR column = 10"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 0 OR column = 2"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 0 OR column < 10"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 0 OR column = 10"));
   }
 
   private boolean runPruner(IndexSegment indexSegment, String query) {
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(query);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
     return PRUNER.prune(indexSegment, queryContext);
   }
 }

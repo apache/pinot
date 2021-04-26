@@ -39,7 +39,7 @@ public class DataTableUtilsTest {
       throws IOException {
     // Selection
     QueryContext queryContext =
-        QueryContextConverterUtils.getQueryContextFromPQL("SELECT * FROM table WHERE foo = 'bar'");
+        QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable WHERE foo = 'bar'");
     DataTable dataTable = DataTableUtils.buildEmptyDataTable(queryContext);
     DataSchema dataSchema = dataTable.getDataSchema();
     assertEquals(dataSchema.getColumnNames(), new String[]{"*"});
@@ -48,7 +48,7 @@ public class DataTableUtilsTest {
 
     // Aggregation
     queryContext = QueryContextConverterUtils
-        .getQueryContextFromPQL("SELECT COUNT(*), SUM(a), MAX(b) FROM table WHERE foo = 'bar'");
+        .getQueryContextFromSQL("SELECT COUNT(*), SUM(a), MAX(b) FROM testTable WHERE foo = 'bar'");
     dataTable = DataTableUtils.buildEmptyDataTable(queryContext);
     dataSchema = dataTable.getDataSchema();
     assertEquals(dataSchema.getColumnNames(), new String[]{"count_star", "sum_a", "max_b"});
@@ -61,7 +61,7 @@ public class DataTableUtilsTest {
 
     // PQL group-by
     queryContext = QueryContextConverterUtils
-        .getQueryContextFromPQL("SELECT COUNT(*), SUM(a), MAX(b) FROM table WHERE foo = 'bar' GROUP BY c, d");
+        .getQueryContextFromPQL("SELECT COUNT(*), SUM(a), MAX(b) FROM testTable WHERE foo = 'bar' GROUP BY c, d");
     dataTable = DataTableUtils.buildEmptyDataTable(queryContext);
     dataSchema = dataTable.getDataSchema();
     assertEquals(dataSchema.getColumnNames(), new String[]{"functionName", "GroupByResultMap"});
@@ -75,8 +75,8 @@ public class DataTableUtilsTest {
     assertEquals(dataTable.getObject(2, 1), Collections.emptyMap());
 
     // SQL group-by
-    queryContext = QueryContextConverterUtils.getQueryContextFromPQL(
-        "SELECT c, d, COUNT(*), SUM(a), MAX(b) FROM table WHERE foo = 'bar' GROUP BY c, d OPTION(groupByMode=sql)");
+    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT c, d, COUNT(*), SUM(a), MAX(b) FROM testTable WHERE foo = 'bar' GROUP BY c, d OPTION(groupByMode=sql)");
     dataTable = DataTableUtils.buildEmptyDataTable(queryContext);
     dataSchema = dataTable.getDataSchema();
     assertEquals(dataSchema.getColumnNames(), new String[]{"c", "d", "count(*)", "sum(a)", "max(b)"});
@@ -86,7 +86,7 @@ public class DataTableUtilsTest {
 
     // Distinct
     queryContext =
-        QueryContextConverterUtils.getQueryContextFromPQL("SELECT DISTINCT(a, b) FROM table WHERE foo = 'bar'");
+        QueryContextConverterUtils.getQueryContextFromSQL("SELECT DISTINCT a, b FROM testTable WHERE foo = 'bar'");
     dataTable = DataTableUtils.buildEmptyDataTable(queryContext);
     dataSchema = dataTable.getDataSchema();
     assertEquals(dataSchema.getColumnNames(), new String[]{"distinct_a:b"});

@@ -170,7 +170,7 @@ public class PartitionerTest {
 
     partitionerConfig =
         new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
-            .setTransformFunction("toEpochDays(timestamp)").build();
+            .setTransformFunction("toEpochDays(\"timestamp\")").build();
     Partitioner partitioner = PartitionerFactory.getPartitioner(partitionerConfig);
     assertEquals(partitioner.getClass(), TransformFunctionPartitioner.class);
     GenericRow row = new GenericRow();

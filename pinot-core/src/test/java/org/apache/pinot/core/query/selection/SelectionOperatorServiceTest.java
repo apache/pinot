@@ -27,7 +27,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.PriorityQueue;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
@@ -77,7 +76,7 @@ public class SelectionOperatorServiceTest {
 
   @BeforeClass
   public void setUp() {
-    _queryContext = QueryContextConverterUtils.getQueryContextFromPQL(
+    _queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
         "SELECT " + String.join(", ", _columnNames) + " FROM testTable ORDER BY int DESC LIMIT 1, 2");
   }
 
@@ -88,7 +87,7 @@ public class SelectionOperatorServiceTest {
 
     // For non 'SELECT *' select only queries, should return deduplicated selection expressions
     QueryContext queryContext = QueryContextConverterUtils
-        .getQueryContextFromPQL("SELECT add(foo, 1), foo, sub(bar, 2 ), bar, foo, foobar, bar FROM testTable");
+        .getQueryContextFromSQL("SELECT add(foo, 1), foo, sub(bar, 2 ), bar, foo, foobar, bar FROM testTable");
     List<ExpressionContext> expressions = SelectionOperatorUtils.extractExpressions(queryContext, indexSegment);
     assertEquals(expressions.size(), 5);
     assertEquals(expressions.get(0).toString(), "add(foo,'1')");
@@ -98,7 +97,7 @@ public class SelectionOperatorServiceTest {
     assertEquals(expressions.get(4).toString(), "foobar");
 
     // For 'SELECT *' select only queries, should return all physical columns in alphabetical order
-    queryContext = QueryContextConverterUtils.getQueryContextFromPQL("SELECT * FROM testTable");
+    queryContext = QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable");
     expressions = SelectionOperatorUtils.extractExpressions(queryContext, indexSegment);
     assertEquals(expressions.size(), 3);
     assertEquals(expressions.get(0).toString(), "bar");
@@ -107,7 +106,7 @@ public class SelectionOperatorServiceTest {
 
     // For non 'SELECT *' select order-by queries, should return deduplicated order-by expressions followed by selection
     // expressions
-    queryContext = QueryContextConverterUtils.getQueryContextFromPQL(
+    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
         "SELECT add(foo, 1), foo, sub(bar, 2 ), bar, foo, foobar, bar FROM testTable ORDER BY foo, sub(bar, 2)");
     expressions = SelectionOperatorUtils.extractExpressions(queryContext, indexSegment);
     assertEquals(expressions.size(), 5);
@@ -120,7 +119,7 @@ public class SelectionOperatorServiceTest {
     // For 'SELECT *' select order-by queries, should return deduplicated order-by expressions followed by all physical
     // columns in alphabetical order
     queryContext =
-        QueryContextConverterUtils.getQueryContextFromPQL("SELECT * FROM testTable ORDER BY foo, sub(bar, 2)");
+        QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable ORDER BY foo, sub(bar, 2)");
     expressions = SelectionOperatorUtils.extractExpressions(queryContext, indexSegment);
     assertEquals(expressions.size(), 4);
     assertEquals(expressions.get(0).toString(), "foo");
@@ -133,22 +132,21 @@ public class SelectionOperatorServiceTest {
   public void testGetSelectionColumns() {
     // For non 'SELECT *', should return selection columns as is
     DataSchema dataSchema = mock(DataSchema.class);
-    List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(Arrays
-        .asList(RequestContextUtils.getExpression("add(foo,'1')"),
-            RequestContextUtils.getExpression("sub(bar,'2')"),
-            RequestContextUtils.getExpression("foobar")), dataSchema);
+    List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(
+        QueryContextConverterUtils.getQueryContextFromSQL("SELECT add(foo, 1), sub(bar, 2), foobar FROM testTable"),
+        dataSchema);
     assertEquals(selectionColumns, Arrays.asList("add(foo,'1')", "sub(bar,'2')", "foobar"));
 
     // 'SELECT *' should return columns (no transform expressions) in alphabetical order
     when(dataSchema.getColumnNames()).thenReturn(new String[]{"add(foo,'1')", "sub(bar,'2')", "foo", "bar", "foobar"});
-    selectionColumns = SelectionOperatorUtils
-        .getSelectionColumns(Collections.singletonList(SelectionOperatorUtils.IDENTIFIER_STAR), dataSchema);
+    selectionColumns = SelectionOperatorUtils.getSelectionColumns(QueryContextConverterUtils
+        .getQueryContextFromSQL("SELECT * FROM testTable ORDER BY add(foo, 1), sub(bar, 2), foo"), dataSchema);
     assertEquals(selectionColumns, Arrays.asList("bar", "foo", "foobar"));
 
     // Test data schema from DataTableBuilder.buildEmptyDataTable()
     when(dataSchema.getColumnNames()).thenReturn(new String[]{"*"});
     selectionColumns = SelectionOperatorUtils
-        .getSelectionColumns(Collections.singletonList(SelectionOperatorUtils.IDENTIFIER_STAR), dataSchema);
+        .getSelectionColumns(QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable"), dataSchema);
     assertEquals(selectionColumns, Collections.singletonList("*"));
   }
 

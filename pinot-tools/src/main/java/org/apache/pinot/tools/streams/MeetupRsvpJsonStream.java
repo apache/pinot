@@ -18,10 +18,7 @@
  */
 package org.apache.pinot.tools.streams;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import javax.websocket.MessageHandler;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtils;
 
 
@@ -35,29 +32,9 @@ public class MeetupRsvpJsonStream extends MeetupRsvpStream {
   @Override
   protected MessageHandler.Whole<String> getMessageHandler() {
     return message -> {
-      try {
-        // Replace nested json with serialized json string
-        ObjectNode messageJson = (ObjectNode) JsonUtils.stringToJsonNode(message);
-        serializeJsonField(messageJson, "venue");
-        serializeJsonField(messageJson, "member");
-        serializeJsonField(messageJson, "event");
-        serializeJsonField(messageJson, "group");
-
-        if (_keepPublishing) {
-          _producer.produce("meetupRSVPEvents", StringUtils.encodeUtf8(messageJson.toString()));
-        }
-      } catch (Exception e) {
-        LOGGER.error("Caught exception while processing the message: {}", message, e);
+      if (_keepPublishing) {
+        _producer.produce("meetupRSVPEvents", StringUtils.encodeUtf8(message));
       }
     };
-  }
-
-  private static void serializeJsonField(ObjectNode messageJson, String fieldName) {
-    JsonNode jsonNode = messageJson.get(fieldName);
-    if (jsonNode != null && jsonNode.isObject()) {
-      messageJson.put(fieldName, jsonNode.toString());
-    } else {
-      messageJson.put(fieldName, "{}");
-    }
   }
 }

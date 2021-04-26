@@ -22,22 +22,6 @@
 <Configuration>
   <Appenders>
     <Console name="console" target="SYSTEM_OUT" />
-    <RandomAccessFile name="controllerLog" fileName="pinotController.log" immediateFlush="false">
-      <PatternLayout>
-        <Pattern>%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Pattern>
-      </PatternLayout>
-    </RandomAccessFile>
-    <RandomAccessFile name="brokerLog" fileName="pinotBroker.log" immediateFlush="false">
-      <PatternLayout>
-        <Pattern>%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Pattern>
-      </PatternLayout>
-    </RandomAccessFile>
-    <RandomAccessFile name="serverLog" fileName="pinotServer.log" immediateFlush="false">
-      <PatternLayout>
-        <Pattern>%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Pattern>
-      </PatternLayout>
-    </RandomAccessFile>
-
   </Appenders>
   <Loggers>
     <Root level="info" additivity="false">
@@ -47,30 +31,6 @@
     <Logger name="org.apache.pinot.tools" level="info" additivity="false">
       <AppenderRef ref="console"/>
     </Logger>
-
-    <!-- Direct controller package log to the controller log file -->
-    <AsyncLogger name="org.apache.pinot.controller" level="info" additivity="false">
-      <AppenderRef ref="controllerLog"/>
-    </AsyncLogger>
-
-    <!-- Direct broker package log to the broker log file -->
-    <AsyncLogger name="org.apache.pinot.broker" level="info" additivity="false">
-      <AppenderRef ref="brokerLog"/>
-    </AsyncLogger>
-
-    <!-- Including server related package log to the server log file -->
-    <AsyncLogger name="org.apache.pinot.server" level="info" additivity="false">
-      <AppenderRef ref="serverLog"/>
-    </AsyncLogger>
-    <AsyncLogger name="org.apache.pinot.core.plan" level="info" additivity="false">
-      <AppenderRef ref="serverLog"/>
-    </AsyncLogger>
-    <AsyncLogger name="org.apache.pinot.core.realtime" level="info" additivity="false">
-      <AppenderRef ref="serverLog"/>
-    </AsyncLogger>
-    <AsyncLogger name="org.apache.pinot.core.query" level="info" additivity="false">
-      <AppenderRef ref="serverLog"/>
-    </AsyncLogger>
     <AsyncLogger name="org.reflections" level="error" additivity="false"/>
     <AsyncLogger name="org.apache.pinot.spi.plugin" level="error" additivity="false">
       <AppenderRef ref="console"/>

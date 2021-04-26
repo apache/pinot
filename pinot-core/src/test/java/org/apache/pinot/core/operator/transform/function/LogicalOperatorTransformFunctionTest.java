@@ -45,9 +45,9 @@ public abstract class LogicalOperatorTransformFunctionTest extends BaseTransform
   @Test
   public void testLogicalOperatorTransformFunction() {
     ExpressionContext intEqualsExpr =
-        RequestContextUtils.getExpression(String.format("EQUALS(%s, %d)", INT_SV_COLUMN, _intSVValues[0]));
+        RequestContextUtils.getExpressionFromSQL(String.format("EQUALS(%s, %d)", INT_SV_COLUMN, _intSVValues[0]));
     ExpressionContext longEqualsExpr =
-        RequestContextUtils.getExpression(String.format("EQUALS(%s, %d)", LONG_SV_COLUMN, _longSVValues[0]));
+        RequestContextUtils.getExpressionFromSQL(String.format("EQUALS(%s, %d)", LONG_SV_COLUMN, _longSVValues[0]));
     ExpressionContext expression = ExpressionContext.forFunction(
         new FunctionContext(FunctionContext.Type.TRANSFORM, getFuncName(),
             Arrays.asList(intEqualsExpr, longEqualsExpr)));
@@ -64,7 +64,7 @@ public abstract class LogicalOperatorTransformFunctionTest extends BaseTransform
   public void testIllegalArguments(String[] expressions) {
     List<ExpressionContext> expressionContextList = new ArrayList<>();
     for (int i = 0; i < expressions.length; i++) {
-      expressionContextList.add(RequestContextUtils.getExpression(expressions[i]));
+      expressionContextList.add(RequestContextUtils.getExpressionFromSQL(expressions[i]));
     }
     TransformFunctionFactory.get(ExpressionContext
             .forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM, getFuncName(), expressionContextList)),

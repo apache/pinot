@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.datasketches.Util;
 import org.apache.datasketches.memory.Memory;
@@ -128,13 +127,8 @@ public class DistinctCountThetaSketchAggregationFunction extends BaseSingleInput
         ExpressionContext filterExpression = arguments.get(i);
         Preconditions.checkArgument(filterExpression.getType() == ExpressionContext.Type.LITERAL,
             "Third to second last argument of DISTINCT_COUNT_THETA_SKETCH aggregation function must be literal (filter expression)");
-        FilterContext filter;
-        try {
-          filter =
-              RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterExpression.getLiteral()));
-        } catch (SqlParseException e) {
-          throw new IllegalArgumentException("Invalid filter expression: " + filterExpression.getLiteral());
-        }
+        FilterContext filter =
+            RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterExpression.getLiteral()));
         // NOTE: Collect expressions before constructing the FilterInfo so that expressionIndexMap always include the
         //       expressions in the filter.
         collectExpressions(filter, _inputExpressions, expressionIndexMap);
@@ -145,13 +139,8 @@ public class DistinctCountThetaSketchAggregationFunction extends BaseSingleInput
       ExpressionContext postAggregationExpression = arguments.get(numArguments - 1);
       Preconditions.checkArgument(postAggregationExpression.getType() == ExpressionContext.Type.LITERAL,
           "Last argument of DISTINCT_COUNT_THETA_SKETCH aggregation function must be literal (post-aggregation expression)");
-      try {
-        _postAggregationExpression = RequestContextUtils
-            .getExpression(CalciteSqlParser.compileToExpression(postAggregationExpression.getLiteral()));
-      } catch (SqlParseException e) {
-        throw new IllegalArgumentException(
-            "Invalid post-aggregation expression: " + postAggregationExpression.getLiteral());
-      }
+      _postAggregationExpression = RequestContextUtils
+          .getExpression(CalciteSqlParser.compileToExpression(postAggregationExpression.getLiteral()));
 
       // Validate the post-aggregation expression
       _includeDefaultSketch = validatePostAggregationExpression(_postAggregationExpression, _filterEvaluators.size());

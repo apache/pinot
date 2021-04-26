@@ -33,6 +33,8 @@ import org.apache.pinot.server.api.access.AccessControl;
 import org.apache.pinot.server.api.access.AccessControlFactory;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.helix.AdminApiApplication;
+import org.apache.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.testng.Assert;
@@ -61,7 +63,8 @@ public class AccessControlTest {
     // Mock the server instance
     ServerInstance serverInstance = mock(ServerInstance.class);
 
-    _adminApiApplication = new AdminApiApplication(serverInstance, new DenyAllAccessFactory());
+    PinotConfiguration serverConf = DefaultHelixStarterServerConfig.loadDefaultServerConf();
+    _adminApiApplication = new AdminApiApplication(serverInstance, new DenyAllAccessFactory(), serverConf);
     _adminApiApplication.start(Collections.singletonList(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, "0.0.0.0",
         CommonConstants.Server.DEFAULT_ADMIN_API_PORT, CommonConstants.HTTP_PROTOCOL, new TlsConfig())));
 

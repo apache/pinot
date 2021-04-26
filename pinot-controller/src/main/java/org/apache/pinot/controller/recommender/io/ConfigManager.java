@@ -41,6 +41,7 @@ public class ConfigManager {
   PartitionConfig _partitionConfig = new PartitionConfig();
   FlaggedQueries _flaggedQueries = new FlaggedQueries();
   Map<String, Map<String, String>> _realtimeProvisioningRecommendations = new HashMap<>();
+  boolean _aggregateMetrics = false;
 
   @JsonSetter(nulls = Nulls.SKIP)
   public void setIndexConfig(IndexConfig indexConfig) {
@@ -63,6 +64,11 @@ public class ConfigManager {
     _realtimeProvisioningRecommendations = realtimeProvisioningRecommendation;
   }
 
+  @JsonSetter(nulls = Nulls.SKIP)
+  public void setAggregateMetrics(boolean aggregateMetrics) {
+    _aggregateMetrics = aggregateMetrics;
+  }
+
   public IndexConfig getIndexConfig() {
     return _indexConfig;
   }
@@ -77,5 +83,9 @@ public class ConfigManager {
 
   public Map<String, Map<String, String>> getRealtimeProvisioningRecommendations() {
     return _realtimeProvisioningRecommendations;
+  }
+
+  public boolean isAggregateMetrics() {
+    return _aggregateMetrics;
   }
 }

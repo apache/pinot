@@ -111,7 +111,7 @@ public class DefaultAggregationExecutorTest {
       }
     }
     queryBuilder.append(" FROM testTable");
-    _queryContext = QueryContextConverterUtils.getQueryContextFromPQL(queryBuilder.toString());
+    _queryContext = QueryContextConverterUtils.getQueryContextFromSQL(queryBuilder.toString());
   }
 
   /**

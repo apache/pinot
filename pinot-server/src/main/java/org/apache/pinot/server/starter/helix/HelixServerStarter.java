@@ -363,7 +363,7 @@ public class HelixServerStarter implements ServiceStartable {
 
     // Update admin API port
     LOGGER.info("Starting server admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
-    _adminApiApplication = new AdminApiApplication(_serverInstance, accessControlFactory);
+    _adminApiApplication = new AdminApiApplication(_serverInstance, accessControlFactory, _serverConf);
     _adminApiApplication.start(_listenerConfigs);
 
     // Update http admin port

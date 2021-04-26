@@ -30,7 +30,7 @@ public class MultiplicationTransformFunctionTest extends BaseTransformFunctionTe
 
   @Test
   public void testMultiplicationTransformFunction() {
-    ExpressionContext expression = RequestContextUtils.getExpression(String
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(String
         .format("mult(%s,%s,%s,%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN, FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN,
             STRING_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
@@ -44,7 +44,7 @@ public class MultiplicationTransformFunctionTest extends BaseTransformFunctionTe
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = RequestContextUtils.getExpression(String
+    expression = RequestContextUtils.getExpressionFromSQL(String
         .format("mult(mult(12,%s),%s,mult(mult(%s,%s),0.34,%s),%s)", STRING_SV_COLUMN, DOUBLE_SV_COLUMN,
             FLOAT_SV_COLUMN, LONG_SV_COLUMN, INT_SV_COLUMN, DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
@@ -58,7 +58,7 @@ public class MultiplicationTransformFunctionTest extends BaseTransformFunctionTe
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 

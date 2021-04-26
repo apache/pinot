@@ -34,6 +34,7 @@ import org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.apache.spark.SparkContext;
@@ -111,6 +112,7 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
         @Override
         public void call(String segmentTarPath)
             throws Exception {
+          PluginManager.get().init();
           for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
             PinotFSFactory
                 .register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));

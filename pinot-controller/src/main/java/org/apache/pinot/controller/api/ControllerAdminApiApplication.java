@@ -26,6 +26,7 @@ import java.util.List;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AuthenticationFilter;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
@@ -42,12 +43,14 @@ import org.slf4j.LoggerFactory;
 
 public class ControllerAdminApiApplication extends ResourceConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerAdminApiApplication.class);
+  public static final String PINOT_CONFIGURATION = "pinotConfiguration";
 
   private HttpServer _httpServer;
   private static final String RESOURCE_PACKAGE = "org.apache.pinot.controller.api.resources";
 
-  public ControllerAdminApiApplication() {
+  public ControllerAdminApiApplication(ControllerConf conf) {
     super();
+    property(PINOT_CONFIGURATION, conf);
 
     packages(RESOURCE_PACKAGE);
     // TODO See ControllerResponseFilter

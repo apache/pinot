@@ -142,7 +142,8 @@ abstract class BaseStarTreeV2Test<R, A> {
         MAX_LEAF_RECORDS);
     File indexDir = new File(TEMP_DIR, SEGMENT_NAME);
     // Randomly build star-tree using on-heap or off-heap mode
-    MultipleTreesBuilder.BuildMode buildMode = RANDOM.nextBoolean() ? MultipleTreesBuilder.BuildMode.ON_HEAP : MultipleTreesBuilder.BuildMode.OFF_HEAP;
+    MultipleTreesBuilder.BuildMode buildMode =
+        RANDOM.nextBoolean() ? MultipleTreesBuilder.BuildMode.ON_HEAP : MultipleTreesBuilder.BuildMode.OFF_HEAP;
     try (MultipleTreesBuilder builder = new MultipleTreesBuilder(Collections.singletonList(starTreeIndexConfig), false,
         indexDir, buildMode)) {
       builder.build();
@@ -183,7 +184,7 @@ abstract class BaseStarTreeV2Test<R, A> {
 
   void testQuery(String query)
       throws IOException {
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(query);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
 
     // Aggregations
     AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
