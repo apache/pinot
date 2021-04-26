@@ -381,10 +381,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
     /**
      * Check if the data type is for fixed width data (INT, LONG, FLOAT, DOUBLE)
-     * or variable width data (STRING, BYTES)
+     * or variable width data (STRING, BYTES, STRUCT, MAP, LIST)
      */
     public boolean isFixedWidth() {
-      return this != STRING && this != BYTES;
+      return this == INT || this == LONG || this == FLOAT || this == DOUBLE;
     }
 
     public boolean isNumeric() {
