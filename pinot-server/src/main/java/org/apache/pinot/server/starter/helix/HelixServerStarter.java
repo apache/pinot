@@ -234,7 +234,7 @@ public class HelixServerStarter implements ServiceStartable {
   }
 
     private void updateInstanceConfigWithMapFieldsIfNeeded(PinotConfiguration overriddenServerConfigs) {
-    if (overriddenServerConfigs.equals(_serverConf)) return;
+    if (overriddenServerConfigs == null || overriddenServerConfigs.equals(_serverConf)) return;
     Map<String, Object> pinotConfigurationMap = overriddenServerConfigs.toMap();
     String failureDomain = pinotConfigurationMap.containsKey(INSTANCE_FAILURE_DOMAIN) ?
         String.valueOf(pinotConfigurationMap.get(INSTANCE_FAILURE_DOMAIN)) : null;
