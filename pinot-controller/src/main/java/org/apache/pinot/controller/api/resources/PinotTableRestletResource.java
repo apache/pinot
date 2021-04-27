@@ -268,7 +268,7 @@ public class PinotTableRestletResource {
       StateType stateType = Constants.validateState(stateStr);
       TableType tableType = Constants.validateTableType(tableTypeStr);
 
-      // validate if user has permission to change the table state to enable/disable/drop
+      // validate if user has permission to change the table state
       String endpointUrl = request.getRequestURL().toString();
       _accessControlUtils
           .validatePermission(tableName, AccessType.UPDATE, httpHeaders, endpointUrl, _accessControlFactory.create());
