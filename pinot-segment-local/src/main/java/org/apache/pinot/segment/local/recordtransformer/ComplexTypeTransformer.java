@@ -131,7 +131,8 @@ public class ComplexTypeTransformer implements RecordTransformer {
     return copy;
   }
 
-  private GenericRow flattenMap(GenericRow record, Collection<String> columns) {
+  @VisibleForTesting
+  protected GenericRow flattenMap(GenericRow record, Collection<String> columns) {
     for (String column : columns) {
       if (record.getValue(column) instanceof Map) {
         Map<String, Object> map = (Map) record.removeValue(column);

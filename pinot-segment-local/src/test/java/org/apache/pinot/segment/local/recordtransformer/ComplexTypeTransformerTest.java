@@ -22,12 +22,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
 
 public class ComplexTypeTransformerTest {
   @Test
@@ -56,6 +58,7 @@ public class ComplexTypeTransformerTest {
     Assert.assertEquals(genericRow.getValue("map2.c"), 3);
 
     // test flattening the tuple inside the collection
+    transformer = new ComplexTypeTransformer(Arrays.asList("l1"));
     genericRow = new GenericRow();
     List<Map<String, Object>> list1 = new ArrayList<>();
     list1.add(map1);
@@ -63,7 +66,7 @@ public class ComplexTypeTransformerTest {
     List<Integer> list2 = new ArrayList<>();
     list2.add(2);
     genericRow.putValue("l2", list2);
-    transformer.transform(genericRow);
+    transformer.flattenMap(genericRow, new HashSet<>(genericRow.getFieldToValueMap().keySet()));
     Map<String, Object> map = (Map<String, Object>) ((Collection) genericRow.getValue("l1")).iterator().next();
     Assert.assertEquals(map.get("b"), "v");
     Assert.assertEquals(map.get("im1.aa"), 2);
