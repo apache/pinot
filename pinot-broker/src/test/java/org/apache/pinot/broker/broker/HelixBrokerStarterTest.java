@@ -31,6 +31,7 @@ import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
@@ -168,7 +169,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
     try {
       _helixResourceManager.addTable(newTableConfig);
       Assert.fail("Table creation should fail as testBroker does not exist");
-    } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
+    } catch (InvalidTableConfigException e) {
       // expected
     }
 

@@ -56,6 +56,9 @@ import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
+import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
+import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
@@ -151,7 +154,7 @@ public class PinotTableRestletResource {
         TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
         checkHybridTableConfig(TableNameBuilder.extractRawTableName(tableName), tableConfig);
       } catch (Exception e) {
-        throw new PinotHelixResourceManager.InvalidTableConfigException(e);
+        throw new InvalidTableConfigException(e);
       }
       _pinotHelixResourceManager.addTable(tableConfig);
       // TODO: validate that table was created successfully
@@ -159,10 +162,10 @@ public class PinotTableRestletResource {
       return new SuccessResponse("Table " + tableName + " succesfully added");
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_ADD_ERROR, 1L);
-      if (e instanceof PinotHelixResourceManager.InvalidTableConfigException) {
+      if (e instanceof InvalidTableConfigException) {
         String errStr = String.format("Invalid table config for table %s: %s", tableName, e.getMessage());
         throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST, e);
-      } else if (e instanceof PinotHelixResourceManager.TableAlreadyExistsException) {
+      } else if (e instanceof TableAlreadyExistsException) {
         throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
       } else {
         throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
@@ -382,10 +385,10 @@ public class PinotTableRestletResource {
         TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
         checkHybridTableConfig(TableNameBuilder.extractRawTableName(tableName), tableConfig);
       } catch (Exception e) {
-        throw new PinotHelixResourceManager.InvalidTableConfigException(e);
+        throw new InvalidTableConfigException(e);
       }
       _pinotHelixResourceManager.updateTableConfig(tableConfig);
-    } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
+    } catch (InvalidTableConfigException e) {
       String errStr = String.format("Failed to update configuration for %s due to: %s", tableName, e.getMessage());
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST, e);
@@ -420,7 +423,7 @@ public class PinotTableRestletResource {
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Validate table config for a table along with specified schema", notes =
-      "Deprecated. Use /configs/validate instead."
+      "Deprecated. Use /tableConfigs/validate instead."
           + "Validate given table config and schema. If specified schema is null, attempt to retrieve schema using the "
           + "table name. This API returns the table config that matches the one you get from 'GET /tables/{tableName}'."
           + " This allows us to validate table config before apply.")

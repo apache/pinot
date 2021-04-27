@@ -722,10 +722,6 @@ public final class TableConfigUtils {
     }
 
     LOGGER.info("Validating realtime and offline configs for the hybrid table: {}", rawTableName);
-    String offlineRawTableName = TableNameBuilder.extractRawTableName(offlineTableConfig.getTableName());
-    String realtimeRawTableName = TableNameBuilder.extractRawTableName(realtimeTableConfig.getTableName());
-    Preconditions.checkState(offlineRawTableName.equals(realtimeRawTableName),
-        "Raw table name for offline table: %s does not match raw table name for realtime table: %s");
     SegmentsValidationAndRetentionConfig offlineSegmentConfig = offlineTableConfig.getValidationConfig();
     SegmentsValidationAndRetentionConfig realtimeSegmentConfig = realtimeTableConfig.getValidationConfig();
     String offlineTimeColumnName = offlineSegmentConfig.getTimeColumnName();
@@ -733,7 +729,7 @@ public final class TableConfigUtils {
     if (!Objects.equal(realtimeTimeColumnName, offlineTimeColumnName)) {
       throw new IllegalStateException(String.format(
           "Time column names are different for table: %s! Offline time column name: %s. Realtime time column name: %s",
-          offlineRawTableName, offlineTimeColumnName, realtimeTimeColumnName));
+          rawTableName, offlineTimeColumnName, realtimeTimeColumnName));
     }
   }
 }

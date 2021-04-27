@@ -43,9 +43,9 @@ public class TableConfigs extends BaseJsonConfig {
       @JsonProperty(value = "offline") @Nullable TableConfig offline,
       @JsonProperty(value = "realtime") @Nullable TableConfig realtime) {
     _tableName = tableName;
+    _schema = schema;
     _offline = offline;
     _realtime = realtime;
-    _schema = schema;
   }
 
   public String getTableName() {
