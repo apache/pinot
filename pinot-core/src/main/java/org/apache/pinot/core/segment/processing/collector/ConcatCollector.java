@@ -18,50 +18,167 @@
  */
 package org.apache.pinot.core.segment.processing.collector;
 
+import com.google.common.base.Preconditions;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.util.GenericRowSerDeUtils;
+import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
- * A Collector implementation for collecting and concatenating all incoming rows
+ * A Collector implementation for collecting and concatenating all incoming rows.
  */
 public class ConcatCollector implements Collector {
-  private final List<GenericRow> _collection = new ArrayList<>();
-  private final GenericRowSorter _sorter;
+  private static final String RECORDS_FILE_NAME = "collector.records";
+
+  private final CollectorConfig _collectorConfig;
+  private final List<FieldSpec> _fieldSpecs = new ArrayList<>();
+  private final Comparator<GenericRow> _genericRowComparator;
+  private int _numDocs;
+
+  private File _workingDir;
+  private File _collectorRecordFile;
+  // TODO: Avoid using BufferedOutputStream, and use ByteBuffer directly.
+  //  However, ByteBuffer has a limitation that the size cannot exceed 2G.
+  //  There are no limits on the size of data inserted into the {@link Collector}.
+  //  Hence, would need to implement a hybrid approach or a trigger a flush when size exceeds on Collector.
+  private BufferedOutputStream _collectorRecordOutputStream;
+  private List<Long> _collectorRecordOffsets;
+  private PinotDataBuffer _collectorRecordBuffer;
 
   public ConcatCollector(CollectorConfig collectorConfig, Schema schema) {
+
+    _collectorConfig = collectorConfig;
+    for (FieldSpec spec : schema.getAllFieldSpecs()) {
+      if (!spec.isVirtualColumn()) {
+        _fieldSpecs.add(spec);
+      }
+    }
     List<String> sortOrder = collectorConfig.getSortOrder();
     if (CollectionUtils.isNotEmpty(sortOrder)) {
-      _sorter = new GenericRowSorter(sortOrder, schema);
+      GenericRowSorter sorter = new GenericRowSorter(sortOrder, schema);
+      _genericRowComparator = sorter.getGenericRowComparator();
     } else {
-      _sorter = null;
+      _genericRowComparator = null;
     }
+
+    initializeBuffer();
+  }
+
+  private void initializeBuffer() {
+    _workingDir =
+        new File(FileUtils.getTempDirectory(), String.format("concat_collector_%d", System.currentTimeMillis()));
+    Preconditions.checkState(_workingDir.mkdirs(), "Failed to create dir: %s for %s with config: %s",
+        _workingDir.getAbsolutePath(), ConcatCollector.class.getSimpleName(), _collectorConfig);
+
+    _collectorRecordFile = new File(_workingDir, RECORDS_FILE_NAME);
+    Preconditions.checkState(!_collectorRecordFile.exists(),
+        "Collector record file: " + _collectorRecordFile + " already exists");
+    try {
+      _collectorRecordOutputStream = new BufferedOutputStream(new FileOutputStream(_collectorRecordFile));
+    } catch (FileNotFoundException e) {
+      throw new RuntimeException(e);
+    }
+    _collectorRecordOffsets = new ArrayList<>();
+    _collectorRecordOffsets.add(0L);
+    _numDocs = 0;
   }
 
   @Override
-  public void collect(GenericRow genericRow) {
-    _collection.add(genericRow);
+  public void collect(GenericRow genericRow)
+      throws IOException {
+    byte[] genericRowBytes = GenericRowSerDeUtils.serializeGenericRow(genericRow, _fieldSpecs);
+    _collectorRecordOutputStream.write(genericRowBytes);
+    _collectorRecordOffsets.add(_collectorRecordOffsets.get(_numDocs) + genericRowBytes.length);
+    _numDocs++;
   }
 
   @Override
-  public Iterator<GenericRow> iterator() {
-    if (_sorter != null) {
-      _sorter.sort(_collection);
+  public Iterator<GenericRow> iterator()
+      throws IOException {
+
+    _collectorRecordOutputStream.flush();
+
+    int[] sortedDocIds = new int[_numDocs];
+    for (int i = 0; i < _numDocs; i++) {
+      sortedDocIds[i] = i;
     }
-    return _collection.iterator();
+
+    _collectorRecordBuffer = PinotDataBuffer
+        .mapFile(_collectorRecordFile, true, 0, _collectorRecordOffsets.get(_numDocs), PinotDataBuffer.NATIVE_ORDER,
+            "ConcatCollector: generic row buffer");
+
+
+    // TODO: A lot of this code can be made common across Collectors, once {@link RollupCollector} is also converted to off heap implementation
+    if (_genericRowComparator != null) {
+      it.unimi.dsi.fastutil.Arrays.quickSort(0, _numDocs, (i1, i2) -> {
+        long startOffset1 = _collectorRecordOffsets.get(sortedDocIds[i1]);
+        long startOffset2 = _collectorRecordOffsets.get(sortedDocIds[i2]);
+        GenericRow row1 = GenericRowSerDeUtils
+            .deserializeGenericRow(_collectorRecordBuffer, startOffset1, _fieldSpecs, new GenericRow());
+        GenericRow row2 = GenericRowSerDeUtils
+            .deserializeGenericRow(_collectorRecordBuffer, startOffset2, _fieldSpecs, new GenericRow());
+        return _genericRowComparator.compare(row1, row2);
+      }, (i1, i2) -> {
+        int temp = sortedDocIds[i1];
+        sortedDocIds[i1] = sortedDocIds[i2];
+        sortedDocIds[i2] = temp;
+      });
+    }
+
+    return new Iterator<GenericRow>() {
+      final GenericRow reuse = new GenericRow();
+      int _nextDocId = 0;
+
+      @Override
+      public boolean hasNext() {
+        return _nextDocId < _numDocs;
+      }
+
+      @Override
+      public GenericRow next() {
+        long offset = _collectorRecordOffsets.get(sortedDocIds[_nextDocId++]);
+        return GenericRowSerDeUtils.deserializeGenericRow(_collectorRecordBuffer, offset, _fieldSpecs, reuse);
+      }
+    };
   }
 
   @Override
   public int size() {
-    return _collection.size();
+    return _numDocs;
   }
 
   @Override
-  public void reset() {
-    _collection.clear();
+  public void reset()
+      throws IOException {
+    close();
+    initializeBuffer();
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+    try {
+      if (_collectorRecordBuffer != null) {
+        _collectorRecordBuffer.close();
+      }
+      if (_collectorRecordOutputStream != null) {
+        _collectorRecordOutputStream.close();
+      }
+    } finally {
+      FileUtils.deleteQuietly(_workingDir);
+    }
   }
 }
