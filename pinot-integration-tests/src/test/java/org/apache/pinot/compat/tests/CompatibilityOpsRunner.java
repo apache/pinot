@@ -21,11 +21,17 @@ package org.apache.pinot.compat.tests;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class CompatibilityOpsRunner {
-  private static final String ROOT_DIR = "compat-tests";
+  private static final Logger LOGGER = LoggerFactory.getLogger(CompatibilityOpsRunner.class);
 
+  private String _parentDir;
   private final String _configFileName;
   private int _generationNumber;
 
@@ -35,15 +41,17 @@ public class CompatibilityOpsRunner {
   }
 
   private boolean runOps() throws Exception {
-    String filePath = ROOT_DIR + "/" + _configFileName;
-    InputStream inputStream = getClass().getClassLoader().getResourceAsStream(filePath);
+    Path path = Paths.get(_configFileName);
+    _parentDir = path.getParent().toString();
+    InputStream inputStream = Files.newInputStream(path);
 
     ObjectMapper om = new ObjectMapper(new YAMLFactory());
     CompatTestOperation operation = om.readValue(inputStream, CompatTestOperation.class);
-    System.out.println("Running compat verifications from file:" + filePath + "(" + operation.getDescription() + ")");
+    LOGGER.info("Running compat verifications from file:{} ({})", path.toString(), operation.getDescription());
 
     boolean passed = true;
     for (BaseOp op : operation.getOperations()) {
+      op.setParentDir(_parentDir);
       if (!op.run(_generationNumber)) {
         passed = false;
         System.out.println("Failure");

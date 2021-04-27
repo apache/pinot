@@ -17,13 +17,9 @@
 # under the License.
 #
 
-description: Yaml file for publishing rows to Kafka topic PinotRealtimeFeatureTest1Event
+description: Yaml file for query ops
 operations:
-  - type: streamOp
-    description: publish rows to PinotRealtimeFeatureTest1Event
-    op: PRODUCE
-    streamConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/feature-test-1-realtime-stream-config.json
-    numRows: 1
-    inputDataFileName: pinot-integration-tests/src/test/resources/compat-tests/data/FeatureTest1-data-00.csv
-    recordReaderConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/data/recordReaderConfig.json
-    tableConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/feature-test-1-realtime.json
+  - type: queryOp
+    description: Run query on FeatureTest1 using SQL
+    queryFileName: queries/feature-test-1-sql.queries
+    expectedResultsFileName: query-results/feature-test-1-rest-sql.results

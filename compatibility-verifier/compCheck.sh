@@ -43,7 +43,7 @@
 # get usage of the script
 function usage() {
   command=$1
-  echo "Usage: $command [workingDir]"
+  echo "Usage: $command workingDir testSuiteDir"
   exit 1
 }
 
@@ -146,11 +146,21 @@ function setupCompatTester() {
   export CLASSPATH_PREFIX
 }
 
+#compute absolute path for testSuiteDir if given relative
+function absPath() {
+  local testSuiteDirPath=$1
+  if [[ ! "$testSuiteDirPath" = /* ]]; then
+    #relative path
+    testSuiteDirPath=$(cd "$testSuiteDirPath"; pwd)
+  fi
+  echo "$testSuiteDirPath"
+}
+
 #
 # Main
 #
 
-if [ $# -ne 1 ] ; then
+if [ $# -ne 2 ] ; then
   usage compCheck
 fi
 
@@ -158,6 +168,7 @@ COMPAT_TESTER_PATH="pinot-integration-tests/target/pinot-integration-tests-pkg/b
 
 # create subdirectories for given commits
 workingDir=$1
+testSuiteDir=$(absPath "$2")
 oldTargetDir="$workingDir"/oldTargetDir
 newTargetDir="$workingDir"/newTargetDir
 
@@ -172,30 +183,31 @@ fi
 
 
 # Setup initial cluster with olderCommit and do rolling upgrade
+# Provide abspath of filepath to $COMPAT_TESTER
 startServices "$oldTargetDir"
-#$COMPAT_TESTER pre-controller-upgrade.yaml 1; if [ $? -ne 0 ]; then exit 1; fi
+#$COMPAT_TESTER $testSuiteDir/pre-controller-upgrade.yaml 1; if [ $? -ne 0 ]; then exit 1; fi
 stopService controller "$oldTargetDir"
 startService controller "$newTargetDir"
 waitForControllerReady
-#$COMPAT_TESTER pre-broker-upgrade.yaml 2; if [ $? -ne 0 ]; then exit 1; fi
+#$COMPAT_TESTER $testSuiteDir/pre-broker-upgrade.yaml 2; if [ $? -ne 0 ]; then exit 1; fi
 stopService broker "$oldTargetDir"
 startService broker "$newTargetDir"
-#$COMPAT_TESTER pre-server-upgrade.yaml 3; if [ $? -ne 0 ]; then exit 1; fi
+#$COMPAT_TESTER $testSuiteDir/pre-server-upgrade.yaml 3; if [ $? -ne 0 ]; then exit 1; fi
 stopService server "$oldTargetDir"
 startService server "$newTargetDir"
-#$COMPAT_TESTER post-server-upgrade.yaml 4; if [ $? -ne 0 ]; then exit 1; fi
+#$COMPAT_TESTER $testSuiteDir/post-server-upgrade.yaml 4; if [ $? -ne 0 ]; then exit 1; fi
 
 # Upgrade completed, now do a rollback
 stopService server "$newTargetDir"
 startService server "$oldTargetDir"
-#$COMPAT_TESTER post-server-rollback.yaml 5; if [ $? -ne 0 ]; then exit 1; fi
+#$COMPAT_TESTER $testSuiteDir/post-server-rollback.yaml 5; if [ $? -ne 0 ]; then exit 1; fi
 stopService broker "$newTargetDir"
 startService broker "$oldTargetDir"
-#$COMPAT_TESTER post-broker-rollback.yaml 6; if [ $? -ne 0 ]; then exit 1; fi
+#$COMPAT_TESTER $testSuiteDir/post-broker-rollback.yaml 6; if [ $? -ne 0 ]; then exit 1; fi
 stopService controller "$newTargetDir"
 startService controller "$oldTargetDir"
 waitForControllerReady
-#$COMPAT_TESTER post-controller-rollback.yaml 7; if [ $? -ne 0 ]; then exit 1; fi
+#$COMPAT_TESTER $testSuiteDir/post-controller-rollback.yaml 7; if [ $? -ne 0 ]; then exit 1; fi
 stopServices "$oldTargetDir"
 
 exit 0

@@ -17,10 +17,9 @@
 # under the License.
 #
 
-description: Yaml file for creating a realtime table
+description: Yaml file for creating Kafka topic PinotRealtimeFeatureTest1Event
 operations:
-  - type: tableOp
-    description: Create table feature-test-1-realtime.json
+  - type: streamOp
+    description: create Kafka topic PinotRealtimeFeatureTest1Event
     op: CREATE
-    schemaFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/FeatureTest1-schema.json
-    tableConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/feature-test-1-realtime.json
+    streamConfigFileName: feature-test-1-realtime-stream-config.json

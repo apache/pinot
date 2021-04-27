@@ -17,13 +17,13 @@
 # under the License.
 #
 
-# Operations to be done.
-description: Yaml file for uploading a segment
+description: Yaml file for publishing rows to Kafka topic PinotRealtimeFeatureTest1Event
 operations:
-  - type: segmentOp
-    description: Build and upload segment using FeatureTest1-data-00.csv
-    op: UPLOAD
-    inputDataFileName: pinot-integration-tests/src/test/resources/compat-tests/data/FeatureTest1-data-00.csv
-    schemaFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/FeatureTest1-schema.json
-    tableConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/feature-test-1.json
-    recordReaderConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/data/recordReaderConfig.json
+  - type: streamOp
+    description: publish rows to PinotRealtimeFeatureTest1Event
+    op: PRODUCE
+    streamConfigFileName: feature-test-1-realtime-stream-config.json
+    numRows: 1
+    inputDataFileName: data/FeatureTest1-data-00.csv
+    recordReaderConfigFileName: data/recordReaderConfig.json
+    tableConfigFileName: feature-test-1-realtime.json
