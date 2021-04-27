@@ -79,24 +79,23 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
     Function function = expression.getFunctionCall();
     List<Expression> operands = function.getOperands();
     String operator = function.getOperator();
-    if (!(operator.equals(FilterKind.EQUALS.name()) || operator.equals(FilterKind.NOT_EQUALS.name()))) {
-      // This is not an EQUALS or NOT_EQUALS function, but one of its operands may be an EQUALS function so
-      // recursively traverse the expression tree to see if we find an EQUALS function to rewrite.
+    if (operator.equals(FilterKind.AND.name()) || operator.equals(FilterKind.OR.name())) {
+      // One of the operands may be an EQUALS or NOT_EQUALS function so recursively traverse the expression tree to see
+      // if we find an EQUALS or NOT_EQUALS function to rewrite.
       operands.forEach(operand -> optimize(operand, schema));
 
       // We have rewritten the child operands, so rewrite the parent if needed.
       return optimizeCurrent(expression);
+    } else if (operator.equals(FilterKind.EQUALS.name()) || operator.equals(FilterKind.NOT_EQUALS.name())) {
+      // Verify that LHS is a numeric column and RHS is a numeric literal before rewriting.
+      Expression lhs = operands.get(0), rhs = operands.get(1);
+      if (isNumericColumn(lhs, schema) && isNumericLiteral(rhs)) {
+        // Rewrite the expression.
+        return rewrite(expression, lhs, rhs, schema);
+      }
     }
 
-    // If we are here, then this expression must have EQUALS operator. Verify that LHS is a numeric column and RHS is
-    // a numeric literal before proceeding further.
-    Expression lhs = operands.get(0), rhs = operands.get(1);
-    if (!(isNumericColumn(lhs, schema) && isNumericLiteral(rhs))) {
-      return expression;
-    }
-
-    // Rewrite the expression.
-    return rewrite(expression, lhs, rhs, schema);
+    return expression;
   }
 
   /**

@@ -104,6 +104,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRequestHandler.class);
   private static final String IN_SUBQUERY = "inSubquery";
   private static final Literal FALSE = Literal.boolValue(false);
+  private static final Literal TRUE = Literal.boolValue(true);
 
   protected final PinotConfiguration _config;
   protected final RoutingManager _routingManager;
@@ -199,8 +200,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // Compile the request
     long compilationStartTimeNs = System.nanoTime();
     BrokerRequest brokerRequest;
+    String queryFormat = pinotQueryRequest.getQueryFormat().toLowerCase();
     try {
-      brokerRequest = PinotQueryParserFactory.get(pinotQueryRequest.getQueryFormat()).compileToBrokerRequest(query);
+      brokerRequest = PinotQueryParserFactory.get(queryFormat).compileToBrokerRequest(query);
     } catch (Exception e) {
       LOGGER.info("Caught exception while compiling request {}: {}, {}", requestId, query, e.getMessage());
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
@@ -347,12 +349,35 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     // Check if response can be send without server query evaluation.
-    if (isResponsePossible(offlineBrokerRequest) && isResponsePossible(realtimeBrokerRequest)) {
-      BrokerResponse brokerResponse = BrokerResponseNative.empty();
-      logBrokerResponse(requestStatistics, requestId, query, compilationStartTimeNs, brokerRequest, 0,
-          new ServerStats(), brokerResponse, System.nanoTime());
+    if (queryFormat.equals(Broker.Request.SQL)) {
+      if (isFilterAlwaysFalse(offlineBrokerRequest)) {
+        // We don't need to evaluate offline request
+        offlineBrokerRequest = null;
+      }
 
-      return brokerResponse;
+      if (isFilterAlwaysFalse(realtimeBrokerRequest)) {
+        // We don't need to evaluate realtime request
+        realtimeBrokerRequest = null;
+      }
+
+      if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
+        // Send empty response since we don't need to evaluate either offline or realtime request.
+        BrokerResponse brokerResponse = BrokerResponseNative.empty();
+        logBrokerResponse(requestStatistics, requestId, query, compilationStartTimeNs, brokerRequest, 0,
+            new ServerStats(), brokerResponse, System.nanoTime());
+
+        return brokerResponse;
+      }
+
+      if (isFilterAlwaysTrue(offlineBrokerRequest)) {
+        // Drop offline request filter since it is always true
+        offlineBrokerRequest.getPinotQuery().setFilterExpression(null);
+      }
+
+      if (isFilterAlwaysTrue(realtimeBrokerRequest)) {
+        // Drop realtime request filter since it is always true
+        realtimeBrokerRequest.getPinotQuery().setFilterExpression(null);
+      }
     }
 
     // Calculate routing table for the query
@@ -443,14 +468,18 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     return brokerResponse;
   }
 
-  /**
-   * Given a {@link BrokerRequest}, this function will determine if we can return a response without server-side query
-   * evaluation. This happens when the optimizer determines that the entire WHERE clause evaluates to false.
-   */
-  private boolean isResponsePossible(BrokerRequest brokerRequest) {
+  /** Given a {@link BrokerRequest}, check if the WHERE clause will always evaluate to false. */
+  private boolean isFilterAlwaysFalse(BrokerRequest brokerRequest) {
     return brokerRequest == null || brokerRequest.getPinotQuery() == null || (
         brokerRequest.getPinotQuery().getFilterExpression() != null && brokerRequest.getPinotQuery()
             .getFilterExpression().equals(FALSE));
+  }
+
+  /** Given a {@link BrokerRequest}, check if the WHERE clause will always evaluate to true. */
+  private boolean isFilterAlwaysTrue(BrokerRequest brokerRequest) {
+    return brokerRequest != null && brokerRequest.getPinotQuery() != null
+        && brokerRequest.getPinotQuery().getFilterExpression() != null && brokerRequest.getPinotQuery()
+        .getFilterExpression().equals(TRUE);
   }
 
   /** Log {@link BrokerResponse} related information */
