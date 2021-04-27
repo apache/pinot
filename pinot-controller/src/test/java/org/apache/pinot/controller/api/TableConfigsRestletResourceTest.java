@@ -292,6 +292,15 @@ public class TableConfigsRestletResourceTest {
     Assert.assertEquals(tableConfigsResponse.getOffline().getTableName(), offlineTableConfig.getTableName());
     Assert.assertEquals(tableConfigsResponse.getRealtime().getTableName(), realtimeTableConfig.getTableName());
     Assert.assertEquals(tableConfigsResponse.getSchema().getSchemaName(), schema.getSchemaName());
+
+    // test POST of existing configs fails
+    try {
+      ControllerTestUtils.sendPostRequest(_createTableConfigsUrl, tableConfigs.toPrettyJsonString());
+      Assert.fail("Should fail for trying to add existing config");
+    } catch (Exception e) {
+      // expected
+    }
+
     ControllerTestUtils
         .sendDeleteRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
 
@@ -426,6 +435,15 @@ public class TableConfigsRestletResourceTest {
     TableConfig realtimeTableConfig = getRealtimeTableConfig(tableName);
     Schema schema = getSchema(tableName);
     TableConfigs tableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, null);
+    // PUT before POST should fail
+    try {
+      ControllerTestUtils
+          .sendPutRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableConfigsUpdate(tableName),
+              tableConfigs.toPrettyJsonString());
+      Assert.fail("Should fail for trying to PUT config before creating via POST");
+    } catch (Exception e) {
+      // expected
+    }
     ControllerTestUtils.sendPostRequest(_createTableConfigsUrl, tableConfigs.toPrettyJsonString());
     String response = ControllerTestUtils
         .sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableConfigsGet(tableName));
