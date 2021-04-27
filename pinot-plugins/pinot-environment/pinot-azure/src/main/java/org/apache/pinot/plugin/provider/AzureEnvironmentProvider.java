@@ -60,6 +60,7 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
   private int _maxRetry;
   private String _imdsEndpoint;
   private CloseableHttpClient _closeableHttpClient;
+  private static final String PLATFORM_FAULT_DOMAIN = "platformFaultDomain";
 
   public AzureEnvironmentProvider() {
   }

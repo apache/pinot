@@ -20,9 +20,8 @@ package org.apache.pinot.spi.utils;
 
 import java.io.File;
 
-public class CommonConstants {
 
-  public static final String PLATFORM_FAULT_DOMAIN = "platformFaultDomain";
+public class CommonConstants {
 
   public static final String PREFIX_OF_SSL_SUBSET = "ssl";
   public static final String HTTP_PROTOCOL = "http";
@@ -348,6 +347,8 @@ public class CommonConstants {
 
     // Environment Provider Configs
     public static final String PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY = "pinot.server.environmentProvider.factory";
+    public static final String CONFIG_OF_ENABLE_ENVIRONMENT_PROVIDER_FACTORY = "pinot.server.environmentProvider.enabled";
+    public static final String CONFIG_OF_ENVIRONMENT_PROVIDER_TYPE = "pinot.server.environmentProvider.type";
   }
 
   public static class Controller {

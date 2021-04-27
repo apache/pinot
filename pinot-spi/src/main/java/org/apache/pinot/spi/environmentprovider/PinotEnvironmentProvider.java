@@ -29,7 +29,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 public interface PinotEnvironmentProvider {
 
   String INSTANCE_FAILURE_DOMAIN = "pinot.environment.instance.failureDomain";
-
   /**
    * Customize base pinot configuration to add environment variable & instance specific configuration
    * @param baseConfiguration Base configuration provided by the invoking service
@@ -41,5 +40,4 @@ public interface PinotEnvironmentProvider {
    * Initializes the configurations specific to an environment provider.
    */
   void init(PinotConfiguration pinotConfiguration);
-
 }
