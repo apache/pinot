@@ -36,7 +36,7 @@ import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Range;
-import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -44,7 +44,6 @@ import static org.testng.Assert.*;
 
 public class QueryOptimizerTest {
   private static final QueryOptimizer OPTIMIZER = new QueryOptimizer();
-  private static final CalciteSqlCompiler SQL_COMPILER = new CalciteSqlCompiler();
   private static final Pql2Compiler PQL_COMPILER = new Pql2Compiler();
   private static final Schema SCHEMA =
       new Schema.SchemaBuilder().setSchemaName("testTable").addSingleValueDimension("int", DataType.INT)
@@ -56,18 +55,13 @@ public class QueryOptimizerTest {
   public void testNoFilter() {
     String query = "SELECT * FROM testTable";
 
-    BrokerRequest sqlBrokerRequest = SQL_COMPILER.compileToBrokerRequest(query);
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    BrokerRequest pqlBrokerRequest = PQL_COMPILER.compileToBrokerRequest(query);
+    BrokerRequest brokerRequest = PQL_COMPILER.compileToBrokerRequest(query);
+    OPTIMIZER.optimize(brokerRequest, SCHEMA);
+    assertNull(brokerRequest.getFilterQuery());
 
-    OPTIMIZER.optimize(sqlBrokerRequest, SCHEMA);
-    assertNull(sqlBrokerRequest.getFilterQuery());
-
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     OPTIMIZER.optimize(pinotQuery, SCHEMA);
     assertNull(pinotQuery.getFilterExpression());
-
-    OPTIMIZER.optimize(pqlBrokerRequest, SCHEMA);
-    assertNull(pqlBrokerRequest.getFilterQuery());
   }
 
   @Test
@@ -75,11 +69,8 @@ public class QueryOptimizerTest {
     String query =
         "SELECT * FROM testTable WHERE ((int = 4 OR (long = 5 AND (float = 9 AND double = 7.5))) OR string = 'foo') OR bytes = 'abc'";
 
-    BrokerRequest sqlBrokerRequest = SQL_COMPILER.compileToBrokerRequest(query);
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    BrokerRequest pqlBrokerRequest = PQL_COMPILER.compileToBrokerRequest(query);
-
-    for (BrokerRequest brokerRequest : Arrays.asList(sqlBrokerRequest, pqlBrokerRequest)) {
+    {
+      BrokerRequest brokerRequest = PQL_COMPILER.compileToBrokerRequest(query);
       OPTIMIZER.optimize(brokerRequest, SCHEMA);
       FilterQueryTree filterQueryTree = RequestUtils.buildFilterQuery(brokerRequest.getFilterQuery().getId(),
           brokerRequest.getFilterSubQueryMap().getFilterQueryMap());
@@ -99,6 +90,7 @@ public class QueryOptimizerTest {
       assertEquals(andFilterChildren.get(2).toString(), "double EQUALITY [7.5]");
     }
 
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     OPTIMIZER.optimize(pinotQuery, SCHEMA);
     Function filterFunction = pinotQuery.getFilterExpression().getFunctionCall();
     assertEquals(filterFunction.getOperator(), FilterKind.OR.name());
@@ -129,11 +121,8 @@ public class QueryOptimizerTest {
     String query =
         "SELECT * FROM testTable WHERE int IN (1, 1) AND (long IN (2, 3) OR long IN (3, 4) OR long = 2) AND (float = 3.5 OR double IN (1.1, 1.2) OR float = 4.5 OR float > 5.5 OR double = 1.3)";
 
-    BrokerRequest sqlBrokerRequest = SQL_COMPILER.compileToBrokerRequest(query);
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    BrokerRequest pqlBrokerRequest = PQL_COMPILER.compileToBrokerRequest(query);
-
-    for (BrokerRequest brokerRequest : Arrays.asList(sqlBrokerRequest, pqlBrokerRequest)) {
+    {
+      BrokerRequest brokerRequest = PQL_COMPILER.compileToBrokerRequest(query);
       OPTIMIZER.optimize(brokerRequest, SCHEMA);
       FilterQueryTree filterQueryTree = RequestUtils.buildFilterQuery(brokerRequest.getFilterQuery().getId(),
           brokerRequest.getFilterSubQueryMap().getFilterQueryMap());
@@ -170,6 +159,7 @@ public class QueryOptimizerTest {
       }
     }
 
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     OPTIMIZER.optimize(pinotQuery, SCHEMA);
     Function filterFunction = pinotQuery.getFilterExpression().getFunctionCall();
     assertEquals(filterFunction.getOperator(), FilterKind.AND.name());
@@ -218,11 +208,8 @@ public class QueryOptimizerTest {
     String query =
         "SELECT * FROM testTable WHERE (int > 10 AND int <= 100 AND int BETWEEN 10 AND 20) OR (float BETWEEN 5.5 AND 7.5 AND float = 6 AND float < 6.5 AND float BETWEEN 6 AND 8) OR (string > '123' AND string > '23') OR (mvInt > 5 AND mvInt < 0)";
 
-    BrokerRequest sqlBrokerRequest = SQL_COMPILER.compileToBrokerRequest(query);
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    BrokerRequest pqlBrokerRequest = PQL_COMPILER.compileToBrokerRequest(query);
-
-    for (BrokerRequest brokerRequest : Arrays.asList(sqlBrokerRequest, pqlBrokerRequest)) {
+    {
+      BrokerRequest brokerRequest = PQL_COMPILER.compileToBrokerRequest(query);
       OPTIMIZER.optimize(brokerRequest, SCHEMA);
       FilterQueryTree filterQueryTree = RequestUtils.buildFilterQuery(brokerRequest.getFilterQuery().getId(),
           brokerRequest.getFilterSubQueryMap().getFilterQueryMap());
@@ -247,6 +234,7 @@ public class QueryOptimizerTest {
       assertEquals(fourthChild.getChildren().get(1).toString(), "mvInt RANGE [(*\0000)]");
     }
 
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     OPTIMIZER.optimize(pinotQuery, SCHEMA);
     Function filterFunction = pinotQuery.getFilterExpression().getFunctionCall();
     assertEquals(filterFunction.getOperator(), FilterKind.OR.name());
@@ -334,26 +322,18 @@ public class QueryOptimizerTest {
   }
 
   private static void testQuery(String actual, String expected) {
-    BrokerRequest actualSqlBrokerRequest = SQL_COMPILER.compileToBrokerRequest(actual);
-    OPTIMIZER.optimize(actualSqlBrokerRequest, SCHEMA);
-    PinotQuery actualPinotQuery = actualSqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(actualPinotQuery, SCHEMA);
-    BrokerRequest actualPqlBrokerRequest = PQL_COMPILER.compileToBrokerRequest(actual);
-    OPTIMIZER.optimize(actualPqlBrokerRequest, SCHEMA);
-
+    BrokerRequest actualBrokerRequest = PQL_COMPILER.compileToBrokerRequest(actual);
+    OPTIMIZER.optimize(actualBrokerRequest, SCHEMA);
     // Also optimize the expected query because the expected range can only be generate via optimizer
-    BrokerRequest expectedSqlBrokerRequest = SQL_COMPILER.compileToBrokerRequest(expected);
-    OPTIMIZER.optimize(expectedSqlBrokerRequest, SCHEMA);
-    PinotQuery expectedPinotQuery = expectedSqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(expectedPinotQuery, SCHEMA);
-    BrokerRequest expectedPqlBrokerRequest = PQL_COMPILER.compileToBrokerRequest(expected);
-    OPTIMIZER.optimize(expectedPqlBrokerRequest, SCHEMA);
+    BrokerRequest expectedBrokerRequest = PQL_COMPILER.compileToBrokerRequest(expected);
+    OPTIMIZER.optimize(expectedBrokerRequest, SCHEMA);
+    compareBrokerRequest(actualBrokerRequest, expectedBrokerRequest);
 
-    // Cross compare PQL and SQL BrokerRequest
-    compareBrokerRequest(actualPqlBrokerRequest, expectedPqlBrokerRequest);
-    compareBrokerRequest(actualPqlBrokerRequest, expectedSqlBrokerRequest);
-    compareBrokerRequest(actualSqlBrokerRequest, expectedPqlBrokerRequest);
-    compareBrokerRequest(actualSqlBrokerRequest, expectedSqlBrokerRequest);
+    PinotQuery actualPinotQuery = CalciteSqlParser.compileToPinotQuery(actual);
+    OPTIMIZER.optimize(actualPinotQuery, SCHEMA);
+    // Also optimize the expected query because the expected range can only be generate via optimizer
+    PinotQuery expectedPinotQuery = CalciteSqlParser.compileToPinotQuery(expected);
+    OPTIMIZER.optimize(expectedPinotQuery, SCHEMA);
     comparePinotQuery(actualPinotQuery, expectedPinotQuery);
   }
 

@@ -24,6 +24,10 @@ import org.apache.pinot.common.request.BrokerRequest;
 /**
  * Interface for Pinot Query compilers.
  */
-public interface AbstractCompiler {
-  BrokerRequest compileToBrokerRequest(String expression);
+public interface QueryCompiler {
+
+  /**
+   * Compiles the given query into a broker request.
+   */
+  BrokerRequest compileToBrokerRequest(String query);
 }

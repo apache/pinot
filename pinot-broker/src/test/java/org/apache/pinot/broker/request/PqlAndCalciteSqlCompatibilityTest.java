@@ -26,8 +26,9 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.parsers.utils.BrokerRequestComparisonUtils;
+import org.apache.pinot.pql.parsers.PinotQuery2BrokerRequestConverter;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
-import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -38,7 +39,6 @@ import org.testng.annotations.Test;
  */
 public class PqlAndCalciteSqlCompatibilityTest {
   private static final Pql2Compiler PQL_COMPILER = new Pql2Compiler();
-  private static final CalciteSqlCompiler SQL_COMPILER = new CalciteSqlCompiler();
 
   // OPTIMIZER is used to flatten certain queries with filtering optimization.
   // The reason is that SQL parser will parse the structure into a binary tree mode.
@@ -78,7 +78,8 @@ public class PqlAndCalciteSqlCompatibilityTest {
   private void testPqlSqlCompatibilityHelper(String pql, String sql) {
     BrokerRequest pqlBrokerRequest = PQL_COMPILER.compileToBrokerRequest(pql);
     OPTIMIZER.optimize(pqlBrokerRequest, null);
-    BrokerRequest sqlBrokerRequest = SQL_COMPILER.compileToBrokerRequest(sql);
+    PinotQuery2BrokerRequestConverter converter = new PinotQuery2BrokerRequestConverter();
+    BrokerRequest sqlBrokerRequest = converter.convert(CalciteSqlParser.compileToPinotQuery(sql));
     OPTIMIZER.optimize(sqlBrokerRequest, null);
     Assert.assertTrue(BrokerRequestComparisonUtils.validate(pqlBrokerRequest, sqlBrokerRequest));
   }
@@ -131,7 +132,8 @@ public class PqlAndCalciteSqlCompatibilityTest {
   private void testPqlSqlOrderByCompatibilityHelper(String pql, String sql, String orderByColumn) {
     BrokerRequest pqlBrokerRequest = PQL_COMPILER.compileToBrokerRequest(pql);
     OPTIMIZER.optimize(pqlBrokerRequest, null);
-    BrokerRequest sqlBrokerRequest = SQL_COMPILER.compileToBrokerRequest(sql);
+    PinotQuery2BrokerRequestConverter converter = new PinotQuery2BrokerRequestConverter();
+    BrokerRequest sqlBrokerRequest = converter.convert(CalciteSqlParser.compileToPinotQuery(sql));
     OPTIMIZER.optimize(sqlBrokerRequest, null);
     Assert.assertTrue(BrokerRequestComparisonUtils.validate(pqlBrokerRequest, sqlBrokerRequest, /*ignoreOrderBy*/true));
 
