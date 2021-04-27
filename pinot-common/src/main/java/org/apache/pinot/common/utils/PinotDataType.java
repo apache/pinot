@@ -42,6 +42,24 @@ import org.apache.pinot.spi.utils.TimestampUtils;
  */
 public enum PinotDataType {
 
+  /**
+   * When converting from BOOLEAN to other types:
+   * - Numeric types:
+   *   - true -> 1
+   *   - false -> 0
+   * - String:
+   *   - true -> "true"
+   *   - false -> "false"
+   *
+   * When converting to BOOLEAN from other types:
+   * - Numeric types:
+   *   - 0 -> false
+   *   - Others -> true
+   * - String:
+   *   - "true" (case-insensitive) -> true
+   *   - "1" -> true (for backward-compatibility where we used to use integer 1 to represent true)
+   *   - Others ->  false
+   */
   BOOLEAN {
     @Override
     public int toInt(Object value) {
@@ -408,6 +426,17 @@ public enum PinotDataType {
     }
   },
 
+  /**
+   * When converting from TIMESTAMP to other types:
+   * - LONG/DOUBLE: millis since epoch value
+   * - String: SQL timestamp format (e.g. "2021-01-01 01:01:01.001")
+   *
+   * When converting to TIMESTAMP from other types:
+   * - LONG/DOUBLE: read long value as millis since epoch
+   * - String:
+   *   - SQL timestamp format (e.g. "2021-01-01 01:01:01.001")
+   *   - Millis since epoch value (e.g. "1609491661001")
+   */
   TIMESTAMP {
     @Override
     public int toInt(Object value) {
@@ -431,7 +460,7 @@ public enum PinotDataType {
 
     @Override
     public boolean toBoolean(Object value) {
-      return ((Timestamp) value).getTime() != 0;
+      throw new UnsupportedOperationException("Cannot convert value from TIMESTAMP to BOOLEAN");
     }
 
     @Override
