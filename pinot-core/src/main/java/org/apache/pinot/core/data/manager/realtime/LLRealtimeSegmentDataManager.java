@@ -20,13 +20,11 @@ package org.apache.pinot.core.data.manager.realtime;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -1132,8 +1130,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   // If the transition is OFFLINE to ONLINE, the caller should have downloaded the segment and we don't reach here.
   public LLRealtimeSegmentDataManager(RealtimeSegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
       RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, IndexLoadingConfig indexLoadingConfig,
-      Schema schema, LLCSegmentName llcSegmentName, Semaphore partitionGroupConsumerSemaphore, ServerMetrics serverMetrics,
-      @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
+      Schema schema, LLCSegmentName llcSegmentName, Semaphore partitionGroupConsumerSemaphore,
+      ServerMetrics serverMetrics, @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
     _segBuildSemaphore = realtimeTableDataManager.getSegmentBuildSemaphore();
     _segmentZKMetadata = (LLCRealtimeSegmentZKMetadata) segmentZKMetadata;
     _tableConfig = tableConfig;
@@ -1160,11 +1158,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _llcSegmentName = llcSegmentName;
     _partitionGroupId = _llcSegmentName.getPartitionGroupId();
-    _partitionGroupConsumptionStatus = new PartitionGroupConsumptionStatus(_partitionGroupId, _llcSegmentName.getSequenceNumber(),
-        _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getStartOffset()),
-        _segmentZKMetadata.getEndOffset() == null ? null
-            : _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getEndOffset()),
-        _segmentZKMetadata.getStatus().toString());
+    _partitionGroupConsumptionStatus =
+        new PartitionGroupConsumptionStatus(_partitionGroupId, _llcSegmentName.getSequenceNumber(),
+            _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getStartOffset()),
+            _segmentZKMetadata.getEndOffset() == null ? null
+                : _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getEndOffset()),
+            _segmentZKMetadata.getStatus().toString());
     _partitionGroupConsumerSemaphore = partitionGroupConsumerSemaphore;
     _acquiredConsumerSemaphore = new AtomicBoolean(false);
     _metricKeyName = _tableNameWithType + "-" + _streamTopic + "-" + _partitionGroupId;
@@ -1359,8 +1358,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       closePartitionGroupConsumer();
     }
     segmentLogger.info("Creating new stream consumer, reason: {}", reason);
-    _partitionGroupConsumer = _streamConsumerFactory.createPartitionGroupConsumer(_clientId,
-        _partitionGroupConsumptionStatus);
+    _partitionGroupConsumer =
+        _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
   }
 
   /**
