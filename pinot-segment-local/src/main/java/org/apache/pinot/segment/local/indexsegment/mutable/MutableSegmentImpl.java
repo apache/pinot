@@ -254,8 +254,8 @@ public class MutableSegmentImpl implements MutableSegment {
       // Check whether to generate raw index for the column while consuming
       // Only support generating raw index on single-value columns that do not have inverted index while
       // consuming. After consumption completes and the segment is built, all single-value columns can have raw index
-      DataType dataType = fieldSpec.getDataType();
-      boolean isFixedWidthColumn = dataType.isFixedWidth();
+      DataType storedType = fieldSpec.getDataType().getStoredType();
+      boolean isFixedWidthColumn = storedType.isFixedWidth();
       MutableForwardIndex forwardIndex;
       MutableDictionary dictionary;
       if (isNoDictionaryColumn(noDictionaryColumns, invertedIndexColumns, fieldSpec, column)) {
@@ -267,7 +267,7 @@ public class MutableSegmentImpl implements MutableSegment {
             buildAllocationContext(_segmentName, column, V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
         if (isFixedWidthColumn) {
           forwardIndex =
-              new FixedByteSVMutableForwardIndex(false, dataType, _capacity, _memoryManager, allocationContext);
+              new FixedByteSVMutableForwardIndex(false, storedType, _capacity, _memoryManager, allocationContext);
         } else {
           // RealtimeSegmentStatsHistory does not have the stats for no-dictionary columns from previous consuming
           // segments
@@ -276,15 +276,16 @@ public class MutableSegmentImpl implements MutableSegment {
           // TODO: Use the stats to get estimated average length
           // Use a smaller capacity as opposed to segment flush size
           int initialCapacity = Math.min(_capacity, NODICT_VARIABLE_WIDTH_ESTIMATED_NUMBER_OF_VALUES_DEFAULT);
-          forwardIndex = new VarByteSVMutableForwardIndex(dataType, _memoryManager, allocationContext, initialCapacity,
-              NODICT_VARIABLE_WIDTH_ESTIMATED_AVERAGE_VALUE_LENGTH_DEFAULT);
+          forwardIndex =
+              new VarByteSVMutableForwardIndex(storedType, _memoryManager, allocationContext, initialCapacity,
+                  NODICT_VARIABLE_WIDTH_ESTIMATED_AVERAGE_VALUE_LENGTH_DEFAULT);
         }
       } else {
         // Dictionary-encoded column
 
         int dictionaryColumnSize;
         if (isFixedWidthColumn) {
-          dictionaryColumnSize = dataType.size();
+          dictionaryColumnSize = storedType.size();
         } else {
           dictionaryColumnSize = _statsHistory.getEstimatedAvgColSize(column);
         }
@@ -293,7 +294,7 @@ public class MutableSegmentImpl implements MutableSegment {
         String dictionaryAllocationContext =
             buildAllocationContext(_segmentName, column, V1Constants.Dict.FILE_EXTENSION);
         dictionary = MutableDictionaryFactory
-            .getMutableDictionary(dataType, _offHeap, _memoryManager, dictionaryColumnSize,
+            .getMutableDictionary(storedType, _offHeap, _memoryManager, dictionaryColumnSize,
                 Math.min(estimatedCardinality, _capacity), dictionaryAllocationContext);
 
         if (fieldSpec.isSingleValueField()) {

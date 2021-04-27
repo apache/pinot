@@ -40,7 +40,6 @@ public class JsonIndexQuickStart {
     Preconditions.checkState(dataDir.mkdirs());
 
     File schemaFile = new File(baseDir, "githubEvents_schema.json");
-    File dataFile = new File(baseDir, "githubEvents.csv");
     File tableConfigFile = new File(baseDir, "githubEvents_offline_table_config.json");
     File ingestionJobSpecFile = new File(baseDir, "ingestionJobSpec.yaml");
 
@@ -51,9 +50,6 @@ public class JsonIndexQuickStart {
     resource = classLoader.getResource("examples/batch/githubEvents/githubEvents_schema.json");
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, schemaFile);
-    resource = classLoader.getResource("examples/batch/githubEvents/rawdata/githubEvents_data.json");
-    Preconditions.checkNotNull(resource);
-    FileUtils.copyURLToFile(resource, dataFile);
     resource = classLoader.getResource("examples/batch/githubEvents/ingestionJobSpec.yaml");
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, ingestionJobSpecFile);

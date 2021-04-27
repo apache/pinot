@@ -859,8 +859,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     columnNames.add(fieldValue.toString());
     switch (literal.getSetField()) {
       case BOOL_VALUE:
-        columnTypes.add(DataSchema.ColumnDataType.STRING);
-        row.add(Boolean.toString(literal.getBoolValue()));
+        columnTypes.add(DataSchema.ColumnDataType.BOOLEAN);
+        row.add(literal.getBoolValue());
         break;
       case BYTE_VALUE:
         columnTypes.add(DataSchema.ColumnDataType.INT);

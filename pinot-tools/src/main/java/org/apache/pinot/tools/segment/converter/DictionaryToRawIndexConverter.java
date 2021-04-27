@@ -41,7 +41,7 @@ import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.kohsuke.args4j.CmdLineParser;
@@ -303,15 +303,15 @@ public class DictionaryToRawIndexConverter {
     }
 
     ChunkCompressionType compressionType = ChunkCompressionType.valueOf(_compressionType);
-    FieldSpec.DataType dataType = dataSourceMetadata.getDataType();
+    DataType storedType = dictionary.getValueType();
     int numDocs = segment.getSegmentMetadata().getTotalDocs();
-    int lengthOfLongestEntry = (dataType == FieldSpec.DataType.STRING) ? getLengthOfLongestEntry(dictionary) : -1;
+    int lengthOfLongestEntry = (storedType == DataType.STRING) ? getLengthOfLongestEntry(dictionary) : -1;
 
     try (ForwardIndexCreator rawIndexCreator = SegmentColumnarIndexCreator
-        .getRawIndexCreatorForColumn(newSegment, compressionType, column, dataType, numDocs, lengthOfLongestEntry,
+        .getRawIndexCreatorForColumn(newSegment, compressionType, column, storedType, numDocs, lengthOfLongestEntry,
             false, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
         ForwardIndexReaderContext readerContext = reader.createContext()) {
-      switch (dataType) {
+      switch (storedType) {
         case INT:
           for (int docId = 0; docId < numDocs; docId++) {
             rawIndexCreator.putInt(dictionary.getIntValue(reader.getDictId(docId, readerContext)));

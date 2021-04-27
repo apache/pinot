@@ -43,6 +43,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ReadMode;
@@ -159,7 +160,7 @@ public class RawIndexConverter {
 
   private boolean shouldConvertColumn(FieldSpec fieldSpec) {
     String columnName = fieldSpec.getName();
-    FieldSpec.DataType dataType = fieldSpec.getDataType();
+    DataType storedType = fieldSpec.getDataType().getStoredType();
     int numTotalDocs = _originalSegmentMetadata.getTotalDocs();
     ColumnMetadata columnMetadata = _originalSegmentMetadata.getColumnMetadataFor(columnName);
 
@@ -167,8 +168,8 @@ public class RawIndexConverter {
 
     // In bits
     int lengthOfEachEntry;
-    if (dataType.isFixedWidth()) {
-      lengthOfEachEntry = dataType.size() * Byte.SIZE;
+    if (storedType.isFixedWidth()) {
+      lengthOfEachEntry = storedType.size() * Byte.SIZE;
     } else {
       lengthOfEachEntry = columnMetadata.getColumnMaxLength() * Byte.SIZE;
     }
@@ -201,14 +202,14 @@ public class RawIndexConverter {
     ForwardIndexReader reader = dataSource.getForwardIndex();
     Dictionary dictionary = dataSource.getDictionary();
     assert dictionary != null;
-    FieldSpec.DataType dataType = fieldSpec.getDataType();
+    DataType storedType = dictionary.getValueType();
     int numDocs = _originalSegmentMetadata.getTotalDocs();
     int lengthOfLongestEntry = _originalSegmentMetadata.getColumnMetadataFor(columnName).getColumnMaxLength();
     try (ForwardIndexCreator rawIndexCreator = SegmentColumnarIndexCreator
-        .getRawIndexCreatorForColumn(_convertedIndexDir, ChunkCompressionType.SNAPPY, columnName, dataType, numDocs,
+        .getRawIndexCreatorForColumn(_convertedIndexDir, ChunkCompressionType.SNAPPY, columnName, storedType, numDocs,
             lengthOfLongestEntry, false, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
         ForwardIndexReaderContext readerContext = reader.createContext()) {
-      switch (dataType) {
+      switch (storedType) {
         case INT:
           for (int docId = 0; docId < numDocs; docId++) {
             rawIndexCreator.putInt(dictionary.getIntValue(reader.getDictId(docId, readerContext)));

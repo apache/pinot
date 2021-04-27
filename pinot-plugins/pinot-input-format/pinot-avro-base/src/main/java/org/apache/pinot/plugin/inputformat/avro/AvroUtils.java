@@ -37,20 +37,17 @@ import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * Utils for handling Avro records
  */
 public class AvroUtils {
-  private static final Logger LOGGER = LoggerFactory.getLogger(AvroUtils.class);
-
   private AvroUtils() {
   }
 
@@ -68,7 +65,7 @@ public class AvroUtils {
 
     for (Field field : avroSchema.getFields()) {
       String fieldName = field.name();
-      FieldSpec.DataType dataType = extractFieldDataType(field);
+      DataType dataType = extractFieldDataType(field);
       boolean isSingleValueField = isSingleValueField(field);
       if (fieldTypeMap == null) {
         pinotSchema.addField(new DimensionFieldSpec(fieldName, dataType, isSingleValueField));
@@ -159,9 +156,9 @@ public class AvroUtils {
     SchemaBuilder.FieldAssembler<org.apache.avro.Schema> fieldAssembler = SchemaBuilder.record("record").fields();
 
     for (FieldSpec fieldSpec : pinotSchema.getAllFieldSpecs()) {
-      FieldSpec.DataType dataType = fieldSpec.getDataType();
+      DataType storedType = fieldSpec.getDataType().getStoredType();
       if (fieldSpec.isSingleValueField()) {
-        switch (dataType) {
+        switch (storedType) {
           case INT:
             fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().intType().noDefault();
             break;
@@ -181,10 +178,10 @@ public class AvroUtils {
             fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().bytesType().noDefault();
             break;
           default:
-            throw new RuntimeException("Unsupported data type: " + dataType);
+            throw new RuntimeException("Unsupported data type: " + storedType);
         }
       } else {
-        switch (dataType) {
+        switch (storedType) {
           case INT:
             fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().array().items().intType().noDefault();
             break;
@@ -201,7 +198,7 @@ public class AvroUtils {
             fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().array().items().stringType().noDefault();
             break;
           default:
-            throw new RuntimeException("Unsupported data type: " + dataType);
+            throw new RuntimeException("Unsupported data type: " + storedType);
         }
       }
     }
@@ -236,7 +233,7 @@ public class AvroUtils {
   /**
    * Extract the data type stored in Pinot for the given Avro field.
    */
-  public static FieldSpec.DataType extractFieldDataType(Field field) {
+  public static DataType extractFieldDataType(Field field) {
     try {
       org.apache.avro.Schema fieldSchema = extractSupportedSchema(field.schema());
       org.apache.avro.Schema.Type fieldType = fieldSchema.getType();

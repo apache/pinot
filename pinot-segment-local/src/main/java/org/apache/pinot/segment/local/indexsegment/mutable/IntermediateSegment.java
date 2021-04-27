@@ -52,17 +52,14 @@ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.RowMetadata;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.spi.data.FieldSpec.DataType;
-import static org.apache.pinot.spi.data.FieldSpec.DataType.BYTES;
-import static org.apache.pinot.spi.data.FieldSpec.DataType.INT;
-import static org.apache.pinot.spi.data.FieldSpec.FieldType;
 
 
 /**
@@ -136,14 +133,14 @@ public class IntermediateSegment implements MutableSegment {
         partitions.add(segmentGeneratorConfig.getSequenceId());
       }
 
-      DataType dataType = fieldSpec.getDataType();
-      boolean isFixedWidthColumn = dataType.isFixedWidth();
+      DataType storedType = fieldSpec.getDataType().getStoredType();
+      boolean isFixedWidthColumn = storedType.isFixedWidth();
       MutableForwardIndex forwardIndex;
       MutableDictionary dictionary;
 
       int dictionaryColumnSize;
       if (isFixedWidthColumn) {
-        dictionaryColumnSize = dataType.size();
+        dictionaryColumnSize = storedType.size();
       } else {
         dictionaryColumnSize = DEFAULT_EST_AVG_COL_SIZE;
       }
@@ -151,16 +148,15 @@ public class IntermediateSegment implements MutableSegment {
       int estimatedCardinality = (int) (DEFAULT_EST_CARDINALITY * 1.1);
       String dictionaryAllocationContext =
           buildAllocationContext(_segmentName, column, V1Constants.Dict.FILE_EXTENSION);
-      dictionary = MutableDictionaryFactory
-          .getMutableDictionary(dataType, true, _memoryManager, dictionaryColumnSize,
-              Math.min(estimatedCardinality, _capacity), dictionaryAllocationContext);
+      dictionary = MutableDictionaryFactory.getMutableDictionary(storedType, true, _memoryManager, dictionaryColumnSize,
+          Math.min(estimatedCardinality, _capacity), dictionaryAllocationContext);
 
       if (fieldSpec.isSingleValueField()) {
         // Single-value dictionary-encoded forward index
         String allocationContext =
             buildAllocationContext(_segmentName, column, V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
-        forwardIndex = new FixedByteSVMutableForwardIndex(true, INT, _capacity, _memoryManager,
-            allocationContext);
+        forwardIndex =
+            new FixedByteSVMutableForwardIndex(true, DataType.INT, _capacity, _memoryManager, allocationContext);
       } else {
         // Multi-value dictionary-encoded forward index
         String allocationContext =
@@ -298,7 +294,7 @@ public class IntermediateSegment implements MutableSegment {
 
           // Update forward index
           DataType dataType = fieldSpec.getDataType();
-          switch (dataType) {
+          switch (dataType.getStoredType()) {
             case INT:
               forwardIndex.setInt(docId, (Integer) value);
               break;
@@ -326,7 +322,7 @@ public class IntermediateSegment implements MutableSegment {
           // NOTE: Skip updating min/max value for aggregated metrics because the value will change over time.
           if (fieldSpec.getFieldType() != FieldType.METRIC) {
             Comparable comparable;
-            if (dataType == BYTES) {
+            if (dataType == DataType.BYTES) {
               comparable = new ByteArray((byte[]) value);
             } else {
               comparable = (Comparable) value;

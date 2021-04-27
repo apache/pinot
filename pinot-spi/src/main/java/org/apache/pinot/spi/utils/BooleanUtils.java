@@ -16,34 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator.transform;
+package org.apache.pinot.spi.utils;
 
-import org.apache.pinot.spi.data.FieldSpec.DataType;
+public class BooleanUtils {
 
-
-/**
- * The <code>TransformResultMetadata</code> class contains the metadata for the transform result.
- */
-public class TransformResultMetadata {
-  private final DataType _dataType;
-  private final boolean _isSingleValue;
-  private final boolean _hasDictionary;
-
-  public TransformResultMetadata(DataType dataType, boolean isSingleValue, boolean hasDictionary) {
-    _dataType = dataType;
-    _isSingleValue = isSingleValue;
-    _hasDictionary = hasDictionary;
+  /**
+   * Returns the boolean value for the given boolean string.
+   * <ul>
+   *   <li>'true', '1' (internal representation) -> true</li>
+   *   <li>Others -> false</li>
+   * </ul>
+   */
+  public static boolean toBoolean(String booleanString) {
+    return booleanString.equalsIgnoreCase("true") || booleanString.equals("1");
   }
 
-  public DataType getDataType() {
-    return _dataType;
-  }
-
-  public boolean isSingleValue() {
-    return _isSingleValue;
-  }
-
-  public boolean hasDictionary() {
-    return _hasDictionary;
+  /**
+   * Returns the int value (1 for true, 0 for false) for the given boolean string.
+   * <ul>
+   *   <li>'true', '1' (internal representation) -> '1'</li>
+   *   <li>Others -> '0'</li>
+   * </ul>
+   */
+  public static int toInt(String booleanString) {
+    return toBoolean(booleanString) ? 1 : 0;
   }
 }

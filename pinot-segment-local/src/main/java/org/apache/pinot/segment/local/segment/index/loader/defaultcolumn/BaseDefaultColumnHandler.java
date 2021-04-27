@@ -417,7 +417,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     int dictionaryElementSize = 0;
 
     Object sortedArray;
-    switch (dataType) {
+    switch (dataType.getStoredType()) {
       case INT:
         Preconditions.checkState(defaultValue instanceof Integer);
         sortedArray = new int[]{(Integer) defaultValue};
@@ -529,7 +529,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       StatsCollectorConfig statsCollectorConfig =
           new StatsCollectorConfig(_indexLoadingConfig.getTableConfig(), _schema, null);
       ColumnIndexCreationInfo indexCreationInfo;
-      switch (fieldSpec.getDataType()) {
+      switch (fieldSpec.getDataType().getStoredType()) {
         case INT: {
           for (int i = 0; i < numDocs; i++) {
             outputValues[i] = ((Number) outputValues[i]).intValue();

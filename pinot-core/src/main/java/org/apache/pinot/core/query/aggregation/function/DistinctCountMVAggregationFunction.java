@@ -31,7 +31,7 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -64,9 +64,9 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
     }
 
     // For non-dictionary-encoded expression, store values into the value set
-    FieldSpec.DataType valueType = blockValSet.getValueType();
-    Set valueSet = getValueSet(aggregationResultHolder, valueType);
-    switch (valueType) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    Set valueSet = getValueSet(aggregationResultHolder, storedType);
+    switch (storedType) {
       case INT:
         IntOpenHashSet intSet = (IntOpenHashSet) valueSet;
         int[][] intValues = blockValSet.getIntValuesMV();
@@ -114,7 +114,7 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
         }
         break;
       default:
-        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_MV aggregation function: " + valueType);
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_MV aggregation function: " + storedType);
     }
   }
 
@@ -134,13 +134,12 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
     }
 
     // For non-dictionary-encoded expression, store values into the value set
-    FieldSpec.DataType valueType = blockValSet.getValueType();
-    switch (valueType) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    switch (storedType) {
       case INT:
         int[][] intValues = blockValSet.getIntValuesMV();
         for (int i = 0; i < length; i++) {
-          IntOpenHashSet intSet =
-              (IntOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], FieldSpec.DataType.INT);
+          IntOpenHashSet intSet = (IntOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.INT);
           for (int value : intValues[i]) {
             intSet.add(value);
           }
@@ -149,8 +148,7 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
       case LONG:
         long[][] longValues = blockValSet.getLongValuesMV();
         for (int i = 0; i < length; i++) {
-          LongOpenHashSet longSet =
-              (LongOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], FieldSpec.DataType.LONG);
+          LongOpenHashSet longSet = (LongOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.LONG);
           for (long value : longValues[i]) {
             longSet.add(value);
           }
@@ -160,7 +158,7 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
         float[][] floatValues = blockValSet.getFloatValuesMV();
         for (int i = 0; i < length; i++) {
           FloatOpenHashSet floatSet =
-              (FloatOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], FieldSpec.DataType.FLOAT);
+              (FloatOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.FLOAT);
           for (float value : floatValues[i]) {
             floatSet.add(value);
           }
@@ -170,7 +168,7 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
         double[][] doubleValues = blockValSet.getDoubleValuesMV();
         for (int i = 0; i < length; i++) {
           DoubleOpenHashSet doubleSet =
-              (DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], FieldSpec.DataType.DOUBLE);
+              (DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.DOUBLE);
           for (double value : doubleValues[i]) {
             doubleSet.add(value);
           }
@@ -180,7 +178,7 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
         String[][] stringValues = blockValSet.getStringValuesMV();
         for (int i = 0; i < length; i++) {
           ObjectOpenHashSet<String> stringSet =
-              (ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKeyArray[i], FieldSpec.DataType.STRING);
+              (ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.STRING);
           //noinspection ManualArrayToCollectionCopy
           for (String value : stringValues[i]) {
             //noinspection UseBulkOperation
@@ -189,7 +187,7 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
         }
         break;
       default:
-        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_MV aggregation function: " + valueType);
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_MV aggregation function: " + storedType);
     }
   }
 
@@ -211,13 +209,13 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
     }
 
     // For non-dictionary-encoded expression, store hash code of the values into the value set
-    FieldSpec.DataType valueType = blockValSet.getValueType();
-    switch (valueType) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    switch (storedType) {
       case INT:
         int[][] intValues = blockValSet.getIntValuesMV();
         for (int i = 0; i < length; i++) {
           for (int groupKey : groupKeysArray[i]) {
-            IntOpenHashSet intSet = (IntOpenHashSet) getValueSet(groupByResultHolder, groupKey, FieldSpec.DataType.INT);
+            IntOpenHashSet intSet = (IntOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.INT);
             for (int value : intValues[i]) {
               intSet.add(value);
             }
@@ -228,8 +226,7 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
         long[][] longValues = blockValSet.getLongValuesMV();
         for (int i = 0; i < length; i++) {
           for (int groupKey : groupKeysArray[i]) {
-            LongOpenHashSet longSet =
-                (LongOpenHashSet) getValueSet(groupByResultHolder, groupKey, FieldSpec.DataType.LONG);
+            LongOpenHashSet longSet = (LongOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.LONG);
             for (long value : longValues[i]) {
               longSet.add(value);
             }
@@ -240,8 +237,7 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
         float[][] floatValues = blockValSet.getFloatValuesMV();
         for (int i = 0; i < length; i++) {
           for (int groupKey : groupKeysArray[i]) {
-            FloatOpenHashSet floatSet =
-                (FloatOpenHashSet) getValueSet(groupByResultHolder, groupKey, FieldSpec.DataType.FLOAT);
+            FloatOpenHashSet floatSet = (FloatOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.FLOAT);
             for (float value : floatValues[i]) {
               floatSet.add(value);
             }
@@ -253,7 +249,7 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
         for (int i = 0; i < length; i++) {
           for (int groupKey : groupKeysArray[i]) {
             DoubleOpenHashSet doubleSet =
-                (DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKey, FieldSpec.DataType.DOUBLE);
+                (DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.DOUBLE);
             for (double value : doubleValues[i]) {
               doubleSet.add(value);
             }
@@ -265,7 +261,7 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
         for (int i = 0; i < length; i++) {
           for (int groupKey : groupKeysArray[i]) {
             ObjectOpenHashSet<String> stringSet =
-                (ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKey, FieldSpec.DataType.STRING);
+                (ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKey, DataType.STRING);
             //noinspection ManualArrayToCollectionCopy
             for (String value : stringValues[i]) {
               //noinspection UseBulkOperation
@@ -275,7 +271,7 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
         }
         break;
       default:
-        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_MV aggregation function: " + valueType);
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_MV aggregation function: " + storedType);
     }
   }
 }

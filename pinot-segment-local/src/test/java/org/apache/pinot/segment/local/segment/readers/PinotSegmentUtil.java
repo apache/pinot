@@ -35,6 +35,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -46,8 +47,8 @@ import org.apache.pinot.spi.utils.TimeUtils;
  * Util class for pinot segment
  */
 public class PinotSegmentUtil {
-  private static int DEFAULT_NUM_MULTIVALUE = 5;
-  private static int DEFAULT_STRING_VALUE_LENGTH = 2;
+  private static final int DEFAULT_NUM_MULTIVALUE = 5;
+  private static final int DEFAULT_STRING_VALUE_LENGTH = 2;
 
   private PinotSegmentUtil() {
   }
@@ -106,7 +107,7 @@ public class PinotSegmentUtil {
     if (fieldSpec instanceof TimeFieldSpec) {
       // explicitly generate the time column values within allowed range so that
       // segment generation code doesn't throw exception
-      TimeFieldSpec timeFieldSpec = (TimeFieldSpec)fieldSpec;
+      TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
       TimeUnit unit = timeFieldSpec.getIncomingGranularitySpec().getTimeType();
       return generateTimeValue(random, unit);
     } else if (fieldSpec instanceof DateTimeFieldSpec) {
@@ -114,7 +115,8 @@ public class PinotSegmentUtil {
       TimeUnit unit = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat()).getColumnUnit();
       return generateTimeValue(random, unit);
     } else {
-      switch (fieldSpec.getDataType()) {
+      DataType storedType = fieldSpec.getDataType().getStoredType();
+      switch (storedType) {
         case INT:
           return Math.abs(random.nextInt());
         case LONG:
@@ -125,10 +127,10 @@ public class PinotSegmentUtil {
           return Math.abs(random.nextDouble());
         case STRING:
           return RandomStringUtils.randomAlphabetic(DEFAULT_STRING_VALUE_LENGTH);
+        default:
+          throw new IllegalStateException("Unsupported data type: " + storedType);
       }
     }
-
-    throw new IllegalStateException("Illegal data type");
   }
 
   private static Object generateTimeValue(ThreadLocalRandom random, TimeUnit unit) {
@@ -144,11 +146,11 @@ public class PinotSegmentUtil {
       case MILLISECONDS:
         return random.nextLong(milliMin, milliMax);
       case SECONDS:
-        return random.nextLong(milliMin/1000, milliMax/1000);
+        return random.nextLong(milliMin / 1000, milliMax / 1000);
       case MICROSECONDS:
-        return random.nextLong(milliMin*1000, milliMax*1000);
+        return random.nextLong(milliMin * 1000, milliMax * 1000);
       case NANOSECONDS:
-        return random.nextLong(milliMin*1000*1000, milliMax*1000*1000);
+        return random.nextLong(milliMin * 1000 * 1000, milliMax * 1000 * 1000);
       case DAYS:
         return random.nextLong(daysMin, daysMax);
       case HOURS:

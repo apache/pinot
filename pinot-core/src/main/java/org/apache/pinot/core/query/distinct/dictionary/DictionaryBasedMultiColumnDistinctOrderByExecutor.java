@@ -27,6 +27,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
@@ -36,8 +37,9 @@ public class DictionaryBasedMultiColumnDistinctOrderByExecutor extends BaseDicti
   private final PriorityQueue<DictIds> _priorityQueue;
 
   public DictionaryBasedMultiColumnDistinctOrderByExecutor(List<ExpressionContext> expressions,
-      List<Dictionary> dictionaries, List<OrderByExpressionContext> orderByExpressions, int limit) {
-    super(expressions, dictionaries, limit);
+      List<Dictionary> dictionaries, List<DataType> dataTypes, List<OrderByExpressionContext> orderByExpressions,
+      int limit) {
+    super(expressions, dictionaries, dataTypes, limit);
 
     int numOrderByExpressions = orderByExpressions.size();
     int[] orderByExpressionIndices = new int[numOrderByExpressions];

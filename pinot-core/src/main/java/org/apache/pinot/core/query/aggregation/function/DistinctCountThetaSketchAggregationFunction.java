@@ -1102,11 +1102,11 @@ public class DistinctCountThetaSketchAggregationFunction extends BaseSingleInput
     for (int i = 0; i < numExpressions; i++) {
       BlockValSet blockValSet = blockValSetMap.get(_inputExpressions.get(i));
       boolean singleValue = blockValSet.isSingleValue();
-      DataType valueType = blockValSet.getValueType();
+      DataType storedType = blockValSet.getValueType().getStoredType();
       singleValues[i] = singleValue;
-      valueTypes[i] = valueType;
+      valueTypes[i] = storedType;
       if (singleValue) {
-        switch (valueType) {
+        switch (storedType) {
           case INT:
             valueArrays[i] = blockValSet.getIntValuesSV();
             break;
@@ -1129,7 +1129,7 @@ public class DistinctCountThetaSketchAggregationFunction extends BaseSingleInput
             throw new IllegalStateException();
         }
       } else {
-        switch (valueType) {
+        switch (storedType) {
           case INT:
             valueArrays[i] = blockValSet.getIntValuesMV();
             break;

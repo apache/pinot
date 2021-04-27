@@ -93,7 +93,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       _resultMetadata = new TransformResultMetadata(dataType, isSingleValue, false);
     } catch (Exception e) {
       throw new IllegalStateException(String.format(
-          "Unsupported results type: %s for jsonExtractScalar function. Supported types are: INT/LONG/FLOAT/DOUBLE/STRING/INT_ARRAY/LONG_ARRAY/FLOAT_ARRAY/DOUBLE_ARRAY/STRING_ARRAY",
+          "Unsupported results type: %s for jsonExtractScalar function. Supported types are: INT/LONG/FLOAT/DOUBLE/BOOLEAN/TIMESTAMP/STRING/INT_ARRAY/LONG_ARRAY/FLOAT_ARRAY/DOUBLE_ARRAY/STRING_ARRAY",
           resultsType));
     }
   }

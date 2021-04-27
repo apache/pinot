@@ -189,6 +189,9 @@ public class JsonUtils {
         return (float) jsonValue.asDouble();
       case DOUBLE:
         return jsonValue.asDouble();
+      case BOOLEAN:
+        return jsonValue.asBoolean();
+      case TIMESTAMP:
       case STRING:
         return jsonValue.asText();
       case BYTES:

@@ -253,9 +253,11 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "contains");
-    String[] expectedValues = new String[NUM_ROWS];
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.BOOLEAN);
+    assertTrue(transformFunction.getResultMetadata().isSingleValue());
+    int[] expectedValues = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = String.valueOf(_stringAlphaNumericSVValues[i].contains("a"));
+      expectedValues[i] = _stringAlphaNumericSVValues[i].contains("a") ? 1 : 0;
     }
     testTransformFunction(transformFunction, expectedValues);
   }
@@ -513,11 +515,11 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "arrayContainsInt");
-    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.STRING);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.BOOLEAN);
     assertTrue(transformFunction.getResultMetadata().isSingleValue());
-    String[] expectedValues = new String[NUM_ROWS];
+    int[] expectedValues = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = Boolean.toString(ArrayUtils.contains(_intMVValues[i], 2));
+      expectedValues[i] = ArrayUtils.contains(_intMVValues[i], 2) ? 1 : 0;
     }
     testTransformFunction(transformFunction, expectedValues);
   }
@@ -529,11 +531,11 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "arrayContainsString");
-    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.STRING);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.BOOLEAN);
     assertTrue(transformFunction.getResultMetadata().isSingleValue());
-    String[] expectedValues = new String[NUM_ROWS];
+    int[] expectedValues = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = Boolean.toString(ArrayUtils.contains(_intMVValues[i], 'a'));
+      expectedValues[i] = ArrayUtils.contains(_intMVValues[i], 'a') ? 1 : 0;
     }
     testTransformFunction(transformFunction, expectedValues);
   }

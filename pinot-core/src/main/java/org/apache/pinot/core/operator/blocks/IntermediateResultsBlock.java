@@ -298,15 +298,14 @@ public class IntermediateResultsBlock implements Block {
   private DataTable getResultDataTable()
       throws IOException {
     DataTableBuilder dataTableBuilder = new DataTableBuilder(_dataSchema);
-
+    ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
     Iterator<Record> iterator = _table.iterator();
-    ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
     while (iterator.hasNext()) {
       Record record = iterator.next();
       dataTableBuilder.startRow();
       int columnIndex = 0;
       for (Object value : record.getValues()) {
-        setDataTableColumn(columnDataTypes[columnIndex], dataTableBuilder, columnIndex, value);
+        setDataTableColumn(storedColumnDataTypes[columnIndex], dataTableBuilder, columnIndex, value);
         columnIndex++;
       }
       dataTableBuilder.finishRow();
