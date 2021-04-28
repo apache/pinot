@@ -28,7 +28,6 @@ import org.apache.pinot.controller.recommender.rules.AbstractRule;
 import org.apache.pinot.controller.recommender.rules.io.params.BloomFilterRuleParams;
 import org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.requesthandler.BrokerRequestOptimizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,7 +40,6 @@ import org.slf4j.LoggerFactory;
 public class  BloomFilterRule extends AbstractRule {
   private final Logger LOGGER = LoggerFactory.getLogger(BloomFilterRule.class);
   private final BloomFilterRuleParams _params;
-  protected final BrokerRequestOptimizer _brokerRequestOptimizer = new BrokerRequestOptimizer();
 
   public BloomFilterRule(InputManager input, ConfigManager output) {
     super(input, output);

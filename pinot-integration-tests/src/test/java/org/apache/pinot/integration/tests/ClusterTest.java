@@ -52,7 +52,6 @@ import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.helix.ControllerTest;
-import org.apache.pinot.core.requesthandler.PinotQueryRequest;
 import org.apache.pinot.minion.MinionStarter;
 import org.apache.pinot.minion.event.MinionEventObserverFactory;
 import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
@@ -367,23 +366,23 @@ public abstract class ClusterTest extends ControllerTest {
    */
   protected JsonNode postQuery(String query)
       throws Exception {
-    return postQuery(new PinotQueryRequest("pql", query), _brokerBaseApiUrl);
+    return postQuery(query, _brokerBaseApiUrl);
   }
 
   /**
    * Queries the broker's pql query endpoint (/query)
    */
-  public static JsonNode postQuery(PinotQueryRequest r, String brokerBaseApiUrl)
+  public static JsonNode postQuery(String query, String brokerBaseApiUrl)
       throws Exception {
-    return postQuery(r.getQuery(), brokerBaseApiUrl, false, r.getQueryFormat(), null);
+    return postQuery(query, brokerBaseApiUrl, null);
   }
 
   /**
    * Queries the broker's pql query endpoint (/query)
    */
-  public static JsonNode postQuery(PinotQueryRequest r, String brokerBaseApiUrl, Map<String, String> headers)
+  public static JsonNode postQuery(String query, String brokerBaseApiUrl, Map<String, String> headers)
       throws Exception {
-    return postQuery(r.getQuery(), brokerBaseApiUrl, false, r.getQueryFormat(), headers);
+    return postQuery(query, brokerBaseApiUrl, false, Broker.Request.PQL, headers);
   }
 
   /**
