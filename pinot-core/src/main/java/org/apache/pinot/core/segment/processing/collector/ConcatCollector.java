@@ -19,6 +19,7 @@
 package org.apache.pinot.core.segment.processing.collector;
 
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.Arrays;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -28,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.util.GenericRowSerDeUtils;
@@ -43,13 +45,12 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 public class ConcatCollector implements Collector {
   private static final String RECORDS_FILE_NAME = "collector.records";
 
-  private final CollectorConfig _collectorConfig;
   private final List<FieldSpec> _fieldSpecs = new ArrayList<>();
   private final Comparator<GenericRow> _genericRowComparator;
   private int _numDocs;
 
-  private File _workingDir;
-  private File _collectorRecordFile;
+  private final File _workingDir;
+  private final File _collectorRecordFile;
   // TODO: Avoid using BufferedOutputStream, and use ByteBuffer directly.
   //  However, ByteBuffer has a limitation that the size cannot exceed 2G.
   //  There are no limits on the size of data inserted into the {@link Collector}.
@@ -60,7 +61,6 @@ public class ConcatCollector implements Collector {
 
   public ConcatCollector(CollectorConfig collectorConfig, Schema schema) {
 
-    _collectorConfig = collectorConfig;
     for (FieldSpec spec : schema.getAllFieldSpecs()) {
       if (!spec.isVirtualColumn()) {
         _fieldSpecs.add(spec);
@@ -74,16 +74,17 @@ public class ConcatCollector implements Collector {
       _genericRowComparator = null;
     }
 
+    _workingDir =
+        new File(FileUtils.getTempDirectory(), String.format("concat_collector_%d", System.currentTimeMillis()));
+    Preconditions.checkState(_workingDir.mkdirs(), "Failed to create dir: %s for %s with config: %s",
+        _workingDir.getAbsolutePath(), ConcatCollector.class.getSimpleName(), collectorConfig);
+    _collectorRecordFile = new File(_workingDir, RECORDS_FILE_NAME);
+
     initializeBuffer();
   }
 
   private void initializeBuffer() {
-    _workingDir =
-        new File(FileUtils.getTempDirectory(), String.format("concat_collector_%d", System.currentTimeMillis()));
-    Preconditions.checkState(_workingDir.mkdirs(), "Failed to create dir: %s for %s with config: %s",
-        _workingDir.getAbsolutePath(), ConcatCollector.class.getSimpleName(), _collectorConfig);
 
-    _collectorRecordFile = new File(_workingDir, RECORDS_FILE_NAME);
     Preconditions.checkState(!_collectorRecordFile.exists(),
         "Collector record file: " + _collectorRecordFile + " already exists");
     try {
@@ -110,20 +111,18 @@ public class ConcatCollector implements Collector {
       throws IOException {
 
     _collectorRecordOutputStream.flush();
-
-    int[] sortedDocIds = new int[_numDocs];
-    for (int i = 0; i < _numDocs; i++) {
-      sortedDocIds[i] = i;
-    }
-
     _collectorRecordBuffer = PinotDataBuffer
         .mapFile(_collectorRecordFile, true, 0, _collectorRecordOffsets.get(_numDocs), PinotDataBuffer.NATIVE_ORDER,
             "ConcatCollector: generic row buffer");
 
-
     // TODO: A lot of this code can be made common across Collectors, once {@link RollupCollector} is also converted to off heap implementation
     if (_genericRowComparator != null) {
-      it.unimi.dsi.fastutil.Arrays.quickSort(0, _numDocs, (i1, i2) -> {
+      int[] sortedDocIds = new int[_numDocs];
+      for (int i = 0; i < _numDocs; i++) {
+        sortedDocIds[i] = i;
+      }
+
+      Arrays.quickSort(0, _numDocs, (i1, i2) -> {
         long startOffset1 = _collectorRecordOffsets.get(sortedDocIds[i1]);
         long startOffset2 = _collectorRecordOffsets.get(sortedDocIds[i2]);
         GenericRow row1 = GenericRowSerDeUtils
@@ -136,10 +135,15 @@ public class ConcatCollector implements Collector {
         sortedDocIds[i1] = sortedDocIds[i2];
         sortedDocIds[i2] = temp;
       });
+      return createIterator(sortedDocIds);
+    } else {
+      return createIterator(null);
     }
+  }
 
+  private Iterator<GenericRow> createIterator(@Nullable int[] sortedDocIds) {
     return new Iterator<GenericRow>() {
-      final GenericRow reuse = new GenericRow();
+      final GenericRow _reuse = new GenericRow();
       int _nextDocId = 0;
 
       @Override
@@ -149,8 +153,13 @@ public class ConcatCollector implements Collector {
 
       @Override
       public GenericRow next() {
-        long offset = _collectorRecordOffsets.get(sortedDocIds[_nextDocId++]);
-        return GenericRowSerDeUtils.deserializeGenericRow(_collectorRecordBuffer, offset, _fieldSpecs, reuse);
+        long offset;
+        if (sortedDocIds == null) {
+          offset = _collectorRecordOffsets.get(_nextDocId++);
+        } else {
+          offset = _collectorRecordOffsets.get(sortedDocIds[_nextDocId++]);
+        }
+        return GenericRowSerDeUtils.deserializeGenericRow(_collectorRecordBuffer, offset, _fieldSpecs, _reuse);
       }
     };
   }
@@ -163,7 +172,16 @@ public class ConcatCollector implements Collector {
   @Override
   public void reset()
       throws IOException {
-    close();
+    try {
+      if (_collectorRecordBuffer != null) {
+        _collectorRecordBuffer.close();
+      }
+      if (_collectorRecordOutputStream != null) {
+        _collectorRecordOutputStream.close();
+      }
+    } finally {
+      FileUtils.deleteQuietly(_collectorRecordFile);
+    }
     initializeBuffer();
   }
 

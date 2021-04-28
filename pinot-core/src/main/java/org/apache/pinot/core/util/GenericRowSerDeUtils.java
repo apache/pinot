@@ -37,7 +37,7 @@ public final class GenericRowSerDeUtils {
   }
 
   /**
-   * Serialize the given GenericRow
+   * Serialize the given GenericRow. The data is stored in native byte order.
    * @param genericRow GenericRow to serialize
    * @param fieldSpecs the fields to serialize
    * @return serialized bytes
@@ -120,7 +120,7 @@ public final class GenericRowSerDeUtils {
       Object value = genericRow.getValue(fieldSpec.getName());
 
       if (fieldSpec.isSingleValueField()) {
-        switch (fieldSpec.getDataType()) {
+        switch (fieldSpec.getDataType().getStoredType()) {
 
           case INT:
             byteBuffer.putInt((int) value);
@@ -134,7 +134,6 @@ public final class GenericRowSerDeUtils {
           case DOUBLE:
             byteBuffer.putDouble((double) value);
             break;
-          case BOOLEAN:
           case STRING:
             byte[] stringBytes = ((String) value).getBytes(StandardCharsets.UTF_8);
             byteBuffer.putInt(stringBytes.length);
@@ -153,7 +152,7 @@ public final class GenericRowSerDeUtils {
         Object[] multiValue = (Object[]) value;
         byteBuffer.putInt(multiValue.length);
 
-        switch (fieldSpec.getDataType()) {
+        switch (fieldSpec.getDataType().getStoredType()) {
 
           case INT:
             for (Object element : multiValue) {
@@ -175,7 +174,6 @@ public final class GenericRowSerDeUtils {
               byteBuffer.putDouble((double) element);
             }
             break;
-          case BOOLEAN:
           case STRING:
             for (Object element : multiValue) {
               byte[] stringBytes = ((String) element).getBytes(StandardCharsets.UTF_8);
@@ -200,7 +198,7 @@ public final class GenericRowSerDeUtils {
   }
 
   /**
-   * Deserializes bytes from the buffer to GenericRow
+   * Deserializes bytes from the native order data buffer to GenericRow
    * @param dataBuffer the pinot data buffer
    * @param offset offset to begin reading from
    * @param fieldSpecs list of field specs to determine fields in deserialization
@@ -210,49 +208,45 @@ public final class GenericRowSerDeUtils {
   public static GenericRow deserializeGenericRow(PinotDataBuffer dataBuffer, long offset, List<FieldSpec> fieldSpecs,
       GenericRow reuse) {
     for (FieldSpec fieldSpec : fieldSpecs) {
-
+      String fieldName = fieldSpec.getName();
       if (fieldSpec.isSingleValueField()) {
         switch (fieldSpec.getDataType().getStoredType()) {
 
           case INT:
             int intValue = dataBuffer.getInt(offset);
-            reuse.putValue(fieldSpec.getName(), intValue);
+            reuse.putValue(fieldName, intValue);
             offset += Integer.BYTES;
             break;
           case LONG:
             long longValue = dataBuffer.getLong(offset);
-            reuse.putValue(fieldSpec.getName(), longValue);
+            reuse.putValue(fieldName, longValue);
             offset += Long.BYTES;
             break;
           case FLOAT:
             float floatValue = dataBuffer.getFloat(offset);
-            reuse.putValue(fieldSpec.getName(), floatValue);
+            reuse.putValue(fieldName, floatValue);
             offset += Float.BYTES;
             break;
           case DOUBLE:
             double doubleValue = dataBuffer.getDouble(offset);
-            reuse.putValue(fieldSpec.getName(), doubleValue);
+            reuse.putValue(fieldName, doubleValue);
             offset += Double.BYTES;
             break;
           case STRING:
             int stringSize = dataBuffer.getInt(offset);
             offset += Integer.BYTES;
             byte[] stringBytes = new byte[stringSize];
-            for (int j = 0; j < stringSize; j++) {
-              stringBytes[j] = dataBuffer.getByte(offset);
-              offset++;
-            }
-            reuse.putValue(fieldSpec.getName(), new String(stringBytes));
+            dataBuffer.copyTo(offset, stringBytes);
+            offset += stringSize;
+            reuse.putValue(fieldName, new String(stringBytes));
             break;
           case BYTES:
             int bytesSize = dataBuffer.getInt(offset);
             offset += Integer.BYTES;
             byte[] bytes = new byte[bytesSize];
-            for (int j = 0; j < bytesSize; j++) {
-              bytes[j] = dataBuffer.getByte(offset);
-              offset++;
-            }
-            reuse.putValue(fieldSpec.getName(), bytes);
+            dataBuffer.copyTo(offset, bytes);
+            offset += bytesSize;
+            reuse.putValue(fieldName, bytes);
             break;
           default:
             throw new UnsupportedOperationException(
@@ -267,58 +261,54 @@ public final class GenericRowSerDeUtils {
         switch (fieldSpec.getDataType().getStoredType()) {
 
           case INT:
-            for (int j = 0; j < numMultiValues; j++) {
-              values[j] = dataBuffer.getInt(offset);
+            for (int i = 0; i < numMultiValues; i++) {
+              values[i] = dataBuffer.getInt(offset);
               offset += Integer.BYTES;
             }
             break;
           case LONG:
-            for (int j = 0; j < numMultiValues; j++) {
-              values[j] = dataBuffer.getLong(offset);
+            for (int i = 0; i < numMultiValues; i++) {
+              values[i] = dataBuffer.getLong(offset);
               offset += Long.BYTES;
             }
             break;
           case FLOAT:
-            for (int j = 0; j < numMultiValues; j++) {
-              values[j] = dataBuffer.getFloat(offset);
+            for (int i = 0; i < numMultiValues; i++) {
+              values[i] = dataBuffer.getFloat(offset);
               offset += Float.BYTES;
             }
             break;
           case DOUBLE:
-            for (int j = 0; j < numMultiValues; j++) {
-              values[j] = dataBuffer.getDouble(offset);
+            for (int i = 0; i < numMultiValues; i++) {
+              values[i] = dataBuffer.getDouble(offset);
               offset += Double.BYTES;
             }
             break;
           case STRING:
-            for (int j = 0; j < numMultiValues; j++) {
+            for (int i = 0; i < numMultiValues; i++) {
               int stringSize = dataBuffer.getInt(offset);
               offset += Integer.BYTES;
               byte[] stringBytes = new byte[stringSize];
-              for (int k = 0; k < stringSize; k++) {
-                stringBytes[k] = dataBuffer.getByte(offset);
-                offset++;
-              }
-              values[j] = new String(stringBytes);
+              dataBuffer.copyTo(offset, stringBytes);
+              offset += stringSize;
+              values[i] = new String(stringBytes);
             }
             break;
           case BYTES:
-            for (int j = 0; j < numMultiValues; j++) {
+            for (int i = 0; i < numMultiValues; i++) {
               int bytesSize = dataBuffer.getInt(offset);
               offset += Integer.BYTES;
               byte[] bytes = new byte[bytesSize];
-              for (int k = 0; k < bytesSize; k++) {
-                bytes[k] = dataBuffer.getByte(offset);
-                offset++;
-              }
-              values[j] = bytes;
+              dataBuffer.copyTo(offset, bytes);
+              offset += bytesSize;
+              values[i] = bytes;
             }
             break;
           default:
             throw new UnsupportedOperationException(
                 String.format("DataType '%s' not supported", fieldSpec.getDataType()));
         }
-        reuse.putValue(fieldSpec.getName(), values);
+        reuse.putValue(fieldName, values);
       }
     }
     return reuse;
