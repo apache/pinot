@@ -47,7 +47,7 @@ public class IndexedTableTest {
   public void testConcurrentIndexedTable()
       throws InterruptedException, TimeoutException, ExecutionException {
     QueryContext queryContext = QueryContextConverterUtils
-        .getQueryContextFromSQL("SELECT SUM(m1), MAX(m2) FROM testTable GROUP BY d1, d2, d3 ORDER BY SUM(m1)");
+        .getQueryContextFromSQL("SELECT SUM(m1), MAX(m2) FROM testTable GROUP BY d1, d2, d3 ORDER BY d1");
     DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)"},
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
     IndexedTable indexedTable = new ConcurrentIndexedTable(dataSchema, queryContext, 5, TRIM_THRESHOLD);
@@ -134,7 +134,7 @@ public class IndexedTableTest {
   @Test(invocationCount = 100)
   public void testQuickSelect(){
     Random random = new Random();
-    //int[] array = random.ints(100, 10,100000).toArray();
+    //int[] array = random.ints(1000000, 10,100000).toArray();
     int[] array = {0, 1, 2, 3, 4};
     int numRecordsToRetain = 3;
 
@@ -166,6 +166,47 @@ public class IndexedTableTest {
       }
       Assert.assertTrue(copies[i]._key.equals(trimmedArray[i]._key));
     }
+
+  }
+
+  @Test(invocationCount = 1)
+  public void testPQ(){
+    Random random = new Random();
+    //int[] array = random.ints(1000000, 10,100000).toArray();
+    int[] array = {0, 10, 20, 30, 5};
+    int numRecordsToRetain = 3;
+
+    TableResizer.IntermediateRecord[] intermediateRecords = new TableResizer.IntermediateRecord[array.length];
+    for (int i = 0; i < array.length; ++i) {
+      Key key = new Key(new Integer[]{array[i]});
+      Record record = new Record(new Integer[]{array[i]});
+      Comparable[] intermediateRecordValues = new Comparable[]{array[i]};
+      intermediateRecords[i] = new TableResizer.IntermediateRecord(key, intermediateRecordValues);
+    }
+    TableResizer.IntermediateRecord[] copies = Arrays.copyOf(intermediateRecords, intermediateRecords.length);
+
+    Comparator Keycomparator = Comparator.naturalOrder();
+    Comparator<TableResizer.IntermediateRecord> comparator = (o1, o2) -> {
+      int result = Keycomparator.compare(o1._values[0], o2._values[0]);
+      if (result != 0) {
+        return result;
+      }
+      return 0;
+    };
+
+    PriorityQueue<TableResizer.IntermediateRecord> priorityQueue = new PriorityQueue<>(numRecordsToRetain, comparator);
+    for (TableResizer.IntermediateRecord intermediateRecord: intermediateRecords) {
+      if (priorityQueue.size() < numRecordsToRetain) {
+        priorityQueue.offer(intermediateRecord);
+      } else {
+        TableResizer.IntermediateRecord peek = priorityQueue.peek();
+        if (comparator.reversed().compare(peek, intermediateRecord) < 0) {
+          priorityQueue.poll();
+          priorityQueue.offer(intermediateRecord);
+        }
+      }
+    }
+    System.out.println(1);
 
   }
 
