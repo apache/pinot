@@ -157,7 +157,7 @@ public class ColumnMetadata {
     String maxString = (String) config
         .getProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.MAX_VALUE));
     if (minString != null && maxString != null) {
-      switch (dataType) {
+      switch (dataType.getStoredType()) {
         case INT:
           builder.setMinValue(Integer.valueOf(minString));
           builder.setMaxValue(Integer.valueOf(maxString));
@@ -261,7 +261,7 @@ public class ColumnMetadata {
     }
 
     public Builder setDataType(DataType dataType) {
-      this.dataType = dataType.getStoredType();
+      this.dataType = dataType;
       return this;
     }
 

@@ -252,14 +252,14 @@ public class PinotTableRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}")
-  @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Get/Enable/Disable/Drop a table", notes =
       "Get/Enable/Disable/Drop a table. If table name is the only parameter specified "
           + ", the tableconfig will be printed")
   public String alterTableStateOrListTableConfig(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "enable|disable|drop") @QueryParam("state") String stateStr,
-      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
+      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr,
+      @Context HttpHeaders httpHeaders, @Context Request request) {
     try {
       if (stateStr == null) {
         return listTableConfigs(tableName, tableTypeStr);
@@ -267,6 +267,11 @@ public class PinotTableRestletResource {
 
       StateType stateType = Constants.validateState(stateStr);
       TableType tableType = Constants.validateTableType(tableTypeStr);
+
+      // validate if user has permission to change the table state
+      String endpointUrl = request.getRequestURL().toString();
+      _accessControlUtils
+          .validatePermission(tableName, AccessType.UPDATE, httpHeaders, endpointUrl, _accessControlFactory.create());
 
       ArrayNode ret = JsonUtils.newArrayNode();
       boolean tableExists = false;

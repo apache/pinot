@@ -80,8 +80,6 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.segment.local.segment.creator.impl.V1Constants.MetadataKeys.Column.*;
 import static org.apache.pinot.segment.local.segment.creator.impl.V1Constants.MetadataKeys.Segment.*;
-import static org.apache.pinot.spi.data.FieldSpec.DataType.BYTES;
-import static org.apache.pinot.spi.data.FieldSpec.DataType.STRING;
 
 
 /**
@@ -177,6 +175,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
 
       String columnName = fieldSpec.getName();
+      DataType storedType = fieldSpec.getDataType().getStoredType();
       ColumnIndexCreationInfo indexCreationInfo = indexCreationInfoMap.get(columnName);
       Preconditions.checkNotNull(indexCreationInfo, "Missing index creation info for column: %s", columnName);
       boolean dictEnabledColumn = createDictionaryForColumn(indexCreationInfo, segmentCreationSpec, fieldSpec);
@@ -235,15 +234,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         Preconditions.checkState(!invertedIndexColumns.contains(columnName),
             "Cannot create inverted index for raw index column: %s", columnName);
 
-        ChunkCompressionType compressionType =
-            getColumnCompressionType(segmentCreationSpec, fieldSpec);
+        ChunkCompressionType compressionType = getColumnCompressionType(segmentCreationSpec, fieldSpec);
 
         // Initialize forward index creator
         boolean deriveNumDocsPerChunk =
             shouldDeriveNumDocsPerChunk(columnName, segmentCreationSpec.getColumnProperties());
         int writerVersion = rawIndexWriterVersion(columnName, segmentCreationSpec.getColumnProperties());
         _forwardIndexCreatorMap.put(columnName,
-            getRawIndexCreatorForColumn(_indexDir, compressionType, columnName, fieldSpec.getDataType(), totalDocs,
+            getRawIndexCreatorForColumn(_indexDir, compressionType, columnName, storedType, totalDocs,
                 indexCreationInfo.getLengthOfLongestEntry(), deriveNumDocsPerChunk, writerVersion));
       }
 
@@ -251,8 +249,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         // Initialize text index creator
         Preconditions.checkState(fieldSpec.isSingleValueField(),
             "Text index is currently only supported on single-value columns");
-        Preconditions.checkState(fieldSpec.getDataType() == STRING,
-            "Text index is currently only supported on STRING type columns");
+        Preconditions
+            .checkState(storedType == DataType.STRING, "Text index is currently only supported on STRING type columns");
         _textIndexCreatorMap
             .put(columnName, new LuceneTextIndexCreator(columnName, _indexDir, true /* commitOnClose */));
       }
@@ -260,8 +258,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       if (fstIndexColumns.contains(columnName)) {
         Preconditions.checkState(fieldSpec.isSingleValueField(),
             "FST index is currently only supported on single-value columns");
-        Preconditions.checkState(fieldSpec.getDataType() == STRING,
-            "FST index is currently only supported on STRING type columns");
+        Preconditions
+            .checkState(storedType == DataType.STRING, "FST index is currently only supported on STRING type columns");
         Preconditions
             .checkState(dictEnabledColumn, "FST index is currently only supported on dictionary-encoded columns");
         _fstIndexCreatorMap.put(columnName, new LuceneFSTIndexCreator(_indexDir, columnName,
@@ -271,8 +269,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       if (jsonIndexColumns.contains(columnName)) {
         Preconditions.checkState(fieldSpec.isSingleValueField(),
             "Json index is currently only supported on single-value columns");
-        Preconditions.checkState(fieldSpec.getDataType() == STRING,
-            "Json index is currently only supported on STRING columns");
+        Preconditions
+            .checkState(storedType == DataType.STRING, "Json index is currently only supported on STRING columns");
         JsonIndexCreator jsonIndexCreator =
             segmentCreationSpec.isOnHeap() ? new OnHeapJsonIndexCreator(_indexDir, columnName)
                 : new OffHeapJsonIndexCreator(_indexDir, columnName);
@@ -283,8 +281,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       if (h3IndexConfig != null) {
         Preconditions
             .checkState(fieldSpec.isSingleValueField(), "H3 index is currently only supported on single-value columns");
-        Preconditions.checkState(fieldSpec.getDataType() == BYTES,
-            "H3 index is currently only supported on BYTES columns");
+        Preconditions.checkState(storedType == DataType.BYTES, "H3 index is currently only supported on BYTES columns");
         H3IndexResolution resolution = h3IndexConfig.getResolution();
         GeoSpatialIndexCreator h3IndexCreator =
             segmentCreationSpec.isOnHeap() ? new OnHeapH3IndexCreator(_indexDir, columnName, resolution)
@@ -336,11 +333,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    */
   private ChunkCompressionType getColumnCompressionType(SegmentGeneratorConfig segmentCreationSpec,
       FieldSpec fieldSpec) {
-    ChunkCompressionType compressionType =
-        segmentCreationSpec.getRawIndexCompressionType().get(fieldSpec.getName());
-
+    ChunkCompressionType compressionType = segmentCreationSpec.getRawIndexCompressionType().get(fieldSpec.getName());
     if (compressionType == null) {
-      if (fieldSpec.getFieldType().equals(FieldType.METRIC)) {
+      if (fieldSpec.getFieldType() == FieldType.METRIC) {
         return ChunkCompressionType.PASS_THROUGH;
       } else {
         return ChunkCompressionType.SNAPPY;
@@ -737,11 +732,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    * @return raw index creator
    * @throws IOException
    */
-  public static ForwardIndexCreator getRawIndexCreatorForColumn(File file,
-      ChunkCompressionType compressionType, String column, DataType dataType, int totalDocs,
-      int lengthOfLongestEntry, boolean deriveNumDocsPerChunk, int writerVersion)
+  public static ForwardIndexCreator getRawIndexCreatorForColumn(File file, ChunkCompressionType compressionType,
+      String column, DataType dataType, int totalDocs, int lengthOfLongestEntry, boolean deriveNumDocsPerChunk,
+      int writerVersion)
       throws IOException {
-    switch (dataType) {
+    switch (dataType.getStoredType()) {
       case INT:
       case LONG:
       case FLOAT:

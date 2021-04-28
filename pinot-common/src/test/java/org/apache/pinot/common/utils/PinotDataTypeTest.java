@@ -22,6 +22,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.utils.PinotDataType.*;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
@@ -98,6 +99,8 @@ public class PinotDataTypeTest {
     assertEquals(OBJECT.toLong(new NumberObject("123")), 123L);
     assertEquals(OBJECT.toFloat(new NumberObject("123")), 123f);
     assertEquals(OBJECT.toDouble(new NumberObject("123")), 123.0);
+    assertTrue(OBJECT.toBoolean(new NumberObject("123")));
+    assertEquals(OBJECT.toTimestamp(new NumberObject("123")).getTime(), 123L);
     assertEquals(OBJECT.toString(new NumberObject("123")), "123");
     assertEquals(OBJECT_ARRAY.getSingleValueType(), OBJECT);
   }
@@ -120,7 +123,6 @@ public class PinotDataTypeTest {
     assertInvalidConversion(BYTES, DOUBLE_ARRAY);
 
     for (PinotDataType sourceType : values()) {
-      assertInvalidConversion(sourceType, BOOLEAN);
       assertInvalidConversion(sourceType, BYTE);
       assertInvalidConversion(sourceType, CHARACTER);
       assertInvalidConversion(sourceType, SHORT);

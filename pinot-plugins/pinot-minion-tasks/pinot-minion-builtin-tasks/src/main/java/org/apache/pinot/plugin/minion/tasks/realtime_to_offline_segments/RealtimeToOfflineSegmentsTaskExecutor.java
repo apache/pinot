@@ -50,6 +50,7 @@ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -249,21 +250,27 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
    */
   private RecordFilterConfig getRecordFilterConfigForWindow(long windowStartMs, long windowEndMs,
       DateTimeFieldSpec dateTimeFieldSpec, String timeColumn) {
+    DataType dataType = dateTimeFieldSpec.getDataType();
     String filterFunction;
-    DateTimeFormatSpec dateTimeFormatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
-    TimeUnit timeUnit = dateTimeFormatSpec.getColumnUnit();
-    DateTimeFieldSpec.TimeFormat timeFormat = dateTimeFormatSpec.getTimeFormat();
-    if (timeUnit.equals(TimeUnit.MILLISECONDS) && timeFormat.equals(DateTimeFieldSpec.TimeFormat.EPOCH)) {
-      // If time column is in EPOCH millis, use windowStart and windowEnd directly to filter
+    if (dataType == DataType.TIMESTAMP) {
+      // TIMESTAMP type stores millis since epoch values
       filterFunction = getFilterFunctionLong(windowStartMs, windowEndMs, timeColumn);
     } else {
-      // Convert windowStart and windowEnd to time format of the data
-      String windowStart = dateTimeFormatSpec.fromMillisToFormat(windowStartMs);
-      String windowEnd = dateTimeFormatSpec.fromMillisToFormat(windowEndMs);
-      if (dateTimeFieldSpec.getDataType().isNumeric()) {
-        filterFunction = getFilterFunctionLong(Long.parseLong(windowStart), Long.parseLong(windowEnd), timeColumn);
+      DateTimeFormatSpec dateTimeFormatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
+      TimeUnit timeUnit = dateTimeFormatSpec.getColumnUnit();
+      DateTimeFieldSpec.TimeFormat timeFormat = dateTimeFormatSpec.getTimeFormat();
+      if (timeUnit == TimeUnit.MILLISECONDS && timeFormat == DateTimeFieldSpec.TimeFormat.EPOCH) {
+        // If time column is in EPOCH millis, use windowStart and windowEnd directly to filter
+        filterFunction = getFilterFunctionLong(windowStartMs, windowEndMs, timeColumn);
       } else {
-        filterFunction = getFilterFunctionString(windowStart, windowEnd, timeColumn);
+        // Convert windowStart and windowEnd to time format of the data
+        String windowStart = dateTimeFormatSpec.fromMillisToFormat(windowStartMs);
+        String windowEnd = dateTimeFormatSpec.fromMillisToFormat(windowEndMs);
+        if (dataType.isNumeric()) {
+          filterFunction = getFilterFunctionLong(Long.parseLong(windowStart), Long.parseLong(windowEnd), timeColumn);
+        } else {
+          filterFunction = getFilterFunctionString(windowStart, windowEnd, timeColumn);
+        }
       }
     }
     return new RecordFilterConfig.Builder().setRecordFilterType(RecordFilterFactory.RecordFilterType.FILTER_FUNCTION)

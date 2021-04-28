@@ -158,7 +158,7 @@ public class StreamOp extends BaseOp {
 
   private boolean createKafkaTopic() {
     try {
-      Properties streamConfigMap = JsonUtils.fileToObject(new File(_streamConfigFileName), Properties.class);
+      Properties streamConfigMap = JsonUtils.fileToObject(new File(getAbsoluteFileName(_streamConfigFileName)), Properties.class);
       String topicName = streamConfigMap.getProperty(TOPIC_NAME);
       int partitions = Integer.parseInt(streamConfigMap.getProperty(NUM_PARTITIONS));
 
@@ -180,12 +180,12 @@ public class StreamOp extends BaseOp {
   private boolean produceData() {
     try {
       // get kafka topic
-      Properties streamConfigMap = JsonUtils.fileToObject(new File(_streamConfigFileName), Properties.class);
+      Properties streamConfigMap = JsonUtils.fileToObject(new File(getAbsoluteFileName(_streamConfigFileName)), Properties.class);
       String topicName = streamConfigMap.getProperty(TOPIC_NAME);
       String partitionColumn = streamConfigMap.getProperty(PARTITION_COLUMN);
 
       // get table config
-      TableConfig tableConfig = JsonUtils.fileToObject(new File(_tableConfigFileName), TableConfig.class);
+      TableConfig tableConfig = JsonUtils.fileToObject(new File(getAbsoluteFileName(_tableConfigFileName)), TableConfig.class);
       String tableName = tableConfig.getTableName();
       long existingTotalDoc = 0;
 
@@ -205,12 +205,12 @@ public class StreamOp extends BaseOp {
       localTempDir.deleteOnExit();
       File localReplacedCSVFile = new File(localTempDir, "replaced");
       FileUtils.forceMkdir(localTempDir);
-      Utils.replaceContent(new File(_inputDataFileName), localReplacedCSVFile, GENERATION_NUMBER_PLACEHOLDER,
+      Utils.replaceContent(new File(getAbsoluteFileName(_inputDataFileName)), localReplacedCSVFile, GENERATION_NUMBER_PLACEHOLDER,
           String.valueOf(_generationNumber));
 
 
       CSVRecordReaderConfig recordReaderConfig =
-          JsonUtils.fileToObject(new File(_recordReaderConfigFileName), CSVRecordReaderConfig.class);
+          JsonUtils.fileToObject(new File(getAbsoluteFileName(_recordReaderConfigFileName)), CSVRecordReaderConfig.class);
       Set<String> columnNames = new HashSet<>();
       Collections.addAll(columnNames,
           recordReaderConfig.getHeader().split(Character.toString(recordReaderConfig.getDelimiter())));

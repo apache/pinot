@@ -29,7 +29,6 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -71,12 +70,7 @@ public class InIdSetTransformFunction extends BaseTransformFunction {
 
   @Override
   public TransformResultMetadata getResultMetadata() {
-    return INT_SV_NO_DICTIONARY_METADATA;
-  }
-
-  @Override
-  public Dictionary getDictionary() {
-    return null;
+    return BOOLEAN_SV_NO_DICTIONARY_METADATA;
   }
 
   @Override
@@ -86,8 +80,8 @@ public class InIdSetTransformFunction extends BaseTransformFunction {
     }
 
     int length = projectionBlock.getNumDocs();
-    DataType dataType = _transformFunction.getResultMetadata().getDataType();
-    switch (dataType) {
+    DataType storedType = _transformFunction.getResultMetadata().getDataType().getStoredType();
+    switch (storedType) {
       case INT:
         int[] intValues = _transformFunction.transformToIntValuesSV(projectionBlock);
         for (int i = 0; i < length; i++) {

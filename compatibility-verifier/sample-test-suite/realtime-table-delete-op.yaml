@@ -17,10 +17,10 @@
 # under the License.
 #
 
-description: Yaml file for creating a offline table
+description: Yaml file for deleting a realtime table
 operations:
   - type: tableOp
-    description: Create table feature-test-1.json
-    op: CREATE
-    schemaFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/FeatureTest1-schema.json
-    tableConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/feature-test-1.json
+    description: Delete table feature-test-1-realtime.json
+    op: DELETE
+    schemaFileName: FeatureTest1-schema.json
+    tableConfigFileName: feature-test-1-realtime.json

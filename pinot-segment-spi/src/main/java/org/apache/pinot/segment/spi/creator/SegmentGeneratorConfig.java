@@ -211,10 +211,10 @@ public class SegmentGeneratorConfig implements Serializable {
       if (dateTimeFieldSpec != null) {
         setTimeColumnName(dateTimeFieldSpec.getName());
         DateTimeFormatSpec formatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
-        if (formatSpec.getTimeFormat().equals(DateTimeFieldSpec.TimeFormat.EPOCH)) {
-          setSegmentTimeUnit(formatSpec.getColumnUnit());
-        } else {
+        if (formatSpec.getTimeFormat() == DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT) {
           setSimpleDateFormat(formatSpec.getSDFPattern());
+        } else {
+          setSegmentTimeUnit(formatSpec.getColumnUnit());
         }
       }
     }

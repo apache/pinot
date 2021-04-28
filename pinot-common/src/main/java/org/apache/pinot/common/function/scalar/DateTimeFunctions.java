@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import java.sql.Timestamp;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.function.DateTimePatternHandler;
 import org.apache.pinot.common.function.DateTimeUtils;
@@ -229,6 +230,22 @@ public class DateTimeFunctions {
   }
 
   /**
+   * Converts epoch millis to Timestamp
+   */
+  @ScalarFunction
+  public static Timestamp toTimestamp(long millis) {
+    return new Timestamp(millis);
+  }
+
+  /**
+   * Converts Timestamp to epoch millis
+   */
+  @ScalarFunction
+  public static long fromTimestamp(Timestamp timestamp) {
+    return timestamp.getTime();
+  }
+
+  /**
    * Converts epoch millis to DateTime string represented by pattern
    */
   @ScalarFunction
@@ -255,6 +272,7 @@ public class DateTimeFunctions {
 
   /**
    * Return current time as epoch millis
+   * TODO: Consider changing the return type to Timestamp
    */
   @ScalarFunction
   public static long now() {

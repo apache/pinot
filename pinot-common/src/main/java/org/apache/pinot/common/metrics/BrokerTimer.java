@@ -29,7 +29,11 @@ public enum BrokerTimer implements AbstractMetrics.Timer {
   ROUTING_TABLE_UPDATE_TIME(true),
   CLUSTER_CHANGE_QUEUE_TIME(true),
   // metric tracking the freshness lag for consuming segments
-  FRESHNESS_LAG_MS(false);
+  FRESHNESS_LAG_MS(false),
+  // aggregated query processing cost (thread cpu time in nanoseconds) from offline servers
+  OFFLINE_THREAD_CPU_TIME_NS(false),
+  // aggregated query processing cost (thread cpu time in nanoseconds) from realtime servers
+  REALTIME_THREAD_CPU_TIME_NS(false);
 
   private final String timerName;
   private final boolean global;

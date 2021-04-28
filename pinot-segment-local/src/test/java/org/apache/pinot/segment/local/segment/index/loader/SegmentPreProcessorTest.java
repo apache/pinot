@@ -48,6 +48,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -384,7 +385,7 @@ public class SegmentPreProcessorTest {
 
       Assert.assertEquals(columnMetadata.getCardinality(), cardinality);
       Assert.assertEquals(columnMetadata.getTotalDocs(), 100000);
-      Assert.assertEquals(columnMetadata.getDataType(), FieldSpec.DataType.STRING);
+      Assert.assertEquals(columnMetadata.getDataType(), DataType.STRING);
       Assert.assertEquals(columnMetadata.getBitsPerElement(), bits);
       Assert.assertEquals(columnMetadata.getColumnMaxLength(), dictionaryElementSize);
       Assert.assertEquals(columnMetadata.getFieldType(), FieldSpec.FieldType.DIMENSION);
@@ -551,7 +552,7 @@ public class SegmentPreProcessorTest {
 
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
     ColumnMetadata hllMetricMetadata = segmentMetadata.getColumnMetadataFor(NEW_HLL_BYTE_METRIC_COLUMN_NAME);
-    Assert.assertEquals(hllMetricMetadata.getDataType(), FieldSpec.DataType.BYTES);
+    Assert.assertEquals(hllMetricMetadata.getDataType(), DataType.BYTES);
     String expectedDefaultValueString =
         "00000008000000ac00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
     ByteArray expectedDefaultValue = BytesUtils.toByteArray(expectedDefaultValueString);
@@ -560,7 +561,7 @@ public class SegmentPreProcessorTest {
     Assert.assertEquals(hllMetricMetadata.getDefaultNullValueString(), expectedDefaultValueString);
 
     ColumnMetadata tDigestMetricMetadata = segmentMetadata.getColumnMetadataFor(NEW_TDIGEST_BYTE_METRIC_COLUMN_NAME);
-    Assert.assertEquals(tDigestMetricMetadata.getDataType(), FieldSpec.DataType.BYTES);
+    Assert.assertEquals(tDigestMetricMetadata.getDataType(), DataType.BYTES);
     expectedDefaultValueString =
         "0000000141ba085ee15d2f3241ba085ee15d2f324059000000000000000000013ff000000000000041ba085ee15d2f32";
     expectedDefaultValue = BytesUtils.toByteArray(expectedDefaultValueString);
@@ -582,7 +583,7 @@ public class SegmentPreProcessorTest {
     ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(NEW_INT_METRIC_COLUMN_NAME);
     Assert.assertEquals(columnMetadata.getCardinality(), 1);
     Assert.assertEquals(columnMetadata.getTotalDocs(), 100000);
-    Assert.assertEquals(columnMetadata.getDataType(), FieldSpec.DataType.INT);
+    Assert.assertEquals(columnMetadata.getDataType(), DataType.INT);
     Assert.assertEquals(columnMetadata.getBitsPerElement(), 1);
     Assert.assertEquals(columnMetadata.getColumnMaxLength(), 0);
     Assert.assertEquals(columnMetadata.getFieldType(), FieldSpec.FieldType.METRIC);
@@ -599,33 +600,33 @@ public class SegmentPreProcessorTest {
     Assert.assertEquals(columnMetadata.getDefaultNullValueString(), "1");
 
     columnMetadata = segmentMetadata.getColumnMetadataFor(NEW_LONG_METRIC_COLUMN_NAME);
-    Assert.assertEquals(columnMetadata.getDataType(), FieldSpec.DataType.LONG);
+    Assert.assertEquals(columnMetadata.getDataType(), DataType.LONG);
     Assert.assertEquals(columnMetadata.getMinValue(), 0L);
     Assert.assertEquals(columnMetadata.getMaxValue(), 0L);
     Assert.assertEquals(columnMetadata.getDefaultNullValueString(), "0");
 
     columnMetadata = segmentMetadata.getColumnMetadataFor(NEW_FLOAT_METRIC_COLUMN_NAME);
-    Assert.assertEquals(columnMetadata.getDataType(), FieldSpec.DataType.FLOAT);
+    Assert.assertEquals(columnMetadata.getDataType(), DataType.FLOAT);
     Assert.assertEquals(columnMetadata.getMinValue(), 0f);
     Assert.assertEquals(columnMetadata.getMaxValue(), 0f);
     Assert.assertEquals(columnMetadata.getDefaultNullValueString(), "0.0");
 
     columnMetadata = segmentMetadata.getColumnMetadataFor(NEW_DOUBLE_METRIC_COLUMN_NAME);
-    Assert.assertEquals(columnMetadata.getDataType(), FieldSpec.DataType.DOUBLE);
+    Assert.assertEquals(columnMetadata.getDataType(), DataType.DOUBLE);
     Assert.assertEquals(columnMetadata.getMinValue(), 0.0);
     Assert.assertEquals(columnMetadata.getMaxValue(), 0.0);
     Assert.assertEquals(columnMetadata.getDefaultNullValueString(), "0.0");
 
     columnMetadata = segmentMetadata.getColumnMetadataFor(NEW_BOOLEAN_SV_DIMENSION_COLUMN_NAME);
-    Assert.assertEquals(columnMetadata.getDataType(), FieldSpec.DataType.STRING);
-    Assert.assertEquals(columnMetadata.getColumnMaxLength(), 5);
+    Assert.assertEquals(columnMetadata.getDataType(), DataType.BOOLEAN);
+    Assert.assertEquals(columnMetadata.getColumnMaxLength(), 0);
     Assert.assertEquals(columnMetadata.getFieldType(), FieldSpec.FieldType.DIMENSION);
-    Assert.assertEquals(columnMetadata.getMinValue(), "false");
-    Assert.assertEquals(columnMetadata.getMaxValue(), "false");
-    Assert.assertEquals(columnMetadata.getDefaultNullValueString(), "false");
+    Assert.assertEquals(columnMetadata.getMinValue(), 0);
+    Assert.assertEquals(columnMetadata.getMaxValue(), 0);
+    Assert.assertEquals(columnMetadata.getDefaultNullValueString(), "0");
 
     columnMetadata = segmentMetadata.getColumnMetadataFor(NEW_STRING_MV_DIMENSION_COLUMN_NAME);
-    Assert.assertEquals(columnMetadata.getDataType(), FieldSpec.DataType.STRING);
+    Assert.assertEquals(columnMetadata.getDataType(), DataType.STRING);
     Assert.assertEquals(columnMetadata.getColumnMaxLength(), 4);
     Assert.assertFalse(columnMetadata.isSorted());
     Assert.assertFalse(columnMetadata.isSingleValue());
@@ -637,7 +638,7 @@ public class SegmentPreProcessorTest {
 
     // Derived column
     columnMetadata = segmentMetadata.getColumnMetadataFor(NEW_INT_SV_DIMENSION_COLUMN_NAME);
-    Assert.assertEquals(columnMetadata.getDataType(), FieldSpec.DataType.INT);
+    Assert.assertEquals(columnMetadata.getDataType(), DataType.INT);
     Assert.assertEquals(columnMetadata.getDefaultNullValueString(), Integer.toString(Integer.MIN_VALUE));
     Assert.assertTrue(columnMetadata.isAutoGenerated());
     ColumnMetadata originalColumnMetadata = segmentMetadata.getColumnMetadataFor(COLUMN1_NAME);

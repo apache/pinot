@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.ArrayUtils;
@@ -121,7 +122,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    if (_resultMetadata.getDataType() != DataType.INT) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.INT) {
       return super.transformToIntValuesSV(projectionBlock);
     }
     if (_intResults == null) {
@@ -133,14 +134,14 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _intResults[i] = (int) _functionInvoker.invoke(_arguments);
+      _intResults[i] = (int) _resultType.toInternal(_functionInvoker.invoke(_arguments));
     }
     return _intResults;
   }
 
   @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
-    if (_resultMetadata.getDataType() != DataType.LONG) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.LONG) {
       return super.transformToLongValuesSV(projectionBlock);
     }
     if (_longResults == null) {
@@ -152,14 +153,14 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _longResults[i] = (long) _functionInvoker.invoke(_arguments);
+      _longResults[i] = (long) _resultType.toInternal(_functionInvoker.invoke(_arguments));
     }
     return _longResults;
   }
 
   @Override
   public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
-    if (_resultMetadata.getDataType() != DataType.FLOAT) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.FLOAT) {
       return super.transformToFloatValuesSV(projectionBlock);
     }
     if (_floatResults == null) {
@@ -171,14 +172,14 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _floatResults[i] = (float) _functionInvoker.invoke(_arguments);
+      _floatResults[i] = (float) _resultType.toInternal(_functionInvoker.invoke(_arguments));
     }
     return _floatResults;
   }
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_resultMetadata.getDataType() != DataType.DOUBLE) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.DOUBLE) {
       return super.transformToDoubleValuesSV(projectionBlock);
     }
     if (_doubleResults == null) {
@@ -190,14 +191,14 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _doubleResults[i] = (double) _functionInvoker.invoke(_arguments);
+      _doubleResults[i] = (double) _resultType.toInternal(_functionInvoker.invoke(_arguments));
     }
     return _doubleResults;
   }
 
   @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-    if (_resultMetadata.getDataType() != DataType.STRING) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.STRING) {
       return super.transformToStringValuesSV(projectionBlock);
     }
     if (_stringResults == null) {
@@ -209,14 +210,16 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _stringResults[i] = _functionInvoker.invoke(_arguments).toString();
+      Object result = _functionInvoker.invoke(_arguments);
+      _stringResults[i] =
+          _resultType == PinotDataType.STRING ? result.toString() : (String) _resultType.toInternal(result);
     }
     return _stringResults;
   }
 
   @Override
   public byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock) {
-    if (_resultMetadata.getDataType() != DataType.BYTES) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.BYTES) {
       return super.transformToBytesValuesSV(projectionBlock);
     }
     if (_bytesResults == null) {
@@ -228,14 +231,14 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _bytesResults[i] = (byte[]) _functionInvoker.invoke(_arguments);
+      _bytesResults[i] = (byte[]) _resultType.toInternal(_functionInvoker.invoke(_arguments));
     }
     return _bytesResults;
   }
 
   @Override
   public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
-    if (_resultMetadata.getDataType() != DataType.INT) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.INT) {
       return super.transformToIntValuesMV(projectionBlock);
     }
     if (_intMVResults == null) {
@@ -247,14 +250,14 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _intMVResults[i] = (int[]) _functionInvoker.invoke(_arguments);
+      _intMVResults[i] = (int[]) _resultType.toInternal(_functionInvoker.invoke(_arguments));
     }
     return _intMVResults;
   }
 
   @Override
   public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
-    if (_resultMetadata.getDataType() != DataType.LONG) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.LONG) {
       return super.transformToLongValuesMV(projectionBlock);
     }
     if (_longMVResults == null) {
@@ -266,14 +269,14 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _longMVResults[i] = (long[]) _functionInvoker.invoke(_arguments);
+      _longMVResults[i] = (long[]) _resultType.toInternal(_functionInvoker.invoke(_arguments));
     }
     return _longMVResults;
   }
 
   @Override
   public float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock) {
-    if (_resultMetadata.getDataType() != DataType.FLOAT) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.FLOAT) {
       return super.transformToFloatValuesMV(projectionBlock);
     }
     if (_floatMVResults == null) {
@@ -285,14 +288,14 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _floatMVResults[i] = (float[]) _functionInvoker.invoke(_arguments);
+      _floatMVResults[i] = (float[]) _resultType.toInternal(_functionInvoker.invoke(_arguments));
     }
     return _floatMVResults;
   }
 
   @Override
   public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
-    if (_resultMetadata.getDataType() != DataType.DOUBLE) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.DOUBLE) {
       return super.transformToDoubleValuesMV(projectionBlock);
     }
     if (_doubleMVResults == null) {
@@ -304,14 +307,14 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _doubleMVResults[i] = (double[]) _functionInvoker.invoke(_arguments);
+      _doubleMVResults[i] = (double[]) _resultType.toInternal(_functionInvoker.invoke(_arguments));
     }
     return _doubleMVResults;
   }
 
   @Override
   public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
-    if (_resultMetadata.getDataType() != DataType.STRING) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.STRING) {
       return super.transformToStringValuesMV(projectionBlock);
     }
     if (_stringMVResults == null) {
@@ -323,7 +326,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _stringMVResults[i] = (String[]) _functionInvoker.invoke(_arguments);
+      _stringMVResults[i] = (String[]) _resultType.toInternal(_functionInvoker.invoke(_arguments));
     }
     return _stringMVResults;
   }
@@ -349,6 +352,26 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         case DOUBLE:
           _nonLiteralValues[i] = ArrayUtils.toObject(transformFunction.transformToDoubleValuesSV(projectionBlock));
           break;
+        case BOOLEAN: {
+          int[] intValues = transformFunction.transformToIntValuesSV(projectionBlock);
+          int numValues = intValues.length;
+          Boolean[] booleanValues = new Boolean[numValues];
+          for (int j = 0; j < numValues; j++) {
+            booleanValues[j] = intValues[j] == 1;
+          }
+          _nonLiteralValues[i] = booleanValues;
+          break;
+        }
+        case TIMESTAMP: {
+          long[] longValues = transformFunction.transformToLongValuesSV(projectionBlock);
+          int numValues = longValues.length;
+          Timestamp[] timestampValues = new Timestamp[numValues];
+          for (int j = 0; j < numValues; j++) {
+            timestampValues[j] = new Timestamp(longValues[j]);
+          }
+          _nonLiteralValues[i] = timestampValues;
+          break;
+        }
         case STRING:
           _nonLiteralValues[i] = transformFunction.transformToStringValuesSV(projectionBlock);
           break;

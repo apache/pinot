@@ -31,6 +31,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -223,7 +224,7 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
         Object otherVal = o.getRow().getValue(column);
         Object thisVal = _row.getValue(column);
         if (fieldSpec.isSingleValueField()) {
-          switch (fieldSpec.getDataType()) {
+          switch (fieldSpec.getDataType().getStoredType()) {
             case INT:
               compare = ((Integer) thisVal).compareTo((Integer) otherVal);
               break;
@@ -238,6 +239,9 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
               break;
             case STRING:
               compare = ((String) thisVal).compareTo((String) otherVal);
+              break;
+            case BYTES:
+              compare = ByteArray.compare((byte[]) thisVal, (byte[]) otherVal);
               break;
             default:
               throw new IllegalStateException("Unsupported column value type");

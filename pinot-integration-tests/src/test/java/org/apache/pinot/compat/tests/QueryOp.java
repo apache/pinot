@@ -88,9 +88,9 @@ public class QueryOp extends BaseOp {
     boolean testPassed = false;
 
     try (BufferedReader queryReader = new BufferedReader(
-        new InputStreamReader(new FileInputStream(_queryFileName), StandardCharsets.UTF_8));
+        new InputStreamReader(new FileInputStream(getAbsoluteFileName(_queryFileName)), StandardCharsets.UTF_8));
         BufferedReader expectedResultReader = new BufferedReader(
-            new InputStreamReader(new FileInputStream(_expectedResultsFileName), StandardCharsets.UTF_8))) {
+            new InputStreamReader(new FileInputStream(getAbsoluteFileName(_expectedResultsFileName)), StandardCharsets.UTF_8))) {
 
       int succeededQueryCount = 0;
       int totalQueryCount = 0;

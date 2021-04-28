@@ -208,7 +208,7 @@ public abstract class QueryScheduler {
       serverMetrics.addValueToTableGauge(tableNameWithType, ServerGauge.RESIZE_TIME_MS, resizeTimeMs);
     }
     if (threadCpuTimeNs > 0) {
-      serverMetrics.addValueToTableGauge(tableNameWithType, ServerGauge.EXECUTION_THREAD_CPU_TIME_NS, threadCpuTimeNs);
+      serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.EXECUTION_THREAD_CPU_TIME_NS, threadCpuTimeNs, TimeUnit.NANOSECONDS);
     }
 
     TimerContext timerContext = queryRequest.getTimerContext();

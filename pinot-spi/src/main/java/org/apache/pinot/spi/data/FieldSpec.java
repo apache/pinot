@@ -21,10 +21,13 @@ package org.apache.pinot.spi.data;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.Serializable;
+import java.sql.Timestamp;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.TimestampUtils;
 
 
 /**
@@ -46,6 +49,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_LONG = Long.MIN_VALUE;
   public static final Float DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT = Float.NEGATIVE_INFINITY;
   public static final Double DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE = Double.NEGATIVE_INFINITY;
+  public static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_BOOLEAN = 0;
+  public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP = 0L;
   public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_STRING = "null";
   public static final byte[] DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES = new byte[0];
 
@@ -87,7 +92,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public FieldSpec(String name, DataType dataType, boolean isSingleValueField, int maxLength,
       @Nullable Object defaultNullValue) {
     _name = name;
-    _dataType = dataType.getStoredType();
+    _dataType = dataType;
     _isSingleValueField = isSingleValueField;
     _maxLength = maxLength;
     setDefaultNullValue(defaultNullValue);
@@ -110,7 +115,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setDataType(DataType dataType) {
-    _dataType = dataType.getStoredType();
+    _dataType = dataType;
     _defaultNullValue = getDefaultNullValue(getFieldType(), _dataType, _stringDefaultNullValue);
   }
 
@@ -218,6 +223,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
               return DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT;
             case DOUBLE:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE;
+            case BOOLEAN:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_BOOLEAN;
+            case TIMESTAMP:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP;
             case STRING:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_STRING;
             case BYTES:
@@ -241,6 +250,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
+
   /**
    * Deprecated. Use TableConfig -> IngestionConfig -> TransformConfigs
    */
@@ -285,6 +295,12 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           break;
         case DOUBLE:
           jsonNode.put(key, (Double) _defaultNullValue);
+          break;
+        case BOOLEAN:
+          jsonNode.put(key, (Integer) _defaultNullValue == 1);
+          break;
+        case TIMESTAMP:
+          jsonNode.put(key, new Timestamp((Long) _defaultNullValue).toString());
           break;
         case STRING:
           jsonNode.put(key, (String) _defaultNullValue);
@@ -352,13 +368,41 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public enum DataType {
     // LIST is for complex lists which is different from multi-value column of primitives
     // STRUCT, MAP and LIST are composable to form a COMPLEX field
-    INT, LONG, FLOAT, DOUBLE, BOOLEAN/* Stored as STRING */, STRING, BYTES, STRUCT, MAP, LIST;
+    INT,
+    LONG,
+    FLOAT,
+    DOUBLE,
+    BOOLEAN /* Stored as INT */,
+    TIMESTAMP /* Stored as LONG */,
+    STRING,
+    BYTES,
+    STRUCT,
+    MAP,
+    LIST;
 
     /**
      * Returns the data type stored in Pinot.
+     * <p>Pinot internally stores data (physical) in INT, LONG, FLOAT, DOUBLE, STRING, BYTES type, other data types
+     * (logical) will be stored as one of these types.
+     * <p>Stored type should be used when reading the physical stored values from Dictionary, Forward Index etc.
      */
     public DataType getStoredType() {
-      return this == BOOLEAN ? STRING : this;
+      switch (this) {
+        case BOOLEAN:
+          return INT;
+        case TIMESTAMP:
+          return LONG;
+        default:
+          return this;
+      }
+    }
+
+    /**
+     * Returns {@code true} if the data type is of fixed width (INT, LONG, FLOAT, DOUBLE, BOOLEAN, TIMESTAMP),
+     * {@code false} otherwise.
+     */
+    public boolean isFixedWidth() {
+      return this.ordinal() < STRING.ordinal();
     }
 
     /**
@@ -367,8 +411,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     public int size() {
       switch (this) {
         case INT:
+        case BOOLEAN:
           return Integer.BYTES;
         case LONG:
+        case TIMESTAMP:
           return Long.BYTES;
         case FLOAT:
           return Float.BYTES;
@@ -380,13 +426,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
 
     /**
-     * Check if the data type is for fixed width data (INT, LONG, FLOAT, DOUBLE)
-     * or variable width data (STRING, BYTES)
+     * Returns {@code true} if the data type is numeric (INT, LONG, FLOAT, DOUBLE), {@code false} otherwise.
      */
-    public boolean isFixedWidth() {
-      return this != STRING && this != BYTES;
-    }
-
     public boolean isNumeric() {
       return this == INT || this == LONG || this == FLOAT || this == DOUBLE;
     }
@@ -405,6 +446,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return Float.valueOf(value);
           case DOUBLE:
             return Double.valueOf(value);
+          case BOOLEAN:
+            return BooleanUtils.toInt(value);
+          case TIMESTAMP:
+            return TimestampUtils.toMillisSinceEpoch(value);
           case STRING:
             return value;
           case BYTES:
@@ -431,6 +476,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return Float.valueOf(value);
           case DOUBLE:
             return Double.valueOf(value);
+          case BOOLEAN:
+            return BooleanUtils.toInt(value);
+          case TIMESTAMP:
+            return TimestampUtils.toMillisSinceEpoch(value);
           case STRING:
             return value;
           case BYTES:

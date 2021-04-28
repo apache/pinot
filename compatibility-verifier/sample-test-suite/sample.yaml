@@ -21,31 +21,31 @@
 description: Operations to be run after Broker downgrade
 operations:
     - type: tableOp
-      description: Create table t1
+      description: Create table FeatureTest1
       op: CREATE
-      schemaFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/FeatureTest1-schema.json
-      tableConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/feature-test-1.json
+      schemaFileName: FeatureTest1-schema.json
+      tableConfigFileName: feature-test-1.json
     - type: segmentOp
-      description: Add segments X and Y to T1
+      description: Add segment FeatureTest1_Segment to table FeatureTest1
       op: UPLOAD
-      inputDataFileName: pinot-integration-tests/src/test/resources/compat-tests/data/FeatureTest1-data-00.csv
-      schemaFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/FeatureTest1-schema.json
-      tableConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/feature-test-1.json
-      recordReaderConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/data/recordReaderConfig.json
+      inputDataFileName: data/FeatureTest1-data-00.csv
+      schemaFileName: FeatureTest1-schema.json
+      tableConfigFileName: feature-test-1.json
+      recordReaderConfigFileName: data/recordReaderConfig.json
       segmentName: FeatureTest1_Segment
     - type: segmentOp
-      description: Delete segments X and Y to T1
+      description: Delete segment FeatureTest1_Segment from table FeatureTest1
       op: DELETE
-      tableConfigFileName: pinot-integration-tests/src/test/resources/compat-tests/configs/feature-test-1.json
+      tableConfigFileName: feature-test-1.json
       segmentName: FeatureTest1_Segment
     - type: tableOp
-      # description: Remove table T1
+      description: Remove table FeatureTest1
       op: DELETE
-      tableConfigFileName: /tmp/tableConfig
+      tableConfigFileName: feature-test-1.json
     - type: queryOp
-      description: Run queries on T1
-      queryFileName: queries/T1.sql
-      expectedResultsFileName: queries/T1-results.sql
+      description: Run queries on FeatureTest1
+      queryFileName: queries/feature-test-1-sql.queries
+      expectedResultsFileName: query-results/feature-test-1-rest-sql.results
     - type: streamOp
       description: Produce rows to topic1
       op: PRODUCE

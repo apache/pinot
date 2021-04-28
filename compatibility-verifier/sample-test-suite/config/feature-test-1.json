@@ -37,7 +37,7 @@
     "sortedColumn": [],
     "streamConfigs": {}
   },
-  "tableName": "FeatureTest1",
+  "tableName": "FeatureTest1_OFFLINE",
   "tableType": "OFFLINE",
   "tenants": {
     "broker": "DefaultTenant",

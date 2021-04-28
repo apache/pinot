@@ -184,7 +184,7 @@ public abstract class BaseQueriesTest {
   @SuppressWarnings("SameParameterValue")
   protected BrokerResponseNative getBrokerResponseForSqlQuery(String sqlQuery, PlanMaker planMaker) {
     BrokerRequest brokerRequest = SQL_COMPILER.compileToBrokerRequest(sqlQuery);
-    Map<String, String> queryOptions = brokerRequest.getQueryOptions();
+    Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
     if (queryOptions == null) {
       queryOptions = new HashMap<>();
       brokerRequest.getPinotQuery().setQueryOptions(queryOptions);

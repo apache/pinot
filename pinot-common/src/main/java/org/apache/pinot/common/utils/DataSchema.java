@@ -18,12 +18,17 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
+import java.sql.Timestamp;
 import java.util.Arrays;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -34,11 +39,15 @@ import org.apache.pinot.spi.utils.EqualityUtils;
 /**
  * The <code>DataSchema</code> class describes the schema of {@link DataTable}.
  */
+@JsonPropertyOrder({"columnNames", "columnDataTypes"})
 public class DataSchema {
   private final String[] _columnNames;
   private final ColumnDataType[] _columnDataTypes;
+  private ColumnDataType[] _storedColumnDataTypes;
 
-  public DataSchema(String[] columnNames, ColumnDataType[] columnDataTypes) {
+  @JsonCreator
+  public DataSchema(@JsonProperty("columnNames") String[] columnNames,
+      @JsonProperty("columnDataTypes") ColumnDataType[] columnDataTypes) {
     _columnNames = columnNames;
     _columnDataTypes = columnDataTypes;
   }
@@ -61,6 +70,18 @@ public class DataSchema {
 
   public ColumnDataType[] getColumnDataTypes() {
     return _columnDataTypes;
+  }
+
+  @JsonIgnore
+  public ColumnDataType[] getStoredColumnDataTypes() {
+    if (_storedColumnDataTypes == null) {
+      int numColumns = _columnDataTypes.length;
+      _storedColumnDataTypes = new ColumnDataType[numColumns];
+      for (int i = 0; i < numColumns; i++) {
+        _storedColumnDataTypes[i] = _columnDataTypes[i].getStoredType();
+      }
+    }
+    return _storedColumnDataTypes;
   }
 
   /**
@@ -215,7 +236,34 @@ public class DataSchema {
   }
 
   public enum ColumnDataType {
-    INT, LONG, FLOAT, DOUBLE, STRING, BYTES, OBJECT, INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY;
+    INT,
+    LONG,
+    FLOAT,
+    DOUBLE,
+    BOOLEAN /* Stored as INT */,
+    TIMESTAMP /* Stored as LONG */,
+    STRING,
+    BYTES,
+    OBJECT,
+    INT_ARRAY,
+    LONG_ARRAY,
+    FLOAT_ARRAY,
+    DOUBLE_ARRAY,
+    STRING_ARRAY;
+
+    /**
+     * Returns the data type stored in Pinot.
+     */
+    public ColumnDataType getStoredType() {
+      switch (this) {
+        case BOOLEAN:
+          return INT;
+        case TIMESTAMP:
+          return LONG;
+        default:
+          return this;
+      }
+    }
 
     public boolean isNumber() {
       return this == INT || this == LONG || this == FLOAT || this == DOUBLE;
@@ -254,6 +302,10 @@ public class DataSchema {
           return DataType.FLOAT;
         case DOUBLE:
           return DataType.DOUBLE;
+        case BOOLEAN:
+          return DataType.BOOLEAN;
+        case TIMESTAMP:
+          return DataType.TIMESTAMP;
         case STRING:
           return DataType.STRING;
         case BYTES:
@@ -277,6 +329,10 @@ public class DataSchema {
           return ((Number) value).floatValue();
         case DOUBLE:
           return ((Number) value).doubleValue();
+        case BOOLEAN:
+          return (Integer) value == 1;
+        case TIMESTAMP:
+          return new Timestamp((Long) value);
         case STRING:
           return value.toString();
         case BYTES:
@@ -337,6 +393,9 @@ public class DataSchema {
      */
     public Serializable format(Object value) {
       switch (this) {
+        case TIMESTAMP:
+          assert value instanceof Timestamp;
+          return value.toString();
         case BYTES:
           return BytesUtils.toHexString((byte[]) value);
         default:
@@ -357,6 +416,10 @@ public class DataSchema {
           return ((Number) value).floatValue();
         case DOUBLE:
           return ((Number) value).doubleValue();
+        case BOOLEAN:
+          return (Integer) value == 1;
+        case TIMESTAMP:
+          return new Timestamp((Long) value).toString();
         case STRING:
           return value.toString();
         case BYTES:
@@ -426,6 +489,10 @@ public class DataSchema {
           return FLOAT;
         case DOUBLE:
           return DOUBLE;
+        case BOOLEAN:
+          return BOOLEAN;
+        case TIMESTAMP:
+          return TIMESTAMP;
         case STRING:
           return STRING;
         case BYTES:
