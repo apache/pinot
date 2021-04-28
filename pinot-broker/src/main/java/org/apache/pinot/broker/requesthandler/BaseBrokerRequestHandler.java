@@ -350,12 +350,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     // Check if response can be send without server query evaluation.
     if (queryFormat.equals(Broker.Request.SQL)) {
-      if (isFilterAlwaysFalse(offlineBrokerRequest)) {
+      if (offlineBrokerRequest == null || offlineBrokerRequest.getPinotQuery() == null || isFilterAlwaysFalse(
+          offlineBrokerRequest)) {
         // We don't need to evaluate offline request
         offlineBrokerRequest = null;
       }
 
-      if (isFilterAlwaysFalse(realtimeBrokerRequest)) {
+      if (realtimeBrokerRequest == null || realtimeBrokerRequest.getPinotQuery() == null || isFilterAlwaysFalse(
+          realtimeBrokerRequest)) {
         // We don't need to evaluate realtime request
         realtimeBrokerRequest = null;
       }
@@ -369,12 +371,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         return brokerResponse;
       }
 
-      if (isFilterAlwaysTrue(offlineBrokerRequest)) {
+      if (offlineBrokerRequest != null && offlineBrokerRequest.getPinotQuery() != null && isFilterAlwaysTrue(
+          offlineBrokerRequest)) {
         // Drop offline request filter since it is always true
         offlineBrokerRequest.getPinotQuery().setFilterExpression(null);
       }
 
-      if (isFilterAlwaysTrue(realtimeBrokerRequest)) {
+      if (realtimeBrokerRequest != null && realtimeBrokerRequest.getPinotQuery() != null && isFilterAlwaysTrue(
+          realtimeBrokerRequest)) {
         // Drop realtime request filter since it is always true
         realtimeBrokerRequest.getPinotQuery().setFilterExpression(null);
       }
@@ -470,15 +474,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   /** Given a {@link BrokerRequest}, check if the WHERE clause will always evaluate to false. */
   private boolean isFilterAlwaysFalse(BrokerRequest brokerRequest) {
-    return brokerRequest == null || brokerRequest.getPinotQuery() == null || (
-        brokerRequest.getPinotQuery().getFilterExpression() != null && brokerRequest.getPinotQuery()
-            .getFilterExpression().equals(FALSE));
+    return brokerRequest.getPinotQuery().getFilterExpression() != null && brokerRequest.getPinotQuery()
+        .getFilterExpression().equals(FALSE);
   }
 
   /** Given a {@link BrokerRequest}, check if the WHERE clause will always evaluate to true. */
   private boolean isFilterAlwaysTrue(BrokerRequest brokerRequest) {
-    return brokerRequest != null && brokerRequest.getPinotQuery() != null
-        && brokerRequest.getPinotQuery().getFilterExpression() != null && brokerRequest.getPinotQuery()
+    return brokerRequest.getPinotQuery().getFilterExpression() != null && brokerRequest.getPinotQuery()
         .getFilterExpression().equals(TRUE);
   }
 

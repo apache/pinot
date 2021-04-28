@@ -37,8 +37,7 @@ import org.apache.pinot.spi.data.Schema;
 
 public class QueryOptimizer {
   private static final List<FilterOptimizer> FILTER_OPTIMIZERS = Arrays
-      .asList(new FlattenAndOrFilterOptimizer(), new MergeEqInFilterOptimizer(), new MergeRangeFilterOptimizer(),
-          new NumericalFilterOptimizer());
+      .asList(new FlattenAndOrFilterOptimizer(), new NumericalFilterOptimizer(), new MergeEqInFilterOptimizer(), new MergeRangeFilterOptimizer());
 
   /**
    * Optimizes the given PQL query.

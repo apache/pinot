@@ -166,7 +166,7 @@ public class MergeRangeFilterOptimizer implements FilterOptimizer {
 
   @Override
   public Expression optimize(Expression filterExpression, @Nullable Schema schema) {
-    if (schema == null) {
+    if (schema == null || filterExpression.getType() != ExpressionType.FUNCTION) {
       return filterExpression;
     }
     Function function = filterExpression.getFunctionCall();

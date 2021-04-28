@@ -88,7 +88,8 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
       return optimizeCurrent(expression);
     } else if (operator.equals(FilterKind.EQUALS.name()) || operator.equals(FilterKind.NOT_EQUALS.name())) {
       // Verify that LHS is a numeric column and RHS is a numeric literal before rewriting.
-      Expression lhs = operands.get(0), rhs = operands.get(1);
+      Expression lhs = operands.get(0);
+      Expression rhs = operands.get(1);
       if (isNumericColumn(lhs, schema) && isNumericLiteral(rhs)) {
         // Rewrite the expression.
         return rewrite(expression, lhs, rhs, schema);
@@ -200,7 +201,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
               setExpressionToBoolean(equals, result);
             } else {
               // Replace long value with converted int value.
-              rhs.setLiteral(Literal.intValue(converted));
+              rhs.getLiteral().setLongValue(converted);
             }
             break;
           }
@@ -211,7 +212,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
               setExpressionToBoolean(equals, result);
             } else {
               // Replace long value with converted float value.
-              rhs.setLiteral(Literal.doubleValue(converted));
+              rhs.getLiteral().setDoubleValue(converted);
             }
             break;
           }
@@ -222,7 +223,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
               setExpressionToBoolean(equals, result);
             } else {
               // Replace long value with converted double value.
-              rhs.setLiteral(Literal.doubleValue(converted));
+              rhs.getLiteral().setDoubleValue(converted);
             }
             break;
           }
@@ -239,7 +240,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
               setExpressionToBoolean(equals, result);
             } else {
               // Replace double value with converted int value.
-              rhs.setLiteral(Literal.intValue(converted));
+              rhs.getLiteral().setLongValue(converted);
             }
             break;
           }
@@ -250,7 +251,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
               setExpressionToBoolean(equals, result);
             } else {
               // Replace double value with converted long value.
-              rhs.setLiteral(Literal.longValue(converted));
+              rhs.getLiteral().setLongValue(converted);
             }
             break;
           }
@@ -261,7 +262,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
               setExpressionToBoolean(equals, result);
             } else {
               // Replace double value with converted float value.
-              rhs.setLiteral(Literal.doubleValue(converted));
+              rhs.getLiteral().setDoubleValue(converted);
             }
             break;
           }

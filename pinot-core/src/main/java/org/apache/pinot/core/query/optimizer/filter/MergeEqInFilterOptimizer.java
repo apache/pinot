@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
@@ -150,7 +151,7 @@ public class MergeEqInFilterOptimizer implements FilterOptimizer {
 
   @Override
   public Expression optimize(Expression filterExpression, @Nullable Schema schema) {
-    return optimize(filterExpression);
+    return filterExpression.getType() == ExpressionType.FUNCTION ? optimize(filterExpression) : filterExpression;
   }
 
   private Expression optimize(Expression filterExpression) {

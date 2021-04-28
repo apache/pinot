@@ -163,10 +163,7 @@ public class RequestUtils {
   }
 
   public static Expression getLiteralExpression(Object object) {
-    if (object instanceof Integer) {
-      return RequestUtils.getLiteralExpression(((Number) object).intValue());
-    }
-    if (object instanceof Long) {
+    if (object instanceof Long || object instanceof Integer) {
       return RequestUtils.getLiteralExpression(((Number) object).longValue());
     }
     if (object instanceof Float || object instanceof Double) {

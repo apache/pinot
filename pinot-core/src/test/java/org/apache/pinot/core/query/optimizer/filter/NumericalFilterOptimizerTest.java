@@ -50,7 +50,7 @@ public class NumericalFilterOptimizerTest {
     // "intColumn = 5.0" should have been rewritten to "intColumn = 5" since 5.0 converts to integer value without any
     // loss of information.
     Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
-        "Expression(type:FUNCTION, functionCall:Function(operator:EQUALS, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:intColumn)), Expression(type:LITERAL, literal:<Literal intValue:5>)]))");
+        "Expression(type:FUNCTION, functionCall:Function(operator:EQUALS, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:intColumn)), Expression(type:LITERAL, literal:<Literal longValue:5>)]))");
   }
 
   @Test
@@ -72,7 +72,7 @@ public class NumericalFilterOptimizerTest {
     OPTIMIZER.optimize(pinotQuery, SCHEMA);
 
     Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
-        "Expression(type:FUNCTION, functionCall:Function(operator:NOT_EQUALS, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:intColumn)), Expression(type:LITERAL, literal:<Literal intValue:5>)]))");
+        "Expression(type:FUNCTION, functionCall:Function(operator:NOT_EQUALS, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:intColumn)), Expression(type:LITERAL, literal:<Literal longValue:5>)]))");
   }
 
   @Test
