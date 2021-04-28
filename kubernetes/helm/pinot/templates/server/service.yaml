@@ -22,8 +22,8 @@ kind: Service
 metadata:
   name: {{ include "pinot.server.fullname" . }}
   annotations:
-    imageTag: {{ .Values.image.tag }}
-  {{- if .Values.broker.service.gcpInternalLB }}
+    type: "service"
+  {{- if .Values.server.service.gcpInternalLB }}
     cloud.google.com/load-balancer-type: Internal
   {{- end }}
   labels:

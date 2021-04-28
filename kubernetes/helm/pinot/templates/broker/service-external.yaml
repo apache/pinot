@@ -24,7 +24,7 @@ kind: Service
 metadata:
   name: {{ template "pinot.broker.external" . }}
   annotations:
-    imageTag: {{ .Values.image.tag }}
+    type: "service-external"
   {{- if .Values.broker.service.gcpInternalLB }}
     cloud.google.com/load-balancer-type: Internal
   {{- end }}
