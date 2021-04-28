@@ -81,6 +81,10 @@ public class GenericRowSorter {
     };
   }
 
+  public Comparator<GenericRow> getGenericRowComparator() {
+    return _genericRowComparator;
+  }
+
   /**
    * Sorts the given list of GenericRow
    */
