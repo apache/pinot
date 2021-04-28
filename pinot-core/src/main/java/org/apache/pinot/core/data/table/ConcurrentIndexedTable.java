@@ -127,7 +127,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
     // the reference held by the indexed table needs to be updated. this is also
     // the reason why it is volatile since the thread doing the resize will result in
     // a new reference
-    _lookupMap = (ConcurrentMap)_tableResizer.resizeRecordsMap(_lookupMap, trimToSize);
+      _lookupMap = (ConcurrentMap)_tableResizer.resizeRecordsMapTopK(_lookupMap, trimToSize);
     long endTime = System.currentTimeMillis();
     long timeElapsed = endTime - startTime;
     _numResizes.incrementAndGet();
@@ -136,7 +136,8 @@ public class ConcurrentIndexedTable extends IndexedTable {
 
   private List<Record> resizeAndSort(int trimToSize) {
     long startTime = System.currentTimeMillis();
-    List<Record> sortedRecords = _tableResizer.sortRecordsMap(_lookupMap, trimToSize);
+    List<Record> sortedRecords;
+    sortedRecords = _tableResizer.sortRecordsMapTopK(_lookupMap, trimToSize);
     long endTime = System.currentTimeMillis();
     long timeElapsed = endTime - startTime;
     _numResizes.incrementAndGet();

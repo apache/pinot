@@ -20,7 +20,6 @@ package org.apache.pinot.core.data.table;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -89,6 +88,9 @@ public class TableResizer {
     };
   }
 
+  public Comparator<IntermediateRecord> getComparator(){
+    return _intermediateRecordComparator;
+  }
   /**
    * Helper method to construct a OrderByValueExtractor based on the given expression.
    */
@@ -119,12 +121,48 @@ public class TableResizer {
    * The IntermediateRecord::values contains only the order by columns, in the query's sort sequence
    * For aggregation values in the order by, the final result is extracted if the intermediate result is non-comparable
    */
-  private IntermediateRecord getIntermediateRecord(Key key, Record record) {
+  public IntermediateRecord getIntermediateRecord(Key key, Record record) {
     Comparable[] intermediateRecordValues = new Comparable[_numOrderByExpressions];
     for (int i = 0; i < _numOrderByExpressions; i++) {
       intermediateRecordValues[i] = _orderByValueExtractors[i].extract(record);
     }
     return new IntermediateRecord(key, intermediateRecordValues);
+  }
+
+
+  /**
+   * Trim recordsMap to trimToSize, based on order by information
+   * Resize only if number of records is greater than trimToSize
+   * The resizer creates an array to keep records and then chooses to evict or records to retain, based on the number of
+   * records and the number of records to evict
+   */
+  public Map<Key, Record> resizeRecordsMapTopK(Map<Key, Record> recordsMap, int trimToSize) {
+    int numRecordsToEvict = recordsMap.size() - trimToSize;
+    if (numRecordsToEvict > 0) {
+      // TODO: compare the performance of converting to IntermediateRecord vs keeping Record, in cases where we do not need to extract final results
+      IntermediateRecord[] recordArray = convertToTrimArray(recordsMap, trimToSize, _intermediateRecordComparator);
+      if (numRecordsToEvict < trimToSize) {
+        for (int i = 0; i < trimToSize; ++i) {
+          recordsMap.remove(recordArray[i]._key);
+        }
+        return recordsMap;
+      } else {
+        // TODO - Consider reusing the same map by removing record from the map
+        Map<Key, Record> trimmedRecordsMap;
+        if (recordsMap instanceof ConcurrentMap) {
+          // invoked by ConcurrentIndexedTable
+          trimmedRecordsMap = new ConcurrentHashMap<>();
+        } else {
+          // invoked by SimpleIndexedTable
+          trimmedRecordsMap = new HashMap<>();
+        }
+        for (int i = 0; i < trimToSize; ++i) {
+          trimmedRecordsMap.put(recordArray[i]._key, recordsMap.get(recordArray[i]._key));
+        }
+        return trimmedRecordsMap;
+      }
+    }
+    return recordsMap;
   }
 
   /**
@@ -136,17 +174,13 @@ public class TableResizer {
     int numRecordsToEvict = recordsMap.size() - trimToSize;
     if (numRecordsToEvict > 0) {
       // TODO: compare the performance of converting to IntermediateRecord vs keeping Record, in cases where we do not need to extract final results
-      IntermediateRecord[] recordArray = convertToTrimArray(recordsMap, trimToSize, _intermediateRecordComparator);
       if (numRecordsToEvict < trimToSize) {
         // num records to evict is smaller than num records to retain
         // make PQ of records to evict
-//        PriorityQueue<IntermediateRecord> priorityQueue =
-//            convertToIntermediateRecordsPQ(recordsMap, numRecordsToEvict, _intermediateRecordComparator);
-//        for (IntermediateRecord evictRecord : priorityQueue) {
-//          recordsMap.remove(evictRecord._key);
-//        }
-        for (int i = 0; i < trimToSize; ++i) {
-          recordsMap.remove(recordArray[i]._key);
+        PriorityQueue<IntermediateRecord> priorityQueue =
+                convertToIntermediateRecordsPQ(recordsMap, numRecordsToEvict, _intermediateRecordComparator);
+        for (IntermediateRecord evictRecord : priorityQueue) {
+          recordsMap.remove(evictRecord._key);
         }
         return recordsMap;
       } else {
@@ -162,14 +196,11 @@ public class TableResizer {
           // invoked by SimpleIndexedTable
           trimmedRecordsMap = new HashMap<>();
         }
-//        Comparator<IntermediateRecord> comparator = _intermediateRecordComparator;
-//        PriorityQueue<IntermediateRecord> priorityQueue =
-//            convertToIntermediateRecordsPQ(recordsMap, trimToSize, comparator);
-//        for (IntermediateRecord recordToRetain : priorityQueue) {
-//          trimmedRecordsMap.put(recordToRetain._key, recordsMap.get(recordToRetain._key));
-//        }
-        for (int i = 0; i < trimToSize; ++i) {
-          trimmedRecordsMap.put(recordArray[i]._key, recordsMap.get(recordArray[i]._key));
+        Comparator<IntermediateRecord> comparator = _intermediateRecordComparator.reversed();
+        PriorityQueue<IntermediateRecord> priorityQueue =
+                convertToIntermediateRecordsPQ(recordsMap, trimToSize, comparator);
+        for (IntermediateRecord recordToRetain : priorityQueue) {
+          trimmedRecordsMap.put(recordToRetain._key, recordsMap.get(recordToRetain._key));
         }
         return trimmedRecordsMap;
       }
@@ -177,7 +208,7 @@ public class TableResizer {
     return recordsMap;
   }
 
-  private PriorityQueue<IntermediateRecord> convertToIntermediateRecordsPQ(Map<Key, Record> recordsMap, int size,
+  public PriorityQueue<IntermediateRecord> convertToIntermediateRecordsPQ(Map<Key, Record> recordsMap, int size,
       Comparator<IntermediateRecord> comparator) {
     PriorityQueue<IntermediateRecord> priorityQueue = new PriorityQueue<>(size, comparator);
     for (Map.Entry<Key, Record> entry : recordsMap.entrySet()) {
@@ -195,7 +226,20 @@ public class TableResizer {
     return priorityQueue;
   }
 
-  private IntermediateRecord[] convertToTrimArray(Map<Key, Record> recordMap, int trimSize,
+  public IntermediateRecord[] convertToArray(Map<Key, Record> recordMap, int trimSize,
+                                                 Comparator<IntermediateRecord> comparator) {
+    IntermediateRecord[] recordArray = new IntermediateRecord[recordMap.size()];
+    int index = 0;
+    for (Map.Entry<Key, Record> entry: recordMap.entrySet()) {
+      recordArray[index] = getIntermediateRecord(entry.getKey(), entry.getValue());
+      ++index;
+    }
+
+    // The entire array is returned but a pivot is set at array[trimSize-1]
+    return recordArray;
+  }
+
+  public IntermediateRecord[] convertToTrimArray(Map<Key, Record> recordMap, int trimSize,
                                                   Comparator<IntermediateRecord> comparator) {
     IntermediateRecord[] recordArray = new IntermediateRecord[recordMap.size()];
     int index = 0;
@@ -220,14 +264,27 @@ public class TableResizer {
       quickSort(recordArray, pivot_index + 1, right, comparator);
     }
   }
+  private static int getMedianOfThree(IntermediateRecord[] recordArray, int left, int right, Comparator<IntermediateRecord> comparator) {
+    int mid = (left + right)/2;
+    if (comparator.compare(recordArray[right], recordArray[left]) < 0) {
+      swap(recordArray, right, left);
+    }
+    if (comparator.compare(recordArray[mid], recordArray[left]) < 0) {
+      swap(recordArray, mid, left);
+    }
+    if (comparator.compare(recordArray[right], recordArray[mid]) < 0) {
+      swap(recordArray, mid, right);
+    }
+    return mid;
+  }
+
   @VisibleForTesting
-  static void quickSortSmallestK(IntermediateRecord[] recordArray, int left, int right, int k,
+  public static void quickSortSmallestK(IntermediateRecord[] recordArray, int left, int right, int k,
                                  Comparator<IntermediateRecord> comparator) {
     if (right <= left) return;
     Random random_num = new Random();
     int pivot_index = left + random_num.nextInt(right - left);
-    //pivot_index = left;
-
+//    int pivot_index = getMedianOfThree(recordArray, left, right, comparator);
     pivot_index = partition(recordArray, left, right, pivot_index, comparator);
 
     if (pivot_index > k - 1) {
@@ -271,9 +328,34 @@ public class TableResizer {
   }
 
   /**
+   * Sorts the recordsMap using a pivot selection and returns a sorted list of records
+   * This method is to be called from IndexedTable::finish, if both resize and sort is needed
+   */
+  public List<Record> sortRecordsMapTopK(Map<Key, Record> recordsMap, int trimToSize) {
+    int numRecords = recordsMap.size();
+    if (numRecords == 0) {
+      return Collections.emptyList();
+    }
+    int numRecordsToRetain = Math.min(numRecords, trimToSize);
+    IntermediateRecord[] recordArray = convertToTrimArray(recordsMap, numRecordsToRetain, _intermediateRecordComparator);
+    // sort left partition
+    // TODO: keep original array or trim it. Which is better?
+    //IntermediateRecord[] trimmedArray = Arrays.copyOfRange(recordArray, 0, numRecordsToRetain);
+    Arrays.sort(recordArray, 0, numRecordsToRetain - 1, _intermediateRecordComparator);
+    //quickSort(recordArray, 0, numRecordsToRetain - 1, _intermediateRecordComparator);
+    Record[] sortedArray = new Record[numRecordsToRetain];
+    for (int i = 0; i < numRecordsToRetain; ++i) {
+      Record record = recordsMap.get(recordArray[i]._key);
+      sortedArray[i] = record;
+    }
+    return Arrays.asList(sortedArray);
+  }
+
+  /**
    * Sorts the recordsMap using a priority queue and returns a sorted list of records
    * This method is to be called from IndexedTable::finish, if both resize and sort is needed
    */
+  @Deprecated
   public List<Record> sortRecordsMap(Map<Key, Record> recordsMap, int trimToSize) {
     int numRecords = recordsMap.size();
     if (numRecords == 0) {
@@ -281,22 +363,12 @@ public class TableResizer {
     }
     int numRecordsToRetain = Math.min(numRecords, trimToSize);
     // make PQ of sorted records to retain
-//    PriorityQueue<IntermediateRecord> priorityQueue = convertToIntermediateRecordsPQ(recordsMap, numRecordsToRetain, _intermediateRecordComparator.reversed());
-//    Record[] sortedArray = new Record[numRecordsToRetain];
-//    while (!priorityQueue.isEmpty()) {
-//      IntermediateRecord intermediateRecord = priorityQueue.poll();
-//      Record record = recordsMap.get(intermediateRecord._key);
-//      sortedArray[--numRecordsToRetain] = record;
-//    }
-    IntermediateRecord[] recordArray = convertToTrimArray(recordsMap, numRecordsToRetain, _intermediateRecordComparator);
-    // sort left partition
-    // TODO: keep original array or trim it. Which is better?
-    //IntermediateRecord[] trimmedArray = Arrays.copyOfRange(recordArray, 0, numRecordsToRetain);
-    quickSort(recordArray, 0, numRecordsToRetain - 1, _intermediateRecordComparator);
+    PriorityQueue<IntermediateRecord> priorityQueue = convertToIntermediateRecordsPQ(recordsMap, numRecordsToRetain, _intermediateRecordComparator.reversed());
     Record[] sortedArray = new Record[numRecordsToRetain];
-    for (int i = 0; i < numRecordsToRetain; ++i) {
-      Record record = recordsMap.get(recordArray[i]._key);
-      sortedArray[i] = record;
+    while (!priorityQueue.isEmpty()) {
+      IntermediateRecord intermediateRecord = priorityQueue.poll();
+      Record record = recordsMap.get(intermediateRecord._key);
+      sortedArray[--numRecordsToRetain] = record;
     }
     return Arrays.asList(sortedArray);
   }
@@ -312,7 +384,7 @@ public class TableResizer {
    * 4. For order by on aggregations, final results should extracted if the intermediate result is non-comparable
    */
   @VisibleForTesting
-  static class IntermediateRecord {
+  public static class IntermediateRecord {
     final Key _key;
     final Comparable[] _values;
 
