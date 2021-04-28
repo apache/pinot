@@ -24,7 +24,7 @@ metadata:
   labels:
     {{- include "pinot.controllerLabels" . | nindent 4 }}
 spec:
-  clusterIP: {{ .Values.controller.service.clusterIP }}
+  clusterIP: None
   ports:
     # [pod_name].[service_name].[namespace].svc.cluster.local
     - name: {{ .Values.controller.service.name }}

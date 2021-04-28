@@ -24,7 +24,7 @@ metadata:
   labels:
     {{- include "pinot.brokerLabels" . | nindent 4 }}
 spec:
-  clusterIP: {{ .Values.broker.service.clusterIP }}
+  clusterIP: None
   ports:
     # [pod_name].[service_name].[namespace].svc.cluster.local
     - name: {{ .Values.broker.service.name }}
