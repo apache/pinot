@@ -40,7 +40,7 @@ import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.parsers.AbstractCompiler;
+import org.apache.pinot.parsers.QueryCompiler;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -229,7 +229,7 @@ public class SegmentPrunerTest {
   }
 
   @Test(dataProvider = "compilerProvider")
-  public void testPartitionAwareSegmentPruner(AbstractCompiler compiler) {
+  public void testPartitionAwareSegmentPruner(QueryCompiler compiler) {
     BrokerRequest brokerRequest1 = compiler.compileToBrokerRequest(QUERY_1);
     BrokerRequest brokerRequest2 = compiler.compileToBrokerRequest(QUERY_2);
     BrokerRequest brokerRequest3 = compiler.compileToBrokerRequest(QUERY_3);
@@ -310,7 +310,7 @@ public class SegmentPrunerTest {
   }
 
   @Test(dataProvider = "compilerProvider")
-  public void testTimeSegmentPruner(AbstractCompiler compiler) {
+  public void testTimeSegmentPruner(QueryCompiler compiler) {
     BrokerRequest brokerRequest1 = compiler.compileToBrokerRequest(QUERY_1);
     BrokerRequest brokerRequest2 = compiler.compileToBrokerRequest(QUERY_5);
     BrokerRequest brokerRequest3 = compiler.compileToBrokerRequest(QUERY_6);
@@ -453,7 +453,7 @@ public class SegmentPrunerTest {
   }
 
   @Test(dataProvider = "compilerProvider")
-  public void testTimeSegmentPrunerSimpleDateFormat(AbstractCompiler compiler) {
+  public void testTimeSegmentPrunerSimpleDateFormat(QueryCompiler compiler) {
     BrokerRequest brokerRequest1 = compiler.compileToBrokerRequest(SDF_QUERY_1);
     BrokerRequest brokerRequest2 = compiler.compileToBrokerRequest(SDF_QUERY_2);
     BrokerRequest brokerRequest3 = compiler.compileToBrokerRequest(SDF_QUERY_3);
@@ -497,7 +497,7 @@ public class SegmentPrunerTest {
   }
 
   @Test(dataProvider = "compilerProvider")
-  public void testEmptySegmentPruner(AbstractCompiler compiler) {
+  public void testEmptySegmentPruner(QueryCompiler compiler) {
     BrokerRequest brokerRequest1 = compiler.compileToBrokerRequest(QUERY_1);
     BrokerRequest brokerRequest2 = compiler.compileToBrokerRequest(QUERY_2);
     BrokerRequest brokerRequest3 = compiler.compileToBrokerRequest(QUERY_3);

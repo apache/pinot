@@ -19,7 +19,7 @@
 package org.apache.pinot.core.requesthandler;
 
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.parsers.AbstractCompiler;
+import org.apache.pinot.parsers.QueryCompiler;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 
@@ -32,7 +32,7 @@ public class PinotQueryParserFactory {
   private static final Pql2Compiler PQL_2_COMPILER = new Pql2Compiler();
   private static final CalciteSqlCompiler CALCITE_SQL_COMPILER = new CalciteSqlCompiler();
 
-  public static AbstractCompiler get(String queryFormat) {
+  public static QueryCompiler get(String queryFormat) {
     switch (queryFormat.toLowerCase()) {
       case PQL:
         return PQL_2_COMPILER;

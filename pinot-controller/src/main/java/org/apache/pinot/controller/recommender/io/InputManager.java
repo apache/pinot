@@ -27,23 +27,32 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.controller.recommender.exceptions.InvalidInputException;
 import org.apache.pinot.controller.recommender.io.metadata.FieldMetadata;
 import org.apache.pinot.controller.recommender.io.metadata.SchemaWithMetaData;
 import org.apache.pinot.controller.recommender.rules.RulesToExecute;
-import org.apache.pinot.controller.recommender.rules.io.params.*;
+import org.apache.pinot.controller.recommender.rules.io.params.BloomFilterRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.FlagQueryRuleParams;
+import org.apache.pinot.controller.recommender.rules.io.params.InvertedSortedIndexJointRuleParams;
+import org.apache.pinot.controller.recommender.rules.io.params.NoDictionaryOnHeapDictionaryJointRuleParams;
+import org.apache.pinot.controller.recommender.rules.io.params.PartitionRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.RealtimeProvisioningRuleParams;
 import org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset;
+import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
-import org.apache.pinot.core.requesthandler.BrokerRequestOptimizer;
 import org.apache.pinot.core.requesthandler.PinotQueryParserFactory;
-import org.apache.pinot.parsers.AbstractCompiler;
+import org.apache.pinot.parsers.QueryCompiler;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -92,9 +101,6 @@ public class InputManager {
   // TODO: Set to dsiabled for now, will discuss this in the next PR
   public boolean _useCardinalityNormalization = DEFAULT_USE_CARDINALITY_NORMALIZATION;
 
-
-
-
   // The parameters of rules
   public PartitionRuleParams _partitionRuleParams = new PartitionRuleParams();
   public InvertedSortedIndexJointRuleParams _invertedSortedIndexJointRuleParams =
@@ -130,7 +136,7 @@ public class InputManager {
     put(FieldSpec.DataType.STRING, Character.BYTES);
     put(null, DEFAULT_NULL_SIZE);
   }};
-  protected final BrokerRequestOptimizer _brokerRequestOptimizer = new BrokerRequestOptimizer();
+  protected final QueryOptimizer _queryOptimizer = new QueryOptimizer();
 
   /**
    * Process the dependencies incurred by overwritten configs.
@@ -143,16 +149,16 @@ public class InputManager {
     reorderDimsAndBuildMap();
     registerColNameFieldType();
     validateQueries();
-    if (_useCardinalityNormalization){
+    if (_useCardinalityNormalization) {
       regulateCardinalityForAll();
     }
   }
-  private void regulateCardinalityForAll(){
+
+  private void regulateCardinalityForAll() {
     double sampleSize;
-    if (getTableType().equalsIgnoreCase(REALTIME)){
+    if (getTableType().equalsIgnoreCase(REALTIME)) {
       sampleSize = getSegmentFlushTime() * getNumMessagesPerSecInKafkaTopic();
-    }
-    else{
+    } else {
       sampleSize = getNumRecordsPerPush();
     }
 
@@ -165,14 +171,18 @@ public class InputManager {
 
   private void validateQueries() {
     List<String> invalidQueries = new LinkedList<>();
+    QueryCompiler compiler = PinotQueryParserFactory.get(getQueryType());
     for (String queryString : _queryWeightMap.keySet()) {
-      BrokerRequest brokerRequest;
-      AbstractCompiler parser = PinotQueryParserFactory.get(getQueryType());
       try {
-        brokerRequest = parser.compileToBrokerRequest(queryString);
-        BrokerRequest optimizedRequest = _brokerRequestOptimizer.optimize(brokerRequest, getPrimaryTimeCol());
-        QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(optimizedRequest);
-        _parsedQueries.put(queryString, Triple.of(_queryWeightMap.get(queryString), optimizedRequest, queryContext));
+        BrokerRequest brokerRequest = compiler.compileToBrokerRequest(queryString);
+        PinotQuery pinotQuery = brokerRequest.getPinotQuery();
+        if (pinotQuery != null) {
+          _queryOptimizer.optimize(pinotQuery, _schema);
+        } else {
+          _queryOptimizer.optimize(brokerRequest, _schema);
+        }
+        QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
+        _parsedQueries.put(queryString, Triple.of(_queryWeightMap.get(queryString), brokerRequest, queryContext));
       } catch (SqlCompilationException e) {
         invalidQueries.add(queryString);
         _overWrittenConfigs.getFlaggedQueries().add(queryString, ERROR_INVALID_QUERY);
@@ -601,7 +611,7 @@ public class InputManager {
     // E(V1) = E(V2) = ... = E(V_cardinality) due to even distribution
     // therefore E(V1 + V2 + V3 + ... + V_cardinality) = cardinality * E(V1) = cardinality * 1 * P(V1)
     // Which is cardinality * (1 - p0^sampleSize) = cardinality * (1-((cardinality - 1) / cardinality)^(sampleSize))
-    return  cardinality * (1 - pow(((cardinality - 1) / cardinality), sampleSize));
+    return cardinality * (1 - pow(((cardinality - 1) / cardinality), sampleSize));
   }
 
   /**
@@ -631,7 +641,7 @@ public class InputManager {
   }
 
   public boolean isPrimaryDateTime(String colName) {
-    return colName!=null && colName.equalsIgnoreCase(getPrimaryTimeCol());
+    return colName != null && colName.equalsIgnoreCase(getPrimaryTimeCol());
   }
 
   public void estimateSizePerRecord()
@@ -694,9 +704,10 @@ public class InputManager {
       return 0;
     } else {
       if (dataType == FieldSpec.DataType.BYTES || dataType == FieldSpec.DataType.STRING) {
-        return (long) Math.ceil( getCardinality(colName) * (_dataTypeSizeMap.get(dataType) * getAverageDataLen(colName)));
+        return (long) Math
+            .ceil(getCardinality(colName) * (_dataTypeSizeMap.get(dataType) * getAverageDataLen(colName)));
       } else {
-        return (long) Math.ceil( getCardinality(colName) * (_dataTypeSizeMap.get(dataType)));
+        return (long) Math.ceil(getCardinality(colName) * (_dataTypeSizeMap.get(dataType)));
       }
     }
   }
