@@ -84,6 +84,7 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.QueryOptions;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -342,18 +343,22 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       realtimeBrokerRequest = getRealtimeBrokerRequest(brokerRequest);
       _queryOptimizer.optimize(realtimeBrokerRequest.getPinotQuery(), schema);
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.HYBRID);
+      requestStatistics.setOfflineBrokerTenant(getBrokerTenant(offlineTableName));
+      requestStatistics.setRealtimeBrokerTenant(getBrokerTenant(realtimeTableName));
     } else if (offlineTableName != null) {
       // OFFLINE only
       setTableName(brokerRequest, offlineTableName);
       _queryOptimizer.optimize(pinotQuery, schema);
       offlineBrokerRequest = brokerRequest;
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.OFFLINE);
+      requestStatistics.setOfflineBrokerTenant(getBrokerTenant(offlineTableName));
     } else {
       // REALTIME only
       setTableName(brokerRequest, realtimeTableName);
       _queryOptimizer.optimize(pinotQuery, schema);
       realtimeBrokerRequest = brokerRequest;
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.REALTIME);
+      requestStatistics.setRealtimeBrokerTenant(getBrokerTenant(realtimeTableName));
     }
 
     // Calculate routing table for the query
@@ -483,6 +488,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _numDroppedLog.incrementAndGet();
     }
     return brokerResponse;
+  }
+
+  private String getBrokerTenant(String tableNameWithType) {
+    TableConfig tableConfig = _tableCache.getTableConfig(tableNameWithType);
+    Preconditions.checkNotNull(tableConfig, "Table config is not available for table '%s'", tableNameWithType);
+    return tableConfig.getTenantConfig().getBroker();
   }
 
   @Deprecated
