@@ -48,18 +48,24 @@ public class MetadataEqualsHashCodeTest {
         usingGetClass().verify();
     EqualsVerifier.forClass(RealtimeSegmentZKMetadata.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).
         usingGetClass().verify();
-    EqualsVerifier.forClass(Schema.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).
+    EqualsVerifier.forClass(Schema.class)
+        .withIgnoredFields("_fieldSpecMap")
+        .suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).
         usingGetClass().verify();
     EqualsVerifier.forClass(DimensionFieldSpec.class)
+        .withIgnoredFields("_virtualColumnProvider")
         .suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS).
         usingGetClass().verify();
     EqualsVerifier.forClass(MetricFieldSpec.class)
+        .withIgnoredFields("_virtualColumnProvider")
         .suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS).
         usingGetClass().verify();
     EqualsVerifier.forClass(TimeFieldSpec.class)
+        .withIgnoredFields("_virtualColumnProvider")
         .suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS).
         usingGetClass().verify();
     EqualsVerifier.forClass(DateTimeFieldSpec.class)
+        .withIgnoredFields("_virtualColumnProvider")
         .suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS).
         usingGetClass().verify();
   }
