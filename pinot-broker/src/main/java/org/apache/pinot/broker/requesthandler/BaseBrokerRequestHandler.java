@@ -343,22 +343,22 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       realtimeBrokerRequest = getRealtimeBrokerRequest(brokerRequest);
       _queryOptimizer.optimize(realtimeBrokerRequest.getPinotQuery(), schema);
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.HYBRID);
-      requestStatistics.setOfflineBrokerTenant(getBrokerTenant(offlineTableName));
-      requestStatistics.setRealtimeBrokerTenant(getBrokerTenant(realtimeTableName));
+      requestStatistics.setOfflineServerTenant(getServerTenant(offlineTableName));
+      requestStatistics.setRealtimeServerTenant(getServerTenant(realtimeTableName));
     } else if (offlineTableName != null) {
       // OFFLINE only
       setTableName(brokerRequest, offlineTableName);
       _queryOptimizer.optimize(pinotQuery, schema);
       offlineBrokerRequest = brokerRequest;
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.OFFLINE);
-      requestStatistics.setOfflineBrokerTenant(getBrokerTenant(offlineTableName));
+      requestStatistics.setOfflineServerTenant(getServerTenant(offlineTableName));
     } else {
       // REALTIME only
       setTableName(brokerRequest, realtimeTableName);
       _queryOptimizer.optimize(pinotQuery, schema);
       realtimeBrokerRequest = brokerRequest;
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.REALTIME);
-      requestStatistics.setRealtimeBrokerTenant(getBrokerTenant(realtimeTableName));
+      requestStatistics.setRealtimeServerTenant(getServerTenant(realtimeTableName));
     }
 
     // Calculate routing table for the query
@@ -490,10 +490,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     return brokerResponse;
   }
 
-  private String getBrokerTenant(String tableNameWithType) {
+  private String getServerTenant(String tableNameWithType) {
     TableConfig tableConfig = _tableCache.getTableConfig(tableNameWithType);
-    Preconditions.checkNotNull(tableConfig, "Table config is not available for table '%s'", tableNameWithType);
-    return tableConfig.getTenantConfig().getBroker();
+    if (tableConfig == null) {
+      LOGGER.debug("Table config is not available for table {}", tableNameWithType);
+      return "unknownTenant";
+    }
+    return tableConfig.getTenantConfig().getServer();
   }
 
   @Deprecated
