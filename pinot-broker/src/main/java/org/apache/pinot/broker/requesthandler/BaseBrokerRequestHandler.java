@@ -79,7 +79,6 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.requesthandler.PinotQueryParserFactory;
-import org.apache.pinot.core.requesthandler.PinotQueryRequest;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.QueryOptions;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
@@ -1337,13 +1336,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {
     return Splitter.on(';').omitEmptyStrings().trimResults().withKeyValueSeparator('=')
         .split(request.get(optionsKey).asText());
-  }
-
-  private PinotQueryRequest getPinotQueryRequest(JsonNode request) {
-    if (request.has(Broker.Request.SQL)) {
-      return new PinotQueryRequest(Broker.Request.SQL, request.get(Broker.Request.SQL).asText());
-    }
-    return new PinotQueryRequest(Broker.Request.PQL, request.get(Broker.Request.PQL).asText());
   }
 
   /**

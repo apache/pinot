@@ -25,7 +25,6 @@ import org.apache.pinot.controller.recommender.io.InputManager;
 import org.apache.pinot.controller.recommender.rules.AbstractRule;
 import org.apache.pinot.controller.recommender.rules.io.params.FlagQueryRuleParams;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.requesthandler.BrokerRequestOptimizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,7 +40,6 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
  */
 public class FlagQueryRule extends AbstractRule {
   private final Logger LOGGER = LoggerFactory.getLogger(FlagQueryRule.class);
-  protected final BrokerRequestOptimizer _brokerRequestOptimizer = new BrokerRequestOptimizer();
   private final FlagQueryRuleParams _params;
 
   public FlagQueryRule(InputManager input, ConfigManager output) {

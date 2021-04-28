@@ -28,7 +28,6 @@ import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.SQL;
 
 
 public class PinotQueryParserFactory {
-
   private static final Pql2Compiler PQL_2_COMPILER = new Pql2Compiler();
   private static final CalciteSqlCompiler CALCITE_SQL_COMPILER = new CalciteSqlCompiler();
 
@@ -41,10 +40,6 @@ public class PinotQueryParserFactory {
       default:
         throw new UnsupportedOperationException("Unknown query format - " + queryFormat);
     }
-  }
-
-  public static BrokerRequest parsePinotQueryRequest(PinotQueryRequest pinotQueryRequest) {
-    return get(pinotQueryRequest.getQueryFormat()).compileToBrokerRequest(pinotQueryRequest.getQuery());
   }
 
   public static BrokerRequest parseSQLQuery(String query) {

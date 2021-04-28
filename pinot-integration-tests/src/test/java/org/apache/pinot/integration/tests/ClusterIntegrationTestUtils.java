@@ -66,7 +66,6 @@ import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.requesthandler.PinotQueryParserFactory;
-import org.apache.pinot.core.requesthandler.PinotQueryRequest;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.pql.parsers.PinotQuery2BrokerRequestConverter;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -560,8 +559,7 @@ public class ClusterIntegrationTestUtils {
       @Nullable Connection h2Connection, @Nullable Map<String, String> headers)
       throws Exception {
     // Use broker response for metadata check, connection response for value check
-    PinotQueryRequest pinotBrokerQueryRequest = new PinotQueryRequest(CommonConstants.Broker.Request.PQL, pinotQuery);
-    JsonNode pinotResponse = ClusterTest.postQuery(pinotBrokerQueryRequest, brokerUrl, headers);
+    JsonNode pinotResponse = ClusterTest.postQuery(pinotQuery, brokerUrl, headers);
     Request pinotClientRequest = new Request(CommonConstants.Broker.Request.PQL, pinotQuery);
     ResultSetGroup pinotResultSetGroup = pinotConnection.execute(pinotClientRequest);
 
