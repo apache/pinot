@@ -90,7 +90,7 @@ public abstract class PinotFS implements Closeable, Serializable {
    * @return true if move is successful
    * @throws IOException on IO failure
    */
-  public boolean move(URI srcUri, URI dstUri, boolean overwrite)
+  public final boolean move(URI srcUri, URI dstUri, boolean overwrite)
       throws IOException {
     if (!exists(srcUri)) {
       LOGGER.warn("Source {} does not exist", srcUri);
@@ -108,7 +108,23 @@ public abstract class PinotFS implements Closeable, Serializable {
       // ensures the parent path of dst exists.
       try {
         Path parentPath = Paths.get(dstUri.getPath()).getParent();
-        URI parentUri = new URI(dstUri.getScheme(), dstUri.getHost(), parentPath.toString(), null);
+        /**
+         * Use authority instead of host if the value contains "_": uri.getHost() will be null
+         * This is related to https://bugs.java.com/bugdatabase/view_bug.do?bug_id=6587184
+         * @see java.net.URI.Parser#parseHostname
+         */
+        String host = dstUri.getHost();
+        if (host == null) {
+          host = dstUri.getAuthority();
+        }
+        /**
+         * Use the 5 element constructor in case the host parameter contains "_",
+         * to ensure getHost() does not return null.
+         * This is possible when using some implementations of PinotFS, for example:
+         *
+         * @see org.apache.pinot.plugin.filesystem.GcsPinotFS
+         */
+        URI parentUri = new URI(dstUri.getScheme(), host, parentPath.toString(), null, null);
         mkdir(parentUri);
       } catch (URISyntaxException e) {
         throw new IOException(e);
