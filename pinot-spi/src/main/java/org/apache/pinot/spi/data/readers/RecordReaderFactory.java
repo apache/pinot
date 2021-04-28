@@ -38,22 +38,24 @@ public class RecordReaderFactory {
   private static final Map<String, String> DEFAULT_RECORD_READER_CONFIG_CLASS_MAP = new HashMap<>();
 
   // TODO: This could be removed once we have dynamic loading plugins supports.
-  private static final String DEFAULT_AVRO_RECORD_READER_CLASS =
+  static final String DEFAULT_AVRO_RECORD_READER_CLASS =
       "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader";
-  private static final String DEFAULT_CSV_RECORD_READER_CLASS =
+  static final String DEFAULT_CSV_RECORD_READER_CLASS =
       "org.apache.pinot.plugin.inputformat.csv.CSVRecordReader";
-  private static final String DEFAULT_CSV_RECORD_READER_CONFIG_CLASS =
+  static final String DEFAULT_CSV_RECORD_READER_CONFIG_CLASS =
       "org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig";
-  private static final String DEFAULT_JSON_RECORD_READER_CLASS =
+  static final String DEFAULT_JSON_RECORD_READER_CLASS =
       "org.apache.pinot.plugin.inputformat.json.JSONRecordReader";
-  private static final String DEFAULT_THRIFT_RECORD_READER_CLASS =
+  static final String DEFAULT_THRIFT_RECORD_READER_CLASS =
       "org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReader";
-  private static final String DEFAULT_THRIFT_RECORD_READER_CONFIG_CLASS =
+  static final String DEFAULT_THRIFT_RECORD_READER_CONFIG_CLASS =
       "org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig";
-  private static final String DEFAULT_ORC_RECORD_READER_CLASS =
+  static final String DEFAULT_ORC_RECORD_READER_CLASS =
       "org.apache.pinot.plugin.inputformat.orc.ORCRecordReader";
-  private static final String DEFAULT_PARQUET_RECORD_READER_CLASS =
+  static final String DEFAULT_PARQUET_RECORD_READER_CLASS =
       "org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReader";
+  static final String DEFAULT_PARQUET_RECORD_READER_CONFIG_CLASS =
+      "org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReaderConfig";
 
   public static void register(String fileFormat, String recordReaderClassName, String recordReaderConfigClassName) {
     DEFAULT_RECORD_READER_CLASS_MAP.put(fileFormat.toUpperCase(), recordReaderClassName);
@@ -71,7 +73,7 @@ public class RecordReaderFactory {
     register(FileFormat.JSON, DEFAULT_JSON_RECORD_READER_CLASS, null);
     register(FileFormat.THRIFT, DEFAULT_THRIFT_RECORD_READER_CLASS, DEFAULT_THRIFT_RECORD_READER_CONFIG_CLASS);
     register(FileFormat.ORC, DEFAULT_ORC_RECORD_READER_CLASS, null);
-    register(FileFormat.PARQUET, DEFAULT_PARQUET_RECORD_READER_CLASS, null);
+    register(FileFormat.PARQUET, DEFAULT_PARQUET_RECORD_READER_CLASS, DEFAULT_PARQUET_RECORD_READER_CONFIG_CLASS);
   }
 
   /**
