@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.utils;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import java.util.HashSet;
@@ -716,16 +715,23 @@ public final class TableConfigUtils {
    */
   public static void verifyHybridTableConfigs(String rawTableName, TableConfig offlineTableConfig,
       TableConfig realtimeTableConfig) {
-    if (offlineTableConfig == null || realtimeTableConfig == null) {
-      return;
-    }
-
+    Preconditions
+        .checkNotNull(offlineTableConfig, "Found null offline table config in hybrid table check for table: %s",
+            rawTableName);
+    Preconditions
+        .checkNotNull(realtimeTableConfig, "Found null realtime table config in hybrid table check for table: %s",
+            rawTableName);
     LOGGER.info("Validating realtime and offline configs for the hybrid table: {}", rawTableName);
     SegmentsValidationAndRetentionConfig offlineSegmentConfig = offlineTableConfig.getValidationConfig();
     SegmentsValidationAndRetentionConfig realtimeSegmentConfig = realtimeTableConfig.getValidationConfig();
     String offlineTimeColumnName = offlineSegmentConfig.getTimeColumnName();
     String realtimeTimeColumnName = realtimeSegmentConfig.getTimeColumnName();
-    if (!Objects.equal(realtimeTimeColumnName, offlineTimeColumnName)) {
+    if (offlineTimeColumnName == null || realtimeTimeColumnName == null) {
+      throw new IllegalStateException(String.format(
+          "'timeColumnName' cannot be null for table: %s! Offline time column name: %s. Realtime time column name: %s",
+          rawTableName, offlineTimeColumnName, realtimeTimeColumnName));
+    }
+    if (!offlineTimeColumnName.equals(realtimeTimeColumnName)) {
       throw new IllegalStateException(String.format(
           "Time column names are different for table: %s! Offline time column name: %s. Realtime time column name: %s",
           rawTableName, offlineTimeColumnName, realtimeTimeColumnName));

@@ -21,7 +21,9 @@ package org.apache.pinot.spi.config;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -42,6 +44,8 @@ public class TableConfigs extends BaseJsonConfig {
       @JsonProperty(value = "schema", required = true) Schema schema,
       @JsonProperty(value = "offline") @Nullable TableConfig offline,
       @JsonProperty(value = "realtime") @Nullable TableConfig realtime) {
+    Preconditions.checkState(StringUtils.isNotBlank(tableName), "'tableName' cannot be null or empty in TableConfigs");
+    Preconditions.checkNotNull(schema, "'schema' cannot be null in TableConfigs");
     _tableName = tableName;
     _schema = schema;
     _offline = offline;
