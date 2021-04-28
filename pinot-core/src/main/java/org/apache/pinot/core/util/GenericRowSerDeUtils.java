@@ -19,11 +19,11 @@
 package org.apache.pinot.core.util;
 
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.StringUtils;
 
 
 /**
@@ -64,7 +64,7 @@ public final class GenericRowSerDeUtils {
             numBytes += Double.BYTES;
             break;
           case STRING:
-            byte[] stringBytes = ((String) value).getBytes(StandardCharsets.UTF_8);
+            byte[] stringBytes = StringUtils.encodeUtf8((String) value);
             numBytes += Integer.BYTES; // string length
             numBytes += stringBytes.length;
             break;
@@ -95,7 +95,7 @@ public final class GenericRowSerDeUtils {
             break;
           case STRING:
             for (Object element : multiValue) {
-              byte[] stringBytes = ((String) element).getBytes(StandardCharsets.UTF_8);
+              byte[] stringBytes = StringUtils.encodeUtf8((String) element);
               numBytes += Integer.BYTES; // string length
               numBytes += stringBytes.length;
             }
@@ -135,7 +135,7 @@ public final class GenericRowSerDeUtils {
             byteBuffer.putDouble((double) value);
             break;
           case STRING:
-            byte[] stringBytes = ((String) value).getBytes(StandardCharsets.UTF_8);
+            byte[] stringBytes = StringUtils.encodeUtf8((String) value);
             byteBuffer.putInt(stringBytes.length);
             byteBuffer.put(stringBytes);
             break;
@@ -176,7 +176,7 @@ public final class GenericRowSerDeUtils {
             break;
           case STRING:
             for (Object element : multiValue) {
-              byte[] stringBytes = ((String) element).getBytes(StandardCharsets.UTF_8);
+              byte[] stringBytes = StringUtils.encodeUtf8((String) element);
               byteBuffer.putInt(stringBytes.length);
               byteBuffer.put(stringBytes);
             }
@@ -238,7 +238,7 @@ public final class GenericRowSerDeUtils {
             byte[] stringBytes = new byte[stringSize];
             dataBuffer.copyTo(offset, stringBytes);
             offset += stringSize;
-            reuse.putValue(fieldName, new String(stringBytes));
+            reuse.putValue(fieldName, StringUtils.decodeUtf8(stringBytes));
             break;
           case BYTES:
             int bytesSize = dataBuffer.getInt(offset);
@@ -291,7 +291,7 @@ public final class GenericRowSerDeUtils {
               byte[] stringBytes = new byte[stringSize];
               dataBuffer.copyTo(offset, stringBytes);
               offset += stringSize;
-              values[i] = new String(stringBytes);
+              values[i] = StringUtils.decodeUtf8(stringBytes);
             }
             break;
           case BYTES:
