@@ -103,7 +103,7 @@
   <properties>
     <pinot.root>${basedir}</pinot.root>
     <build.profile.id>dev</build.profile.id>
-    <jdk.version>1.8</jdk.version>
+    <jdk.version>11</jdk.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <!-- Only unit tests are run by default. -->
     <skip.integration.tests>true</skip.integration.tests>
@@ -1289,7 +1289,10 @@
           <configuration>
             <source>${jdk.version}</source>
             <target>${jdk.version}</target>
+            <release>${jdk.version}</release>
             <compilerVersion>${jdk.version}</compilerVersion>
+            <fork>true</fork>
+            <encoding>${project.build.sourceEncoding}</encoding>
           </configuration>
         </plugin>
         <plugin>
