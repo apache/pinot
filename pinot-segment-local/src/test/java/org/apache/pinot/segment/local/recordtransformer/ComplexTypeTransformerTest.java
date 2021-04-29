@@ -76,6 +76,22 @@ public class ComplexTypeTransformerTest {
   @Test
   public void testUnnestCollection() {
     // unnest root level collection
+    //    {
+    //      "array":[
+    //      {
+    //        "a":"v1"
+    //      },
+    //      {
+    //        "a":"v2"
+    //      }
+    //   ]}
+    //  ->
+    //    [{
+    //      "array.a":"v1"
+    //    },
+    //    {
+    //      "array.a":"v2"
+    //    }]
     ComplexTypeTransformer transformer = new ComplexTypeTransformer(Arrays.asList("array"));
     GenericRow genericRow = new GenericRow();
     Object[] array = new Object[2];
@@ -95,6 +111,37 @@ public class ComplexTypeTransformerTest {
     Assert.assertEquals("v2", itr.next().getValue("array.a"));
 
     // unnest sibling collections
+    //    {
+    //      "array":[
+    //      {
+    //        "a":"v1"
+    //      },
+    //      {
+    //        "a":"v2"
+    //      }],
+    //      "array2":[
+    //      {
+    //        "b":"v3"
+    //      },
+    //      {
+    //        "b":"v4"
+    //      }]
+    //    }
+    // ->
+    //  [
+    //   {
+    //      "array.a":"v1","array2.b":"v3"
+    //   },
+    //   {
+    //      "array.a":"v1","array2.b":"v4"
+    //   },
+    //   {
+    //      "array.a":"v2","array2.b":"v3"
+    //   },
+    //   {
+    //      "array.a":"v2","array2.b":"v4"
+    //   }]
+    //
     transformer = new ComplexTypeTransformer(Arrays.asList("array", "array2"));
     genericRow = new GenericRow();
     Object[] array2 = new Object[2];
@@ -125,6 +172,37 @@ public class ComplexTypeTransformerTest {
     Assert.assertEquals("v4", next.getValue("array2.b"));
 
     // unnest nested collection
+    // {
+    //   "array":[
+    //      {
+    //         "a":"v1",
+    //         "array2":[
+    //            {
+    //               "b":"v3"
+    //            },
+    //            {
+    //               "b":"v4"
+    //            }
+    //         ]
+    //      },
+    //      {
+    //         "a":"v2",
+    //         "array2":[
+    //
+    //         ]
+    //      }
+    //   ]}
+    // ->
+    // [
+    //   {
+    //      "array.a":"v1","array.array2.b":"v3"
+    //   },
+    //   {
+    //      "array.a":"v1","array.array2.b":"v4"
+    //   },
+    //   {
+    //      "array.a":"v2"
+    //   }]
     transformer = new ComplexTypeTransformer(Arrays.asList("array", "array.array2"));
     genericRow = new GenericRow();
     genericRow.putValue("array", array);
