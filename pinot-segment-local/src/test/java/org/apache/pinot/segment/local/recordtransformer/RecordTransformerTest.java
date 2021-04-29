@@ -47,7 +47,9 @@ public class RecordTransformerTest {
       .addMultiValueDimension("mvDouble", DataType.DOUBLE)
       // For sanitation
       .addSingleValueDimension("svStringWithNullCharacters", DataType.STRING)
-      .addSingleValueDimension("svStringWithLengthLimit", DataType.STRING).build();
+      .addSingleValueDimension("svStringWithLengthLimit", DataType.STRING)
+      .addMultiValueDimension("mvString1", DataType.STRING).addMultiValueDimension("mvString2", DataType.STRING)
+      .build();
   private static final TableConfig TABLE_CONFIG =
       new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
 
@@ -74,6 +76,8 @@ public class RecordTransformerTest {
     record.putValue("mvDouble", Collections.singletonMap("key", 123));
     record.putValue("svStringWithNullCharacters", "1\0002\0003");
     record.putValue("svStringWithLengthLimit", "123");
+    record.putValue("mvString1", new Object[]{"123", 123, 123L, 123f, 123.0});
+    record.putValue("mvString2", new Object[]{123, 123L, 123f, 123.0, "123"});
     return record;
   }
 
@@ -143,6 +147,9 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("mvDouble"), new Object[]{123d});
       assertEquals(record.getValue("svStringWithNullCharacters"), "1\0002\0003");
       assertEquals(record.getValue("svStringWithLengthLimit"), "123");
+      // NOTE: We identify the array type by the first element, so data type conversion only applied to 'mvString2'
+      assertEquals(record.getValue("mvString1"), new Object[]{"123", 123, 123L, 123f, 123.0});
+      assertEquals(record.getValue("mvString2"), new Object[]{"123", "123", "123.0", "123.0", "123"});
       assertNull(record.getValue("$virtual"));
       assertTrue(record.getNullValueFields().isEmpty());
     }
@@ -157,6 +164,8 @@ public class RecordTransformerTest {
       assertNotNull(record);
       assertEquals(record.getValue("svStringWithNullCharacters"), "1");
       assertEquals(record.getValue("svStringWithLengthLimit"), "12");
+      assertEquals(record.getValue("mvString1"), new Object[]{"123", "123", "123", "123.0", "123.0"});
+      assertEquals(record.getValue("mvString2"), new Object[]{"123", "123", "123.0", "123.0", "123"});
       assertNull(record.getValue("$virtual"));
       assertTrue(record.getNullValueFields().isEmpty());
     }
@@ -187,6 +196,8 @@ public class RecordTransformerTest {
     assertEquals(record.getValue("mvDouble"), new Object[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE});
     assertEquals(record.getValue("svStringWithNullCharacters"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
     assertEquals(record.getValue("svStringWithLengthLimit"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
+    assertEquals(record.getValue("mvString1"), new Object[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING});
+    assertEquals(record.getValue("mvString2"), new Object[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING});
     assertNull(record.getValue("$virtual"));
     validateNullValueFields(record);
   }
@@ -204,6 +215,8 @@ public class RecordTransformerTest {
     assertTrue(record.isNullValue("mvDouble"));
     assertTrue(record.isNullValue("svStringWithNullCharacters"));
     assertTrue(record.isNullValue("svStringWithLengthLimit"));
+    assertTrue(record.isNullValue("mvString1"));
+    assertTrue(record.isNullValue("mvString2"));
     assertFalse(record.isNullValue("$virtual"));
     assertEquals(record.getNullValueFields(), SCHEMA.getPhysicalColumnNames());
   }
@@ -228,6 +241,8 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("mvDouble"), new Object[]{123d});
       assertEquals(record.getValue("svStringWithNullCharacters"), "1");
       assertEquals(record.getValue("svStringWithLengthLimit"), "12");
+      assertEquals(record.getValue("mvString1"), new Object[]{"123", "123", "123", "123.0", "123.0"});
+      assertEquals(record.getValue("mvString2"), new Object[]{"123", "123", "123.0", "123.0", "123"});
       assertNull(record.getValue("$virtual"));
       assertTrue(record.getNullValueFields().isEmpty());
     }
@@ -251,6 +266,8 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("svStringWithNullCharacters"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
       assertEquals(record.getValue("svStringWithLengthLimit"),
           FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING.substring(0, 2));
+      assertEquals(record.getValue("mvString1"), new Object[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING});
+      assertEquals(record.getValue("mvString2"), new Object[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING});
       assertNull(record.getValue("$virtual"));
       validateNullValueFields(record);
     }
