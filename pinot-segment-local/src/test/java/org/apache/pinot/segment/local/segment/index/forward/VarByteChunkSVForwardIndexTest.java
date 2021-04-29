@@ -60,6 +60,13 @@ public class VarByteChunkSVForwardIndexTest {
     test(ChunkCompressionType.PASS_THROUGH);
   }
 
+  @Test
+  public void testWithZstandardCompression()
+      throws Exception {
+    test(ChunkCompressionType.ZSTANDARD);
+  }
+
+
   /**
    * This test writes {@link #NUM_ENTRIES} using {@link VarByteChunkSVForwardIndexWriter}. It then reads
    * the strings & bytes using {@link VarByteChunkSVForwardIndexReader}, and asserts that what was written is the same as
@@ -161,24 +168,31 @@ public class VarByteChunkSVForwardIndexTest {
       throws Exception {
     testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 10, 1000);
     testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 10, 1000);
+    testLargeVarcharHelper(ChunkCompressionType.ZSTANDARD, 10, 1000);
 
     testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 100, 1000);
     testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 100, 1000);
+    testLargeVarcharHelper(ChunkCompressionType.ZSTANDARD, 100, 1000);
 
     testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 1000, 1000);
     testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 1000, 1000);
+    testLargeVarcharHelper(ChunkCompressionType.ZSTANDARD, 1000, 1000);
 
     testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 10000, 100);
     testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 10000, 100);
+    testLargeVarcharHelper(ChunkCompressionType.ZSTANDARD, 10000, 100);
 
     testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 100000, 10);
     testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 100000, 10);
+    testLargeVarcharHelper(ChunkCompressionType.ZSTANDARD, 100000, 10);
 
     testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 1000000, 10);
     testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 1000000, 10);
+    testLargeVarcharHelper(ChunkCompressionType.ZSTANDARD, 1000000, 10);
 
     testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 2000000, 10);
     testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 2000000, 10);
+    testLargeVarcharHelper(ChunkCompressionType.ZSTANDARD, 2000000, 10);
   }
 
   private void testLargeVarcharHelper(ChunkCompressionType compressionType, int numChars, int numDocs)

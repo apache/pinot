@@ -144,6 +144,7 @@
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.1.2</dropwizard-metrics.version>
     <snappy-java.version>1.1.1.7</snappy-java.version>
+    <zstd-jni.version>1.4.9-5</zstd-jni.version>
     <log4j.version>2.11.2</log4j.version>
     <netty.version>4.1.54.Final</netty.version>
     <jts.version>1.16.1</jts.version>
@@ -519,6 +520,11 @@
         <groupId>org.xerial.snappy</groupId>
         <artifactId>snappy-java</artifactId>
         <version>${snappy-java.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.github.luben</groupId>
+        <artifactId>zstd-jni</artifactId>
+        <version>${zstd-jni.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.commons</groupId>

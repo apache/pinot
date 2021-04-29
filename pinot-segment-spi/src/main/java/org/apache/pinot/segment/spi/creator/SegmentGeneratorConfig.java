@@ -193,6 +193,7 @@ public class SegmentGeneratorConfig implements Serializable {
       extractTextIndexColumnsFromTableConfig(tableConfig);
       extractFSTIndexColumnsFromTableConfig(tableConfig);
       extractH3IndexConfigsFromTableConfig(tableConfig);
+      extractCompressionCodecConfigsFromTableConfig(tableConfig);
 
       _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
     }
@@ -257,6 +258,19 @@ public class SegmentGeneratorConfig implements Serializable {
         if (fieldConfig.getIndexType() == FieldConfig.IndexType.H3) {
           //noinspection ConstantConditions
           _h3IndexConfigs.put(fieldConfig.getName(), new H3IndexConfig(fieldConfig.getProperties()));
+        }
+      }
+    }
+  }
+
+  private void extractCompressionCodecConfigsFromTableConfig(TableConfig tableConfig) {
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    if (fieldConfigList != null) {
+      for (FieldConfig fieldConfig : fieldConfigList) {
+        if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW && fieldConfig.getCompressionCodec() != null) {
+          _rawIndexCreationColumns.add(fieldConfig.getName());
+          _rawIndexCompressionType.put(fieldConfig.getName(),
+              ChunkCompressionType.valueOf(fieldConfig.getCompressionCodec().name()));
         }
       }
     }
