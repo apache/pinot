@@ -75,6 +75,7 @@ import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
+import org.apache.pinot.spi.stream.PartitionGroupMetadataFetcher;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
@@ -257,7 +258,8 @@ public class PinotLLCRealtimeSegmentManager {
     PartitionLevelStreamConfig streamConfig =
         new PartitionLevelStreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
-    List<PartitionGroupMetadata> newPartitionGroupMetadataList = getNewPartitionGroupMetadataList(streamConfig, Collections.emptyList());
+    List<PartitionGroupMetadata> newPartitionGroupMetadataList =
+        getNewPartitionGroupMetadataList(streamConfig, Collections.emptyList(), PartitionGroupMetadataFetcher.Reason.TABLE_CREATION.name());
     int numPartitionGroups = newPartitionGroupMetadataList.size();
     int numReplicas = getNumReplicas(tableConfig, instancePartitions);
 
@@ -502,7 +504,8 @@ public class PinotLLCRealtimeSegmentManager {
 
     // Fetches new partition groups, given current list of {@link PartitionGroupConsumptionStatus}.
     List<PartitionGroupMetadata> newPartitionGroupMetadataList =
-        getNewPartitionGroupMetadataList(streamConfig, currentPartitionGroupConsumptionStatusList);
+        getNewPartitionGroupMetadataList(streamConfig, currentPartitionGroupConsumptionStatusList,
+            PartitionGroupMetadataFetcher.Reason.SEGMENT_COMMITMENT.name() + "-" + committingSegmentPartitionGroupId);
     Set<Integer> newPartitionGroupSet =
         newPartitionGroupMetadataList.stream().map(PartitionGroupMetadata::getPartitionGroupId).collect(Collectors.toSet());
     int numPartitionGroups = newPartitionGroupMetadataList.size();
@@ -705,9 +708,9 @@ public class PinotLLCRealtimeSegmentManager {
    */
   @VisibleForTesting
   List<PartitionGroupMetadata> getNewPartitionGroupMetadataList(StreamConfig streamConfig,
-      List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList) {
+      List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList, String reason) {
     return PinotTableIdealStateBuilder.getPartitionGroupMetadataList(streamConfig,
-        currentPartitionGroupConsumptionStatusList);
+        currentPartitionGroupConsumptionStatusList, reason);
   }
 
   /**
@@ -813,7 +816,8 @@ public class PinotLLCRealtimeSegmentManager {
         List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
             getPartitionGroupConsumptionStatusList(idealState, streamConfig);
         List<PartitionGroupMetadata> newPartitionGroupMetadataList =
-            getNewPartitionGroupMetadataList(streamConfig, currentPartitionGroupConsumptionStatusList);
+            getNewPartitionGroupMetadataList(streamConfig, currentPartitionGroupConsumptionStatusList,
+                PartitionGroupMetadataFetcher.Reason.PERIODIC_SEGMENT_VALIDATION.name());
         return ensureAllPartitionsConsuming(tableConfig, streamConfig, idealState, newPartitionGroupMetadataList);
 
       } else {
@@ -1134,7 +1138,8 @@ public class PinotLLCRealtimeSegmentManager {
     StreamConfig smallestOffsetCriteriaStreamConfig =
         new StreamConfig(streamConfig.getTableNameWithType(), streamConfigMapWithSmallestOffsetCriteria);
     List<PartitionGroupMetadata> smallestOffsetCriteriaPartitionGroupMetadata =
-        getNewPartitionGroupMetadataList(smallestOffsetCriteriaStreamConfig, Collections.emptyList());
+        getNewPartitionGroupMetadataList(smallestOffsetCriteriaStreamConfig, Collections.emptyList(),
+            PartitionGroupMetadataFetcher.Reason.PERIODIC_PARTITION_GROUP_SMALLEST_OFFSET_FETCHER.name() + "-" + partitionGroupId);
     StreamPartitionMsgOffset partitionStartOffset = null;
     for (PartitionGroupMetadata info : smallestOffsetCriteriaPartitionGroupMetadata) {
       if (info.getPartitionGroupId() == partitionGroupId) {
