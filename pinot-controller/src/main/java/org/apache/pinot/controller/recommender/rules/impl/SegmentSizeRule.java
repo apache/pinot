@@ -85,7 +85,12 @@ public class SegmentSizeRule extends AbstractRule {
   }
 
   /**
-   * Estimate optimal segment size parameters
+   * Estimate segment size parameters by extrapolation based on the number of records and size of the generated segment.
+   * The linear extrapolation used here is not optimal because of columnar way of storing data and usage of different
+   * indices. Another way would be to iteratively generate new segments with expected number of rows until the ideal
+   * segment is found, but that's costly because of the time it takes to generate segments. Although the extrapolation
+   * approach seems to be less accurate, it is chosen due to its performance.
+   *
    * @param GSS  generated segment size
    * @param DSS  desired segment size
    * @param NRGS num records of generated segment
