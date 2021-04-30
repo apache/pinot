@@ -20,7 +20,6 @@ package org.apache.pinot.spi.stream;
 
 import java.util.List;
 import java.util.concurrent.Callable;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,27 +32,18 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PartitionGroupMetadataFetcher.class);
 
-  public enum Reason {
-    TABLE_CREATION, SEGMENT_COMMITMENT, PERIODIC_SEGMENT_VALIDATION, PERIODIC_PARTITION_GROUP_SMALLEST_OFFSET_FETCHER
-  }
-
   private List<PartitionGroupMetadata> _newPartitionGroupMetadataList;
   private final StreamConfig _streamConfig;
   private final List<PartitionGroupConsumptionStatus> _partitionGroupConsumptionStatusList;
   private final StreamConsumerFactory _streamConsumerFactory;
   private Exception _exception;
   private final String _topicName;
-  private final String _reason;
 
-  public PartitionGroupMetadataFetcher(
-      StreamConfig streamConfig,
-      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList,
-      String reason) {
+  public PartitionGroupMetadataFetcher(StreamConfig streamConfig, List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList) {
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
     _topicName = streamConfig.getTopicName();
     _streamConfig = streamConfig;
     _partitionGroupConsumptionStatusList = partitionGroupConsumptionStatusList;
-    _reason = reason;
   }
 
   public List<PartitionGroupMetadata> getPartitionGroupMetadataList() {
@@ -71,10 +61,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   @Override
   public Boolean call()
       throws Exception {
-    String clientId = PartitionGroupMetadataFetcher.class.getSimpleName()
-        + "-" + _topicName
-        + "-" + TableNameBuilder.extractRawTableName(_streamConfig.getTableNameWithType())
-        + "-" + _reason;
+    String clientId = PartitionGroupMetadataFetcher.class.getSimpleName() + "-" + _topicName;
     try (
         StreamMetadataProvider streamMetadataProvider = _streamConsumerFactory.createStreamMetadataProvider(clientId)) {
       _newPartitionGroupMetadataList = streamMetadataProvider
