@@ -197,11 +197,6 @@ if [ "$JAVA_VER" -eq 8 ] ; then
   fi
 fi
 
-# For java 9 and later, we need to set extra java options to access JDK’s internal APIs.
-if [ "$JAVA_VER" -gt 8 ] ; then
-  ALL_JAVA_OPTS="--add-exports java.base/jdk.internal.ref=ALL-UNNAMED $ALL_JAVA_OPTS"
-fi
-
 exec "$JAVACMD" $ALL_JAVA_OPTS \
   -classpath "$CLASSPATH" \
   -Dapp.name="@APP_NAME@" \
