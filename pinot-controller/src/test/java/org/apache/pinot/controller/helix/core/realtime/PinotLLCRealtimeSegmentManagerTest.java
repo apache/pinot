@@ -254,7 +254,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     // committing segment's partitionGroupId no longer in the newPartitionGroupMetadataList
     List<PartitionGroupMetadata> partitionGroupMetadataListWithout0 =
-        segmentManager.getNewPartitionGroupMetadataList(segmentManager._streamConfig, Collections.emptyList(), "TEST_TABLE_CREATION");
+        segmentManager.getNewPartitionGroupMetadataList(segmentManager._streamConfig, Collections.emptyList());
     partitionGroupMetadataListWithout0.remove(0);
     segmentManager._partitionGroupMetadataList = partitionGroupMetadataListWithout0;
 
@@ -565,8 +565,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
      */
     // 1 reached end of shard.
     List<PartitionGroupMetadata> partitionGroupMetadataListWithout1 =
-        segmentManager.getNewPartitionGroupMetadataList(segmentManager._streamConfig, Collections.emptyList(),
-            "TEST_TABLE_CREATION");
+        segmentManager.getNewPartitionGroupMetadataList(segmentManager._streamConfig, Collections.emptyList());
     partitionGroupMetadataListWithout1.remove(1);
     segmentManager._partitionGroupMetadataList = partitionGroupMetadataListWithout1;
     // noop
@@ -963,7 +962,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     public void ensureAllPartitionsConsuming() {
       ensureAllPartitionsConsuming(_tableConfig, _streamConfig, _idealState,
-          getNewPartitionGroupMetadataList(_streamConfig, Collections.emptyList(), "TEST_PERIODIC_SEGMENT_VALIDATION"));
+          getNewPartitionGroupMetadataList(_streamConfig, Collections.emptyList()));
     }
 
     @Override
@@ -1030,7 +1029,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     @Override
     List<PartitionGroupMetadata> getNewPartitionGroupMetadataList(StreamConfig streamConfig,
-        List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList, String reason) {
+        List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList) {
       if (_partitionGroupMetadataList != null) {
         return _partitionGroupMetadataList;
       } else {

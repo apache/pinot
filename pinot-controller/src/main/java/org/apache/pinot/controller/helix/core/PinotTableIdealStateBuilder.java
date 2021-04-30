@@ -149,12 +149,11 @@ public class PinotTableIdealStateBuilder {
    * @param partitionGroupConsumptionStatusList List of {@link PartitionGroupConsumptionStatus} for the current partition groups.
    *                                          The size of this list is equal to the number of partition groups,
    *                                          and is created using the latest segment zk metadata.
-   * @param reason the reason to get partition group metadata
    */
   public static List<PartitionGroupMetadata> getPartitionGroupMetadataList(StreamConfig streamConfig,
-      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList, String reason) {
+      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList) {
     PartitionGroupMetadataFetcher partitionGroupMetadataFetcher =
-        new PartitionGroupMetadataFetcher(streamConfig, partitionGroupConsumptionStatusList, reason);
+        new PartitionGroupMetadataFetcher(streamConfig, partitionGroupConsumptionStatusList);
     try {
       DEFAULT_IDEALSTATE_UPDATE_RETRY_POLICY.attempt(partitionGroupMetadataFetcher);
       return partitionGroupMetadataFetcher.getPartitionGroupMetadataList();
