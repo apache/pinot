@@ -71,8 +71,8 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
   @Override
   public Expression optimize(Expression expression, @Nullable Schema schema) {
     ExpressionType type = expression.getType();
-    if (type != ExpressionType.FUNCTION) {
-      // Not a function, so we have nothing to rewrite.
+    if (type != ExpressionType.FUNCTION || schema == null) {
+      // We have nothing to rewrite if expression is not a function or schema is null
       return expression;
     }
 
@@ -110,8 +110,10 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
     List<Expression> operands = function.getOperands();
     if (function.getOperator().equals(FilterKind.AND.name())) {
       // If any of the literal operands are FALSE, then replace AND function with FALSE.
-      if (operands.stream().anyMatch(operand -> operand.equals(FALSE))) {
-        return setExpressionToBoolean(expression, false);
+      for (Expression operand : operands) {
+        if (operand.equals(FALSE)) {
+          return setExpressionToBoolean(expression, false);
+        }
       }
 
       // Remove all Literal operands that are TRUE.
@@ -121,8 +123,10 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
       }
     } else if (function.getOperator().equals(FilterKind.OR.name())) {
       // If any of the literal operands are TRUE, then replace OR function with TRUE
-      if (operands.stream().anyMatch(operand -> operand.equals(TRUE))) {
-        return setExpressionToBoolean(expression, true);
+      for (Expression operand : operands) {
+        if (operand.equals(TRUE)) {
+          return setExpressionToBoolean(expression, true);
+        }
       }
 
       // Remove all Literal operands that are FALSE.

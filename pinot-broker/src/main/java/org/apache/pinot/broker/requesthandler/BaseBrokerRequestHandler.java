@@ -489,14 +489,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   /** Given a {@link BrokerRequest}, check if the WHERE clause will always evaluate to false. */
   private boolean isFilterAlwaysFalse(BrokerRequest brokerRequest) {
-    return brokerRequest.getPinotQuery().getFilterExpression() != null && brokerRequest.getPinotQuery()
-        .getFilterExpression().equals(FALSE);
+    return FALSE.equals(brokerRequest.getPinotQuery().getFilterExpression());
   }
 
   /** Given a {@link BrokerRequest}, check if the WHERE clause will always evaluate to true. */
   private boolean isFilterAlwaysTrue(BrokerRequest brokerRequest) {
-    return brokerRequest.getPinotQuery().getFilterExpression() != null && brokerRequest.getPinotQuery()
-        .getFilterExpression().equals(TRUE);
+    return TRUE.equals(brokerRequest.getPinotQuery().getFilterExpression());
   }
 
   private void logBrokerResponse(long requestId, String query, RequestStatistics requestStatistics,
