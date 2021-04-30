@@ -272,6 +272,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       // Write the index files to disk
       indexCreator.setSegmentName(segmentName);
       indexCreator.seal();
+    } catch (Exception e) {
+      LOGGER.error("Failed to seal indexCreator", e);
+      throw e;
     } finally {
       indexCreator.close();
     }
