@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.ingestion.ComplexTypeHandlingConfig;
+import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -83,10 +83,10 @@ public class ComplexTypeTransformer implements RecordTransformer {
 
   public ComplexTypeTransformer(TableConfig tableConfig) {
     if (tableConfig.getIngestionConfig() != null
-        && tableConfig.getIngestionConfig().getComplexTypeHandlingConfig() != null) {
+        && tableConfig.getIngestionConfig().getComplexTypeConfig() != null) {
       _collectionsToUnnest =
-          tableConfig.getIngestionConfig().getComplexTypeHandlingConfig().getUnnestConfig() != null ? tableConfig
-              .getIngestionConfig().getComplexTypeHandlingConfig().getUnnestConfig() : new ArrayList<>();
+          tableConfig.getIngestionConfig().getComplexTypeConfig().getUnnestConfig() != null ? tableConfig
+              .getIngestionConfig().getComplexTypeConfig().getUnnestConfig() : new ArrayList<>();
     } else {
       _collectionsToUnnest = new ArrayList<>();
     }
@@ -100,12 +100,12 @@ public class ComplexTypeTransformer implements RecordTransformer {
 
   public static boolean isComplexTypeHandlingEnabled(TableConfig tableConfig) {
     if (tableConfig.getIngestionConfig() == null
-        || tableConfig.getIngestionConfig().getComplexTypeHandlingConfig() == null
-        || tableConfig.getIngestionConfig().getComplexTypeHandlingConfig().getMode() == null) {
+        || tableConfig.getIngestionConfig().getComplexTypeConfig() == null
+        || tableConfig.getIngestionConfig().getComplexTypeConfig().getMode() == null) {
       return false;
     }
-    return tableConfig.getIngestionConfig().getComplexTypeHandlingConfig().getMode()
-        != ComplexTypeHandlingConfig.Mode.NONE;
+    return tableConfig.getIngestionConfig().getComplexTypeConfig().getMode()
+        != ComplexTypeConfig.Mode.NONE;
   }
 
   @Nullable
@@ -139,7 +139,6 @@ public class ComplexTypeTransformer implements RecordTransformer {
     if (value == null) {
       // use the record itself
       list.add(record);
-      return;
     } else if (value instanceof Collection) {
       if (((Collection) value).isEmpty()) {
         // use the record itself

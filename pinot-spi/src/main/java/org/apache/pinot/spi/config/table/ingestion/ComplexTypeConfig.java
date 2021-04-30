@@ -29,7 +29,7 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 /**
  * Config related to handling complex type
  */
-public class ComplexTypeHandlingConfig extends BaseJsonConfig {
+public class ComplexTypeConfig extends BaseJsonConfig {
   public enum Mode {
     NONE, FLATTEN_MAP
   }
@@ -41,13 +41,12 @@ public class ComplexTypeHandlingConfig extends BaseJsonConfig {
   private final List<String> _unnestConfig;
 
   @JsonCreator
-  public ComplexTypeHandlingConfig(@JsonProperty(value = "mode") @Nullable Mode mode,
+  public ComplexTypeConfig(@JsonProperty(value = "mode") Mode mode,
       @JsonProperty("unnestConfig") @Nullable List<String> unnestConfig) {
     _mode = mode;
     _unnestConfig = unnestConfig;
   }
 
-  @Nullable
   public Mode getMode() {
     return _mode;
   }
