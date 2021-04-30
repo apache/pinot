@@ -11,6 +11,11 @@ rules:
   labels:
     table: "$1"
     tableType: "$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.idealstateZnodeGzipSize.(\\w+)_(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_idealstateZnodeGzipSize_$3"
+  labels:
+    table: "$1"
+    tableType: "$2"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.numberOfReplicas.(\\w+)_(\\w+)\"><>(\\w+)"
   name: "pinot_controller_numberOfReplicas_$3"
   labels:

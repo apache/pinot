@@ -21,8 +21,10 @@ package org.apache.pinot.controller.helix;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.util.GZipCompressionUtil;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -50,6 +52,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
   // log messages about disabled tables atmost once a day
   private static final long DISABLED_TABLE_LOG_INTERVAL_MS = TimeUnit.DAYS.toMillis(1);
+  private static final ZNRecordSerializer _recordSerializer = new ZNRecordSerializer();
   private long _lastDisabledTableLogTimestamp = 0;
 
   /**
@@ -145,7 +148,9 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     }
 
     _controllerMetrics
-        .setValueOfTableGauge(tableNameWithType, ControllerGauge.IDEALSTATE_ZNODE_SIZE, idealState.toString().length());
+        .setValueOfTableGauge(tableNameWithType, ControllerGauge.IDEALSTATE_ZNODE_SIZE,  idealState.toString().length());
+    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.IDEALSTATE_ZNODE_GZIP_SIZE,
+        idealState.serialize(_recordSerializer).length);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENT_COUNT,
         (long) (idealState.getPartitionSet().size()));
     ExternalView externalView = _pinotHelixResourceManager.getTableExternalView(tableNameWithType);
