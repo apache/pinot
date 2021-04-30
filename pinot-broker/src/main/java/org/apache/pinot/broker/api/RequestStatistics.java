@@ -50,10 +50,20 @@ public class RequestStatistics {
   private boolean _isNumGroupsLimitReached;
   private int _numExceptions;
   private String _brokerId;
+  private String _offlineServerTenant;
+  private String _realtimeServerTenant;
   private long _requestId;
 
   public String getBrokerId() {
     return _brokerId;
+  }
+
+  public String getOfflineServerTenant() {
+    return _offlineServerTenant;
+  }
+
+  public String getRealtimeServerTenant() {
+    return _realtimeServerTenant;
   }
 
   public long getRequestId() {
@@ -116,6 +126,14 @@ public class RequestStatistics {
 
   public void setBrokerId(String brokerId) {
     _brokerId = brokerId;
+  }
+
+  public void setOfflineServerTenant(String offlineServerTenant) {
+    _offlineServerTenant = offlineServerTenant;
+  }
+
+  public void setRealtimeServerTenant(String realtimeServerTenant) {
+    _realtimeServerTenant = realtimeServerTenant;
   }
 
   public void setRequestId(long requestId) {
