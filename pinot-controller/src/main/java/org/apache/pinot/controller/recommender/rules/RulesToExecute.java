@@ -30,6 +30,7 @@ import org.apache.pinot.controller.recommender.rules.impl.KafkaPartitionRule;
 import org.apache.pinot.controller.recommender.rules.impl.NoDictionaryOnHeapDictionaryJointRule;
 import org.apache.pinot.controller.recommender.rules.impl.PinotTablePartitionRule;
 import org.apache.pinot.controller.recommender.rules.impl.RealtimeProvisioningRule;
+import org.apache.pinot.controller.recommender.rules.impl.SegmentSizeRule;
 import org.apache.pinot.controller.recommender.rules.impl.VariedLengthDictionaryRule;
 
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.RulesToExecute.*;
@@ -45,6 +46,8 @@ public class RulesToExecute {
   public static class RuleFactory {
     public static AbstractRule getRule(Rule rule, InputManager inputManager, ConfigManager outputManager) {
       switch (rule) {
+        case SegmentSizeRule:
+          return new SegmentSizeRule(inputManager, outputManager);
         case FlagQueryRule:
           return new FlagQueryRule(inputManager, outputManager);
         case InvertedSortedIndexJointRule:
@@ -69,6 +72,7 @@ public class RulesToExecute {
     }
   }
   // All rules will execute by default unless explicitly specifying "recommendInvertedSortedIndexJoint" = "false"
+  boolean _recommendSegmentSize = DEFAULT_RECOMMEND_KAFKA_PARTITION;
   boolean _recommendKafkaPartition = DEFAULT_RECOMMEND_KAFKA_PARTITION;
   boolean _recommendPinotTablePartition = DEFAULT_RECOMMEND_PINOT_TABLE_PARTITION;
   boolean _recommendInvertedSortedIndexJoint = DEFAULT_RECOMMEND_INVERTED_SORTED_INDEX_JOINT;
@@ -121,7 +125,12 @@ public class RulesToExecute {
 
   @JsonSetter(nulls = Nulls.SKIP)
   public void setRecommendRealtimeProvisioning(boolean recommendRealtimeProvisioning) {
-    _recommendPinotTablePartition = recommendRealtimeProvisioning;
+    _recommendRealtimeProvisioning = recommendRealtimeProvisioning;
+  }
+
+  @JsonSetter(nulls = Nulls.SKIP)
+  public void setRecommendSegmentSize(boolean recommendSegmentSize) {
+    _recommendSegmentSize = recommendSegmentSize;
   }
 
   public boolean isRecommendVariedLengthDictionary() {
@@ -160,9 +169,14 @@ public class RulesToExecute {
     return _recommendRealtimeProvisioning;
   }
 
+  public boolean isRecommendSegmentSize() {
+    return _recommendSegmentSize;
+  }
+
   // Be careful with the sequence, each rule can execute individually
   // but a rule may depend on its previous rule when they both fired
   public enum Rule {
+    SegmentSizeRule, // This rule must be the first rule. It provides segment count, segment size, numRows in segments which are used in other rules
     FlagQueryRule,
     KafkaPartitionRule,
     InvertedSortedIndexJointRule,

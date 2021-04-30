@@ -63,16 +63,12 @@ public class PinotTablePartitionRule extends AbstractRule {
 
   public PinotTablePartitionRule(InputManager input, ConfigManager output) {
     super(input, output);
-    this._params = input.getPartitionRuleParams();
+    _params = input.getPartitionRuleParams();
   }
 
   @Override
   public void run()
       throws InvalidInputException {
-    //**********Calculate size per record***************/
-    _input.estimateSizePerRecord();
-    //**************************************************/
-
     LOGGER.info("Recommending partition configurations");
 
     if (_input.getQps()
@@ -105,8 +101,7 @@ public class PinotTablePartitionRule extends AbstractRule {
 
     LOGGER.info("*Recommending number of partitions ");
     int numKafkaPartitions = _output.getPartitionConfig().getNumKafkaPartitions();
-    long offLineDataSizePerPush = _input.getNumRecordsPerPush() * _input.getSizePerRecord();
-    int optimalOfflinePartitions = (int) Math.ceil((double) offLineDataSizePerPush / _params.OPTIMAL_SIZE_PER_SEGMENT);
+    int optimalOfflinePartitions = (int) _output.getSegmentSizeRecommendations().getNumSegments();
     if (_input.getTableType().equalsIgnoreCase(REALTIME) || _input.getTableType().equalsIgnoreCase(HYBRID)) {
       //real time num of partitions should be the same value as the number of kafka partitions
       if (!_input.getOverWrittenConfigs().getPartitionConfig().isNumPartitionsRealtimeOverwritten()) {

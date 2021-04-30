@@ -37,6 +37,7 @@ public class RecommenderConstants {
   }
 
   public static class RulesToExecute {
+    public static final boolean DEFAULT_RECOMMEND_SEGMENT_SIZE = true;
     public static final boolean DEFAULT_RECOMMEND_FLAG_QUERY = true;
     public static final boolean DEFAULT_RECOMMEND_VARIED_LENGTH_DICTIONARY = true;
     public static final boolean DEFAULT_RECOMMEND_KAFKA_PARTITION = true;
@@ -87,6 +88,12 @@ public class RecommenderConstants {
     public static final String DEFAULT_MAX_USABLE_HOST_MEMORY = "48G";
     public static final int[] DEFAULT_NUM_HOURS = {2, 4, 6, 8, 10, 12};
     public static final int[] DEFAULT_NUM_HOSTS = {3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+  }
+
+  public static class SegmentSizeRule {
+    public static final int DEFAULT_NUM_SEGMENTS = 1;
+    public static final int DEFAULT_DESIRED_SEGMENT_SIZE_MB = 500;
+    public static final int DEFAULT_NUM_ROWS_IN_GENERATED_SEGMENT = 50_000;
   }
 
   public static final String PQL = "pql";

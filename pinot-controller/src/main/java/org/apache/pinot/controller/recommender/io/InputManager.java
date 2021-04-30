@@ -40,6 +40,7 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.controller.recommender.exceptions.InvalidInputException;
 import org.apache.pinot.controller.recommender.io.metadata.FieldMetadata;
 import org.apache.pinot.controller.recommender.io.metadata.SchemaWithMetaData;
+import org.apache.pinot.controller.recommender.io.metadata.TimeFieldSpecMetadata;
 import org.apache.pinot.controller.recommender.rules.RulesToExecute;
 import org.apache.pinot.controller.recommender.rules.io.params.BloomFilterRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.FlagQueryRuleParams;
@@ -47,6 +48,7 @@ import org.apache.pinot.controller.recommender.rules.io.params.InvertedSortedInd
 import org.apache.pinot.controller.recommender.rules.io.params.NoDictionaryOnHeapDictionaryJointRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.PartitionRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.RealtimeProvisioningRuleParams;
+import org.apache.pinot.controller.recommender.rules.io.params.SegmentSizeRuleParams;
 import org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -110,6 +112,7 @@ public class InputManager {
       new NoDictionaryOnHeapDictionaryJointRuleParams();
   public FlagQueryRuleParams _flagQueryRuleParams = new FlagQueryRuleParams();
   public RealtimeProvisioningRuleParams _realtimeProvisioningRuleParams;
+  public SegmentSizeRuleParams _segmentSizeRuleParams = new SegmentSizeRuleParams();
 
   // For forward compatibility: 1. dev/sre to overwrite field(s) 2. incremental recommendation on existing/staging tables
   public ConfigManager _overWrittenConfigs = new ConfigManager();
@@ -167,6 +170,33 @@ public class InputManager {
       double regulatedCardinality = regulateCardinalityInfinitePopulation(cardinality, sampleSize);
       _metaDataMap.get(colName).setCardinality((int) Math.round(regulatedCardinality));
     });
+  }
+
+  /**
+   * Cardinalities provided by users are relative to number of records per push, but we might end up creating multiple
+   * segments for each push. Using this methods, cardinalities will be capped by the provided number of rows in segment.
+   */
+  public void capCardinalities(int numRecordsInSegment) {
+    _metaDataMap.keySet().forEach(colName -> {
+      int cardinality = Math.min(numRecordsInSegment, _metaDataMap.get(colName).getCardinality());
+      _metaDataMap.get(colName).setCardinality(cardinality);
+    });
+    if (_schemaWithMetaData.getDimensionFieldSpecs() != null) {
+      _schemaWithMetaData.getDimensionFieldSpecs()
+          .forEach(column -> column.setCardinality(Math.min(numRecordsInSegment, column.getCardinality())));
+    }
+    if (_schemaWithMetaData.getMetricFieldSpecs() != null) {
+      _schemaWithMetaData.getMetricFieldSpecs()
+          .forEach(column -> column.setCardinality(Math.min(numRecordsInSegment, column.getCardinality())));
+    }
+    if (_schemaWithMetaData.getDateTimeFieldSpecs() != null) {
+      _schemaWithMetaData.getDateTimeFieldSpecs()
+          .forEach(column -> column.setCardinality(Math.min(numRecordsInSegment, column.getCardinality())));
+    }
+    if (_schemaWithMetaData.getTimeFieldSpec() != null) {
+      TimeFieldSpecMetadata column = _schemaWithMetaData.getTimeFieldSpec();
+      column.setCardinality(Math.min(numRecordsInSegment, column.getCardinality()));
+    }
   }
 
   private void validateQueries() {
@@ -402,6 +432,11 @@ public class InputManager {
     _overWrittenConfigs = overWrittenConfigs;
   }
 
+  @JsonSetter(nulls = Nulls.SKIP)
+  public void setSegmentSizeRuleParams(SegmentSizeRuleParams segmentSizeRuleParams) {
+    _segmentSizeRuleParams = segmentSizeRuleParams;
+  }
+
   public boolean isUseCardinalityNormalization() {
     return _useCardinalityNormalization;
   }
@@ -533,6 +568,10 @@ public class InputManager {
 
   public ConfigManager getOverWrittenConfigs() {
     return _overWrittenConfigs;
+  }
+
+  public SegmentSizeRuleParams getSegmentSizeRuleParams() {
+    return _segmentSizeRuleParams;
   }
 
   public long getSizePerRecord() {

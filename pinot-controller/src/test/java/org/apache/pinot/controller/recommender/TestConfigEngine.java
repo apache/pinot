@@ -36,6 +36,8 @@ import org.apache.pinot.controller.recommender.io.InputManager;
 import org.apache.pinot.controller.recommender.rules.AbstractRule;
 import org.apache.pinot.controller.recommender.rules.RulesToExecute;
 import org.apache.pinot.controller.recommender.rules.impl.InvertedSortedIndexJointRule;
+import org.apache.pinot.controller.recommender.rules.impl.SegmentSizeRule;
+import org.apache.pinot.controller.recommender.rules.io.configs.SegmentSizeRecommendations;
 import org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset;
 import org.apache.pinot.controller.recommender.rules.utils.QueryInvertedSortedIndexRecommender;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -229,6 +231,10 @@ public class TestConfigEngine {
       throws InvalidInputException, IOException {
     loadInput("recommenderInput/PinotTablePartitionRuleInput.json");
 
+    // segment size recommendations get populated by SegmentSize Rule; hard-coding the values here
+    _input._overWrittenConfigs.setSegmentSizeRecommendations(
+        new SegmentSizeRecommendations(/*numRows=*/1_000_000, /*numSegments=*/4, /*segmentSize=*/1_000_000));
+
     AbstractRule abstractRule = RulesToExecute.RuleFactory
         .getRule(RulesToExecute.Rule.KafkaPartitionRule, _input, _input._overWrittenConfigs);
     abstractRule.run();
@@ -374,6 +380,14 @@ public class TestConfigEngine {
   void testAggregateMetricsRule() throws Exception {
     ConfigManager output = runRecommenderDriver("recommenderInput/AggregateMetricsRuleInput.json");
     assertTrue(output.isAggregateMetrics());
+  }
+
+  @Test
+  void testSegmentSizeRule() throws Exception {
+    ConfigManager output = runRecommenderDriver("recommenderInput/SegmentSizeRuleInput.json");
+    SegmentSizeRecommendations segmentSizeRecommendations = output.getSegmentSizeRecommendations();
+    assertEquals(segmentSizeRecommendations.getNumSegments(), 2);
+    assertEquals(segmentSizeRecommendations.getNumRows(), 50_000);
   }
 
   private void testRealtimeProvisioningRule(String fileName) throws Exception {
