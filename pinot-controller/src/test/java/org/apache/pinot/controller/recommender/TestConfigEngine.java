@@ -36,7 +36,6 @@ import org.apache.pinot.controller.recommender.io.InputManager;
 import org.apache.pinot.controller.recommender.rules.AbstractRule;
 import org.apache.pinot.controller.recommender.rules.RulesToExecute;
 import org.apache.pinot.controller.recommender.rules.impl.InvertedSortedIndexJointRule;
-import org.apache.pinot.controller.recommender.rules.impl.SegmentSizeRule;
 import org.apache.pinot.controller.recommender.rules.io.configs.SegmentSizeRecommendations;
 import org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset;
 import org.apache.pinot.controller.recommender.rules.utils.QueryInvertedSortedIndexRecommender;
