@@ -72,7 +72,7 @@ public class RulesToExecute {
     }
   }
   // All rules will execute by default unless explicitly specifying "recommendInvertedSortedIndexJoint" = "false"
-  boolean _recommendSegmentSize = DEFAULT_RECOMMEND_KAFKA_PARTITION;
+  boolean _recommendSegmentSize = DEFAULT_RECOMMEND_SEGMENT_SIZE;
   boolean _recommendKafkaPartition = DEFAULT_RECOMMEND_KAFKA_PARTITION;
   boolean _recommendPinotTablePartition = DEFAULT_RECOMMEND_PINOT_TABLE_PARTITION;
   boolean _recommendInvertedSortedIndexJoint = DEFAULT_RECOMMEND_INVERTED_SORTED_INDEX_JOINT;
