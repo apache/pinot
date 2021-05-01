@@ -101,7 +101,6 @@ public class PinotTablePartitionRule extends AbstractRule {
 
     LOGGER.info("*Recommending number of partitions ");
     int numKafkaPartitions = _output.getPartitionConfig().getNumKafkaPartitions();
-    int optimalOfflinePartitions = (int) _output.getSegmentSizeRecommendations().getNumSegments();
     if (_input.getTableType().equalsIgnoreCase(REALTIME) || _input.getTableType().equalsIgnoreCase(HYBRID)) {
       //real time num of partitions should be the same value as the number of kafka partitions
       if (!_input.getOverWrittenConfigs().getPartitionConfig().isNumPartitionsRealtimeOverwritten()) {
@@ -114,12 +113,15 @@ public class PinotTablePartitionRule extends AbstractRule {
       //We define have a desirable segment size OPTIMAL_SIZE_PER_SEGMENT
       //Divide the size of data coming in on a given day by OPTIMAL_SIZE_PER_SEGMENT we get the number of partitions.
       if (!_input.getOverWrittenConfigs().getPartitionConfig().isNumPartitionsOfflineOverwritten()) {
-        _output.getPartitionConfig().setNumPartitionsOffline((int) (optimalOfflinePartitions));
+        int optimalOfflinePartitions = (int) _output.getSegmentSizeRecommendations().getNumSegments();
+        _output.getPartitionConfig().setNumPartitionsOffline(optimalOfflinePartitions);
       }
     }
     if (_input.getTableType().equalsIgnoreCase(HYBRID)) {
       if (!_input.getOverWrittenConfigs().getPartitionConfig().isNumPartitionsOfflineOverwritten()) {
-        _output.getPartitionConfig().setNumPartitionsOffline(Math.min(optimalOfflinePartitions, numKafkaPartitions));
+        int optimalOfflinePartitions =
+            Math.min((int) _output.getSegmentSizeRecommendations().getNumSegments(), numKafkaPartitions);
+        _output.getPartitionConfig().setNumPartitionsOffline(optimalOfflinePartitions);
       }
     }
 
