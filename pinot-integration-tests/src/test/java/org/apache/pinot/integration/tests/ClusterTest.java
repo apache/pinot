@@ -50,7 +50,6 @@ import org.apache.http.message.BasicNameValuePair;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.minion.MinionStarter;
 import org.apache.pinot.minion.event.MinionEventObserverFactory;
@@ -68,6 +67,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Minion;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,6 +88,7 @@ public abstract class ClusterTest extends ControllerTest {
   private List<HelixBrokerStarter> _brokerStarters;
   private List<HelixServerStarter> _serverStarters;
   private MinionStarter _minionStarter;
+  private List<Integer> _brokerPorts;
 
   protected PinotConfiguration getDefaultBrokerConfiguration() {
     return new PinotConfiguration();
@@ -105,17 +106,19 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void startBrokers(int numBrokers)
       throws Exception {
-    startBrokers(numBrokers, DEFAULT_BROKER_PORT, ZkStarter.DEFAULT_ZK_STR);
+    startBrokers(numBrokers, DEFAULT_BROKER_PORT, getZkUrl());
   }
 
   protected void startBrokers(int numBrokers, int basePort, String zkStr)
       throws Exception {
-    _brokerBaseApiUrl = "http://localhost:" + basePort;
     _brokerStarters = new ArrayList<>(numBrokers);
+    _brokerPorts = new ArrayList<>();
     for (int i = 0; i < numBrokers; i++) {
       Map<String, Object> properties = getDefaultBrokerConfiguration().toMap();
       properties.put(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
-      properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, basePort + i);
+      int port = NetUtils.findOpenPort(basePort + i);
+      _brokerPorts.add(port);
+      properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, port);
       properties.put(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
       PinotConfiguration configuration = new PinotConfiguration(properties);
       overrideBrokerConf(configuration);
@@ -125,6 +128,15 @@ public abstract class ClusterTest extends ControllerTest {
       brokerStarter.start();
       _brokerStarters.add(brokerStarter);
     }
+    _brokerBaseApiUrl = "http://localhost:" + _brokerPorts.get(0);
+  }
+
+  protected int getBrokerPort(int index) {
+    return _brokerPorts.get(index);
+  }
+
+  protected List<Integer> getBrokerPorts() {
+    return ImmutableList.copyOf(_brokerPorts);
   }
 
   protected PinotConfiguration getDefaultServerConfiguration() {
@@ -143,12 +155,12 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void startServer(PinotConfiguration configuration) {
     startServers(1, configuration, Server.DEFAULT_ADMIN_API_PORT, Helix.DEFAULT_SERVER_NETTY_PORT,
-        ZkStarter.DEFAULT_ZK_STR);
+        getZkUrl());
   }
 
   protected void startServers(int numServers) {
     startServers(numServers, getDefaultServerConfiguration(), Server.DEFAULT_ADMIN_API_PORT,
-        Helix.DEFAULT_SERVER_NETTY_PORT, ZkStarter.DEFAULT_ZK_STR);
+        Helix.DEFAULT_SERVER_NETTY_PORT, getZkUrl());
   }
 
   protected void startServers(int numServers, int baseAdminApiPort, int baseNettyPort, String zkStr) {
@@ -189,7 +201,7 @@ public abstract class ClusterTest extends ControllerTest {
       @Nullable List<MinionEventObserverFactory> eventObserverFactories) {
     FileUtils.deleteQuietly(new File(Minion.DEFAULT_INSTANCE_BASE_DIR));
     try {
-      _minionStarter = new MinionStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, getDefaultMinionConfiguration());
+      _minionStarter = new MinionStarter(getHelixClusterName(), getZkUrl(), getDefaultMinionConfiguration());
       // Register task executor factories
       if (taskExecutorFactories != null) {
         for (PinotTaskExecutorFactory taskExecutorFactory : taskExecutorFactories) {

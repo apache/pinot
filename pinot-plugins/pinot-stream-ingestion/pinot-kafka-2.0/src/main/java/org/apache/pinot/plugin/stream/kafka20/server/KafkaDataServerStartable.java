@@ -95,4 +95,9 @@ public class KafkaDataServerStartable implements StreamDataServerStartable {
     Collection<NewTopic> topicList = Arrays.asList(new NewTopic(topic, partition, (short) 1));
     adminClient.createTopics(topicList);
   }
+
+  @Override
+  public int getPort() {
+    return port;
+  }
 }

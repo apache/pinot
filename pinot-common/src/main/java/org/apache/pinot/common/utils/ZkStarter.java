@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.TimeUnit;
 import org.I0Itec.zkclient.ZkClient;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.zookeeper.server.ServerConfig;
 import org.apache.zookeeper.server.ZooKeeperServerMain;
 import org.apache.zookeeper.server.admin.AdminServer;
@@ -34,16 +35,22 @@ import org.slf4j.LoggerFactory;
 public class ZkStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(ZkStarter.class);
   public static final int DEFAULT_ZK_TEST_PORT = 2191;
-  public static final String DEFAULT_ZK_STR = "localhost:" + DEFAULT_ZK_TEST_PORT;
   private static final int DEFAULT_ZK_CLIENT_RETRIES = 10;
+  private static int ZK_TEST_PORT = 2191;
 
   public static class ZookeeperInstance {
     private PublicZooKeeperServerMain _serverMain;
     private String _dataDirPath;
+    private int _port;
 
-    private ZookeeperInstance(PublicZooKeeperServerMain serverMain, String dataDirPath) {
+    private ZookeeperInstance(PublicZooKeeperServerMain serverMain, String dataDirPath, int port) {
       _serverMain = serverMain;
       _dataDirPath = dataDirPath;
+      _port = port;
+    }
+
+    public String getZkUrl() {
+      return "localhost:" + _port;
     }
   }
 
@@ -130,7 +137,11 @@ public class ZkStarter {
    * Starts an empty local Zk instance on the default port
    */
   public static ZookeeperInstance startLocalZkServer() {
-    return startLocalZkServer(DEFAULT_ZK_TEST_PORT);
+    return startLocalZkServer(NetUtils.findOpenPort(DEFAULT_ZK_TEST_PORT));
+  }
+
+  public static String getDefaultZkStr() {
+    return "localhost:" + ZK_TEST_PORT;
   }
 
   /**
@@ -180,7 +191,7 @@ public class ZkStarter {
           }
         }
       }
-      return new ZookeeperInstance(zookeeperServerMain, dataDirPath);
+      return new ZookeeperInstance(zookeeperServerMain, dataDirPath, port);
     } catch (Exception e) {
       LOGGER.warn("Caught exception while starting ZK", e);
       throw new RuntimeException(e);

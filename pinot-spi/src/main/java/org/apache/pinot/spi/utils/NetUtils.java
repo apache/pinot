@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.spi.utils;
 
+import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.ServerSocket;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 
@@ -56,5 +58,63 @@ public class NetUtils {
         return null;
       }
     }
+  }
+
+  /**
+   * Find an open port.
+   * @return an open port
+   * @throws IOException
+   */
+  public static int findOpenPort()
+      throws IOException {
+    try (ServerSocket socket = new ServerSocket(0)) {
+      return socket.getLocalPort();
+    }
+  }
+
+  /**
+   * Find an open port，otherwise use given default port.
+   * @param defaultPort
+   * @return an open port otherwise default port
+   */
+  public static int findOpenPort(int defaultPort) {
+    if (available(defaultPort)) {
+      return defaultPort;
+    }
+    int port = defaultPort;
+    while (available(++port)) {
+      return port;
+    }
+    throw new RuntimeException("Unable to find an open port from range: [ " + defaultPort + ", " + port + " ]");
+  }
+
+  /**
+   * Checks to see if a specific port is available.
+   *
+   * @param port the port to check for availability
+   */
+  public static boolean available(int port) {
+    ServerSocket ss = null;
+    DatagramSocket ds = null;
+    try {
+      ss = new ServerSocket(port);
+      ss.setReuseAddress(true);
+      ds = new DatagramSocket(port);
+      ds.setReuseAddress(true);
+      return true;
+    } catch (IOException e) {
+    } finally {
+      if (ds != null) {
+        ds.close();
+      }
+      if (ss != null) {
+        try {
+          ss.close();
+        } catch (IOException e) {
+          /* should not be thrown */
+        }
+      }
+    }
+    return false;
   }
 }
