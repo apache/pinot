@@ -150,6 +150,8 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
   /**
    * Converts a shardId string to a partitionGroupId integer by parsing the digits of the shardId
    * e.g. "shardId-000000000001" becomes 1
+   * FIXME: Although practically the shard values follow this format, the Kinesis docs don't guarantee it.
+   *  Re-evaluate if this convention needs to be changed.
    */
   private int getPartitionGroupIdFromShardId(String shardId) {
     String shardIdNum = StringUtils.stripStart(StringUtils.removeStart(shardId, SHARD_ID_PREFIX), "0");

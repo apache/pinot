@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.stream.kinesis;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -101,8 +102,10 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
 
       // TODO: iterate upon all the shardIds in the map
       //  Okay for now, since we have assumed that every partition group contains a single shard
-      Map.Entry<String, String> shardToSequenceNum =
-          kinesisStartCheckpoint.getShardToStartSequenceMap().entrySet().iterator().next();
+      Map<String, String> shardToStartSequenceMap = kinesisStartCheckpoint.getShardToStartSequenceMap();
+      Preconditions.checkState(shardToStartSequenceMap.size() == 1, "Only 1 shard per consumer supported. Found: %s",
+          shardToStartSequenceMap.keySet());
+      Map.Entry<String, String> shardToSequenceNum = shardToStartSequenceMap.entrySet().iterator().next();
       String shardIterator = getShardIterator(shardToSequenceNum.getKey(), shardToSequenceNum.getValue());
 
       String kinesisEndSequenceNumber = null;
@@ -112,7 +115,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
         kinesisEndSequenceNumber = kinesisEndCheckpoint.getShardToStartSequenceMap().values().iterator().next();
       }
 
-      String nextStartSequenceNumber = null;
+      String nextStartSequenceNumber;
       boolean isEndOfShard = false;
 
       while (shardIterator != null) {
@@ -124,7 +127,6 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
           nextStartSequenceNumber = recordList.get(recordList.size() - 1).sequenceNumber();
 
           if (kinesisEndSequenceNumber != null && kinesisEndSequenceNumber.compareTo(nextStartSequenceNumber) <= 0) {
-            nextStartSequenceNumber = kinesisEndSequenceNumber;
             break;
           }
 
