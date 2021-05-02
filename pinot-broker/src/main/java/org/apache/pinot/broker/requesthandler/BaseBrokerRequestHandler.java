@@ -102,8 +102,8 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRequestHandler.class);
   private static final String IN_SUBQUERY = "inSubquery";
-  private static final Literal FALSE = Literal.boolValue(false);
-  private static final Literal TRUE = Literal.boolValue(true);
+  private static final Expression FALSE = RequestUtils.getLiteralExpression(false);
+  private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
 
   protected final PinotConfiguration _config;
   protected final RoutingManager _routingManager;
