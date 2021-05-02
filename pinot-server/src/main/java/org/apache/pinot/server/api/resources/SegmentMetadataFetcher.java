@@ -20,6 +20,7 @@ package org.apache.pinot.server.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,6 +33,9 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImp
 import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
+import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 /**
@@ -49,6 +53,15 @@ public class SegmentMetadataFetcher {
   private static final String INDEX_NOT_AVAILABLE = "NO";
   private static final String INDEX_AVAILABLE = "YES";
 
+  private static final String STAR_TREE_INDEX_KEY = "star-tree-index";
+  private static final String STAR_TREE_DIMENSION_COLUMNS = "dimention-columns";
+  private static final String STAR_TREE_FUNCTION_COLUMN_PAIR_FUNCTION = "aggregation";
+  private static final String STAR_TREE_FUNCTION_COLUMN_PAIR_COLUMN = "column";
+  private static final String STAR_TREE_METRIC_AGGREGATIONS = "metric-aggregations";
+  private static final String STAR_TREE_MAX_LEAF_RECORDS = "max-leaf-records";
+  private static final String STAR_TREE_DIMENSION_COLUMNS_SKIPPED = "dimension-columns-skipped";
+  
+
   /**
    * This is a helper method that fetches the segment metadata for a given segment.
    * @param columns Columns to include for metadata
@@ -64,7 +77,65 @@ public class SegmentMetadataFetcher {
     }
     ObjectNode segmentMetadataJson = (ObjectNode) segmentMetadata.toJson(columnSet);
     segmentMetadataJson.set("indexes", JsonUtils.objectToJsonNode(getIndexesForSegmentColumns(segmentDataManager)));
+    segmentMetadataJson.set(STAR_TREE_INDEX_KEY, JsonUtils.objectToJsonNode((getStartreeIndexForSegmentColumns(segmentDataManager))));
     return JsonUtils.objectToString(segmentMetadataJson);
+  }
+
+  /**
+   * Get the JSON object containing star tree index details for a segment.
+   */
+  private static List<Map<String, Object>> getStartreeIndexForSegmentColumns(SegmentDataManager segmentDataManager) {
+    List<Map<String, Object>> startreeDetails = new ArrayList<>();
+
+    if (segmentDataManager instanceof ImmutableSegmentDataManager) {
+      ImmutableSegmentDataManager immutableSegmentDataManager = (ImmutableSegmentDataManager) segmentDataManager;
+
+      ImmutableSegment immutableSegment = immutableSegmentDataManager.getSegment();
+
+      if (immutableSegment instanceof ImmutableSegmentImpl) {
+        List<StarTreeV2> starTrees = immutableSegment.getStarTrees();
+
+        if (starTrees == null) {
+          return startreeDetails;
+        }
+
+        startreeDetails = getImmutableSegmentStartreeIndexes(starTrees);
+      }
+    }
+    return startreeDetails;
+  }
+
+  /**
+   * Helper to loop over star trees of a segment to create a map containing star tree details.
+   */
+  private static List<Map<String, Object>> getImmutableSegmentStartreeIndexes(List<StarTreeV2> starTrees){
+    List<Map<String, Object>> startreeDetails = new ArrayList<>();
+    for (StarTreeV2 starTree : starTrees) {
+      StarTreeV2Metadata starTreeMetadata = starTree.getMetadata();
+
+      Map<String, Object> starTreeIndexMap = new LinkedHashMap<>();
+
+      List<String> starTreeDimensions = starTreeMetadata.getDimensionsSplitOrder();
+      starTreeIndexMap.put(STAR_TREE_DIMENSION_COLUMNS, starTreeDimensions);
+
+      List<Map<String, String>> starTreeMetricAggregations = new ArrayList<>();
+      Set<AggregationFunctionColumnPair> functionColumnPairs = starTreeMetadata.getFunctionColumnPairs();
+      for (AggregationFunctionColumnPair functionColumnPair : functionColumnPairs) {
+        Map<String, String> starTreeMetricAggregation = new LinkedHashMap<>();
+        starTreeMetricAggregation.put(STAR_TREE_FUNCTION_COLUMN_PAIR_COLUMN, functionColumnPair.getColumn());
+        starTreeMetricAggregation.put(STAR_TREE_FUNCTION_COLUMN_PAIR_FUNCTION, functionColumnPair.getFunctionType().toString());
+        starTreeMetricAggregations.add(starTreeMetricAggregation);
+      }
+
+      starTreeIndexMap.put(STAR_TREE_METRIC_AGGREGATIONS, starTreeMetricAggregations);
+
+      starTreeIndexMap.put(STAR_TREE_MAX_LEAF_RECORDS, starTreeMetadata.getMaxLeafRecords());
+
+      starTreeIndexMap.put(STAR_TREE_DIMENSION_COLUMNS_SKIPPED, starTreeMetadata.getSkipStarNodeCreationForDimensions());
+
+      startreeDetails.add(starTreeIndexMap);
+    }
+    return startreeDetails;
   }
 
   /**
