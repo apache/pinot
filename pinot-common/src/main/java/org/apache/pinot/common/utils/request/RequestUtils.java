@@ -126,6 +126,12 @@ public class RequestUtils {
     return expression;
   }
 
+  public static Expression getLiteralExpression(boolean value) {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setBoolValue(value);
+    return expression;
+  }
+
   public static Expression getLiteralExpression(long value) {
     Expression expression = createNewLiteralExpression();
     expression.getLiteral().setLongValue(value);

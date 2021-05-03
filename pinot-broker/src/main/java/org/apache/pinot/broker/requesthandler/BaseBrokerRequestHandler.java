@@ -102,6 +102,8 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRequestHandler.class);
   private static final String IN_SUBQUERY = "inSubquery";
+  private static final Expression FALSE = RequestUtils.getLiteralExpression(false);
+  private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
 
   protected final PinotConfiguration _config;
   protected final RoutingManager _routingManager;
@@ -360,6 +362,40 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       requestStatistics.setRealtimeServerTenant(getServerTenant(realtimeTableName));
     }
 
+    // Check if response can be send without server query evaluation.
+    if (offlineBrokerRequest == null || offlineBrokerRequest.getPinotQuery() == null || isFilterAlwaysFalse(
+        offlineBrokerRequest)) {
+      // We don't need to evaluate offline request
+      offlineBrokerRequest = null;
+    }
+
+    if (realtimeBrokerRequest == null || realtimeBrokerRequest.getPinotQuery() == null || isFilterAlwaysFalse(
+        realtimeBrokerRequest)) {
+      // We don't need to evaluate realtime request
+      realtimeBrokerRequest = null;
+    }
+
+    if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
+      // Send empty response since we don't need to evaluate either offline or realtime request.
+      BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
+      logBrokerResponse(requestId, query, requestStatistics, brokerRequest, 0, new ServerStats(), brokerResponse,
+          System.nanoTime());
+
+      return brokerResponse;
+    }
+
+    if (offlineBrokerRequest != null && offlineBrokerRequest.getPinotQuery() != null && isFilterAlwaysTrue(
+        offlineBrokerRequest)) {
+      // Drop offline request filter since it is always true
+      offlineBrokerRequest.getPinotQuery().setFilterExpression(null);
+    }
+
+    if (realtimeBrokerRequest != null && realtimeBrokerRequest.getPinotQuery() != null && isFilterAlwaysTrue(
+        realtimeBrokerRequest)) {
+      // Drop realtime request filter since it is always true
+      realtimeBrokerRequest.getPinotQuery().setFilterExpression(null);
+    }
+
     // Calculate routing table for the query
     long routingStartTimeNs = System.nanoTime();
     Map<ServerInstance, List<String>> offlineRoutingTable = null;
@@ -450,6 +486,24 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     requestStatistics.setQueryProcessingTime(totalTimeMs);
     requestStatistics.setStatistics(brokerResponse);
 
+    logBrokerResponse(requestId, query, requestStatistics, brokerRequest, numUnavailableSegments, serverStats,
+        brokerResponse, totalTimeMs);
+    return brokerResponse;
+  }
+
+  /** Given a {@link BrokerRequest}, check if the WHERE clause will always evaluate to false. */
+  private boolean isFilterAlwaysFalse(BrokerRequest brokerRequest) {
+    return FALSE.equals(brokerRequest.getPinotQuery().getFilterExpression());
+  }
+
+  /** Given a {@link BrokerRequest}, check if the WHERE clause will always evaluate to true. */
+  private boolean isFilterAlwaysTrue(BrokerRequest brokerRequest) {
+    return TRUE.equals(brokerRequest.getPinotQuery().getFilterExpression());
+  }
+
+  private void logBrokerResponse(long requestId, String query, RequestStatistics requestStatistics,
+      BrokerRequest brokerRequest, int numUnavailableSegments, ServerStats serverStats,
+      BrokerResponseNative brokerResponse, long totalTimeMs) {
     LOGGER.debug("Broker Response: {}", brokerResponse);
 
     // Please keep the format as name=value comma-separated with no spaces
@@ -486,7 +540,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       // Increment the count for dropped log
       _numDroppedLog.incrementAndGet();
     }
-    return brokerResponse;
   }
 
   private String getServerTenant(String tableNameWithType) {
