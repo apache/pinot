@@ -236,6 +236,11 @@ public class IntermediateSegment implements MutableSegment {
   }
 
   @Override
+  public Map<String, IntermediateIndexContainer> getIndexContainerMap() {
+    return _indexContainerMap;
+  }
+
+  @Override
   public void destroy() {
     String segmentName = getSegmentName();
     LOGGER.info("Trying to destroy segment : {}", segmentName);

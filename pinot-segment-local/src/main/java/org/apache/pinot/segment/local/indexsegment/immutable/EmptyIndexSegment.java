@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.indexsegment.immutable;
 
 import com.google.common.base.Preconditions;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.datasource.EmptyDataSource;
@@ -27,6 +28,7 @@ import org.apache.pinot.segment.local.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
@@ -97,6 +99,11 @@ public class EmptyIndexSegment implements ImmutableSegment {
   public GenericRow getRecord(int docId, GenericRow reuse) {
     // NOTE: Use PinotSegmentRecordReader to read immutable segment
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public final Map<String, ColumnIndexContainer> getIndexContainerMap() {
+    return null;
   }
 
   @Override

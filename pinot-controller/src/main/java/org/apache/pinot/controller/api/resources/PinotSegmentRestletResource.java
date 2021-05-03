@@ -590,10 +590,6 @@ public class PinotSegmentRestletResource {
                                                @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) {
     LOGGER.info("Received a request to fetch metadata for all segments for table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
-    if (tableType == TableType.REALTIME) {
-      throw new ControllerApplicationException(LOGGER,
-          "Table type : " + tableTypeStr + " not yet supported.", Status.NOT_IMPLEMENTED);
-    }
 
     String tableNameWithType = getExistingTableNamesWithType(tableName, tableType).get(0);
     String segmentsMetadata;

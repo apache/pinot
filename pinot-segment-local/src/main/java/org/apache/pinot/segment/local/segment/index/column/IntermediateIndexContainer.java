@@ -18,21 +18,27 @@
  */
 package org.apache.pinot.segment.local.segment.index.column;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
+import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
+import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
+import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
+import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.MutableDictionary;
 import org.apache.pinot.segment.spi.index.reader.MutableForwardIndex;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class IntermediateIndexContainer implements Closeable {
+public class IntermediateIndexContainer implements ColumnIndexContainer {
   private static final Logger LOGGER = LoggerFactory.getLogger(IntermediateIndexContainer.class);
 
   final FieldSpec _fieldSpec;
@@ -96,8 +102,48 @@ public class IntermediateIndexContainer implements Closeable {
     return _forwardIndex;
   }
 
+  @Override
+  public InvertedIndexReader<?> getInvertedIndex() {
+    return null;
+  }
+
+  @Override
+  public InvertedIndexReader<?> getRangeIndex() {
+    return null;
+  }
+
+  @Override
+  public TextIndexReader getTextIndex() {
+    return null;
+  }
+
+  @Override
+  public TextIndexReader getFSTIndex() {
+    return null;
+  }
+
+  @Override
+  public JsonIndexReader getJsonIndex() {
+    return null;
+  }
+
+  @Override
+  public H3IndexReader getH3Index() {
+    return null;
+  }
+
   public MutableDictionary getDictionary() {
     return _dictionary;
+  }
+
+  @Override
+  public BloomFilterReader getBloomFilter() {
+    return null;
+  }
+
+  @Override
+  public NullValueVectorReader getNullValueVector() {
+    return null;
   }
 
   public int getDictId() {
