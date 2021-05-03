@@ -22,7 +22,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
@@ -35,8 +35,8 @@ public class PinotSegmentColumnReader implements Closeable {
   private final Dictionary _dictionary;
   private final int[] _dictIdBuffer;
 
-  public PinotSegmentColumnReader(ImmutableSegment immutableSegment, String column) {
-    DataSource dataSource = immutableSegment.getDataSource(column);
+  public PinotSegmentColumnReader(IndexSegment indexSegment, String column) {
+    DataSource dataSource = indexSegment.getDataSource(column);
     _reader = dataSource.getForwardIndex();
     _readerContext = _reader.createContext();
     _dictionary = dataSource.getDictionary();

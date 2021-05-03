@@ -38,6 +38,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.data.partition.PartitionFunction;
+import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.geospatial.serde.GeometrySerializer;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig;
@@ -159,6 +160,8 @@ public class MutableSegmentImpl implements MutableSegment {
   //        the valid doc ids won't be updated.
   private final ThreadSafeMutableRoaringBitmap _validDocIds;
   private final ValidDocIndexReader _validDocIndex;
+
+  private final PinotSegmentRecordReader _pinotSegmentRecordReader;
 
   public MutableSegmentImpl(RealtimeSegmentConfig config, @Nullable ServerMetrics serverMetrics) {
     _serverMetrics = serverMetrics;
@@ -367,10 +370,18 @@ public class MutableSegmentImpl implements MutableSegment {
       _partitionUpsertMetadataManager = config.getPartitionUpsertMetadataManager();
       _validDocIds = new ThreadSafeMutableRoaringBitmap();
       _validDocIndex = new ValidDocIndexReaderImpl(_validDocIds);
+
+      // init PinotSegmentRecordReader for partial upsert lookup
+      try {
+        _pinotSegmentRecordReader = new PinotSegmentRecordReader(this);
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to initiate PinotSegmentRecordReader", e);
+      }
     } else {
       _partitionUpsertMetadataManager = null;
       _validDocIds = null;
       _validDocIndex = null;
+      _pinotSegmentRecordReader = null;
     }
   }
 
