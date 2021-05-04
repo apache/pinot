@@ -48,7 +48,7 @@ public class SegmentSizeRuleTest {
     SegmentSizeRecommendations params = RULE.estimate(GSS, DSS, NRGS, NRPP);
     assertEquals(params.getNumSegments(), 2);
     assertEquals(params.getSegmentSize(), 100 * MEGA_BYTE);
-    assertEquals(params.getNumRows(), 10 * MILLION);
+    assertEquals(params.getNumRowsPerSegment(), 10 * MILLION);
 
     NRPP = 22 * MILLION;
     NRGS = 5 * MILLION;
@@ -57,7 +57,7 @@ public class SegmentSizeRuleTest {
     params = RULE.estimate(GSS, DSS, NRGS, NRPP);
     assertEquals(params.getNumSegments(), 2);
     assertEquals(params.getSegmentSize(), 110 * MEGA_BYTE);
-    assertEquals(params.getNumRows(), 11 * MILLION);
+    assertEquals(params.getNumRowsPerSegment(), 11 * MILLION);
 
     NRPP = 18 * MILLION;
     NRGS = 5 * MILLION;
@@ -66,7 +66,7 @@ public class SegmentSizeRuleTest {
     params = RULE.estimate(GSS, DSS, NRGS, NRPP);
     assertEquals(params.getNumSegments(), 2);
     assertEquals(params.getSegmentSize(), 90 * MEGA_BYTE);
-    assertEquals(params.getNumRows(), 9 * MILLION);
+    assertEquals(params.getNumRowsPerSegment(), 9 * MILLION);
 
     NRPP = 16 * MILLION;
     NRGS = 5 * MILLION;
@@ -75,7 +75,7 @@ public class SegmentSizeRuleTest {
     params = RULE.estimate(GSS, DSS, NRGS, NRPP);
     assertEquals(params.getNumSegments(), 1);
     assertEquals(params.getSegmentSize(), 160 * MEGA_BYTE);
-    assertEquals(params.getNumRows(), 16 * MILLION);
+    assertEquals(params.getNumRowsPerSegment(), 16 * MILLION);
 
     NRPP = 2 * MILLION;
     NRGS = 5 * MILLION;
@@ -84,6 +84,6 @@ public class SegmentSizeRuleTest {
     params = RULE.estimate(GSS, DSS, NRGS, NRPP);
     assertEquals(params.getNumSegments(), 1);
     assertEquals(params.getSegmentSize(), 20 * MEGA_BYTE);
-    assertEquals(params.getNumRows(), 2 * MILLION);
+    assertEquals(params.getNumRowsPerSegment(), 2 * MILLION);
   }
 }

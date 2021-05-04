@@ -44,6 +44,9 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
  *   - number of segments
  *   - number of records in each segment
  *   - size of each segment
+ * The purpose of generating a segment is to estimate the size and number of rows of one sample segment. In case user
+ * already have a production segment in hand, they can provide actualSegmentSize and numRowsInActualSegment parameters
+ * in the input and then this rule uses those parameters instead of generating a segment to derived those values.
  */
 public class SegmentSizeRule extends AbstractRule {
 
@@ -91,12 +94,12 @@ public class SegmentSizeRule extends AbstractRule {
 
     // estimate optimal segment count & size parameters
     SegmentSizeRecommendations params =
-        estimate(segmentSize, segmentSizeRuleParams.getDesiredSegmentSizeMb() * MEGA_BYTE, numRows,
+        estimate(segmentSize, segmentSizeRuleParams.getDesiredSegmentSizeMB() * MEGA_BYTE, numRows,
             _input.getNumRecordsPerPush());
 
-    // wire the recommendations
+    // wire the recommendations and also update the cardinalities in input manager. The updated cardinalities are used in subsequent rules.
     _output.setSegmentSizeRecommendations(params);
-    _input.capCardinalities((int) params.getNumRows());
+    _input.capCardinalities((int) params.getNumRowsPerSegment());
   }
 
   /**

@@ -386,7 +386,7 @@ public class TestConfigEngine {
     ConfigManager output = runRecommenderDriver("recommenderInput/SegmentSizeRuleInput.json");
     SegmentSizeRecommendations segmentSizeRecommendations = output.getSegmentSizeRecommendations();
     assertEquals(segmentSizeRecommendations.getNumSegments(), 2);
-    assertEquals(segmentSizeRecommendations.getNumRows(), 50_000);
+    assertEquals(segmentSizeRecommendations.getNumRowsPerSegment(), 50_000);
   }
 
   @Test
@@ -394,7 +394,7 @@ public class TestConfigEngine {
     ConfigManager output = runRecommenderDriver("recommenderInput/SegmentSizeRuleInput_noNeedToGenerateSegment.json");
     SegmentSizeRecommendations segmentSizeRecommendations = output.getSegmentSizeRecommendations();
     assertEquals(segmentSizeRecommendations.getNumSegments(), 2);
-    assertEquals(segmentSizeRecommendations.getNumRows(), 50_000);
+    assertEquals(segmentSizeRecommendations.getNumRowsPerSegment(), 50_000);
   }
 
   private void testRealtimeProvisioningRule(String fileName) throws Exception {

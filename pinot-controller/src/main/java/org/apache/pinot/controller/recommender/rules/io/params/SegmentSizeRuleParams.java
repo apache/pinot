@@ -31,7 +31,7 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
 public class SegmentSizeRuleParams {
 
   // Desired segment size in MB
-  private int desiredSegmentSizeMb = DEFAULT_DESIRED_SEGMENT_SIZE_MB;
+  private int desiredSegmentSizeMB = DEFAULT_DESIRED_SEGMENT_SIZE_MB;
 
   // Number for rows in the generated segment
   private int numRowsInGeneratedSegment = DEFAULT_NUM_ROWS_IN_GENERATED_SEGMENT;
@@ -45,13 +45,13 @@ public class SegmentSizeRuleParams {
 
   // setter and getters
 
-  public int getDesiredSegmentSizeMb() {
-    return desiredSegmentSizeMb;
+  public int getDesiredSegmentSizeMB() {
+    return desiredSegmentSizeMB;
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
-  public void setDesiredSegmentSizeMb(int desiredSegmentSizeMb) {
-    this.desiredSegmentSizeMb = desiredSegmentSizeMb;
+  public void setDesiredSegmentSizeMB(int desiredSegmentSizeMB) {
+    this.desiredSegmentSizeMB = desiredSegmentSizeMB;
   }
 
   public int getNumRowsInGeneratedSegment() {

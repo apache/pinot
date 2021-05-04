@@ -54,7 +54,6 @@ public class RecommenderConstants {
 
     public static final long DEFAULT_THRESHOLD_MAX_LATENCY_SLA_PARTITION = 1000;
     public static final long DEFAULT_THRESHOLD_MIN_QPS_PARTITION = 200;
-    public static final long DEFAULT_OPTIMAL_SIZE_PER_SEGMENT = 1000_000_000; //1GB
     public static final long DEFAULT_KAFKA_NUM_MESSAGES_PER_SEC_PER_PARTITION = 250;
     public static final double DEFAULT_THRESHOLD_RATIO_MIN_DIMENSION_PARTITION_TOP_CANDIDATES = 0.8d;
     public static final int DEFAULT_THRESHOLD_MAX_IN_LENGTH = 4;

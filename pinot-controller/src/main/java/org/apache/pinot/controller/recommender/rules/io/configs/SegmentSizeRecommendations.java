@@ -25,12 +25,12 @@ package org.apache.pinot.controller.recommender.rules.io.configs;
  */
 public class SegmentSizeRecommendations {
 
-  private long numRows;
+  private long numRowsPerSegment;
   private long numSegments;
   private long segmentSize;
 
-  public SegmentSizeRecommendations(long numRows, long numSegments, long segmentSize) {
-    this.numRows = numRows;
+  public SegmentSizeRecommendations(long numRowsPerSegment, long numSegments, long segmentSize) {
+    this.numRowsPerSegment = numRowsPerSegment;
     this.numSegments = numSegments;
     this.segmentSize = segmentSize;
   }
@@ -38,12 +38,12 @@ public class SegmentSizeRecommendations {
   public SegmentSizeRecommendations() {
   }
 
-  public long getNumRows() {
-    return numRows;
+  public long getNumRowsPerSegment() {
+    return numRowsPerSegment;
   }
 
-  public void setNumRows(long numRows) {
-    this.numRows = numRows;
+  public void setNumRowsPerSegment(long numRowsPerSegment) {
+    this.numRowsPerSegment = numRowsPerSegment;
   }
 
   public long getNumSegments() {

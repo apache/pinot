@@ -176,7 +176,7 @@ public class RulesToExecute {
   // Be careful with the sequence, each rule can execute individually
   // but a rule may depend on its previous rule when they both fired
   public enum Rule {
-    SegmentSizeRule, // This rule must be the first rule. It provides segment count, segment size, numRows in segments which are used in other rules
+    SegmentSizeRule, // This rule must be the first rule. It provides segment count, segment size, numRows in segments which are used in other rules. It also adjust cardinality per segment for different columns.
     FlagQueryRule,
     KafkaPartitionRule,
     InvertedSortedIndexJointRule,
