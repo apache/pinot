@@ -29,10 +29,13 @@ import org.apache.pinot.controller.recommender.io.InputManager;
 import org.apache.pinot.controller.recommender.realtime.provisioning.MemoryEstimator;
 import org.apache.pinot.controller.recommender.rules.AbstractRule;
 import org.apache.pinot.controller.recommender.rules.io.configs.SegmentSizeRecommendations;
+import org.apache.pinot.controller.recommender.rules.io.params.SegmentSizeRuleParams;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+
+import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.SegmentSizeRule.NOT_PROVIDED;
 
 
 /**
@@ -60,28 +63,40 @@ public class SegmentSizeRule extends AbstractRule {
       return;
     }
 
-    // generate a segment
-    TableConfig tableConfig = createTableConfig(_input.getSchema());
-    int numRowsInGeneratedSegment = _input.getSegmentSizeRuleParams().getNumRowsInGeneratedSegment();
-    File generatedSegmentDir =
-        new MemoryEstimator.SegmentGenerator(_input._schemaWithMetaData, _input._schema, tableConfig,
-            numRowsInGeneratedSegment, true).generate();
+    long segmentSize;
+    int numRows;
+    SegmentSizeRuleParams segmentSizeRuleParams = _input.getSegmentSizeRuleParams();
+    if (segmentSizeRuleParams.getActualSegmentSizeMB() == NOT_PROVIDED
+        && segmentSizeRuleParams.getNumRowsInActualSegment() == NOT_PROVIDED) {
+
+      // generate a segment
+      TableConfig tableConfig = createTableConfig(_input.getSchema());
+      int numRowsInGeneratedSegment = segmentSizeRuleParams.getNumRowsInGeneratedSegment();
+      File generatedSegmentDir =
+          new MemoryEstimator.SegmentGenerator(_input._schemaWithMetaData, _input._schema, tableConfig,
+              numRowsInGeneratedSegment, true).generate();
+      segmentSize = FileUtils.sizeOfDirectory(generatedSegmentDir);
+      numRows = numRowsInGeneratedSegment;
+
+      // cleanup
+      try {
+        FileUtils.deleteDirectory(generatedSegmentDir);
+      } catch (IOException e) {
+        throw new RuntimeException("Cannot delete the generated segment directory", e);
+      }
+    } else {
+      segmentSize = segmentSizeRuleParams.getActualSegmentSizeMB() * MEGA_BYTE;
+      numRows = segmentSizeRuleParams.getNumRowsInActualSegment();
+    }
 
     // estimate optimal segment count & size parameters
-    SegmentSizeRecommendations params = estimate(FileUtils.sizeOfDirectory(generatedSegmentDir),
-        _input.getSegmentSizeRuleParams().getDesiredSegmentSizeMb() * MEGA_BYTE, numRowsInGeneratedSegment,
-        _input.getNumRecordsPerPush());
+    SegmentSizeRecommendations params =
+        estimate(segmentSize, segmentSizeRuleParams.getDesiredSegmentSizeMb() * MEGA_BYTE, numRows,
+            _input.getNumRecordsPerPush());
 
     // wire the recommendations
     _output.setSegmentSizeRecommendations(params);
     _input.capCardinalities((int) params.getNumRows());
-
-    // cleanup
-    try {
-      FileUtils.deleteDirectory(generatedSegmentDir);
-    } catch (IOException e) {
-      throw new RuntimeException("Cannot delete the generated segment directory", e);
-    }
   }
 
   /**

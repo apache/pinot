@@ -22,6 +22,8 @@ package org.apache.pinot.controller.recommender.rules.io.params;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 
+import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.SegmentSizeRule.*;
+
 
 /**
  * Parameters used in SegmentSizeRule
@@ -29,10 +31,19 @@ import com.fasterxml.jackson.annotation.Nulls;
 public class SegmentSizeRuleParams {
 
   // Desired segment size in MB
-  private int desiredSegmentSizeMb = RecommenderConstants.SegmentSizeRule.DEFAULT_DESIRED_SEGMENT_SIZE_MB;
+  private int desiredSegmentSizeMb = DEFAULT_DESIRED_SEGMENT_SIZE_MB;
 
   // Number for rows in the generated segment
-  private int numRowsInGeneratedSegment = RecommenderConstants.SegmentSizeRule.DEFAULT_NUM_ROWS_IN_GENERATED_SEGMENT;
+  private int numRowsInGeneratedSegment = DEFAULT_NUM_ROWS_IN_GENERATED_SEGMENT;
+
+  // Actual segment size in MB
+  private int actualSegmentSizeMB = NOT_PROVIDED;
+
+  // Number of rows in the actual segment
+  private int numRowsInActualSegment = NOT_PROVIDED;
+
+
+  // setter and getters
 
   public int getDesiredSegmentSizeMb() {
     return desiredSegmentSizeMb;
@@ -50,5 +61,23 @@ public class SegmentSizeRuleParams {
   @JsonSetter(nulls = Nulls.SKIP)
   public void setNumRowsInGeneratedSegment(int numRowsInGeneratedSegment) {
     this.numRowsInGeneratedSegment = numRowsInGeneratedSegment;
+  }
+
+  public int getActualSegmentSizeMB() {
+    return actualSegmentSizeMB;
+  }
+
+  @JsonSetter(nulls = Nulls.SKIP)
+  public void setActualSegmentSizeMB(int actualSegmentSizeMB) {
+    this.actualSegmentSizeMB = actualSegmentSizeMB;
+  }
+
+  public int getNumRowsInActualSegment() {
+    return numRowsInActualSegment;
+  }
+
+  @JsonSetter(nulls = Nulls.SKIP)
+  public void setNumRowsInActualSegment(int numRowsInActualSegment) {
+    this.numRowsInActualSegment = numRowsInActualSegment;
   }
 }

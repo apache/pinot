@@ -94,6 +94,7 @@ public class RecommenderConstants {
     public static final int DEFAULT_NUM_SEGMENTS = 1;
     public static final int DEFAULT_DESIRED_SEGMENT_SIZE_MB = 500;
     public static final int DEFAULT_NUM_ROWS_IN_GENERATED_SEGMENT = 50_000;
+    public static final int NOT_PROVIDED = -1;
   }
 
   public static final String PQL = "pql";
