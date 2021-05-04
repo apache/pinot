@@ -23,6 +23,8 @@ import com.google.common.base.Preconditions;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
@@ -226,20 +228,42 @@ public class TableResizer {
     return priorityQueue;
   }
 
-  public IntermediateRecord[] convertToArray(Map<Key, Record> recordMap, int trimSize,
+  public IntermediateRecord[] convertToTrimArray(Map<Key, Record> recordMap, int trimSize,
                                                  Comparator<IntermediateRecord> comparator) {
     IntermediateRecord[] recordArray = new IntermediateRecord[recordMap.size()];
-    int index = 0;
+    int left_index = 0;
+    int right_index = recordMap.size() - 1;
+    IntermediateRecord pivot = getIntermediateRecord((Key)recordMap.keySet().toArray()[0], (Record) recordMap.values().toArray()[0]);
+    int i = 0;
     for (Map.Entry<Key, Record> entry: recordMap.entrySet()) {
-      recordArray[index] = getIntermediateRecord(entry.getKey(), entry.getValue());
-      ++index;
+      if (i == 0) {
+        ++i;
+        continue;
+      }
+      IntermediateRecord current = getIntermediateRecord(entry.getKey(), entry.getValue());
+      if (comparator.compare(pivot, current) < 0) {
+        recordArray[right_index] = current;
+        --right_index;
+      }
+      else {
+        recordArray[left_index] = current;
+        ++left_index;
+      }
+    }
+    recordArray[left_index] = pivot;
+    if (left_index > trimSize - 1) {
+      // target pivot is in the left partition
+      quickSortSmallestK(recordArray, 0,  left_index - 1, trimSize, comparator);
+    } else if (left_index < trimSize - 1) {
+      // target pivot is in the right partition
+      quickSortSmallestK(recordArray, left_index + 1, recordArray.length - 1, trimSize, comparator);
     }
 
     // The entire array is returned but a pivot is set at array[trimSize-1]
     return recordArray;
   }
 
-  public IntermediateRecord[] convertToTrimArray(Map<Key, Record> recordMap, int trimSize,
+  public IntermediateRecord[] convertToTrimArray1(Map<Key, Record> recordMap, int trimSize,
                                                   Comparator<IntermediateRecord> comparator) {
     IntermediateRecord[] recordArray = new IntermediateRecord[recordMap.size()];
     int index = 0;
@@ -355,7 +379,6 @@ public class TableResizer {
    * Sorts the recordsMap using a priority queue and returns a sorted list of records
    * This method is to be called from IndexedTable::finish, if both resize and sort is needed
    */
-  @Deprecated
   public List<Record> sortRecordsMap(Map<Key, Record> recordsMap, int trimToSize) {
     int numRecords = recordsMap.size();
     if (numRecords == 0) {

@@ -105,7 +105,7 @@ public class SimpleIndexedTable extends IndexedTable {
 
   private List<Record> resizeAndSort(int trimToSize) {
     long startTime = System.currentTimeMillis();
-    List<Record> sortedRecords = _tableResizer.sortRecordsMap(_lookupMap, trimToSize);
+    List<Record> sortedRecords = _tableResizer.sortRecordsMapTopK(_lookupMap, trimToSize);
     long endTime = System.currentTimeMillis();
     long timeElapsed = endTime - startTime;
     _numResizes++;
