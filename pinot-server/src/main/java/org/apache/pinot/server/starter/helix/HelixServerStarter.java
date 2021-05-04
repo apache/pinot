@@ -76,18 +76,19 @@ import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.Instance;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel;
-import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.CommonConstants.Server.SegmentCompletionProtocol;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.common.utils.CommonConstants.Server.*;
 import static org.apache.pinot.spi.environmentprovider.PinotEnvironmentProvider.*;
+import static org.apache.pinot.spi.utils.CommonConstants.*;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.*;
+import static org.apache.pinot.spi.utils.CommonConstants.Server.*;
+
 
 /**
  * Starter for Pinot server.
@@ -110,14 +111,9 @@ import static org.apache.pinot.spi.environmentprovider.PinotEnvironmentProvider.
  */
 public class HelixServerStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixServerStarter.class);
-
-  private static final String ENVIRONMENT_IDENTIFIER = "environment";
-  private static final String FAILURE_DOMAIN_IDENTIFIER = "failureDomain";
-  private static final String TRUE = "true";
   private final String _helixClusterName;
   private final String _zkAddress;
-  private final PinotConfiguration _serverConf;
-  private PinotConfiguration _overriddenServerConfigs;
+  private PinotConfiguration _serverConf;
   private final List<ListenerConfig> _listenerConfigs;
   private final String _host;
   private final int _port;
@@ -129,29 +125,24 @@ public class HelixServerStarter implements ServiceStartable {
   private AdminApiApplication _adminApiApplication;
   private ServerQueriesDisabledTracker _serverQueriesDisabledTracker;
   private RealtimeLuceneIndexRefreshState _realtimeLuceneIndexRefreshState;
-  private boolean skipPinotEnvironmentProviderFactoryInit = true;
 
   public HelixServerStarter(String helixClusterName, String zkAddress, PinotConfiguration serverConf) throws Exception {
     _helixClusterName = helixClusterName;
     _zkAddress = zkAddress;
     // Make a clone so that changes to the config won't propagate to the caller
     _serverConf = serverConf.clone();
-    // Check if PinotEnvironmentProviderFactoryInit is enabled or not
-    if (_serverConf.containsKey(CONFIG_OF_ENABLE_ENVIRONMENT_PROVIDER_FACTORY) &&
-        TRUE.equals(serverConf.getProperty(CONFIG_OF_ENABLE_ENVIRONMENT_PROVIDER_FACTORY))) {
-        skipPinotEnvironmentProviderFactoryInit = false;
-    }
+
     _listenerConfigs = ListenerConfigUtil.buildServerAdminConfigs(_serverConf);
 
-    _host = _serverConf.getProperty(Helix.KEY_OF_SERVER_NETTY_HOST,
-        _serverConf.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils.getHostnameOrAddress()
+    _host = _serverConf.getProperty(KEY_OF_SERVER_NETTY_HOST,
+        _serverConf.getProperty(SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils.getHostnameOrAddress()
             : NetUtils.getHostAddress());
-    _port = _serverConf.getProperty(Helix.KEY_OF_SERVER_NETTY_PORT, Helix.DEFAULT_SERVER_NETTY_PORT);
+    _port = _serverConf.getProperty(KEY_OF_SERVER_NETTY_PORT, DEFAULT_SERVER_NETTY_PORT);
 
-    String instanceId = _serverConf.getProperty(Server.CONFIG_OF_INSTANCE_ID);
+    String instanceId = _serverConf.getProperty(CONFIG_OF_INSTANCE_ID);
     if (instanceId == null) {
-      instanceId = Helix.PREFIX_OF_SERVER_INSTANCE + _host + "_" + _port;
-      _serverConf.addProperty(Server.CONFIG_OF_INSTANCE_ID, instanceId);
+      instanceId = PREFIX_OF_SERVER_INSTANCE + _host + "_" + _port;
+      _serverConf.addProperty(CONFIG_OF_INSTANCE_ID, instanceId);
     }
     _instanceId = instanceId;
 
@@ -159,15 +150,23 @@ public class HelixServerStarter implements ServiceStartable {
         new HelixConfigScopeBuilder(ConfigScopeProperty.PARTICIPANT, _helixClusterName).forParticipant(_instanceId)
             .build();
 
+    // Invoke pinot environment provider factory's init method to register the environment provider
+    for (String key : _serverConf.toMap().keySet()) {
+      if (key.startsWith(PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY.toLowerCase())) {
+        PinotConfiguration environmentProviderConfigs = _serverConf.subset(PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY);
+        PinotEnvironmentProviderFactory.init(environmentProviderConfigs);
+        break;
+      }
+    }
+
     // Enable/disable thread CPU time measurement through instance config.
     ThreadTimer.setThreadCpuTimeMeasurementEnabled(_serverConf
-        .getProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
-            Server.DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT));
+        .getProperty(CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
+            DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT));
 
     // Set data table version send to broker.
     DataTableBuilder.setCurrentDataTableVersion(_serverConf
-        .getProperty(Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION,
-            Server.DEFAULT_CURRENT_DATA_TABLE_VERSION));
+        .getProperty(CONFIG_OF_CURRENT_DATA_TABLE_VERSION, DEFAULT_CURRENT_DATA_TABLE_VERSION));
   }
 
   /**
@@ -175,11 +174,10 @@ public class HelixServerStarter implements ServiceStartable {
    */
   private void registerServiceStatusHandler() {
     double minResourcePercentForStartup = _serverConf
-        .getProperty(Server.CONFIG_OF_SERVER_MIN_RESOURCE_PERCENT_FOR_START,
-            Server.DEFAULT_SERVER_MIN_RESOURCE_PERCENT_FOR_START);
+        .getProperty(CONFIG_OF_SERVER_MIN_RESOURCE_PERCENT_FOR_START, DEFAULT_SERVER_MIN_RESOURCE_PERCENT_FOR_START);
     int realtimeConsumptionCatchupWaitMs = _serverConf
-        .getProperty(Server.CONFIG_OF_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS,
-            Server.DEFAULT_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS);
+        .getProperty(CONFIG_OF_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS,
+            DEFAULT_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS);
 
     // collect all resources which have this instance in the ideal state
     List<String> resourcesToMonitor = new ArrayList<>();
@@ -233,29 +231,6 @@ public class HelixServerStarter implements ServiceStartable {
         new ServiceStatus.MultipleCallbackServiceStatusCallback(serviceStatusCallbackListBuilder.build()));
   }
 
-    private void updateInstanceConfigWithMapFieldsIfNeeded(PinotConfiguration overriddenServerConfigs) {
-    if (overriddenServerConfigs == null || overriddenServerConfigs.equals(_serverConf)) return;
-    Map<String, Object> pinotConfigurationMap = overriddenServerConfigs.toMap();
-    String failureDomain = pinotConfigurationMap.containsKey(INSTANCE_FAILURE_DOMAIN) ?
-        String.valueOf(pinotConfigurationMap.get(INSTANCE_FAILURE_DOMAIN)) : null;
-    if (failureDomain == null) {
-      LOGGER.info("No failure domain information found for instance: {}", _instanceId);
-      return;
-    }
-    Map<String, String> failureDomainMap = new HashMap<>();
-    failureDomainMap.put(FAILURE_DOMAIN_IDENTIFIER, failureDomain);
-    Map<String, Map<String, String>> cloudSpecificMapFields = new HashMap<>();
-    cloudSpecificMapFields.put(ENVIRONMENT_IDENTIFIER, failureDomainMap);
-
-    InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(_helixClusterName, _instanceId);
-    instanceConfig.getRecord().setMapFields(cloudSpecificMapFields);
-    HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
-    Preconditions.checkState(
-        helixDataAccessor.setProperty(helixDataAccessor.keyBuilder().instanceConfig(_instanceId), instanceConfig),
-        "Failed to update instance config");
-    LOGGER.info("Updating instance config for instance: {} with failure domain information", _instanceId);
-  }
-
   private void updateInstanceConfigIfNeeded(String host, int port) {
     InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(_helixClusterName, _instanceId);
     boolean needToUpdateInstanceConfig = false;
@@ -267,7 +242,7 @@ public class HelixServerStarter implements ServiceStartable {
         instanceConfig.addTag(TagNameUtils.getOfflineTagForTenant(null));
         instanceConfig.addTag(TagNameUtils.getRealtimeTagForTenant(null));
       } else {
-        instanceConfig.addTag(Helix.UNTAGGED_SERVER_INSTANCE);
+        instanceConfig.addTag(UNTAGGED_SERVER_INSTANCE);
       }
       needToUpdateInstanceConfig = true;
     }
@@ -300,12 +275,39 @@ public class HelixServerStarter implements ServiceStartable {
         "Failed to update instance config");
   }
 
+  // Fetch the overridden server configs for the invoked environment provider
+  private String populateFailureDomain() {
+    String className = _serverConf.getProperty(ENVIRONMENT_PROVIDER_CLASS_NAME);
+    PinotEnvironmentProvider pinotEnvironmentProvider = PinotEnvironmentProviderFactory.getEnvironmentProvider(className.toLowerCase());
+    _serverConf = pinotEnvironmentProvider.getEnvironment(_serverConf.toMap());
+    Map<String, Object> overriddenPinotConfigurationMap = _serverConf.toMap();
+    String failureDomain = overriddenPinotConfigurationMap.containsKey(INSTANCE_FAILURE_DOMAIN.toLowerCase()) ?
+        String.valueOf(overriddenPinotConfigurationMap.get(INSTANCE_FAILURE_DOMAIN.toLowerCase())) : null;
+    if (failureDomain == null) {
+      LOGGER.info("No failure domain information found for instance: {}", _instanceId);
+      return null;
+    }
+    Map<String, String> failureDomainMap = new HashMap<>();
+    failureDomainMap.put(FAILURE_DOMAIN_IDENTIFIER, failureDomain);
+    Map<String, Map<String, String>> environmentSpecificMapFields = new HashMap<>();
+    environmentSpecificMapFields.put(ENVIRONMENT_IDENTIFIER, failureDomainMap);
+
+    InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(_helixClusterName, _instanceId);
+    instanceConfig.getRecord().setMapFields(environmentSpecificMapFields);
+    HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
+    Preconditions.checkState(
+        helixDataAccessor.setProperty(helixDataAccessor.keyBuilder().instanceConfig(_instanceId), instanceConfig),
+        "Failed to update instance config");
+    LOGGER.info("Updated instance config for instance: {} with failure domain information", _instanceId);
+    return failureDomain;
+  }
+
   private void setupHelixSystemProperties() {
     // NOTE: Helix will disconnect the manager and disable the instance if it detects flapping (too frequent disconnect
     // from ZooKeeper). Setting flapping time window to a small value can avoid this from happening. Helix ignores the
     // non-positive value, so set the default value as 1.
     System.setProperty(SystemPropertyKeys.FLAPPING_TIME_WINDOW,
-        _serverConf.getProperty(Helix.CONFIG_OF_SERVER_FLAPPING_TIME_WINDOW_MS, Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
+        _serverConf.getProperty(CONFIG_OF_SERVER_FLAPPING_TIME_WINDOW_MS, DEFAULT_FLAPPING_TIME_WINDOW_MS));
   }
 
   /**
@@ -316,8 +318,8 @@ public class HelixServerStarter implements ServiceStartable {
   private void startupServiceStatusCheck(long endTimeMs) {
     LOGGER.info("Starting startup service status check");
     long startTimeMs = System.currentTimeMillis();
-    long checkIntervalMs = _serverConf.getProperty(Server.CONFIG_OF_STARTUP_SERVICE_STATUS_CHECK_INTERVAL_MS,
-        Server.DEFAULT_STARTUP_SERVICE_STATUS_CHECK_INTERVAL_MS);
+    long checkIntervalMs = _serverConf.getProperty(CONFIG_OF_STARTUP_SERVICE_STATUS_CHECK_INTERVAL_MS,
+        DEFAULT_STARTUP_SERVICE_STATUS_CHECK_INTERVAL_MS);
 
     while (System.currentTimeMillis() < endTimeMs) {
       Status serviceStatus = ServiceStatus.getServiceStatus();
@@ -375,15 +377,6 @@ public class HelixServerStarter implements ServiceStartable {
     Utils.logVersions();
     ControllerLeaderLocator.create(_helixManager);
 
-    // Invoke pinot environment provider factory's init method to register the environment provider
-    // and fetch the overridden server configs for the invoked environment provider
-    if (!skipPinotEnvironmentProviderFactoryInit) {
-      PinotEnvironmentProviderFactory.init(_serverConf.subset(PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY));
-      PinotEnvironmentProvider pinotEnvironmentProvider = PinotEnvironmentProviderFactory.getEnvironmentProvider(
-          _serverConf.getProperty(CONFIG_OF_ENVIRONMENT_PROVIDER_TYPE));
-      _overriddenServerConfigs = pinotEnvironmentProvider.getEnvironment(_serverConf.toMap());
-    }
-
     ServerSegmentCompletionProtocolHandler
         .init(_serverConf.subset(SegmentCompletionProtocol.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
     ServerConf serverInstanceConfig = DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(_serverConf);
@@ -404,12 +397,10 @@ public class HelixServerStarter implements ServiceStartable {
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
     updateInstanceConfigIfNeeded(_host, _port);
-
-    updateInstanceConfigWithMapFieldsIfNeeded(_overriddenServerConfigs);
-
+    populateFailureDomain();
     // Start restlet server for admin API endpoint
     String accessControlFactoryClass =
-        _serverConf.getProperty(Server.ACCESS_CONTROL_FACTORY_CLASS, Server.DEFAULT_ACCESS_CONTROL_FACTORY_CLASS);
+        _serverConf.getProperty(ACCESS_CONTROL_FACTORY_CLASS, DEFAULT_ACCESS_CONTROL_FACTORY_CLASS);
     LOGGER.info("Using class: {} as the AccessControlFactory", accessControlFactoryClass);
     final AccessControlFactory accessControlFactory;
     try {
@@ -467,21 +458,21 @@ public class HelixServerStarter implements ServiceStartable {
     _helixManager.getMessagingService()
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(), messageHandlerFactory);
 
-    serverMetrics.addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME, () -> _helixManager.isConnected() ? 1L : 0L);
+    serverMetrics.addCallbackGauge(INSTANCE_CONNECTED_METRIC_NAME, () -> _helixManager.isConnected() ? 1L : 0L);
     _helixManager
         .addPreConnectCallback(() -> serverMetrics.addMeteredGlobalValue(ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
 
     // Register the service status handler
     registerServiceStatusHandler();
 
-    if (_serverConf.getProperty(Server.CONFIG_OF_STARTUP_ENABLE_SERVICE_STATUS_CHECK,
-        Server.DEFAULT_STARTUP_ENABLE_SERVICE_STATUS_CHECK)) {
+    if (_serverConf.getProperty(CONFIG_OF_STARTUP_ENABLE_SERVICE_STATUS_CHECK,
+        DEFAULT_STARTUP_ENABLE_SERVICE_STATUS_CHECK)) {
       long endTimeMs =
-          startTimeMs + _serverConf.getProperty(Server.CONFIG_OF_STARTUP_TIMEOUT_MS, Server.DEFAULT_STARTUP_TIMEOUT_MS);
+          startTimeMs + _serverConf.getProperty(CONFIG_OF_STARTUP_TIMEOUT_MS, DEFAULT_STARTUP_TIMEOUT_MS);
       startupServiceStatusCheck(endTimeMs);
     }
     _helixAdmin.setConfig(_instanceConfigScope,
-        Collections.singletonMap(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(false)));
+        Collections.singletonMap(IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(false)));
     LOGGER.info("Pinot server ready");
 
     // Create metrics for mmap stuff
@@ -512,18 +503,18 @@ public class HelixServerStarter implements ServiceStartable {
     }
     _adminApiApplication.stop();
     _helixAdmin.setConfig(_instanceConfigScope,
-        Collections.singletonMap(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(true)));
+        Collections.singletonMap(IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(true)));
 
     long endTimeMs =
-        startTimeMs + _serverConf.getProperty(Server.CONFIG_OF_SHUTDOWN_TIMEOUT_MS, Server.DEFAULT_SHUTDOWN_TIMEOUT_MS);
+        startTimeMs + _serverConf.getProperty(CONFIG_OF_SHUTDOWN_TIMEOUT_MS, DEFAULT_SHUTDOWN_TIMEOUT_MS);
     if (_serverConf
-        .getProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK, Server.DEFAULT_SHUTDOWN_ENABLE_QUERY_CHECK)) {
+        .getProperty(CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK, DEFAULT_SHUTDOWN_ENABLE_QUERY_CHECK)) {
       shutdownQueryCheck(endTimeMs);
     }
     _helixManager.disconnect();
     _serverInstance.shutDown();
     if (_serverConf
-        .getProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_RESOURCE_CHECK, Server.DEFAULT_SHUTDOWN_ENABLE_RESOURCE_CHECK)) {
+        .getProperty(CONFIG_OF_SHUTDOWN_ENABLE_RESOURCE_CHECK, DEFAULT_SHUTDOWN_ENABLE_RESOURCE_CHECK)) {
       shutdownResourceCheck(endTimeMs);
     }
     _serverQueriesDisabledTracker.stop();
@@ -543,8 +534,8 @@ public class HelixServerStarter implements ServiceStartable {
     long startTimeMs = System.currentTimeMillis();
 
     long maxQueryTimeMs =
-        _serverConf.getProperty(Server.CONFIG_OF_QUERY_EXECUTOR_TIMEOUT, Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
-    long noQueryThresholdMs = _serverConf.getProperty(Server.CONFIG_OF_SHUTDOWN_NO_QUERY_THRESHOLD_MS, maxQueryTimeMs);
+        _serverConf.getProperty(CONFIG_OF_QUERY_EXECUTOR_TIMEOUT, DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    long noQueryThresholdMs = _serverConf.getProperty(CONFIG_OF_SHUTDOWN_NO_QUERY_THRESHOLD_MS, maxQueryTimeMs);
 
     // Wait until no incoming queries
     boolean noIncomingQueries = false;
@@ -624,8 +615,8 @@ public class HelixServerStarter implements ServiceStartable {
         }
       }
 
-      long checkIntervalMs = _serverConf.getProperty(Server.CONFIG_OF_SHUTDOWN_RESOURCE_CHECK_INTERVAL_MS,
-          Server.DEFAULT_SHUTDOWN_RESOURCE_CHECK_INTERVAL_MS);
+      long checkIntervalMs = _serverConf.getProperty(CONFIG_OF_SHUTDOWN_RESOURCE_CHECK_INTERVAL_MS,
+          DEFAULT_SHUTDOWN_RESOURCE_CHECK_INTERVAL_MS);
       while (System.currentTimeMillis() < endTimeMs) {
         Iterator<String> iterator = resourcesToMonitor.iterator();
         String currentResource = null;
@@ -710,9 +701,9 @@ public class HelixServerStarter implements ServiceStartable {
       throws Exception {
     Map<String, Object> properties = new HashMap<>();
     int port = 8003;
-    properties.put(Helix.KEY_OF_SERVER_NETTY_PORT, port);
-    properties.put(Server.CONFIG_OF_INSTANCE_DATA_DIR, "/tmp/PinotServer/test" + port + "/index");
-    properties.put(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, "/tmp/PinotServer/test" + port + "/segmentTar");
+    properties.put(KEY_OF_SERVER_NETTY_PORT, port);
+    properties.put(CONFIG_OF_INSTANCE_DATA_DIR, "/tmp/PinotServer/test" + port + "/index");
+    properties.put(CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, "/tmp/PinotServer/test" + port + "/segmentTar");
 
     HelixServerStarter serverStarter =
         new HelixServerStarter("quickstart", "localhost:2191", new PinotConfiguration(properties));

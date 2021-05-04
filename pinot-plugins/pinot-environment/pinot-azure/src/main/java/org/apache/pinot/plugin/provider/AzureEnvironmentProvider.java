@@ -44,8 +44,6 @@ import org.apache.http.util.EntityUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.environmentprovider.PinotEnvironmentProvider;
 
-import static org.apache.pinot.common.utils.CommonConstants.*;
-
 /**
  * Azure Environment Provider used to retrieve azure cloud specific instance configuration.
  */
@@ -56,7 +54,6 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
   protected static final String REQUEST_TIMEOUT = "requestTimeout";
   private static final String COMPUTE = "compute";
   private static final String METADATA = "Metadata";
-  private static final String TRUE = "true";
   private int _maxRetry;
   private String _imdsEndpoint;
   private CloseableHttpClient _closeableHttpClient;
@@ -151,7 +148,7 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
   @VisibleForTesting
   private String getAzureInstanceMetadata() {
     HttpGet httpGet = new HttpGet(_imdsEndpoint);
-    httpGet.setHeader(METADATA, TRUE);
+    httpGet.setHeader(METADATA, Boolean.TRUE.toString());
 
     try {
       final CloseableHttpResponse closeableHttpResponse = _closeableHttpClient.execute(httpGet);

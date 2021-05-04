@@ -59,8 +59,10 @@ public class PinotEnvironmentProviderFactory {
     // Get environment and their respective classes
     PinotConfiguration environmentConfiguration = environmentProviderFactoryConfig.subset(CLASS);
     List<String> environments = environmentConfiguration.getKeys();
-    if (!environments.isEmpty()) {
+
+    if (environments.isEmpty()) {
       LOGGER.info("Did not find any environment provider classes in the configuration");
+      return;
     }
 
     for (String environment : environments) {
