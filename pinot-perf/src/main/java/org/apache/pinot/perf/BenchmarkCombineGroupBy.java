@@ -52,6 +52,7 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
+import org.openjdk.jmh.profile.JavaFlightRecorderProfiler;
 import org.openjdk.jmh.profile.StackProfiler;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
@@ -60,11 +61,11 @@ import org.openjdk.jmh.runner.options.TimeValue;
 
 
 @State(Scope.Benchmark)
-@Fork(value = 1, jvmArgs = {"-server", "-Xmx8G", "-XX:MaxDirectMemorySize=32G"})
+@Fork(value = 1, jvmArgs = {"-server", "-Xmx4G", "-XX:MaxGCPauseMillis=200"})
 public class BenchmarkCombineGroupBy {
-  private static final int BENCHMARK_SIZE = 1000_000;
-  private static final int CARDINALITY_D1 = 50000;
-  private static final int CARDINALITY_D2 = 50000;
+  private static final int BENCHMARK_SIZE = 50_000;
+  private static final int CARDINALITY_D1 = 5000;
+  private static final int CARDINALITY_D2 = 5000;
   private static final int TRIM_SIZE = 5000;
   private static final Random RANDOM = new Random();
 
@@ -120,7 +121,6 @@ public class BenchmarkCombineGroupBy {
       map3.put(key, record);
       map4.put(key, record);
     }
-    recordArray = _TableResizer.convertToArray(map1, TRIM_SIZE, _TableResizer.getComparator());
   }
 
   @TearDown
@@ -147,53 +147,46 @@ public class BenchmarkCombineGroupBy {
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
-  public int TopKSort()
+  public int TopKTrim()
       throws InterruptedException, ExecutionException, TimeoutException {
 
-    return _TableResizer.sortRecordsMapTopK(map1, TRIM_SIZE).size();
+    return _TableResizer.resizeRecordsMapTopK(map1, TRIM_SIZE).size();
   }
 //
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
-  public int PQSort()
+  public int PQTrim()
       throws InterruptedException, TimeoutException, ExecutionException {
-    return _TableResizer.sortRecordsMap(map3, TRIM_SIZE).size();
+    return _TableResizer.resizeRecordsMap(map2, TRIM_SIZE).size();
   }
 
     @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
-  public int TokTrimArray()
+  public int TopKSort()
       throws InterruptedException, TimeoutException, ExecutionException {
-    return _TableResizer.convertToArray(map2, TRIM_SIZE, _TableResizer.getComparator()).length;
+
+    return _TableResizer.sortRecordsMapTopK(map3, TRIM_SIZE).size();
   }
 
-//  @Benchmark
-//  @BenchmarkMode(Mode.AverageTime)
-//  @OutputTimeUnit(TimeUnit.MICROSECONDS)
-//  public int TopKSelect()
-//          throws InterruptedException, ExecutionException, TimeoutException {
-//
-//     _TableResizer.quickSortSmallestK(recordArray, 0, recordArray.length - 1, TRIM_SIZE, _TableResizer.getComparator());
-//     return recordArray.length;
-//  }
+  @Benchmark
+  @BenchmarkMode(Mode.AverageTime)
+  @OutputTimeUnit(TimeUnit.MICROSECONDS)
+  public int PQSort()
+          throws InterruptedException, ExecutionException, TimeoutException {
 
-//  @Benchmark
-//  @BenchmarkMode(Mode.AverageTime)
-//  @OutputTimeUnit(TimeUnit.MICROSECONDS)
-//  public int PQTrim()
-//          throws InterruptedException, TimeoutException, ExecutionException {
-//    return _TableResizer.convertToIntermediateRecordsPQ(map4, TRIM_SIZE, _TableResizer.getComparator().reversed()).size();
-//  }
+    return _TableResizer.sortRecordsMap(map4, TRIM_SIZE).size();
+  }
+
+
 
   public static void main(String[] args)
       throws Exception {
     ChainedOptionsBuilder opt =
         new OptionsBuilder().include(BenchmarkCombineGroupBy.class.getSimpleName()).warmupTime(TimeValue.seconds(10))
             .warmupIterations(1).measurementTime(TimeValue.seconds(30)).measurementIterations(3).forks(1);
-    opt = opt.addProfiler(StackProfiler.class,
-            "excludePackages=true;excludePackageNames=sun.,java.net.,io.netty.,org.apache.zookeeper.,org.eclipse.jetty.;lines=5;period=1;top=20");
+    opt = opt.addProfiler(JavaFlightRecorderProfiler.class);
     new Runner(opt.build()).run();
   }
 }

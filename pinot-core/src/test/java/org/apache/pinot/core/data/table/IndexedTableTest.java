@@ -47,7 +47,7 @@ public class IndexedTableTest {
   public void testConcurrentIndexedTable()
       throws InterruptedException, TimeoutException, ExecutionException {
     QueryContext queryContext = QueryContextConverterUtils
-        .getQueryContextFromSQL("SELECT SUM(m1), MAX(m2) FROM testTable GROUP BY d1, d2, d3 ORDER BY d1");
+        .getQueryContextFromSQL("SELECT SUM(m1), MAX(m2) FROM testTable GROUP BY d1, d2, d3 ORDER BY SUM(m1)");
     DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)"},
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
     IndexedTable indexedTable = new ConcurrentIndexedTable(dataSchema, queryContext, 5, TRIM_THRESHOLD);
