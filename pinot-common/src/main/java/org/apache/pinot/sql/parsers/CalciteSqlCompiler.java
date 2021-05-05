@@ -19,10 +19,9 @@
 package org.apache.pinot.sql.parsers;
 
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.parsers.QueryCompiler;
+import org.apache.pinot.pql.parsers.PinotQuery2BrokerRequestConverter;
 
 
 /**
@@ -33,15 +32,7 @@ public class CalciteSqlCompiler implements QueryCompiler {
   @Override
   public BrokerRequest compileToBrokerRequest(String query) {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    BrokerRequest brokerRequest = new BrokerRequest();
-    brokerRequest.setPinotQuery(pinotQuery);
-    // Set table name in broker request because it is used for access control, query routing etc.
-    DataSource dataSource = pinotQuery.getDataSource();
-    if (dataSource != null) {
-      QuerySource querySource = new QuerySource();
-      querySource.setTableName(dataSource.getTableName());
-      brokerRequest.setQuerySource(querySource);
-    }
-    return brokerRequest;
+    PinotQuery2BrokerRequestConverter converter = new PinotQuery2BrokerRequestConverter();
+    return converter.convert(pinotQuery);
   }
 }

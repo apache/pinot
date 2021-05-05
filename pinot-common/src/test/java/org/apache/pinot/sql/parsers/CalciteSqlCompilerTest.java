@@ -1774,34 +1774,35 @@ public class CalciteSqlCompilerTest {
 
   @Test
   public void testCaseInsensitiveFilter() {
+    CalciteSqlCompiler calciteSqlCompiler = new CalciteSqlCompiler();
+
     String query = "SELECT count(*) FROM foo where text_match(col, 'expr')";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    PinotQuery2BrokerRequestConverter converter = new PinotQuery2BrokerRequestConverter();
-    BrokerRequest brokerRequest = converter.convert(pinotQuery);
+    BrokerRequest brokerRequest = calciteSqlCompiler.compileToBrokerRequest(query);
     Assert.assertEquals(pinotQuery.getFilterExpression().getFunctionCall().getOperator(), "TEXT_MATCH");
     Assert.assertEquals(brokerRequest.getFilterQuery().getOperator(), FilterOperator.TEXT_MATCH);
 
     query = "SELECT count(*) FROM foo where TEXT_MATCH(col, 'expr')";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    brokerRequest = converter.convert(pinotQuery);
+    brokerRequest = calciteSqlCompiler.compileToBrokerRequest(query);
     Assert.assertEquals(pinotQuery.getFilterExpression().getFunctionCall().getOperator(), "TEXT_MATCH");
     Assert.assertEquals(brokerRequest.getFilterQuery().getOperator(), FilterOperator.TEXT_MATCH);
 
     query = "SELECT count(*) FROM foo where regexp_like(col, 'expr')";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    brokerRequest = converter.convert(pinotQuery);
+    brokerRequest = calciteSqlCompiler.compileToBrokerRequest(query);
     Assert.assertEquals(pinotQuery.getFilterExpression().getFunctionCall().getOperator(), "REGEXP_LIKE");
     Assert.assertEquals(brokerRequest.getFilterQuery().getOperator(), FilterOperator.REGEXP_LIKE);
 
     query = "SELECT count(*) FROM foo where REGEXP_LIKE(col, 'expr')";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    brokerRequest = converter.convert(pinotQuery);
+    brokerRequest = calciteSqlCompiler.compileToBrokerRequest(query);
     Assert.assertEquals(pinotQuery.getFilterExpression().getFunctionCall().getOperator(), "REGEXP_LIKE");
     Assert.assertEquals(brokerRequest.getFilterQuery().getOperator(), FilterOperator.REGEXP_LIKE);
 
     query = "SELECT count(*) FROM foo where col is not null";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    brokerRequest = converter.convert(pinotQuery);
+    brokerRequest = calciteSqlCompiler.compileToBrokerRequest(query);
     Assert.assertEquals(pinotQuery.getFilterExpression().getFunctionCall().getOperator(), "IS_NOT_NULL");
     Assert
         .assertEquals(pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getIdentifier().getName(),
@@ -1811,7 +1812,7 @@ public class CalciteSqlCompilerTest {
 
     query = "SELECT count(*) FROM foo where col IS NOT NULL";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    brokerRequest = converter.convert(pinotQuery);
+    brokerRequest = calciteSqlCompiler.compileToBrokerRequest(query);
     Assert.assertEquals(pinotQuery.getFilterExpression().getFunctionCall().getOperator(), "IS_NOT_NULL");
     Assert
         .assertEquals(pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getIdentifier().getName(),
@@ -1821,7 +1822,7 @@ public class CalciteSqlCompilerTest {
 
     query = "SELECT count(*) FROM foo where col is null";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    brokerRequest = converter.convert(pinotQuery);
+    brokerRequest = calciteSqlCompiler.compileToBrokerRequest(query);
     Assert.assertEquals(pinotQuery.getFilterExpression().getFunctionCall().getOperator(), "IS_NULL");
     Assert
         .assertEquals(pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getIdentifier().getName(),
@@ -1831,7 +1832,7 @@ public class CalciteSqlCompilerTest {
 
     query = "SELECT count(*) FROM foo where col IS NULL";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    brokerRequest = converter.convert(pinotQuery);
+    brokerRequest = calciteSqlCompiler.compileToBrokerRequest(query);
     Assert.assertEquals(pinotQuery.getFilterExpression().getFunctionCall().getOperator(), "IS_NULL");
     Assert
         .assertEquals(pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getIdentifier().getName(),
