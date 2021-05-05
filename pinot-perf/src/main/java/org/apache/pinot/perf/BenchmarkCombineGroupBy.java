@@ -67,7 +67,7 @@ import org.openjdk.jmh.runner.options.TimeValue;
 @Fork(value = 1, jvmArgs = {"-server", "-Xmx8G", "-XX:MaxDirectMemorySize=16G"})
 public class BenchmarkCombineGroupBy {
   private static final int NUM_SEGMENTS = 4;
-  private static final int NUM_RECORDS_PER_SEGMENT = 800_000;
+  private static final int NUM_RECORDS_PER_SEGMENT = 100_000;
   private static final int CARDINALITY_D1 = 500;
   private static final int CARDINALITY_D2 = 500;
   private static final Random RANDOM = new Random();
@@ -98,7 +98,7 @@ public class BenchmarkCombineGroupBy {
     }
 
     _queryContext = QueryContextConverterUtils
-        .getQueryContextFromSQL("SELECT sum(m1), max(m2) FROM testTable GROUP BY d1, d2 ORDER BY sum(m1) LIMIT 5000");
+        .getQueryContextFromSQL("SELECT sum(m1), max(m2) FROM testTable GROUP BY d1, d2 ORDER BY sum(m1) LIMIT 500");
     _aggregationFunctions = _queryContext.getAggregationFunctions();
     assert _aggregationFunctions != null;
     _dataSchema = new DataSchema(new String[]{"d1", "d2", "sum(m1)", "max(m2)"},
@@ -158,7 +158,7 @@ public class BenchmarkCombineGroupBy {
       future.get(30, TimeUnit.SECONDS);
     }
 
-    concurrentIndexedTable.finish(true);
+    concurrentIndexedTable.finish(false);
   }
 
   @Benchmark
