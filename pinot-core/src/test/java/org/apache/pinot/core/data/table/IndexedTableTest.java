@@ -23,7 +23,6 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
-import java.util.PriorityQueue;
 import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -137,82 +136,32 @@ public class IndexedTableTest {
     checkSurvivors(indexedTable, survivors);
   }
 
-  @Test(invocationCount = 100)
+  @Test(invocationCount = 10)
   public void testQuickSelect(){
     Random random = new Random();
-    //int[] array = random.ints(1000000, 10,100000).toArray();
-    int[] array = {0, 1, 2, 3, 4};
-    int numRecordsToRetain = 3;
-
+    int[] array = random.ints(10000, 10,100000).toArray();
+    int numRecordsToRetain = 3000;
+    // Make intermediate record map
     TableResizer.IntermediateRecord[] intermediateRecords = new TableResizer.IntermediateRecord[array.length];
     for (int i = 0; i < array.length; ++i) {
       Key key = new Key(new Integer[]{array[i]});
-      Record record = new Record(new Integer[]{array[i]+1});
       Comparable[] intermediateRecordValues = new Comparable[]{array[i]};
       intermediateRecords[i] = new TableResizer.IntermediateRecord(key, intermediateRecordValues);
     }
     TableResizer.IntermediateRecord[] copies = Arrays.copyOf(intermediateRecords, intermediateRecords.length);
 
     Comparator comparator = Comparator.naturalOrder();
-    Comparator<TableResizer.IntermediateRecord> keyComparator = (o1, o2) -> {
-        int result = comparator.compare(o1._values[0], o2._values[0]);
-        if (result != 0) {
-          return result;
-        }
-      return 0;
-    };
+    Comparator<TableResizer.IntermediateRecord> keyComparator =
+        (o1, o2) -> comparator.compare(o1._values[0], o2._values[0]);
 
-    TableResizer.quickSortSmallestK(intermediateRecords, 0, intermediateRecords.length-1, numRecordsToRetain, keyComparator);
+    TableResizer.TopKSelect(intermediateRecords, 0, intermediateRecords.length-1, numRecordsToRetain, keyComparator);
     TableResizer.IntermediateRecord[] trimmedArray = Arrays.copyOfRange(intermediateRecords, 0, numRecordsToRetain);
-    TableResizer.quickSort(trimmedArray, 0, numRecordsToRetain - 1, keyComparator);
+    Arrays.sort(trimmedArray, 0, numRecordsToRetain - 1, keyComparator);
     Arrays.sort(copies, keyComparator);
+    // Compare result
     for (int i = 0; i < trimmedArray.length; ++i) {
-      if (!copies[i]._key.equals(trimmedArray[i]._key)) {
-        System.out.println(1);
-      }
-      Assert.assertTrue(copies[i]._key.equals(trimmedArray[i]._key));
+      Assert.assertEquals(trimmedArray[i]._key, copies[i]._key);
     }
-
-  }
-
-  @Test(invocationCount = 1)
-  public void testPQ(){
-    Random random = new Random();
-    //int[] array = random.ints(1000000, 10,100000).toArray();
-    int[] array = {0, 10, 20, 30, 5};
-    int numRecordsToRetain = 3;
-
-    TableResizer.IntermediateRecord[] intermediateRecords = new TableResizer.IntermediateRecord[array.length];
-    for (int i = 0; i < array.length; ++i) {
-      Key key = new Key(new Integer[]{array[i]});
-      Record record = new Record(new Integer[]{array[i]});
-      Comparable[] intermediateRecordValues = new Comparable[]{array[i]};
-      intermediateRecords[i] = new TableResizer.IntermediateRecord(key, intermediateRecordValues);
-    }
-    TableResizer.IntermediateRecord[] copies = Arrays.copyOf(intermediateRecords, intermediateRecords.length);
-
-    Comparator Keycomparator = Comparator.naturalOrder();
-    Comparator<TableResizer.IntermediateRecord> comparator = (o1, o2) -> {
-      int result = Keycomparator.compare(o1._values[0], o2._values[0]);
-      if (result != 0) {
-        return result;
-      }
-      return 0;
-    };
-
-    PriorityQueue<TableResizer.IntermediateRecord> priorityQueue = new PriorityQueue<>(numRecordsToRetain, comparator);
-    for (TableResizer.IntermediateRecord intermediateRecord: intermediateRecords) {
-      if (priorityQueue.size() < numRecordsToRetain) {
-        priorityQueue.offer(intermediateRecord);
-      } else {
-        TableResizer.IntermediateRecord peek = priorityQueue.peek();
-        if (comparator.reversed().compare(peek, intermediateRecord) < 0) {
-          priorityQueue.poll();
-          priorityQueue.offer(intermediateRecord);
-        }
-      }
-    }
-    System.out.println(1);
 
   }
 

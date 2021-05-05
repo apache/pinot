@@ -236,7 +236,9 @@ public class TableResizer {
     IntermediateRecord[] recordArray = new IntermediateRecord[recordMap.size()];
     int left_index = 0;
     int right_index = recordMap.size() - 1;
-    IntermediateRecord pivot = getIntermediateRecord((Key)recordMap.keySet().toArray()[0], (Record) recordMap.values().toArray()[0]);
+    // find pivot while converting to an array
+    IntermediateRecord pivot =
+        getIntermediateRecord((Key)recordMap.keySet().toArray()[0], (Record) recordMap.values().toArray()[0]);
     int i = 0;
     for (Map.Entry<Key, Record> entry: recordMap.entrySet()) {
       if (i == 0) {
@@ -256,45 +258,18 @@ public class TableResizer {
     recordArray[left_index] = pivot;
     if (left_index > trimSize - 1) {
       // target pivot is in the left partition
-      quickSortSmallestK(recordArray, 0,  left_index - 1, trimSize, comparator);
+      TopKSelect(recordArray, 0,  left_index - 1, trimSize, comparator);
     } else if (left_index < trimSize - 1) {
       // target pivot is in the right partition
-      quickSortSmallestK(recordArray, left_index + 1, recordArray.length - 1, trimSize, comparator);
+      TopKSelect(recordArray, left_index + 1, recordArray.length - 1, trimSize, comparator);
     }
-
     // The entire array is returned but a pivot is set at array[trimSize-1]
     return recordArray;
   }
 
   @VisibleForTesting
-  static void quickSort(IntermediateRecord[] recordArray, int left, int right,
-                         Comparator<IntermediateRecord> comparator) {
-    if (left < right) {
-      Random random_num = new Random();
-      int pivot_index = left + random_num.nextInt(right - left);
-
-      pivot_index = partition(recordArray, left, right, pivot_index, comparator);
-      quickSort(recordArray, left, pivot_index - 1, comparator);
-      quickSort(recordArray, pivot_index + 1, right, comparator);
-    }
-  }
-  private static int getMedianOfThree(IntermediateRecord[] recordArray, int left, int right, Comparator<IntermediateRecord> comparator) {
-    int mid = (left + right)/2;
-    if (comparator.compare(recordArray[right], recordArray[left]) < 0) {
-      swap(recordArray, right, left);
-    }
-    if (comparator.compare(recordArray[mid], recordArray[left]) < 0) {
-      swap(recordArray, mid, left);
-    }
-    if (comparator.compare(recordArray[right], recordArray[mid]) < 0) {
-      swap(recordArray, mid, right);
-    }
-    return mid;
-  }
-
-  @VisibleForTesting
-  public static void quickSortSmallestK(IntermediateRecord[] recordArray, int left, int right, int k,
-                                 Comparator<IntermediateRecord> comparator) {
+  public static void TopKSelect(IntermediateRecord[] recordArray, int left, int right, int k,
+                                Comparator<IntermediateRecord> comparator) {
     if (right <= left) return;
     Random random_num = new Random();
     int pivot_index = left + random_num.nextInt(right - left);
@@ -303,10 +278,10 @@ public class TableResizer {
 
     if (pivot_index > k - 1) {
       // target pivot is in the left partition
-      quickSortSmallestK(recordArray, left, pivot_index - 1, k, comparator);
+      TopKSelect(recordArray, left, pivot_index - 1, k, comparator);
     } else if (pivot_index < k - 1) {
       // target pivot is in the right partition
-      quickSortSmallestK(recordArray, pivot_index + 1, right, k, comparator);
+      TopKSelect(recordArray, pivot_index + 1, right, k, comparator);
     }
     // else pivot_index is the target
   }
@@ -353,10 +328,7 @@ public class TableResizer {
     int numRecordsToRetain = Math.min(numRecords, trimToSize);
     IntermediateRecord[] recordArray = convertToTrimArray(recordsMap, numRecordsToRetain, _intermediateRecordComparator);
     // sort left partition
-    // TODO: keep original array or trim it. Which is better?
-    //IntermediateRecord[] trimmedArray = Arrays.copyOfRange(recordArray, 0, numRecordsToRetain);
     Arrays.sort(recordArray, 0, numRecordsToRetain - 1, _intermediateRecordComparator);
-    //quickSort(recordArray, 0, numRecordsToRetain - 1, _intermediateRecordComparator);
     Record[] sortedArray = new Record[numRecordsToRetain];
     for (int i = 0; i < numRecordsToRetain; ++i) {
       Record record = recordsMap.get(recordArray[i]._key);
@@ -397,7 +369,7 @@ public class TableResizer {
    * 4. For order by on aggregations, final results should extracted if the intermediate result is non-comparable
    */
   @VisibleForTesting
-  public static class IntermediateRecord {
+  static class IntermediateRecord {
     final Key _key;
     final Comparable[] _values;
 

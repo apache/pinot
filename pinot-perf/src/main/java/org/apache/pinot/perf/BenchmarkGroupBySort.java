@@ -63,15 +63,11 @@ public class BenchmarkGroupBySort {
   private static final int TRIM_SIZE = 5000;
   private static final Random RANDOM = new Random();
 
-  private QueryContext _queryContext;
-  private AggregationFunction[] _aggregationFunctions;
-  private DataSchema _dataSchema;
   private TableResizer _TableResizer;
   private Map<Key, Record> map1;
   private Map<Key, Record> map2;
   private Map<Key, Record> map3;
   private Map<Key, Record> map4;
-  private TableResizer.IntermediateRecord[] recordArray;
 
   private List<String> _d1;
   private List<Integer> _d2;
@@ -93,12 +89,12 @@ public class BenchmarkGroupBySort {
       _d2.add(i);
     }
 
-    _queryContext = QueryContextConverterUtils
-        .getQueryContextFromSQL("SELECT sum(m1), max(m2) FROM testTable GROUP BY d1, d2 ORDER BY d1");
-    _aggregationFunctions = _queryContext.getAggregationFunctions();
+    QueryContext _queryContext = QueryContextConverterUtils
+            .getQueryContextFromSQL("SELECT sum(m1), max(m2) FROM testTable GROUP BY d1, d2 ORDER BY d1");
+    AggregationFunction[] _aggregationFunctions = _queryContext.getAggregationFunctions();
     assert _aggregationFunctions != null;
-    _dataSchema = new DataSchema(new String[]{"d1", "d2", "sum(m1)", "max(m2)"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
+    DataSchema _dataSchema = new DataSchema(new String[]{"d1", "d2", "sum(m1)", "max(m2)"},
+            new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
 
     _TableResizer = new TableResizer(_dataSchema, _queryContext);
 
@@ -134,8 +130,7 @@ public class BenchmarkGroupBySort {
   }
 
   private Key getKey(Record record) {
-    Key key = new Key(Arrays.copyOfRange(record.getValues(), 0, 2));
-    return key;
+    return new Key(Arrays.copyOfRange(record.getValues(), 0, 2));
   }
 
   @Benchmark
@@ -143,10 +138,9 @@ public class BenchmarkGroupBySort {
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public int TopKTrim()
       throws InterruptedException {
-
     return _TableResizer.resizeRecordsMapTopK(map1, TRIM_SIZE).size();
   }
-//
+
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -160,7 +154,6 @@ public class BenchmarkGroupBySort {
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public int TopKSort()
       throws InterruptedException {
-
     return _TableResizer.sortRecordsMapTopK(map3, TRIM_SIZE).size();
   }
 
@@ -169,7 +162,6 @@ public class BenchmarkGroupBySort {
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public int PQSort()
           throws InterruptedException {
-
     return _TableResizer.sortRecordsMap(map4, TRIM_SIZE).size();
   }
 
