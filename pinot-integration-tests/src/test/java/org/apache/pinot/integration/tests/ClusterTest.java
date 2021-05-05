@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -82,6 +83,7 @@ import static org.testng.Assert.assertTrue;
 public abstract class ClusterTest extends ControllerTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(ClusterTest.class);
   private static final int DEFAULT_BROKER_PORT = 18099;
+  private static final Random RANDOM = new Random(System.currentTimeMillis());
 
   protected String _brokerBaseApiUrl;
 
@@ -129,6 +131,10 @@ public abstract class ClusterTest extends ControllerTest {
       _brokerStarters.add(brokerStarter);
     }
     _brokerBaseApiUrl = "http://localhost:" + _brokerPorts.get(0);
+  }
+
+  protected int getRandomBrokerPort() {
+    return _brokerPorts.get(RANDOM.nextInt(_brokerPorts.size()));
   }
 
   protected int getBrokerPort(int index) {

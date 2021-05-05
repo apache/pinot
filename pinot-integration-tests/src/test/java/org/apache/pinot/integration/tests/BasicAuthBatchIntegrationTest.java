@@ -100,7 +100,7 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
   public void testBrokerNoAuth()
       throws Exception {
     JsonNode response =
-        JsonUtils.stringToJsonNode(sendPostRequest("http://localhost:" + getBrokerPort(0) + "/query/sql", "{\"sql\":\"SELECT now()\"}"));
+        JsonUtils.stringToJsonNode(sendPostRequest("http://localhost:" + getRandomBrokerPort() + "/query/sql", "{\"sql\":\"SELECT now()\"}"));
     Assert.assertFalse(response.has("resultTable"), "must not return result table");
     Assert.assertTrue(response.get("exceptions").get(0).get("errorCode").asInt() != 0, "must return error code");
   }
@@ -109,7 +109,7 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
   public void testBroker()
       throws Exception {
     JsonNode response = JsonUtils.stringToJsonNode(
-        sendPostRequest("http://localhost:" + getBrokerPort(0) + "/query/sql", "{\"sql\":\"SELECT now()\"}", AUTH_HEADER));
+        sendPostRequest("http://localhost:" + getRandomBrokerPort() + "/query/sql", "{\"sql\":\"SELECT now()\"}", AUTH_HEADER));
     Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "LONG",
         "must return result with LONG value");
     Assert.assertTrue(response.get("exceptions").isEmpty(), "must not return exception");
@@ -165,7 +165,7 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
 
     // admin with full access
     JsonNode response = JsonUtils.stringToJsonNode(
-        sendPostRequest("http://localhost:" + getBrokerPort(0) + "/query/sql", "{\"sql\":\"SELECT count(*) FROM baseballStats\"}",
+        sendPostRequest("http://localhost:" + getRandomBrokerPort() + "/query/sql", "{\"sql\":\"SELECT count(*) FROM baseballStats\"}",
             AUTH_HEADER));
     Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "LONG",
         "must return result with LONG value");
@@ -177,7 +177,7 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
 
     // user with valid auth but no table access
     JsonNode responseUser = JsonUtils.stringToJsonNode(
-        sendPostRequest("http://localhost:" + getBrokerPort(0) + "/query/sql", "{\"sql\":\"SELECT count(*) FROM baseballStats\"}",
+        sendPostRequest("http://localhost:" + getRandomBrokerPort() + "/query/sql", "{\"sql\":\"SELECT count(*) FROM baseballStats\"}",
             AUTH_HEADER_USER));
     Assert.assertFalse(responseUser.has("resultTable"), "must not return result table");
     Assert.assertTrue(responseUser.get("exceptions").get(0).get("errorCode").asInt() != 0, "must return error code");

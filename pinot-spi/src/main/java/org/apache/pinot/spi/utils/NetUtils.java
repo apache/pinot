@@ -73,19 +73,15 @@ public class NetUtils {
   }
 
   /**
-   * Find an open port，otherwise use given default port.
-   * @param defaultPort
-   * @return an open port otherwise default port
+   * Find the first open port from default port in an incremental order.
+   * @param basePort
+   * @return an open port
    */
-  public static int findOpenPort(int defaultPort) {
-    if (available(defaultPort)) {
-      return defaultPort;
+  public static int findOpenPort(int basePort) {
+    while (!available(basePort)) {
+      basePort++;
     }
-    int port = defaultPort;
-    while (available(++port)) {
-      return port;
-    }
-    throw new RuntimeException("Unable to find an open port from range: [ " + defaultPort + ", " + port + " ]");
+    return basePort;
   }
 
   /**
@@ -103,6 +99,7 @@ public class NetUtils {
       ds.setReuseAddress(true);
       return true;
     } catch (IOException e) {
+      return false;
     } finally {
       if (ds != null) {
         ds.close();
@@ -115,6 +112,5 @@ public class NetUtils {
         }
       }
     }
-    return false;
   }
 }
