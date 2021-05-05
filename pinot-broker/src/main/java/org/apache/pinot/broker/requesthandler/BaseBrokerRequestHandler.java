@@ -30,6 +30,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -1706,11 +1707,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         }
         List<Expression> orderByList = pinotQuery.getOrderByList();
         if (orderByList != null) {
+          List<Expression> selectOperands = selectList.get(0).getFunctionCall().getOperands();
+          List<Expression> orderByOperands = new LinkedList<>();
           for (Expression expression : orderByList) {
             // NOTE: Order-by is always a Function with the ordering of the Expression
-            if (!selectList.contains(expression.getFunctionCall().getOperands().get(0))) {
-              throw new IllegalStateException("ORDER-BY columns should be included in the DISTINCT columns");
-            }
+            orderByOperands.add(expression.getFunctionCall().getOperands().get(0));
+          }
+          if (!selectOperands.containsAll(orderByOperands)) {
+            throw new IllegalStateException("ORDER-BY columns should be included in the DISTINCT columns");
           }
         }
       }
