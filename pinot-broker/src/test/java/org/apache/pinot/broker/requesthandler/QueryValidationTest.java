@@ -181,7 +181,7 @@ public class QueryValidationTest {
   }
 
   private void testSupportedSQLQuery(String query) {
-      PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-      BaseBrokerRequestHandler.validateRequest(pinotQuery, 1000);
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    BaseBrokerRequestHandler.validateRequest(pinotQuery, 1000);
   }
 }
