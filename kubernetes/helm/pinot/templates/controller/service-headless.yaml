@@ -22,17 +22,12 @@ kind: Service
 metadata:
   name: {{ template "pinot.controller.headless" . }}
   labels:
-    app: {{ include "pinot.name" . }}
-    chart: {{ include "pinot.chart" . }}
-    component: {{ .Values.controller.name }}
-    release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
+    {{- include "pinot.controllerLabels" . | nindent 4 }}
 spec:
   clusterIP: None
   ports:
     # [pod_name].[service_name].[namespace].svc.cluster.local
-    - port: {{ .Values.controller.service.port }}
+    - name: {{ .Values.controller.service.name }}
+      port: {{ .Values.controller.service.port }}
   selector:
-    app: {{ include "pinot.name" . }}
-    release: {{ .Release.Name }}
-    component: {{ .Values.controller.name }}
+    {{- include "pinot.controllerMatchLabels" . | nindent 4 }}

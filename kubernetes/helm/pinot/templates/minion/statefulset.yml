@@ -22,31 +22,31 @@ kind: StatefulSet
 metadata:
   name: {{ include "pinot.minion.fullname" . }}
   labels:
-    app: {{ include "pinot.name" . }}
-    chart: {{ include "pinot.chart" . }}
-    component: {{ .Values.minion.name }}
-    release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
+    {{- include "pinot.minionLabels" . | nindent 4 }}
 spec:
   selector:
     matchLabels:
-      app: {{ include "pinot.name" . }}
-      release: {{ .Release.Name }}
-      component: {{ .Values.minion.name }}
+      {{- include "pinot.minionMatchLabels" . | nindent 6 }}
   serviceName: {{ template "pinot.minion.headless" . }}
   replicas: {{ .Values.minion.replicaCount }}
   updateStrategy:
     type: {{ .Values.minion.updateStrategy.type }}
-  podManagementPolicy: Parallel
+  podManagementPolicy: {{ .Values.minion.podManagementPolicy }}
   template:
     metadata:
       labels:
-        app: {{ include "pinot.name" . }}
-        release: {{ .Release.Name }}
-        component: {{ .Values.minion.name }}
+        {{- include "pinot.minionLabels" . | nindent 8 }}
       annotations:
 {{ toYaml .Values.minion.podAnnotations | indent 8 }}
     spec:
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      serviceAccountName: {{ include "pinot.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.minion.podSecurityContext | nindent 8 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       nodeSelector:
 {{ toYaml .Values.minion.nodeSelector | indent 8 }}
       affinity:
@@ -55,6 +55,8 @@ spec:
 {{ toYaml .Values.minion.tolerations | indent 8 }}
       containers:
       - name: minion
+        securityContext:
+          {{- toYaml .Values.minion.securityContext | nindent 10 }}
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args: [
@@ -72,8 +74,25 @@ spec:
         envFrom:
 {{ toYaml .Values.minion.envFrom | indent 10 }}
         ports:
-          - containerPort: {{ .Values.minion.port }}
-            protocol: TCP
+          - containerPort: {{ .Values.minion.service.port }}
+            protocol: {{ .Values.minion.service.protocol }}
+            name: {{ .Values.minion.service.name }}
+        {{- if .Values.minion.probes.livenessEnabled }}
+        livenessProbe:
+          initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}
+          periodSeconds: {{ .Values.probes.periodSeconds }}
+          httpGet:
+            path: {{ .Values.minion.probes.endpoint }}
+            port: {{ .Values.minion.service.port }}
+        {{- end }}
+        {{- if .Values.minion.probes.livenessEnabled }}
+        readinessProbe:
+          initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}
+          periodSeconds: {{ .Values.probes.periodSeconds }}
+          httpGet:
+            path: {{ .Values.minion.probes.endpoint }}
+            port: {{ .Values.minion.service.port }}
+        {{- end }}
         volumeMounts:
           - name: config
             mountPath: /var/pinot/minion/config
