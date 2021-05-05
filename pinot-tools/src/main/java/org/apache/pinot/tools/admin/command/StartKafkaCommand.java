@@ -46,7 +46,7 @@ public class StartKafkaCommand extends AbstractBaseAdminCommand implements Comma
   private int _brokerId = KafkaStarterUtils.DEFAULT_BROKER_ID;
 
   @Option(name = "-zkAddress", required = false, metaVar = "<string>", usage = "Address of Zookeeper.")
-  private String _zkAddress = KafkaStarterUtils.DEFAULT_ZK_STR;
+  private String _zkAddress = KafkaStarterUtils.getDefaultKafkaZKAddress();
   private StreamDataServerStartable _kafkaStarter;
 
   @Override

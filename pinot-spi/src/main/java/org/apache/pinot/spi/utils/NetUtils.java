@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.spi.utils;
 
+import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.ServerSocket;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 
@@ -54,6 +56,60 @@ public class NetUtils {
         return getHostAddress();
       } catch (Exception e) {
         return null;
+      }
+    }
+  }
+
+  /**
+   * Find an open port.
+   * @return an open port
+   * @throws IOException
+   */
+  public static int findOpenPort()
+      throws IOException {
+    try (ServerSocket socket = new ServerSocket(0)) {
+      return socket.getLocalPort();
+    }
+  }
+
+  /**
+   * Find the first open port from default port in an incremental order.
+   * @param basePort
+   * @return an open port
+   */
+  public static int findOpenPort(int basePort) {
+    while (!available(basePort)) {
+      basePort++;
+    }
+    return basePort;
+  }
+
+  /**
+   * Checks to see if a specific port is available.
+   *
+   * @param port the port to check for availability
+   */
+  public static boolean available(int port) {
+    ServerSocket ss = null;
+    DatagramSocket ds = null;
+    try {
+      ss = new ServerSocket(port);
+      ss.setReuseAddress(true);
+      ds = new DatagramSocket(port);
+      ds.setReuseAddress(true);
+      return true;
+    } catch (IOException e) {
+      return false;
+    } finally {
+      if (ds != null) {
+        ds.close();
+      }
+      if (ss != null) {
+        try {
+          ss.close();
+        } catch (IOException e) {
+          /* should not be thrown */
+        }
       }
     }
   }

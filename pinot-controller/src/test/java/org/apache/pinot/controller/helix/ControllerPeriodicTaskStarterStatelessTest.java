@@ -42,11 +42,12 @@ public class ControllerPeriodicTaskStarterStatelessTest extends ControllerTest {
   @Test
   public void testHelixResourceManagerDuringControllerStart() {
     startController();
+    stopController();
   }
 
   @AfterClass
   public void teardown() {
-    stopController();
+    stopZk();
   }
 
   @Override

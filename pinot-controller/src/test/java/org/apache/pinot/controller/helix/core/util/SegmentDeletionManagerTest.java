@@ -244,6 +244,9 @@ public class SegmentDeletionManagerTest {
       createTestFileWithAge(dummyDir2.getAbsolutePath() + File.separator + "file" + i, i);
     }
 
+    // Sleep 1 second to ensure the clock moves.
+    Thread.sleep(1000L);
+
     // Check that dummy directories and files are successfully created.
     Assert.assertEquals(dummyDir1.list().length, 3);
     Assert.assertEquals(dummyDir2.list().length, 3);

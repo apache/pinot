@@ -145,6 +145,10 @@ public class MultiGetRequestTest {
         }
       } catch (IOException e) {
         ++errors;
+      } finally {
+        if (getMethod != null) {
+          getMethod.releaseConnection();
+        }
       }
     }
 
