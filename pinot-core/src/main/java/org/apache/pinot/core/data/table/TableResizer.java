@@ -20,10 +20,16 @@ package org.apache.pinot.core.data.table;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.PriorityQueue;
+import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -90,9 +96,6 @@ public class TableResizer {
     };
   }
 
-  public Comparator<IntermediateRecord> getComparator(){
-    return _intermediateRecordComparator;
-  }
   /**
    * Helper method to construct a OrderByValueExtractor based on the given expression.
    */
@@ -123,7 +126,7 @@ public class TableResizer {
    * The IntermediateRecord::values contains only the order by columns, in the query's sort sequence
    * For aggregation values in the order by, the final result is extracted if the intermediate result is non-comparable
    */
-  public IntermediateRecord getIntermediateRecord(Key key, Record record) {
+  private IntermediateRecord getIntermediateRecord(Key key, Record record) {
     Comparable[] intermediateRecordValues = new Comparable[_numOrderByExpressions];
     for (int i = 0; i < _numOrderByExpressions; i++) {
       intermediateRecordValues[i] = _orderByValueExtractors[i].extract(record);
@@ -180,7 +183,7 @@ public class TableResizer {
         // num records to evict is smaller than num records to retain
         // make PQ of records to evict
         PriorityQueue<IntermediateRecord> priorityQueue =
-                convertToIntermediateRecordsPQ(recordsMap, numRecordsToEvict, _intermediateRecordComparator);
+            convertToIntermediateRecordsPQ(recordsMap, numRecordsToEvict, _intermediateRecordComparator);
         for (IntermediateRecord evictRecord : priorityQueue) {
           recordsMap.remove(evictRecord._key);
         }
@@ -200,7 +203,7 @@ public class TableResizer {
         }
         Comparator<IntermediateRecord> comparator = _intermediateRecordComparator.reversed();
         PriorityQueue<IntermediateRecord> priorityQueue =
-                convertToIntermediateRecordsPQ(recordsMap, trimToSize, comparator);
+            convertToIntermediateRecordsPQ(recordsMap, trimToSize, comparator);
         for (IntermediateRecord recordToRetain : priorityQueue) {
           trimmedRecordsMap.put(recordToRetain._key, recordsMap.get(recordToRetain._key));
         }
@@ -210,7 +213,7 @@ public class TableResizer {
     return recordsMap;
   }
 
-  public PriorityQueue<IntermediateRecord> convertToIntermediateRecordsPQ(Map<Key, Record> recordsMap, int size,
+  private PriorityQueue<IntermediateRecord> convertToIntermediateRecordsPQ(Map<Key, Record> recordsMap, int size,
       Comparator<IntermediateRecord> comparator) {
     PriorityQueue<IntermediateRecord> priorityQueue = new PriorityQueue<>(size, comparator);
     for (Map.Entry<Key, Record> entry : recordsMap.entrySet()) {
@@ -228,7 +231,7 @@ public class TableResizer {
     return priorityQueue;
   }
 
-  public IntermediateRecord[] convertToTrimArray(Map<Key, Record> recordMap, int trimSize,
+  private IntermediateRecord[] convertToTrimArray(Map<Key, Record> recordMap, int trimSize,
                                                  Comparator<IntermediateRecord> comparator) {
     IntermediateRecord[] recordArray = new IntermediateRecord[recordMap.size()];
     int left_index = 0;
@@ -263,19 +266,6 @@ public class TableResizer {
     return recordArray;
   }
 
-  public IntermediateRecord[] convertToTrimArray1(Map<Key, Record> recordMap, int trimSize,
-                                                  Comparator<IntermediateRecord> comparator) {
-    IntermediateRecord[] recordArray = new IntermediateRecord[recordMap.size()];
-    int index = 0;
-    for (Map.Entry<Key, Record> entry: recordMap.entrySet()) {
-      recordArray[index] = getIntermediateRecord(entry.getKey(), entry.getValue());
-      ++index;
-    }
-    quickSortSmallestK(recordArray, 0, recordArray.length - 1, trimSize, comparator);
-
-    // The entire array is returned but a pivot is set at array[trimSize-1]
-    return recordArray;
-  }
   @VisibleForTesting
   static void quickSort(IntermediateRecord[] recordArray, int left, int right,
                          Comparator<IntermediateRecord> comparator) {
