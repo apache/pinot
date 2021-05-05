@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.inv.json;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeType;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
@@ -87,7 +89,15 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   @Override
   public void add(String jsonString)
       throws IOException {
-    addFlattenedRecords(JsonUtils.flatten(JsonUtils.stringToJsonNode(jsonString)));
+    JsonNode jsonNode = JsonUtils.stringToJsonNode(jsonString);
+    JsonNodeType jsonNodeType = jsonNode.getNodeType();
+    if (jsonNodeType == JsonNodeType.OBJECT) {
+      addFlattenedRecords(JsonUtils.flatten(JsonUtils.stringToJsonNode(jsonString)));
+    } else {
+      throw new IllegalStateException(
+          "Cannot index JSON node value of type " + jsonNodeType.name() + ". Enclose node value within JSON "
+              + JsonNodeType.OBJECT.name() + ". Node value: " + jsonString);
+    }
   }
 
   /**

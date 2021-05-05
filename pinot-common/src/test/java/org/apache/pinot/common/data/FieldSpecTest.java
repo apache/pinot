@@ -58,6 +58,7 @@ public class FieldSpecTest {
     Assert.assertEquals(BOOLEAN.getStoredType(), INT);
     Assert.assertEquals(TIMESTAMP.getStoredType(), LONG);
     Assert.assertEquals(STRING.getStoredType(), STRING);
+    Assert.assertEquals(JSON.getStoredType(), STRING);
     Assert.assertEquals(BYTES.getStoredType(), BYTES);
 
     Assert.assertEquals(INT.size(), Integer.BYTES);
@@ -105,6 +106,17 @@ public class FieldSpecTest {
     Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
     Assert.assertEquals(fieldSpec1.getDefaultNullValue(), "null");
+
+    // Single-value json type dimension field with max length and default null value.
+    fieldSpec1 = new DimensionFieldSpec();
+    fieldSpec1.setName("svDimension");
+    fieldSpec1.setDataType(JSON);
+    fieldSpec1.setMaxLength(20000);
+    fieldSpec2 = new DimensionFieldSpec("svDimension", JSON, true, 20000, null);
+    Assert.assertEquals(fieldSpec1, fieldSpec2);
+    Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
+    Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
+    Assert.assertEquals(fieldSpec1.getDefaultNullValue(), "{}");
 
     // Multi-value dimension field.
     fieldSpec1 = new DimensionFieldSpec();

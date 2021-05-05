@@ -72,6 +72,7 @@ public class EqualsPredicateEvaluatorFactory {
       case TIMESTAMP:
         return new LongRawValueBasedEqPredicateEvaluator(TimestampUtils.toMillisSinceEpoch(value));
       case STRING:
+      case JSON:
         return new StringRawValueBasedEqPredicateEvaluator(value);
       case BYTES:
         return new BytesRawValueBasedEqPredicateEvaluator(BytesUtils.toBytes(value));

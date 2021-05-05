@@ -285,7 +285,7 @@ public class DataFetcher {
         _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
         _dictionary.readIntValues(dictIdBuffer, length, valueBuffer);
       } else {
-        switch (_reader.getValueType()) {
+        switch (_reader.getValueType().getStoredType()) {
           case INT:
             for (int i = 0; i < length; i++) {
               valueBuffer[i] = _reader.getInt(docIds[i], readerContext);
@@ -324,7 +324,7 @@ public class DataFetcher {
         _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
         _dictionary.readLongValues(dictIdBuffer, length, valueBuffer);
       } else {
-        switch (_reader.getValueType()) {
+        switch (_reader.getValueType().getStoredType()) {
           case INT:
             for (int i = 0; i < length; i++) {
               valueBuffer[i] = _reader.getInt(docIds[i], readerContext);
@@ -363,7 +363,7 @@ public class DataFetcher {
         _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
         _dictionary.readFloatValues(dictIdBuffer, length, valueBuffer);
       } else {
-        switch (_reader.getValueType()) {
+        switch (_reader.getValueType().getStoredType()) {
           case INT:
             for (int i = 0; i < length; i++) {
               valueBuffer[i] = _reader.getInt(docIds[i], readerContext);
@@ -402,7 +402,7 @@ public class DataFetcher {
         _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
         _dictionary.readDoubleValues(dictIdBuffer, length, valueBuffer);
       } else {
-        switch (_reader.getValueType()) {
+        switch (_reader.getValueType().getStoredType()) {
           case INT:
             for (int i = 0; i < length; i++) {
               valueBuffer[i] = _reader.getInt(docIds[i], readerContext);
@@ -441,7 +441,7 @@ public class DataFetcher {
         _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
         _dictionary.readStringValues(dictIdBuffer, length, valueBuffer);
       } else {
-        switch (_reader.getValueType()) {
+        switch (_reader.getValueType().getStoredType()) {
           case INT:
             for (int i = 0; i < length; i++) {
               valueBuffer[i] = Integer.toString(_reader.getInt(docIds[i], readerContext));
@@ -485,7 +485,7 @@ public class DataFetcher {
         _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
         _dictionary.readBytesValues(dictIdBuffer, length, valueBuffer);
       } else {
-        switch (_reader.getValueType()) {
+        switch (_reader.getValueType().getStoredType()) {
           case STRING:
             for (int i = 0; i < length; i++) {
               valueBuffer[i] = BytesUtils.toBytes(_reader.getString(docIds[i], readerContext));

@@ -72,6 +72,7 @@ public class NotEqualsPredicateEvaluatorFactory {
       case TIMESTAMP:
         return new LongRawValueBasedNeqPredicateEvaluator(TimestampUtils.toMillisSinceEpoch(value));
       case STRING:
+      case JSON:
         return new StringRawValueBasedNeqPredicateEvaluator(value);
       case BYTES:
         return new BytesRawValueBasedNeqPredicateEvaluator(BytesUtils.toBytes(value));

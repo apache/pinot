@@ -52,6 +52,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_BOOLEAN = 0;
   public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP = 0L;
   public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_STRING = "null";
+  public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_JSON = "{}";
   public static final byte[] DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES = new byte[0];
 
   public static final Integer DEFAULT_METRIC_NULL_VALUE_OF_INT = 0;
@@ -229,6 +230,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
               return DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP;
             case STRING:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_STRING;
+            case JSON:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_JSON;
             case BYTES:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES;
             default:
@@ -303,6 +306,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           jsonNode.put(key, new Timestamp((Long) _defaultNullValue).toString());
           break;
         case STRING:
+        case JSON:
           jsonNode.put(key, (String) _defaultNullValue);
           break;
         case BYTES:
@@ -375,6 +379,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     BOOLEAN /* Stored as INT */,
     TIMESTAMP /* Stored as LONG */,
     STRING,
+    JSON /* Stored as STRING */,
     BYTES,
     STRUCT,
     MAP,
@@ -392,6 +397,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           return INT;
         case TIMESTAMP:
           return LONG;
+        case JSON:
+          return STRING;
         default:
           return this;
       }
@@ -451,6 +458,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           case TIMESTAMP:
             return TimestampUtils.toMillisSinceEpoch(value);
           case STRING:
+          case JSON:
             return value;
           case BYTES:
             return BytesUtils.toBytes(value);
@@ -481,6 +489,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           case TIMESTAMP:
             return TimestampUtils.toMillisSinceEpoch(value);
           case STRING:
+          case JSON:
             return value;
           case BYTES:
             return BytesUtils.toByteArray(value);

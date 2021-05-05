@@ -96,6 +96,7 @@ public class RangePredicateEvaluatorFactory {
             upperUnbounded ? Long.MAX_VALUE : TimestampUtils.toMillisSinceEpoch(upperBound), lowerInclusive,
             upperInclusive);
       case STRING:
+      case JSON:
         return new StringRawValueBasedRangePredicateEvaluator(lowerUnbounded ? null : lowerBound,
             upperUnbounded ? null : upperBound, lowerInclusive, upperInclusive);
       case BYTES:
