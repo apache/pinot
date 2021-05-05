@@ -101,12 +101,12 @@ public class RealtimeJsonIndexQuickStart {
     printStatus(Color.YELLOW, "***** Realtime json-index quickstart setup complete *****");
 
     String q1 =
-        "select json_extract_scalar(event_json, '$.event_name', 'STRING') from meetupRsvp where json_match(group_json, 'group_topics.topic_name=''Fitness''') limit 10";
+        "select json_extract_scalar(event_json, '$.event_name', 'STRING') from meetupRsvp where json_match(group_json, '\"$.group_topics[*].topic_name\"=''Fitness''') limit 10";
     printStatus(Color.YELLOW, "Events related to fitness");
     printStatus(Color.CYAN, "Query : " + q1);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));
-    printStatus(Color.GREEN, "***************************************************");
 
+    printStatus(Color.GREEN, "***************************************************");
     printStatus(Color.GREEN, "You can always go to http://localhost:9000 to play around in the query console");
   }
 }
