@@ -158,8 +158,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     }
   }
 
-  protected int getBaseKafkaPort() {
-    return KafkaStarterUtils.DEFAULT_KAFKA_PORT;
+  protected int getKafkaPort() {
+    int idx = RANDOM.nextInt(_kafkaStarters.size());
+    return _kafkaStarters.get(idx).getPort();
   }
 
   protected String getKafkaZKAddress() {
@@ -468,7 +469,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected void pushAvroIntoKafka(List<File> avroFiles)
       throws Exception {
-    ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles, "localhost:" + getBaseKafkaPort(), getKafkaTopic(),
+
+    ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles, "localhost:" + getKafkaPort(), getKafkaTopic(),
         getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
   }
 
@@ -504,8 +506,12 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected void startKafka() {
+    startKafka(KafkaStarterUtils.DEFAULT_KAFKA_PORT);
+  }
+
+  protected void startKafka(int port) {
     Properties kafkaConfig = KafkaStarterUtils.getDefaultKafkaConfiguration();
-    _kafkaStarters = KafkaStarterUtils.startServers(getNumKafkaBrokers(), getBaseKafkaPort(), getKafkaZKAddress(),
+    _kafkaStarters = KafkaStarterUtils.startServers(getNumKafkaBrokers(), port, getKafkaZKAddress(),
         kafkaConfig);
     _kafkaStarters.get(0)
         .createTopic(getKafkaTopic(), KafkaStarterUtils.getTopicCreationProps(getNumKafkaPartitions()));
@@ -525,7 +531,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected long getCurrentCountStarResult()
       throws Exception {
-    return getPinotConnection().execute(new Request("pql", "SELECT COUNT(*) FROM " + getTableName())).getResultSet(0)
+    return getPinotConnection().execute(new Request("sql", "SELECT COUNT(*) FROM " + getTableName())).getResultSet(0)
         .getLong(0);
   }
 

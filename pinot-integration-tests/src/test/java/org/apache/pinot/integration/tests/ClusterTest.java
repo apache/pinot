@@ -83,7 +83,7 @@ import static org.testng.Assert.assertTrue;
 public abstract class ClusterTest extends ControllerTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(ClusterTest.class);
   private static final int DEFAULT_BROKER_PORT = 18099;
-  private static final Random RANDOM = new Random(System.currentTimeMillis());
+  protected static final Random RANDOM = new Random(System.currentTimeMillis());
 
   protected String _brokerBaseApiUrl;
 

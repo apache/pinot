@@ -19,6 +19,7 @@
 package org.apache.pinot.integration.tests;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -28,6 +29,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.http.HttpStatus;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
@@ -39,6 +41,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -93,6 +96,19 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
+  }
+
+
+  @AfterClass
+  public void tearDown()
+      throws IOException {
+    dropRealtimeTable(getTableName());
+    stopServer();
+    stopBroker();
+    stopController();
+    stopKafka();
+    stopZk();
+    FileUtils.deleteDirectory(_tempDir);
   }
 
   @Override
