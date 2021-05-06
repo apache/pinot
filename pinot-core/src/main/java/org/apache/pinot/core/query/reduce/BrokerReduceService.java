@@ -91,8 +91,8 @@ public class BrokerReduceService {
     if (resultTable == null) {
       return;
     }
-    Map<ExpressionContext, String> aliasMap = queryContext.getAliasMap();
-    if (aliasMap.isEmpty()) {
+    List<String> aliasList = queryContext.getAliasList();
+    if (aliasList.isEmpty()) {
       return;
     }
 
@@ -104,7 +104,7 @@ public class BrokerReduceService {
       return;
     }
     for (int i = 0; i < numSelectExpressions; i++) {
-      String alias = aliasMap.get(selectExpressions.get(i));
+      String alias = aliasList.get(i);
       if (alias != null) {
         columnNames[i] = alias;
       }
