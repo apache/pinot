@@ -28,6 +28,8 @@ CONTROLLER_HOST="localhost"
 CONTROLLER_PORT="9000"
 CONTROLLER_SCHEME="http"
 
+export JAVA_OPTS="$(echo $JAVA_OPTS | sed -E 's/-javaagent\S+//')"
+
 USAGE="$(basename "$0") [-h] [-a PATH] [-c HOST:PORT] [-s SCHEME] [-j PATH] [-n ROWS] TEMPLATE_NAME [TABLE_NAME]
 
   where:
@@ -124,7 +126,7 @@ if [ "$TEMPLATE_NAME" = "complexWebsite" ]; then
 fi
 
 echo "Generating data for ${TEMPLATE_NAME} in ${DATA_DIR}"
-JAVA_OPTS="" ${ADMIN_PATH} GenerateData \
+${ADMIN_PATH} GenerateData \
 -numFiles 1 -numRecords $NUM_RECORDS -format csv \
 -schemaFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json" \
 -schemaAnnotationFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_generator.json" \
@@ -137,7 +139,7 @@ if [ ! -d "${DATA_DIR}" ]; then
 fi
 
 echo "Creating segment for ${TEMPLATE_NAME} in ${SEGMENT_DIR}"
-JAVA_OPTS="" ${ADMIN_PATH} CreateSegment \
+${ADMIN_PATH} CreateSegment \
 -format csv \
 -tableConfigFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_config.json" \
 -schemaFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json" \
@@ -151,7 +153,7 @@ if [ ! -d "${SEGMENT_DIR}" ]; then
 fi
 
 echo "Adding table ${TABLE_NAME} from template ${TEMPLATE_NAME}"
-JAVA_OPTS="" ${ADMIN_PATH} AddTable -exec \
+${ADMIN_PATH} AddTable -exec \
 -tableConfigFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_config.json" \
 -schemaFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json" \
 -controllerHost "${CONTROLLER_HOST}" \
@@ -165,7 +167,7 @@ if [ $? != 0 ]; then
 fi
 
 echo "Uploading segment for ${TEMPLATE_NAME}"
-JAVA_OPTS="" ${ADMIN_PATH} UploadSegment \
+${ADMIN_PATH} UploadSegment \
 -tableName "${TABLE_NAME}" \
 -segmentDir "${SEGMENT_DIR}" \
 -controllerHost "${CONTROLLER_HOST}" \
