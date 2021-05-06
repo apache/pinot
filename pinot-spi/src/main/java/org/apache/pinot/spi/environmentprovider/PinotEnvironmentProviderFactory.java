@@ -34,7 +34,6 @@ import org.slf4j.LoggerFactory;
 public class PinotEnvironmentProviderFactory {
 
   private PinotEnvironmentProviderFactory() {
-
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotEnvironmentProviderFactory.class);

@@ -89,7 +89,6 @@ import static org.apache.pinot.spi.utils.CommonConstants.*;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.*;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.*;
 
-
 /**
  * Starter for Pinot server.
  * <p>When the server starts for the first time, it will automatically join the Helix cluster with the default tag.
@@ -131,7 +130,6 @@ public class HelixServerStarter implements ServiceStartable {
     _zkAddress = zkAddress;
     // Make a clone so that changes to the config won't propagate to the caller
     _serverConf = serverConf.clone();
-
     _listenerConfigs = ListenerConfigUtil.buildServerAdminConfigs(_serverConf);
 
     _host = _serverConf.getProperty(KEY_OF_SERVER_NETTY_HOST,
@@ -276,8 +274,9 @@ public class HelixServerStarter implements ServiceStartable {
   }
 
   // Fetch the overridden server configs for the invoked environment provider
-  private String populateFailureDomain() {
+  private void populateFailureDomain() {
     String className = _serverConf.getProperty(ENVIRONMENT_PROVIDER_CLASS_NAME);
+    if (className == null) return;
     PinotEnvironmentProvider pinotEnvironmentProvider = PinotEnvironmentProviderFactory.getEnvironmentProvider(className.toLowerCase());
     _serverConf = pinotEnvironmentProvider.getEnvironment(_serverConf.toMap());
     Map<String, Object> overriddenPinotConfigurationMap = _serverConf.toMap();
@@ -285,7 +284,7 @@ public class HelixServerStarter implements ServiceStartable {
         String.valueOf(overriddenPinotConfigurationMap.get(INSTANCE_FAILURE_DOMAIN.toLowerCase())) : null;
     if (failureDomain == null) {
       LOGGER.info("No failure domain information found for instance: {}", _instanceId);
-      return null;
+      return;
     }
     Map<String, String> failureDomainMap = new HashMap<>();
     failureDomainMap.put(FAILURE_DOMAIN_IDENTIFIER, failureDomain);
@@ -299,7 +298,6 @@ public class HelixServerStarter implements ServiceStartable {
         helixDataAccessor.setProperty(helixDataAccessor.keyBuilder().instanceConfig(_instanceId), instanceConfig),
         "Failed to update instance config");
     LOGGER.info("Updated instance config for instance: {} with failure domain information", _instanceId);
-    return failureDomain;
   }
 
   private void setupHelixSystemProperties() {
