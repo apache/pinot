@@ -20,7 +20,7 @@ package org.apache.pinot.core.util;
 
 import java.nio.ByteBuffer;
 import java.util.List;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.StringUtils;
