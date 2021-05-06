@@ -37,16 +37,39 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
 
   @Override
   protected InstanceResponseBlock getNextBlock() {
-    ThreadTimer mainThreadTimer = new ThreadTimer();
-    mainThreadTimer.start();
-
+    long startWallClockTimeNs = System.nanoTime();
     IntermediateResultsBlock intermediateResultsBlock = (IntermediateResultsBlock) _operator.nextBlock();
     InstanceResponseBlock instanceResponseBlock = new InstanceResponseBlock(intermediateResultsBlock);
     DataTable dataTable = instanceResponseBlock.getInstanceResponseDataTable();
+    long endWallClockTimeNs = System.nanoTime();
 
-    mainThreadTimer.stop();
-    long totalThreadCpuTimeNs =
-        intermediateResultsBlock.getExecutionThreadCpuTimeNs() + mainThreadTimer.getThreadTimeNs();
+    long multipleThreadCpuTimeNs = intermediateResultsBlock.getExecutionThreadCpuTimeNs();
+    long totalWallClockTimeNs = endWallClockTimeNs - startWallClockTimeNs;
+    /*
+     * System activities time such as OS paging, GC, context switching are not captured by
+     * totalThreadCpuTimeNs. For example, let's divide query processing into 4 phases.
+     * - phase 1: single thread preparing. Time used: T1
+     * - phase 2: N threads processing segments in parallel, each thread use time T2
+     * - phase 3: GC/OS paging. Time used: T3
+     * - phase 4: single thread merging intermediate results blocks. Time used: T4
+     *
+     * Then we have following equations:
+     * - singleThreadCpuTimeNs = T1 + T4
+     * - multipleThreadCpuTimeNs = T2 * N
+     * - totalWallClockTimeNs = T1 + T2 + T3 + T4 = singleThreadCpuTimeNs + T2 + T3
+     * - totalThreadCpuTimeNsWithoutSystemActivities = T1 + T2 * N + T4 = singleThreadCpuTimeNs + T2 * N
+     * - systemActivitiesTimeNs = T3 = (totalWallClockTimeNs - totalThreadCpuTimeNsWithoutSystemActivities) + T2 * (N - 1)
+     *
+     * Thus:
+     * totalThreadCpuTimeNsWithSystemActivities = totalThreadCpuTimeNsWithoutSystemActivities + systemActivitiesTimeNs
+     * = totalThreadCpuTimeNsWithoutSystemActivities + T3
+     * = totalThreadCpuTimeNsWithoutSystemActivities + (totalWallClockTimeNs - totalThreadCpuTimeNsWithoutSystemActivities) + T2 * (N - 1)
+     * = totalWallClockTimeNs + T2 * (N - 1)
+     * = totalWallClockTimeNs + (multipleThreadCpuTimeNs / N) * (N - 1)
+     */
+    int numServerThreads = intermediateResultsBlock.getNumServerThreads();
+    long totalThreadCpuTimeNs = totalWallClockTimeNs + multipleThreadCpuTimeNs * (numServerThreads - 1) / numServerThreads;
+
     dataTable.getMetadata().put(MetadataKey.THREAD_CPU_TIME_NS.getName(), String.valueOf(totalThreadCpuTimeNs));
 
     return instanceResponseBlock;

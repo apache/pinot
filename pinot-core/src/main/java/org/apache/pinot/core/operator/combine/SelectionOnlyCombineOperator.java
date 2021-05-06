@@ -60,7 +60,7 @@ public class SelectionOnlyCombineOperator extends BaseCombineOperator {
     // For LIMIT 0 query, only process one segment to get the data schema
     if (_numRowsToKeep == 0) {
       IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) _operators.get(0).nextBlock();
-      CombineOperatorUtils.setExecutionStatistics(resultsBlock, _operators, 0);
+      CombineOperatorUtils.setExecutionStatistics(resultsBlock, _operators, 0, 1);
       return resultsBlock;
     }
 
