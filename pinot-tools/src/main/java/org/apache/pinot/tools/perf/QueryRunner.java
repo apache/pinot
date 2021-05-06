@@ -294,8 +294,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         if (currentTime - reportStartTime >= reportIntervalMs) {
           long timePassed = currentTime - startTime;
           LOGGER.info("Time Passed: {}ms, Queries Executed: {}, Exceptions: {}, Average QPS: {}, "
-                  + "Average Broker Time: {}ms, Average Client Time: {}ms.", timePassed, numQueriesExecuted,
-              numExceptions, numQueriesExecuted / ((double) timePassed / MILLIS_PER_SECOND),
+                  + "Average Broker Time: {}ms, Average Client Time: {}ms.", timePassed, numQueriesExecuted, numExceptions,
+              numQueriesExecuted / ((double) timePassed / MILLIS_PER_SECOND),
               totalBrokerTime / (double) numQueriesExecuted, totalClientTime / (double) numQueriesExecuted);
           reportStartTime = currentTime;
           numReportIntervals++;
