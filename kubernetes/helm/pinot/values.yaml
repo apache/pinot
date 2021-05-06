@@ -387,6 +387,12 @@ zookeeper:
   ## ref: https://github.com/kubernetes/charts/tree/master/incubator/zookeeper
   enabled: true
 
+  ## If the Zookeeper Chart is disabled a URL override is required to connect
+  urlOverride: "my-zookeeper:2181/my-pinot"
+
+  ## Zookeeper port
+  port: 2181
+
   ## Configure Zookeeper resource requests and limits
   ## ref: http://kubernetes.io/docs/user-guide/compute-resources/
   resources: {}
@@ -408,10 +414,6 @@ zookeeper:
   ## ref: http://kubernetes.io/docs/user-guide/images/#pre-pulling-images
   image:
     PullPolicy: "IfNotPresent"
-
-  ## If the Zookeeper Chart is disabled a URL and port are required to connect
-  url: ""
-  port: 2181
 
   ## Pod scheduling preferences (by default keep pods within a release on separate nodes).
   ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
