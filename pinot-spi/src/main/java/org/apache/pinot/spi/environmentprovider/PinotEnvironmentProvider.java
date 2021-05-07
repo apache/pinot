@@ -22,19 +22,18 @@ import java.util.Map;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 /**
- *  Environment Provider interface implemented by different cloud
- *  providers to customize the base pinot configuration to add environment
- *  variables & instance specific configuration
+ *  Environment Provider interface implemented by different cloud providers to customize
+ *  the base pinot configuration to add environment variables & instance specific configuration
  */
 public interface PinotEnvironmentProvider {
 
   String INSTANCE_FAILURE_DOMAIN = "pinot.environment.instance.failureDomain";
+
   /**
-   * Customize base pinot configuration to add environment variable & instance specific configuration
-   * @param baseConfiguration Base configuration provided by the invoking service
-   * @return Custom Pinot Configuration
+   * Customize base pinot configuration to add environment variables & instance specific configuration
+   * @return custom pinot configuration map
    */
-  PinotConfiguration getEnvironment(Map<String, Object> baseConfiguration);
+  Map<String, Object> getEnvironment();
 
   /**
    * Initializes the configurations specific to an environment provider.

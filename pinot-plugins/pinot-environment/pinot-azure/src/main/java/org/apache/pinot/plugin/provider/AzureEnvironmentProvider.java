@@ -54,24 +54,26 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
   protected static final String REQUEST_TIMEOUT = "requestTimeout";
   private static final String COMPUTE = "compute";
   private static final String METADATA = "Metadata";
+  private static final String PLATFORM_FAULT_DOMAIN = "platformFaultDomain";
   private int _maxRetry;
   private String _imdsEndpoint;
   private CloseableHttpClient _closeableHttpClient;
-  private static final String PLATFORM_FAULT_DOMAIN = "platformFaultDomain";
+  private PinotConfiguration _serverConfigs;
 
   public AzureEnvironmentProvider() {
   }
 
   public void init(PinotConfiguration pinotConfiguration) throws NullPointerException, IllegalArgumentException {
-    Preconditions.checkArgument(0 < Integer.parseInt(pinotConfiguration.getProperty(MAX_RETRY)),
+    _serverConfigs = pinotConfiguration;
+    Preconditions.checkArgument(0 < Integer.parseInt(_serverConfigs.getProperty(MAX_RETRY)),
          "maxRetry cannot be less than or equal to 0");
-    Preconditions.checkArgument(!StringUtils.isBlank(pinotConfiguration.getProperty(IMDS_ENDPOINT)),
+    Preconditions.checkArgument(!StringUtils.isBlank(_serverConfigs.getProperty(IMDS_ENDPOINT)),
         "imdsEndpoint should not be null or empty");
 
-    _maxRetry = Integer.parseInt(pinotConfiguration.getProperty(MAX_RETRY));
-    _imdsEndpoint = pinotConfiguration.getProperty(IMDS_ENDPOINT);
-    int connectionTimeout = Integer.parseInt(pinotConfiguration.getProperty(CONNECTION_TIMEOUT));
-    int requestTimeout = Integer.parseInt(pinotConfiguration.getProperty(REQUEST_TIMEOUT));
+    _maxRetry = Integer.parseInt(_serverConfigs.getProperty(MAX_RETRY));
+    _imdsEndpoint = _serverConfigs.getProperty(IMDS_ENDPOINT);
+    int connectionTimeout = Integer.parseInt(_serverConfigs.getProperty(CONNECTION_TIMEOUT));
+    int requestTimeout = Integer.parseInt(_serverConfigs.getProperty(REQUEST_TIMEOUT));
 
     final RequestConfig requestConfig = RequestConfig.custom()
         .setConnectTimeout(connectionTimeout)
@@ -89,7 +91,6 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
         HttpClients.custom().setDefaultRequestConfig(requestConfig).setRetryHandler(httpRequestRetryHandler).build();
   }
 
-
   // Constructor for test purposes.
   public AzureEnvironmentProvider(int maxRetry, String imdsEndpoint, CloseableHttpClient closeableHttpClient) {
     Preconditions.checkArgument(maxRetry > 0, "maxRetry cannot be less than or equal to 0");
@@ -101,24 +102,23 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
 
   /**
    *
-   * Method for constructing custom pinot configuration used by the service invoking HelixServerStarter to update
+   * Method for constructing custom pinot configuration used by the HelixServerStarter to update
    * zookeeper node with custom instance configs.
-   * @param baseConfiguration Base configuration provided by the invoking service
-   * @return Custom Pinot Configuration
+   * @return custom pinot configuration map
    */
   @Override
-  public PinotConfiguration getEnvironment(Map<String, Object> baseConfiguration) {
-    Map<String, Object> customPinotConfiguration = new HashMap<>(baseConfiguration);
+  public Map<String, Object> getEnvironment() {
+    Map<String, Object> customPinotConfiguration = new HashMap<>(_serverConfigs.toMap());
 
     // Populate failure domain information
-    customPinotConfiguration.put(INSTANCE_FAILURE_DOMAIN,  getFaultDomain());
+    customPinotConfiguration.put(INSTANCE_FAILURE_DOMAIN,  getFailureDomain());
 
-    return new PinotConfiguration(customPinotConfiguration);
+    return customPinotConfiguration;
   }
 
-  // Utility used to query the azure instance metadata service (Azure IMDS) to fetch the fault domain information.
+  // Utility used to query the azure instance metadata service (Azure IMDS) to fetch the fault/failure domain information.
   @VisibleForTesting
-  protected final String getFaultDomain() {
+  protected final String getFailureDomain() {
     final String responsePayload = getAzureInstanceMetadata();
 
     // For a sample response payload,

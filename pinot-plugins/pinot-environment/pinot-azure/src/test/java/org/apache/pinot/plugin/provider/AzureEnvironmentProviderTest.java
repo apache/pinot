@@ -75,7 +75,7 @@ public class AzureEnvironmentProviderTest {
   public void testFailureDomainRetrieval() throws IOException {
     mockUtil();
     when(_mockHttpEntity.getContent()).thenReturn(getClass().getClassLoader().getResourceAsStream(IMDS_RESPONSE_FILE));
-    String failureDomain = _azureEnvironmentProviderWithParams.getFaultDomain();
+    String failureDomain = _azureEnvironmentProviderWithParams.getFailureDomain();
     Assert.assertEquals(failureDomain, "36");
     verify(_mockHttpClient, times(1)).execute(any(HttpGet.class));
     verify(_mockHttpResponse, times(1)).getStatusLine();
@@ -116,7 +116,7 @@ public class AzureEnvironmentProviderTest {
     mockUtil();
     when(_mockHttpEntity.getContent())
         .thenReturn(getClass().getClassLoader().getResourceAsStream(IMDS_RESPONSE_WITHOUT_COMPUTE_INFO));
-    _azureEnvironmentProviderWithParams.getFaultDomain();
+    _azureEnvironmentProviderWithParams.getFailureDomain();
   }
 
   @Test(expectedExceptions = WebApplicationException.class,
@@ -125,7 +125,7 @@ public class AzureEnvironmentProviderTest {
     mockUtil();
     when(_mockHttpEntity.getContent())
         .thenReturn(getClass().getClassLoader().getResourceAsStream(IMDS_RESPONSE_WITHOUT_FAULT_DOMAIN_INFO));
-    _azureEnvironmentProviderWithParams.getFaultDomain();
+    _azureEnvironmentProviderWithParams.getFailureDomain();
   }
 
   @Test(expectedExceptions = WebApplicationException.class,
@@ -133,7 +133,7 @@ public class AzureEnvironmentProviderTest {
   public void testIMDSCallFailure() throws WebApplicationException, IOException {
     mockUtil();
     when(_mockStatusLine.getStatusCode()).thenReturn(SC_NOT_FOUND);
-    _azureEnvironmentProviderWithParams.getFaultDomain();
+    _azureEnvironmentProviderWithParams.getFailureDomain();
   }
 
   // Mock Response utility method
