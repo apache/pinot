@@ -187,7 +187,9 @@ public class QueryRoutingTest {
   public void testServerDown()
       throws Exception {
     long requestId = 123;
-    long timeout = 1000L;
+    // To avoid flakyness, set timeout to 2000 msec. For some test runs, it can take up to
+    // 1400 msec to mark request as failed.
+    long timeout = 2000L;
     DataTable dataTable = DataTableBuilder.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     byte[] responseBytes = dataTable.toBytes();
@@ -211,8 +213,8 @@ public class QueryRoutingTest {
     assertEquals(serverResponse.getResponseDelayMs(), -1);
     assertEquals(serverResponse.getResponseSize(), 0);
     assertEquals(serverResponse.getDeserializationTimeMs(), 0);
-    // Query should early terminate (give 10ms extra to verify timeout)
-    assertTrue(System.currentTimeMillis() - startTimeMs < timeout + 10L);
+    // Query should early terminate
+    assertTrue(System.currentTimeMillis() - startTimeMs < timeout);
 
     // Submit query after server is down
     startTimeMs = System.currentTimeMillis();
@@ -227,8 +229,8 @@ public class QueryRoutingTest {
     assertEquals(serverResponse.getResponseDelayMs(), -1);
     assertEquals(serverResponse.getResponseSize(), 0);
     assertEquals(serverResponse.getDeserializationTimeMs(), 0);
-    // Query should early terminate (give 10ms extra to verify timeout)
-    assertTrue(System.currentTimeMillis() - startTimeMs < timeout + 10L);
+    // Query should early terminate
+    assertTrue(System.currentTimeMillis() - startTimeMs < timeout);
   }
 
   @AfterClass
