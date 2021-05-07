@@ -154,7 +154,6 @@ public class HavingFilterHandler {
         case TIMESTAMP:
           return _predicateEvaluator.applySV(((Timestamp) value).getTime());
         case STRING:
-        case JSON:
           return _predicateEvaluator.applySV((String) value);
         case BYTES:
           return _predicateEvaluator.applySV((byte[]) value);

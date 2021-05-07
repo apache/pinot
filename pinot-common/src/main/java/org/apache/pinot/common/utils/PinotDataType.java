@@ -553,12 +553,12 @@ public enum PinotDataType {
 
     @Override
     public float toFloat(Object value) {
-      return Float.parseFloat(value.toString().trim());
+      return Float.parseFloat(value.toString());
     }
 
     @Override
     public double toDouble(Object value) {
-      return Double.parseDouble(value.toString().trim());
+      return Double.parseDouble(value.toString());
     }
 
     @Override
@@ -568,8 +568,7 @@ public enum PinotDataType {
 
     @Override
     public Timestamp toTimestamp(Object value) {
-      return (value instanceof Long) ? new Timestamp(((Long) value).longValue())
-          : Timestamp.valueOf(value.toString().trim());
+      return TimestampUtils.toTimestamp(value.toString().trim());
     }
 
     @Override
@@ -579,17 +578,14 @@ public enum PinotDataType {
 
     @Override
     public byte[] toBytes(Object value) {
-      if (value instanceof String) {
-        // Assume that input JSON string value is Base64 encoded.
-        try {
-          return Base64.getDecoder().decode(((String) value).getBytes("UTF-8"));
-        } catch (Exception e) {
-          throw new RuntimeException(
-              "Unable to convert JSON base64 encoded string value to BYTES. Input value: " + value, e);
-        }
+      // Base64 encoding is the commonly used mechanism for encoding binary data in JSON documents. Note that
+      // toJson function converts byte[] into a Base64 encoded json string value.
+      try {
+        return Base64.getDecoder().decode(value.toString());
+      } catch (Exception e) {
+        throw new RuntimeException(
+            "Unable to convert JSON base64 encoded string value to BYTES. Input value: " + value, e);
       }
-
-      throw new UnsupportedOperationException("Cannot convert non base64 encoded string value from JSON to BYTES");
     }
 
     @Override
@@ -777,7 +773,7 @@ public enum PinotDataType {
   OBJECT_ARRAY;
 
   /**
-   * NOTE: override toInt(), toLong(), toFloat(), toDouble(), toBoolean(), toTimestamp(), toString(), toJson(), and
+   * NOTE: override toInt(), toLong(), toFloat(), toDouble(), toBoolean(), toTimestamp(), toString(), and
    * toBytes() for single-value types.
    */
 

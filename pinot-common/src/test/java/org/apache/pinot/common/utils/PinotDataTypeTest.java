@@ -150,7 +150,7 @@ public class PinotDataTypeTest {
   @Test
   public void testInvalidConversion() {
     for (PinotDataType sourceType : values()) {
-      if (sourceType.isSingleValue() && sourceType != STRING && sourceType != BYTES) {
+      if (sourceType.isSingleValue() && sourceType != STRING && sourceType != BYTES && sourceType != JSON) {
         assertInvalidConversion(null, sourceType, BYTES, UnsupportedOperationException.class);
       }
     }

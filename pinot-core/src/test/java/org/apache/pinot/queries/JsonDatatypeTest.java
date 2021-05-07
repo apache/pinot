@@ -27,6 +27,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -141,6 +142,20 @@ public class JsonDatatypeTest extends BaseQueriesTest {
         ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
     _indexSegment = immutableSegment;
     _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
+  }
+
+  /** Verify result column type of a simple select query against JSON column */
+  @Test
+  public void testSimpleSelectOnJsonColumn() {
+    try {
+      Operator operator = getOperatorForSqlQuery("select jsonColumn FROM testTable");
+      IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+      Collection<Object[]> rows = block.getSelectionResult();
+      Assert.assertEquals(rows.size(), 9);
+      Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.JSON);
+    } catch (IllegalStateException ise) {
+      Assert.assertTrue(true);
+    }
   }
 
   /** Test filtering on string value associated with  JSON key*/

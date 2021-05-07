@@ -78,6 +78,7 @@ public class CastTransformFunction extends BaseTransformFunction {
           break;
         case "JSON":
           _resultMetadata = JSON_SV_NO_DICTIONARY_METADATA;
+          break;
         default:
           throw new IllegalArgumentException("Unable to cast expression to type - " + targetType);
       }
@@ -131,9 +132,6 @@ public class CastTransformFunction extends BaseTransformFunction {
           for (int i = 0; i < numDocs; i++) {
             _stringValuesSV[i] = new Timestamp(longValuesSV[i]).toString();
           }
-          break;
-        case JSON:
-          _stringValuesSV = _transformFunction.transformToStringValuesSV(projectionBlock);
           break;
         default:
           throw new IllegalStateException();
