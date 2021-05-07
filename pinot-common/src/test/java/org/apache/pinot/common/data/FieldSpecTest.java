@@ -116,7 +116,7 @@ public class FieldSpecTest {
     Assert.assertEquals(fieldSpec1, fieldSpec2);
     Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
-    Assert.assertEquals(fieldSpec1.getDefaultNullValue(), "{}");
+    Assert.assertEquals(fieldSpec1.getDefaultNullValue(), "null");
 
     // Multi-value dimension field.
     fieldSpec1 = new DimensionFieldSpec();
