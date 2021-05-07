@@ -641,7 +641,7 @@ public class TableConfigUtilsTest {
 
     try {
       FieldConfig fieldConfig =
-          new FieldConfig("myCol1", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null);
+          new FieldConfig("myCol1", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null, null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for with conflicting encoding type of myCol1");
@@ -654,7 +654,7 @@ public class TableConfigUtilsTest {
         .setNoDictionaryColumns(Arrays.asList("myCol1")).build();
     try {
       FieldConfig fieldConfig =
-          new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.FST, null);
+          new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.FST, null, null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail since FST index is enabled on RAW encoding type");
@@ -665,7 +665,7 @@ public class TableConfigUtilsTest {
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     try {
       FieldConfig fieldConfig =
-          new FieldConfig("myCol2", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null);
+          new FieldConfig("myCol2", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null, null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail since FST index is enabled on multi value column");
@@ -676,7 +676,7 @@ public class TableConfigUtilsTest {
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     try {
       FieldConfig fieldConfig =
-          new FieldConfig("intCol", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null);
+          new FieldConfig("intCol", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null, null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail since FST index is enabled on non String column");
@@ -688,7 +688,7 @@ public class TableConfigUtilsTest {
         .setNoDictionaryColumns(Arrays.asList("myCol2", "intCol")).build();
     try {
       FieldConfig fieldConfig =
-          new FieldConfig("myCol2", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null);
+          new FieldConfig("myCol2", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null, null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail since TEXT index is enabled on multi value column");
@@ -700,7 +700,7 @@ public class TableConfigUtilsTest {
         .setNoDictionaryColumns(Arrays.asList("myCol2", "intCol")).build();
     try {
       FieldConfig fieldConfig =
-          new FieldConfig("intCol", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null);
+          new FieldConfig("intCol", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null, null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail since TEXT index is enabled on non String column");
@@ -712,13 +712,35 @@ public class TableConfigUtilsTest {
         .setNoDictionaryColumns(Arrays.asList("myCol1")).build();
     try {
       FieldConfig fieldConfig =
-          new FieldConfig("myCol21", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.FST, null);
+          new FieldConfig("myCol21", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.FST, null, null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail since field name is not present in schema");
     } catch (Exception e) {
       Assert.assertEquals(e.getMessage(),
           "Column Name myCol21 defined in field config list must be a valid column defined in the schema");
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    try {
+      FieldConfig fieldConfig =
+          new FieldConfig("intCol", FieldConfig.EncodingType.DICTIONARY, null, FieldConfig.CompressionCodec.SNAPPY, null);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail since dictionary encoding does not support compression codec snappy");
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(), "Set compression codec to null for dictionary encoding type");
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    try {
+      FieldConfig fieldConfig =
+          new FieldConfig("intCol", FieldConfig.EncodingType.DICTIONARY, null, FieldConfig.CompressionCodec.ZSTANDARD, null);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail since dictionary encoding does not support compression codec zstandard");
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(), "Set compression codec to null for dictionary encoding type");
     }
   }
 
@@ -888,7 +910,7 @@ public class TableConfigUtilsTest {
       // expected
     }
 
-    FieldConfig fieldConfig = new FieldConfig("myCol2", null, null, null);
+    FieldConfig fieldConfig = new FieldConfig("myCol2", null, null, null, null);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setFieldConfigList(Arrays.asList(fieldConfig)).build();
     try {
