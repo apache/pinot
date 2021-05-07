@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.common.utils;
 
+import java.sql.Time;
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -106,7 +108,9 @@ public class PinotDataTypeTest {
     assertEquals(TIMESTAMP.convert(1620324238610l, LONG), Timestamp.valueOf("2021-05-06 11:03:58.61"));
     assertEquals(TIMESTAMP.convert("2021-05-06 11:03:58.61", STRING), Timestamp.valueOf("2021-05-06 11:03:58.61"));
     assertEquals(TIMESTAMP.convert(1620324238610l, JSON), Timestamp.valueOf("2021-05-06 11:03:58.61"));
-    assertEquals(TIMESTAMP.convert("2021-05-06 11:03:58.61", JSON), Timestamp.valueOf("2021-05-06 11:03:58.61"));
+
+    Timestamp timestamp = Timestamp.valueOf(LocalDateTime.now());
+    assertEquals(TIMESTAMP.convert(timestamp.toString(), JSON), timestamp);
   }
 
   @Test
@@ -140,7 +144,7 @@ public class PinotDataTypeTest {
     Map<String, Object> map2 = new HashMap<>();
     map2.put("map", map1);
     map2.put("bytes", new byte[]{0,1});
-    map2.put("timestamp", Timestamp.valueOf("2021-05-06 11:03:58.61"));
+    map2.put("timestamp", new Timestamp(1620324238610l));
 
     return map2;
   }
