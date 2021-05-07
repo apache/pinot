@@ -324,9 +324,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         totalClientTime, statisticsList);
     LOGGER.info("--------------------------------------------------------------------------------");
     LOGGER.info("FINAL REPORT:");
-    LOGGER.info("Time Passed: {}ms, Queries Executed: {}, Exceptions: {}, Average QPS: {}, Average Broker Time: {}ms, "
-            + "Average Client Time: {}ms.", querySummary.getTimePassed(), querySummary.getNumQueriesExecuted(),
-            querySummary.getNumExceptions(), querySummary.getAvgQps(), querySummary.getAvgBrokerTime(), querySummary.getAvgClientTime());
+    LOGGER.info(querySummary.toString());
     for (Statistics statistics : statisticsList) {
       statistics.report();
     }
@@ -432,10 +430,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         totalBrokerTime.get(), totalClientTime.get(), statisticsList);
     LOGGER.info("--------------------------------------------------------------------------------");
     LOGGER.info("FINAL REPORT:");
-    LOGGER.info("Time Passed: {}ms, Queries Executed: {}, Exceptions: {}. Average QPS: {}, Average Broker Time: {}ms, "
-            + "Average Client Time: {}ms.", querySummary.getTimePassed(), querySummary.getNumQueriesExecuted(),
-        querySummary.getNumExceptions(), querySummary.getAvgQps(), querySummary.getAvgBrokerTime(),
-        querySummary.getAvgClientTime());
+    LOGGER.info(querySummary.toString());
     for (Statistics statistics : statisticsList) {
       statistics.report();
     }
@@ -553,10 +548,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         totalBrokerTime.get(), totalClientTime.get(), statisticsList);
     LOGGER.info("--------------------------------------------------------------------------------");
     LOGGER.info("FINAL REPORT:");
-    LOGGER.info("Target QPS: {}, Time Passed: {}ms, Queries Executed: {}, Exceptions: {}, Average QPS: {}, "
-            + "Average Broker Time: {}ms, Average Client Time: {}ms.", startQPS, querySummary.getTimePassed(),
-        querySummary.getNumQueriesExecuted(), querySummary.getNumExceptions(), querySummary.getAvgQps(),
-        querySummary.getAvgBrokerTime(), querySummary.getAvgClientTime());
+    LOGGER.info(querySummary.toString());
     for (Statistics statistics : statisticsList) {
       statistics.report();
     }
@@ -698,10 +690,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         totalBrokerTime.get(), totalClientTime.get(), statisticsList);
     LOGGER.info("--------------------------------------------------------------------------------");
     LOGGER.info("FINAL REPORT:");
-    LOGGER.info("Target QPS: {}, Time Passed: {}ms, Queries Executed: {}, Exceptions: {}, Average QPS: {}, "
-            + "Average Broker Time: {}ms, Average Client Time: {}ms.", startQPS, querySummary.getTimePassed(),
-        querySummary.getNumQueriesExecuted(), querySummary.getNumExceptions(), querySummary.getAvgQps(),
-        querySummary.getAvgBrokerTime(), querySummary.getAvgClientTime());
+    LOGGER.info(querySummary.toString());
     for (Statistics statistics : statisticsList) {
       statistics.report();
     }
@@ -887,6 +876,13 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
 
     public List<Statistics> getStatisticsList() {
       return _statisticsList;
+    }
+
+    @Override
+    public String toString() {
+      return String.format("Time Passed: %sms, Queries Executed: %s, Exceptions: %s, "
+          + "Average QPS: %s, Average Broker Time: %sms, Average Client Time: %sms",
+          _timePassed, _numQueriesExecuted, _numExceptions, _avgQps, _avgBrokerTime, _avgClientTime);
     }
   }
 
