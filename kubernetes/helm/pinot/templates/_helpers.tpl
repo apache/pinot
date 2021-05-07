@@ -176,9 +176,7 @@ else use user-provided URL
 {{- if .Values.zookeeper.enabled -}}
 {{- printf "%s:%s" (include "pinot.zookeeper.fullname" .) $port }}
 {{- else -}}
-{{- $zookeeperConnect := printf "%s:%s" .Values.zookeeper.url $port }}
-{{- $zookeeperConnectOverride := index .Values "configurationOverrides" "zookeeper.connect" }}
-{{- default $zookeeperConnect $zookeeperConnectOverride }}
+{{- required "Missing 'zookeeper.urlOverride' entry zookeeper is disabled!"  .Values.zookeeper.urlOverride }}
 {{- end -}}
 {{- end -}}
 
