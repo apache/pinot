@@ -187,6 +187,7 @@ public class QueryRoutingTest {
   public void testServerDown()
       throws Exception {
     long requestId = 123;
+    long timeout = 1000L;
     DataTable dataTable = DataTableBuilder.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     byte[] responseBytes = dataTable.toBytes();
@@ -197,7 +198,7 @@ public class QueryRoutingTest {
 
     long startTimeMs = System.currentTimeMillis();
     AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId + 1, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+        _queryRouter.submitQuery(requestId + 1, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, timeout);
 
     // Shut down the server before getting the response
     queryServer.shutDown();
@@ -210,13 +211,13 @@ public class QueryRoutingTest {
     assertEquals(serverResponse.getResponseDelayMs(), -1);
     assertEquals(serverResponse.getResponseSize(), 0);
     assertEquals(serverResponse.getDeserializationTimeMs(), 0);
-    // Query should early terminate
-    assertTrue(System.currentTimeMillis() - startTimeMs < 1000);
+    // Query should early terminate (give 10ms extra to verify timeout)
+    assertTrue(System.currentTimeMillis() - startTimeMs < timeout + 10L);
 
     // Submit query after server is down
     startTimeMs = System.currentTimeMillis();
     asyncQueryResponse =
-        _queryRouter.submitQuery(requestId + 1, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+        _queryRouter.submitQuery(requestId + 1, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, timeout);
     response = asyncQueryResponse.getResponse();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
@@ -226,8 +227,8 @@ public class QueryRoutingTest {
     assertEquals(serverResponse.getResponseDelayMs(), -1);
     assertEquals(serverResponse.getResponseSize(), 0);
     assertEquals(serverResponse.getDeserializationTimeMs(), 0);
-    // Query should early terminate
-    assertTrue(System.currentTimeMillis() - startTimeMs < 1000);
+    // Query should early terminate (give 10ms extra to verify timeout)
+    assertTrue(System.currentTimeMillis() - startTimeMs < timeout + 10L);
   }
 
   @AfterClass
