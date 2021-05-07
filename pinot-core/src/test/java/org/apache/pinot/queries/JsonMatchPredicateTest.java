@@ -52,7 +52,8 @@ import org.testng.annotations.Test;
 /**
  * Test cases verifying evaluation of predicate with expressions that contain numerical values of different types.
  * TODO: Update these test cases to: 1) use V2 JSON_MATCH function, 2) use multi-dimensional JSON array addressing,
- * 3) do json_extract_scalar on a column other than the JSON_MATCH column, and 4) query deeper levels of nesting.
+ * 3) do json_extract_scalar on a column other than the JSON_MATCH column, 4) query deeper levels of nesting, and
+ * 5) add test cases for GROUP BY on json_extract_scalar or path expressions.
  */
 public class JsonMatchPredicateTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "JsonMatchPredicateTest");
