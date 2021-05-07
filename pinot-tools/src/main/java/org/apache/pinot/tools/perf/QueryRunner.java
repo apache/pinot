@@ -842,13 +842,13 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   }
 
   public static class QuerySummary {
-    private long _timePassed;
-    private int _numQueriesExecuted;
-    private int _numExceptions;
-    private double _avgQps;
-    private double _avgBrokerTime;
-    private double _avgClientTime;
-    private List<Statistics> _statisticsList;
+    private final long _timePassed;
+    private final int _numQueriesExecuted;
+    private final int _numExceptions;
+    private final double _avgQps;
+    private final double _avgBrokerTime;
+    private final double _avgClientTime;
+    private final List<Statistics> _statisticsList;
 
     private QuerySummary(long timePassed, int numQueriesExecuted, int numExceptions,
                          long totalBrokerTime, long totalClientTime, List<Statistics> statisticsList) {
