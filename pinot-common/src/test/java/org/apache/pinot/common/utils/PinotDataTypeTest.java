@@ -115,7 +115,7 @@ public class PinotDataTypeTest {
     assertEquals(JSON.convert(true, BOOLEAN), "true");
     assertEquals(JSON.convert(new byte[]{0, 1}, BYTES), "\"AAE=\""); // Base64 encoding.
     assertEquals(JSON.convert("{\"bytes\":\"AAE=\",\"map\":{\"key1\":\"value\",\"key2\":null,\"array\":[-5.4,4,\"2\"]},\"timestamp\":1620324238610}", STRING), "{\"bytes\":\"AAE=\",\"map\":{\"key1\":\"value\",\"key2\":null,\"array\":[-5.4,4,\"2\"]},\"timestamp\":1620324238610}");
-    assertEquals(JSON.convert(Timestamp.valueOf("2021-05-06 11:03:58.61"), TIMESTAMP), "1620324238610");
+    assertEquals(JSON.convert(new Timestamp(1620324238610l), TIMESTAMP), "1620324238610");
   }
 
   @Test
