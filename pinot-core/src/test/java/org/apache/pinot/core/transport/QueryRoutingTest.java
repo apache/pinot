@@ -211,7 +211,7 @@ public class QueryRoutingTest {
     assertEquals(serverResponse.getResponseSize(), 0);
     assertEquals(serverResponse.getDeserializationTimeMs(), 0);
     // Query should early terminate
-    assertTrue(System.currentTimeMillis() - startTimeMs < 1000);
+    assertTrue(System.currentTimeMillis() - startTimeMs < 1010);
 
     // Submit query after server is down
     startTimeMs = System.currentTimeMillis();
@@ -227,8 +227,7 @@ public class QueryRoutingTest {
     assertEquals(serverResponse.getResponseSize(), 0);
     assertEquals(serverResponse.getDeserializationTimeMs(), 0);
     // Query should early terminate
-    long duration = System.currentTimeMillis() - startTimeMs;
-    assertTrue(System.currentTimeMillis() - startTimeMs < 1005);
+    assertTrue(System.currentTimeMillis() - startTimeMs < 1010);
   }
 
   @AfterClass

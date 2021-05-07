@@ -31,9 +31,6 @@ public class FunctionUtils {
   private FunctionUtils() {
   }
 
-  // TODO: Do we need to create a class for handling JSON. It doesn't seem like this is needed since JSON type directly
-  // uses String.
-
   // Types allowed as the function parameter (in the function signature) for type conversion
   private static final Map<Class<?>, PinotDataType> PARAMETER_TYPE_MAP = new HashMap<Class<?>, PinotDataType>() {{
     put(int.class, PinotDataType.INTEGER);
@@ -80,7 +77,6 @@ public class FunctionUtils {
     put(String[].class, PinotDataType.STRING_ARRAY);
   }};
 
-  // TODO: create class for JSON type
   private static final Map<Class<?>, DataType> DATA_TYPE_MAP = new HashMap<Class<?>, DataType>() {{
     put(int.class, DataType.INT);
     put(Integer.class, DataType.INT);

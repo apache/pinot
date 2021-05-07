@@ -143,7 +143,7 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("svBoolean"), 1);
       assertEquals(record.getValue("svTimestamp"), Timestamp.valueOf("2020-02-02 22:22:22.222").getTime());
       assertEquals(record.getValue("svBytes"), new byte[]{123, 123});
-      assertEquals(record.getValue("svJson"), "{\"first\": \"daffy\", \"last\": \"duck\"}");
+      assertEquals(record.getValue("svJson"), "{\"first\":\"daffy\",\"last\":\"duck\"}");
       assertEquals(record.getValue("mvInt"), new Object[]{123});
       assertEquals(record.getValue("mvLong"), new Object[]{123L});
       assertEquals(record.getValue("mvFloat"), new Object[]{123f});
@@ -239,7 +239,7 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("svDouble"), 123d);
       assertEquals(record.getValue("svBoolean"), 1);
       assertEquals(record.getValue("svTimestamp"), Timestamp.valueOf("2020-02-02 22:22:22.222").getTime());
-      assertEquals(record.getValue("svJson"),"{\"first\": \"daffy\", \"last\": \"duck\"}");
+      assertEquals(record.getValue("svJson"),"{\"first\":\"daffy\",\"last\":\"duck\"}");
       assertEquals(record.getValue("svBytes"), new byte[]{123, 123});
       assertEquals(record.getValue("mvInt"), new Object[]{123});
       assertEquals(record.getValue("mvLong"), new Object[]{123L});

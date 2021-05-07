@@ -285,7 +285,7 @@ public class DataFetcher {
         _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
         _dictionary.readIntValues(dictIdBuffer, length, valueBuffer);
       } else {
-        switch (_reader.getValueType().getStoredType()) {
+        switch (_reader.getValueType()) {
           case INT:
             for (int i = 0; i < length; i++) {
               valueBuffer[i] = _reader.getInt(docIds[i], readerContext);

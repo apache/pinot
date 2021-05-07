@@ -114,8 +114,7 @@ public class InPredicateEvaluatorFactory {
         }
         return new LongRawValueBasedInPredicateEvaluator(matchingValues);
       }
-      case STRING:
-      case JSON: {
+      case STRING: {
         Set<String> matchingValues = new ObjectOpenHashSet<>(hashSetSize);
         matchingValues.addAll(values);
         return new StringRawValueBasedInPredicateEvaluator(matchingValues);

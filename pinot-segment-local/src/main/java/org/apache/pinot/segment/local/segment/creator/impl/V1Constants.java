@@ -24,10 +24,6 @@ public class V1Constants {
   public static class Str {
     public static final char DEFAULT_STRING_PAD_CHAR = '\0';
     public static final char LEGACY_STRING_PAD_CHAR = '%';
-
-    // Default current storage format of all datatypes. Individual types would need to adopt a different
-    // storage format name as and when there storage format changes.
-    public static final String STORAGE_FORMAT_DEFAULT_VALUE = "original";
   }
 
   public static class Dict {
@@ -80,7 +76,6 @@ public class V1Constants {
       public static final String BITS_PER_ELEMENT = "bitsPerElement";
       public static final String DICTIONARY_ELEMENT_SIZE = "lengthOfEachEntry";
       public static final String COLUMN_TYPE = "columnType";
-      public static final String STORAGE_FORMAT = "storageFormat";
       public static final String IS_SORTED = "isSorted";
       public static final String HAS_NULL_VALUE = "hasNullValue";
       public static final String HAS_DICTIONARY = "hasDictionary";

@@ -18,9 +18,8 @@
  */
 package org.apache.pinot.common.utils;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import java.io.IOException;
 import java.sql.Timestamp;
+import java.util.Base64;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -100,12 +99,6 @@ public enum PinotDataType {
     }
 
     @Override
-    public String toJson(Object value) {
-      // Accept only JSON TEXT not individual JSON values.
-      throw new UnsupportedOperationException("Cannot convert value from BOOLEAN to JSON");
-    }
-
-    @Override
     public byte[] toBytes(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from BOOLEAN to BYTES");
     }
@@ -158,12 +151,6 @@ public enum PinotDataType {
     }
 
     @Override
-    public String toJson(Object value) {
-      // Accept only JSON TEXT not individual JSON values.
-      throw new UnsupportedOperationException("Cannot convert value from BYTE to JSON");
-    }
-
-    @Override
     public byte[] toBytes(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from BYTE to BYTES");
     }
@@ -198,12 +185,6 @@ public enum PinotDataType {
     @Override
     public Timestamp toTimestamp(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from CHARACTER to TIMESTAMP");
-    }
-
-    @Override
-    public String toJson(Object value) {
-      // Accept only JSON TEXT not individual JSON values.
-      throw new UnsupportedOperationException("Cannot convert value from CHARACTER to JSON");
     }
 
     @Override
@@ -254,12 +235,6 @@ public enum PinotDataType {
     }
 
     @Override
-    public String toJson(Object value) {
-      // Accept only JSON TEXT not individual JSON values.
-      throw new UnsupportedOperationException("Cannot convert value from SHORT to JSON");
-    }
-
-    @Override
     public byte[] toBytes(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from SHORT to BYTES");
     }
@@ -289,12 +264,6 @@ public enum PinotDataType {
     @Override
     public boolean toBoolean(Object value) {
       return (Integer) value != 0;
-    }
-
-    @Override
-    public String toJson(Object value) {
-      // Accept only JSON TEXT not individual JSON values.
-      throw new UnsupportedOperationException("Cannot convert value from INTEGER to JSON");
     }
 
     @Override
@@ -355,12 +324,6 @@ public enum PinotDataType {
     }
 
     @Override
-    public String toJson(Object value) {
-      // Accept only JSON TEXT not individual JSON values.
-      throw new UnsupportedOperationException("Cannot convert value from LONG to JSON");
-    }
-
-    @Override
     public byte[] toBytes(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from LONG to BYTES");
     }
@@ -408,12 +371,6 @@ public enum PinotDataType {
     }
 
     @Override
-    public String toJson(Object value) {
-      // Accept only JSON TEXT not individual JSON values.
-      throw new UnsupportedOperationException("Cannot convert value from FLOAT to JSON");
-    }
-
-    @Override
     public byte[] toBytes(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from FLOAT to BYTES");
     }
@@ -458,12 +415,6 @@ public enum PinotDataType {
     @Override
     public String toString(Object value) {
       return value.toString();
-    }
-
-    @Override
-    public String toJson(Object value) {
-      // Accept only JSON TEXT not individual JSON values.
-      throw new UnsupportedOperationException("Cannot convert value from DOUBLE to JSON");
     }
 
     @Override
@@ -525,12 +476,6 @@ public enum PinotDataType {
     }
 
     @Override
-    public String toJson(Object value) {
-      // Accept only JSON TEXT not individual JSON values.
-      throw new UnsupportedOperationException("Cannot convert value from TIMESTAMP to JSON");
-    }
-
-    @Override
     public byte[] toBytes(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from TIMESTAMP to BYTES");
     }
@@ -585,11 +530,6 @@ public enum PinotDataType {
     }
 
     @Override
-    public String toJson(Object value) {
-      return super.toJson(value);
-    }
-
-    @Override
     public byte[] toBytes(Object value) {
       return BytesUtils.toBytes(value.toString().trim());
     }
@@ -603,32 +543,33 @@ public enum PinotDataType {
   JSON {
     @Override
     public int toInt(Object value) {
-      throw new UnsupportedOperationException("Cannot convert value from JSON to INT");
+      return Integer.parseInt(value.toString().trim());
     }
 
     @Override
     public long toLong(Object value) {
-      throw new UnsupportedOperationException("Cannot convert value from JSON to LONG");
+      return Long.parseLong(value.toString().trim());
     }
 
     @Override
     public float toFloat(Object value) {
-      throw new UnsupportedOperationException("Cannot convert value from JSON to FLOAT");
+      return Float.parseFloat(value.toString().trim());
     }
 
     @Override
     public double toDouble(Object value) {
-      throw new UnsupportedOperationException("Cannot convert value from JSON to DOUBLE");
+      return Double.parseDouble(value.toString().trim());
     }
 
     @Override
     public boolean toBoolean(Object value) {
-      throw new UnsupportedOperationException("Cannot convert value from JSON to BOOLEAN");
+      return Boolean.parseBoolean(value.toString().trim());
     }
 
     @Override
     public Timestamp toTimestamp(Object value) {
-      throw new UnsupportedOperationException("Cannot convert value from JSON to TIMESTAMP");
+      return (value instanceof Long) ? new Timestamp(((Long) value).longValue())
+          : Timestamp.valueOf(value.toString().trim());
     }
 
     @Override
@@ -637,18 +578,23 @@ public enum PinotDataType {
     }
 
     @Override
-    public String toJson(Object value) {
-      return value.toString();
-    }
-
-    @Override
     public byte[] toBytes(Object value) {
-      throw new UnsupportedOperationException("Cannot convert value from JSON to BYTES");
+      if (value instanceof String) {
+        // Assume that input JSON string value is Base64 encoded.
+        try {
+          return Base64.getDecoder().decode(((String) value).getBytes("UTF-8"));
+        } catch (Exception e) {
+          throw new RuntimeException(
+              "Unable to convert JSON base64 encoded string value to BYTES. Input value: " + value, e);
+        }
+      }
+
+      throw new UnsupportedOperationException("Cannot convert non base64 encoded string value from JSON to BYTES");
     }
 
     @Override
     public String convert(Object value, PinotDataType sourceType) {
-      return sourceType.toString(value);
+      return sourceType.toJson(value);
     }
   },
 
@@ -686,12 +632,6 @@ public enum PinotDataType {
     @Override
     public String toString(Object value) {
       return BytesUtils.toHexString((byte[]) value);
-    }
-
-    @Override
-    public String toJson(Object value) {
-      // Accept only JSON TEXT not individual JSON values.
-      throw new UnsupportedOperationException("Cannot convert value from BYTES to JSON");
     }
 
     @Override
@@ -739,11 +679,6 @@ public enum PinotDataType {
     @Override
     public String toString(Object value) {
       return value.toString();
-    }
-
-    @Override
-    public String toJson(Object value) {
-      return super.toJson(value);
     }
 
     @Override
@@ -874,18 +809,21 @@ public enum PinotDataType {
     return getSingleValueType().toString(toObjectArray(value)[0]);
   }
 
+
   public String toJson(Object value) {
-    String jsonString = getSingleValueType().toString(toObjectArray(value)[0]);
-
-    // Check if the string is valid JSON.
-    JsonNode jsonNode = null;
-    try {
-      jsonNode = JsonUtils.stringToJsonNode(jsonString);
-    } catch (IOException ioe) {
-      throw new UnsupportedOperationException("Cannot convert value from STRING to JSON");
+    if (value instanceof String) {
+      try {
+        return JsonUtils.stringToJsonNode((String) value).toString();
+      } catch (Exception e) {
+        throw new RuntimeException("Unable to convert String into JSON. Input value: " + value, e);
+      }
+    } else {
+      try {
+        return JsonUtils.objectToString(value).toString();
+      } catch (Exception e) {
+        throw new RuntimeException("Unable to convert " + value.getClass().getCanonicalName() + " to JSON. Input value: " + value, e);
+      }
     }
-
-    return jsonNode.toString();
   }
 
   public byte[] toBytes(Object value) {
@@ -1076,7 +1014,7 @@ public enum PinotDataType {
   }
 
   public Object convert(Object value, PinotDataType sourceType) {
-    throw new UnsupportedOperationException("Cannot convert value form " + sourceType + " to " + this);
+    throw new UnsupportedOperationException("Cannot convert value from " + sourceType + " to " + this);
   }
 
   /**
@@ -1126,7 +1064,7 @@ public enum PinotDataType {
   /**
    * Returns the {@link PinotDataType} for the given {@link FieldSpec} for data ingestion purpose. Returns object array
    * type for multi-valued types.
-   * TODO: Add MV support for BOOLEAN, TIMESTAMP, BYTES, JSON
+   * TODO: Add MV support for BOOLEAN, TIMESTAMP, BYTES
    */
   public static PinotDataType getPinotDataTypeForIngestion(FieldSpec fieldSpec) {
     DataType dataType = fieldSpec.getDataType();
