@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.BiMap;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,6 +36,8 @@ import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
+import org.apache.pinot.spi.config.table.TableStatus;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -129,6 +132,49 @@ public class ConsumingSegmentInfoReader {
 
   private String generateServerURL(String tableNameWithType, String endpoint) {
     return String.format("%s/tables/%s/consumingSegmentsInfo", endpoint, tableNameWithType);
+  }
+
+  /**
+   * Utility method to derive ingestion status from consuming segment Info. Status is HEALTHY if
+   * consuming segment info specifies CONSUMING state for all active segments across all servers
+   * including replicas.
+   */
+  public TableStatus.IngestionStatus getIngestionStatus(String tableNameWithType, int timeoutMs) {
+    try {
+      ConsumingSegmentsInfoMap consumingSegmentsInfoMap = getConsumingSegmentsInfo(tableNameWithType, timeoutMs);
+      for (Map.Entry<String, List<ConsumingSegmentInfo>> consumingSegmentInfoEntry : consumingSegmentsInfoMap._segmentToConsumingInfoMap
+          .entrySet()) {
+        String segmentName = consumingSegmentInfoEntry.getKey();
+        List<ConsumingSegmentInfo> consumingSegmentInfoList = consumingSegmentInfoEntry.getValue();
+        if (consumingSegmentInfoList == null || consumingSegmentInfoList.isEmpty()) {
+          String errorMessage = "Did not get any response from servers for segment: " + segmentName;
+          return TableStatus.IngestionStatus.newIngestionStatus(TableStatus.IngestionState.UNHEALTHY, errorMessage);
+        }
+
+        // Check if any responses are missing
+        Set<String> serversForSegment = _pinotHelixResourceManager.getServersForSegment(tableNameWithType, segmentName);
+        if (serversForSegment.size() != consumingSegmentInfoList.size()) {
+          serversForSegment.removeAll(consumingSegmentInfoList);
+          String errorMessage =
+              "Not all servers responded for segment: " + segmentName + " Missing servers : " + serversForSegment;
+          return TableStatus.IngestionStatus.newIngestionStatus(TableStatus.IngestionState.UNHEALTHY, errorMessage);
+        }
+
+        for (ConsumingSegmentInfo consumingSegmentInfo : consumingSegmentInfoList) {
+          if (consumingSegmentInfo._consumerState
+              .equals(RealtimeSegmentDataManager.ConsumerState.NOT_CONSUMING.toString())) {
+            String errorMessage =
+                "Segment: " + segmentName + " is not being consumed on server: " + consumingSegmentInfo._serverName;
+            return TableStatus.IngestionStatus.newIngestionStatus(TableStatus.IngestionState.UNHEALTHY, errorMessage);
+          }
+        }
+      }
+      return TableStatus.IngestionStatus.newIngestionStatus(TableStatus.IngestionState.HEALTHY, "");
+    } catch (Exception e) {
+      String errorMessage = "Unable to get consuming segments info from all the servers. Reason: " + e.getMessage();
+      LOGGER.error("Unable to get consuming segments info from all the servers", e);
+      return TableStatus.IngestionStatus.newIngestionStatus(TableStatus.IngestionState.UNHEALTHY, errorMessage);
+    }
   }
 
   /**

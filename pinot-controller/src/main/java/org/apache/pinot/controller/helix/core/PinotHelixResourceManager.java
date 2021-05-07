@@ -2117,6 +2117,17 @@ public class PinotHelixResourceManager {
     return consumingSegments;
   }
 
+  /**
+   * Utility function to return set of servers corresponding to a given segment.
+   */
+  public Set<String> getServersForSegment(String tableNameWithType, String segmentName) {
+    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
+    if (idealState == null) {
+      throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
+    }
+    return new HashSet<>(idealState.getInstanceStateMap(segmentName).keySet());
+  }
+
   public synchronized Map<String, String> getSegmentsCrcForTable(String tableNameWithType) {
     // Get the segment list for this table
     IdealState is = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);

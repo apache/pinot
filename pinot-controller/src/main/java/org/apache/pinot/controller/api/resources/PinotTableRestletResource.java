@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -47,6 +48,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -63,9 +65,11 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.recommender.RecommenderDriver;
+import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStats;
+import org.apache.pinot.spi.config.table.TableStatus;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -113,6 +117,12 @@ public class PinotTableRestletResource {
   @Inject
   AccessControlFactory _accessControlFactory;
   AccessControlUtils _accessControlUtils = new AccessControlUtils();
+
+  @Inject
+  Executor _executor;
+
+  @Inject
+  HttpConnectionManager _connectionManager;
 
   /**
    * API to create a table. Before adding, validations will be done (min number of replicas,
@@ -584,6 +594,33 @@ public class PinotTableRestletResource {
         TableConfigUtils.verifyHybridTableConfigs(rawTableName, tableConfig,
             _pinotHelixResourceManager.getRealtimeTableConfig(rawTableName));
       }
+    }
+  }
+
+  @GET
+  @Path("/tables/{tableName}/status")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "table status", notes = "Provides status of the table including ingestion status")
+  public String getTableStatus(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
+    try {
+      TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+      if (TableType.OFFLINE == tableType) {
+        // TODO: Support table status for offline table. Currently only supported for realtime.
+        throw new IllegalStateException("Table status for OFFLINE table: " + tableName + " is currently unsupported");
+      }
+      String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
+      ConsumingSegmentInfoReader consumingSegmentInfoReader =
+          new ConsumingSegmentInfoReader(_executor, _connectionManager, _pinotHelixResourceManager);
+      TableStatus.IngestionStatus ingestionStatus = consumingSegmentInfoReader
+          .getIngestionStatus(tableNameWithType, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+      TableStatus tableStatus = new TableStatus(ingestionStatus);
+      return JsonUtils.objectToPrettyString(tableStatus);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to get status (ingestion status) for table %s. Reason: %s", tableName, e.getMessage()),
+          Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 }

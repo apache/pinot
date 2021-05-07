@@ -27,8 +27,10 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -42,6 +44,7 @@ import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager.ConsumerState;
+import org.apache.pinot.spi.config.table.TableStatus;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.mockito.ArgumentMatchers;
 import org.slf4j.Logger;
@@ -180,15 +183,38 @@ public class ConsumingSegmentInfoReaderTest {
     return endpoints;
   }
 
-  private ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap testRunner(final String[] servers,
-      final Set<String> consumingSegments, String table)
+  private void mockSetup(final String[] servers, final Set<String> consumingSegments)
       throws InvalidConfigException {
     when(helix.getServerToSegmentsMap(anyString())).thenAnswer(invocationOnMock -> subsetOfServerSegments(servers));
     when(helix.getDataInstanceAdminEndpoints(ArgumentMatchers.anySet()))
         .thenAnswer(invocationOnMock -> serverEndpoints(servers));
     when(helix.getConsumingSegments(anyString())).thenAnswer(invocationOnMock -> consumingSegments);
+    when(helix.getServersForSegment(anyString(), anyString())).thenAnswer(invocationOnMock -> new HashSet<>(
+        Arrays.asList(servers)));
+  }
+
+  private ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap testRunner(final String[] servers,
+      final Set<String> consumingSegments, String table)
+      throws InvalidConfigException {
+    mockSetup(servers, consumingSegments);
     ConsumingSegmentInfoReader reader = new ConsumingSegmentInfoReader(executor, connectionManager, helix);
     return reader.getConsumingSegmentsInfo(table, timeoutMsec);
+  }
+
+  private TableStatus.IngestionStatus testRunnerIngestionStatus(final String[] servers,
+      final Set<String> consumingSegments, String table)
+      throws InvalidConfigException {
+    mockSetup(servers, consumingSegments);
+    ConsumingSegmentInfoReader reader = new ConsumingSegmentInfoReader(executor, connectionManager, helix);
+    return reader.getIngestionStatus(table, timeoutMsec);
+  }
+
+  private void checkIngestionStatus(final String[] servers, final Set<String> consumingSegments,
+      TableStatus.IngestionState expectedState)
+      throws InvalidConfigException {
+    TableStatus.IngestionStatus ingestionStatus =
+        testRunnerIngestionStatus(servers, consumingSegments, TABLE_NAME);
+    Assert.assertEquals(ingestionStatus.getIngestionState(), expectedState);
   }
 
   @Test
@@ -196,6 +222,7 @@ public class ConsumingSegmentInfoReaderTest {
       throws InvalidConfigException {
     ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentsInfoMap =
         testRunner(new String[]{}, Collections.emptySet(), TABLE_NAME);
+    checkIngestionStatus(new String[]{}, Collections.emptySet(), TableStatus.IngestionState.HEALTHY);
     Assert.assertTrue(consumingSegmentsInfoMap._segmentToConsumingInfoMap.isEmpty());
   }
 
@@ -206,8 +233,10 @@ public class ConsumingSegmentInfoReaderTest {
   public void testHappyPath()
       throws InvalidConfigException {
     final String[] servers = {"server0", "server1"};
+    final Set<String> consumingSegments = Sets.newHashSet(SEGMENT_NAME_PARTITION_0, SEGMENT_NAME_PARTITION_1);
     ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentsInfoMap =
-        testRunner(servers, Sets.newHashSet(SEGMENT_NAME_PARTITION_0, SEGMENT_NAME_PARTITION_1), TABLE_NAME);
+        testRunner(servers, consumingSegments, TABLE_NAME);
+    checkIngestionStatus(servers, consumingSegments, TableStatus.IngestionState.HEALTHY);
 
     List<ConsumingSegmentInfoReader.ConsumingSegmentInfo> consumingSegmentInfos =
         consumingSegmentsInfoMap._segmentToConsumingInfoMap.get(SEGMENT_NAME_PARTITION_0);
@@ -231,8 +260,11 @@ public class ConsumingSegmentInfoReaderTest {
   public void testNotConsumingState()
       throws InvalidConfigException {
     final String[] servers = {"server0", "server2"};
+    final Set<String> consumingSegments = Sets.newHashSet(SEGMENT_NAME_PARTITION_0, SEGMENT_NAME_PARTITION_1);
     ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentsInfoMap =
-        testRunner(servers, Sets.newHashSet(SEGMENT_NAME_PARTITION_0, SEGMENT_NAME_PARTITION_1), TABLE_NAME);
+        testRunner(servers, consumingSegments, TABLE_NAME);
+    checkIngestionStatus(servers, consumingSegments, TableStatus.IngestionState.UNHEALTHY);
+
     List<ConsumingSegmentInfoReader.ConsumingSegmentInfo> consumingSegmentInfos =
         consumingSegmentsInfoMap._segmentToConsumingInfoMap.get(SEGMENT_NAME_PARTITION_0);
     Assert.assertEquals(consumingSegmentInfos.size(), 2);
@@ -258,8 +290,11 @@ public class ConsumingSegmentInfoReaderTest {
   public void testNoConsumerButConsumingInIdealState()
       throws InvalidConfigException {
     final String[] servers = {"server3"};
+    final Set<String> consumingSegments = Sets.newHashSet(SEGMENT_NAME_PARTITION_0, SEGMENT_NAME_PARTITION_1);
     ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentsInfoMap =
-        testRunner(servers, Sets.newHashSet(SEGMENT_NAME_PARTITION_0, SEGMENT_NAME_PARTITION_1), TABLE_NAME);
+        testRunner(servers, consumingSegments, TABLE_NAME);
+    checkIngestionStatus(servers, consumingSegments, TableStatus.IngestionState.UNHEALTHY);
+
     List<ConsumingSegmentInfoReader.ConsumingSegmentInfo> consumingSegmentInfos =
         consumingSegmentsInfoMap._segmentToConsumingInfoMap.get(SEGMENT_NAME_PARTITION_0);
     Assert.assertTrue(consumingSegmentInfos.isEmpty());
@@ -277,8 +312,12 @@ public class ConsumingSegmentInfoReaderTest {
   public void testNoConsumerOfflineInIdealState()
       throws InvalidConfigException {
     final String[] servers = {"server3"};
+    Set<String> consumingSegments = Sets.newHashSet(SEGMENT_NAME_PARTITION_1);
     ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentsInfoMap =
-        testRunner(servers, Sets.newHashSet(SEGMENT_NAME_PARTITION_1), TABLE_NAME);
+        testRunner(servers, consumingSegments, TABLE_NAME);
+    consumingSegments = Sets.newHashSet(SEGMENT_NAME_PARTITION_0, SEGMENT_NAME_PARTITION_1);
+    checkIngestionStatus(servers, consumingSegments, TableStatus.IngestionState.UNHEALTHY);
+
     List<ConsumingSegmentInfoReader.ConsumingSegmentInfo> consumingSegmentInfos =
         consumingSegmentsInfoMap._segmentToConsumingInfoMap.get(SEGMENT_NAME_PARTITION_0);
     Assert.assertNull(consumingSegmentInfos);
@@ -296,8 +335,11 @@ public class ConsumingSegmentInfoReaderTest {
   public void testErrorFromServer()
       throws InvalidConfigException {
     final String[] servers = {"server0", "server4"};
+    final Set<String> consumingSegments = Sets.newHashSet(SEGMENT_NAME_PARTITION_0, SEGMENT_NAME_PARTITION_1);
     ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentsInfoMap =
-        testRunner(servers, Sets.newHashSet(SEGMENT_NAME_PARTITION_0, SEGMENT_NAME_PARTITION_1), TABLE_NAME);
+        testRunner(servers, consumingSegments, TABLE_NAME);
+    checkIngestionStatus(servers, consumingSegments, TableStatus.IngestionState.UNHEALTHY);
+
     List<ConsumingSegmentInfoReader.ConsumingSegmentInfo> consumingSegmentInfos =
         consumingSegmentsInfoMap._segmentToConsumingInfoMap.get(SEGMENT_NAME_PARTITION_0);
     Assert.assertEquals(consumingSegmentInfos.size(), 1);
