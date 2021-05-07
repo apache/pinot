@@ -50,7 +50,7 @@ import org.testng.annotations.Test;
 
 
 /**
- * Test cases verifying evaluation of predicate with expressions that contain numerical values of different types.
+ * Test cases verifying query evaluation against column of type JSON.
  */
 public class JsonDatatypeTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "JsonMatchPredicateTest");
