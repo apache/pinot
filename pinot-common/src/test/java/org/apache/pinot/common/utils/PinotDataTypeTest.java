@@ -18,6 +18,11 @@
  */
 package org.apache.pinot.common.utils;
 
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.utils.PinotDataType.*;
@@ -28,16 +33,16 @@ import static org.testng.Assert.fail;
 
 public class PinotDataTypeTest {
   private static final PinotDataType[] SOURCE_TYPES =
-      {BYTE, CHARACTER, SHORT, INTEGER, LONG, FLOAT, DOUBLE, STRING, BYTE_ARRAY, CHARACTER_ARRAY, SHORT_ARRAY, INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY};
+      {BYTE, CHARACTER, SHORT, INTEGER, LONG, FLOAT, DOUBLE, STRING, JSON, BYTE_ARRAY, CHARACTER_ARRAY, SHORT_ARRAY, INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY};
   private static final Object[] SOURCE_VALUES =
-      {(byte) 123, (char) 123, (short) 123, 123, 123L, 123f, 123d, " 123", new Object[]{(byte) 123}, new Object[]{(char) 123}, new Object[]{(short) 123}, new Object[]{123}, new Object[]{123L}, new Object[]{123f}, new Object[]{123d}, new Object[]{" 123"}};
+      {(byte) 123, (char) 123, (short) 123, 123, 123L, 123f, 123d, " 123", "123 ", new Object[]{(byte) 123}, new Object[]{(char) 123}, new Object[]{(short) 123}, new Object[]{123}, new Object[]{123L}, new Object[]{123f}, new Object[]{123d}, new Object[]{" 123"}};
   private static final PinotDataType[] DEST_TYPES =
       {INTEGER, LONG, FLOAT, DOUBLE, INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY};
   private static final Object[] EXPECTED_DEST_VALUES =
       {123, 123L, 123f, 123d, new Object[]{123}, new Object[]{123L}, new Object[]{123f}, new Object[]{123d}};
   private static final String[] EXPECTED_STRING_VALUES =
       {Byte.toString((byte) 123), Character.toString((char) 123), Short.toString((short) 123), Integer.toString(
-          123), Long.toString(123L), Float.toString(123f), Double.toString(123d), " 123", Byte.toString(
+          123), Long.toString(123L), Float.toString(123f), Double.toString(123d), " 123", "123 ", Byte.toString(
           (byte) 123), Character.toString((char) 123), Short.toString((short) 123), Integer.toString(
           123), Long.toString(123L), Float.toString(123f), Double.toString(123d), " 123"};
 
@@ -76,6 +81,9 @@ public class PinotDataTypeTest {
     assertEquals(DOUBLE.convert(false, BOOLEAN), 0d);
     assertEquals(STRING.convert(true, BOOLEAN), "true");
     assertEquals(STRING.convert(false, BOOLEAN), "false");
+
+    assertEquals(BOOLEAN.convert("true", JSON), true);
+    assertEquals(BOOLEAN.convert("false", JSON), false);
   }
 
   @Test
@@ -89,8 +97,27 @@ public class PinotDataTypeTest {
     assertEquals(STRING.convert(new byte[]{0, 1}, BYTES), "0001");
     assertEquals(BYTES.convert("0001", STRING), new byte[]{0, 1});
     assertEquals(BYTES.convert(new byte[]{0, 1}, BYTES), new byte[]{0, 1});
+    assertEquals(BYTES.convert("AAE=", JSON), new byte[]{0,1});
     assertEquals(BYTES.convert(new Byte[]{0, 1}, BYTE_ARRAY), new byte[]{0, 1});
     assertEquals(BYTES.convert(new String[]{"0001"}, STRING_ARRAY), new byte[]{0, 1});
+  }
+
+  @Test
+  public void testTimestamp() {
+    Timestamp timestamp = Timestamp.valueOf(LocalDateTime.now());
+    assertEquals(TIMESTAMP.convert(timestamp.getTime(), LONG), timestamp);
+    assertEquals(TIMESTAMP.convert(timestamp.toString(), STRING), timestamp);
+    assertEquals(TIMESTAMP.convert(timestamp.getTime(), JSON), timestamp);
+    assertEquals(TIMESTAMP.convert(timestamp.toString(), JSON), timestamp);
+  }
+
+  @Test
+  public void testJSON() {
+    assertEquals(JSON.convert(false, BOOLEAN), "false");
+    assertEquals(JSON.convert(true, BOOLEAN), "true");
+    assertEquals(JSON.convert(new byte[]{0, 1}, BYTES), "\"AAE=\""); // Base64 encoding.
+    assertEquals(JSON.convert("{\"bytes\":\"AAE=\",\"map\":{\"key1\":\"value\",\"key2\":null,\"array\":[-5.4,4,\"2\"]},\"timestamp\":1620324238610}", STRING), "{\"bytes\":\"AAE=\",\"map\":{\"key1\":\"value\",\"key2\":null,\"array\":[-5.4,4,\"2\"]},\"timestamp\":1620324238610}");
+    assertEquals(JSON.convert(new Timestamp(1620324238610l), TIMESTAMP), "1620324238610");
   }
 
   @Test
@@ -102,43 +129,64 @@ public class PinotDataTypeTest {
     assertTrue(OBJECT.toBoolean(new NumberObject("123")));
     assertEquals(OBJECT.toTimestamp(new NumberObject("123")).getTime(), 123L);
     assertEquals(OBJECT.toString(new NumberObject("123")), "123");
+    assertEquals(OBJECT.toJson(getGenericTestObject()), "{\"bytes\":\"AAE=\",\"map\":{\"key1\":\"value\",\"key2\":null,\"array\":[-5.4,4,\"2\"]},\"timestamp\":1620324238610}");
     assertEquals(OBJECT_ARRAY.getSingleValueType(), OBJECT);
+  }
+
+  private static Object getGenericTestObject() {
+    Map<String, Object> map1 = new HashMap<>();
+    map1.put("array", Arrays.asList(-5.4,4, "2"));
+    map1.put("key1", "value");
+    map1.put("key2", null);
+
+    Map<String, Object> map2 = new HashMap<>();
+    map2.put("map", map1);
+    map2.put("bytes", new byte[]{0,1});
+    map2.put("timestamp", new Timestamp(1620324238610l));
+
+    return map2;
   }
 
   @Test
   public void testInvalidConversion() {
     for (PinotDataType sourceType : values()) {
-      if (sourceType.isSingleValue() && sourceType != STRING && sourceType != BYTES) {
-        assertInvalidConversion(sourceType, BYTES);
+      if (sourceType.isSingleValue() && sourceType != STRING && sourceType != BYTES && sourceType != JSON) {
+        assertInvalidConversion(null, sourceType, BYTES, UnsupportedOperationException.class);
       }
     }
 
-    assertInvalidConversion(BYTES, INTEGER);
-    assertInvalidConversion(BYTES, LONG);
-    assertInvalidConversion(BYTES, FLOAT);
-    assertInvalidConversion(BYTES, DOUBLE);
-    assertInvalidConversion(BYTES, INTEGER_ARRAY);
-    assertInvalidConversion(BYTES, LONG_ARRAY);
-    assertInvalidConversion(BYTES, FLOAT_ARRAY);
-    assertInvalidConversion(BYTES, DOUBLE_ARRAY);
+    assertInvalidConversion(null, BYTES, INTEGER, UnsupportedOperationException.class);
+    assertInvalidConversion(null, BYTES, LONG, UnsupportedOperationException.class);
+    assertInvalidConversion(null, BYTES, FLOAT, UnsupportedOperationException.class);
+    assertInvalidConversion(null, BYTES, DOUBLE, UnsupportedOperationException.class);
+    assertInvalidConversion(null, BYTES, INTEGER_ARRAY, UnsupportedOperationException.class);
+    assertInvalidConversion(null, BYTES, LONG_ARRAY, UnsupportedOperationException.class);
+    assertInvalidConversion(null, BYTES, FLOAT_ARRAY, UnsupportedOperationException.class);
+    assertInvalidConversion(null, BYTES, DOUBLE_ARRAY, UnsupportedOperationException.class);
 
     for (PinotDataType sourceType : values()) {
-      assertInvalidConversion(sourceType, BYTE);
-      assertInvalidConversion(sourceType, CHARACTER);
-      assertInvalidConversion(sourceType, SHORT);
-      assertInvalidConversion(sourceType, OBJECT);
-      assertInvalidConversion(sourceType, BYTE_ARRAY);
-      assertInvalidConversion(sourceType, CHARACTER_ARRAY);
-      assertInvalidConversion(sourceType, SHORT_ARRAY);
-      assertInvalidConversion(sourceType, OBJECT_ARRAY);
+      assertInvalidConversion(null, sourceType, BYTE, UnsupportedOperationException.class);
+      assertInvalidConversion(null, sourceType, CHARACTER, UnsupportedOperationException.class);
+      assertInvalidConversion(null, sourceType, SHORT, UnsupportedOperationException.class);
+      assertInvalidConversion(null, sourceType, OBJECT, UnsupportedOperationException.class);
+      assertInvalidConversion(null, sourceType, BYTE_ARRAY, UnsupportedOperationException.class);
+      assertInvalidConversion(null, sourceType, CHARACTER_ARRAY, UnsupportedOperationException.class);
+      assertInvalidConversion(null, sourceType, SHORT_ARRAY, UnsupportedOperationException.class);
+      assertInvalidConversion(null, sourceType, OBJECT_ARRAY, UnsupportedOperationException.class);
     }
+
+    assertInvalidConversion("xyz", STRING, JSON, RuntimeException.class);
+
   }
 
-  private void assertInvalidConversion(PinotDataType sourceType, PinotDataType destType) {
+  private void assertInvalidConversion(Object value, PinotDataType sourceType, PinotDataType destType,
+      Class expectedExceptionType) {
     try {
-      destType.convert(null, sourceType);
-    } catch (UnsupportedOperationException e) {
-      return;
+      destType.convert(value, sourceType);
+    } catch (Exception e) {
+      if (e.getClass().equals(expectedExceptionType)) {
+        return;
+      }
     }
     fail();
   }

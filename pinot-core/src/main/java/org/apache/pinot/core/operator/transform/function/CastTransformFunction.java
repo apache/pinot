@@ -76,6 +76,9 @@ public class CastTransformFunction extends BaseTransformFunction {
         case "VARCHAR":
           _resultMetadata = STRING_SV_NO_DICTIONARY_METADATA;
           break;
+        case "JSON":
+          _resultMetadata = JSON_SV_NO_DICTIONARY_METADATA;
+          break;
         default:
           throw new IllegalArgumentException("Unable to cast expression to type - " + targetType);
       }

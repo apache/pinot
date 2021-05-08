@@ -243,6 +243,7 @@ public class DataSchema {
     BOOLEAN /* Stored as INT */,
     TIMESTAMP /* Stored as LONG */,
     STRING,
+    JSON /* Stored as STRING */,
     BYTES,
     OBJECT,
     INT_ARRAY,
@@ -260,6 +261,8 @@ public class DataSchema {
           return INT;
         case TIMESTAMP:
           return LONG;
+        case JSON:
+          return STRING;
         default:
           return this;
       }
@@ -308,6 +311,8 @@ public class DataSchema {
           return DataType.TIMESTAMP;
         case STRING:
           return DataType.STRING;
+        case JSON:
+          return DataType.JSON;
         case BYTES:
           return DataType.BYTES;
         default:
@@ -334,6 +339,7 @@ public class DataSchema {
         case TIMESTAMP:
           return new Timestamp((Long) value);
         case STRING:
+        case JSON:
           return value.toString();
         case BYTES:
           return ((ByteArray) value).getBytes();
@@ -421,6 +427,7 @@ public class DataSchema {
         case TIMESTAMP:
           return new Timestamp((Long) value).toString();
         case STRING:
+        case JSON:
           return value.toString();
         case BYTES:
           return ((ByteArray) value).toHexString();
@@ -495,6 +502,8 @@ public class DataSchema {
           return TIMESTAMP;
         case STRING:
           return STRING;
+        case JSON:
+          return JSON;
         case BYTES:
           return BYTES;
         default:

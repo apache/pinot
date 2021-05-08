@@ -443,6 +443,7 @@ public final class Schema implements Serializable {
             case BOOLEAN:
             case TIMESTAMP:
             case STRING:
+            case JSON:
             case BYTES:
               break;
             default:

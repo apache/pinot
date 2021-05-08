@@ -193,6 +193,7 @@ public class JsonUtils {
         return jsonValue.asBoolean();
       case TIMESTAMP:
       case STRING:
+      case JSON:
         return jsonValue.asText();
       case BYTES:
         try {

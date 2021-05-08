@@ -27,6 +27,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -50,12 +51,9 @@ import org.testng.annotations.Test;
 
 
 /**
- * Test cases verifying evaluation of predicate with expressions that contain numerical values of different types.
- * TODO: Update these test cases to: 1) use V2 JSON_MATCH function, 2) use multi-dimensional JSON array addressing,
- * 3) do json_extract_scalar on a column other than the JSON_MATCH column, 4) query deeper levels of nesting, and
- * 5) add test cases for GROUP BY on json_extract_scalar or path expressions.
+ * Test cases verifying query evaluation against column of type JSON.
  */
-public class JsonMatchPredicateTest extends BaseQueriesTest {
+public class JsonDatatypeTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "JsonMatchPredicateTest");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
@@ -66,7 +64,7 @@ public class JsonMatchPredicateTest extends BaseQueriesTest {
   private static final String STRING_COLUMN = "stringColumn";
   private static final Schema SCHEMA =
       new Schema.SchemaBuilder().addSingleValueDimension(INT_COLUMN, FieldSpec.DataType.INT)
-          .addSingleValueDimension(JSON_COLUMN, FieldSpec.DataType.STRING)
+          .addSingleValueDimension(JSON_COLUMN, FieldSpec.DataType.JSON)
           .addSingleValueDimension(STRING_COLUMN, FieldSpec.DataType.STRING).build();
   private static final TableConfig TABLE_CONFIG =
       new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
@@ -146,18 +144,34 @@ public class JsonMatchPredicateTest extends BaseQueriesTest {
     _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
   }
 
+  /** Verify result column type of a simple select query against JSON column */
+  @Test
+  public void testSimpleSelectOnJsonColumn() {
+    try {
+      Operator operator = getOperatorForSqlQuery("select jsonColumn FROM testTable");
+      IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
+      Collection<Object[]> rows = block.getSelectionResult();
+      Assert.assertEquals(rows.size(), 9);
+      Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.JSON);
+    } catch (IllegalStateException ise) {
+      Assert.assertTrue(true);
+    }
+  }
+
   /** Test filtering on string value associated with  JSON key*/
   @Test
   public void testExtractScalarWithStringFilter() {
     Operator operator = getOperatorForSqlQuery(
-        "select json_extract_scalar(jsonColumn, '$.name.last', 'STRING') FROM testTable WHERE json_extract_scalar(jsonColumn, '$.name.first', 'STRING') = 'daffy'");
+        "select intColumn, json_extract_scalar(jsonColumn, '$.name.last', 'STRING') FROM testTable WHERE json_extract_scalar(jsonColumn, '$.name.first', 'STRING') = 'daffy'");
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     Collection<Object[]> rows = block.getSelectionResult();
     Assert.assertEquals(rows.size(), 1);
 
     Iterator<Object[]> iterator = rows.iterator();
     Assert.assertTrue(iterator.hasNext());
-    Assert.assertEquals(iterator.next()[0], "duck");
+    Object[] row = iterator.next();
+    Assert.assertEquals(row[0], 1);
+    Assert.assertEquals(row[1], "duck");
   }
 
   /** Test filtering on number value associated with  JSON key*/
@@ -283,37 +297,6 @@ public class JsonMatchPredicateTest extends BaseQueriesTest {
     Assert.assertEquals(iterator.next()[0], "pluto");
     Assert.assertTrue(iterator.hasNext());
     Assert.assertEquals(iterator.next()[0], "goofy");
-  }
-
-  /** Evaluate json_extract_scalar over string column that does not contain valid json data. */
-  @Test
-  public void testJsonExtractScalarAgainstInvalidJson() {
-    // json_extract_scalar throws exception since we are trying to parse a non-JSON string.
-    Operator operator1 = getOperatorForSqlQuery(
-        "select count(*) FROM testTable WHERE json_extract_scalar(stringColumn, '$.name.first', 'INT') = 0");
-    try {
-      IntermediateResultsBlock block1 = (IntermediateResultsBlock) operator1.nextBlock();
-      Assert.fail("Expected query to fail with Exception.");
-    } catch (RuntimeException re) {
-      // JSON parsing exception expected.
-    }
-
-    // JSON data is stored in columns of type STRING, so there is nothing preventing the column from storing bad json
-    // string. Bad JSON string in columns will cause json_extract_scalar to throw an exception which would terminate
-    // query processing. However, when json_extract_scalar is used within the WHERE clause, we should return the
-    // default value instead of throwing exception. This will allow the predicate to be evaluated to either true or
-    // false and hence allow the query to complete successfully. Returning default value from json_extract_scalar is
-    // an undocumented feature. Ideally, json_extract_scalar should return NULL when it encounters bad JSON. However,
-    // NULL support is currently pending, so this is the best we can do.
-    Operator operator2 = getOperatorForSqlQuery(
-        "select count(*) FROM testTable WHERE json_extract_scalar(stringColumn, '$.name.first', 'INT', 0) = 0");
-
-    IntermediateResultsBlock block2 = (IntermediateResultsBlock) operator2.nextBlock();
-    Collection<Object[]> rows = block2.getSelectionResult();
-
-    // None of the values in stringColumn are valid JSON. Hence, json_extract_scalar should default to '0' for all rows
-    // and count returned by the query should be 9 (same as number of rows in the table).
-    Assert.assertEquals(block2.getAggregationResult().get(0), 9L);
   }
 
   @AfterClass

@@ -64,7 +64,7 @@ public class ColumnMinMaxValueGenerator {
     Set<String> columnsToAddMinMaxValue = new HashSet<>(schema.getPhysicalColumnNames());
 
     // mode ALL - use all columns
-    // mode NON_METRIC - use all dimensions and time columns 
+    // mode NON_METRIC - use all dimensions and time columns
     // mode TIME - use only time columns
     switch (_columnMinMaxValueGeneratorMode) {
       case TIME:
@@ -89,7 +89,7 @@ public class ColumnMinMaxValueGenerator {
     }
 
     PinotDataBuffer dictionaryBuffer = _segmentWriter.getIndexFor(columnName, ColumnIndexType.DICTIONARY);
-    DataType dataType = columnMetadata.getDataType();
+    DataType dataType = columnMetadata.getDataType().getStoredType();
     int length = columnMetadata.getCardinality();
     switch (dataType) {
       case INT:
@@ -146,8 +146,8 @@ public class ColumnMinMaxValueGenerator {
   private void saveMetadata()
       throws Exception {
     if (_minMaxValueAdded) {
-      // Commons Configuration 1.10 does not support file path containing '%'. 
-      // Explicitly providing the output stream for the file bypasses the problem. 
+      // Commons Configuration 1.10 does not support file path containing '%'.
+      // Explicitly providing the output stream for the file bypasses the problem.
       try (FileOutputStream fileOutputStream = new FileOutputStream(_segmentProperties.getFile())) {
         _segmentProperties.save(fileOutputStream);
       }

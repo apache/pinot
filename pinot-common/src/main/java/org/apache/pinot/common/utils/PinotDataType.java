@@ -19,12 +19,14 @@
 package org.apache.pinot.common.utils;
 
 import java.sql.Timestamp;
+import java.util.Base64;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
 
 
@@ -538,6 +540,60 @@ public enum PinotDataType {
     }
   },
 
+  JSON {
+    @Override
+    public int toInt(Object value) {
+      return Integer.parseInt(value.toString().trim());
+    }
+
+    @Override
+    public long toLong(Object value) {
+      return Long.parseLong(value.toString().trim());
+    }
+
+    @Override
+    public float toFloat(Object value) {
+      return Float.parseFloat(value.toString());
+    }
+
+    @Override
+    public double toDouble(Object value) {
+      return Double.parseDouble(value.toString());
+    }
+
+    @Override
+    public boolean toBoolean(Object value) {
+      return Boolean.parseBoolean(value.toString().trim());
+    }
+
+    @Override
+    public Timestamp toTimestamp(Object value) {
+      return TimestampUtils.toTimestamp(value.toString().trim());
+    }
+
+    @Override
+    public String toString(Object value) {
+      return value.toString();
+    }
+
+    @Override
+    public byte[] toBytes(Object value) {
+      // Base64 encoding is the commonly used mechanism for encoding binary data in JSON documents. Note that
+      // toJson function converts byte[] into a Base64 encoded json string value.
+      try {
+        return Base64.getDecoder().decode(value.toString());
+      } catch (Exception e) {
+        throw new RuntimeException(
+            "Unable to convert JSON base64 encoded string value to BYTES. Input value: " + value, e);
+      }
+    }
+
+    @Override
+    public String convert(Object value, PinotDataType sourceType) {
+      return sourceType.toJson(value);
+    }
+  },
+
   BYTES {
     @Override
     public int toInt(Object value) {
@@ -717,7 +773,8 @@ public enum PinotDataType {
   OBJECT_ARRAY;
 
   /**
-   * NOTE: override toInt(), toLong(), toFloat(), toDouble(), toBoolean(), toTimestamp(), toString() and toBytes() for single-value types.
+   * NOTE: override toInt(), toLong(), toFloat(), toDouble(), toBoolean(), toTimestamp(), toString(), and
+   * toBytes() for single-value types.
    */
 
   public int toInt(Object value) {
@@ -746,6 +803,23 @@ public enum PinotDataType {
 
   public String toString(Object value) {
     return getSingleValueType().toString(toObjectArray(value)[0]);
+  }
+
+
+  public String toJson(Object value) {
+    if (value instanceof String) {
+      try {
+        return JsonUtils.stringToJsonNode((String) value).toString();
+      } catch (Exception e) {
+        throw new RuntimeException("Unable to convert String into JSON. Input value: " + value, e);
+      }
+    } else {
+      try {
+        return JsonUtils.objectToString(value).toString();
+      } catch (Exception e) {
+        throw new RuntimeException("Unable to convert " + value.getClass().getCanonicalName() + " to JSON. Input value: " + value, e);
+      }
+    }
   }
 
   public byte[] toBytes(Object value) {
@@ -936,7 +1010,7 @@ public enum PinotDataType {
   }
 
   public Object convert(Object value, PinotDataType sourceType) {
-    throw new UnsupportedOperationException("Cannot convert value form " + sourceType + " to " + this);
+    throw new UnsupportedOperationException("Cannot convert value from " + sourceType + " to " + this);
   }
 
   /**
@@ -1011,6 +1085,12 @@ public enum PinotDataType {
         } else {
           throw new IllegalStateException("There is no multi-value type for TIMESTAMP");
         }
+      case JSON:
+        if (fieldSpec.isSingleValueField()) {
+          return PinotDataType.JSON;
+        } else {
+          throw new IllegalStateException("There is no multi-value type for JSON");
+        }
       case STRING:
         return fieldSpec.isSingleValueField() ? PinotDataType.STRING : PinotDataType.STRING_ARRAY;
       case BYTES:
@@ -1045,6 +1125,8 @@ public enum PinotDataType {
         return TIMESTAMP;
       case STRING:
         return STRING;
+      case JSON:
+        return JSON;
       case BYTES:
         return BYTES;
       case INT_ARRAY:
