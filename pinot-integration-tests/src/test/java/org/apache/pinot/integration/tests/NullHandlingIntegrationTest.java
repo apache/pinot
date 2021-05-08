@@ -22,7 +22,9 @@ import java.io.File;
 import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.util.TestUtils;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -65,6 +67,22 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(10_000L);
+  }
+
+  @AfterClass
+  public void tearDown()
+      throws Exception {
+    dropRealtimeTable(getTableName());
+
+    // Stop the Pinot cluster
+    stopServer();
+    stopBroker();
+    stopController();
+    // Stop Kafka
+    stopKafka();
+    // Stop Zookeeper
+    stopZk();
+    FileUtils.deleteDirectory(_tempDir);
   }
 
   @Override

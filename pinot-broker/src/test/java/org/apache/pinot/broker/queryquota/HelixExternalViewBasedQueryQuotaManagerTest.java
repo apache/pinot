@@ -78,7 +78,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
 
   private HelixManager initHelixManager(String helixClusterName) {
     return new FakeHelixManager(helixClusterName, BROKER_INSTANCE_ID, InstanceType.PARTICIPANT,
-        ZkStarter.DEFAULT_ZK_STR);
+        _zookeeperInstance.getZkUrl());
   }
 
   public class FakeHelixManager extends ZKHelixManager {
@@ -86,7 +86,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
 
     FakeHelixManager(String clusterName, String instanceName, InstanceType instanceType, String zkAddress) {
       super(clusterName, instanceName, instanceType, zkAddress);
-      super._zkclient = new ZkClient(StringUtil.join("/", StringUtils.chomp(ZkStarter.DEFAULT_ZK_STR, "/")),
+      super._zkclient = new ZkClient(StringUtil.join("/", StringUtils.chomp(_zookeeperInstance.getZkUrl(), "/")),
           ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
       _zkclient.deleteRecursively("/" + clusterName + "/PROPERTYSTORE");
       _zkclient.createPersistent("/" + clusterName + "/PROPERTYSTORE", true);

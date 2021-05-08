@@ -23,8 +23,8 @@ metadata:
   name: {{ include "pinot.server.config" . }}
 data:
   pinot-server.conf: |-
-    pinot.server.netty.port={{ .Values.server.ports.netty }}
-    pinot.server.adminapi.port={{ .Values.server.ports.admin }}
+    pinot.server.netty.port={{ .Values.server.service.nettyPort }}
+    pinot.server.adminapi.port={{ .Values.server.service.adminPort }}
     pinot.server.instance.dataDir={{ .Values.server.dataDir }}
     pinot.server.instance.segmentTarDir={{ .Values.server.segmentTarDir }}
 {{ .Values.server.extra.configs | indent 4 }}

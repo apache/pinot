@@ -61,6 +61,7 @@ eksctl create cluster \
 --nodes-max 4 \
 --node-ami auto
 ```
+
 You can monitor cluster status by command:
 
 ```bash
@@ -80,6 +81,7 @@ aws eks update-kubeconfig --name ${EKS_CLUSTER_NAME}
 ```
 
 To verify the connection, you can run
+
 ```bash
 kubectl get nodes
 ```
@@ -114,7 +116,7 @@ GCLOUD_EMAIL=pinot-demo@example.com
 ./setup_gke.sh
 ```
 
-### (Optional) How to connect to an existing cluster
+### (Optional) How to connect to an existing GKE cluster
 
 Simply run below command to get the credential for the cluster you just created or your existing cluster.
 Please modify the Env variables `${GCLOUD_PROJECT}`, `${GCLOUD_ZONE}`, `${GCLOUD_CLUSTER}` accordingly in below script.
@@ -125,7 +127,6 @@ GCLOUD_ZONE=us-west1-b
 GCLOUD_CLUSTER=pinot-quickstart
 gcloud container clusters get-credentials ${GCLOUD_CLUSTER} --zone ${GCLOUD_ZONE} --project ${GCLOUD_PROJECT}
 ```
-
 
 ## (Optional) Setup a Kubernetes cluster on Microsoft Azure
 
@@ -160,7 +161,7 @@ az aks create --resource-group ${AKS_RESOURCE_GROUP}  --name ${AKS_CLUSTER_NAME}
 az provider register --namespace Microsoft.Network
 ```
 
-### (Optional) How to connect to an existing cluster
+### (Optional) How to connect to an existing AKS cluster
 
 Simply run below command to get the credential for the cluster you just created or your existing cluster.
 
@@ -171,6 +172,7 @@ az aks get-credentials --resource-group ${AKS_RESOURCE_GROUP} --name ${AKS_CLUST
 ```
 
 To verify the connection, you can run
+
 ```bash
 kubectl get nodes
 ```
@@ -185,17 +187,22 @@ helm dependency update
 
 ### Start Pinot with Helm
 
-- For helm v3.1.2
+- For helm v3.X.X
 
 ```bash
 kubectl create ns pinot-quickstart
 helm install pinot -n pinot-quickstart .
 ```
 
-- For helm v3.0.0
+- For helm v3.X.X
 
 ```bash
 kubectl create ns pinot-quickstart
+
+# First run dry-run with debug to verify:
+helm install -n pinot-quickstart pinot . --dry-run --debug
+
+# Install the Helm chart with:
 helm install -n pinot-quickstart pinot .
 ```
 
@@ -213,7 +220,8 @@ Then deploy pinot cluster by:
 helm install --namespace "pinot-quickstart" --name "pinot" .
 ```
 
-#### Troubleshooting (For helm v2.12.1)
+### Troubleshooting (For helm v2.12.1)
+
 - Error: Please run below command if encountering issue:
 
 ```
@@ -248,7 +256,7 @@ kubectl get all -n pinot-quickstart
 
 #### Bring up a Kafka Cluster for realtime data ingestion
 
-- For helm v3.0.0
+- For helm v3.X.X
 
 ```bash
 helm repo add incubator https://charts.helm.sh/incubator

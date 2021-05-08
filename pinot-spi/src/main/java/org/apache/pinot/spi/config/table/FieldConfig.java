@@ -30,6 +30,7 @@ public class FieldConfig extends BaseJsonConfig {
   private final String _name;
   private final EncodingType _encodingType;
   private final IndexType _indexType;
+  private final CompressionCodec _compressionCodec;
   private final Map<String, String> _properties;
 
   public static String BLOOM_FILTER_COLUMN_KEY = "createBloomFilter";
@@ -51,11 +52,13 @@ public class FieldConfig extends BaseJsonConfig {
   public FieldConfig(@JsonProperty(value = "name", required = true) String name,
       @JsonProperty(value = "encodingType") @Nullable EncodingType encodingType,
       @JsonProperty(value = "indexType") @Nullable IndexType indexType,
+      @JsonProperty(value = "compressionCodec") @Nullable CompressionCodec compressionCodec,
       @JsonProperty(value = "properties") @Nullable Map<String, String> properties) {
     Preconditions.checkArgument(name != null, "'name' must be configured");
     _name = name;
     _encodingType = encodingType;
     _indexType = indexType;
+    _compressionCodec = compressionCodec;
     _properties = properties;
   }
 
@@ -67,6 +70,10 @@ public class FieldConfig extends BaseJsonConfig {
   // If null, there won't be any index
   public enum IndexType {
     INVERTED, SORTED, TEXT, FST, H3
+  }
+
+  public enum CompressionCodec {
+    PASS_THROUGH, SNAPPY, ZSTANDARD
   }
 
   public String getName() {
@@ -81,6 +88,11 @@ public class FieldConfig extends BaseJsonConfig {
   @Nullable
   public IndexType getIndexType() {
     return _indexType;
+  }
+
+  @Nullable
+  public CompressionCodec getCompressionCodec() {
+    return _compressionCodec;
   }
 
   @Nullable

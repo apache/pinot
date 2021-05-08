@@ -147,7 +147,7 @@ public abstract class ControllerTestUtils {
     properties.put(ControllerConf.CONTROLLER_HOST, LOCAL_HOST);
     properties.put(ControllerConf.CONTROLLER_PORT, DEFAULT_CONTROLLER_PORT);
     properties.put(ControllerConf.DATA_DIR, DEFAULT_DATA_DIR);
-    properties.put(ControllerConf.ZK_STR, ZkStarter.DEFAULT_ZK_STR);
+    properties.put(ControllerConf.ZK_STR, _zookeeperInstance.getZkUrl());
     properties.put(ControllerConf.HELIX_CLUSTER_NAME, getHelixClusterName());
 
     return properties;
@@ -234,7 +234,7 @@ public abstract class ControllerTestUtils {
       throws Exception {
     HelixManager helixManager =
         HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
-            ZkStarter.DEFAULT_ZK_STR);
+            _zookeeperInstance.getZkUrl());
     helixManager.getStateMachineEngine()
         .registerStateModelFactory(FakeBrokerResourceOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
             FakeBrokerResourceOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
@@ -333,7 +333,7 @@ public abstract class ControllerTestUtils {
       int adminPort) throws Exception {
     HelixManager helixManager =
         HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
-            ZkStarter.DEFAULT_ZK_STR);
+            _zookeeperInstance.getZkUrl());
     helixManager.getStateMachineEngine()
         .registerStateModelFactory(FakeSegmentOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
             FakeSegmentOnlineOfflineStateModelFactory.FACTORY_INSTANCE);

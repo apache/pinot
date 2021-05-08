@@ -31,6 +31,7 @@ import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.concurrent.ThreadSafe;
@@ -254,9 +255,10 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
    * @param numIntervalsToReportAndClearStatistics number of report intervals to report detailed statistics and clear
    *                                               them, 0 means never.
    * @param timeout timeout in milliseconds for completing all queries.
+   * @return QuerySummary containing final report of query stats
    * @throws Exception
    */
-  public static void singleThreadedQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
+  public static QuerySummary singleThreadedQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
       int numTimesToRunQueries, int reportIntervalMs, int numIntervalsToReportAndClearStatistics, long timeout)
       throws Exception {
     PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
@@ -275,7 +277,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       for (String query : queries) {
         if (timeout > 0 && System.currentTimeMillis() - startTimeAbsolute > timeout) {
           LOGGER.warn("Timeout of {} sec reached. Aborting", timeout);
-          return;
+          throw new TimeoutException("Timeout of " + timeout + " sec reached. Aborting");
         }
 
         JsonNode response = driver.postQuery(query);
@@ -291,7 +293,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         long currentTime = System.currentTimeMillis();
         if (currentTime - reportStartTime >= reportIntervalMs) {
           long timePassed = currentTime - startTime;
-          LOGGER.info("Time Passed: {}ms, Queries Executed: {}, Exeptions: {}, Average QPS: {}, "
+          LOGGER.info("Time Passed: {}ms, Queries Executed: {}, Exceptions: {}, Average QPS: {}, "
                   + "Average Broker Time: {}ms, Average Client Time: {}ms.", timePassed, numQueriesExecuted, numExceptions,
               numQueriesExecuted / ((double) timePassed / MILLIS_PER_SECOND),
               totalBrokerTime / (double) numQueriesExecuted, totalClientTime / (double) numQueriesExecuted);
@@ -317,15 +319,17 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     }
 
     long timePassed = System.currentTimeMillis() - startTime;
+
+    QuerySummary querySummary = new QuerySummary(timePassed, numQueriesExecuted, numExceptions, totalBrokerTime,
+        totalClientTime, statisticsList);
     LOGGER.info("--------------------------------------------------------------------------------");
     LOGGER.info("FINAL REPORT:");
-    LOGGER.info("Time Passed: {}ms, Queries Executed: {}, Exceptions: {}, Average QPS: {}, Average Broker Time: {}ms, "
-            + "Average Client Time: {}ms.", timePassed, numQueriesExecuted, numExceptions,
-        numQueriesExecuted / ((double) timePassed / MILLIS_PER_SECOND), totalBrokerTime / (double) numQueriesExecuted,
-        totalClientTime / (double) numQueriesExecuted);
+    LOGGER.info(querySummary.toString());
     for (Statistics statistics : statisticsList) {
       statistics.report();
     }
+
+    return querySummary;
   }
 
   /**
@@ -346,9 +350,10 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
    * @param numIntervalsToReportAndClearStatistics number of report intervals to report detailed statistics and clear
    *                                               them, 0 means never.
    * @param timeout timeout in milliseconds for completing all queries
+   * @return QuerySummary containing final report of query stats
    * @throws Exception
    */
-  public static void multiThreadedQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
+  public static QuerySummary multiThreadedQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
       int numTimesToRunQueries, int numThreads, int queueDepth, int reportIntervalMs,
       int numIntervalsToReportAndClearStatistics, long timeout)
       throws Exception {
@@ -375,13 +380,11 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     int numTimesExecuted = 0;
     while (numTimesToRunQueries == 0 || numTimesExecuted < numTimesToRunQueries) {
       if (executorService.isTerminated()) {
-        LOGGER.error("All threads got exception and already dead.");
-        return;
+        throw new IllegalThreadStateException("All threads got exception and already dead.");
       }
 
       if (timeout > 0 && System.currentTimeMillis() - startTimeAbsolute > timeout) {
-        LOGGER.warn("Timeout of {} sec reached. Aborting", timeout);
-        return;
+        throw new TimeoutException("Timeout of " + timeout + " sec reached. Aborting");
       }
 
       for (String query : queries) {
@@ -423,16 +426,16 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     }
 
     long timePassed = System.currentTimeMillis() - startTime;
-    int numQueriesExecutedInt = numQueriesExecuted.get();
+    QuerySummary querySummary = new QuerySummary(timePassed, numQueriesExecuted.get(), numExceptions.get(),
+        totalBrokerTime.get(), totalClientTime.get(), statisticsList);
     LOGGER.info("--------------------------------------------------------------------------------");
     LOGGER.info("FINAL REPORT:");
-    LOGGER.info("Time Passed: {}ms, Queries Executed: {}, Exceptions: {}. Average QPS: {}, Average Broker Time: {}ms, "
-            + "Average Client Time: {}ms.", timePassed, numQueriesExecutedInt, numExceptions.get(),
-        numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
-        totalBrokerTime.get() / (double) numQueriesExecutedInt, totalClientTime.get() / (double) numQueriesExecutedInt);
+    LOGGER.info(querySummary.toString());
     for (Statistics statistics : statisticsList) {
       statistics.report();
     }
+
+    return querySummary;
   }
 
   /**
@@ -454,9 +457,10 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
    * @param numIntervalsToReportAndClearStatistics number of report intervals to report detailed statistics and clear
    *                                               them, 0 means never.
    * @param timeout timeout in milliseconds for completing all queries
+   * @return QuerySummary containing final report of query stats
    * @throws Exception
    */
-  public static void targetQPSQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries, int numTimesToRunQueries,
+  public static QuerySummary targetQPSQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries, int numTimesToRunQueries,
       int numThreads, int queueDepth, double startQPS, int reportIntervalMs, int numIntervalsToReportAndClearStatistics,
       long timeout)
       throws Exception {
@@ -484,13 +488,11 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     int numTimesExecuted = 0;
     while (numTimesToRunQueries == 0 || numTimesExecuted < numTimesToRunQueries) {
       if (executorService.isTerminated()) {
-        LOGGER.error("All threads got exception and already dead.");
-        return;
+        throw new IllegalThreadStateException("All threads got exception and already dead.");
       }
 
       if (timeout > 0 && System.currentTimeMillis() - startTimeAbsolute > timeout) {
-        LOGGER.warn("Timeout of {} sec reached. Aborting", timeout);
-        return;
+        throw new TimeoutException("Timeout of " + timeout + " sec reached. Aborting");
       }
 
       long nextQueryNanos = System.nanoTime();
@@ -542,16 +544,17 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     }
 
     long timePassed = System.currentTimeMillis() - startTime;
-    int numQueriesExecutedInt = numQueriesExecuted.get();
+    QuerySummary querySummary = new QuerySummary(timePassed, numQueriesExecuted.get(), numExceptions.get(),
+        totalBrokerTime.get(), totalClientTime.get(), statisticsList);
     LOGGER.info("--------------------------------------------------------------------------------");
     LOGGER.info("FINAL REPORT:");
-    LOGGER.info("Target QPS: {}, Time Passed: {}ms, Queries Executed: {}, Exceptions: {}, Average QPS: {}, "
-            + "Average Broker Time: {}ms, Average Client Time: {}ms.", startQPS, timePassed, numQueriesExecutedInt,
-        numExceptions.get(), numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
-        totalBrokerTime.get() / (double) numQueriesExecutedInt, totalClientTime.get() / (double) numQueriesExecutedInt);
+    LOGGER.info("Target QPS: {}", startQPS);
+    LOGGER.info(querySummary.toString());
     for (Statistics statistics : statisticsList) {
       statistics.report();
     }
+
+    return querySummary;
   }
 
   /**
@@ -576,10 +579,10 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
    *                                               them, 0 means never.
    * @param timeout timeout in milliseconds for completing all queries.
    * @param numIntervalsToIncreaseQPS number of intervals to increase QPS.
+   * @return QuerySummary containing final report of query stats
    * @throws Exception
    */
-
-  public static void increasingQPSQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
+  public static QuerySummary increasingQPSQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
       int numTimesToRunQueries, int numThreads, int queueDepth, double startQPS, double deltaQPS, int reportIntervalMs,
       int numIntervalsToReportAndClearStatistics, int numIntervalsToIncreaseQPS, long timeout)
       throws Exception {
@@ -608,13 +611,11 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     long queryIntervalNanos = (long) (1E9 / currentQPS);
     while (numTimesToRunQueries == 0 || numTimesExecuted < numTimesToRunQueries) {
       if (executorService.isTerminated()) {
-        LOGGER.error("All threads got exception and already dead.");
-        return;
+        throw new IllegalThreadStateException("All threads got exception and already dead.");
       }
 
       if (timeout > 0 && System.currentTimeMillis() - startTimeAbsolute > timeout) {
-        LOGGER.warn("Timeout of {} sec reached. Aborting", timeout);
-        return;
+        throw new TimeoutException("Timeout of " + timeout + " sec reached. Aborting");
       }
 
       long nextQueryNanos = System.nanoTime();
@@ -686,16 +687,17 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     }
 
     long timePassed = System.currentTimeMillis() - startTime;
-    int numQueriesExecutedInt = numQueriesExecuted.get();
+    QuerySummary querySummary = new QuerySummary(timePassed, numQueriesExecuted.get(), numExceptions.get(),
+        totalBrokerTime.get(), totalClientTime.get(), statisticsList);
     LOGGER.info("--------------------------------------------------------------------------------");
     LOGGER.info("FINAL REPORT:");
-    LOGGER.info("Current Target QPS: {}, Time Passed: {}ms, Queries Executed: {}, Exceptions: {}, Average QPS: {}, "
-            + "Average Broker Time: {}ms, Average Client Time: {}ms.", currentQPS, timePassed, numQueriesExecutedInt,
-        numExceptions.get(), numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
-        totalBrokerTime.get() / (double) numQueriesExecutedInt, totalClientTime.get() / (double) numQueriesExecutedInt);
+    LOGGER.info("Current Target QPS: {}", currentQPS);
+    LOGGER.info(querySummary.toString());
     for (Statistics statistics : statisticsList) {
       statistics.report();
     }
+
+    return querySummary;
   }
 
   private static List<String> makeQueries(List<String> queries, QueryMode queryMode, int queryCount) {
@@ -827,6 +829,62 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       synchronized (_statistics) {
         _statistics.clear();
       }
+    }
+  }
+
+  public static class QuerySummary {
+    private final long _timePassed;
+    private final int _numQueriesExecuted;
+    private final int _numExceptions;
+    private final double _avgQps;
+    private final double _avgBrokerTime;
+    private final double _avgClientTime;
+    private final List<Statistics> _statisticsList;
+
+    private QuerySummary(long timePassed, int numQueriesExecuted, int numExceptions,
+                         long totalBrokerTime, long totalClientTime, List<Statistics> statisticsList) {
+      _timePassed = timePassed;
+      _numQueriesExecuted = numQueriesExecuted;
+      _numExceptions = numExceptions;
+      _avgQps = numQueriesExecuted / ((double) timePassed / MILLIS_PER_SECOND);
+      _avgBrokerTime = totalBrokerTime / (double) numQueriesExecuted;
+      _avgClientTime = totalClientTime / (double) numQueriesExecuted;
+      _statisticsList = statisticsList;
+    }
+
+    public long getTimePassed() {
+      return _timePassed;
+    }
+
+    public int getNumQueriesExecuted() {
+      return _numQueriesExecuted;
+    }
+
+    public int getNumExceptions() {
+      return _numExceptions;
+    }
+
+    public double getAvgQps() {
+      return _avgQps;
+    }
+
+    public double getAvgBrokerTime() {
+      return _avgBrokerTime;
+    }
+
+    public double getAvgClientTime() {
+      return _avgClientTime;
+    }
+
+    public List<Statistics> getStatisticsList() {
+      return _statisticsList;
+    }
+
+    @Override
+    public String toString() {
+      return String.format("Time Passed: %sms\nQueries Executed: %s\nExceptions: %s\n"
+          + "Average QPS: %s\nAverage Broker Time: %sms\nAverage Client Time: %sms",
+          _timePassed, _numQueriesExecuted, _numExceptions, _avgQps, _avgBrokerTime, _avgClientTime);
     }
   }
 

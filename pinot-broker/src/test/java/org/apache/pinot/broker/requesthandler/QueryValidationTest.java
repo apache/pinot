@@ -125,6 +125,39 @@ public class QueryValidationTest {
 
     sql = "SELECT DISTINCT col1, col2 FROM foo ORDER BY col3 OPTION(groupByMode=sql,responseFormat=sql)";
     testUnsupportedSQLQuery(sql, "ORDER-BY columns should be included in the DISTINCT columns");
+
+    sql = "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY col1, col2, col3 OPTION(groupByMode=sql,responseFormat=sql)";
+    testUnsupportedSQLQuery(sql, "ORDER-BY columns should be included in the DISTINCT columns");
+
+    sql = "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY col1, mod(col2, 10) OPTION(groupByMode=sql,responseFormat=sql)";
+    testUnsupportedSQLQuery(sql, "ORDER-BY columns should be included in the DISTINCT columns");
+  }
+
+  @Test
+  public void testSupportedDistinctQueries() {
+    String sql = "SELECT DISTINCT col1, col2 FROM foo ORDER BY col1, col2 OPTION(groupByMode=sql,responseFormat=sql)";
+    testSupportedSQLQuery(sql);
+
+    sql = "SELECT DISTINCT col1, col2 FROM foo ORDER BY col2, col1 OPTION(groupByMode=sql,responseFormat=sql)";
+    testSupportedSQLQuery(sql);
+
+    sql = "SELECT DISTINCT col1, col2 FROM foo ORDER BY col1 DESC, col2 OPTION(groupByMode=sql,responseFormat=sql)";
+    testSupportedSQLQuery(sql);
+
+    sql = "SELECT DISTINCT col1, col2 FROM foo ORDER BY col1, col2 DESC OPTION(groupByMode=sql,responseFormat=sql)";
+    testSupportedSQLQuery(sql);
+
+    sql = "SELECT DISTINCT col1, col2 FROM foo ORDER BY col1 DESC, col2 DESC OPTION(groupByMode=sql,responseFormat=sql)";
+    testSupportedSQLQuery(sql);
+
+    sql = "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY add(col1, sub(col2, 3)) OPTION(groupByMode=sql,responseFormat=sql)";
+    testSupportedSQLQuery(sql);
+
+    sql = "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY mod(col2, 10), add(col1, sub(col2, 3)) OPTION(groupByMode=sql,responseFormat=sql)";
+    testSupportedSQLQuery(sql);
+
+    sql = "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) DESC OPTION(groupByMode=sql,responseFormat=sql)";
+    testSupportedSQLQuery(sql);
   }
 
   private void testUnsupportedPQLQuery(String query, String errorMessage) {
@@ -145,5 +178,10 @@ public class QueryValidationTest {
     } catch (Exception e) {
       Assert.assertEquals(errorMessage, e.getMessage());
     }
+  }
+
+  private void testSupportedSQLQuery(String query) {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    BaseBrokerRequestHandler.validateRequest(pinotQuery, 1000);
   }
 }

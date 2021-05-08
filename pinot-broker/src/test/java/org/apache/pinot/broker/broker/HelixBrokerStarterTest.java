@@ -29,7 +29,6 @@ import org.apache.pinot.broker.routing.RoutingTable;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.helix.ControllerTest;
@@ -79,7 +78,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
     properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, 18099);
     
     _brokerStarter =
-        new HelixBrokerStarter(new PinotConfiguration(properties), getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR);
+        new HelixBrokerStarter(new PinotConfiguration(properties), getHelixClusterName(), getZkUrl());
     _brokerStarter.start();
 
     addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKERS - 1, true);

@@ -1706,11 +1706,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         }
         List<Expression> orderByList = pinotQuery.getOrderByList();
         if (orderByList != null) {
-          for (Expression expression : orderByList) {
+          List<Expression> distinctExpressions = function.getOperands();
+          for (Expression orderByExpression : orderByList) {
             // NOTE: Order-by is always a Function with the ordering of the Expression
-            if (!selectList.contains(expression.getFunctionCall().getOperands().get(0))) {
+            if (!distinctExpressions.contains(orderByExpression.getFunctionCall().getOperands().get(0)))
               throw new IllegalStateException("ORDER-BY columns should be included in the DISTINCT columns");
-            }
           }
         }
       }

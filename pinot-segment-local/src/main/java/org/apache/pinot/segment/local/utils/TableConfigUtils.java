@@ -573,6 +573,9 @@ public final class TableConfigUtils {
             Preconditions.checkArgument(!noDictionaryColumns.contains(columnName),
                 "FieldConfig encoding type is different from indexingConfig for column: " + columnName);
           }
+          Preconditions.checkArgument(fieldConfig.getCompressionCodec() == null,
+              "Set compression codec to null for dictionary encoding type");
+          break;
       }
 
       switch (fieldConfig.getIndexType()) {

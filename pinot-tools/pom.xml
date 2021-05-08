@@ -389,6 +389,16 @@
                 </extraArguments>
               </jvmSettings>
             </program>
+            <program>
+              <mainClass>org.apache.pinot.tools.AuthQuickstart</mainClass>
+              <name>quick-start-auth</name>
+              <jvmSettings>
+                <initialMemorySize>4G</initialMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
           </programs>
           <binFileExtensions>
             <unix>.sh</unix>
