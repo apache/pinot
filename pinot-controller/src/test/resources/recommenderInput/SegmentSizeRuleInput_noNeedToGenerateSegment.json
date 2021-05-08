@@ -159,14 +159,6 @@
   "noDictionaryOnHeapDictionaryJointRuleParams": {
     "THRESHOLD_MIN_PERCENT_DICTIONARY_STORAGE_SAVE" : 0.96
   },
-  "realtimeProvisioningRuleParams": {
-    "numPartitions": 10,
-    "numReplicas": 3,
-    "realtimeTableRetentionHours": 72,
-    "maxUsableHostMemory": "60G",
-    "numHours": [2, 4, 6, 8, 10, 12],
-    "numHosts": [3, 6, 9, 12, 15, 18, 21]
-  },
   "overWrittenConfigs": {
     "indexConfig": {
       "invertedIndexColumns": ["a","b"],

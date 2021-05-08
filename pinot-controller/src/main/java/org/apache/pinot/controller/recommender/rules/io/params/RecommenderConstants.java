@@ -57,6 +57,7 @@ public class RecommenderConstants {
     public static final long DEFAULT_KAFKA_NUM_MESSAGES_PER_SEC_PER_PARTITION = 250;
     public static final double DEFAULT_THRESHOLD_RATIO_MIN_DIMENSION_PARTITION_TOP_CANDIDATES = 0.8d;
     public static final int DEFAULT_THRESHOLD_MAX_IN_LENGTH = 4;
+    public static final double ACCEPTABLE_CARDINALITY_TO_NUM_PARTITIONS_RATIO = 0.7;
   }
 
   public static class BloomFilterRule {
@@ -92,8 +93,8 @@ public class RecommenderConstants {
   public static class SegmentSizeRule {
     public static final int DEFAULT_NUM_SEGMENTS = 1;
     public static final int DEFAULT_DESIRED_SEGMENT_SIZE_MB = 500;
-    public static final int DEFAULT_NUM_ROWS_IN_GENERATED_SEGMENT = 50_000;
     public static final int NOT_PROVIDED = -1;
+    public static final double INDEX_OVERHEAD_RATIO_FOR_SEGMENT_SIZE = 1.2;
   }
 
   public static final String PQL = "pql";
@@ -126,4 +127,5 @@ public class RecommenderConstants {
   public static final int FIRST = 0;
   public static final int SECOND = 1;
 
+  public static final int DEFAULT_NUM_ROWS_IN_GENERATED_SEGMENT = 50_000;
 }

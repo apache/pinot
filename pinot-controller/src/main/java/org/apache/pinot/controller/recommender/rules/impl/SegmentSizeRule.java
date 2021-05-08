@@ -29,6 +29,7 @@ import org.apache.pinot.controller.recommender.io.InputManager;
 import org.apache.pinot.controller.recommender.realtime.provisioning.MemoryEstimator;
 import org.apache.pinot.controller.recommender.rules.AbstractRule;
 import org.apache.pinot.controller.recommender.rules.io.configs.SegmentSizeRecommendations;
+import org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants;
 import org.apache.pinot.controller.recommender.rules.io.params.SegmentSizeRuleParams;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -44,9 +45,17 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
  *   - number of segments
  *   - number of records in each segment
  *   - size of each segment
+ *
  * The purpose of generating a segment is to estimate the size and number of rows of one sample segment. In case user
  * already have a production segment in hand, they can provide actualSegmentSize and numRowsInActualSegment parameters
  * in the input and then this rule uses those parameters instead of generating a segment to derived those values.
+ * It's worth noting that since this rule gets executed before other rules, we run into chicken-egg problem.
+ *  - Index recommendation, dictionary, bloom filter rules will be run next.
+ *  - Only after the subsequent rules run and the index recommendation is available, will we know what segment might
+ *    look like.
+ * So here we just assume dictionary on all dimensions and raw for metric columns and try to generate a segment quickly.
+ * This also means that the calculated size of the optimal segment should ideally be bumped up by a factor, say 20%, to
+ * account for what the size might look like when all the index/dictionary/bloom recommendations are applied.
  */
 public class SegmentSizeRule extends AbstractRule {
 
@@ -63,14 +72,16 @@ public class SegmentSizeRule extends AbstractRule {
     if (_input.getTableType().equalsIgnoreCase("REALTIME")) {
       // no need to estimate segment size & optimal number of segments for realtime only tables;
       // RT Provisioning Rule will have a comprehensive analysis on that
+      _output.setSegmentSizeRecommendations(new SegmentSizeRecommendations(
+          "Segment sizing for realtime-only tables is done via Realtime Provisioning Rule"));
       return;
     }
 
     long segmentSize;
     int numRows;
     SegmentSizeRuleParams segmentSizeRuleParams = _input.getSegmentSizeRuleParams();
-    if (segmentSizeRuleParams.getActualSegmentSizeMB() == NOT_PROVIDED
-        && segmentSizeRuleParams.getNumRowsInActualSegment() == NOT_PROVIDED) {
+    if (segmentSizeRuleParams.getActualSegmentSizeMB() == RecommenderConstants.SegmentSizeRule.NOT_PROVIDED
+        && segmentSizeRuleParams.getNumRowsInActualSegment() == RecommenderConstants.SegmentSizeRule.NOT_PROVIDED) {
 
       // generate a segment
       TableConfig tableConfig = createTableConfig(_input.getSchema());
@@ -78,7 +89,8 @@ public class SegmentSizeRule extends AbstractRule {
       File generatedSegmentDir =
           new MemoryEstimator.SegmentGenerator(_input._schemaWithMetaData, _input._schema, tableConfig,
               numRowsInGeneratedSegment, true).generate();
-      segmentSize = FileUtils.sizeOfDirectory(generatedSegmentDir);
+      segmentSize = Math.round(FileUtils.sizeOfDirectory(generatedSegmentDir)
+          * RecommenderConstants.SegmentSizeRule.INDEX_OVERHEAD_RATIO_FOR_SEGMENT_SIZE);
       numRows = numRowsInGeneratedSegment;
 
       // cleanup
@@ -141,5 +153,10 @@ public class SegmentSizeRule extends AbstractRule {
         .setTableName(schema.getSchemaName())
         .setNoDictionaryColumns(schema.getMetricNames())
         .build();
+  }
+
+  @Override
+  public void hideOutput() {
+    _output.setSegmentSizeRecommendations(null);
   }
 }

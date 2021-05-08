@@ -22,8 +22,6 @@ package org.apache.pinot.controller.recommender.rules.io.params;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 
-import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.SegmentSizeRule.*;
-
 
 /**
  * Parameters used in SegmentSizeRule
@@ -31,16 +29,16 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
 public class SegmentSizeRuleParams {
 
   // Desired segment size in MB
-  private int desiredSegmentSizeMB = DEFAULT_DESIRED_SEGMENT_SIZE_MB;
+  private int desiredSegmentSizeMB = RecommenderConstants.SegmentSizeRule.DEFAULT_DESIRED_SEGMENT_SIZE_MB;
 
   // Number for rows in the generated segment
-  private int numRowsInGeneratedSegment = DEFAULT_NUM_ROWS_IN_GENERATED_SEGMENT;
+  private int numRowsInGeneratedSegment = RecommenderConstants.DEFAULT_NUM_ROWS_IN_GENERATED_SEGMENT;
 
   // Actual segment size in MB
-  private int actualSegmentSizeMB = NOT_PROVIDED;
+  private int actualSegmentSizeMB = RecommenderConstants.SegmentSizeRule.NOT_PROVIDED;
 
   // Number of rows in the actual segment
-  private int numRowsInActualSegment = NOT_PROVIDED;
+  private int numRowsInActualSegment = RecommenderConstants.SegmentSizeRule.NOT_PROVIDED;
 
 
   // setter and getters

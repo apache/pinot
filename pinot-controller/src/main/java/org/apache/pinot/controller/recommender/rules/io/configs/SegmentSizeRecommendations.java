@@ -19,6 +19,9 @@
 
 package org.apache.pinot.controller.recommender.rules.io.configs;
 
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
+
 
 /**
  * The recommendations proposed by SegmentSizeRule
@@ -28,11 +31,16 @@ public class SegmentSizeRecommendations {
   private long numRowsPerSegment;
   private long numSegments;
   private long segmentSize;
+  private String message;
 
   public SegmentSizeRecommendations(long numRowsPerSegment, long numSegments, long segmentSize) {
     this.numRowsPerSegment = numRowsPerSegment;
     this.numSegments = numSegments;
     this.segmentSize = segmentSize;
+  }
+
+  public SegmentSizeRecommendations(String message) {
+    this.message = message;
   }
 
   public SegmentSizeRecommendations() {
@@ -42,6 +50,7 @@ public class SegmentSizeRecommendations {
     return numRowsPerSegment;
   }
 
+  @JsonSetter(nulls = Nulls.SKIP)
   public void setNumRowsPerSegment(long numRowsPerSegment) {
     this.numRowsPerSegment = numRowsPerSegment;
   }
@@ -50,6 +59,7 @@ public class SegmentSizeRecommendations {
     return numSegments;
   }
 
+  @JsonSetter(nulls = Nulls.SKIP)
   public void setNumSegments(long numSegments) {
     this.numSegments = numSegments;
   }
@@ -58,7 +68,17 @@ public class SegmentSizeRecommendations {
     return segmentSize;
   }
 
+  @JsonSetter(nulls = Nulls.SKIP)
   public void setSegmentSize(long segmentSize) {
     this.segmentSize = segmentSize;
+  }
+
+  public String getMessage() {
+    return message;
+  }
+
+  @JsonSetter(nulls = Nulls.SKIP)
+  public void setMessage(String message) {
+    this.message = message;
   }
 }

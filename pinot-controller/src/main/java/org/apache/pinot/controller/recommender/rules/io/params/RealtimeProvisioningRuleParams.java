@@ -48,6 +48,8 @@ public class RealtimeProvisioningRuleParams {
   // Acceptable values for `number of hours` parameter. NumHours represents consumption duration.
   private int[] numHours = RecommenderConstants.RealtimeProvisioningRule.DEFAULT_NUM_HOURS;
 
+  // Number of rows for the segment that is going to be generated
+  private int numRowsInGeneratedSegment = RecommenderConstants.DEFAULT_NUM_ROWS_IN_GENERATED_SEGMENT;
 
   // Getters & Setters
 
@@ -101,5 +103,14 @@ public class RealtimeProvisioningRuleParams {
   @JsonSetter(nulls = Nulls.SKIP)
   public void setNumHours(int[] numHours) {
     this.numHours = numHours;
+  }
+
+  public int getNumRowsInGeneratedSegment() {
+    return numRowsInGeneratedSegment;
+  }
+
+  @JsonSetter(nulls = Nulls.SKIP)
+  public void setNumRowsInGeneratedSegment(int numRowsInGeneratedSegment) {
+    this.numRowsInGeneratedSegment = numRowsInGeneratedSegment;
   }
 }
