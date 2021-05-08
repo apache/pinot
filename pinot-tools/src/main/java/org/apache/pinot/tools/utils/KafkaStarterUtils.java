@@ -26,6 +26,7 @@ import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
+import org.apache.pinot.spi.utils.NetUtils;
 
 
 public class KafkaStarterUtils {
@@ -103,7 +104,6 @@ public class KafkaStarterUtils {
   public static List<StreamDataServerStartable> startServers(final int brokerCount, final int port, final String zkStr,
       final Properties configuration) {
     List<StreamDataServerStartable> startables = new ArrayList<>(brokerCount);
-
     for (int i = 0; i < brokerCount; i++) {
       startables.add(startServer(port + i, i, zkStr, configuration));
     }
@@ -114,9 +114,10 @@ public class KafkaStarterUtils {
       final Properties baseConf) {
     StreamDataServerStartable kafkaStarter;
     Properties configuration = new Properties(baseConf);
+    int kafkaPort = NetUtils.findOpenPort(port);
     try {
       configureOffsetsTopicReplicationFactor(configuration, (short) 1);
-      configuration.put(KafkaStarterUtils.PORT, port);
+      configuration.put(KafkaStarterUtils.PORT, kafkaPort);
       configuration.put(KafkaStarterUtils.BROKER_ID, brokerId);
       configuration.put(KafkaStarterUtils.ZOOKEEPER_CONNECT, zkStr);
       configuration.put(KafkaStarterUtils.LOG_DIRS, "/tmp/kafka-" + Double.toHexString(Math.random()));

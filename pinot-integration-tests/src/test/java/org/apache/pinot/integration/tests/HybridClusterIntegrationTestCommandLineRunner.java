@@ -258,7 +258,7 @@ public class HybridClusterIntegrationTestCommandLineRunner {
     }
 
     @Override
-    protected int getBaseKafkaPort() {
+    protected int getKafkaPort() {
       return KAFKA_PORT;
     }
 
@@ -327,7 +327,7 @@ public class HybridClusterIntegrationTestCommandLineRunner {
 
       // Start Zk and Kafka
       startZk(ZK_PORT);
-      startKafka();
+      startKafka(getKafkaPort());
 
       // Start the Pinot cluster
       Map<String, Object> properties = getDefaultControllerConfiguration();

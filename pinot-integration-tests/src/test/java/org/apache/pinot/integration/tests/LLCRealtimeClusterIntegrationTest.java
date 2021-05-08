@@ -36,6 +36,7 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -108,6 +109,14 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
     FileUtils.deleteQuietly(new File(CONSUMER_DIRECTORY));
 
     super.setUp();
+  }
+
+  @AfterClass
+  @Override
+  public void tearDown()
+      throws Exception {
+    FileUtils.deleteDirectory(new File(CONSUMER_DIRECTORY));
+    super.tearDown();
   }
 
   @Test
