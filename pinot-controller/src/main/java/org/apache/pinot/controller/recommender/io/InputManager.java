@@ -65,7 +65,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static java.lang.Math.max;
-import static java.lang.Math.pow;
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.*;
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.FlagQueryRuleParams.ERROR_INVALID_QUERY;
 

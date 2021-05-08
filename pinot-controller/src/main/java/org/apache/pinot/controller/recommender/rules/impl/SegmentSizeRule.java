@@ -36,8 +36,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 
-import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.SegmentSizeRule.NOT_PROVIDED;
-
 
 /**
  * This rule generates a segment based on the provided schema characteristics and then recommends the followings
