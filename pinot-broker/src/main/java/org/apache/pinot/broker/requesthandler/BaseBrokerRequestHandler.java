@@ -40,7 +40,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.api.RequesterIdentity;
@@ -1666,14 +1665,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * <ul>
    *   <li>Value for 'LIMIT' <= configured value</li>
    *   <li>Query options must be set to SQL mode</li>
-   *   <li>
-   *     For DISTINCT queries:
-   *     <ul>
-   *       <li>No GROUP-BY clause</li>
-   *       <li>LIMIT must be positive</li>
-   *       <li>ORDER-BY columns (if exist) should be included in the DISTINCT columns</li>
-   *     </ul>
-   *   </li>
    * </ul>
    */
   @VisibleForTesting
@@ -1690,30 +1681,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     QueryOptions queryOptions = new QueryOptions(pinotQuery.getQueryOptions());
     if (!queryOptions.isGroupByModeSQL() || !queryOptions.isResponseFormatSQL()) {
       throw new IllegalStateException("SQL query should always have response format and group-by mode set to SQL");
-    }
-
-    List<Expression> selectList = pinotQuery.getSelectList();
-    if (selectList.size() == 1) {
-      Function function = selectList.get(0).getFunctionCall();
-      if (function != null && function.getOperator().equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
-        if (CollectionUtils.isNotEmpty(pinotQuery.getGroupByList())) {
-          // TODO: Explore if DISTINCT should be supported with GROUP BY
-          throw new IllegalStateException("DISTINCT with GROUP BY is currently not supported");
-        }
-        if (limit <= 0) {
-          // TODO: Consider changing it to SELECTION query for LIMIT 0
-          throw new IllegalStateException("DISTINCT must have positive LIMIT");
-        }
-        List<Expression> orderByList = pinotQuery.getOrderByList();
-        if (orderByList != null) {
-          List<Expression> distinctExpressions = function.getOperands();
-          for (Expression orderByExpression : orderByList) {
-            // NOTE: Order-by is always a Function with the ordering of the Expression
-            if (!distinctExpressions.contains(orderByExpression.getFunctionCall().getOperands().get(0)))
-              throw new IllegalStateException("ORDER-BY columns should be included in the DISTINCT columns");
-          }
-        }
-      }
     }
   }
 
