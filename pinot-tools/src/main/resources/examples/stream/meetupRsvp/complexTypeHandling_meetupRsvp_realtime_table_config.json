@@ -32,7 +32,6 @@
       }
     ],
     "complexTypeConfig": {
-      "mode": "FLATTEN_MAP",
       "unnestConfig": ["group.group_topics"]
     }
   },

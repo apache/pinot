@@ -22,12 +22,10 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -79,40 +77,32 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  */
 public class ComplexTypeTransformer implements RecordTransformer {
   private static final CharSequence DELIMITER = ".";
-  private final List<String> _collectionsToUnnest;
+  private final List<String> _unnestFields;
 
   public ComplexTypeTransformer(TableConfig tableConfig) {
-    if (tableConfig.getIngestionConfig() != null
-        && tableConfig.getIngestionConfig().getComplexTypeConfig() != null) {
-      _collectionsToUnnest =
-          tableConfig.getIngestionConfig().getComplexTypeConfig().getUnnestConfig() != null ? tableConfig
-              .getIngestionConfig().getComplexTypeConfig().getUnnestConfig() : new ArrayList<>();
+    if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getComplexTypeConfig() != null) {
+      _unnestFields = tableConfig.getIngestionConfig().getComplexTypeConfig().getUnnestConfig() != null ? tableConfig
+          .getIngestionConfig().getComplexTypeConfig().getUnnestConfig() : new ArrayList<>();
     } else {
-      _collectionsToUnnest = new ArrayList<>();
+      _unnestFields = new ArrayList<>();
     }
   }
 
   @VisibleForTesting
   public ComplexTypeTransformer(List<String> unnestCollections) {
-    _collectionsToUnnest = new ArrayList<>(unnestCollections);
-    Collections.sort(_collectionsToUnnest);
+    _unnestFields = new ArrayList<>(unnestCollections);
+    Collections.sort(_unnestFields);
   }
 
   public static boolean isComplexTypeHandlingEnabled(TableConfig tableConfig) {
-    if (tableConfig.getIngestionConfig() == null
-        || tableConfig.getIngestionConfig().getComplexTypeConfig() == null
-        || tableConfig.getIngestionConfig().getComplexTypeConfig().getMode() == null) {
-      return false;
-    }
-    return tableConfig.getIngestionConfig().getComplexTypeConfig().getMode()
-        != ComplexTypeConfig.Mode.NONE;
+    return tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getComplexTypeConfig() != null;
   }
 
   @Nullable
   @Override
   public GenericRow transform(GenericRow record) {
-    flattenMap(record, new HashSet<>(record.getFieldToValueMap().keySet()));
-    for (String collection : _collectionsToUnnest) {
+    flattenMap(record, new ArrayList<>(record.getFieldToValueMap().keySet()));
+    for (String collection : _unnestFields) {
       unnestCollection(record, collection);
     }
     return record;
@@ -149,7 +139,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
           list.add(copy);
         }
       }
-    } else if (value.getClass().isArray()) {
+    } else if (isArray(value)) {
       if (((Object[]) value).length == 0) {
         // use the record itself
         list.add(record);
@@ -166,7 +156,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
     GenericRow copy = record.copy();
     if (obj instanceof Map) {
       Map<String, Object> map = (Map<String, Object>) obj;
-      for (Map.Entry<String, Object> entry : new HashSet<>(map.entrySet())) {
+      for (Map.Entry<String, Object> entry : map.entrySet()) {
         String flattenName = concat(column, entry.getKey());
         copy.putValue(flattenName, entry.getValue());
       }
@@ -176,47 +166,80 @@ public class ComplexTypeTransformer implements RecordTransformer {
     return copy;
   }
 
+  /**
+   * Recursively flatten all the Maps in the record. It will also navigate into the collections marked as "unnest" and
+   * flatten the nested maps.
+   */
   @VisibleForTesting
-  protected GenericRow flattenMap(GenericRow record, Collection<String> columns) {
+  protected void flattenMap(GenericRow record, Collection<String> columns) {
     for (String column : columns) {
-      if (record.getValue(column) instanceof Map) {
+      Object value = record.getValue(column);
+      if (value instanceof Map) {
         Map<String, Object> map = (Map) record.removeValue(column);
         List<String> mapColumns = new ArrayList<>();
-        for (Map.Entry<String, Object> entry : new HashSet<>(map.entrySet())) {
+        for (Map.Entry<String, Object> entry : new ArrayList<>(map.entrySet())) {
           String flattenName = concat(column, entry.getKey());
-          record.putValue(flattenName, entry.getValue());
-          mapColumns.add(flattenName);
+          Object nestedValue = entry.getValue();
+          record.putValue(flattenName, nestedValue);
+          if (nestedValue instanceof Map || nestedValue instanceof Collection || isArray(nestedValue)) {
+            mapColumns.add(flattenName);
+          }
         }
-        record = flattenMap(record, mapColumns);
-      } else if (record.getValue(column) instanceof Collection && _collectionsToUnnest.contains(column)) {
+        flattenMap(record, mapColumns);
+      } else if (value instanceof Collection && _unnestFields.contains(column)) {
         for (Object inner : (Collection) record.getValue(column)) {
           if (inner instanceof Map) {
             Map<String, Object> innerMap = (Map<String, Object>) inner;
-            flattenMap(column, innerMap, new HashSet<>(innerMap.keySet()));
+            flattenMap(column, innerMap, new ArrayList<>(innerMap.keySet()));
+          }
+        }
+      } else if (isArray(value) && _unnestFields.contains(column)) {
+        for (Object inner : (Object[]) value) {
+          if (inner instanceof Map) {
+            Map<String, Object> innerMap = (Map<String, Object>) inner;
+            flattenMap(column, innerMap, new ArrayList<>(innerMap.keySet()));
           }
         }
       }
     }
-    return record;
+  }
+
+  static private boolean isArray(Object obj) {
+    if (obj == null) {
+      return false;
+    }
+    return obj.getClass().isArray();
   }
 
   private void flattenMap(String path, Map<String, Object> map, Collection<String> fields) {
     for (String field : fields) {
-      if (map.get(field) instanceof Map) {
+      Object value = map.get(field);
+      String concatName = concat(path, field);
+      if (value instanceof Map) {
         Map<String, Object> innerMap = (Map<String, Object>) map.remove(field);
         List<String> innerMapFields = new ArrayList<>();
-        for (Map.Entry<String, Object> innerEntry : new HashSet<>(innerMap.entrySet())) {
+        for (Map.Entry<String, Object> innerEntry : new ArrayList<>(innerMap.entrySet())) {
+          Object innerValue = innerEntry.getValue();
           map.put(concat(field, innerEntry.getKey()), innerEntry.getValue());
-          innerMapFields.add(concat(field, innerEntry.getKey()));
+          if (innerValue instanceof Map || innerValue instanceof Collection || isArray(innerValue)) {
+            innerMapFields.add(concat(field, innerEntry.getKey()));
+          }
         }
         if (!innerMapFields.isEmpty()) {
-          flattenMap(concat(path, field), map, innerMapFields);
+          flattenMap(concatName, map, innerMapFields);
         }
-      } else if (map.get(field) instanceof Collection && _collectionsToUnnest.contains(concat(path, field))) {
-        for (Object inner : (Collection) map.get(field)) {
+      } else if (value instanceof Collection && _unnestFields.contains(concatName)) {
+        for (Object inner : (Collection) value) {
           if (inner instanceof Map) {
             Map<String, Object> innerMap = (Map<String, Object>) inner;
-            flattenMap(concat(path, field), innerMap, new HashSet<>(innerMap.keySet()));
+            flattenMap(concatName, innerMap, new ArrayList<>(innerMap.keySet()));
+          }
+        }
+      } else if (isArray(value) && _unnestFields.contains(concatName)) {
+        for (Object inner : (Object[]) value) {
+          if (inner instanceof Map) {
+            Map<String, Object> innerMap = (Map<String, Object>) inner;
+            flattenMap(concatName, innerMap, new ArrayList<>(innerMap.keySet()));
           }
         }
       }

@@ -30,25 +30,13 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
  * Config related to handling complex type
  */
 public class ComplexTypeConfig extends BaseJsonConfig {
-  public enum Mode {
-    NONE, FLATTEN_MAP
-  }
-
-  @JsonPropertyDescription("The complex-type handling mode")
-  private final Mode _mode;
 
   @JsonPropertyDescription("The collections to unnest")
   private final List<String> _unnestConfig;
 
   @JsonCreator
-  public ComplexTypeConfig(@JsonProperty(value = "mode") Mode mode,
-      @JsonProperty("unnestConfig") @Nullable List<String> unnestConfig) {
-    _mode = mode;
+  public ComplexTypeConfig(@JsonProperty("unnestConfig") @Nullable List<String> unnestConfig) {
     _unnestConfig = unnestConfig;
-  }
-
-  public Mode getMode() {
-    return _mode;
   }
 
   @Nullable
