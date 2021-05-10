@@ -478,6 +478,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   /**
    * Removes a table gauge given the table name and the gauge.
+   * The add/remove is expected to work correctly in case of being invoked across multiple threads.
    * @param tableName table name
    * @param gauge the gauge to be removed
    */
