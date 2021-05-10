@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Executor;
+import java.util.stream.Collectors;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
@@ -154,7 +155,9 @@ public class ConsumingSegmentInfoReader {
         // Check if any responses are missing
         Set<String> serversForSegment = _pinotHelixResourceManager.getServersForSegment(tableNameWithType, segmentName);
         if (serversForSegment.size() != consumingSegmentInfoList.size()) {
-          serversForSegment.removeAll(consumingSegmentInfoList);
+          Set<String> serversResponded =
+              consumingSegmentInfoList.stream().map(c -> c._serverName).collect(Collectors.toSet());
+          serversForSegment.removeAll(serversResponded);
           String errorMessage =
               "Not all servers responded for segment: " + segmentName + " Missing servers : " + serversForSegment;
           return TableStatus.IngestionStatus.newIngestionStatus(TableStatus.IngestionState.UNHEALTHY, errorMessage);

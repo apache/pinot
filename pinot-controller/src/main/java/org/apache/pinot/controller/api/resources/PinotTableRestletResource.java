@@ -608,7 +608,8 @@ public class PinotTableRestletResource {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
       if (TableType.OFFLINE == tableType) {
         // TODO: Support table status for offline table. Currently only supported for realtime.
-        throw new IllegalStateException("Table status for OFFLINE table: " + tableName + " is currently unsupported");
+        throw new UnsupportedOperationException(
+            "Table status for OFFLINE table: " + tableName + " is currently unsupported");
       }
       String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
       ConsumingSegmentInfoReader consumingSegmentInfoReader =
