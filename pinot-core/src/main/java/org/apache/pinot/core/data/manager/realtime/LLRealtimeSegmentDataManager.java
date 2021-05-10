@@ -923,6 +923,17 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
+  /**
+   * Cleans up the metrics that reflects the state of the realtime segment.
+   * This step is essential as the instance may not be the target location for some of the partitions.
+   * E.g. if the number of partitions increases, or a host swap is needed, the target location for some partitions may change,
+   * and the current host remains to run. In this case, the current server would still keep the state of the old partitions,
+   * which no longer resides in this host any more, thus causes false positive information to the metric system.
+   */
+  private void cleanupMetrics() {
+    _serverMetrics.removeTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING);
+  }
+
   protected void hold() {
     try {
       Thread.sleep(SegmentCompletionProtocol.MAX_HOLD_TIME_MS);
@@ -1083,6 +1094,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
     _realtimeSegment.destroy();
     closeStreamConsumers();
+    cleanupMetrics();
   }
 
   protected void start() {

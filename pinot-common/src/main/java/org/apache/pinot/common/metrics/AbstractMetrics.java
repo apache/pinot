@@ -151,11 +151,12 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   private void addValueToTimer(String fullTimerName, final long duration, final TimeUnit timeUnit) {
     final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullTimerName);
-    PinotTimer timer = PinotMetricUtils.makePinotTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS);
+    PinotTimer timer =
+        PinotMetricUtils.makePinotTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS);
     if (timer != null) {
       timer.update(duration, timeUnit);
-    }  
-   }
+    }
+  }
 
   /**
    * Logs a value to a meter.
@@ -462,16 +463,49 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param valueCallback The callback function used to retrieve the value of the gauge
    */
   public void addCallbackGauge(final String metricName, final Callable<Long> valueCallback) {
-    PinotMetricUtils.makeGauge(_metricsRegistry, PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
-        PinotMetricUtils.makePinotGauge(avoid -> {
-          try {
-            return valueCallback.call();
-          } catch (Exception e) {
-            LOGGER.error("Caught exception", e);
-            Utils.rethrowException(e);
-            throw new AssertionError("Should not reach this");
-          }
-        }));
+    PinotMetricUtils
+        .makeGauge(_metricsRegistry, PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
+            PinotMetricUtils.makePinotGauge(avoid -> {
+              try {
+                return valueCallback.call();
+              } catch (Exception e) {
+                LOGGER.error("Caught exception", e);
+                Utils.rethrowException(e);
+                throw new AssertionError("Should not reach this");
+              }
+            }));
+  }
+
+  /**
+   * Removes a table gauge given the table name and the gauge.
+   * The add/remove is expected to work correctly in case of being invoked across multiple threads.
+   * @param tableName table name
+   * @param gauge the gauge to be removed
+   */
+  public void removeTableGauge(final String tableName, final G gauge) {
+    final String fullGaugeName;
+    String gaugeName = gauge.getGaugeName();
+    fullGaugeName = gaugeName + "." + getTableName(tableName);
+    removeGauge(fullGaugeName);
+  }
+
+  /**
+   * Remove gauge from Pinot metrics.
+   * @param gaugeName gauge name
+   */
+  private void removeGauge(final String gaugeName) {
+    if (_gaugeValues.remove(gaugeName) != null) {
+      removeCallbackGauge(gaugeName);
+    }
+  }
+
+  /**
+   * Remove callback gauge.
+   * @param metricName metric name
+   */
+  private void removeCallbackGauge(String metricName) {
+    PinotMetricUtils
+        .removeMetric(_metricsRegistry, PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName));
   }
 
   protected abstract QP[] getQueryPhases();
