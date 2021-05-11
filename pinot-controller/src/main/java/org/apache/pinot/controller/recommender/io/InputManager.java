@@ -47,6 +47,7 @@ import org.apache.pinot.controller.recommender.rules.io.params.InvertedSortedInd
 import org.apache.pinot.controller.recommender.rules.io.params.NoDictionaryOnHeapDictionaryJointRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.PartitionRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.RealtimeProvisioningRuleParams;
+import org.apache.pinot.controller.recommender.rules.io.params.SegmentSizeRuleParams;
 import org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -63,7 +64,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static java.lang.Math.max;
-import static java.lang.Math.pow;
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.*;
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.FlagQueryRuleParams.ERROR_INVALID_QUERY;
 
@@ -96,11 +96,6 @@ public class InputManager {
   // (consuming segments -> online segments)
   public Integer _segmentFlushTime = DEFAULT_SEGMENT_FLUSH_TIME;
 
-  // If the cardinality given by the customer is the global cardinality for the dataset (even potential data)
-  // If true, the cardinality will be regulated see regulateCardinality()
-  // TODO: Set to dsiabled for now, will discuss this in the next PR
-  public boolean _useCardinalityNormalization = DEFAULT_USE_CARDINALITY_NORMALIZATION;
-
   // The parameters of rules
   public PartitionRuleParams _partitionRuleParams = new PartitionRuleParams();
   public InvertedSortedIndexJointRuleParams _invertedSortedIndexJointRuleParams =
@@ -110,6 +105,7 @@ public class InputManager {
       new NoDictionaryOnHeapDictionaryJointRuleParams();
   public FlagQueryRuleParams _flagQueryRuleParams = new FlagQueryRuleParams();
   public RealtimeProvisioningRuleParams _realtimeProvisioningRuleParams;
+  public SegmentSizeRuleParams _segmentSizeRuleParams = new SegmentSizeRuleParams();
 
   // For forward compatibility: 1. dev/sre to overwrite field(s) 2. incremental recommendation on existing/staging tables
   public ConfigManager _overWrittenConfigs = new ConfigManager();
@@ -149,23 +145,16 @@ public class InputManager {
     reorderDimsAndBuildMap();
     registerColNameFieldType();
     validateQueries();
-    if (_useCardinalityNormalization) {
-      regulateCardinalityForAll();
-    }
   }
 
-  private void regulateCardinalityForAll() {
-    double sampleSize;
-    if (getTableType().equalsIgnoreCase(REALTIME)) {
-      sampleSize = getSegmentFlushTime() * getNumMessagesPerSecInKafkaTopic();
-    } else {
-      sampleSize = getNumRecordsPerPush();
-    }
-
+  /**
+   * Cardinalities provided by users are relative to number of records per push, but we might end up creating multiple
+   * segments for each push. Using this methods, cardinalities will be capped by the provided number of rows in segment.
+   */
+  public void capCardinalities(int numRecordsInSegment) {
     _metaDataMap.keySet().forEach(colName -> {
-      int cardinality = _metaDataMap.get(colName).getCardinality();
-      double regulatedCardinality = regulateCardinalityInfinitePopulation(cardinality, sampleSize);
-      _metaDataMap.get(colName).setCardinality((int) Math.round(regulatedCardinality));
+      int cardinality = Math.min(numRecordsInSegment, _metaDataMap.get(colName).getCardinality());
+      _metaDataMap.get(colName).setCardinality(cardinality);
     });
   }
 
@@ -290,11 +279,6 @@ public class InputManager {
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
-  public void setUseCardinalityNormalization(boolean cardinalityGlobal) {
-    _useCardinalityNormalization = cardinalityGlobal;
-  }
-
-  @JsonSetter(nulls = Nulls.SKIP)
   public void setFlagQueryRuleParams(FlagQueryRuleParams flagQueryRuleParams) {
     _flagQueryRuleParams = flagQueryRuleParams;
   }
@@ -402,8 +386,9 @@ public class InputManager {
     _overWrittenConfigs = overWrittenConfigs;
   }
 
-  public boolean isUseCardinalityNormalization() {
-    return _useCardinalityNormalization;
+  @JsonSetter(nulls = Nulls.SKIP)
+  public void setSegmentSizeRuleParams(SegmentSizeRuleParams segmentSizeRuleParams) {
+    _segmentSizeRuleParams = segmentSizeRuleParams;
   }
 
   public Set<String> getParsedQueries() {
@@ -535,6 +520,10 @@ public class InputManager {
     return _overWrittenConfigs;
   }
 
+  public SegmentSizeRuleParams getSegmentSizeRuleParams() {
+    return _segmentSizeRuleParams;
+  }
+
   public long getSizePerRecord() {
     return _sizePerRecord;
   }
@@ -563,55 +552,6 @@ public class InputManager {
     FieldMetadata fieldMetadata = _metaDataMap.getOrDefault(colName, new FieldMetadata());
     return fieldMetadata.isSingleValueField() && (fieldMetadata.getNumValuesPerEntry()
         < DEFAULT_AVERAGE_NUM_VALUES_PER_ENTRY + EPSILON);
-  }
-
-  /**
-   * Expectation of unique values in sample, E(Cardinality_sample)
-   * This can be used to calculate the cardinality per segment or per push, given the segment/ push size
-   * TODO: a iterative algorithm to recommend no dictionary columns and number of partitions,
-   *       It works like:
-   *          1. Start from a large number of partitions, recommend no index columns,
-   *             use this function to calculate per segment cardinality.
-   *             regulateCardinality(cardinality, segmentSize = pushSize/numPartitions, pushSize)
-   *          2. Then based on no-index result recommend numPartitions
-   *          3. re-recommend the no dictionary columns based on the new numPartitions
-   *       This way we can resolve the dependency between noIndexRecommendation <--> numPartitions
-   * @param cardinality the cardinality of population
-   * @param sampleSize a segment / push of data which is a sample from population
-   * @param populationSize total dataset size (rows), assuming even distribution of data,
-   *                       i.e. each unique value corresponds to population/cardinality rows
-   * @return Expected cardinality of sample
-   */
-  public double regulateCardinality(double cardinality, double sampleSize, double populationSize) {
-    double fpcReciprocal; // reciprocal of Finite Population Correction Factor, used when sampleSize> 0.05*population
-    if (sampleSize / populationSize < THRESHOLD_MIN_USE_FPC) {
-      fpcReciprocal = 1;
-    } else {
-      fpcReciprocal = Math.sqrt((populationSize - 1) / (populationSize - sampleSize));
-    }
-
-    // The probability of not selecting a given value in one sample is p0 = (cardinality - 1)/cardinality
-    // The probability of not selecting a given value in sampleSize samples is p0^sampleSize
-    // The probability of selecting a given value in sampleSize samples is 1 - p0^sampleSize
-    // The expectation of selected values is E(V1 + V2 + V3 + ... + V_cardinality) = E(V1) + E(V2) + ... (linearity of expectation)
-    // E(V1) = E(V2) = ... = E(V_cardinality) due to even distribution
-    // therefore E(V1 + V2 + V3 + ... + V_cardinality) = cardinality * E(V1) = cardinality * 1 * P(V1)
-    // Which is cardinality * (1 - p0^sampleSize) = cardinality * (1-((cardinality - 1) / cardinality)^(sampleSize))
-    return fpcReciprocal * cardinality * (1 - pow(((cardinality - 1) / cardinality), sampleSize));
-  }
-
-  /**
-   * No fix version of the above process, assuming very large population
-   */
-  public double regulateCardinalityInfinitePopulation(double cardinality, double sampleSize) {
-    // The probability of not selecting a given value in one sample is p0 = (cardinality - 1)/cardinality
-    // The probability of not selecting a given value in sampleSize samples is p0^sampleSize
-    // The probability of selecting a given value in sampleSize samples is 1 - p0^sampleSize
-    // The expectation of selected values is E(V1 + V2 + V3 + ... + V_cardinality) = E(V1) + E(V2) + ... (linearity of expectation)
-    // E(V1) = E(V2) = ... = E(V_cardinality) due to even distribution
-    // therefore E(V1 + V2 + V3 + ... + V_cardinality) = cardinality * E(V1) = cardinality * 1 * P(V1)
-    // Which is cardinality * (1 - p0^sampleSize) = cardinality * (1-((cardinality - 1) / cardinality)^(sampleSize))
-    return cardinality * (1 - pow(((cardinality - 1) / cardinality), sampleSize));
   }
 
   /**

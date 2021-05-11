@@ -5,7 +5,7 @@
       {
         "name": "a",
         "dataType": "INT",
-        "cardinality":20,
+        "cardinality":70000,
         "numValuesPerEntry":1
       },
       {
@@ -133,13 +133,18 @@
     "select f from tableName where (a=0 and b=1) or c=7 or (d = 7 and e =1)": 2,
     "select f from tableName where t between 1 and 1000": 2
   },
-  "qps": 150,
+  "qps": 400,
   "numMessagesPerSecInKafkaTopic":1000,
-  "numRecordsPerPush":10000000,
+  "numRecordsPerPush":100000,
   "tableType": "HYBRID",
   "latencySLA": 500,
   "rulesToExecute": {
-    "recommendRealtimeProvisioning": true
+    "recommendSegmentSize": true,
+    "recommendRealtimeProvisioning": false
+  },
+  "segmentSizeRuleParams": {
+    "desiredSegmentSizeMB": 5,
+    "numRowsInGeneratedSegment": 50000
   },
   "partitionRuleParams": {
     "THRESHOLD_MAX_LATENCY_SLA_PARTITION": 1001
@@ -152,15 +157,6 @@
   },
   "noDictionaryOnHeapDictionaryJointRuleParams": {
     "THRESHOLD_MIN_PERCENT_DICTIONARY_STORAGE_SAVE" : 0.96
-  },
-  "realtimeProvisioningRuleParams": {
-    "numPartitions": 10,
-    "numReplicas": 3,
-    "realtimeTableRetentionHours": 72,
-    "maxUsableHostMemory": "60G",
-    "numHours": [2, 4, 6, 8, 10, 12],
-    "numHosts": [3, 6, 9, 12, 15, 18, 21],
-    "numRowsInGeneratedSegment": 10000
   },
   "overWrittenConfigs": {
     "indexConfig": {

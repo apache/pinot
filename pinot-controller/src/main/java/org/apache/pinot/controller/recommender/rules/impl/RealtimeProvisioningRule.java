@@ -84,7 +84,7 @@ public class RealtimeProvisioningRule extends AbstractRule {
         new MemoryEstimator(tableConfig,
             _input.getSchema(),
             _input.getSchemaWithMetadata(),
-            (int) _input.getNumRecordsPerPush(), // TODO we may not want to use numRecordsPerPush as the numRows for the completed segment we are going to generate. A more fine-grained number is needed which we need to figure out how to capture.
+            _params.getNumRowsInGeneratedSegment(),
             ingestionRatePerPartition,
             maxUsableHostMemoryByte,
             _params.getRealtimeTableRetentionHours());

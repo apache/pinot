@@ -18,12 +18,14 @@
         "name": "c",
         "dataType": "DOUBLE",
         "cardinality":2000,
+        "singleValueField": false,
         "numValuesPerEntry":4
       },
       {
         "name": "d",
         "dataType": "STRING",
         "cardinality":1000,
+        "singleValueField": false,
         "numValuesPerEntry":2,
         "averageLength" : 27
       }
