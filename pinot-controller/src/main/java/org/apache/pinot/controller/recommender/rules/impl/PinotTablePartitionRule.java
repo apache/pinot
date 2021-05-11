@@ -112,20 +112,13 @@ public class PinotTablePartitionRule extends AbstractRule {
         _output.getPartitionConfig().setNumPartitionsRealtime(numKafkaPartitions);
       }
     }
-    if (isOfflineTable) {
+    if (isOfflineTable || isHybridTable) {
       //Offline partition num is dependent on the amount of data coming in on a given day.
       //Using a very high value of numPartitions for small dataset size will result in too many small sized segments.
       //We define have a desirable segment size OPTIMAL_SIZE_PER_SEGMENT
       //Divide the size of data coming in on a given day by OPTIMAL_SIZE_PER_SEGMENT we get the number of partitions.
       if (!_input.getOverWrittenConfigs().getPartitionConfig().isNumPartitionsOfflineOverwritten()) {
         int optimalOfflinePartitions = (int) _output.getSegmentSizeRecommendations().getNumSegments();
-        _output.getPartitionConfig().setNumPartitionsOffline(optimalOfflinePartitions);
-      }
-    }
-    if (isHybridTable) {
-      if (!_input.getOverWrittenConfigs().getPartitionConfig().isNumPartitionsOfflineOverwritten()) {
-        int optimalOfflinePartitions =
-            Math.min((int) _output.getSegmentSizeRecommendations().getNumSegments(), numKafkaPartitions);
         _output.getPartitionConfig().setNumPartitionsOffline(optimalOfflinePartitions);
       }
     }

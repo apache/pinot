@@ -157,22 +157,6 @@ public class InputManager {
       int cardinality = Math.min(numRecordsInSegment, _metaDataMap.get(colName).getCardinality());
       _metaDataMap.get(colName).setCardinality(cardinality);
     });
-    if (_schemaWithMetaData.getDimensionFieldSpecs() != null) {
-      _schemaWithMetaData.getDimensionFieldSpecs()
-          .forEach(column -> column.setCardinality(Math.min(numRecordsInSegment, column.getCardinality())));
-    }
-    if (_schemaWithMetaData.getMetricFieldSpecs() != null) {
-      _schemaWithMetaData.getMetricFieldSpecs()
-          .forEach(column -> column.setCardinality(Math.min(numRecordsInSegment, column.getCardinality())));
-    }
-    if (_schemaWithMetaData.getDateTimeFieldSpecs() != null) {
-      _schemaWithMetaData.getDateTimeFieldSpecs()
-          .forEach(column -> column.setCardinality(Math.min(numRecordsInSegment, column.getCardinality())));
-    }
-    if (_schemaWithMetaData.getTimeFieldSpec() != null) {
-      TimeFieldSpecMetadata column = _schemaWithMetaData.getTimeFieldSpec();
-      column.setCardinality(Math.min(numRecordsInSegment, column.getCardinality()));
-    }
   }
 
   private void validateQueries() {

@@ -135,7 +135,6 @@
   },
   "qps": 150,
   "numMessagesPerSecInKafkaTopic":1000,
-  "numRecordsPerPush":10000000,
   "tableType": "HYBRID",
   "latencySLA": 500,
   "rulesToExecute": {
