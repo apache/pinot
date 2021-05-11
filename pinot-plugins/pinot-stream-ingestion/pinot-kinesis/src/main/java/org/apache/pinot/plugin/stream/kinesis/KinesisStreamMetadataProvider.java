@@ -104,8 +104,14 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
       KinesisPartitionGroupOffset kinesisStartCheckpoint =
           (KinesisPartitionGroupOffset) currentPartitionGroupConsumptionStatus.getStartOffset();
       String shardId = kinesisStartCheckpoint.getShardToStartSequenceMap().keySet().iterator().next();
-      Shard shard = shardIdToShardMap.get(shardId);
       shardsInCurrent.add(shardId);
+      Shard shard = shardIdToShardMap.get(shardId);
+      if (shard == null) { // Shard has expired
+        shardsEnded.add(shardId);
+        continue;
+        // FIXME: Here we assume that we were done consuming the shard before it expired.
+        //  Handle edge case where consumer lags behind, resulting in shard to expire before it is all consumed
+      }
 
       StreamPartitionMsgOffset newStartOffset;
       StreamPartitionMsgOffset currentEndOffset = currentPartitionGroupConsumptionStatus.getEndOffset();
@@ -125,9 +131,9 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
           new PartitionGroupMetadata(currentPartitionGroupConsumptionStatus.getPartitionGroupId(), newStartOffset));
     }
 
-    // Add new shards. Parent should be null (new table case, very first shards)
-    // OR it should be flagged as reached EOL and completely consumed.
+    // Add brand new shards
     for (Map.Entry<String, Shard> entry : shardIdToShardMap.entrySet()) {
+      // If shard was already in current list, skip
       String newShardId = entry.getKey();
       if (shardsInCurrent.contains(newShardId)) {
         continue;
@@ -136,7 +142,11 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
       Shard newShard = entry.getValue();
       String parentShardId = newShard.parentShardId();
 
-      if (parentShardId == null || shardsEnded.contains(parentShardId)) {
+      // Add the new shard in the following 3 cases:
+      // 1. Root shards - Parent shardId will be null. Will find this case when creating new table.
+      // 2. Parent expired - Parent shardId will not be part of shardIdToShard map
+      // 3. Parent reached EOL and completely consumed.
+      if (parentShardId == null || !shardIdToShardMap.containsKey(parentShardId) || shardsEnded.contains(parentShardId)) {
         Map<String, String> shardToSequenceNumberMap = new HashMap<>();
         shardToSequenceNumberMap.put(newShardId, newShard.sequenceNumberRange().startingSequenceNumber());
         newStartOffset = new KinesisPartitionGroupOffset(shardToSequenceNumberMap);
