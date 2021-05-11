@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.stream.kinesis;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -28,7 +29,13 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 /**
  * A {@link StreamPartitionMsgOffset} implementation for the Kinesis partition group consumption
- * A partition group consists of 1 or more shards. The KinesisCheckpoint maintains a Map of shards to the sequenceNumber
+ * A partition group consists of 1 or more shards. The KinesisCheckpoint maintains a Map of shards to the sequenceNumber.
+ * The sequenceNumber is the id (equivalent to offset in kafka) for the messages in the shard.
+ * From the Kinesis documentation:
+ * Each data record has a sequence number that is unique per partition-key within its shard.
+ * Kinesis Data Streams assigns the sequence number after you write to the stream with client.putRecords or client.putRecord.
+ * Sequence numbers for the same partition key generally increase over time.
+ * The longer the time period between write requests, the larger the sequence numbers become.
  */
 public class KinesisPartitionGroupOffset implements StreamPartitionMsgOffset {
   private final Map<String, String> _shardToStartSequenceMap;
@@ -69,8 +76,17 @@ public class KinesisPartitionGroupOffset implements StreamPartitionMsgOffset {
 
   @Override
   public int compareTo(Object o) {
-
+    Preconditions.checkNotNull(o);
+    KinesisPartitionGroupOffset other = (KinesisPartitionGroupOffset) o;
+    Preconditions.checkNotNull(other._shardToStartSequenceMap);
+    Preconditions.checkNotNull(this._shardToStartSequenceMap);
+    Preconditions
+        .checkState(other._shardToStartSequenceMap.size() == 1, "Only 1 shard per consumer supported. Found: %s",
+            other._shardToStartSequenceMap);
+    Preconditions
+        .checkState(this._shardToStartSequenceMap.size() == 1, "Only 1 shard per consumer supported. Found: %s",
+            this._shardToStartSequenceMap);
     return this._shardToStartSequenceMap.values().iterator().next()
-        .compareTo(((KinesisPartitionGroupOffset) o)._shardToStartSequenceMap.values().iterator().next());
+        .compareTo(other._shardToStartSequenceMap.values().iterator().next());
   }
 }

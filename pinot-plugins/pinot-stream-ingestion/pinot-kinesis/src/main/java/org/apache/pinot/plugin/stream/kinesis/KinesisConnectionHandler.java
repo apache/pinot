@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.plugin.stream.kinesis;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.kinesis.KinesisClient;
 import software.amazon.awssdk.services.kinesis.model.ListShardsRequest;
@@ -33,17 +37,24 @@ import software.amazon.awssdk.services.kinesis.model.Shard;
 public class KinesisConnectionHandler {
   protected KinesisClient _kinesisClient;
   private final String _stream;
-  private final String _awsRegion;
+  private final String _region;
+  private final String _accessKey;
+  private final String _secretKey;
 
-  public KinesisConnectionHandler(String stream, String awsRegion) {
-    _stream = stream;
-    _awsRegion = awsRegion;
+  public KinesisConnectionHandler(KinesisConfig kinesisConfig) {
+    _stream = kinesisConfig.getStreamTopicName();
+    _region = kinesisConfig.getAwsRegion();
+    _accessKey = kinesisConfig.getAccessKey();
+    _secretKey = kinesisConfig.getSecretKey();
     createConnection();
   }
 
-  public KinesisConnectionHandler(String stream, String awsRegion, KinesisClient kinesisClient) {
-    _stream = stream;
-    _awsRegion = awsRegion;
+  @VisibleForTesting
+  public KinesisConnectionHandler(KinesisConfig kinesisConfig, KinesisClient kinesisClient) {
+    _stream = kinesisConfig.getStreamTopicName();
+    _region = kinesisConfig.getAwsRegion();
+    _accessKey = kinesisConfig.getAccessKey();
+    _secretKey = kinesisConfig.getSecretKey();
     _kinesisClient = kinesisClient;
   }
 
@@ -61,9 +72,15 @@ public class KinesisConnectionHandler {
    */
   public void createConnection() {
     if (_kinesisClient == null) {
-      _kinesisClient =
-          KinesisClient.builder().region(Region.of(_awsRegion)).credentialsProvider(DefaultCredentialsProvider.create())
-              .build();
+      if (StringUtils.isNotBlank(_accessKey) && StringUtils.isNotBlank(_secretKey)) {
+        AwsBasicCredentials awsBasicCredentials = AwsBasicCredentials.create(_accessKey, _secretKey);
+        _kinesisClient = KinesisClient.builder().region(Region.of(_region))
+            .credentialsProvider(StaticCredentialsProvider.create(awsBasicCredentials)).build();
+      } else {
+        _kinesisClient =
+            KinesisClient.builder().region(Region.of(_region)).credentialsProvider(DefaultCredentialsProvider.create())
+                .build();
+      }
     }
   }
 

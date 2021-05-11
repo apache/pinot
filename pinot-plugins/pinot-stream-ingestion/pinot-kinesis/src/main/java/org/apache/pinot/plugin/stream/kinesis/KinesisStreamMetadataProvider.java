@@ -54,7 +54,7 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
 
   public KinesisStreamMetadataProvider(String clientId, StreamConfig streamConfig) {
     KinesisConfig kinesisConfig = new KinesisConfig(streamConfig);
-    _kinesisConnectionHandler = new KinesisConnectionHandler(kinesisConfig.getStreamTopicName(), kinesisConfig.getAwsRegion());
+    _kinesisConnectionHandler = new KinesisConnectionHandler(kinesisConfig);
     _kinesisStreamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
     _clientId = clientId;
     _fetchTimeoutMs = streamConfig.getFetchTimeoutMillis();

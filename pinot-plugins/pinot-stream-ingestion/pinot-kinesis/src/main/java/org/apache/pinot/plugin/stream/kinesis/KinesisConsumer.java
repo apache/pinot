@@ -56,7 +56,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
   private final ShardIteratorType _shardIteratorType;
 
   public KinesisConsumer(KinesisConfig kinesisConfig) {
-    super(kinesisConfig.getStreamTopicName(), kinesisConfig.getAwsRegion());
+    super(kinesisConfig);
     _streamTopicName = kinesisConfig.getStreamTopicName();
     _numMaxRecordsToFetch = kinesisConfig.getNumMaxRecordsToFetch();
     _shardIteratorType = kinesisConfig.getShardIteratorType();
@@ -65,7 +65,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
 
   @VisibleForTesting
   public KinesisConsumer(KinesisConfig kinesisConfig, KinesisClient kinesisClient) {
-    super(kinesisConfig.getStreamTopicName(), kinesisConfig.getAwsRegion(), kinesisClient);
+    super(kinesisConfig, kinesisClient);
     _kinesisClient = kinesisClient;
     _streamTopicName = kinesisConfig.getStreamTopicName();
     _numMaxRecordsToFetch = kinesisConfig.getNumMaxRecordsToFetch();

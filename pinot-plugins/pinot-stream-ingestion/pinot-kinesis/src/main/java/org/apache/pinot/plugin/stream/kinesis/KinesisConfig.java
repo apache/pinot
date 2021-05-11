@@ -29,9 +29,11 @@ import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
  */
 public class KinesisConfig {
   public static final String STREAM_TYPE = "kinesis";
-  public static final String SHARD_ITERATOR_TYPE = "shard-iterator-type";
-  public static final String AWS_REGION = "aws-region";
-  public static final String MAX_RECORDS_TO_FETCH = "max-records-to-fetch";
+  public static final String SHARD_ITERATOR_TYPE = "shardIteratorType";
+  public static final String REGION = "region";
+  public static final String ACCESS_KEY = "accessKey";
+  public static final String SECRET_KEY = "secretKey";
+  public static final String MAX_RECORDS_TO_FETCH = "maxRecordsToFetch";
   // TODO: this is a starting point, until a better default is figured out
   public static final String DEFAULT_MAX_RECORDS = "20";
   public static final String DEFAULT_SHARD_ITERATOR_TYPE = ShardIteratorType.LATEST.toString();
@@ -40,16 +42,20 @@ public class KinesisConfig {
   private final String _awsRegion;
   private final int _numMaxRecordsToFetch;
   private final ShardIteratorType _shardIteratorType;
+  private final String _accessKey;
+  private final String _secretKey;
 
   public KinesisConfig(StreamConfig streamConfig) {
     Map<String, String> props = streamConfig.getStreamConfigsMap();
     _streamTopicName = streamConfig.getTopicName();
-    _awsRegion = props.get(AWS_REGION);
-    Preconditions.checkNotNull(_awsRegion, "Must provide 'aws-region' in stream config for table: %s",
+    _awsRegion = props.get(REGION);
+    Preconditions.checkNotNull(_awsRegion, "Must provide 'region' in stream config for table: %s",
         streamConfig.getTableNameWithType());
     _numMaxRecordsToFetch = Integer.parseInt(props.getOrDefault(MAX_RECORDS_TO_FETCH, DEFAULT_MAX_RECORDS));
     _shardIteratorType =
         ShardIteratorType.fromValue(props.getOrDefault(SHARD_ITERATOR_TYPE, DEFAULT_SHARD_ITERATOR_TYPE));
+    _accessKey = props.get(ACCESS_KEY);
+    _secretKey = props.get(SECRET_KEY);
   }
 
   public String getStreamTopicName() {
@@ -66,5 +72,13 @@ public class KinesisConfig {
 
   public ShardIteratorType getShardIteratorType() {
     return _shardIteratorType;
+  }
+
+  public String getAccessKey() {
+    return _accessKey;
+  }
+
+  public String getSecretKey() {
+    return _secretKey;
   }
 }

@@ -75,7 +75,7 @@ public class KinesisConsumerTest {
         KinesisConsumerFactory.class.getName());
     props.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_DECODER_CLASS),
         "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder");
-    props.put(KinesisConfig.AWS_REGION, AWS_REGION);
+    props.put(KinesisConfig.REGION, AWS_REGION);
     props.put(KinesisConfig.MAX_RECORDS_TO_FETCH, String.valueOf(MAX_RECORDS_TO_FETCH));
     props.put(KinesisConfig.SHARD_ITERATOR_TYPE, ShardIteratorType.AT_SEQUENCE_NUMBER.toString());
     return new KinesisConfig(new StreamConfig(TABLE_NAME_WITH_TYPE, props));
