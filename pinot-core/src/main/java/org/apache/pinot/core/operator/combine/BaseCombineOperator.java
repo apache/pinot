@@ -87,7 +87,7 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
     Phaser phaser = new Phaser(1);
 
     for (int i = 0; i < _numTasks; i++) {
-      int threadIndex = i;
+      int taskIndex = i;
       _futures[i] = _executorService.submit(new TraceRunnable() {
         @Override
         public void runJob() {
@@ -102,7 +102,7 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
             return;
           }
           try {
-            processSegments(threadIndex);
+            processSegments(taskIndex);
           } finally {
             phaser.arriveAndDeregister();
           }
@@ -133,6 +133,7 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
      * use those number of threads to concurrently process segments. Instead, if _executorService thread pool has
      * less number of threads than _numTasks, the number of threads that used to concurrently process segments equals
      * to the pool size.
+     * TODO: Get the actual number of query worker threads instead of using the default value.
      */
     int numServerThreads = Math.min(_numTasks, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
     CombineOperatorUtils
@@ -143,8 +144,8 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
   /**
    * Executes query on one or more segments in a worker thread.
    */
-  protected void processSegments(int threadIndex) {
-    for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
+  protected void processSegments(int taskIndex) {
+    for (int operatorIndex = taskIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
       try {
         IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) _operators.get(operatorIndex).nextBlock();
         if (isQuerySatisfied(resultsBlock)) {

@@ -26,7 +26,7 @@ import org.testng.annotations.Test;
 public class ThreadCpuTimeMeasurementTest {
 
   @Test
-  public void testAdditionTransformFunction() {
+  public void testCalTotalThreadCpuTimeNs() {
     class testCase {
       final long totalWallClockTimeNs;
       final long multipleThreadCpuTimeNs;
@@ -47,9 +47,9 @@ public class ThreadCpuTimeMeasurementTest {
             new testCase(4245673, 7124487, 3, 8995331),
             new testCase(21500000, 10962161, 2, 26981081),
             new testCase(59000000, 23690790, 1, 59000000),
-            new testCase(5123, 11321792, 5, 9062557),
-            new testCase(79000, 35537324, 7, 30539563),
-            new testCase(2056, 2462128, 4, 1848652)
+            new testCase(59124358, 11321792, 5, 68181792),
+            new testCase(79888780, 35537324, 7, 110349343),
+            new testCase(915432, 2462128, 4, 2762028)
         };
 
     for (testCase testCase : testCases) {
@@ -59,7 +59,7 @@ public class ThreadCpuTimeMeasurementTest {
       long expectedTotalThreadCpuTimeNs = testCase.totalThreadCpuTimeNs;
       long actualTotalThreadCpuTimeNs = InstanceResponseOperator
           .calTotalThreadCpuTimeNs(totalWallClockTimeNs, multipleThreadCpuTimeNs, numServerThreads);
-      Assert.equals(actualTotalThreadCpuTimeNs, expectedTotalThreadCpuTimeNs);
+      Assert.equals(expectedTotalThreadCpuTimeNs, actualTotalThreadCpuTimeNs);
     }
   }
 }
