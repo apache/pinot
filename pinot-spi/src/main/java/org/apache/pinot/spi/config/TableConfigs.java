@@ -21,6 +21,7 @@ package org.apache.pinot.spi.config;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -70,9 +71,31 @@ public class TableConfigs extends BaseJsonConfig {
     return _realtime;
   }
 
+  private ObjectNode toJsonObject() {
+    ObjectNode tableConfigsObjectNode = JsonUtils.newObjectNode();
+    tableConfigsObjectNode.put("tableName", _tableName);
+    tableConfigsObjectNode.set("schema", _schema.toJsonObject());
+    if (_offline != null) {
+      tableConfigsObjectNode.set("offline", _offline.toJsonNode());
+    }
+    if (_realtime != null) {
+      tableConfigsObjectNode.set("realtime", _realtime.toJsonNode());
+    }
+    return tableConfigsObjectNode;
+  }
+
+  @Override
+  public String toJsonString() {
+    try {
+      return JsonUtils.objectToString(toJsonObject());
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   public String toPrettyJsonString() {
     try {
-      return JsonUtils.objectToPrettyString(this);
+      return JsonUtils.objectToPrettyString(toJsonObject());
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }
