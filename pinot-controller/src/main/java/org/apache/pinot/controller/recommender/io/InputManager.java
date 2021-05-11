@@ -40,7 +40,6 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.controller.recommender.exceptions.InvalidInputException;
 import org.apache.pinot.controller.recommender.io.metadata.FieldMetadata;
 import org.apache.pinot.controller.recommender.io.metadata.SchemaWithMetaData;
-import org.apache.pinot.controller.recommender.io.metadata.TimeFieldSpecMetadata;
 import org.apache.pinot.controller.recommender.rules.RulesToExecute;
 import org.apache.pinot.controller.recommender.rules.io.params.BloomFilterRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.FlagQueryRuleParams;
