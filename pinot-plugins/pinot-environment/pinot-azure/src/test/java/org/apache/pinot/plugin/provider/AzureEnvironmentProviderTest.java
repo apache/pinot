@@ -21,7 +21,6 @@ package org.apache.pinot.plugin.provider;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import javax.ws.rs.WebApplicationException;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpStatus;
 import org.apache.http.StatusLine;
@@ -85,8 +84,8 @@ public class AzureEnvironmentProviderTest {
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class,
-        expectedExceptionsMessageRegExp = "imdsEndpoint should not be null or empty")
-  public void testInvalidIMDSEndpoint() throws IllegalArgumentException {
+      expectedExceptionsMessageRegExp = "\\[AzureEnvironmentProvider\\]: imdsEndpoint should not be null or empty")
+  public void testInvalidIMDSEndpoint() {
     Map<String, Object> map = _pinotConfiguration.toMap();
     map.put(MAX_RETRY, "3");
     map.put(IMDS_ENDPOINT, "");
@@ -95,8 +94,8 @@ public class AzureEnvironmentProviderTest {
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class,
-        expectedExceptionsMessageRegExp = "maxRetry cannot be less than or equal to 0")
-  public void testInvalidRetryCount() throws IllegalArgumentException {
+        expectedExceptionsMessageRegExp = "\\[AzureEnvironmentProvider\\]: maxRetry cannot be less than or equal to 0")
+  public void testInvalidRetryCount() {
     Map<String, Object> map = _pinotConfiguration.toMap();
     map.put(MAX_RETRY, "0");
     PinotConfiguration pinotConfiguration = new PinotConfiguration(map);
@@ -104,33 +103,32 @@ public class AzureEnvironmentProviderTest {
   }
 
   @Test(expectedExceptions = NullPointerException.class,
-      expectedExceptionsMessageRegExp = "Closeable Http Client cannot be null")
-  public void testInvalidHttpClient() throws IllegalArgumentException {
-    new AzureEnvironmentProvider(
-        3, IMDS_ENDPOINT_VALUE, null);
+      expectedExceptionsMessageRegExp = "\\[AzureEnvironmentProvider\\]: Closeable Http Client cannot be null")
+  public void testInvalidHttpClient() {
+    new AzureEnvironmentProvider(3, IMDS_ENDPOINT_VALUE, null);
   }
 
-  @Test(expectedExceptions = WebApplicationException.class,
+  @Test(expectedExceptions = RuntimeException.class,
         expectedExceptionsMessageRegExp = "Compute node is missing in the payload. Cannot retrieve Failure Domain Information")
-  public void testMissingComputeNodeResponse() throws WebApplicationException, IOException {
+  public void testMissingComputeNodeResponse() throws IOException {
     mockUtil();
     when(_mockHttpEntity.getContent())
         .thenReturn(getClass().getClassLoader().getResourceAsStream(IMDS_RESPONSE_WITHOUT_COMPUTE_INFO));
     _azureEnvironmentProviderWithParams.getFailureDomain();
   }
 
-  @Test(expectedExceptions = WebApplicationException.class,
+  @Test(expectedExceptions = RuntimeException.class,
       expectedExceptionsMessageRegExp = "Json node platformFaultDomain is missing or is invalid.")
-  public void testMissingFaultDomainResponse() throws WebApplicationException, IOException {
+  public void testMissingFaultDomainResponse() throws IOException {
     mockUtil();
     when(_mockHttpEntity.getContent())
         .thenReturn(getClass().getClassLoader().getResourceAsStream(IMDS_RESPONSE_WITHOUT_FAULT_DOMAIN_INFO));
     _azureEnvironmentProviderWithParams.getFailureDomain();
   }
 
-  @Test(expectedExceptions = WebApplicationException.class,
+  @Test(expectedExceptions = RuntimeException.class,
       expectedExceptionsMessageRegExp = "Failed to retrieve azure instance metadata. Response Status code: " + SC_NOT_FOUND)
-  public void testIMDSCallFailure() throws WebApplicationException, IOException {
+  public void testIMDSCallFailure() throws IOException {
     mockUtil();
     when(_mockStatusLine.getStatusCode()).thenReturn(SC_NOT_FOUND);
     _azureEnvironmentProviderWithParams.getFailureDomain();

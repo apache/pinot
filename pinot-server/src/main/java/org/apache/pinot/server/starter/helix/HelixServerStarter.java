@@ -86,6 +86,8 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.*;
+
 
 /**
  * Starter for Pinot server.
@@ -123,7 +125,7 @@ public class HelixServerStarter implements ServiceStartable {
   private AdminApiApplication _adminApiApplication;
   private ServerQueriesDisabledTracker _serverQueriesDisabledTracker;
   private RealtimeLuceneIndexRefreshState _realtimeLuceneIndexRefreshState;
-  private static Map<String, Map<String, String>> environmentSpecificMapFields = new HashMap<>();
+  private Map<String, String> _environmentProperties;
 
   public HelixServerStarter(String helixClusterName, String zkAddress, PinotConfiguration serverConf)
       throws Exception {
@@ -149,6 +151,8 @@ public class HelixServerStarter implements ServiceStartable {
         new HelixConfigScopeBuilder(ConfigScopeProperty.PARTICIPANT, _helixClusterName).forParticipant(_instanceId)
             .build();
 
+    _environmentProperties = new HashMap<>();
+
     // Fetch Environment Specific Configs
     fetchEnvironmentSpecificConfigs();
 
@@ -172,14 +176,15 @@ public class HelixServerStarter implements ServiceStartable {
         Server.PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY);
 
     if (environmentProviderConfigs.toMap().isEmpty()) {
-      LOGGER.info("No Environment Provider Configs found.");
+      LOGGER.info("No environment provider config values provided for server property: {}",
+          Server.PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY);
       return;
     }
 
     PinotEnvironmentProviderFactory.init(environmentProviderConfigs);
     String environmentProviderClassName = _serverConf.getProperty(Server.ENVIRONMENT_PROVIDER_CLASS_NAME);
     if (environmentProviderClassName == null) {
-      LOGGER.info("No Class Name provided for Environment Provider.");
+      LOGGER.info("No className value provided for property: {}", Server.ENVIRONMENT_PROVIDER_CLASS_NAME);
       return;
     }
 
@@ -188,18 +193,24 @@ public class HelixServerStarter implements ServiceStartable {
         environmentProviderClassName.toLowerCase());
 
     // Fetch the overridden pinot configuration containing custom configs.
-    Map<String, Object> overriddenPinotConfigs = pinotEnvironmentProvider.getEnvironment();
+    Map<String, String> overriddenPinotConfigs = pinotEnvironmentProvider.getEnvironment();
 
     // Populate environment specific fields in the map.
-    String failureDomain = (String)overriddenPinotConfigs.get(PinotEnvironmentProvider.INSTANCE_FAILURE_DOMAIN);
+    String failureDomain = overriddenPinotConfigs.get(CommonConstants.INSTANCE_FAILURE_DOMAIN);
     if (failureDomain == null) {
-      LOGGER.info("No failure domain information found for instance: {}", _instanceId);
-      return;
+      LOGGER.error("No failure domain information retrieved for environment provider: {} for instance: {}",
+          environmentProviderClassName, _instanceId);
+      throw new RuntimeException(
+          "No failure domain information retrieved for server instance : " + _instanceId + ", halting the server starter process.");
     }
 
-    Map<String, String> failureDomainMap = new HashMap<>();
-    failureDomainMap.put(CommonConstants.FAILURE_DOMAIN_IDENTIFIER, failureDomain);
-    environmentSpecificMapFields.put(CommonConstants.ENVIRONMENT_IDENTIFIER, failureDomainMap);
+    // Replacing property name with custom key name for better readability in zookeeper node.
+    // e.g Replace "pinot.environment.instance.failureDomain" with "failureDomain".
+    overriddenPinotConfigs.put(FAILURE_DOMAIN_IDENTIFIER, failureDomain);
+    overriddenPinotConfigs.remove(CommonConstants.INSTANCE_FAILURE_DOMAIN);
+
+    // Copying all environment specific properties to be populated into server instance's ZkNode mapFields during startup.
+    _environmentProperties.putAll(overriddenPinotConfigs);
   }
 
   /**
@@ -292,6 +303,10 @@ public class HelixServerStarter implements ServiceStartable {
       needToUpdateInstanceConfig = true;
     }
 
+    // Update instance configs with environment specific properties
+    instanceConfig.getRecord().setMapField(ENVIRONMENT_IDENTIFIER, _environmentProperties);
+    LOGGER.info("Updated instance config for instance: {} with environment specific properties", _instanceId);
+
     if (needToUpdateInstanceConfig) {
       LOGGER.info("Updating instance config for instance: {} with instance tags: {}, host: {}, port: {}", _instanceId,
           instanceTags, host, port);
@@ -307,22 +322,6 @@ public class HelixServerStarter implements ServiceStartable {
     Preconditions.checkState(
         helixDataAccessor.setProperty(helixDataAccessor.keyBuilder().instanceConfig(_instanceId), instanceConfig),
         "Failed to update instance config");
-  }
-
-  // Update instance configs with environment specific properties
-  private void updateInstanceConfigWithEnvironmentSpecificConfigs() {
-    InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(_helixClusterName, _instanceId);
-    if (environmentSpecificMapFields.size() == 0) {
-      LOGGER.info("No environment properties found to update the instance config.");
-      return;
-    }
-
-    instanceConfig.getRecord().setMapFields(environmentSpecificMapFields);
-    HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
-    Preconditions.checkState(
-        helixDataAccessor.setProperty(helixDataAccessor.keyBuilder().instanceConfig(_instanceId), instanceConfig),
-        "Failed to update instance config with environment properties");
-    LOGGER.info("Updated instance config for instance: {} with environment specific properties", _instanceId);
   }
 
   private void setupHelixSystemProperties() {
@@ -399,7 +398,6 @@ public class HelixServerStarter implements ServiceStartable {
     LOGGER.info("Initializing server instance and registering state model factory");
     Utils.logVersions();
     ControllerLeaderLocator.create(_helixManager);
-
     ServerSegmentCompletionProtocolHandler
         .init(_serverConf.subset(SegmentCompletionProtocol.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
     ServerConf serverInstanceConfig = DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(_serverConf);
@@ -420,8 +418,6 @@ public class HelixServerStarter implements ServiceStartable {
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
     updateInstanceConfigIfNeeded(_host, _port);
-
-    updateInstanceConfigWithEnvironmentSpecificConfigs();
 
     // Start restlet server for admin API endpoint
     String accessControlFactoryClass =

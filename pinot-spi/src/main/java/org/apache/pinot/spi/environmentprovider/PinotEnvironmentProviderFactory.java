@@ -39,7 +39,7 @@ public class PinotEnvironmentProviderFactory {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotEnvironmentProviderFactory.class);
   private static final String CLASS = "class";
-  private static final Map<String, PinotEnvironmentProvider> PINOT_ENVIRONMENT_PROVIDER_MAP = new HashMap<>();
+  private static final Map<String, PinotEnvironmentProvider> ENVIRONMENT_TO_ENVIRONMENT_PROVIDER_MAP = new HashMap<>();
 
   public static void init(PinotConfiguration environmentProviderFactoryConfig) {
     // Get environment and it's respective class
@@ -55,27 +55,29 @@ public class PinotEnvironmentProviderFactory {
     String environmentProviderClassName = environmentConfiguration.getProperty(environment);
     PinotConfiguration environmentProviderConfiguration = environmentProviderFactoryConfig.subset(environment);
     LOGGER.info("Got environment {}, initializing class {}", environment, environmentProviderClassName);
-    register(environment, environmentProviderClassName, environmentProviderConfiguration);
+    if (!ENVIRONMENT_TO_ENVIRONMENT_PROVIDER_MAP.containsKey(environment)) {
+      register(environment, environmentProviderClassName, environmentProviderConfiguration);
+    }
   }
 
   // Utility to invoke the cloud specific environment provider.
   public static PinotEnvironmentProvider getEnvironmentProvider(String environment) {
-    PinotEnvironmentProvider pinotEnvironmentProvider = PINOT_ENVIRONMENT_PROVIDER_MAP.get(environment);
+    PinotEnvironmentProvider pinotEnvironmentProvider = ENVIRONMENT_TO_ENVIRONMENT_PROVIDER_MAP.get(environment);
     Preconditions.checkState(pinotEnvironmentProvider != null,
         "PinotEnvironmentProvider for environment: %s has not been initialized", environment);
     return pinotEnvironmentProvider;
   }
 
   private static void register(
-      String environment, String environmentProviderFileName, PinotConfiguration environmentProviderConfiguration) {
+      String environment, String environmentProviderClassName, PinotConfiguration environmentProviderConfiguration) {
     try {
-      LOGGER.info("Initializing PinotEnvironmentProvider for environment {}, classname {}", environment, environmentProviderFileName);
-      PinotEnvironmentProvider pinotEnvironmentProvider = PluginManager.get().createInstance(environmentProviderFileName);
+      LOGGER.info("Initializing PinotEnvironmentProvider for environment {}, classname {}", environment, environmentProviderClassName);
+      PinotEnvironmentProvider pinotEnvironmentProvider = PluginManager.get().createInstance(environmentProviderClassName);
       pinotEnvironmentProvider.init(environmentProviderConfiguration);
-      PINOT_ENVIRONMENT_PROVIDER_MAP.put(environment, pinotEnvironmentProvider);
+      ENVIRONMENT_TO_ENVIRONMENT_PROVIDER_MAP.put(environment, pinotEnvironmentProvider);
     } catch (Exception ex) {
       LOGGER.error("Could not instantiate environment provider for class {} with environment {}",
-          environmentProviderFileName, environment, ex);
+          environmentProviderClassName, environment, ex);
       throw new RuntimeException(ex);
     }
   }

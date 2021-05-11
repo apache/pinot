@@ -57,7 +57,7 @@ public class PinotEnvironmentProviderFactoryTest {
     }
 
     @Override
-    public Map<String, Object> getEnvironment() {
+    public Map<String, String> getEnvironment() {
       return new HashMap<>();
     }
 

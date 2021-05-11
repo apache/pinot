@@ -28,7 +28,6 @@ import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map;
 import javax.net.ssl.SSLException;
-import javax.ws.rs.WebApplicationException;
 import org.apache.commons.lang.StringUtils;
 import org.apache.http.HttpEntityEnclosingRequest;
 import org.apache.http.HttpStatus;
@@ -43,6 +42,8 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.environmentprovider.PinotEnvironmentProvider;
+import org.apache.pinot.spi.utils.CommonConstants;
+
 
 /**
  * Azure Environment Provider used to retrieve azure cloud specific instance configuration.
@@ -63,12 +64,12 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
   public AzureEnvironmentProvider() {
   }
 
-  public void init(PinotConfiguration pinotConfiguration) throws NullPointerException, IllegalArgumentException {
+  public void init(PinotConfiguration pinotConfiguration) {
     _serverConfigs = pinotConfiguration;
     Preconditions.checkArgument(0 < Integer.parseInt(_serverConfigs.getProperty(MAX_RETRY)),
-         "maxRetry cannot be less than or equal to 0");
+         "[AzureEnvironmentProvider]: " + MAX_RETRY + " cannot be less than or equal to 0");
     Preconditions.checkArgument(!StringUtils.isBlank(_serverConfigs.getProperty(IMDS_ENDPOINT)),
-        "imdsEndpoint should not be null or empty");
+        "[AzureEnvironmentProvider]: " + IMDS_ENDPOINT + " should not be null or empty");
 
     _maxRetry = Integer.parseInt(_serverConfigs.getProperty(MAX_RETRY));
     _imdsEndpoint = _serverConfigs.getProperty(IMDS_ENDPOINT);
@@ -92,26 +93,26 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
   }
 
   // Constructor for test purposes.
+  @VisibleForTesting
   public AzureEnvironmentProvider(int maxRetry, String imdsEndpoint, CloseableHttpClient closeableHttpClient) {
-    Preconditions.checkArgument(maxRetry > 0, "maxRetry cannot be less than or equal to 0");
-    Preconditions.checkArgument(!StringUtils.isBlank(imdsEndpoint), "imdsEndpoint should not be null or empty");
     _maxRetry = maxRetry;
     _imdsEndpoint = imdsEndpoint;
-    _closeableHttpClient = Preconditions.checkNotNull(closeableHttpClient, "Closeable Http Client cannot be null");
+    _closeableHttpClient = Preconditions.checkNotNull(closeableHttpClient,
+        "[AzureEnvironmentProvider]: Closeable Http Client cannot be null");
   }
 
   /**
    *
-   * Method for constructing custom pinot configuration used by the HelixServerStarter to update
+   * Method for constructing custom pinot configuration map used by the HelixServerStarter to update
    * zookeeper node with custom instance configs.
    * @return custom pinot configuration map
    */
   @Override
-  public Map<String, Object> getEnvironment() {
-    Map<String, Object> customPinotConfiguration = new HashMap<>(_serverConfigs.toMap());
+  public Map<String, String> getEnvironment() {
+    Map<String, String> customPinotConfiguration = new HashMap<>();
 
     // Populate failure domain information
-    customPinotConfiguration.put(INSTANCE_FAILURE_DOMAIN,  getFailureDomain());
+    customPinotConfiguration.put(CommonConstants.INSTANCE_FAILURE_DOMAIN,  getFailureDomain());
 
     return customPinotConfiguration;
   }
@@ -129,16 +130,16 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
       final JsonNode computeNode = jsonNode.path(COMPUTE);
 
       if (computeNode.isMissingNode()) {
-        throw new WebApplicationException(
+        throw new RuntimeException(
             "Compute node is missing in the payload. Cannot retrieve Failure Domain Information");
       }
       final JsonNode platformFailureDomainNode = computeNode.path(PLATFORM_FAULT_DOMAIN);
       if (platformFailureDomainNode.isMissingNode() || !platformFailureDomainNode.isTextual()) {
-        throw new WebApplicationException("Json node platformFaultDomain is missing or is invalid.");
+        throw new RuntimeException("Json node platformFaultDomain is missing or is invalid.");
       }
       return platformFailureDomainNode.textValue();
     } catch (IOException ex) {
-      throw new WebApplicationException(
+      throw new RuntimeException(
           String.format(
               "Errors when parsing response payload from Azure Instance Metadata Service: %s", responsePayload), ex);
     }
@@ -153,18 +154,18 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
     try {
       final CloseableHttpResponse closeableHttpResponse = _closeableHttpClient.execute(httpGet);
       if (closeableHttpResponse == null) {
-        throw new WebApplicationException("Response is null. Please verify the imds endpoint");
+        throw new RuntimeException("Response is null. Please verify the imds endpoint");
       }
       final StatusLine statusLine = closeableHttpResponse.getStatusLine();
       final int statusCode = statusLine.getStatusCode();
       if (statusCode != HttpStatus.SC_OK) {
         final String errorMsg = String.format(
             "Failed to retrieve azure instance metadata. Response Status code: %s", statusCode);
-        throw new WebApplicationException(errorMsg);
+        throw new RuntimeException(errorMsg);
       }
       return EntityUtils.toString(closeableHttpResponse.getEntity());
     } catch (IOException ex) {
-      throw new WebApplicationException(
+      throw new RuntimeException(
           String.format("Failed to retrieve metadata from Azure Instance Metadata Service %s", _imdsEndpoint), ex);
     }
   }
