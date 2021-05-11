@@ -71,19 +71,23 @@ public class TableConfigs extends BaseJsonConfig {
     return _realtime;
   }
 
+  private ObjectNode toJsonObject() {
+    ObjectNode tableConfigsObjectNode = JsonUtils.newObjectNode();
+    tableConfigsObjectNode.put("tableName", _tableName);
+    tableConfigsObjectNode.set("schema", _schema.toJsonObject());
+    if (_offline != null) {
+      tableConfigsObjectNode.set("offline", _offline.toJsonNode());
+    }
+    if (_realtime != null) {
+      tableConfigsObjectNode.set("realtime", _realtime.toJsonNode());
+    }
+    return tableConfigsObjectNode;
+  }
+
   @Override
   public String toJsonString() {
     try {
-      ObjectNode tableConfigs = JsonUtils.newObjectNode();
-      tableConfigs.put("tableName", _tableName);
-      tableConfigs.set("schema", _schema.toJsonObject());
-      if (_offline != null) {
-        tableConfigs.set("offline", _offline.toJsonNode());
-      }
-      if (_realtime != null) {
-        tableConfigs.set("realtime", _realtime.toJsonNode());
-      }
-      return JsonUtils.objectToString(tableConfigs);
+      return JsonUtils.objectToString(toJsonObject());
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }
@@ -91,7 +95,7 @@ public class TableConfigs extends BaseJsonConfig {
 
   public String toPrettyJsonString() {
     try {
-      return JsonUtils.objectToPrettyString(this);
+      return JsonUtils.objectToPrettyString(toJsonObject());
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }
