@@ -43,6 +43,11 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
     long endWallClockTimeNs = System.nanoTime();
 
     long multipleThreadCpuTimeNs = intermediateResultsBlock.getExecutionThreadCpuTimeNs();
+    /*
+     * If/when the threadCpuTime based instrumentation is done for other parts of execution (planning, pruning etc),
+     * we will have to change the wallClockTime computation accordingly. Right now everything under
+     * InstanceResponseOperator is the one that is instrumented with threadCpuTime.
+     */
     long totalWallClockTimeNs = endWallClockTimeNs - startWallClockTimeNs;
 
     int numServerThreads = intermediateResultsBlock.getNumServerThreads();
@@ -78,7 +83,8 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
    * = totalWallClockTimeNs + (multipleThreadCpuTimeNs / N) * (N - 1)
    */
   public static long calTotalThreadCpuTimeNs(long totalWallClockTimeNs, long multipleThreadCpuTimeNs, int numServerThreads) {
-    return totalWallClockTimeNs + multipleThreadCpuTimeNs * (numServerThreads - 1) / numServerThreads;
+    double perThreadCpuTimeNs = multipleThreadCpuTimeNs * 1.0 / numServerThreads;
+    return Math.round(totalWallClockTimeNs + perThreadCpuTimeNs * (numServerThreads - 1));
   }
 
   @Override

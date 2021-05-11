@@ -140,7 +140,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
     //       segment result is merged.
     Comparable threadBoundaryValue = null;
 
-    for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numThreads) {
+    for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
       // Calculate the boundary value from global boundary and thread boundary
       Comparable boundaryValue = _globalBoundaryValue.get();
       if (boundaryValue == null) {
@@ -168,7 +168,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
           if (minMaxValueContext._minValue != null) {
             int result = minMaxValueContext._minValue.compareTo(boundaryValue);
             if (result > 0 || (result == 0 && numOrderByExpressions == 1)) {
-              _numOperatorsSkipped.getAndAdd((_numOperators - operatorIndex - 1) / _numThreads);
+              _numOperatorsSkipped.getAndAdd((_numOperators - operatorIndex - 1) / _numTasks);
               _blockingQueue.offer(LAST_RESULTS_BLOCK);
               return;
             }
@@ -179,7 +179,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
           if (minMaxValueContext._maxValue != null) {
             int result = minMaxValueContext._maxValue.compareTo(boundaryValue);
             if (result < 0 || (result == 0 && numOrderByExpressions == 1)) {
-              _numOperatorsSkipped.getAndAdd((_numOperators - operatorIndex - 1) / _numThreads);
+              _numOperatorsSkipped.getAndAdd((_numOperators - operatorIndex - 1) / _numTasks);
               _blockingQueue.offer(LAST_RESULTS_BLOCK);
               return;
             }
