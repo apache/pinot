@@ -92,6 +92,8 @@ public class MutableJsonIndex implements JsonIndexReader {
     for (int i = 0; i < numRecords; i++) {
       _docIdMapping.add(_nextDocId);
     }
+    // TODO: Consider storing tuples as the key of the posting list so that the strings can be reused, and the hashcode
+    //       can be cached.
     for (Map<String, String> record : records) {
       for (Map.Entry<String, String> entry : record.entrySet()) {
         // Put both key and key-value into the posting list. Key is useful for checking if a key exists in the json.
