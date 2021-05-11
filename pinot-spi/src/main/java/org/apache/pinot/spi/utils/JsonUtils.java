@@ -35,10 +35,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -49,9 +49,12 @@ public class JsonUtils {
   }
 
   // For flattening
+  public static final String VALUE_KEY = "";
   public static final String KEY_SEPARATOR = ".";
-  public static final String ARRAY_VALUE_KEY = "";
-  public static final String ARRAY_INDEX_KEY = "$index";
+  public static final String ARRAY_INDEX_KEY = ".$index";
+
+  // For querying
+  public static final String WILDCARD = "*";
 
   // NOTE: Do not expose the ObjectMapper to prevent configuration change
   private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper();
@@ -209,7 +212,7 @@ public class JsonUtils {
   /**
    * Flattens the given json node.
    * <p>Json array will be flattened into multiple records, where each record has a special key to store the index of
-   * the element. Multi-dimensional array is not supported.
+   * the element.
    * <pre>
    * E.g.
    * {
@@ -230,135 +233,127 @@ public class JsonUtils {
    * -->
    * [
    *   {
-   *     "name": "adam",
-   *     "addresses.$index": "0",
-   *     "addresses.country": "us",
-   *     "addresses.street": "main st",
-   *     "addresses.number": "1"
+   *     ".name": "adam",
+   *     ".addresses.$index": "0",
+   *     ".addresses..country": "us",
+   *     ".addresses..street": "main st",
+   *     ".addresses..number": "1"
    *   },
    *   {
-   *     "name": "adam",
-   *     "addresses.$index": "1",
-   *     "addresses.country": "ca",
-   *     "addresses.street": "second st",
-   *     "addresses.number": "2"
+   *     ".name": "adam",
+   *     ".addresses.$index": "1",
+   *     ".addresses..country": "ca",
+   *     ".addresses..street": "second st",
+   *     ".addresses..number": "2"
    *   }
    * ]
    * </pre>
    */
   public static List<Map<String, String>> flatten(JsonNode node) {
+    // Null
     if (node.isNull()) {
       return Collections.emptyList();
     }
-    Preconditions.checkState(!node.isValueNode(), "Cannot flatten value node: %s", node);
 
+    // Value
+    if (node.isValueNode()) {
+      return Collections.singletonList(Collections.singletonMap(VALUE_KEY, node.asText()));
+    }
+
+    // Array
     if (node.isArray()) {
-      // Array node
-
       List<Map<String, String>> results = new ArrayList<>();
       int numChildren = node.size();
       for (int i = 0; i < numChildren; i++) {
         JsonNode childNode = node.get(i);
-        Preconditions.checkState(!childNode.isArray(), "Do not support multi-dimensional array: %s", node);
-
-        // Skip null node
-        if (childNode.isNull()) {
-          continue;
-        }
-
         String arrayIndexValue = Integer.toString(i);
-        if (childNode.isValueNode()) {
-          Map<String, String> result = new HashMap<>();
-          result.put(ARRAY_VALUE_KEY, childNode.asText());
-          result.put(ARRAY_INDEX_KEY, Integer.toString(i));
-          results.add(result);
-        } else {
-          assert childNode.isObject();
-          List<Map<String, String>> childResults = flatten(childNode);
-          for (Map<String, String> childResult : childResults) {
-            childResult.put(ARRAY_INDEX_KEY, arrayIndexValue);
-            results.add(childResult);
+        List<Map<String, String>> childResults = flatten(childNode);
+        for (Map<String, String> childResult : childResults) {
+          if (!childResult.isEmpty()) {
+            Map<String, String> result = new TreeMap<>();
+            for (Map.Entry<String, String> entry : childResult.entrySet()) {
+              result.put(KEY_SEPARATOR + entry.getKey(), entry.getValue());
+            }
+            result.put(ARRAY_INDEX_KEY, arrayIndexValue);
+            results.add(result);
           }
         }
       }
       return results;
-    } else {
-      // Object node
-      assert node.isObject();
+    }
 
-      Map<String, String> nonNestedResult = new HashMap<>();
-      List<List<Map<String, String>>> nestedResultsList = new ArrayList<>();
-      Iterator<Map.Entry<String, JsonNode>> fieldIterator = node.fields();
-      while (fieldIterator.hasNext()) {
-        Map.Entry<String, JsonNode> fieldEntry = fieldIterator.next();
-        String fieldName = fieldEntry.getKey();
-        JsonNode childNode = fieldEntry.getValue();
+    // Object
+    assert node.isObject();
 
-        // Skip null node
-        if (childNode.isNull()) {
-          continue;
+    // Merge all non-nested results into a single map
+    Map<String, String> nonNestedResult = new TreeMap<>();
+    // Put all nested results (from array) into a list to be processed later
+    List<List<Map<String, String>>> nestedResultsList = new ArrayList<>();
+
+    Iterator<Map.Entry<String, JsonNode>> fieldIterator = node.fields();
+    while (fieldIterator.hasNext()) {
+      Map.Entry<String, JsonNode> fieldEntry = fieldIterator.next();
+      JsonNode childNode = fieldEntry.getValue();
+      List<Map<String, String>> childResults = flatten(childNode);
+      int numChildResults = childResults.size();
+
+      // Empty list - skip
+      if (numChildResults == 0) {
+        continue;
+      }
+
+      // Single map - put all key-value pairs into the non-nested result map
+      String prefix = KEY_SEPARATOR + fieldEntry.getKey();
+      if (numChildResults == 1) {
+        Map<String, String> childResult = childResults.get(0);
+        for (Map.Entry<String, String> entry : childResult.entrySet()) {
+          nonNestedResult.put(prefix + entry.getKey(), entry.getValue());
         }
+        continue;
+      }
 
-        if (childNode.isValueNode()) {
-          nonNestedResult.put(fieldName, childNode.asText());
-        } else {
-          String prefix = fieldName + KEY_SEPARATOR;
-          List<Map<String, String>> childResults = flatten(childNode);
-          int numChildResults = childResults.size();
-
-          // Skip empty array
-          if (numChildResults == 0) {
-            continue;
+      // Multiple maps - put the results into a list to be processed later
+      List<Map<String, String>> prefixedResults = new ArrayList<>(numChildResults);
+      for (Map<String, String> childResult : childResults) {
+        if (!childResult.isEmpty()) {
+          Map<String, String> prefixedResult = new TreeMap<>();
+          for (Map.Entry<String, String> entry : childResult.entrySet()) {
+            prefixedResult.put(prefix + entry.getKey(), entry.getValue());
           }
-
-          if (numChildResults == 1) {
-            Map<String, String> childResult = childResults.get(0);
-            for (Map.Entry<String, String> entry : childResult.entrySet()) {
-              String key = entry.getKey();
-              String value = entry.getValue();
-              if (key.equals(ARRAY_VALUE_KEY)) {
-                nonNestedResult.put(fieldName, value);
-              } else {
-                nonNestedResult.put(prefix + key, value);
-              }
-            }
-          } else {
-            // If the flattened child node contains multiple records, add prefix to all the keys and put the results
-            // into a list to be processed later.
-            for (int i = 0; i < numChildResults; i++) {
-              Map<String, String> childResult = childResults.get(i);
-              Map<String, String> prefixedResult = new HashMap<>();
-              for (Map.Entry<String, String> entry : childResult.entrySet()) {
-                String key = entry.getKey();
-                String value = entry.getValue();
-                if (key.equals(ARRAY_VALUE_KEY)) {
-                  prefixedResult.put(fieldName, value);
-                } else {
-                  prefixedResult.put(prefix + key, value);
-                }
-              }
-              childResults.set(i, prefixedResult);
-            }
-            nestedResultsList.add(childResults);
-          }
+          prefixedResults.add(prefixedResult);
         }
       }
-      int nestedResultsListSize = nestedResultsList.size();
-      if (nestedResultsListSize == 0) {
-        return Collections.singletonList(nonNestedResult);
-      } else if (nestedResultsListSize == 1) {
-        List<Map<String, String>> nestedResults = nestedResultsList.get(0);
-        for (Map<String, String> nestedResult : nestedResults) {
-          nestedResult.putAll(nonNestedResult);
-        }
-        return nestedResults;
+      int numPrefixedResults = prefixedResults.size();
+      if (numPrefixedResults == 0) {
+        continue;
+      }
+      if (numPrefixedResults == 1) {
+        nonNestedResult.putAll(prefixedResults.get(0));
+        continue;
+      }
+      nestedResultsList.add(prefixedResults);
+    }
+
+    // Merge non-nested results and nested results
+    int nestedResultsListSize = nestedResultsList.size();
+    if (nestedResultsListSize == 0) {
+      if (nonNestedResult.isEmpty()) {
+        return Collections.emptyList();
       } else {
-        // If there are multiple child nodes with multiple records, calculate each combination of them as a new record.
-        List<Map<String, String>> results = new ArrayList<>();
-        unnestResults(nestedResultsList.get(0), nestedResultsList, 1, nonNestedResult, results);
-        return results;
+        return Collections.singletonList(nonNestedResult);
       }
     }
+    if (nestedResultsListSize == 1) {
+      List<Map<String, String>> nestedResults = nestedResultsList.get(0);
+      for (Map<String, String> nestedResult : nestedResults) {
+        nestedResult.putAll(nonNestedResult);
+      }
+      return nestedResults;
+    }
+    // If there are multiple child nodes with multiple records, calculate each combination of them as a new record.
+    List<Map<String, String>> results = new ArrayList<>();
+    unnestResults(nestedResultsList.get(0), nestedResultsList, 1, nonNestedResult, results);
+    return results;
   }
 
   private static void unnestResults(List<Map<String, String>> currentResults,
@@ -377,7 +372,7 @@ public class JsonUtils {
       List<Map<String, String>> newCurrentResults = new ArrayList<>(numCurrentResults * numNestedResults);
       for (Map<String, String> currentResult : currentResults) {
         for (Map<String, String> nestedResult : nestedResults) {
-          Map<String, String> newCurrentResult = new HashMap<>(currentResult);
+          Map<String, String> newCurrentResult = new TreeMap<>(currentResult);
           newCurrentResult.putAll(nestedResult);
           newCurrentResults.add(newCurrentResult);
         }
