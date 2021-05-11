@@ -49,6 +49,7 @@ import org.testng.annotations.Test;
 public class CalciteSqlCompilerTest {
   private static final PinotQuery2BrokerRequestConverter BROKER_REQUEST_CONVERTER =
       new PinotQuery2BrokerRequestConverter();
+  private static final long ONE_HOUR_IN_MS = TimeUnit.HOURS.toMillis(1);
 
   @Test
   public void testCaseWhenStatements() {
@@ -370,6 +371,15 @@ public class CalciteSqlCompilerTest {
     Assert.assertNotNull(literal);
     PinotQuery2BrokerRequestConverter converter = new PinotQuery2BrokerRequestConverter();
     BrokerRequest tempBrokerRequest = converter.convert(pinotQuery);
+    Assert.assertEquals(tempBrokerRequest.getQuerySource().getTableName(), "mytable");
+    Assert.assertEquals(tempBrokerRequest.getSelections().getSelectionColumns().get(0),
+        String.format("'%s'", literal.getFieldValue().toString()));
+
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("select ago('PT1H') from mytable");
+    literal = pinotQuery.getSelectList().get(0).getLiteral();
+    Assert.assertNotNull(literal);
+    converter = new PinotQuery2BrokerRequestConverter();
+    tempBrokerRequest = converter.convert(pinotQuery);
     Assert.assertEquals(tempBrokerRequest.getQuerySource().getTableName(), "mytable");
     Assert.assertEquals(tempBrokerRequest.getSelections().getSelectionColumns().get(0),
         String.format("'%s'", literal.getFieldValue().toString()));
@@ -1668,7 +1678,7 @@ public class CalciteSqlCompilerTest {
 
   @Test
   public void testCompilationInvokedFunction() {
-    String query = "SELECT now() FROM foo ";
+    String query = "SELECT now() FROM foo";
     long lowerBound = System.currentTimeMillis();
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     long nowTs = pinotQuery.getSelectList().get(0).getLiteral().getLongValue();
@@ -1690,6 +1700,23 @@ public class CalciteSqlCompilerTest {
     greaterThan = pinotQuery.getFilterExpression().getFunctionCall();
     nowTs = greaterThan.getOperands().get(1).getLiteral().getLongValue();
     Assert.assertEquals(nowTs, 1577836800000L);
+
+    query = "SELECT ago('PT1H') FROM foo";
+    lowerBound = System.currentTimeMillis() - ONE_HOUR_IN_MS;
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    nowTs = pinotQuery.getSelectList().get(0).getLiteral().getLongValue();
+    upperBound = System.currentTimeMillis() - ONE_HOUR_IN_MS;
+    Assert.assertTrue(nowTs >= lowerBound);
+    Assert.assertTrue(nowTs <= upperBound);
+
+    query = "SELECT a FROM foo where time_col > ago('PT1H')";
+    lowerBound = System.currentTimeMillis() - ONE_HOUR_IN_MS;
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    greaterThan = pinotQuery.getFilterExpression().getFunctionCall();
+    nowTs = greaterThan.getOperands().get(1).getLiteral().getLongValue();
+    upperBound = System.currentTimeMillis() - ONE_HOUR_IN_MS;
+    Assert.assertTrue(nowTs >= lowerBound);
+    Assert.assertTrue(nowTs <= upperBound);
   }
 
   @Test
@@ -1713,8 +1740,6 @@ public class CalciteSqlCompilerTest {
     long upperBound = System.currentTimeMillis();
     long result = expression.getLiteral().getLongValue();
     Assert.assertTrue(result >= lowerBound && result <= upperBound);
-
-    long ONE_HOUR_IN_MS = TimeUnit.HOURS.toMillis(1);
 
     lowerBound = TimeUnit.MILLISECONDS.toHours(System.currentTimeMillis()) + 1;
     expression = CalciteSqlParser.compileToExpression("to_epoch_hours(now() + 3600000)");
