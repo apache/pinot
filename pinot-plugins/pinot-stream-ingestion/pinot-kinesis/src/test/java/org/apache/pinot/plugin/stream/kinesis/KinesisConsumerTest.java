@@ -66,7 +66,7 @@ public class KinesisConsumerTest {
     Map<String, String> props = new HashMap<>();
     props.put(StreamConfigProperties.STREAM_TYPE, STREAM_TYPE);
     props.put(StreamConfigProperties
-            .constructStreamProperty(StreamConfigProperties.STREAM_TYPE, StreamConfigProperties.STREAM_TOPIC_NAME),
+            .constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_TOPIC_NAME),
         STREAM_NAME);
     props.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_CONSUMER_TYPES),
         StreamConfig.ConsumerType.LOWLEVEL.toString());
