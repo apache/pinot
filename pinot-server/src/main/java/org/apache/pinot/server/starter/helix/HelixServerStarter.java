@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
+import javax.annotation.Nullable;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -85,8 +86,6 @@ import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.spi.utils.CommonConstants.*;
 
 
 /**
@@ -151,10 +150,8 @@ public class HelixServerStarter implements ServiceStartable {
         new HelixConfigScopeBuilder(ConfigScopeProperty.PARTICIPANT, _helixClusterName).forParticipant(_instanceId)
             .build();
 
-    _environmentProperties = new HashMap<>();
-
-    // Fetch Environment Specific Configs
-    fetchEnvironmentSpecificConfigs();
+    // Fetch Environment Specific Properties
+    _environmentProperties = fetchEnvironmentProperties();
 
     // Enable/disable thread CPU time measurement through instance config.
     ThreadTimer.setThreadCpuTimeMeasurementEnabled(_serverConf
@@ -171,21 +168,22 @@ public class HelixServerStarter implements ServiceStartable {
    *  Invoke pinot environment provider factory's init method to register the environment provider &
    *  fetch the overridden server configs for the invoked environment provider.
    */
-  private void fetchEnvironmentSpecificConfigs() {
+  @Nullable
+  private Map<String, String> fetchEnvironmentProperties() {
     PinotConfiguration environmentProviderConfigs = _serverConf.subset(
         Server.PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY);
 
     if (environmentProviderConfigs.toMap().isEmpty()) {
       LOGGER.info("No environment provider config values provided for server property: {}",
           Server.PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY);
-      return;
+      return null;
     }
 
     PinotEnvironmentProviderFactory.init(environmentProviderConfigs);
     String environmentProviderClassName = _serverConf.getProperty(Server.ENVIRONMENT_PROVIDER_CLASS_NAME);
     if (environmentProviderClassName == null) {
       LOGGER.info("No className value provided for property: {}", Server.ENVIRONMENT_PROVIDER_CLASS_NAME);
-      return;
+      return null;
     }
 
     // Fetch environment provider instance
@@ -193,24 +191,7 @@ public class HelixServerStarter implements ServiceStartable {
         environmentProviderClassName.toLowerCase());
 
     // Fetch the overridden pinot configuration containing custom configs.
-    Map<String, String> overriddenPinotConfigs = pinotEnvironmentProvider.getEnvironment();
-
-    // Populate environment specific fields in the map.
-    String failureDomain = overriddenPinotConfigs.get(CommonConstants.INSTANCE_FAILURE_DOMAIN);
-    if (failureDomain == null) {
-      LOGGER.error("No failure domain information retrieved for environment provider: {} for instance: {}",
-          environmentProviderClassName, _instanceId);
-      throw new RuntimeException(
-          "No failure domain information retrieved for server instance : " + _instanceId + ", halting the server starter process.");
-    }
-
-    // Replacing property name with custom key name for better readability in zookeeper node.
-    // e.g Replace "pinot.environment.instance.failureDomain" with "failureDomain".
-    overriddenPinotConfigs.put(FAILURE_DOMAIN_IDENTIFIER, failureDomain);
-    overriddenPinotConfigs.remove(CommonConstants.INSTANCE_FAILURE_DOMAIN);
-
-    // Copying all environment specific properties to be populated into server instance's ZkNode mapFields during startup.
-    _environmentProperties.putAll(overriddenPinotConfigs);
+    return pinotEnvironmentProvider.getEnvironment();
   }
 
   /**
@@ -303,9 +284,13 @@ public class HelixServerStarter implements ServiceStartable {
       needToUpdateInstanceConfig = true;
     }
 
-    // Update instance configs with environment specific properties
-    instanceConfig.getRecord().setMapField(ENVIRONMENT_IDENTIFIER, _environmentProperties);
-    LOGGER.info("Updated instance config for instance: {} with environment specific properties", _instanceId);
+    // Update instance configs with environment specific properties if needed
+    if (!instanceConfig.getRecord().getMapField(CommonConstants.ENVIRONMENT_IDENTIFIER).equals(_environmentProperties)) {
+      instanceConfig.getRecord().setMapField(CommonConstants.ENVIRONMENT_IDENTIFIER, _environmentProperties);
+      LOGGER.info("Updated instance config for instance: {} with environment specific properties: {}",
+          _instanceId, _environmentProperties);
+      needToUpdateInstanceConfig = true;
+    }
 
     if (needToUpdateInstanceConfig) {
       LOGGER.info("Updating instance config for instance: {} with instance tags: {}, host: {}, port: {}", _instanceId,

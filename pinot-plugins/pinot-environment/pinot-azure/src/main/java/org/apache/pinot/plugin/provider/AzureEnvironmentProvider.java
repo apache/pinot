@@ -43,12 +43,17 @@ import org.apache.http.util.EntityUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.environmentprovider.PinotEnvironmentProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Azure Environment Provider used to retrieve azure cloud specific instance configuration.
  */
 public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(AzureEnvironmentProvider.class);
+
   protected static final String MAX_RETRY = "maxRetry";
   protected static final String IMDS_ENDPOINT = "imdsEndpoint";
   protected static final String CONNECTION_TIMEOUT = "connectionTimeout";
@@ -59,22 +64,20 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
   private int _maxRetry;
   private String _imdsEndpoint;
   private CloseableHttpClient _closeableHttpClient;
-  private PinotConfiguration _serverConfigs;
 
   public AzureEnvironmentProvider() {
   }
 
   public void init(PinotConfiguration pinotConfiguration) {
-    _serverConfigs = pinotConfiguration;
-    Preconditions.checkArgument(0 < Integer.parseInt(_serverConfigs.getProperty(MAX_RETRY)),
+    Preconditions.checkArgument(0 < Integer.parseInt(pinotConfiguration.getProperty(MAX_RETRY)),
          "[AzureEnvironmentProvider]: " + MAX_RETRY + " cannot be less than or equal to 0");
-    Preconditions.checkArgument(!StringUtils.isBlank(_serverConfigs.getProperty(IMDS_ENDPOINT)),
+    Preconditions.checkArgument(!StringUtils.isBlank(pinotConfiguration.getProperty(IMDS_ENDPOINT)),
         "[AzureEnvironmentProvider]: " + IMDS_ENDPOINT + " should not be null or empty");
 
-    _maxRetry = Integer.parseInt(_serverConfigs.getProperty(MAX_RETRY));
-    _imdsEndpoint = _serverConfigs.getProperty(IMDS_ENDPOINT);
-    int connectionTimeout = Integer.parseInt(_serverConfigs.getProperty(CONNECTION_TIMEOUT));
-    int requestTimeout = Integer.parseInt(_serverConfigs.getProperty(REQUEST_TIMEOUT));
+    _maxRetry = Integer.parseInt(pinotConfiguration.getProperty(MAX_RETRY));
+    _imdsEndpoint = pinotConfiguration.getProperty(IMDS_ENDPOINT);
+    int connectionTimeout = Integer.parseInt(pinotConfiguration.getProperty(CONNECTION_TIMEOUT));
+    int requestTimeout = Integer.parseInt(pinotConfiguration.getProperty(REQUEST_TIMEOUT));
 
     final RequestConfig requestConfig = RequestConfig.custom()
         .setConnectTimeout(connectionTimeout)
@@ -111,8 +114,13 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
   public Map<String, String> getEnvironment() {
     Map<String, String> customPinotConfiguration = new HashMap<>();
 
+    String failureDomain = getFailureDomain();
+    if (StringUtils.isBlank(failureDomain)) {
+      LOGGER.error("[AzureEnvironmentProvider]: No failure domain information retrieved for given server instance.");
+      throw new RuntimeException("No failure domain information retrieved for given server instance.");
+    }
     // Populate failure domain information
-    customPinotConfiguration.put(CommonConstants.INSTANCE_FAILURE_DOMAIN,  getFailureDomain());
+    customPinotConfiguration.put(CommonConstants.INSTANCE_FAILURE_DOMAIN,  failureDomain);
 
     return customPinotConfiguration;
   }
