@@ -132,8 +132,8 @@ public class GenericRow implements Serializable {
   public GenericRow copy() {
     GenericRow copy = new GenericRow();
     copy.init(this);
-    for (Map.Entry<String, Object> entry : new HashSet<>(copy._fieldToValueMap.entrySet())) {
-      copy.putValue(entry.getKey(), copy(entry.getValue()));
+    for (Map.Entry<String, Object> entry : copy._fieldToValueMap.entrySet()) {
+      entry.setValue(copy(entry.getValue()));
     }
     return copy;
   }
@@ -145,9 +145,9 @@ public class GenericRow implements Serializable {
     if (value == null) {
       return null;
     } else if (value instanceof Map) {
-      Map<String, Object> map = new HashMap<>();
-      for (String key : ((Map<String, Object>) value).keySet()) {
-        map.put(key, copy(((Map<String, Object>) value).get(key)));
+      Map<String, Object> map = new HashMap<>((Map<String, Object>) value);
+      for (Map.Entry<String, Object> entry : map.entrySet()) {
+        entry.setValue(copy(entry.getValue()));
       }
       return map;
     } else if (value instanceof Collection) {
