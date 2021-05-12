@@ -33,7 +33,7 @@ import org.testng.annotations.Test;
 public class ComplexTypeTransformerTest {
   @Test
   public void testFlattenMap() {
-    ComplexTypeTransformer transformer = new ComplexTypeTransformer(new ArrayList<>());
+    ComplexTypeTransformer transformer = new ComplexTypeTransformer(new ArrayList<>(), ".");
 
     // test flatten root-level tuples
     GenericRow genericRow = new GenericRow();
@@ -57,7 +57,7 @@ public class ComplexTypeTransformerTest {
     Assert.assertEquals(genericRow.getValue("map2.c"), 3);
 
     // test flattening the tuple inside the collection
-    transformer = new ComplexTypeTransformer(Arrays.asList("l1"));
+    transformer = new ComplexTypeTransformer(Arrays.asList("l1"), ".");
     genericRow = new GenericRow();
     List<Map<String, Object>> list1 = new ArrayList<>();
     list1.add(map1);
@@ -70,6 +70,22 @@ public class ComplexTypeTransformerTest {
     Assert.assertEquals(map.get("b"), "v");
     Assert.assertEquals(map.get("im1.aa"), 2);
     Assert.assertEquals(map.get("im1.bb"), "u");
+
+    // test overriding delimiter
+    transformer = new ComplexTypeTransformer(Arrays.asList("l1"), "_");
+    genericRow = new GenericRow();
+    innerMap1 = new HashMap<>();
+    innerMap1.put("aa", 2);
+    innerMap1.put("bb", "u");
+    map1 = new HashMap<>();
+    map1.put("im1", innerMap1);
+    list1 = new ArrayList<>();
+    list1.add(map1);
+    genericRow.putValue("l1", list1);
+    transformer.flattenMap(genericRow, new ArrayList<>(genericRow.getFieldToValueMap().keySet()));
+    map = (Map<String, Object>) ((Collection) genericRow.getValue("l1")).iterator().next();
+    Assert.assertEquals(map.get("im1_aa"), 2);
+    Assert.assertEquals(map.get("im1_bb"), "u");
   }
 
   @Test
@@ -91,7 +107,7 @@ public class ComplexTypeTransformerTest {
     //    {
     //      "array.a":"v2"
     //    }]
-    ComplexTypeTransformer transformer = new ComplexTypeTransformer(Arrays.asList("array"));
+    ComplexTypeTransformer transformer = new ComplexTypeTransformer(Arrays.asList("array"), ".");
     GenericRow genericRow = new GenericRow();
     Object[] array = new Object[2];
     Map<String, Object> map1 = new HashMap<>();
@@ -141,7 +157,7 @@ public class ComplexTypeTransformerTest {
     //      "array.a":"v2","array2.b":"v4"
     //   }]
     //
-    transformer = new ComplexTypeTransformer(Arrays.asList("array", "array2"));
+    transformer = new ComplexTypeTransformer(Arrays.asList("array", "array2"), ".");
     genericRow = new GenericRow();
     Object[] array2 = new Object[2];
     Map<String, Object> map3 = new HashMap<>();
@@ -202,7 +218,7 @@ public class ComplexTypeTransformerTest {
     //   {
     //      "array.a":"v2"
     //   }]
-    transformer = new ComplexTypeTransformer(Arrays.asList("array", "array.array2"));
+    transformer = new ComplexTypeTransformer(Arrays.asList("array", "array.array2"), ".");
     genericRow = new GenericRow();
     genericRow.putValue("array", array);
     map1.put("array2", array2);
