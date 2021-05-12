@@ -18,32 +18,17 @@
 #
 
 # Operations to be done.
-description: Operations to be run after Broker downgrade
+description: Operations to be run before server upgrade
 operations:
-    - type: tableOp
-      description: Create table t1
-      op: CREATE
-      schemaFileName: /tmp/schema
-      tableConfigFileName: /tmp/tableConfig
-    - type: segmentOp
-      description: Add segments X and Y to T1
-      op: UPLOAD
-      inputDataFileName: /tmp/data.csv
-      tableConfigFileName: /tmp/tableConfig
-    - type: tableOp
-      # description: Remove table T1
-      op: DELETE
-      tableConfigFileName: /tmp/tableConfig
-    - type: queryOp
-      description: Run queries on T1
-      queryFileName: queries/T1.sql
-      expectedResultsFileName: queries/T1-results.sql
-    - type: streamOp
-      description: Produce rows to topic1
-      op: PRODUCE
-      numRows: 66
-      streamConfigFileName: kafka/topic1.cfg
-      inputDataFileName: kafka/input.csv
-      tableConfigFileNames:
-        - T1
-        - T2
+  - type: segmentOp
+    description: Add segment FeatureTest1_Segment3 to table FeatureTest1
+    op: UPLOAD
+    inputDataFileName: data/FeatureTest1-data-00.csv
+    schemaFileName: FeatureTest1-schema.json
+    tableConfigFileName: feature-test-1.json
+    recordReaderConfigFileName: data/recordReaderConfig.json
+    segmentName: FeatureTest1_Segment3
+  - type: queryOp
+    description: Run query on FeatureTest1 using SQL
+    queryFileName: queries/feature-test-1-sql.queries
+    expectedResultsFileName: query-results/feature-test-1-rest-sql.results

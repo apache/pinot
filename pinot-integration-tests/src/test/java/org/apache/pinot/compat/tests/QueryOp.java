@@ -76,7 +76,12 @@ public class QueryOp extends BaseOp {
   boolean runOp(int generationNumber) {
     System.out.println("Verifying queries in " + _queryFileName + " against results in " + _expectedResultsFileName);
     try {
-      return verifyQueries(generationNumber);
+      for(int i = 1; i <= generationNumber; i++) {
+        if (!verifyQueries(i) ) {
+          return false;
+        }
+      }
+      return true;
     } catch (Exception e) {
       LOGGER.error("FAILED to verify queries in {}: {}", _queryFileName, e);
       return false;
