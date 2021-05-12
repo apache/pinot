@@ -73,6 +73,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  *  * <pre/>
  *
  *  Note the unnest rule will output a collection of generic rows under the field {@link GenericRow#MULTIPLE_RECORDS_KEY}.
+ *  TODO: support multi-dimensional array handling
  *
  */
 public class ComplexTypeTransformer implements RecordTransformer {
@@ -225,9 +226,10 @@ public class ComplexTypeTransformer implements RecordTransformer {
         List<String> innerMapFields = new ArrayList<>();
         for (Map.Entry<String, Object> innerEntry : new ArrayList<>(innerMap.entrySet())) {
           Object innerValue = innerEntry.getValue();
-          map.put(concat(field, innerEntry.getKey()), innerEntry.getValue());
+          String innerCancatName = concat(field, innerEntry.getKey());
+          map.put(innerCancatName, innerEntry.getValue());
           if (innerValue instanceof Map || innerValue instanceof Collection || isArray(innerValue)) {
-            innerMapFields.add(concat(field, innerEntry.getKey()));
+            innerMapFields.add(innerCancatName);
           }
         }
         if (!innerMapFields.isEmpty()) {

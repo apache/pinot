@@ -151,7 +151,7 @@ public class GenericRow implements Serializable {
       }
       return map;
     } else if (value instanceof Collection) {
-      List list = new ArrayList();
+      List list = new ArrayList(((Collection) value).size());
       for (Object object : (Collection) value) {
         list.add(copy(object));
       }
