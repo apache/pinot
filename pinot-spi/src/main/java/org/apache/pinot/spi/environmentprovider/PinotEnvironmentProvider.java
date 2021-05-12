@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.spi.environmentprovider;
 
-import java.util.Map;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 /**
  *  Environment Provider interface implemented by different cloud providers to customize
@@ -30,11 +30,13 @@ public interface PinotEnvironmentProvider {
   /**
    * Initializes the configurations specific to an environment provider.
    */
-  void init(PinotConfiguration pinotConfiguration);
+   void init(PinotConfiguration pinotConfiguration);
 
   /**
-   * Customize base pinot configuration to add environment variables & instance specific configuration
-   * @return custom pinot configuration map
+   * Method to retrieve failure domain information for a pinot instance.
+   * @return failure domain information
    */
-  Map<String, String> getEnvironment();
+   default String getFailureDomain() {
+     return CommonConstants.DEFAULT_FAILURE_DOMAIN;
+   }
 }

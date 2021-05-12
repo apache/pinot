@@ -47,18 +47,12 @@ public class PinotEnvironmentProviderFactoryTest {
         testPinotEnvironment).getConfiguration().getProperty("requestTimeout"), "100");
   }
 
-
   public static class TestEnvironmentProvider implements PinotEnvironmentProvider {
     public int initCalled = 0;
     private PinotConfiguration _configuration;
 
     public int getInitCalled() {
       return initCalled;
-    }
-
-    @Override
-    public Map<String, String> getEnvironment() {
-      return new HashMap<>();
     }
 
     @Override

@@ -25,8 +25,6 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.net.UnknownHostException;
-import java.util.HashMap;
-import java.util.Map;
 import javax.net.ssl.SSLException;
 import org.apache.commons.lang.StringUtils;
 import org.apache.http.HttpEntityEnclosingRequest;
@@ -42,7 +40,6 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.environmentprovider.PinotEnvironmentProvider;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -106,28 +103,13 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
 
   /**
    *
-   * Method for constructing custom pinot configuration map used by the HelixServerStarter to update
-   * zookeeper node with custom instance configs.
-   * @return custom pinot configuration map
+   * Utility used to query the azure instance metadata service (Azure IMDS) to fetch the failure domain information,
+   * used at HelixServerStarter startup to update the instance configs.
+   * @return failure domain information
    */
-  @Override
-  public Map<String, String> getEnvironment() {
-    Map<String, String> customPinotConfiguration = new HashMap<>();
-
-    String failureDomain = getFailureDomain();
-    if (StringUtils.isBlank(failureDomain)) {
-      LOGGER.error("[AzureEnvironmentProvider]: No failure domain information retrieved for given server instance.");
-      throw new RuntimeException("No failure domain information retrieved for given server instance.");
-    }
-    // Populate failure domain information
-    customPinotConfiguration.put(CommonConstants.INSTANCE_FAILURE_DOMAIN,  failureDomain);
-
-    return customPinotConfiguration;
-  }
-
-  // Utility used to query the azure instance metadata service (Azure IMDS) to fetch the fault/failure domain information.
   @VisibleForTesting
-  protected final String getFailureDomain() {
+  @Override
+  public String getFailureDomain() {
     final String responsePayload = getAzureInstanceMetadata();
 
     // For a sample response payload,
@@ -139,17 +121,18 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
 
       if (computeNode.isMissingNode()) {
         throw new RuntimeException(
-            "Compute node is missing in the payload. Cannot retrieve Failure Domain Information");
+            "[AzureEnvironmentProvider]: Compute node is missing in the payload. Cannot retrieve failure domain information");
       }
       final JsonNode platformFailureDomainNode = computeNode.path(PLATFORM_FAULT_DOMAIN);
       if (platformFailureDomainNode.isMissingNode() || !platformFailureDomainNode.isTextual()) {
-        throw new RuntimeException("Json node platformFaultDomain is missing or is invalid.");
+        throw new RuntimeException("[AzureEnvironmentProvider]: Json node platformFaultDomain is missing or is invalid."
+            + " No failure domain information retrieved for given server instance");
       }
       return platformFailureDomainNode.textValue();
     } catch (IOException ex) {
       throw new RuntimeException(
-          String.format(
-              "Errors when parsing response payload from Azure Instance Metadata Service: %s", responsePayload), ex);
+          String.format("[AzureEnvironmentProvider]: Errors when parsing response payload from Azure Instance Metadata Service: %s",
+              responsePayload), ex);
     }
   }
 
@@ -162,19 +145,20 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
     try {
       final CloseableHttpResponse closeableHttpResponse = _closeableHttpClient.execute(httpGet);
       if (closeableHttpResponse == null) {
-        throw new RuntimeException("Response is null. Please verify the imds endpoint");
+        throw new RuntimeException("[AzureEnvironmentProvider]: Response is null. Please verify the imds endpoint");
       }
       final StatusLine statusLine = closeableHttpResponse.getStatusLine();
       final int statusCode = statusLine.getStatusCode();
       if (statusCode != HttpStatus.SC_OK) {
         final String errorMsg = String.format(
-            "Failed to retrieve azure instance metadata. Response Status code: %s", statusCode);
+            "[AzureEnvironmentProvider]: Failed to retrieve azure instance metadata. Response Status code: %s", statusCode);
         throw new RuntimeException(errorMsg);
       }
       return EntityUtils.toString(closeableHttpResponse.getEntity());
     } catch (IOException ex) {
       throw new RuntimeException(
-          String.format("Failed to retrieve metadata from Azure Instance Metadata Service %s", _imdsEndpoint), ex);
+          String.format("[AzureEnvironmentProvider]: Failed to retrieve metadata from Azure Instance Metadata Service %s",
+              _imdsEndpoint), ex);
     }
   }
 }

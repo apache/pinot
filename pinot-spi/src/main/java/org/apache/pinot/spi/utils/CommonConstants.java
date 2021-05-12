@@ -25,6 +25,7 @@ public class CommonConstants {
 
   public static final String ENVIRONMENT_IDENTIFIER = "environment";
   public static final String INSTANCE_FAILURE_DOMAIN = "failureDomain";
+  public static final String DEFAULT_FAILURE_DOMAIN = "No such domain";
 
   public static final String PREFIX_OF_SSL_SUBSET = "ssl";
   public static final String HTTP_PROTOCOL = "http";

@@ -109,7 +109,8 @@ public class AzureEnvironmentProviderTest {
   }
 
   @Test(expectedExceptions = RuntimeException.class,
-        expectedExceptionsMessageRegExp = "Compute node is missing in the payload. Cannot retrieve Failure Domain Information")
+      expectedExceptionsMessageRegExp = "\\[AzureEnvironmentProvider\\]: Compute node is missing in the payload. "
+          + "Cannot retrieve failure domain information")
   public void testMissingComputeNodeResponse() throws IOException {
     mockUtil();
     when(_mockHttpEntity.getContent())
@@ -118,7 +119,8 @@ public class AzureEnvironmentProviderTest {
   }
 
   @Test(expectedExceptions = RuntimeException.class,
-      expectedExceptionsMessageRegExp = "Json node platformFaultDomain is missing or is invalid.")
+      expectedExceptionsMessageRegExp = "\\[AzureEnvironmentProvider\\]: Json node platformFaultDomain is missing or is invalid."
+          + " No failure domain information retrieved for given server instance")
   public void testMissingFaultDomainResponse() throws IOException {
     mockUtil();
     when(_mockHttpEntity.getContent())
@@ -127,7 +129,8 @@ public class AzureEnvironmentProviderTest {
   }
 
   @Test(expectedExceptions = RuntimeException.class,
-      expectedExceptionsMessageRegExp = "Failed to retrieve azure instance metadata. Response Status code: " + SC_NOT_FOUND)
+      expectedExceptionsMessageRegExp = "\\[AzureEnvironmentProvider\\]: Failed to retrieve azure instance metadata."
+          + " Response Status code: " + SC_NOT_FOUND)
   public void testIMDSCallFailure() throws IOException {
     mockUtil();
     when(_mockStatusLine.getStatusCode()).thenReturn(SC_NOT_FOUND);
