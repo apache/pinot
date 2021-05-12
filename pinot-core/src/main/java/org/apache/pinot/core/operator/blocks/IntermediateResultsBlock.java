@@ -67,6 +67,7 @@ public class IntermediateResultsBlock implements Block {
   private int _numResizes;
   private long _resizeTimeMs;
   private long _executionThreadCpuTimeNs;
+  private int _numServerThreads;
 
   private Table _table;
 
@@ -207,6 +208,14 @@ public class IntermediateResultsBlock implements Block {
 
   public void setExecutionThreadCpuTimeNs(long executionThreadCpuTimeNs) {
     _executionThreadCpuTimeNs = executionThreadCpuTimeNs;
+  }
+
+  public void setNumServerThreads(int numServerThreads) {
+    _numServerThreads = numServerThreads;
+  }
+
+  public int getNumServerThreads() {
+    return _numServerThreads;
   }
 
   @VisibleForTesting
