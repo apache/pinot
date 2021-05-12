@@ -31,16 +31,16 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
  */
 public class ComplexTypeConfig extends BaseJsonConfig {
 
-  @JsonPropertyDescription("The collections to unnest")
-  private final List<String> _unnestConfig;
+  @JsonPropertyDescription("The fields to unnest")
+  private final List<String> _unnestFields;
 
   @JsonCreator
-  public ComplexTypeConfig(@JsonProperty("unnestConfig") @Nullable List<String> unnestConfig) {
-    _unnestConfig = unnestConfig;
+  public ComplexTypeConfig(@JsonProperty("unnestFields") @Nullable List<String> unnestFields) {
+    _unnestFields = unnestFields;
   }
 
   @Nullable
-  public List<String> getUnnestConfig() {
-    return _unnestConfig;
+  public List<String> getUnnestFields() {
+    return _unnestFields;
   }
 }

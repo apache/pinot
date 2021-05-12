@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -66,7 +65,7 @@ public class ComplexTypeTransformerTest {
     List<Integer> list2 = new ArrayList<>();
     list2.add(2);
     genericRow.putValue("l2", list2);
-    transformer.flattenMap(genericRow, new HashSet<>(genericRow.getFieldToValueMap().keySet()));
+    transformer.flattenMap(genericRow, new ArrayList<>(genericRow.getFieldToValueMap().keySet()));
     Map<String, Object> map = (Map<String, Object>) ((Collection) genericRow.getValue("l1")).iterator().next();
     Assert.assertEquals(map.get("b"), "v");
     Assert.assertEquals(map.get("im1.aa"), 2);

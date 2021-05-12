@@ -76,21 +76,25 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  *
  */
 public class ComplexTypeTransformer implements RecordTransformer {
+  // TODO: make configurable
   private static final CharSequence DELIMITER = ".";
   private final List<String> _unnestFields;
 
   public ComplexTypeTransformer(TableConfig tableConfig) {
     if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getComplexTypeConfig() != null) {
-      _unnestFields = tableConfig.getIngestionConfig().getComplexTypeConfig().getUnnestConfig() != null ? tableConfig
-          .getIngestionConfig().getComplexTypeConfig().getUnnestConfig() : new ArrayList<>();
+      _unnestFields = tableConfig.getIngestionConfig().getComplexTypeConfig().getUnnestFields() != null ? tableConfig
+          .getIngestionConfig().getComplexTypeConfig().getUnnestFields() : new ArrayList<>();
+      // the unnest fields are sorted to achieve the topological sort of the collections, so that the parent collection
+      // (e.g. foo) is unnested before the child collection (e.g. foo.bar)
+      Collections.sort(_unnestFields);
     } else {
       _unnestFields = new ArrayList<>();
     }
   }
 
   @VisibleForTesting
-  public ComplexTypeTransformer(List<String> unnestCollections) {
-    _unnestFields = new ArrayList<>(unnestCollections);
+  public ComplexTypeTransformer(List<String> unnestFields) {
+    _unnestFields = new ArrayList<>(unnestFields);
     Collections.sort(_unnestFields);
   }
 
@@ -109,12 +113,13 @@ public class ComplexTypeTransformer implements RecordTransformer {
   }
 
   private GenericRow unnestCollection(GenericRow record, String column) {
-    if (record.getValue(GenericRow.MULTIPLE_RECORDS_KEY) == null) {
+    Object value = record.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
+    if (value == null) {
       List<GenericRow> list = new ArrayList<>();
       unnestCollection(record, column, list);
       record.putValue(GenericRow.MULTIPLE_RECORDS_KEY, list);
     } else {
-      Collection<GenericRow> records = (Collection) record.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
+      Collection<GenericRow> records = (Collection) value;
       List<GenericRow> list = new ArrayList<>();
       for (GenericRow innerRecord : records) {
         unnestCollection(innerRecord, column, list);
@@ -171,7 +176,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
    * flatten the nested maps.
    */
   @VisibleForTesting
-  protected void flattenMap(GenericRow record, Collection<String> columns) {
+  protected void flattenMap(GenericRow record, List<String> columns) {
     for (String column : columns) {
       Object value = record.getValue(column);
       if (value instanceof Map) {
@@ -187,7 +192,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
         }
         flattenMap(record, mapColumns);
       } else if (value instanceof Collection && _unnestFields.contains(column)) {
-        for (Object inner : (Collection) record.getValue(column)) {
+        for (Object inner : (Collection) value) {
           if (inner instanceof Map) {
             Map<String, Object> innerMap = (Map<String, Object>) inner;
             flattenMap(column, innerMap, new ArrayList<>(innerMap.keySet()));

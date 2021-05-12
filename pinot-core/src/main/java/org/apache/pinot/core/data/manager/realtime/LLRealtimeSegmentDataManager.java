@@ -486,6 +486,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       if (decodedRow != null) {
         try {
           if (_complexTypeTransformer != null) {
+            // TODO: consolidate complex type transformer into composite type transformer
             decodedRow = _complexTypeTransformer.transform(decodedRow);
           }
           if (decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {

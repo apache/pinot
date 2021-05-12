@@ -274,17 +274,16 @@ public class TableConfigSerDeTest {
       streamConfigMaps.add(streamConfigMap);
       List<Map<String, String>> batchConfigMaps = new ArrayList<>();
       batchConfigMaps.add(batchConfigMap);
-      List<String> unnestConfig = Arrays.asList("c1, c2");
+      List<String> unnestFields = Arrays.asList("c1, c2");
       IngestionConfig ingestionConfig =
           new IngestionConfig(new BatchIngestionConfig(batchConfigMaps, "APPEND", "HOURLY"),
               new StreamIngestionConfig(streamConfigMaps), new FilterConfig("filterFunc(foo)"), transformConfigs,
-              new ComplexTypeConfig(unnestConfig));
+              new ComplexTypeConfig(unnestFields));
       TableConfig tableConfig = tableConfigBuilder.setIngestionConfig(ingestionConfig).build();
 
       checkIngestionConfig(tableConfig);
 
       // Serialize then de-serialize
-
       TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
       assertEquals(tableConfigToCompare, tableConfig);
       checkIngestionConfig(tableConfigToCompare);

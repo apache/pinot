@@ -32,7 +32,7 @@
       }
     ],
     "complexTypeConfig": {
-      "unnestConfig": ["group.group_topics"]
+      "unnestFields": ["group.group_topics"]
     }
   },
   "tableIndexConfig": {
