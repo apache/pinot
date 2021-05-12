@@ -539,7 +539,7 @@ public class SegmentPreProcessorTest {
       throws Exception {
     constructV1Segment();
     _tableConfig.setIngestionConfig(new IngestionConfig(null, null, null,
-        Collections.singletonList(new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 1)"))));
+        Collections.singletonList(new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 1)")), null));
     _indexLoadingConfig.getInvertedIndexColumns().add(NEW_COLUMN_INVERTED_INDEX);
     checkUpdateDefaultColumns();
 
