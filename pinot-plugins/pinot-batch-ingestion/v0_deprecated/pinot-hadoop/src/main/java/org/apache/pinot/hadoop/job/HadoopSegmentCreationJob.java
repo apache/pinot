@@ -69,7 +69,7 @@ public class HadoopSegmentCreationJob extends SegmentCreationJob {
 
     // Gather all data files
     List<Path> dataFilePaths = getDataFilePaths(_inputPattern);
-    int numDataFiles = dataFilePaths.size();
+    int numDataFiles = 1;
     if (numDataFiles == 0) {
       String errorMessage = "No data file founded with pattern: " + _inputPattern;
       _logger.error(errorMessage);
