@@ -54,12 +54,12 @@ public class SegmentMetadataFetcher {
   private static final String INDEX_AVAILABLE = "YES";
 
   private static final String STAR_TREE_INDEX_KEY = "star-tree-index";
-  private static final String STAR_TREE_DIMENSION_COLUMNS = "dimention-columns";
-  private static final String STAR_TREE_FUNCTION_COLUMN_PAIR_FUNCTION = "aggregation";
-  private static final String STAR_TREE_FUNCTION_COLUMN_PAIR_COLUMN = "column";
+  private static final String STAR_TREE_DIMENSION_COLUMNS = "dimension-columns";
   private static final String STAR_TREE_METRIC_AGGREGATIONS = "metric-aggregations";
   private static final String STAR_TREE_MAX_LEAF_RECORDS = "max-leaf-records";
   private static final String STAR_TREE_DIMENSION_COLUMNS_SKIPPED = "dimension-columns-skipped";
+
+  private static final String COLUMN_INDEX_KEY = "indexes";
   
 
   /**
@@ -76,7 +76,7 @@ public class SegmentMetadataFetcher {
       columnSet = new HashSet<>(columns);
     }
     ObjectNode segmentMetadataJson = (ObjectNode) segmentMetadata.toJson(columnSet);
-    segmentMetadataJson.set("indexes", JsonUtils.objectToJsonNode(getIndexesForSegmentColumns(segmentDataManager)));
+    segmentMetadataJson.set(COLUMN_INDEX_KEY, JsonUtils.objectToJsonNode(getIndexesForSegmentColumns(segmentDataManager)));
     segmentMetadataJson.set(STAR_TREE_INDEX_KEY, JsonUtils.objectToJsonNode((getStartreeIndexForSegmentColumns(segmentDataManager))));
     return JsonUtils.objectToString(segmentMetadataJson);
   }
@@ -86,22 +86,13 @@ public class SegmentMetadataFetcher {
    */
   private static List<Map<String, Object>> getStartreeIndexForSegmentColumns(SegmentDataManager segmentDataManager) {
     List<Map<String, Object>> startreeDetails = new ArrayList<>();
-
-    if (segmentDataManager instanceof ImmutableSegmentDataManager) {
-      ImmutableSegmentDataManager immutableSegmentDataManager = (ImmutableSegmentDataManager) segmentDataManager;
-
-      ImmutableSegment immutableSegment = immutableSegmentDataManager.getSegment();
-
-      if (immutableSegment instanceof ImmutableSegmentImpl) {
-        List<StarTreeV2> starTrees = immutableSegment.getStarTrees();
-
-        if (starTrees == null) {
-          return startreeDetails;
-        }
-
-        startreeDetails = getImmutableSegmentStartreeIndexes(starTrees);
-      }
+    ImmutableSegmentDataManager immutableSegmentDataManager = (ImmutableSegmentDataManager) segmentDataManager;
+    ImmutableSegment immutableSegment = immutableSegmentDataManager.getSegment();
+    List<StarTreeV2> starTrees = immutableSegment.getStarTrees();
+    if (starTrees == null) {
+      return startreeDetails;
     }
+    startreeDetails = getImmutableSegmentStartreeIndexes(starTrees);
     return startreeDetails;
   }
 
@@ -118,21 +109,15 @@ public class SegmentMetadataFetcher {
       List<String> starTreeDimensions = starTreeMetadata.getDimensionsSplitOrder();
       starTreeIndexMap.put(STAR_TREE_DIMENSION_COLUMNS, starTreeDimensions);
 
-      List<Map<String, String>> starTreeMetricAggregations = new ArrayList<>();
+      List<String> starTreeMetricAggregations = new ArrayList<>();
       Set<AggregationFunctionColumnPair> functionColumnPairs = starTreeMetadata.getFunctionColumnPairs();
       for (AggregationFunctionColumnPair functionColumnPair : functionColumnPairs) {
-        Map<String, String> starTreeMetricAggregation = new LinkedHashMap<>();
-        starTreeMetricAggregation.put(STAR_TREE_FUNCTION_COLUMN_PAIR_COLUMN, functionColumnPair.getColumn());
-        starTreeMetricAggregation.put(STAR_TREE_FUNCTION_COLUMN_PAIR_FUNCTION, functionColumnPair.getFunctionType().toString());
-        starTreeMetricAggregations.add(starTreeMetricAggregation);
+        starTreeMetricAggregations.add(functionColumnPair.toColumnName());
       }
-
       starTreeIndexMap.put(STAR_TREE_METRIC_AGGREGATIONS, starTreeMetricAggregations);
 
       starTreeIndexMap.put(STAR_TREE_MAX_LEAF_RECORDS, starTreeMetadata.getMaxLeafRecords());
-
       starTreeIndexMap.put(STAR_TREE_DIMENSION_COLUMNS_SKIPPED, starTreeMetadata.getSkipStarNodeCreationForDimensions());
-
       startreeDetails.add(starTreeIndexMap);
     }
     return startreeDetails;
@@ -143,15 +128,11 @@ public class SegmentMetadataFetcher {
    */
   private static Map<String, Map<String, String>> getIndexesForSegmentColumns(SegmentDataManager segmentDataManager) {
     Map<String, Map<String, String>> columnIndexMap = null;
-    if (segmentDataManager instanceof ImmutableSegmentDataManager) {
-      ImmutableSegmentDataManager immutableSegmentDataManager = (ImmutableSegmentDataManager) segmentDataManager;
-      ImmutableSegment immutableSegment = immutableSegmentDataManager.getSegment();
-      if (immutableSegment instanceof ImmutableSegmentImpl) {
-        ImmutableSegmentImpl immutableSegmentImpl = (ImmutableSegmentImpl) immutableSegment;
-        Map<String, ColumnIndexContainer> columnIndexContainerMap = immutableSegmentImpl.getIndexContainerMap();
-        columnIndexMap = getImmutableSegmentColumnIndexes(columnIndexContainerMap);
-      }
-    }
+    ImmutableSegmentDataManager immutableSegmentDataManager = (ImmutableSegmentDataManager) segmentDataManager;
+    ImmutableSegment immutableSegment = immutableSegmentDataManager.getSegment();
+    ImmutableSegmentImpl immutableSegmentImpl = (ImmutableSegmentImpl) immutableSegment;
+    Map<String, ColumnIndexContainer> columnIndexContainerMap = immutableSegmentImpl.getIndexContainerMap();
+    columnIndexMap = getImmutableSegmentColumnIndexes(columnIndexContainerMap);
     return columnIndexMap;
   }
 
