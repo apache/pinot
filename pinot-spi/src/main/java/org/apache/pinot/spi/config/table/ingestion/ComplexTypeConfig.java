@@ -34,13 +34,23 @@ public class ComplexTypeConfig extends BaseJsonConfig {
   @JsonPropertyDescription("The fields to unnest")
   private final List<String> _unnestFields;
 
+  @JsonPropertyDescription("The delimiter used to separate components in a path")
+  private final String _delimiter;
+
   @JsonCreator
-  public ComplexTypeConfig(@JsonProperty("unnestFields") @Nullable List<String> unnestFields) {
+  public ComplexTypeConfig(@JsonProperty("unnestFields") @Nullable List<String> unnestFields,
+      @JsonProperty("delimiter") @Nullable String delimiter) {
     _unnestFields = unnestFields;
+    _delimiter = delimiter;
   }
 
   @Nullable
   public List<String> getUnnestFields() {
     return _unnestFields;
+  }
+
+  @Nullable
+  public String getDelimiter() {
+    return _delimiter;
   }
 }

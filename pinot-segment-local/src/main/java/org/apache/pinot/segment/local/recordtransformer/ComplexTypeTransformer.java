@@ -77,26 +77,39 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  *
  */
 public class ComplexTypeTransformer implements RecordTransformer {
-  // TODO: make configurable
-  private static final CharSequence DELIMITER = ".";
+  private static final String DEFAULT_DELIMITER = ".";
   private final List<String> _unnestFields;
+  private final String _delimiter;
 
   public ComplexTypeTransformer(TableConfig tableConfig) {
-    if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getComplexTypeConfig() != null) {
-      _unnestFields = tableConfig.getIngestionConfig().getComplexTypeConfig().getUnnestFields() != null ? tableConfig
-          .getIngestionConfig().getComplexTypeConfig().getUnnestFields() : new ArrayList<>();
-      // the unnest fields are sorted to achieve the topological sort of the collections, so that the parent collection
-      // (e.g. foo) is unnested before the child collection (e.g. foo.bar)
-      Collections.sort(_unnestFields);
-    } else {
-      _unnestFields = new ArrayList<>();
-    }
+    this(parseUnnestFields(tableConfig), parseDelimiter(tableConfig));
   }
 
   @VisibleForTesting
-  public ComplexTypeTransformer(List<String> unnestFields) {
+  public ComplexTypeTransformer(List<String> unnestFields, String delimiter) {
     _unnestFields = new ArrayList<>(unnestFields);
+    _delimiter = delimiter;
+    // the unnest fields are sorted to achieve the topological sort of the collections, so that the parent collection
+    // (e.g. foo) is unnested before the child collection (e.g. foo.bar)
     Collections.sort(_unnestFields);
+  }
+
+  private static List<String> parseUnnestFields(TableConfig tableConfig) {
+    if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getComplexTypeConfig() != null
+        && tableConfig.getIngestionConfig().getComplexTypeConfig().getUnnestFields() != null) {
+      return tableConfig.getIngestionConfig().getComplexTypeConfig().getUnnestFields();
+    } else {
+      return new ArrayList<>();
+    }
+  }
+
+  private static String parseDelimiter(TableConfig tableConfig) {
+    if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getComplexTypeConfig() != null
+        && tableConfig.getIngestionConfig().getComplexTypeConfig().getDelimiter() != null) {
+      return tableConfig.getIngestionConfig().getComplexTypeConfig().getDelimiter();
+    } else {
+      return DEFAULT_DELIMITER;
+    }
   }
 
   public static boolean isComplexTypeHandlingEnabled(TableConfig tableConfig) {
@@ -253,7 +266,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
     }
   }
 
-  private static String concat(String left, String right) {
-    return String.join(DELIMITER, left, right);
+  private String concat(String left, String right) {
+    return String.join(_delimiter, left, right);
   }
 }
