@@ -1251,9 +1251,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
 
     // Create complex type transformer
-    _complexTypeTransformer =
-        ComplexTypeTransformer.isComplexTypeHandlingEnabled(tableConfig) ? new ComplexTypeTransformer(tableConfig)
-            : null;
+    _complexTypeTransformer = ComplexTypeTransformer.getComplexTypeTransformer(tableConfig);
 
     // Acquire semaphore to create stream consumers
     try {

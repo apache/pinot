@@ -123,7 +123,7 @@ public class RealtimeSegmentConverter {
     final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     RealtimeSegmentSegmentCreationDataSource dataSource =
         new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, reader, _dataSchema);
-    driver.init(genConfig, dataSource, CompositeTransformer.getPassThroughTransformer());
+    driver.init(genConfig, dataSource, CompositeTransformer.getPassThroughTransformer(), null);
     driver.build();
 
     if (segmentPartitionConfig != null) {

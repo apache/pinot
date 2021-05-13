@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.segment.creator.IntermediateSegmentSegmentCreationDataSource;
@@ -85,6 +86,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private SegmentIndexCreationInfo segmentIndexCreationInfo;
   private Schema dataSchema;
   private RecordTransformer _recordTransformer;
+  private ComplexTypeTransformer _complexTypeTransformer;
   private IngestionSchemaValidator _ingestionSchemaValidator;
   private int totalDocs = 0;
   private File tempIndexDir;
@@ -147,11 +149,12 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       LOGGER.info("RecordReaderSegmentCreationDataSource is used");
       dataSource = new RecordReaderSegmentCreationDataSource(recordReader);
     }
-    init(config, dataSource, CompositeTransformer.getDefaultTransformer(config.getTableConfig(), config.getSchema()));
+    init(config, dataSource, CompositeTransformer.getDefaultTransformer(config.getTableConfig(), config.getSchema()),
+        ComplexTypeTransformer.getComplexTypeTransformer(config.getTableConfig()));
   }
 
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource,
-      RecordTransformer recordTransformer)
+      RecordTransformer recordTransformer, ComplexTypeTransformer complexTypeTransformer)
       throws Exception {
     this.config = config;
     recordReader = dataSource.getRecordReader();
@@ -161,6 +164,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
 
     _recordTransformer = recordTransformer;
+    _complexTypeTransformer = complexTypeTransformer;
 
     // Initialize stats collection
     segmentStats = dataSource
@@ -211,6 +215,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         long indexStopTime;
         reuse.clear();
         GenericRow decodedRow = recordReader.next(reuse);
+        if (_complexTypeTransformer != null) {
+          // TODO: consolidate complex type transformer into composite type transformer
+          decodedRow = _complexTypeTransformer.transform(decodedRow);
+        }
         if (decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
           recordReadStopTime = System.currentTimeMillis();
           totalRecordReadTime += (recordReadStopTime - recordReadStartTime);

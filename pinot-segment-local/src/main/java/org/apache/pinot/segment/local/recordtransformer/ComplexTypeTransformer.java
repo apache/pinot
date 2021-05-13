@@ -112,8 +112,14 @@ public class ComplexTypeTransformer implements RecordTransformer {
     }
   }
 
-  public static boolean isComplexTypeHandlingEnabled(TableConfig tableConfig) {
-    return tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getComplexTypeConfig() != null;
+  /**
+   * @return the complex type transformer defined table config, null if the table config does not have the config
+   */
+  public static ComplexTypeTransformer getComplexTypeTransformer(TableConfig tableConfig) {
+    if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getComplexTypeConfig() != null) {
+      return new ComplexTypeTransformer(tableConfig);
+    }
+    return null;
   }
 
   @Nullable
