@@ -77,19 +77,20 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  *
  */
 public class ComplexTypeTransformer implements RecordTransformer {
-  // TODO: make configurable
-  private static final CharSequence DEFAULT_DELIMITER = ".";
+  private static final String DEFAULT_DELIMITER = ".";
   private final List<String> _unnestFields;
-  private final CharSequence _delimiter;
+  private final String _delimiter;
 
   public ComplexTypeTransformer(TableConfig tableConfig) {
     this(parseUnnestFields(tableConfig), parseDelimiter(tableConfig));
   }
 
   @VisibleForTesting
-  public ComplexTypeTransformer(List<String> unnestFields, CharSequence delimiter) {
+  public ComplexTypeTransformer(List<String> unnestFields, String delimiter) {
     _unnestFields = new ArrayList<>(unnestFields);
     _delimiter = delimiter;
+    // the unnest fields are sorted to achieve the topological sort of the collections, so that the parent collection
+    // (e.g. foo) is unnested before the child collection (e.g. foo.bar)
     Collections.sort(_unnestFields);
   }
 
@@ -102,7 +103,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
     }
   }
 
-  private static CharSequence parseDelimiter(TableConfig tableConfig) {
+  private static String parseDelimiter(TableConfig tableConfig) {
     if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getComplexTypeConfig() != null
         && tableConfig.getIngestionConfig().getComplexTypeConfig().getDelimiter() != null) {
       return tableConfig.getIngestionConfig().getComplexTypeConfig().getDelimiter();
