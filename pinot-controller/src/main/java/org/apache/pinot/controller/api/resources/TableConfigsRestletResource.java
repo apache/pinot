@@ -306,15 +306,15 @@ public class TableConfigsRestletResource {
           _pinotHelixResourceManager.addTable(offlineTableConfig);
           LOGGER.info("Created offline table config: {}", tableName);
         }
-        if (realtimeTableConfig != null) {
-          tuneConfig(realtimeTableConfig, schema);
-          if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-            _pinotHelixResourceManager.updateTableConfig(realtimeTableConfig);
-            LOGGER.info("Updated realtime table config: {}", tableName);
-          } else {
-            _pinotHelixResourceManager.addTable(realtimeTableConfig);
-            LOGGER.info("Created realtime table config: {}", tableName);
-          }
+      }
+      if (realtimeTableConfig != null) {
+        tuneConfig(realtimeTableConfig, schema);
+        if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+          _pinotHelixResourceManager.updateTableConfig(realtimeTableConfig);
+          LOGGER.info("Updated realtime table config: {}", tableName);
+        } else {
+          _pinotHelixResourceManager.addTable(realtimeTableConfig);
+          LOGGER.info("Created realtime table config: {}", tableName);
         }
       }
     } catch (InvalidTableConfigException e) {

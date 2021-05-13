@@ -485,7 +485,7 @@ public class TableConfigsRestletResourceTest {
 
     // update existing config
     schema.addField(new MetricFieldSpec("newMetric", FieldSpec.DataType.LONG));
-    tableConfigs = new TableConfigs(tableName, schema, tableConfigsResponse.getOffline(), tableConfigs.getRealtime());
+    tableConfigs = new TableConfigs(tableName, schema, tableConfigsResponse.getOffline(), tableConfigsResponse.getRealtime());
     ControllerTestUtils
         .sendPutRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableConfigsUpdate(tableName),
             tableConfigs.toPrettyJsonString());
@@ -497,6 +497,18 @@ public class TableConfigsRestletResourceTest {
     Assert.assertEquals(tableConfigsResponse.getRealtime().getTableName(), realtimeTableConfig.getTableName());
     Assert.assertEquals(tableConfigsResponse.getSchema().getSchemaName(), schema.getSchemaName());
     Assert.assertTrue(tableConfigsResponse.getSchema().getMetricNames().contains("newMetric"));
+
+    tableConfigsResponse.getOffline().getIndexingConfig().setInvertedIndexColumns(Lists.newArrayList("dimA"));
+    tableConfigsResponse.getRealtime().getIndexingConfig().setInvertedIndexColumns(Lists.newArrayList("dimA"));
+    tableConfigs = new TableConfigs(tableName, schema, tableConfigsResponse.getOffline(), tableConfigsResponse.getRealtime());
+    ControllerTestUtils
+        .sendPutRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableConfigsUpdate(tableName),
+            tableConfigs.toPrettyJsonString());
+    response = ControllerTestUtils
+        .sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableConfigsGet(tableName));
+    tableConfigsResponse = JsonUtils.stringToObject(response, TableConfigs.class);
+    Assert.assertTrue(tableConfigsResponse.getOffline().getIndexingConfig().getInvertedIndexColumns().contains("dimA"));
+    Assert.assertTrue(tableConfigsResponse.getRealtime().getIndexingConfig().getInvertedIndexColumns().contains("dimA"));
 
     ControllerTestUtils
         .sendDeleteRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
