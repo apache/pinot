@@ -22,7 +22,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.BiMap;
-import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -37,8 +36,8 @@ import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.spi.config.table.TableStatus;
+import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -165,7 +164,7 @@ public class ConsumingSegmentInfoReader {
 
         for (ConsumingSegmentInfo consumingSegmentInfo : consumingSegmentInfoList) {
           if (consumingSegmentInfo._consumerState
-              .equals(RealtimeSegmentDataManager.ConsumerState.NOT_CONSUMING.toString())) {
+              .equals(ConsumerState.NOT_CONSUMING.toString())) {
             String errorMessage =
                 "Segment: " + segmentName + " is not being consumed on server: " + consumingSegmentInfo._serverName;
             return TableStatus.IngestionStatus.newIngestionStatus(TableStatus.IngestionState.UNHEALTHY, errorMessage);

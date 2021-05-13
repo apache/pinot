@@ -43,8 +43,8 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
-import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager.ConsumerState;
 import org.apache.pinot.spi.config.table.TableStatus;
+import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.mockito.ArgumentMatchers;
 import org.slf4j.Logger;
@@ -242,14 +242,14 @@ public class ConsumingSegmentInfoReaderTest {
         consumingSegmentsInfoMap._segmentToConsumingInfoMap.get(SEGMENT_NAME_PARTITION_0);
     Assert.assertEquals(consumingSegmentInfos.size(), 2);
     for (ConsumingSegmentInfoReader.ConsumingSegmentInfo info : consumingSegmentInfos) {
-      checkConsumingSegmentInfo(info, Sets.newHashSet("server0", "server1"), ConsumerState.CONSUMING.toString(), "0",
-          "150");
+      checkConsumingSegmentInfo(info, Sets.newHashSet("server0", "server1"),
+          ConsumerState.CONSUMING.toString(), "0", "150");
     }
     consumingSegmentInfos = consumingSegmentsInfoMap._segmentToConsumingInfoMap.get(SEGMENT_NAME_PARTITION_1);
     Assert.assertEquals(consumingSegmentInfos.size(), 2);
     for (ConsumingSegmentInfoReader.ConsumingSegmentInfo info : consumingSegmentInfos) {
-      checkConsumingSegmentInfo(info, Sets.newHashSet("server0", "server1"), ConsumerState.CONSUMING.toString(), "1",
-          "150");
+      checkConsumingSegmentInfo(info, Sets.newHashSet("server0", "server1"),
+          ConsumerState.CONSUMING.toString(), "1", "150");
     }
   }
 
@@ -270,16 +270,18 @@ public class ConsumingSegmentInfoReaderTest {
     Assert.assertEquals(consumingSegmentInfos.size(), 2);
     for (ConsumingSegmentInfoReader.ConsumingSegmentInfo info : consumingSegmentInfos) {
       if (info._serverName.equals("server0")) {
-        checkConsumingSegmentInfo(info, Sets.newHashSet("server0"), ConsumerState.CONSUMING.toString(), "0", "150");
+        checkConsumingSegmentInfo(info, Sets.newHashSet("server0"), ConsumerState.CONSUMING.toString(),
+            "0", "150");
       } else {
-        checkConsumingSegmentInfo(info, Sets.newHashSet("server2"), ConsumerState.NOT_CONSUMING.toString(), "0", "150");
+        checkConsumingSegmentInfo(info, Sets.newHashSet("server2"),
+            ConsumerState.NOT_CONSUMING.toString(), "0", "150");
       }
     }
     consumingSegmentInfos = consumingSegmentsInfoMap._segmentToConsumingInfoMap.get(SEGMENT_NAME_PARTITION_1);
     Assert.assertEquals(consumingSegmentInfos.size(), 2);
     for (ConsumingSegmentInfoReader.ConsumingSegmentInfo info : consumingSegmentInfos) {
-      checkConsumingSegmentInfo(info, Sets.newHashSet("server0", "server2"), ConsumerState.CONSUMING.toString(), "1",
-          "150");
+      checkConsumingSegmentInfo(info, Sets.newHashSet("server0", "server2"),
+          ConsumerState.CONSUMING.toString(), "1", "150");
     }
   }
 
