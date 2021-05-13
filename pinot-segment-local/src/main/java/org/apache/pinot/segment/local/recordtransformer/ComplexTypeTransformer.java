@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -25,6 +26,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.function.scalar.JsonFunctions;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
@@ -212,22 +214,62 @@ public class ComplexTypeTransformer implements RecordTransformer {
           }
         }
         flattenMap(record, mapColumns);
-      } else if (value instanceof Collection && _unnestFields.contains(column)) {
-        for (Object inner : (Collection) value) {
-          if (inner instanceof Map) {
-            Map<String, Object> innerMap = (Map<String, Object>) inner;
-            flattenMap(column, innerMap, new ArrayList<>(innerMap.keySet()));
+      } else if (value instanceof Collection) {
+        Collection collection = (Collection) value;
+        if (_unnestFields.contains(column)) {
+          for (Object inner : collection) {
+            if (inner instanceof Map) {
+              Map<String, Object> innerMap = (Map<String, Object>) inner;
+              flattenMap(column, innerMap, new ArrayList<>(innerMap.keySet()));
+            }
+          }
+        } else if (!containPrimitives(collection)) {
+          try {
+            // convert the collection to JSON string
+            String jsonString = JsonFunctions.jsonFormat(collection);
+            record.putValue(column, jsonString);
+          } catch (JsonProcessingException e) {
+            throw new RuntimeException(
+                String.format("Caught exception while converting value to JSON string %s", value), e);
           }
         }
-      } else if (isArray(value) && _unnestFields.contains(column)) {
-        for (Object inner : (Object[]) value) {
-          if (inner instanceof Map) {
-            Map<String, Object> innerMap = (Map<String, Object>) inner;
-            flattenMap(column, innerMap, new ArrayList<>(innerMap.keySet()));
+      } else if (isArray(value)) {
+        Object[] array = (Object[]) value;
+        if (_unnestFields.contains(column)) {
+          for (Object inner : array) {
+            if (inner instanceof Map) {
+              Map<String, Object> innerMap = (Map<String, Object>) inner;
+              flattenMap(column, innerMap, new ArrayList<>(innerMap.keySet()));
+            }
+          }
+        } else if (!containPrimitives(array)) {
+          try {
+            // convert the array to JSON string
+            String jsonString = JsonFunctions.jsonFormat(array);
+            record.putValue(column, jsonString);
+          } catch (JsonProcessingException e) {
+            throw new RuntimeException(
+                String.format("Caught exception while converting value to JSON string %s", value), e);
           }
         }
       }
     }
+  }
+
+  private boolean containPrimitives(Object[] value) {
+    if (value.length == 0) {
+      return true;
+    }
+    Object element = value[0];
+    return !(element instanceof Map || element instanceof Collection || isArray(element));
+  }
+
+  private boolean containPrimitives(Collection value) {
+    if (value.isEmpty()) {
+      return true;
+    }
+    Object element = value.iterator().next();
+    return !(element instanceof Map || element instanceof Collection || isArray(element));
   }
 
   static private boolean isArray(Object obj) {
@@ -256,17 +298,41 @@ public class ComplexTypeTransformer implements RecordTransformer {
           flattenMap(concatName, map, innerMapFields);
         }
       } else if (value instanceof Collection && _unnestFields.contains(concatName)) {
-        for (Object inner : (Collection) value) {
-          if (inner instanceof Map) {
-            Map<String, Object> innerMap = (Map<String, Object>) inner;
-            flattenMap(concatName, innerMap, new ArrayList<>(innerMap.keySet()));
+        Collection collection = (Collection) value;
+        if (_unnestFields.contains(concatName)) {
+          for (Object inner : (Collection) value) {
+            if (inner instanceof Map) {
+              Map<String, Object> innerMap = (Map<String, Object>) inner;
+              flattenMap(concatName, innerMap, new ArrayList<>(innerMap.keySet()));
+            }
+          }
+        } else if (!containPrimitives(collection)) {
+          try {
+            // convert the collection to JSON string
+            String jsonString = JsonFunctions.jsonFormat(collection);
+            map.put(field, jsonString);
+          } catch (JsonProcessingException e) {
+            throw new RuntimeException(
+                String.format("Caught exception while converting value to JSON string %s", value), e);
           }
         }
-      } else if (isArray(value) && _unnestFields.contains(concatName)) {
-        for (Object inner : (Object[]) value) {
-          if (inner instanceof Map) {
-            Map<String, Object> innerMap = (Map<String, Object>) inner;
-            flattenMap(concatName, innerMap, new ArrayList<>(innerMap.keySet()));
+      } else if (isArray(value)) {
+        Object[] array = (Object[]) value;
+        if (_unnestFields.contains(concatName)) {
+          for (Object inner : (Object[]) value) {
+            if (inner instanceof Map) {
+              Map<String, Object> innerMap = (Map<String, Object>) inner;
+              flattenMap(concatName, innerMap, new ArrayList<>(innerMap.keySet()));
+            }
+          }
+        } else if (!containPrimitives(array)) {
+          try {
+            // convert the array to JSON string
+            String jsonString = JsonFunctions.jsonFormat(array);
+            map.put(field, jsonString);
+          } catch (JsonProcessingException e) {
+            throw new RuntimeException(
+                String.format("Caught exception while converting value to JSON string %s", value), e);
           }
         }
       }
