@@ -23,6 +23,10 @@ import java.io.File;
 
 public class CommonConstants {
 
+  public static final String ENVIRONMENT_IDENTIFIER = "environment";
+  public static final String INSTANCE_FAILURE_DOMAIN = "failureDomain";
+  public static final String DEFAULT_FAILURE_DOMAIN = "No such domain";
+
   public static final String PREFIX_OF_SSL_SUBSET = "ssl";
   public static final String HTTP_PROTOCOL = "http";
   public static final String HTTPS_PROTOCOL = "https";
@@ -344,6 +348,10 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_CURRENT_DATA_TABLE_VERSION = "pinot.server.instance.currentDataTableVersion";
     public static final int DEFAULT_CURRENT_DATA_TABLE_VERSION = 3;
+
+    // Environment Provider Configs
+    public static final String PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY = "pinot.server.environmentProvider.factory";
+    public static final String ENVIRONMENT_PROVIDER_CLASS_NAME = "pinot.server.environmentProvider.className";
   }
 
   public static class Controller {
