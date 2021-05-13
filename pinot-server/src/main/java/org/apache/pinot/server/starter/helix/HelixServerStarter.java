@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -56,7 +57,9 @@ import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.core.transport.ListenerConfig;
+import org.apache.pinot.core.transport.TlsConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.core.util.TlsUtils;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
 import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
 import org.apache.pinot.server.api.access.AccessControlFactory;
@@ -317,6 +320,14 @@ public class HelixServerStarter implements ServiceStartable {
       throws Exception {
     LOGGER.info("Starting Pinot server");
     long startTimeMs = System.currentTimeMillis();
+
+    // install default SSL context if necessary (even if not force-enabled everywhere)
+    TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_serverConf, Server.SERVER_TLS_PREFIX);
+    if (StringUtils.isNotBlank(tlsDefaults.getKeyStorePath()) || StringUtils
+        .isNotBlank(tlsDefaults.getTrustStorePath())) {
+      LOGGER.info("Installing default SSL context for any client requests");
+      TlsUtils.installDefaultSSLSocketFactory(tlsDefaults);
+    }
 
     LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,
         _helixClusterName, _instanceId);
