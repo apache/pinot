@@ -132,6 +132,9 @@ public class FileUploadDownloadClient implements Closeable {
    * @param sslContext SSL context
    */
   public FileUploadDownloadClient(@Nullable SSLContext sslContext) {
+    if (sslContext == null) {
+      sslContext = _defaultSSLContext;
+    }
     _httpClient = HttpClients.custom().setSSLContext(sslContext).build();
   }
 
