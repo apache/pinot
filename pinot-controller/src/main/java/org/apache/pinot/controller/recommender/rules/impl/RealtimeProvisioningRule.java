@@ -21,7 +21,6 @@ package org.apache.pinot.controller.recommender.rules.impl;
 
 import com.google.common.io.Files;
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;

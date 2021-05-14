@@ -22,7 +22,6 @@ package org.apache.pinot.controller.recommender.rules.impl;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.io.Files;
 import java.io.File;
-import java.io.IOException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.controller.recommender.exceptions.InvalidInputException;
 import org.apache.pinot.controller.recommender.io.ConfigManager;
