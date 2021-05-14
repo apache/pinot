@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
@@ -154,7 +155,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   }
 
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource,
-      RecordTransformer recordTransformer, ComplexTypeTransformer complexTypeTransformer)
+      RecordTransformer recordTransformer, @Nullable ComplexTypeTransformer complexTypeTransformer)
       throws Exception {
     this.config = config;
     recordReader = dataSource.getRecordReader();
