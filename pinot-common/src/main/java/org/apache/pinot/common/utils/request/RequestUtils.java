@@ -107,7 +107,11 @@ public class RequestUtils {
     Expression expression = new Expression(ExpressionType.LITERAL);
     Literal literal = new Literal();
     if (node instanceof SqlNumericLiteral) {
-      if (((SqlNumericLiteral) node).isInteger()) {
+      // Mitigate calcite NPE bug, we need to check if SqlNumericLiteral.getScale() is null before calling
+      // SqlNumericLiteral.isInteger(). TODO: Undo this fix once a Calcite release that contains CALCITE-4199 is
+      // available and Pinot has been upgraded to use such a release.
+      SqlNumericLiteral sqlNumericLiteral = (SqlNumericLiteral) node;
+      if (sqlNumericLiteral.getScale() != null && sqlNumericLiteral.isInteger()) {
         literal.setLongValue(node.bigDecimalValue().longValue());
       } else {
         literal.setDoubleValue(node.bigDecimalValue().doubleValue());
