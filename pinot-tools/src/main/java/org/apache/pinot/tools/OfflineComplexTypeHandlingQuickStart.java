@@ -48,6 +48,7 @@ public class OfflineComplexTypeHandlingQuickStart {
     URL resource = classLoader.getResource("examples/batch/githubEvents/githubEvents_offline_complexTypeHandling_table_config.json");
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, tableConfigFile);
+    // TODO: add all columns of the flattened fields after the schema inference
     resource = classLoader.getResource("examples/batch/githubEvents/githubEvents_offline_complexTypeHandling_schema.json");
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, schemaFile);
