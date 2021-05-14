@@ -1,0 +1,44 @@
+{
+  "dimensionFieldSpecs": [
+    {
+      "name": "id",
+      "dataType": "STRING"
+    },
+    {
+      "name": "type",
+      "dataType": "STRING"
+    },
+    {
+      "name": "payload.commits.sha",
+      "dataType": "STRING"
+    },
+    {
+      "name": "payload.commits.author.name",
+      "dataType": "STRING"
+    },
+    {
+      "name": "payload.commits.author.email",
+      "dataType": "STRING"
+    },
+    {
+      "name": "payload_json",
+      "dataType": "STRING",
+      "maxLength": 2147483647
+    }
+  ],
+  "dateTimeFieldSpecs": [
+    {
+      "name": "created_at",
+      "dataType": "STRING",
+      "format": "1:SECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd'T'HH:mm:ss'Z'",
+      "granularity": "1:SECONDS"
+    },
+    {
+      "name": "created_at_timestamp",
+      "dataType": "TIMESTAMP",
+      "format": "1:MILLISECONDS:TIMESTAMP",
+      "granularity": "1:SECONDS"
+    }
+  ],
+  "schemaName": "githubEvents"
+}
