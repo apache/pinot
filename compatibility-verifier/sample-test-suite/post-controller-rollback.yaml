@@ -28,10 +28,22 @@ operations:
     tableConfigFileName: feature-test-1.json
     recordReaderConfigFileName: data/recordReaderConfig.json
     segmentName: FeatureTest1_Segment7
+  - type: streamOp
+    description: publish rows to PinotRealtimeFeatureTest2Event
+    op: PRODUCE
+    streamConfigFileName: feature-test-2-realtime-stream-config.json
+    numRows: 66
+    inputDataFileName: data/RealtimeFeatureTest1-data-00.csv
+    recordReaderConfigFileName: data/recordReaderConfig.json
+    tableConfigFileName: feature-test-2-realtime.json
   - type: queryOp
     description: Run query on FeatureTest1 using SQL
     queryFileName: queries/feature-test-1-sql.queries
     expectedResultsFileName: query-results/feature-test-1-rest-sql.results
+  - type: queryOp
+    description: Run query on FeatureTest2 using SQL
+    queryFileName: queries/feature-test-2-sql-realtime.queries
+    expectedResultsFileName: query-results/feature-test-2-sql-realtime.results
   - type: segmentOp
     description: Delete segment FeatureTest1_Segment
     op: DELETE

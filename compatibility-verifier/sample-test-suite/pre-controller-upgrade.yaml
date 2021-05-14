@@ -20,6 +20,16 @@
 # Operations to be done.
 description: Operations to be run before Controller upgrade
 operations:
+  - type: streamOp
+    description: create Kafka topic PinotRealtimeFeatureTest2Event
+    op: CREATE
+    streamConfigFileName: feature-test-2-realtime-stream-config.json
+  - type: tableOp
+    description: Create realtime table FeatureTest2
+    op: CREATE
+    schemaFileName: FeatureTest2-schema.json
+    tableConfigFileName: feature-test-2-realtime.json
+    recordReaderConfigFileName: data/recordReaderConfig.json
   - type: tableOp
     description: Create offline table FeatureTest1
     op: CREATE
@@ -33,7 +43,19 @@ operations:
     tableConfigFileName: feature-test-1.json
     recordReaderConfigFileName: data/recordReaderConfig.json
     segmentName: FeatureTest1_Segment
+  - type: streamOp
+    description: publish rows to PinotRealtimeFeatureTest2Event
+    op: PRODUCE
+    streamConfigFileName: feature-test-2-realtime-stream-config.json
+    numRows: 66
+    inputDataFileName: data/RealtimeFeatureTest1-data-00.csv
+    recordReaderConfigFileName: data/recordReaderConfig.json
+    tableConfigFileName: feature-test-2-realtime.json
   - type: queryOp
     description: Run query on FeatureTest1 using SQL
     queryFileName: queries/feature-test-1-sql.queries
     expectedResultsFileName: query-results/feature-test-1-rest-sql.results
+  - type: queryOp
+    description: Run query on FeatureTest2 using SQL
+    queryFileName: queries/feature-test-2-sql-realtime.queries
+    expectedResultsFileName: query-results/feature-test-2-sql-realtime.results
