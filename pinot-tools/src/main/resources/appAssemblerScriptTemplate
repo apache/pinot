@@ -18,28 +18,6 @@
 # under the License.
 #
 
-jdk_version() {
-  IFS='
-'
-  # remove \r for Cygwin
-  lines=$(java -Xms32M -Xmx32M -version 2>&1 | tr '\r' '\n')
-  for line in $lines; do
-    if test -z $result && echo "$line" | grep -q 'version "'
-    then
-      ver=$(echo $line | sed -e 's/.*version "\(.*\)"\(.*\)/\1/; 1q')
-      # on macOS, sed doesn't support '?'
-      if case $ver in "1."*) true;; *) false;; esac;
-      then
-        result=$(echo $ver | sed -e 's/1\.\([0-9]*\)\(.*\)/\1/; 1q')
-      else
-        result=$(echo $ver | sed -e 's/\([0-9]*\)\(.*\)/\1/; 1q')
-      fi
-    fi
-  done
-  unset IFS
-  echo "$result"
-}
-
 # resolve links - $0 may be a softlink
 PRG="$0"
 
@@ -129,46 +107,40 @@ if [ -n "$CLASSPATH_PREFIX" ] ; then
   CLASSPATH=$CLASSPATH_PREFIX:$CLASSPATH
 fi
 
-
-JAVA_VER="$(jdk_version)"
-
-# For java 9 and later version, we need to explicitly set Pinot Plugins directory into classpath.
-if [ "$JAVA_VER" -gt 8 ] ; then
-  # Set $PLUGINS_CLASSPATH for plugin jars to be put into classpath.
-  # $PLUGINS_DIR and $PLUGINS_INCLUDE are used if $PLUGINS_CLASSPATH is not set.
-  # $PLUGINS_DIR is the root directory of plugins directory, default to '"$BASEDIR"/plugins' if not set.
-  # $PLUGINS_INCLUDE is semi-colon separated plugins name, e.g. pinot-avro;pinot-batch-ingestion-standalone. Default is not set, which means load all the plugin jars.
-  if [ -z "$PLUGINS_CLASSPATH" ] ; then
-    if [ -z "$PLUGINS_DIR" ] ; then
-      PLUGINS_DIR="$BASEDIR"/plugins
-    fi
-    if [ -d "$PLUGINS_DIR" ] ; then
-      if [ -n "$PLUGINS_INCLUDE" ] ; then
-        IFS=';' echo "$PLUGINS_INCLUDE" | read -ra PLUGINS_ARR
-        for PLUGIN_JAR in "${PLUGINS_ARR[@]}"; do
-            PLUGIN_JAR_PATH=$(find "$PLUGINS_DIR" -path \*/"$PLUGIN_JAR"/"$PLUGIN_JAR"-\*.jar)
-            if [ -n "$PLUGINS_CLASSPATH" ] ; then
-              PLUGINS_CLASSPATH=$PLUGINS_CLASSPATH:$PLUGIN_JAR_PATH
-            else
-              PLUGINS_CLASSPATH=$PLUGIN_JAR_PATH
-            fi
-        done
-      else
-        PLUGIN_JARS=$(find "$PLUGINS_DIR" -name \*.jar)
-        for PLUGIN_JAR in $PLUGIN_JARS ; do
+# Set $PLUGINS_CLASSPATH for plugin jars to be put into classpath.
+# $PLUGINS_DIR and $PLUGINS_INCLUDE are used if $PLUGINS_CLASSPATH is not set.
+# $PLUGINS_DIR is the root directory of plugins directory, default to '"$BASEDIR"/plugins' if not set.
+# $PLUGINS_INCLUDE is semi-colon separated plugins name, e.g. pinot-avro;pinot-batch-ingestion-standalone. Default is not set, which means load all the plugin jars.
+if [ -z "$PLUGINS_CLASSPATH" ] ; then
+  if [ -z "$PLUGINS_DIR" ] ; then
+    PLUGINS_DIR="$BASEDIR"/plugins
+  fi
+  if [ -d "$PLUGINS_DIR" ] ; then
+    if [ -n "$PLUGINS_INCLUDE" ] ; then
+      IFS=';' echo "$PLUGINS_INCLUDE" | read -ra PLUGINS_ARR
+      for PLUGIN_JAR in "${PLUGINS_ARR[@]}"; do
+          PLUGIN_JAR_PATH=$(find "$PLUGINS_DIR" -path \*/"$PLUGIN_JAR"/"$PLUGIN_JAR"-\*.jar)
           if [ -n "$PLUGINS_CLASSPATH" ] ; then
-            PLUGINS_CLASSPATH=$PLUGINS_CLASSPATH:$PLUGIN_JAR
+            PLUGINS_CLASSPATH=$PLUGINS_CLASSPATH:$PLUGIN_JAR_PATH
           else
-            PLUGINS_CLASSPATH=$PLUGIN_JAR
+            PLUGINS_CLASSPATH=$PLUGIN_JAR_PATH
           fi
-        done
-      fi
+      done
+    else
+      PLUGIN_JARS=$(find "$PLUGINS_DIR" -name \*.jar)
+      for PLUGIN_JAR in $PLUGIN_JARS ; do
+        if [ -n "$PLUGINS_CLASSPATH" ] ; then
+          PLUGINS_CLASSPATH=$PLUGINS_CLASSPATH:$PLUGIN_JAR
+        else
+          PLUGINS_CLASSPATH=$PLUGIN_JAR
+        fi
+      done
     fi
   fi
+fi
 
-  if [ -n "$PLUGINS_CLASSPATH" ] ; then
-    CLASSPATH=$CLASSPATH:$PLUGINS_CLASSPATH
-  fi
+if [ -n "$PLUGINS_CLASSPATH" ] ; then
+  CLASSPATH=$CLASSPATH:$PLUGINS_CLASSPATH
 fi
 
 # For Cygwin, switch paths to Windows format before running java
@@ -186,15 +158,12 @@ else
   ALL_JAVA_OPTS=$JAVA_OPTS
 fi
 
-# For java 8, we set jvm system property `plugins.dir` to load Pinot plugins
-if [ "$JAVA_VER" -eq 8 ] ; then
-  if [ -z "$PLUGINS_DIR" ] ; then
-    PLUGINS_DIR=$BASEDIR/plugins
-  fi
-  ALL_JAVA_OPTS="$ALL_JAVA_OPTS -Dplugins.dir=$PLUGINS_DIR"
-  if [ -n "$PLUGINS_INCLUDE" ] ; then
-    ALL_JAVA_OPTS="$ALL_JAVA_OPTS -Dplugins.include=$PLUGINS_INCLUDE"
-  fi
+if [ -z "$PLUGINS_DIR" ] ; then
+  PLUGINS_DIR=$BASEDIR/plugins
+fi
+ALL_JAVA_OPTS="$ALL_JAVA_OPTS -Dplugins.dir=$PLUGINS_DIR"
+if [ -n "$PLUGINS_INCLUDE" ] ; then
+  ALL_JAVA_OPTS="$ALL_JAVA_OPTS -Dplugins.include=$PLUGINS_INCLUDE"
 fi
 
 exec "$JAVACMD" $ALL_JAVA_OPTS \

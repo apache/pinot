@@ -1289,7 +1289,6 @@
           <configuration>
             <source>${jdk.version}</source>
             <target>${jdk.version}</target>
-            <release>${jdk.version}</release>
             <compilerVersion>${jdk.version}</compilerVersion>
             <fork>true</fork>
             <encoding>${project.build.sourceEncoding}</encoding>

@@ -105,6 +105,7 @@ public class PinotDataTypeTest {
   @Test
   public void testTimestamp() {
     Timestamp timestamp = Timestamp.valueOf(LocalDateTime.now());
+    timestamp.setNanos(0);
     assertEquals(TIMESTAMP.convert(timestamp.getTime(), LONG), timestamp);
     assertEquals(TIMESTAMP.convert(timestamp.toString(), STRING), timestamp);
     assertEquals(TIMESTAMP.convert(timestamp.getTime(), JSON), timestamp);
