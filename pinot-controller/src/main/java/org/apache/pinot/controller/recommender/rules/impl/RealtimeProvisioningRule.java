@@ -19,6 +19,7 @@
 
 package org.apache.pinot.controller.recommender.rules.impl;
 
+import com.google.common.io.Files;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -76,10 +77,11 @@ public class RealtimeProvisioningRule extends AbstractRule {
     long maxUsableHostMemoryByte = DataSizeUtils.toBytes(_params.getMaxUsableHostMemory());
     int totalConsumingPartitions = _params.getNumPartitions() * _params.getNumReplicas();
     int ingestionRatePerPartition = (int) _input.getNumMessagesPerSecInKafkaTopic() / _params.getNumPartitions();
+    int retentionHours = _params.getRealtimeTableRetentionHours();
     int[] numHosts = _params.getNumHosts();
     int[] numHours = _params.getNumHours();
 
-    // run memory estimator
+    File workingDir = Files.createTempDir();
     MemoryEstimator memoryEstimator =
         new MemoryEstimator(tableConfig,
             _input.getSchema(),
@@ -87,14 +89,20 @@ public class RealtimeProvisioningRule extends AbstractRule {
             _params.getNumRowsInGeneratedSegment(),
             ingestionRatePerPartition,
             maxUsableHostMemoryByte,
-            _params.getRealtimeTableRetentionHours());
-    File statsFile = memoryEstimator.initializeStatsHistory();
-    runAndRethrowIOException(() -> memoryEstimator
-        .estimateMemoryUsed(statsFile, numHosts, numHours, totalConsumingPartitions,
-            _params.getRealtimeTableRetentionHours()));
+            retentionHours,
+            workingDir);
+    try {
+      // run memory estimator
+      File statsFile = memoryEstimator.initializeStatsHistory();
+      memoryEstimator.estimateMemoryUsed(statsFile, numHosts, numHours, totalConsumingPartitions, retentionHours);
 
-    // extract recommendations
-    extractResults(memoryEstimator, numHosts, numHours, _output.getRealtimeProvisioningRecommendations());
+      // extract recommendations
+      extractResults(memoryEstimator, numHosts, numHours, _output.getRealtimeProvisioningRecommendations());
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    } finally {
+      memoryEstimator.cleanup();
+    }
   }
 
   private TableConfig createTableConfig(IndexConfig indexConfig, Schema schema, boolean aggregateMetrics) {
@@ -172,19 +180,5 @@ public class RealtimeProvisioningRule extends AbstractRule {
     }
 
     return output;
-  }
-
-  private void runAndRethrowIOException(Func func) {
-    try {
-      func.run();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  @FunctionalInterface
-  private interface Func {
-    void run()
-        throws IOException;
   }
 }
