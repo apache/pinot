@@ -756,12 +756,7 @@ public class MutableSegmentImpl implements MutableSegment {
     return _validDocIndex;
   }
 
-  /**
-   * Returns a record that contains only physical columns
-   * @param docId document ID
-   * @param reuse a GenericRow object that will be re-used if provided. Otherwise, this method will allocate a new one
-   * @return Generic row with physical columns of the specified row.
-   */
+  @Override
   public GenericRow getRecord(int docId, GenericRow reuse) {
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
       String column = entry.getKey();

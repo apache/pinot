@@ -131,6 +131,8 @@ public class SegmentMapper {
       // Write record to avro file for its partition
       SegmentProcessorAvroUtils.convertGenericRowToAvroRecord(reusableRow, reusableRecord);
       recordWriter.append(reusableRecord);
+
+      reusableRow.clear();
     }
   }
 

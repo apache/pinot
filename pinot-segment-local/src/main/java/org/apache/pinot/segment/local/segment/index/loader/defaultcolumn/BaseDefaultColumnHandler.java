@@ -664,8 +664,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       } else {
         _dictionary = null;
       }
-      _columnReader =
-          new PinotSegmentColumnReader(_forwardIndexReader, _dictionary, columnMetadata.getMaxNumberOfMultiValues());
+      _columnReader = new PinotSegmentColumnReader(_forwardIndexReader, _dictionary, null,
+          columnMetadata.getMaxNumberOfMultiValues());
     }
 
     Object getValue(int docId) {
