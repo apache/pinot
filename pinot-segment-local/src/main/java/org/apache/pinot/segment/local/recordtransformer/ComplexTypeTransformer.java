@@ -77,7 +77,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  *
  */
 public class ComplexTypeTransformer implements RecordTransformer {
-  private static final String DEFAULT_DELIMITER = ".";
+  public static final String DEFAULT_DELIMITER = ".";
   private final List<String> _unnestFields;
   private final String _delimiter;
 
