@@ -41,276 +41,277 @@ public class NumericalFilterOptimizerTest {
           .addMultiValueDimension("mvIntColumn", FieldSpec.DataType.INT).build();
 
   @Test
-  public void testEqualsIntColumnWithValidDecimalValue() {
-    BrokerRequest sqlBrokerRequest =
-        SQL_COMPILER.compileToBrokerRequest("SELECT * FROM testTable WHERE intColumn = 5.0");
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
-
-    // "intColumn = 5.0" should have been rewritten to "intColumn = 5" since 5.0 converts to integer value without any
-    // loss of information.
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
+  public void testEqualsRewrites() {
+    // Test int column equals valid decimal value. "intColumn = 5.0" should have been rewritten to "intColumn = 5"
+    // since 5.0 converts to integer value without any loss of information.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn = 5.0"),
         "Expression(type:FUNCTION, functionCall:Function(operator:EQUALS, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:intColumn)), Expression(type:LITERAL, literal:<Literal longValue:5>)]))");
-  }
 
-  @Test
-  public void testEqualsIntColumnWithInvalidDecimalValue() {
-    BrokerRequest sqlBrokerRequest =
-        SQL_COMPILER.compileToBrokerRequest("SELECT * FROM testTable WHERE intColumn = 5.5");
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
-
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
+    // Test int column equals invalid decimal value.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn = 5.5"),
         "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
-  }
 
-  @Test
-  public void testNotEqualsIntColumnWithValidDecimalValue() {
-    BrokerRequest sqlBrokerRequest =
-        SQL_COMPILER.compileToBrokerRequest("SELECT * FROM testTable WHERE intColumn != 5.0");
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
-
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
+    // Test int column not equals valid decimal value.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn != 5.0"),
         "Expression(type:FUNCTION, functionCall:Function(operator:NOT_EQUALS, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:intColumn)), Expression(type:LITERAL, literal:<Literal longValue:5>)]))");
-  }
 
-  @Test
-  public void testNotEqualsIntColumnWithInvalidDecimalValue() {
-    BrokerRequest sqlBrokerRequest =
-        SQL_COMPILER.compileToBrokerRequest("SELECT * FROM testTable WHERE intColumn != 5.5");
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
-
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
+    // Test int column not equals invalid decimal value.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn != 5.5"),
         "Expression(type:LITERAL, literal:<Literal boolValue:true>)");
-  }
 
-  @Test
-  public void testEqualsIntColumnWithOutOfDomainValue() {
-    BrokerRequest sqlBrokerRequest =
-        SQL_COMPILER.compileToBrokerRequest("SELECT * FROM testTable WHERE intColumn = 5000000000");
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
-
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
+    // Test int column equals out of domain value.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn = 5000000000"),
         "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
-  }
 
-  @Test
-  public void testNotEqualsIntColumnWithOutOfDomainValue() {
-    BrokerRequest sqlBrokerRequest =
-        SQL_COMPILER.compileToBrokerRequest("SELECT * FROM testTable WHERE intColumn != 5000000000");
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
-
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
+    // Test int column not equals out of domain value.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn != 5000000000"),
         "Expression(type:LITERAL, literal:<Literal boolValue:true>)");
-  }
 
-  @Test
-  public void testEqualsLongColumnWithValidDecimalValue() {
-    BrokerRequest sqlBrokerRequest =
-        SQL_COMPILER.compileToBrokerRequest("SELECT * FROM testTable WHERE longColumn = 5.0");
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
-
-    // "intColumn = 5.0" should have been rewritten to "intColumn = 5" since 5.0 converts to integer value without any
-    // loss of information.
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
+    // Test long column equals valid decimal value. "longColumn = 5.0" should be rewritten to "longColumn = 5" since 5.0
+    // converts to long value without any loss of information.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE longColumn = 5.0"),
         "Expression(type:FUNCTION, functionCall:Function(operator:EQUALS, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:longColumn)), Expression(type:LITERAL, literal:<Literal longValue:5>)]))");
-  }
 
-  @Test
-  public void testEqualsLongColumnWithInvalidDecimalValue() {
-    BrokerRequest sqlBrokerRequest =
-        SQL_COMPILER.compileToBrokerRequest("SELECT * FROM testTable WHERE longColumn = 5.5");
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
-
-    // "intColumn = 5.5" should have been rewritten to "false" literal since an INT column can never have a decimal
-    // value.
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
+    // Test long column equals invalid decimal value. "longColumn = 5.5" should have been rewritten to "false" literal
+    // since an LONG column can never have a decimal value.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE longColumn = 5.5"),
         "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
-  }
 
-  @Test
-  public void testNotEqualsLongColumnWithValidDecimalValue() {
-    BrokerRequest sqlBrokerRequest =
-        SQL_COMPILER.compileToBrokerRequest("SELECT * FROM testTable WHERE longColumn != 5.0");
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
-
-    // "intColumn = 5.5" should have been rewritten to "false" literal since an INT column can never have a decimal
-    // value.
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
+    // Test long column with valid decimal value. "longColumn = 5.5" should have been rewritten to "false" literal since
+    // LONG column can never have a decimal value.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE longColumn != 5.0"),
         "Expression(type:FUNCTION, functionCall:Function(operator:NOT_EQUALS, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:longColumn)), Expression(type:LITERAL, literal:<Literal longValue:5>)]))");
-  }
 
-  @Test
-  public void testNotEqualsLongColumnWithInvalidDecimalValue() {
-    BrokerRequest sqlBrokerRequest =
-        SQL_COMPILER.compileToBrokerRequest("SELECT * FROM testTable WHERE longColumn != 5.5");
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
-
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
+    // Test long column not equals invalid decimal value.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE longColumn != 5.5"),
         "Expression(type:LITERAL, literal:<Literal boolValue:true>)");
 
-    System.out.println(Float.MAX_VALUE);
-  }
-
-  @Test
-  public void testEqualsFloatColumnWithValidLongValue() {
-    BrokerRequest sqlBrokerRequest =
-        SQL_COMPILER.compileToBrokerRequest("SELECT * FROM testTable WHERE floatColumn = 5");
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
-
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
+    // Test float column equals valid long value.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE floatColumn = 5"),
         "Expression(type:FUNCTION, functionCall:Function(operator:EQUALS, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:floatColumn)), Expression(type:LITERAL, literal:<Literal doubleValue:5.0>)]))");
-  }
 
-  @Test
-  public void testEqualsFloatColumnWithInvalidLongValue() {
-    BrokerRequest sqlBrokerRequest = SQL_COMPILER
-        .compileToBrokerRequest("SELECT * FROM testTable WHERE floatColumn = " + String.valueOf(Long.MAX_VALUE));
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
-
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
+    // Test float column equals invalid long value.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE floatColumn = " + String.valueOf(Long.MAX_VALUE)),
         "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
-  }
 
-  @Test
-  public void testNotEqualsFloatColumnWithValidLongValue() {
-    BrokerRequest sqlBrokerRequest = SQL_COMPILER
-        .compileToBrokerRequest("SELECT * FROM testTable WHERE floatColumn != " + String.valueOf(Long.MAX_VALUE));
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
-
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
+    // Test float column not equals valid long value
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE floatColumn != " + String.valueOf(Long.MAX_VALUE)),
         "Expression(type:LITERAL, literal:<Literal boolValue:true>)");
-  }
 
-  @Test
-  public void testNotEqualsFloatColumnWithInvalidLongValue() {
-    BrokerRequest sqlBrokerRequest =
-        SQL_COMPILER.compileToBrokerRequest("SELECT * FROM testTable WHERE floatColumn != 5");
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
-
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
+    // Test float column not equals valid long value
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE floatColumn != 5"),
         "Expression(type:FUNCTION, functionCall:Function(operator:NOT_EQUALS, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:floatColumn)), Expression(type:LITERAL, literal:<Literal doubleValue:5.0>)]))");
-  }
 
-  @Test
-  public void testEqualsDoubleColumnWithValidLongValue() {
-    BrokerRequest sqlBrokerRequest =
-        SQL_COMPILER.compileToBrokerRequest("SELECT * FROM testTable WHERE doubleColumn = 5");
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
-
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
+    // test double column equals valid long value.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE doubleColumn = 5"),
         "Expression(type:FUNCTION, functionCall:Function(operator:EQUALS, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:doubleColumn)), Expression(type:LITERAL, literal:<Literal doubleValue:5.0>)]))");
-  }
 
-  @Test
-  public void testEqualsDoubleColumnWithInvalidLongValue() {
-    BrokerRequest sqlBrokerRequest = SQL_COMPILER
-        .compileToBrokerRequest("SELECT * FROM testTable WHERE doubleColumn = " + String.valueOf(Long.MAX_VALUE));
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
-
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
+    // Test double column equals invalid long value.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE doubleColumn = " + String.valueOf(Long.MAX_VALUE)),
         "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
-  }
 
-  @Test
-  public void testNotEqualsDoubleColumnWithValidLongValue() {
-    BrokerRequest sqlBrokerRequest = SQL_COMPILER
-        .compileToBrokerRequest("SELECT * FROM testTable WHERE doubleColumn != " + String.valueOf(Long.MAX_VALUE));
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
-
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
+    // Test double column not equals valid long value
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE doubleColumn != " + String.valueOf(Long.MAX_VALUE)),
         "Expression(type:LITERAL, literal:<Literal boolValue:true>)");
-  }
 
-  @Test
-  public void testNotEqualsDoubleColumnWithInvalidLongValue() {
-    BrokerRequest sqlBrokerRequest =
-        SQL_COMPILER.compileToBrokerRequest("SELECT * FROM testTable WHERE doubleColumn != 5");
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
-
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
+    // Test double column not equals invalid long value.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE doubleColumn != 5"),
         "Expression(type:FUNCTION, functionCall:Function(operator:NOT_EQUALS, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:doubleColumn)), Expression(type:LITERAL, literal:<Literal doubleValue:5.0>)]))");
   }
 
   @Test
-  public void testAndWithAllTrueOperands() {
-    BrokerRequest sqlBrokerRequest =
-        SQL_COMPILER.compileToBrokerRequest("SELECT * FROM testTable WHERE intColumn != 5.5 AND longColumn != 6.4");
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
+  public void testRangeRewrites() {
 
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
+    // Test INT column with DOUBLE value greater than Integer.MAX_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn > 3000000000.0"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
+
+    // Test INT column with DOUBLE value greater than Integer.MAX_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn < 3000000000.0"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:true>)");
+
+    // Test INT column with DOUBLE value greater than Integer.MIN_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn > -3000000000.0"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:true>)");
+
+    // Test INT column with LONG value less than Integer.MIN_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn < -3000000000"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
+
+    // Test INT column with LONG value greater than Integer.MAX_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn > 3000000000"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
+
+    // Test INT column with LONG value greater than Integer.MAX_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn < 3000000000"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:true>)");
+
+    // Test INT column with LONG value greater than Integer.MIN_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn > -3000000000"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:true>)");
+
+    // Test INT column with LONG value less than Integer.MIN_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn < -3000000000"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
+
+    // Test INT column with DOUBLE value that falls within INT bounds.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn < -2100000000.5"),
+        "Expression(type:FUNCTION, functionCall:Function(operator:LESS_THAN, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:intColumn)), Expression(type:LITERAL, literal:<Literal longValue:-2100000000>)]))");
+
+    // Test INT column with DOUBLE value that falls within INT bounds.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn < 2100000000.5"),
+        "Expression(type:FUNCTION, functionCall:Function(operator:LESS_THAN_OR_EQUAL, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:intColumn)), Expression(type:LITERAL, literal:<Literal longValue:2100000000>)]))");
+
+    // Test FLOAT column greater than Double.MAX_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE floatColumn > " + Double.MAX_VALUE),
+        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
+
+    // Test FLOAT column less than Double.MAX_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE floatColumn < " + Double.MAX_VALUE),
+        "Expression(type:LITERAL, literal:<Literal boolValue:true>)");
+
+    // Test FLOAT column greater than -Double.MAX_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE floatColumn > " + -Double.MAX_VALUE),
+        "Expression(type:LITERAL, literal:<Literal boolValue:true>)");
+
+    // Test FLOAT column less than -Double.MAX_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE floatColumn < " + -Double.MAX_VALUE),
+        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
+
+    // Test FLOAT column greater than Long.MAX_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE floatColumn > " + Long.MAX_VALUE),
+        "Expression(type:FUNCTION, functionCall:Function(operator:GREATER_THAN_OR_EQUAL, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:floatColumn)), Expression(type:LITERAL, literal:<Literal doubleValue:9.223372036854776E18>)]))");
+
+    // Test FLOAT column less than Long.MIN_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE floatColumn < " + Long.MIN_VALUE),
+        "Expression(type:FUNCTION, functionCall:Function(operator:LESS_THAN_OR_EQUAL, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:floatColumn)), Expression(type:LITERAL, literal:<Literal doubleValue:-9.223372036854776E18>)]))");
+
+    // Test FLOAT column greater than Long.MIN_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE floatColumn > " + Long.MIN_VALUE),
+        "Expression(type:FUNCTION, functionCall:Function(operator:GREATER_THAN, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:floatColumn)), Expression(type:LITERAL, literal:<Literal doubleValue:-9.223372036854776E18>)]))");
+
+    // Test FLOAT column with DOUBLE value that is within bounds of FLOAT.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE floatColumn > -2100000000.5"),
+        "Expression(type:FUNCTION, functionCall:Function(operator:GREATER_THAN_OR_EQUAL, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:floatColumn)), Expression(type:LITERAL, literal:<Literal doubleValue:-2.1E9>)]))");
+
+    // Test FLOAT column with DOUBLE value that is within bounds of FLOAT.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE floatColumn < -2100000000.5"),
+        "Expression(type:FUNCTION, functionCall:Function(operator:LESS_THAN, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:floatColumn)), Expression(type:LITERAL, literal:<Literal doubleValue:-2.1E9>)]))");
+
+    // Test FLOAT column with DOUBLE value that is within bounds of FLOAT.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE floatColumn <= 2100000000.5"),
+        "Expression(type:FUNCTION, functionCall:Function(operator:LESS_THAN_OR_EQUAL, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:floatColumn)), Expression(type:LITERAL, literal:<Literal doubleValue:2.1E9>)]))");
+
+    // Test FLOAT column with DOUBLE value that is within bounds of FLOAT.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE floatColumn >= 2100000000.5"),
+        "Expression(type:FUNCTION, functionCall:Function(operator:GREATER_THAN, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:floatColumn)), Expression(type:LITERAL, literal:<Literal doubleValue:2.1E9>)]))");
+
+    // Test LONG column with DOUBLE value greater than Long.MAX_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE longColumn > 999999999999999999999999999999.9999"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
+
+    // Test LONG column with DOUBLE value greater than Long.MAX_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE longColumn < 999999999999999999999999999999.9999"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:true>)");
+
+    // Test LONG column with DOUBLE value greater than Long.MIN_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE longColumn > -999999999999999999999999999999.9999"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:true>)");
+
+    // Test LONG column with DOUBLE value that falls within LONG bounds.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE longColumn < -2100000000.5"),
+        "Expression(type:FUNCTION, functionCall:Function(operator:LESS_THAN, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:longColumn)), Expression(type:LITERAL, literal:<Literal longValue:-2100000000>)]))");
+
+    // Test LONG column with DOUBLE value that falls within LONG bounds.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE longColumn > -2100000000.5"),
+        "Expression(type:FUNCTION, functionCall:Function(operator:GREATER_THAN_OR_EQUAL, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:longColumn)), Expression(type:LITERAL, literal:<Literal longValue:-2100000000>)]))");
+
+    // Test LONG column with DOUBLE value that falls within LONG bounds.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE longColumn < 2100000000.5"),
+        "Expression(type:FUNCTION, functionCall:Function(operator:LESS_THAN_OR_EQUAL, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:longColumn)), Expression(type:LITERAL, literal:<Literal longValue:2100000000>)]))");
+
+    // Test LONG column with DOUBLE value that falls within LONG bounds.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE longColumn > 2100000000.5"),
+        "Expression(type:FUNCTION, functionCall:Function(operator:GREATER_THAN, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:longColumn)), Expression(type:LITERAL, literal:<Literal longValue:2100000000>)]))");
+
+    // Test DOUBLE column greater than Long.MAX_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE doubleColumn > " + Long.MAX_VALUE),
+        "Expression(type:FUNCTION, functionCall:Function(operator:GREATER_THAN_OR_EQUAL, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:doubleColumn)), Expression(type:LITERAL, literal:<Literal doubleValue:9.223372036854776E18>)]))");
+
+    // Test DOUBLE column less than Long.MIN_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE doubleColumn < " + Long.MIN_VALUE),
+        "Expression(type:FUNCTION, functionCall:Function(operator:LESS_THAN_OR_EQUAL, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:doubleColumn)), Expression(type:LITERAL, literal:<Literal doubleValue:-9.223372036854776E18>)]))");
+
+    // Test DOUBLE column greater than Long.MIN_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE doubleColumn > " + Long.MIN_VALUE),
+        "Expression(type:FUNCTION, functionCall:Function(operator:GREATER_THAN, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:doubleColumn)), Expression(type:LITERAL, literal:<Literal doubleValue:-9.223372036854776E18>)]))");
+
+
+  }
+
+  @Test
+  public void temp() {
+
+    // Test LONG column with DOUBLE value that falls within LONG bounds.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE longColumn < -2100000000.5"),
+        "Expression(type:FUNCTION, functionCall:Function(operator:LESS_THAN, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:longColumn)), Expression(type:LITERAL, literal:<Literal longValue:-2100000000>)]))");
+
+    // Test LONG column with DOUBLE value that falls within LONG bounds.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE longColumn > -2100000000.5"),
+        "Expression(type:FUNCTION, functionCall:Function(operator:GREATER_THAN_OR_EQUAL, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:longColumn)), Expression(type:LITERAL, literal:<Literal longValue:-2100000000>)]))");
+
+    // Test LONG column with DOUBLE value that falls within LONG bounds.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE longColumn < 2100000000.5"),
+        "Expression(type:FUNCTION, functionCall:Function(operator:LESS_THAN_OR_EQUAL, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:longColumn)), Expression(type:LITERAL, literal:<Literal longValue:2100000000>)]))");
+
+    // Test LONG column with DOUBLE value that falls within LONG bounds.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE longColumn > 2100000000.5"),
+        "Expression(type:FUNCTION, functionCall:Function(operator:GREATER_THAN, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:longColumn)), Expression(type:LITERAL, literal:<Literal longValue:2100000000>)]))");
+
+  }
+
+  @Test
+  public void testAndRewrites() {
+    // Test and with all true operands
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn != 5.5 AND longColumn != 6.4"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:true>)");
+
+    // Test and with all false operands
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn = 5.5 AND longColumn = 6.4"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
+
+    // Test and with one false operand
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn = 5.5 AND longColumn != 6.4"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
+
+    // Test or with all true operands
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn != 5.5 OR longColumn != 6.4"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:true>)");
+
+    // Test int column with exclusive valid double value.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn > 5.0 AND intColumn < 10.0"),
+        "Expression(type:FUNCTION, functionCall:Function(operator:RANGE, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:intColumn)), Expression(type:LITERAL, literal:<Literal stringValue:(5\u000010)>)]))");
+
+    // Test int column with inclusive valid double value.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn >= 5.0 AND intColumn <= 10.0"),
+        "Expression(type:FUNCTION, functionCall:Function(operator:RANGE, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:intColumn)), Expression(type:LITERAL, literal:<Literal stringValue:[5\u000010]>)]))");
+  }
+
+  @Test
+  public void testOrRewrites() {
+    // Test or with all false operands
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn = 5.5 OR longColumn = 6.4"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
+
+    // Test or with one false operand.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn != 5.5 OR longColumn = 6.4"),
         "Expression(type:LITERAL, literal:<Literal boolValue:true>)");
   }
 
-  @Test
-  public void testAndWithAllFalseOperands() {
-    BrokerRequest sqlBrokerRequest =
-        SQL_COMPILER.compileToBrokerRequest("SELECT * FROM testTable WHERE intColumn = 5.5 AND longColumn = 6.4");
+  private static String rewrite(String query) {
+    BrokerRequest sqlBrokerRequest = SQL_COMPILER.compileToBrokerRequest(query);
     PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
     OPTIMIZER.optimize(pinotQuery, SCHEMA);
-
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
-        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
-  }
-
-  @Test
-  public void testAndWithOneFalseOperands() {
-    BrokerRequest sqlBrokerRequest =
-        SQL_COMPILER.compileToBrokerRequest("SELECT * FROM testTable WHERE intColumn = 5.5 AND longColumn != 6.4");
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
-
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
-        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
-  }
-
-  @Test
-  public void testOrWithAllTrueOperands() {
-    BrokerRequest sqlBrokerRequest =
-        SQL_COMPILER.compileToBrokerRequest("SELECT * FROM testTable WHERE intColumn != 5.5 OR longColumn != 6.4");
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
-
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
-        "Expression(type:LITERAL, literal:<Literal boolValue:true>)");
-  }
-
-  @Test
-  public void testOrWithAllFalseOperands() {
-    BrokerRequest sqlBrokerRequest =
-        SQL_COMPILER.compileToBrokerRequest("SELECT * FROM testTable WHERE intColumn = 5.5 OR longColumn = 6.4");
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
-
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
-        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
-  }
-
-  @Test
-  public void testOrWithOneFalseOperands() {
-    BrokerRequest sqlBrokerRequest =
-        SQL_COMPILER.compileToBrokerRequest("SELECT * FROM testTable WHERE intColumn != 5.5 OR longColumn = 6.4");
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
-
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
-        "Expression(type:LITERAL, literal:<Literal boolValue:true>)");
+    return pinotQuery.getFilterExpression().toString();
   }
 }
