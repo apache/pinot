@@ -28,6 +28,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.scalar.JsonFunctions;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -80,17 +81,27 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  */
 public class ComplexTypeTransformer implements RecordTransformer {
   public static final String DEFAULT_DELIMITER = ".";
+  public static final ComplexTypeConfig.CollectionToJsonMode DEFAULT_COLLECTION_TO_JSON_MODE =
+      ComplexTypeConfig.CollectionToJsonMode.NON_PRIMITIVE;
   private final List<String> _unnestFields;
   private final String _delimiter;
+  private final ComplexTypeConfig.CollectionToJsonMode _collectionToJsonMode;
 
   public ComplexTypeTransformer(TableConfig tableConfig) {
-    this(parseUnnestFields(tableConfig), parseDelimiter(tableConfig));
+    this(parseUnnestFields(tableConfig), parseDelimiter(tableConfig), parseCollectionToJsonMode(tableConfig));
   }
 
   @VisibleForTesting
-  public ComplexTypeTransformer(List<String> unnestFields, String delimiter) {
+  ComplexTypeTransformer(List<String> unnestFields, String delimiter) {
+    this(unnestFields, delimiter, DEFAULT_COLLECTION_TO_JSON_MODE);
+  }
+
+  @VisibleForTesting
+  ComplexTypeTransformer(List<String> unnestFields, String delimiter,
+      ComplexTypeConfig.CollectionToJsonMode collectionToJsonMode) {
     _unnestFields = new ArrayList<>(unnestFields);
     _delimiter = delimiter;
+    _collectionToJsonMode = collectionToJsonMode;
     // the unnest fields are sorted to achieve the topological sort of the collections, so that the parent collection
     // (e.g. foo) is unnested before the child collection (e.g. foo.bar)
     Collections.sort(_unnestFields);
@@ -123,6 +134,15 @@ public class ComplexTypeTransformer implements RecordTransformer {
       return new ComplexTypeTransformer(tableConfig);
     }
     return null;
+  }
+
+  private static ComplexTypeConfig.CollectionToJsonMode parseCollectionToJsonMode(TableConfig tableConfig) {
+    if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getComplexTypeConfig() != null
+        && tableConfig.getIngestionConfig().getComplexTypeConfig().getCollectionToJsonMode() != null) {
+      return tableConfig.getIngestionConfig().getComplexTypeConfig().getCollectionToJsonMode();
+    } else {
+      return DEFAULT_COLLECTION_TO_JSON_MODE;
+    }
   }
 
   @Nullable
@@ -223,7 +243,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
               flattenMap(column, innerMap, new ArrayList<>(innerMap.keySet()));
             }
           }
-        } else if (!containPrimitives(collection)) {
+        } else if (shallConvertToJson(collection)) {
           try {
             // convert the collection to JSON string
             String jsonString = JsonFunctions.jsonFormat(collection);
@@ -242,7 +262,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
               flattenMap(column, innerMap, new ArrayList<>(innerMap.keySet()));
             }
           }
-        } else if (!containPrimitives(array)) {
+        } else if (shallConvertToJson(array)) {
           try {
             // convert the array to JSON string
             String jsonString = JsonFunctions.jsonFormat(array);
@@ -272,7 +292,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
     return !(element instanceof Map || element instanceof Collection || isArray(element));
   }
 
-  static private boolean isArray(Object obj) {
+  static boolean isArray(Object obj) {
     if (obj == null) {
       return false;
     }
@@ -306,7 +326,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
               flattenMap(concatName, innerMap, new ArrayList<>(innerMap.keySet()));
             }
           }
-        } else if (!containPrimitives(collection)) {
+        } else if (shallConvertToJson(collection)) {
           try {
             // convert the collection to JSON string
             String jsonString = JsonFunctions.jsonFormat(collection);
@@ -325,7 +345,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
               flattenMap(concatName, innerMap, new ArrayList<>(innerMap.keySet()));
             }
           }
-        } else if (!containPrimitives(array)) {
+        } else if (shallConvertToJson(array)) {
           try {
             // convert the array to JSON string
             String jsonString = JsonFunctions.jsonFormat(array);
@@ -336,6 +356,32 @@ public class ComplexTypeTransformer implements RecordTransformer {
           }
         }
       }
+    }
+  }
+
+  private boolean shallConvertToJson(Object[] value) {
+    switch (_collectionToJsonMode) {
+      case ALL:
+        return true;
+      case NONE:
+        return false;
+      case NON_PRIMITIVE:
+        return !containPrimitives(value);
+      default:
+        throw new IllegalArgumentException(String.format("Unsupported collectionToJsonMode %s", _collectionToJsonMode));
+    }
+  }
+
+  private boolean shallConvertToJson(Collection value) {
+    switch (_collectionToJsonMode) {
+      case ALL:
+        return true;
+      case NONE:
+        return false;
+      case NON_PRIMITIVE:
+        return !containPrimitives(value);
+      default:
+        throw new IllegalArgumentException(String.format("Unsupported collectionToJsonMode %s", _collectionToJsonMode));
     }
   }
 

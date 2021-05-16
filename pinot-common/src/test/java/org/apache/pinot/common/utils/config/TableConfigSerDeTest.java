@@ -229,8 +229,8 @@ public class TableConfigSerDeTest {
       properties.put("foo", "bar");
       properties.put("foobar", "potato");
       List<FieldConfig> fieldConfigList = Arrays.asList(
-          new FieldConfig("column1", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED, null, properties),
-          new FieldConfig("column2", null, null, null, null));
+          new FieldConfig("column1", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED, null,
+              properties), new FieldConfig("column2", null, null, null, null));
       TableConfig tableConfig = tableConfigBuilder.setFieldConfigList(fieldConfigList).build();
 
       checkFieldConfig(tableConfig);
@@ -278,7 +278,7 @@ public class TableConfigSerDeTest {
       IngestionConfig ingestionConfig =
           new IngestionConfig(new BatchIngestionConfig(batchConfigMaps, "APPEND", "HOURLY"),
               new StreamIngestionConfig(streamConfigMaps), new FilterConfig("filterFunc(foo)"), transformConfigs,
-              new ComplexTypeConfig(unnestFields, "."));
+              new ComplexTypeConfig(unnestFields, ".", ComplexTypeConfig.CollectionToJsonMode.NON_PRIMITIVE));
       TableConfig tableConfig = tableConfigBuilder.setIngestionConfig(ingestionConfig).build();
 
       checkIngestionConfig(tableConfig);
