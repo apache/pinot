@@ -41,6 +41,9 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * This is a wrapper class for fetching segment metadata related information.
  */
 public class SegmentMetadataFetcher {
+  private static final String COLUMN_INDEX_KEY = "indexes";
+  private static final String STAR_TREE_INDEX_KEY = "star-tree-index";
+
   private static final String BLOOM_FILTER = "bloom-filter";
   private static final String DICTIONARY = "dictionary";
   private static final String FORWARD_INDEX = "forward-index";
@@ -52,13 +55,10 @@ public class SegmentMetadataFetcher {
   private static final String INDEX_NOT_AVAILABLE = "NO";
   private static final String INDEX_AVAILABLE = "YES";
 
-  private static final String STAR_TREE_INDEX_KEY = "star-tree-index";
   private static final String STAR_TREE_DIMENSION_COLUMNS = "dimension-columns";
   private static final String STAR_TREE_METRIC_AGGREGATIONS = "metric-aggregations";
   private static final String STAR_TREE_MAX_LEAF_RECORDS = "max-leaf-records";
   private static final String STAR_TREE_DIMENSION_COLUMNS_SKIPPED = "dimension-columns-skipped";
-
-  private static final String COLUMN_INDEX_KEY = "indexes";
   
 
   /**
