@@ -63,6 +63,7 @@ public class ComplexTypeConfig extends BaseJsonConfig {
     return _delimiter;
   }
 
+  @Nullable
   public CollectionToJsonMode getCollectionToJsonMode() {
     return _collectionToJsonMode;
   }
