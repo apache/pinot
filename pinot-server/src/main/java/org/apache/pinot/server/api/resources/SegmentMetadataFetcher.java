@@ -128,11 +128,12 @@ public class SegmentMetadataFetcher {
    */
   private static Map<String, Map<String, String>> getIndexesForSegmentColumns(SegmentDataManager segmentDataManager) {
     Map<String, Map<String, String>> columnIndexMap = null;
-    ImmutableSegmentDataManager immutableSegmentDataManager = (ImmutableSegmentDataManager) segmentDataManager;
-    ImmutableSegment immutableSegment = immutableSegmentDataManager.getSegment();
-    ImmutableSegmentImpl immutableSegmentImpl = (ImmutableSegmentImpl) immutableSegment;
-    Map<String, ColumnIndexContainer> columnIndexContainerMap = immutableSegmentImpl.getIndexContainerMap();
-    columnIndexMap = getImmutableSegmentColumnIndexes(columnIndexContainerMap);
+    IndexSegment segment = segmentDataManager.getSegment();
+    if (segment instanceof ImmutableSegmentImpl) {
+      return getImmutableSegmentColumnIndexes(((ImmutableSegmentImpl) segment).getIndexContainerMap());
+    } else {
+      return null;
+    }
     return columnIndexMap;
   }
 
