@@ -19,6 +19,7 @@
 
 package org.apache.pinot.spi.config.table;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 
@@ -35,6 +36,7 @@ public class TableStatus {
     UNHEALTHY
   }
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
   public static class IngestionStatus {
     private IngestionState _ingestionState;
     private String _errorMessage;
