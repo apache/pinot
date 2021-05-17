@@ -18,51 +18,65 @@
  */
 package org.apache.pinot.core.data.readers;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.data.readers.sort.PinotSegmentSorter;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
-import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.core.indexsegment.mutable.MutableSegment;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Record reader for Pinot segment.
  */
 public class PinotSegmentRecordReader implements RecordReader {
-  private final ImmutableSegment _immutableSegment;
-  private final int _numDocs;
-  private final Schema _schema;
-  private final Map<String, PinotSegmentColumnReader> _columnReaderMap;
-  private final int[] _docIdsInSortedColumnOrder;
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentRecordReader.class);
+
+  private IndexSegment _indexSegment;
+  private boolean _destroySegmentOnClose;
+  private int _numDocs;
+  private Map<String, PinotSegmentColumnReader> _columnReaderMap;
+  private int[] _sortedDocIds;
+  private boolean _skipDefaultNullValues;
 
   private int _nextDocId = 0;
 
-  /**
-   * Read records using the segment schema
-   * @param indexDir input path for the segment index
-   */
-  public PinotSegmentRecordReader(File indexDir)
-      throws Exception {
-    this(indexDir, null, null);
+  public PinotSegmentRecordReader() {
   }
 
   /**
+   * Deprecated: use empty constructor and init() instead.
+   *
+   * Read records using the segment schema
+   * @param indexDir input path for the segment index
+   */
+  @Deprecated
+  public PinotSegmentRecordReader(File indexDir)
+      throws Exception {
+    try {
+      init(indexDir, null, null, false);
+    } catch (Exception e) {
+      close();
+      throw e;
+    }
+  }
+
+  /**
+   * Deprecated: use empty constructor and init() instead.
+   *
    * Read records using the segment schema with the given schema and sort order
    * <p>Passed in schema must be a subset of the segment schema.
    *
@@ -70,57 +84,107 @@ public class PinotSegmentRecordReader implements RecordReader {
    * @param schema input schema that is a subset of the segment schema
    * @param sortOrder a list of column names that represent the sorting order
    */
+  @Deprecated
   public PinotSegmentRecordReader(File indexDir, @Nullable Schema schema, @Nullable List<String> sortOrder)
       throws Exception {
-    _immutableSegment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
+    Set<String> fieldsToRead = schema != null ? schema.getPhysicalColumnNames() : null;
     try {
-      SegmentMetadata segmentMetadata = _immutableSegment.getSegmentMetadata();
-      _numDocs = segmentMetadata.getTotalDocs();
-      // In order not to expose virtual columns to client, schema shouldn't be fetched from segmentMetadata;
-      // otherwise the original metadata will be modified. Hence, initialize a new schema.
-      _schema = schema == null ? new SegmentMetadataImpl(indexDir).getSchema() : schema;
-      if (_numDocs > 0) {
-        _columnReaderMap = new HashMap<>();
-        if (schema == null) {
-          Collection<String> columnNames = _schema.getColumnNames();
-          for (String columnName : columnNames) {
-            _columnReaderMap.put(columnName, new PinotSegmentColumnReader(_immutableSegment, columnName));
-          }
-        } else {
-          Schema segmentSchema = segmentMetadata.getSchema();
-          Collection<FieldSpec> fieldSpecs = _schema.getAllFieldSpecs();
-          for (FieldSpec fieldSpec : fieldSpecs) {
-            String columnName = fieldSpec.getName();
-            FieldSpec segmentFieldSpec = segmentSchema.getFieldSpecFor(columnName);
-            Preconditions.checkState(fieldSpec.equals(segmentFieldSpec),
-                "Field spec mismatch for column: %s, in the given schema: %s, in the segment schema: %s", columnName,
-                fieldSpec, segmentFieldSpec);
-            _columnReaderMap.put(columnName, new PinotSegmentColumnReader(_immutableSegment, columnName));
-          }
-        }
-        // Initialize sorted doc ids
-        if (sortOrder != null && !sortOrder.isEmpty()) {
-          _docIdsInSortedColumnOrder =
-              new PinotSegmentSorter(_numDocs, _schema, _columnReaderMap).getSortedDocIds(sortOrder);
-        } else {
-          _docIdsInSortedColumnOrder = null;
-        }
-      } else {
-        _columnReaderMap = Collections.emptyMap();
-        _docIdsInSortedColumnOrder = null;
-      }
+      init(indexDir, fieldsToRead, sortOrder, false);
     } catch (Exception e) {
-      _immutableSegment.destroy();
+      close();
       throw e;
     }
   }
 
-  public Schema getSchema() {
-    return _schema;
+  @Override
+  public void init(File indexDir, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig) {
+    init(indexDir, fieldsToRead, null, true);
   }
 
-  @Override
-  public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig) {
+  /**
+   * Initializes the record reader from an index directory.
+   *
+   * @param indexDir Index directory
+   * @param fieldsToRead The fields to read from the segment. If null or empty, reads all fields
+   * @param sortOrder List of sorted columns
+   * @param skipDefaultNullValues Whether to skip putting default null values into the record
+   */
+  public void init(File indexDir, @Nullable Set<String> fieldsToRead, @Nullable List<String> sortOrder,
+      boolean skipDefaultNullValues) {
+    IndexSegment indexSegment;
+    try {
+      indexSegment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
+    } catch (Exception e) {
+      throw new RuntimeException("Caught exception while loading the segment from: " + indexDir, e);
+    }
+    init(indexSegment, true, fieldsToRead, null, sortOrder, skipDefaultNullValues);
+  }
+
+  /**
+   * Initializes the record reader from a mutable segment.
+   * NOTE: The mutable segment should have already finished consumption and ready to be sealed. In order to read records
+   *       from consuming segment, use {@link org.apache.pinot.core.indexsegment.mutable.MutableSegment#getRecord(int, GenericRow)} instead.
+   *
+   * @param mutableSegment Mutable segment
+   * @param sortedDocIds Array of sorted document ids
+   */
+  public void init(MutableSegment mutableSegment, @Nullable int[] sortedDocIds) {
+    init(mutableSegment, false, null, sortedDocIds, null, false);
+  }
+
+  /**
+   * Initializes the record reader.
+   *
+   * @param indexSegment Index segment to read from
+   * @param destroySegmentOnClose Whether to destroy the segment when closing the record reader
+   * @param fieldsToRead The fields to read from the segment. If null or empty, reads all fields
+   * @param sortedDocIds Array of sorted document ids
+   * @param sortOrder List of sorted columns
+   * @param skipDefaultNullValues Whether to skip putting default null values into the record
+   */
+  private void init(IndexSegment indexSegment, boolean destroySegmentOnClose, @Nullable Set<String> fieldsToRead,
+      @Nullable int[] sortedDocIds, @Nullable List<String> sortOrder, boolean skipDefaultNullValues) {
+    _indexSegment = indexSegment;
+    _destroySegmentOnClose = destroySegmentOnClose;
+    _numDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
+
+    if (_numDocs > 0) {
+      _columnReaderMap = new HashMap<>();
+      Set<String> columnsInSegment = _indexSegment.getPhysicalColumnNames();
+      if (CollectionUtils.isEmpty(fieldsToRead)) {
+        for (String column : columnsInSegment) {
+          _columnReaderMap.put(column, new PinotSegmentColumnReader(indexSegment, column));
+        }
+      } else {
+        for (String column : fieldsToRead) {
+          if (columnsInSegment.contains(column)) {
+            _columnReaderMap.put(column, new PinotSegmentColumnReader(indexSegment, column));
+          } else {
+            LOGGER.warn("Ignoring column: {} that does not exist in the segment", column);
+          }
+        }
+      }
+
+      if (sortedDocIds != null) {
+        _sortedDocIds = sortedDocIds;
+      } else {
+        if (CollectionUtils.isNotEmpty(sortOrder)) {
+          _sortedDocIds = new PinotSegmentSorter(_numDocs, _columnReaderMap).getSortedDocIds(sortOrder);
+        } else {
+          _sortedDocIds = null;
+        }
+      }
+
+      _skipDefaultNullValues = skipDefaultNullValues;
+    }
+  }
+
+  /**
+   * Returns the sorted document ids.
+   */
+  @Nullable
+  public int[] getSortedDocIds() {
+    return _sortedDocIds;
   }
 
   @Override
@@ -135,24 +199,25 @@ public class PinotSegmentRecordReader implements RecordReader {
 
   @Override
   public GenericRow next(GenericRow reuse) {
-    if (_docIdsInSortedColumnOrder == null) {
-      reuse = getRecord(reuse, _nextDocId);
+    if (_sortedDocIds == null) {
+      getRecord(reuse, _nextDocId);
     } else {
-      reuse = getRecord(reuse, _docIdsInSortedColumnOrder[_nextDocId]);
+      getRecord(reuse, _sortedDocIds[_nextDocId]);
     }
     _nextDocId++;
     return reuse;
   }
 
-  /**
-   * Return the row given a docId
-   */
-  private GenericRow getRecord(GenericRow reuse, int docId) {
-    for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
-      String fieldName = fieldSpec.getName();
-      reuse.putValue(fieldName, _columnReaderMap.get(fieldName).getValue(docId));
+  private void getRecord(GenericRow reuse, int docId) {
+    for (Map.Entry<String, PinotSegmentColumnReader> entry : _columnReaderMap.entrySet()) {
+      String column = entry.getKey();
+      PinotSegmentColumnReader columnReader = entry.getValue();
+      if (!columnReader.isNull(docId)) {
+        reuse.putValue(column, columnReader.getValue(docId));
+      } else if (!_skipDefaultNullValues) {
+        reuse.putDefaultNullValue(column, columnReader.getValue(docId));
+      }
     }
-    return reuse;
   }
 
   @Override
@@ -163,9 +228,13 @@ public class PinotSegmentRecordReader implements RecordReader {
   @Override
   public void close()
       throws IOException {
-    for (PinotSegmentColumnReader columnReader : _columnReaderMap.values()) {
-      columnReader.close();
+    if (_columnReaderMap != null) {
+      for (PinotSegmentColumnReader columnReader : _columnReaderMap.values()) {
+        columnReader.close();
+      }
     }
-    _immutableSegment.destroy();
+    if (_destroySegmentOnClose && _indexSegment != null) {
+      _indexSegment.destroy();
+    }
   }
 }

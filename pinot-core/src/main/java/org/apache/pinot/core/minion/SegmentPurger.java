@@ -28,7 +28,6 @@ import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
@@ -80,7 +79,7 @@ public class SegmentPurger {
         return null;
       }
 
-      SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, purgeRecordReader.getSchema());
+      SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, segmentMetadata.getSchema());
       config.setOutDir(_workingDir.getPath());
       config.setSegmentName(segmentName);
 
@@ -140,10 +139,6 @@ public class SegmentPurger {
       _pinotSegmentRecordReader = new PinotSegmentRecordReader(_indexDir);
     }
 
-    public Schema getSchema() {
-      return _pinotSegmentRecordReader.getSchema();
-    }
-
     @Override
     public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig) {
     }
@@ -165,6 +160,7 @@ public class SegmentPurger {
 
         // Try to get the next row to return
         while (_pinotSegmentRecordReader.hasNext()) {
+          _nextRow.clear();
           _nextRow = _pinotSegmentRecordReader.next(_nextRow);
 
           if (_recordPurger.shouldPurge(_nextRow)) {

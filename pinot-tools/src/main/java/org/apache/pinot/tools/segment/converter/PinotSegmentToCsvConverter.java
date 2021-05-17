@@ -61,6 +61,7 @@ public class PinotSegmentToCsvConverter implements PinotSegmentConverter {
       }
       writeRow(recordWriter, row, fields);
       while (recordReader.hasNext()) {
+        row.clear();
         row = recordReader.next(row);
         writeRow(recordWriter, row, fields);
       }

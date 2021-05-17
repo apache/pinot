@@ -20,9 +20,9 @@ package org.apache.pinot.core.realtime.converter.stats;
 
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
-import org.apache.pinot.core.realtime.converter.RealtimeSegmentRecordReader;
+import org.apache.pinot.core.indexsegment.mutable.MutableSegment;
 import org.apache.pinot.core.segment.creator.ColumnStatistics;
 import org.apache.pinot.core.segment.creator.SegmentPreIndexStatsContainer;
 
@@ -31,19 +31,18 @@ import org.apache.pinot.core.segment.creator.SegmentPreIndexStatsContainer;
  * Stats container for an in-memory realtime segment.
  */
 public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContainer {
-  private final MutableSegmentImpl _realtimeSegment;
+  private final MutableSegment _mutableSegment;
   private final Map<String, ColumnStatistics> _columnStatisticsMap = new HashMap<>();
 
-  public RealtimeSegmentStatsContainer(MutableSegmentImpl realtimeSegment,
-      RealtimeSegmentRecordReader realtimeSegmentRecordReader) {
-    _realtimeSegment = realtimeSegment;
+  public RealtimeSegmentStatsContainer(MutableSegment mutableSegment, @Nullable int[] sortedDocIds) {
+    _mutableSegment = mutableSegment;
 
     // Create all column statistics
-    for (String columnName : realtimeSegment.getPhysicalColumnNames()) {
-      DataSource dataSource = realtimeSegment.getDataSource(columnName);
+    for (String columnName : mutableSegment.getPhysicalColumnNames()) {
+      DataSource dataSource = mutableSegment.getDataSource(columnName);
       if (dataSource.getDictionary() != null) {
-        _columnStatisticsMap.put(columnName, new RealtimeColumnStatistics(realtimeSegment.getDataSource(columnName),
-            realtimeSegmentRecordReader.getSortedDocIdIterationOrder()));
+        _columnStatisticsMap
+            .put(columnName, new RealtimeColumnStatistics(mutableSegment.getDataSource(columnName), sortedDocIds));
       } else {
         _columnStatisticsMap.put(columnName, new RealtimeNoDictionaryColStatistics(dataSource));
       }
@@ -57,6 +56,6 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
 
   @Override
   public int getTotalDocCount() {
-    return _realtimeSegment.getNumDocsIndexed();
+    return _mutableSegment.getNumDocsIndexed();
   }
 }

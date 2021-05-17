@@ -26,15 +26,14 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
-import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
+import org.apache.pinot.core.io.compression.ChunkCompressorFactory.CompressionType;
 import org.apache.pinot.core.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
-import org.apache.pinot.core.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -81,8 +80,6 @@ public class RealtimeSegmentConverter {
 
   public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics)
       throws Exception {
-    // lets create a record reader
-    RealtimeSegmentRecordReader reader = new RealtimeSegmentRecordReader(_realtimeSegmentImpl, _sortedColumn);
     SegmentGeneratorConfig genConfig = new SegmentGeneratorConfig(_tableConfig, _dataSchema);
     // The segment generation code in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable
@@ -97,11 +94,11 @@ public class RealtimeSegmentConverter {
     }
     if (_noDictionaryColumns != null) {
       genConfig.setRawIndexCreationColumns(_noDictionaryColumns);
-      Map<String, ChunkCompressorFactory.CompressionType> columnToCompressionType = new HashMap<>();
+      Map<String, CompressionType> columnToCompressionType = new HashMap<>();
       for (String column : _noDictionaryColumns) {
         FieldSpec fieldSpec = _dataSchema.getFieldSpecFor(column);
         if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.METRIC)) {
-          columnToCompressionType.put(column, ChunkCompressorFactory.CompressionType.PASS_THROUGH);
+          columnToCompressionType.put(column, CompressionType.PASS_THROUGH);
         }
       }
       genConfig.setRawIndexCompressionType(columnToCompressionType);
@@ -122,11 +119,17 @@ public class RealtimeSegmentConverter {
     SegmentPartitionConfig segmentPartitionConfig = _realtimeSegmentImpl.getSegmentPartitionConfig();
     genConfig.setSegmentPartitionConfig(segmentPartitionConfig);
     genConfig.setNullHandlingEnabled(_nullHandlingEnabled);
-    final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    RealtimeSegmentSegmentCreationDataSource dataSource =
-        new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, reader, _dataSchema);
-    driver.init(genConfig, dataSource, CompositeTransformer.getPassThroughTransformer());
-    driver.build();
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
+      int[] sortedDocIds =
+          _sortedColumn != null ? _realtimeSegmentImpl.getSortedDocIdIterationOrderWithSortedColumn(_sortedColumn)
+              : null;
+      recordReader.init(_realtimeSegmentImpl, sortedDocIds);
+      RealtimeSegmentSegmentCreationDataSource dataSource =
+          new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, recordReader);
+      driver.init(genConfig, dataSource, CompositeTransformer.getPassThroughTransformer());
+      driver.build();
+    }
 
     if (segmentPartitionConfig != null) {
       Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();

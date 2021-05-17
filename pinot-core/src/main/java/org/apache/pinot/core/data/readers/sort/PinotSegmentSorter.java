@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.data.readers.sort;
 
+import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.Arrays;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -31,32 +31,16 @@ import org.apache.pinot.core.data.readers.PinotSegmentColumnReader;
  * Sorter implementation for pinot segments
  */
 public class PinotSegmentSorter implements SegmentSorter {
+  private final int _numDocs;
+  private final Map<String, PinotSegmentColumnReader> _columnReaderMap;
 
-  private int _numDocs;
-  private Schema _schema;
-  private Map<String, PinotSegmentColumnReader> _columnReaderMap;
-  private int[] _sortOrder;
-  private List<String> _dimensionNames;
-  int _numDimensions;
-
-  public PinotSegmentSorter(int numDocs, Schema schema, Map<String, PinotSegmentColumnReader> columnReaderMap) {
+  public PinotSegmentSorter(int numDocs, Map<String, PinotSegmentColumnReader> columnReaderMap) {
     _numDocs = numDocs;
-    _schema = schema;
     _columnReaderMap = columnReaderMap;
-    _dimensionNames = new ArrayList<>();
-    for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
-      // Count all fields that are not metrics as dimensions
-      if (fieldSpec.getFieldType() != FieldSpec.FieldType.METRIC) {
-        String dimensionName = fieldSpec.getName();
-        _numDimensions++;
-        _dimensionNames.add(dimensionName);
-      }
-    }
   }
 
   /**
-   * Sort the segment by the sort order columns. For PinotSegmentSorter, orderings are computed by comparing
-   * dictionary ids.
+   * Sort the segment by the sort order columns. Orderings are computed by comparing dictionary ids.
    *
    * TODO: add the support for no-dictionary and multi-value columns.
    *
@@ -64,20 +48,21 @@ public class PinotSegmentSorter implements SegmentSorter {
    * @return an array of sorted docIds
    */
   @Override
-  public int[] getSortedDocIds(final List<String> sortOrder) {
-    _sortOrder = new int[sortOrder.size()];
-    int index = 0;
-    for (String dimension : sortOrder) {
-      int dimensionId = _dimensionNames.indexOf(dimension);
-      if (dimensionId != -1) {
-        _sortOrder[index++] = dimensionId;
-      } else {
-        throw new IllegalStateException(
-            "Passed dimension in the sorting order does not exist in the schema: " + dimension);
-      }
+  public int[] getSortedDocIds(List<String> sortOrder) {
+    int numSortedColumns = sortOrder.size();
+    PinotSegmentColumnReader[] sortedColumnReaders = new PinotSegmentColumnReader[numSortedColumns];
+    for (int i = 0; i < numSortedColumns; i++) {
+      String sortedColumn = sortOrder.get(i);
+      PinotSegmentColumnReader sortedColumnReader = _columnReaderMap.get(sortedColumn);
+      Preconditions.checkState(sortedColumnReader != null, "Failed to find sorted column: %s", sortedColumn);
+      Preconditions
+          .checkState(sortedColumnReader.isSingleValue(), "Unsupported sorted multi-value column: %s", sortedColumn);
+      Preconditions
+          .checkState(sortedColumnReader.hasDictionary(), "Unsupported sorted no-dictionary column: %s", sortedColumn);
+      sortedColumnReaders[i] = sortedColumnReader;
     }
 
-    final int[] sortedDocIds = new int[_numDocs];
+    int[] sortedDocIds = new int[_numDocs];
     for (int i = 0; i < _numDocs; i++) {
       sortedDocIds[i] = i;
     }
@@ -86,30 +71,14 @@ public class PinotSegmentSorter implements SegmentSorter {
       int docId1 = sortedDocIds[i1];
       int docId2 = sortedDocIds[i2];
 
-      int compare = 0;
-      for (int sortIndex : _sortOrder) {
-        String dimensionName = _dimensionNames.get(sortIndex);
-        FieldSpec fieldSpec = _schema.getFieldSpecFor(dimensionName);
-        PinotSegmentColumnReader columnReader = _columnReaderMap.get(dimensionName);
-
-        // Multi value column or no dictionary column is not supported
-        boolean isMultiValueColumn = !fieldSpec.isSingleValueField();
-        boolean isNoDictionaryColumn = !columnReader.hasDictionary();
-        if (isMultiValueColumn || isNoDictionaryColumn) {
-          throw new IllegalStateException(
-              "Multi value column or no dictionary column is not supported. ( column name: " + dimensionName
-                  + ", multi value column: " + isMultiValueColumn + ", no dictionary column: " + isNoDictionaryColumn
-                  + " )");
-        }
-
-        // Compute the order
-        compare = columnReader.getDictId(docId1) - columnReader.getDictId(docId2);
-
-        if (compare != 0) {
-          return compare;
+      for (PinotSegmentColumnReader sortedColumnReader : sortedColumnReaders) {
+        int result = sortedColumnReader.getDictionary()
+            .compare(sortedColumnReader.getDictId(docId1), sortedColumnReader.getDictId(docId2));
+        if (result != 0) {
+          return result;
         }
       }
-      return compare;
+      return 0;
     }, (i, j) -> {
       int temp = sortedDocIds[i];
       sortedDocIds[i] = sortedDocIds[j];

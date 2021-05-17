@@ -18,61 +18,75 @@
  */
 package org.apache.pinot.core.data.readers;
 
+import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
+import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 
 
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class PinotSegmentColumnReader implements Closeable {
-  private final ForwardIndexReader _reader;
-  private final ForwardIndexReaderContext _readerContext;
+  private final ForwardIndexReader _forwardIndexReader;
+  private final ForwardIndexReaderContext _forwardIndexReaderContext;
   private final Dictionary _dictionary;
+  private final NullValueVectorReader _nullValueVectorReader;
   private final int[] _dictIdBuffer;
 
-  public PinotSegmentColumnReader(ImmutableSegment immutableSegment, String column) {
-    DataSource dataSource = immutableSegment.getDataSource(column);
-    _reader = dataSource.getForwardIndex();
-    _readerContext = _reader.createContext();
+  public PinotSegmentColumnReader(IndexSegment indexSegment, String column) {
+    DataSource dataSource = indexSegment.getDataSource(column);
+    Preconditions.checkArgument(dataSource != null, "Failed to find data source for column: %s", column);
+    _forwardIndexReader = dataSource.getForwardIndex();
+    _forwardIndexReaderContext = _forwardIndexReader.createContext();
     _dictionary = dataSource.getDictionary();
-    if (_reader.isSingleValue()) {
+    _nullValueVectorReader = dataSource.getNullValueVector();
+    if (_forwardIndexReader.isSingleValue()) {
       _dictIdBuffer = null;
     } else {
       _dictIdBuffer = new int[dataSource.getDataSourceMetadata().getMaxNumValuesPerMVEntry()];
     }
   }
 
-  public PinotSegmentColumnReader(ForwardIndexReader reader, @Nullable Dictionary dictionary,
-      int maxNumValuesPerMVEntry) {
-    _reader = reader;
-    _readerContext = _reader.createContext();
+  public PinotSegmentColumnReader(ForwardIndexReader forwardIndexReader, @Nullable Dictionary dictionary,
+      @Nullable NullValueVectorReader nullValueVectorReader, int maxNumValuesPerMVEntry) {
+    _forwardIndexReader = forwardIndexReader;
+    _forwardIndexReaderContext = _forwardIndexReader.createContext();
     _dictionary = dictionary;
-    if (_reader.isSingleValue()) {
+    _nullValueVectorReader = nullValueVectorReader;
+    if (_forwardIndexReader.isSingleValue()) {
       _dictIdBuffer = null;
     } else {
       _dictIdBuffer = new int[maxNumValuesPerMVEntry];
     }
   }
 
+  public boolean isSingleValue() {
+    return _forwardIndexReader.isSingleValue();
+  }
+
   public boolean hasDictionary() {
     return _dictionary != null;
   }
 
+  public Dictionary getDictionary() {
+    return _dictionary;
+  }
+
   public int getDictId(int docId) {
-    return _reader.getDictId(docId, _readerContext);
+    return _forwardIndexReader.getDictId(docId, _forwardIndexReaderContext);
   }
 
   public Object getValue(int docId) {
     if (_dictionary != null) {
-      if (_reader.isSingleValue()) {
-        return _dictionary.get(_reader.getDictId(docId, _readerContext));
+      if (_forwardIndexReader.isSingleValue()) {
+        return _dictionary.get(_forwardIndexReader.getDictId(docId, _forwardIndexReaderContext));
       } else {
-        int numValues = _reader.getDictIdMV(docId, _dictIdBuffer, _readerContext);
+        int numValues = _forwardIndexReader.getDictIdMV(docId, _dictIdBuffer, _forwardIndexReaderContext);
         Object[] values = new Object[numValues];
         for (int i = 0; i < numValues; i++) {
           values[i] = _dictionary.get(_dictIdBuffer[i]);
@@ -81,32 +95,36 @@ public class PinotSegmentColumnReader implements Closeable {
       }
     } else {
       // NOTE: Only support single-value raw index
-      assert _reader.isSingleValue();
+      assert _forwardIndexReader.isSingleValue();
 
-      switch (_reader.getValueType()) {
+      switch (_forwardIndexReader.getValueType()) {
         case INT:
-          return _reader.getInt(docId, _readerContext);
+          return _forwardIndexReader.getInt(docId, _forwardIndexReaderContext);
         case LONG:
-          return _reader.getLong(docId, _readerContext);
+          return _forwardIndexReader.getLong(docId, _forwardIndexReaderContext);
         case FLOAT:
-          return _reader.getFloat(docId, _readerContext);
+          return _forwardIndexReader.getFloat(docId, _forwardIndexReaderContext);
         case DOUBLE:
-          return _reader.getDouble(docId, _readerContext);
+          return _forwardIndexReader.getDouble(docId, _forwardIndexReaderContext);
         case STRING:
-          return _reader.getString(docId, _readerContext);
+          return _forwardIndexReader.getString(docId, _forwardIndexReaderContext);
         case BYTES:
-          return _reader.getBytes(docId, _readerContext);
+          return _forwardIndexReader.getBytes(docId, _forwardIndexReaderContext);
         default:
           throw new IllegalStateException();
       }
     }
   }
 
+  public boolean isNull(int docId) {
+    return _nullValueVectorReader != null && _nullValueVectorReader.isNull(docId);
+  }
+
   @Override
   public void close()
       throws IOException {
-    if (_readerContext != null) {
-      _readerContext.close();
+    if (_forwardIndexReaderContext != null) {
+      _forwardIndexReaderContext.close();
     }
   }
 }

@@ -21,26 +21,25 @@ package org.apache.pinot.core.data.readers;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.PriorityQueue;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
  * Record reader for multiple pinot segments.
  */
 public class MultiplePinotSegmentRecordReader implements RecordReader {
-  private List<PinotSegmentRecordReader> _pinotSegmentRecordReaders;
-  private PriorityQueue<GenericRowWithReader> _priorityQueue;
-  private Schema _schema;
-  private List<String> _sortOrder;
+  private final List<PinotSegmentRecordReader> _recordReaders;
+  private final List<String> _sortOrder;
+  private final PriorityQueue<GenericRowWithReader> _priorityQueue;
+
   private int _currentReaderId;
 
   /**
@@ -61,56 +60,34 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
    * muiltiple segments.
    *
    * @param indexDirs a list of input paths for the segment indices
-   * @param schema input schema that is a subset of the segment schema
+   * @param fieldsToRead if null or empty, reads all fields
    * @param sortOrder a list of column names that represent the sorting order
    */
-  public MultiplePinotSegmentRecordReader(List<File> indexDirs, @Nullable Schema schema,
+  public MultiplePinotSegmentRecordReader(List<File> indexDirs, @Nullable Set<String> fieldsToRead,
       @Nullable List<String> sortOrder)
       throws Exception {
     // Initialize pinot segment record readers
-    _pinotSegmentRecordReaders = new ArrayList<>(indexDirs.size());
-    for (File file : indexDirs) {
-      _pinotSegmentRecordReaders.add(new PinotSegmentRecordReader(file, schema, sortOrder));
-    }
-
-    // Initialize schema
-    if (schema == null) {
-      // Validate that segment schemas from all segments are the same if the schema is not passed.
-      Set<Schema> schemas = new HashSet<>();
-      for (PinotSegmentRecordReader pinotSegmentRecordReader : _pinotSegmentRecordReaders) {
-        schemas.add(pinotSegmentRecordReader.getSchema());
-      }
-      if (schemas.size() == 1) {
-        _schema = schemas.iterator().next();
-      } else {
-        throw new IllegalStateException("Schemas from input segments are not the same");
-      }
-    } else {
-      // If the schema is given, the passed schema can directly be used.
-      _schema = schema;
+    int numSegments = indexDirs.size();
+    _recordReaders = new ArrayList<>(numSegments);
+    for (File indexDir : indexDirs) {
+      PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader();
+      recordReader.init(indexDir, fieldsToRead, sortOrder, false);
+      _recordReaders.add(recordReader);
     }
 
     // Initialize sort order and priority queue
-    _sortOrder = sortOrder;
-    if (isSortedSegment()) {
-      _priorityQueue = new PriorityQueue<>(_pinotSegmentRecordReaders.size());
-      for (PinotSegmentRecordReader recordReader : _pinotSegmentRecordReaders) {
+    if (CollectionUtils.isNotEmpty(sortOrder)) {
+      _sortOrder = sortOrder;
+      _priorityQueue = new PriorityQueue<>(numSegments);
+      for (PinotSegmentRecordReader recordReader : _recordReaders) {
         if (recordReader.hasNext()) {
-          _priorityQueue.add(new GenericRowWithReader(recordReader.next(), recordReader, _sortOrder, _schema));
+          _priorityQueue.add(new GenericRowWithReader(recordReader.next(), recordReader));
         }
       }
+    } else {
+      _sortOrder = null;
+      _priorityQueue = null;
     }
-  }
-
-  public Schema getSchema() {
-    return _schema;
-  }
-
-  /**
-   * Indicate whether the segment should be sorted or not
-   */
-  private boolean isSortedSegment() {
-    return _sortOrder != null && !_sortOrder.isEmpty();
   }
 
   @Override
@@ -119,17 +96,15 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
 
   @Override
   public boolean hasNext() {
-    if (isSortedSegment()) {
+    if (_sortOrder != null) {
       return _priorityQueue.size() > 0;
     } else {
-      boolean hasNext = false;
-      for (PinotSegmentRecordReader recordReader : _pinotSegmentRecordReaders) {
+      for (PinotSegmentRecordReader recordReader : _recordReaders) {
         if (recordReader.hasNext()) {
-          hasNext = true;
-          break;
+          return true;
         }
       }
-      return hasNext;
+      return false;
     }
   }
 
@@ -140,8 +115,9 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
 
   @Override
   public GenericRow next(GenericRow reuse) {
-    if (isSortedSegment()) {
+    if (_sortOrder != null) {
       GenericRowWithReader genericRowComparable = _priorityQueue.poll();
+      assert genericRowComparable != null;
       GenericRow currentRow = genericRowComparable.getRow();
 
       // Fill reuse with the information from the currentRow
@@ -151,16 +127,14 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
       PinotSegmentRecordReader recordReader = genericRowComparable.getRecordReader();
       if (recordReader.hasNext()) {
         currentRow.clear();
-        genericRowComparable.setRow(recordReader.next(currentRow));
-        genericRowComparable.setRecordReader(recordReader);
-        _priorityQueue.add(genericRowComparable);
+        _priorityQueue.add(new GenericRowWithReader(recordReader.next(currentRow), recordReader));
       }
       return reuse;
     } else {
       // If there is no sorted column specified, simply concatenate the segments
-      for (int i = 0; i < _pinotSegmentRecordReaders.size();
-          i++, _currentReaderId = (_currentReaderId + 1) % _pinotSegmentRecordReaders.size()) {
-        PinotSegmentRecordReader currentReader = _pinotSegmentRecordReaders.get(_currentReaderId);
+      int numSegments = _recordReaders.size();
+      for (int i = 0; i < numSegments; i++, _currentReaderId = (_currentReaderId + 1) % numSegments) {
+        PinotSegmentRecordReader currentReader = _recordReaders.get(_currentReaderId);
         if (currentReader.hasNext()) {
           return currentReader.next(reuse);
         }
@@ -171,15 +145,15 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
 
   @Override
   public void rewind() {
-    for (PinotSegmentRecordReader recordReader : _pinotSegmentRecordReaders) {
+    for (PinotSegmentRecordReader recordReader : _recordReaders) {
       recordReader.rewind();
     }
     // If the segment is sorted, we need to re-initialize the priority queue
-    if (isSortedSegment()) {
+    if (_sortOrder != null) {
       _priorityQueue.clear();
-      for (PinotSegmentRecordReader recordReader : _pinotSegmentRecordReaders) {
+      for (PinotSegmentRecordReader recordReader : _recordReaders) {
         if (recordReader.hasNext()) {
-          _priorityQueue.add(new GenericRowWithReader(recordReader.next(), recordReader, _sortOrder, _schema));
+          _priorityQueue.add(new GenericRowWithReader(recordReader.next(), recordReader));
         }
       }
     } else {
@@ -190,7 +164,7 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
   @Override
   public void close()
       throws IOException {
-    for (PinotSegmentRecordReader recordReader : _pinotSegmentRecordReaders) {
+    for (PinotSegmentRecordReader recordReader : _recordReaders) {
       recordReader.close();
     }
   }
@@ -201,80 +175,40 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
    *
    * TODO: add the support for multi value columns
    */
-  class GenericRowWithReader implements Comparable<GenericRowWithReader> {
-    private GenericRow _row;
-    private PinotSegmentRecordReader _recordReader;
-    private List<String> _sortOrder;
-    private Schema _schema;
+  private class GenericRowWithReader implements Comparable<GenericRowWithReader> {
+    private final GenericRow _row;
+    private final PinotSegmentRecordReader _recordReader;
 
-    public GenericRowWithReader(GenericRow row, PinotSegmentRecordReader recordReader, List<String> sortOrder,
-        Schema schema) {
+    GenericRowWithReader(GenericRow row, PinotSegmentRecordReader recordReader) {
       _row = row;
       _recordReader = recordReader;
-      _sortOrder = sortOrder;
-      _schema = schema;
     }
 
+    @SuppressWarnings({"unchecked", "rawtypes", "ConstantConditions", "NullableProblems"})
     @Override
-    public int compareTo(GenericRowWithReader o) {
-      int compare = 0;
+    public int compareTo(GenericRowWithReader other) {
       for (String column : _sortOrder) {
-        FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
-        Object otherVal = o.getRow().getValue(column);
         Object thisVal = _row.getValue(column);
-        if (fieldSpec.isSingleValueField()) {
-          switch (fieldSpec.getDataType()) {
-            case INT:
-              compare = ((Integer) thisVal).compareTo((Integer) otherVal);
-              break;
-            case LONG:
-              compare = ((Long) thisVal).compareTo((Long) otherVal);
-              break;
-            case FLOAT:
-              compare = ((Float) thisVal).compareTo((Float) otherVal);
-              break;
-            case DOUBLE:
-              compare = ((Double) thisVal).compareTo((Double) otherVal);
-              break;
-            case STRING:
-              compare = ((String) thisVal).compareTo((String) otherVal);
-              break;
-            default:
-              throw new IllegalStateException("Unsupported column value type");
-          }
+        Object otherVal = other.getRow().getValue(column);
+        int result;
+        if (thisVal instanceof byte[]) {
+          result = ByteArray.compare((byte[]) thisVal, (byte[]) otherVal);
         } else {
-          throw new IllegalStateException("Multi value column is not supported");
+          result = ((Comparable) thisVal).compareTo(otherVal);
         }
-
-        if (compare != 0) {
-          return compare;
+        if (result != 0) {
+          return result;
         }
       }
-      return compare;
+      return 0;
     }
 
     public GenericRow getRow() {
       return _row;
     }
 
-    public void setRow(GenericRow row) {
-      _row = row;
-    }
-
     public PinotSegmentRecordReader getRecordReader() {
       return _recordReader;
-    }
-
-    public void setRecordReader(PinotSegmentRecordReader recordReader) {
-      _recordReader = recordReader;
-    }
-
-    public Schema getSchema() {
-      return _schema;
-    }
-
-    public void setSchema(Schema schema) {
-      _schema = schema;
     }
   }
 }

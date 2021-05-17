@@ -419,6 +419,7 @@ public class PinotDataAndQueryAnonymizer {
           row = recordReader.next(row);
           buildAvroRow(avroRecordWriter, row);
           rows++;
+          row.clear();
         }
         totalRows += rows;
         LOGGER.info("Generated Avro File {} with {} rows", pathToAvroFile, rows);

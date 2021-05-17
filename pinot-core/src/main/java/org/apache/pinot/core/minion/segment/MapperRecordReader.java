@@ -26,7 +26,6 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.data.readers.MultiplePinotSegmentRecordReader;
 import org.apache.pinot.core.segment.processing.transformer.RecordTransformer;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
@@ -56,10 +55,6 @@ public class MapperRecordReader implements RecordReader {
     _currentPartition = currentPartition;
   }
 
-  public Schema getSchema() {
-    return _multiplePinotSegmentRecordReader.getSchema();
-  }
-
   @Override
   public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig) {
   }
@@ -84,11 +79,13 @@ public class MapperRecordReader implements RecordReader {
         // Skip the record if the row is null after transformation
         if (_nextRow == null) {
           _nextRow = new GenericRow();
+          continue;
         } else {
           _nextRowReturned = false;
           return true;
         }
       }
+      _nextRow.clear();
     }
 
     // Done with reading all records

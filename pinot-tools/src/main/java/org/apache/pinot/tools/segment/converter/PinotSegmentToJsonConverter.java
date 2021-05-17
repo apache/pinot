@@ -61,6 +61,7 @@ public class PinotSegmentToJsonConverter implements PinotSegmentConverter {
         }
         recordWriter.write(record.toString());
         recordWriter.newLine();
+        row.clear();
       }
     }
   }
