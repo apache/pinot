@@ -64,7 +64,6 @@ public class AvroSchemaUtil {
       case BOOLEAN:
       case STRING:
       case ENUM:
-      case BYTES:
         return true;
       default:
         return false;

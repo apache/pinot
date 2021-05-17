@@ -285,42 +285,46 @@ public class AvroUtils {
       List<String> unnestFields, String delimiter, String path, Schema pinotSchema,
       @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit) {
     org.apache.avro.Schema.Type fieldType = fieldSchema.getType();
-    if (fieldType == org.apache.avro.Schema.Type.UNION) {
-      org.apache.avro.Schema nonNullSchema = null;
-      for (org.apache.avro.Schema childFieldSchema : fieldSchema.getTypes()) {
-        if (childFieldSchema.getType() != org.apache.avro.Schema.Type.NULL) {
-          if (nonNullSchema == null) {
-            nonNullSchema = childFieldSchema;
-          } else {
-            throw new IllegalStateException("More than one non-null schema in UNION schema");
+    switch (fieldType) {
+      case UNION:
+        org.apache.avro.Schema nonNullSchema = null;
+        for (org.apache.avro.Schema childFieldSchema : fieldSchema.getTypes()) {
+          if (childFieldSchema.getType() != org.apache.avro.Schema.Type.NULL) {
+            if (nonNullSchema == null) {
+              nonNullSchema = childFieldSchema;
+            } else {
+              throw new IllegalStateException("More than one non-null schema in UNION schema");
+            }
           }
         }
-      }
-      if (nonNullSchema != null) {
-        extractSchemaWithComplexTypeHandling(nonNullSchema, unnestFields, delimiter, path, pinotSchema, fieldTypeMap,
-            timeUnit);
-      } else {
-        throw new IllegalStateException("Cannot find non-null schema in UNION schema");
-      }
-    } else if (fieldType == org.apache.avro.Schema.Type.RECORD) {
-      for (Field innerField : fieldSchema.getFields()) {
-        extractSchemaWithComplexTypeHandling(innerField.schema(), unnestFields, delimiter,
-            concat(delimiter, path, innerField.name()), pinotSchema, fieldTypeMap, timeUnit);
-      }
-    } else if (fieldType == org.apache.avro.Schema.Type.ARRAY) {
-      org.apache.avro.Schema elementType = fieldSchema.getElementType();
-      if (unnestFields.contains(path)) {
-        extractSchemaWithComplexTypeHandling(elementType, unnestFields, delimiter, path, pinotSchema, fieldTypeMap,
-            timeUnit);
-      } else if (AvroSchemaUtil.isPrimitiveType(elementType.getType())) {
-        addFieldToPinotSchema(pinotSchema, AvroSchemaUtil.valueOf(elementType.getType()), path, false, fieldTypeMap,
-            timeUnit);
-      } else {
-        addFieldToPinotSchema(pinotSchema, DataType.STRING, path, true, fieldTypeMap, timeUnit);
-      }
-    } else {
-      DataType dataType = AvroSchemaUtil.valueOf(fieldType);
-      addFieldToPinotSchema(pinotSchema, dataType, path, true, fieldTypeMap, timeUnit);
+        if (nonNullSchema != null) {
+          extractSchemaWithComplexTypeHandling(nonNullSchema, unnestFields, delimiter, path, pinotSchema, fieldTypeMap,
+              timeUnit);
+        } else {
+          throw new IllegalStateException("Cannot find non-null schema in UNION schema");
+        }
+        break;
+      case RECORD:
+        for (Field innerField : fieldSchema.getFields()) {
+          extractSchemaWithComplexTypeHandling(innerField.schema(), unnestFields, delimiter,
+              String.join(delimiter, path, innerField.name()), pinotSchema, fieldTypeMap, timeUnit);
+        }
+        break;
+      case ARRAY:
+        org.apache.avro.Schema elementType = fieldSchema.getElementType();
+        if (unnestFields.contains(path)) {
+          extractSchemaWithComplexTypeHandling(elementType, unnestFields, delimiter, path, pinotSchema, fieldTypeMap,
+              timeUnit);
+        } else if (AvroSchemaUtil.isPrimitiveType(elementType.getType())) {
+          addFieldToPinotSchema(pinotSchema, AvroSchemaUtil.valueOf(elementType.getType()), path, false, fieldTypeMap,
+              timeUnit);
+        } else {
+          addFieldToPinotSchema(pinotSchema, DataType.STRING, path, true, fieldTypeMap, timeUnit);
+        }
+        break;
+      default:
+        DataType dataType = AvroSchemaUtil.valueOf(fieldType);
+        addFieldToPinotSchema(pinotSchema, dataType, path, true, fieldTypeMap, timeUnit);
     }
   }
 
@@ -357,9 +361,5 @@ public class AvroUtils {
           throw new UnsupportedOperationException("Unsupported field type: " + fieldType + " for field: " + name);
       }
     }
-  }
-
-  private static String concat(String delimiter, String path, String component) {
-    return String.join(delimiter, path, component);
   }
 }
