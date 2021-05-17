@@ -29,6 +29,7 @@ import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSour
 import org.apache.pinot.segment.local.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.local.segment.index.readers.ValidDocIndexReaderImpl;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.store.SegmentDirectory;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexContainer;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
@@ -171,7 +172,15 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   @Override
   public GenericRow getRecord(int docId, GenericRow reuse) {
     // NOTE: Use PinotSegmentRecordReader to read immutable segment
-    throw new UnsupportedOperationException();
+    try {
+      PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader();
+      pinotSegmentRecordReader.init(this);
+      pinotSegmentRecordReader.getRecord(reuse, docId);
+      return reuse;
+    } catch (Exception e) {
+      LOGGER.error("Failed to use PinotSegmentRecordReader to read immutable segment", e);
+      throw new RuntimeException("Failed to use PinotSegmentRecordReader to read immutable segment");
+    }
   }
 
   public Map<String, ColumnIndexContainer> getIndexContainerMap() {

@@ -28,6 +28,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.readers.sort.PinotSegmentSorter;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.spi.data.Schema;
@@ -132,6 +133,10 @@ public class PinotSegmentRecordReader implements RecordReader {
     init(mutableSegment, false, null, sortedDocIds, null, false);
   }
 
+  public void init(ImmutableSegment immutableSegment) {
+    init(immutableSegment, false, null, null, null, false);
+  }
+
   /**
    * Initializes the record reader.
    *
@@ -208,7 +213,7 @@ public class PinotSegmentRecordReader implements RecordReader {
     return reuse;
   }
 
-  private void getRecord(GenericRow reuse, int docId) {
+  public void getRecord(GenericRow reuse, int docId) {
     for (Map.Entry<String, PinotSegmentColumnReader> entry : _columnReaderMap.entrySet()) {
       String column = entry.getKey();
       PinotSegmentColumnReader columnReader = entry.getValue();
