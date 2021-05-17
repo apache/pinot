@@ -133,6 +133,11 @@ public class PinotSegmentRecordReader implements RecordReader {
     init(mutableSegment, false, null, sortedDocIds, null, false);
   }
 
+  /**
+   * Initializes the record reader from a immutable segment.
+   *
+   * @param immutableSegment Immutable segment
+   */
   public void init(ImmutableSegment immutableSegment) {
     init(immutableSegment, false, null, null, null, false);
   }
