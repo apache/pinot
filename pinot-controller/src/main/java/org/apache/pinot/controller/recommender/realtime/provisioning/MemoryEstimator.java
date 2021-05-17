@@ -351,7 +351,7 @@ public class MemoryEstimator {
         GenericRow row = new GenericRow();
 
         while (segmentRecordReader.hasNext()) {
-          segmentRecordReader.next(row);
+          row = segmentRecordReader.next(row);
           for (String multiValueColumn : multiValueColumns) {
             multiValuesSum += ((Object[]) (row.getValue(multiValueColumn))).length;
             numValues++;
