@@ -1,0 +1,25 @@
+{
+  "entries": [
+    {
+      "id": 1234,
+      "description": "entry1"
+    },
+    {
+      "id": 1235,
+      "description": "entry2"
+    }
+  ],
+  "tuple": {
+    "address": {
+      "streetaddress": "1st Ave",
+      "city": "Palo Alto"
+    }
+  },
+  "d2": [
+    1,
+    2
+  ],
+  "d1": "dim1",
+  "hoursSinceEpoch": 1621286582,
+  "m1": 12
+}
