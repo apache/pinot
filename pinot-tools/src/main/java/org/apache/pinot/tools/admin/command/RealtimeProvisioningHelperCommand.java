@@ -280,7 +280,6 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     displayResults(memoryEstimator.getConsumingMemoryPerHost(), numHosts, numHours);
     LOGGER.info("\nTotal number of segments queried per host (for all partitions)");
     displayResults(memoryEstimator.getNumSegmentsQueriedPerHost(), numHosts, numHours);
-    memoryEstimator.cleanup();
     return true;
   }
 

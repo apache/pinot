@@ -99,8 +99,6 @@ public class RealtimeProvisioningRule extends AbstractRule {
       extractResults(memoryEstimator, numHosts, numHours, _output.getRealtimeProvisioningRecommendations());
     } catch (Exception e) {
       throw new RuntimeException(e);
-    } finally {
-      memoryEstimator.cleanup();
     }
   }
 

@@ -87,6 +87,9 @@ public class MemoryEstimator {
   private Set<String> _noDictionaryColumns = new HashSet<>();
   private Set<String> _varLengthDictionaryColumns = new HashSet<>();
   int _avgMultiValues;
+
+  // Working dir will contain statsFile and also the generated segment if requested.
+  // It will get deleted after memory estimation is done.
   private File _workingDir;
 
   private String[][] _activeMemoryPerHost;
@@ -290,6 +293,9 @@ public class MemoryEstimator {
         }
       }
     }
+
+    // cleanup
+    FileUtils.deleteQuietly(_workingDir);
   }
 
   private long getMemoryForConsumingSegmentPerPartition(File statsFile, int totalDocs)
@@ -422,10 +428,6 @@ public class MemoryEstimator {
     return _numSegmentsQueriedPerHost;
   }
 
-  public void cleanup() {
-    FileUtils.deleteQuietly(_workingDir);
-  }
-
   private static File generateCompletedSegment(SchemaWithMetaData schemaWithMetadata, Schema schema,
       TableConfig tableConfig, int numberOfRows, File workingDir) {
     return new SegmentGenerator(schemaWithMetadata, schema, tableConfig, numberOfRows, true, workingDir).generate();
@@ -532,6 +534,8 @@ public class MemoryEstimator {
         driver.build();
       } catch (Exception e) {
         FileUtils.deleteQuietly(new File(outDir));
+        File csvDir = csvDataFile.getParentFile();
+        FileUtils.deleteQuietly(csvDir);
         throw new RuntimeException("Caught exception while generating segment from file: " + csvDataFile, e);
       }
       String segmentName = driver.getSegmentName();
