@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -25,7 +26,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.function.scalar.JsonFunctions;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -78,17 +81,27 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  */
 public class ComplexTypeTransformer implements RecordTransformer {
   public static final String DEFAULT_DELIMITER = ".";
+  public static final ComplexTypeConfig.CollectionToJsonMode DEFAULT_COLLECTION_TO_JSON_MODE =
+      ComplexTypeConfig.CollectionToJsonMode.NON_PRIMITIVE;
   private final List<String> _unnestFields;
   private final String _delimiter;
+  private final ComplexTypeConfig.CollectionToJsonMode _collectionToJsonMode;
 
   public ComplexTypeTransformer(TableConfig tableConfig) {
-    this(parseUnnestFields(tableConfig), parseDelimiter(tableConfig));
+    this(parseUnnestFields(tableConfig), parseDelimiter(tableConfig), parseCollectionToJsonMode(tableConfig));
   }
 
   @VisibleForTesting
-  public ComplexTypeTransformer(List<String> unnestFields, String delimiter) {
+  ComplexTypeTransformer(List<String> unnestFields, String delimiter) {
+    this(unnestFields, delimiter, DEFAULT_COLLECTION_TO_JSON_MODE);
+  }
+
+  @VisibleForTesting
+  ComplexTypeTransformer(List<String> unnestFields, String delimiter,
+      ComplexTypeConfig.CollectionToJsonMode collectionToJsonMode) {
     _unnestFields = new ArrayList<>(unnestFields);
     _delimiter = delimiter;
+    _collectionToJsonMode = collectionToJsonMode;
     // the unnest fields are sorted to achieve the topological sort of the collections, so that the parent collection
     // (e.g. foo) is unnested before the child collection (e.g. foo.bar)
     Collections.sort(_unnestFields);
@@ -121,6 +134,15 @@ public class ComplexTypeTransformer implements RecordTransformer {
       return new ComplexTypeTransformer(tableConfig);
     }
     return null;
+  }
+
+  private static ComplexTypeConfig.CollectionToJsonMode parseCollectionToJsonMode(TableConfig tableConfig) {
+    if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getComplexTypeConfig() != null
+        && tableConfig.getIngestionConfig().getComplexTypeConfig().getCollectionToJsonMode() != null) {
+      return tableConfig.getIngestionConfig().getComplexTypeConfig().getCollectionToJsonMode();
+    } else {
+      return DEFAULT_COLLECTION_TO_JSON_MODE;
+    }
   }
 
   @Nullable
@@ -212,25 +234,69 @@ public class ComplexTypeTransformer implements RecordTransformer {
           }
         }
         flattenMap(record, mapColumns);
-      } else if (value instanceof Collection && _unnestFields.contains(column)) {
-        for (Object inner : (Collection) value) {
-          if (inner instanceof Map) {
-            Map<String, Object> innerMap = (Map<String, Object>) inner;
-            flattenMap(column, innerMap, new ArrayList<>(innerMap.keySet()));
+      } else if (value instanceof Collection) {
+        Collection collection = (Collection) value;
+        if (_unnestFields.contains(column)) {
+          for (Object inner : collection) {
+            if (inner instanceof Map) {
+              Map<String, Object> innerMap = (Map<String, Object>) inner;
+              flattenMap(column, innerMap, new ArrayList<>(innerMap.keySet()));
+            }
+          }
+        } else if (shallConvertToJson(collection)) {
+          try {
+            // convert the collection to JSON string
+            String jsonString = JsonFunctions.jsonFormat(collection);
+            record.putValue(column, jsonString);
+          } catch (JsonProcessingException e) {
+            throw new RuntimeException(
+                String.format("Caught exception while converting value to JSON string %s", value), e);
           }
         }
-      } else if (isArray(value) && _unnestFields.contains(column)) {
-        for (Object inner : (Object[]) value) {
-          if (inner instanceof Map) {
-            Map<String, Object> innerMap = (Map<String, Object>) inner;
-            flattenMap(column, innerMap, new ArrayList<>(innerMap.keySet()));
+      } else if (isArray(value)) {
+        Object[] array = (Object[]) value;
+        if (_unnestFields.contains(column)) {
+          for (Object inner : array) {
+            if (inner instanceof Map) {
+              Map<String, Object> innerMap = (Map<String, Object>) inner;
+              flattenMap(column, innerMap, new ArrayList<>(innerMap.keySet()));
+            }
+          }
+        } else if (shallConvertToJson(array)) {
+          try {
+            // convert the array to JSON string
+            String jsonString = JsonFunctions.jsonFormat(array);
+            record.putValue(column, jsonString);
+          } catch (JsonProcessingException e) {
+            throw new RuntimeException(
+                String.format("Caught exception while converting value to JSON string %s", value), e);
           }
         }
       }
     }
   }
 
-  static private boolean isArray(Object obj) {
+  private boolean containPrimitives(Object[] value) {
+    if (value.length == 0) {
+      return true;
+    }
+    Object element = value[0];
+    return !(element instanceof Map || element instanceof Collection || isArray(element));
+  }
+
+  /**
+   * This function assumes the collection is a homogeneous data structure that elements have same data type.
+   * So it checks the first element only.
+   */
+  private boolean containPrimitives(Collection value) {
+    if (value.isEmpty()) {
+      return true;
+    }
+    Object element = value.iterator().next();
+    return !(element instanceof Map || element instanceof Collection || isArray(element));
+  }
+
+  protected static boolean isArray(Object obj) {
     if (obj == null) {
       return false;
     }
@@ -256,20 +322,70 @@ public class ComplexTypeTransformer implements RecordTransformer {
           flattenMap(concatName, map, innerMapFields);
         }
       } else if (value instanceof Collection && _unnestFields.contains(concatName)) {
-        for (Object inner : (Collection) value) {
-          if (inner instanceof Map) {
-            Map<String, Object> innerMap = (Map<String, Object>) inner;
-            flattenMap(concatName, innerMap, new ArrayList<>(innerMap.keySet()));
+        Collection collection = (Collection) value;
+        if (_unnestFields.contains(concatName)) {
+          for (Object inner : (Collection) value) {
+            if (inner instanceof Map) {
+              Map<String, Object> innerMap = (Map<String, Object>) inner;
+              flattenMap(concatName, innerMap, new ArrayList<>(innerMap.keySet()));
+            }
+          }
+        } else if (shallConvertToJson(collection)) {
+          try {
+            // convert the collection to JSON string
+            String jsonString = JsonFunctions.jsonFormat(collection);
+            map.put(field, jsonString);
+          } catch (JsonProcessingException e) {
+            throw new RuntimeException(
+                String.format("Caught exception while converting value to JSON string %s", value), e);
           }
         }
-      } else if (isArray(value) && _unnestFields.contains(concatName)) {
-        for (Object inner : (Object[]) value) {
-          if (inner instanceof Map) {
-            Map<String, Object> innerMap = (Map<String, Object>) inner;
-            flattenMap(concatName, innerMap, new ArrayList<>(innerMap.keySet()));
+      } else if (isArray(value)) {
+        Object[] array = (Object[]) value;
+        if (_unnestFields.contains(concatName)) {
+          for (Object inner : (Object[]) value) {
+            if (inner instanceof Map) {
+              Map<String, Object> innerMap = (Map<String, Object>) inner;
+              flattenMap(concatName, innerMap, new ArrayList<>(innerMap.keySet()));
+            }
+          }
+        } else if (shallConvertToJson(array)) {
+          try {
+            // convert the array to JSON string
+            String jsonString = JsonFunctions.jsonFormat(array);
+            map.put(field, jsonString);
+          } catch (JsonProcessingException e) {
+            throw new RuntimeException(
+                String.format("Caught exception while converting value to JSON string %s", value), e);
           }
         }
       }
+    }
+  }
+
+  private boolean shallConvertToJson(Object[] value) {
+    switch (_collectionToJsonMode) {
+      case ALL:
+        return true;
+      case NONE:
+        return false;
+      case NON_PRIMITIVE:
+        return !containPrimitives(value);
+      default:
+        throw new IllegalArgumentException(String.format("Unsupported collectionToJsonMode %s", _collectionToJsonMode));
+    }
+  }
+
+  private boolean shallConvertToJson(Collection value) {
+    switch (_collectionToJsonMode) {
+      case ALL:
+        return true;
+      case NONE:
+        return false;
+      case NON_PRIMITIVE:
+        return !containPrimitives(value);
+      default:
+        throw new IllegalArgumentException(String.format("Unsupported collectionToJsonMode %s", _collectionToJsonMode));
     }
   }
 

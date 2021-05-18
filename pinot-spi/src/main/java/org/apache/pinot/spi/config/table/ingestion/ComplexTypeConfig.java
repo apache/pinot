@@ -31,17 +31,26 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
  */
 public class ComplexTypeConfig extends BaseJsonConfig {
 
+  public enum CollectionToJsonMode {
+    NONE, NON_PRIMITIVE, ALL
+  }
+
   @JsonPropertyDescription("The fields to unnest")
   private final List<String> _unnestFields;
 
   @JsonPropertyDescription("The delimiter used to separate components in a path")
   private final String _delimiter;
 
+  @JsonPropertyDescription("The mode of converting collection to JSON string")
+  private final CollectionToJsonMode _collectionToJsonMode;
+
   @JsonCreator
   public ComplexTypeConfig(@JsonProperty("unnestFields") @Nullable List<String> unnestFields,
-      @JsonProperty("delimiter") @Nullable String delimiter) {
+      @JsonProperty("delimiter") @Nullable String delimiter,
+      @JsonProperty("collectionToJsonMode") @Nullable CollectionToJsonMode collectionToJsonMode) {
     _unnestFields = unnestFields;
     _delimiter = delimiter;
+    _collectionToJsonMode = collectionToJsonMode;
   }
 
   @Nullable
@@ -52,5 +61,10 @@ public class ComplexTypeConfig extends BaseJsonConfig {
   @Nullable
   public String getDelimiter() {
     return _delimiter;
+  }
+
+  @Nullable
+  public CollectionToJsonMode getCollectionToJsonMode() {
+    return _collectionToJsonMode;
   }
 }

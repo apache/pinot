@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -25,6 +26,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -236,5 +238,111 @@ public class ComplexTypeTransformerTest {
     Assert.assertEquals("v4", next.getValue("array.array2.b"));
     next = itr.next();
     Assert.assertEquals("v2", next.getValue("array.a"));
+  }
+
+  @Test
+  public void testConvertCollectionToString() {
+    // json convert inner collections
+    // {
+    //   "array":[
+    //      {
+    //         "array1":[
+    //            {
+    //               "b":"v1"
+    //            }
+    //         ]
+    //      }
+    //   ]
+    // }
+    // is converted to
+    // [{
+    //   "array.array1":"[
+    //            {
+    //               "b":"v1"
+    //            }
+    //         ]"
+    // }]
+    ComplexTypeTransformer transformer = new ComplexTypeTransformer(Arrays.asList("array"), ".");
+    GenericRow genericRow = new GenericRow();
+    Map<String, Object> map = new HashMap<>();
+    Object[] array1 = new Object[1];
+    array1[0] = ImmutableMap.of("b", "v1");
+    map.put("array1", array1);
+    Object[] array = new Object[1];
+    array[0] = map;
+    genericRow.putValue("array", array);
+    transformer.transform(genericRow);
+    Assert.assertNotNull(genericRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY));
+    Collection<GenericRow> collection = (Collection<GenericRow>) genericRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
+    GenericRow row = collection.iterator().next();
+    Assert.assertTrue(row.getValue("array.array1") instanceof String);
+
+    // primitive array not converted
+    // {
+    //   "array":[1,2]
+    // }
+    transformer = new ComplexTypeTransformer(Arrays.asList(), ".");
+    genericRow = new GenericRow();
+    array = new Object[]{1, 2};
+    genericRow.putValue("array", array);
+    transformer.transform(genericRow);
+    Assert.assertTrue(genericRow.getValue("array") instanceof Object[]);
+
+    // primitive array converted
+    // {
+    //   "array":[1,2]
+    // }
+    // ->
+    // {
+    //   "array":"[1,2]"
+    // }
+    transformer = new ComplexTypeTransformer(Arrays.asList(), ".", ComplexTypeConfig.CollectionToJsonMode.ALL);
+    genericRow = new GenericRow();
+    array = new Object[]{1, 2};
+    genericRow.putValue("array", array);
+    transformer.transform(genericRow);
+    Assert.assertTrue(genericRow.getValue("array") instanceof String);
+
+    // array under tuple converted
+    // {
+    //   "t": {
+    //         "array1":[
+    //            {
+    //               "b":"v1"
+    //            }
+    //         ]
+    //      }
+    // to
+    // {
+    //   "t": "{
+    //         "array1":[
+    //            {
+    //               "b":"v1"
+    //            }
+    //         ]
+    //  }"
+    genericRow = new GenericRow();
+    genericRow.putValue("t", map);
+    transformer.transform(genericRow);
+    Assert.assertTrue(genericRow.getValue("t.array1") instanceof String);
+
+    // array under tuple not converted
+    // {
+    //   "t": {
+    //         "array1":[
+    //            {
+    //               "b":"v1"
+    //            }
+    //         ]
+    //      }
+    genericRow = new GenericRow();
+    map = new HashMap<>();
+    array1 = new Object[1];
+    array1[0] = ImmutableMap.of("b", "v1");
+    map.put("array1", array1);
+    genericRow.putValue("t", map);
+    transformer = new ComplexTypeTransformer(Arrays.asList(), ".", ComplexTypeConfig.CollectionToJsonMode.NONE);
+    transformer.transform(genericRow);
+    Assert.assertTrue(ComplexTypeTransformer.isArray(genericRow.getValue("t.array1")));
   }
 }
