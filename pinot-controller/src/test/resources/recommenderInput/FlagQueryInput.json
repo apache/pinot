@@ -115,6 +115,15 @@
         "numValuesPerEntry":1
       }
     ],
+    "dateTimeFieldSpecs": [
+      {
+        "name": "x",
+        "dataType": "INT",
+        "format": "1:DAYS:EPOCH",
+        "granularity": "1:DAYS",
+        "cardinality": 1000
+      }
+    ],
     "timeFieldSpec": {
       "incomingGranularitySpec": {
         "dataType": "INT",
@@ -128,8 +137,10 @@
   "queriesWithWeights":{
     "select f from tableName": 0.1,
     "select f from tableName where a =3": 0.1,
-    "not a valid query": 0.1,
-    "select g from tableName LIMIT 1000000000": 0.1
+    "select * from tableName": 0.1,
+    "select g from tableName LIMIT 1000000000": 0.1,
+    "select f from tableName where x = 2": 0.2,
+    "select f from tableName where t = 3": 0.3
   },
   "numRecordsPerPush":1000000000
 }

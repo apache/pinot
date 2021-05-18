@@ -88,7 +88,7 @@ public class TestConfigEngine {
     assertEquals(_input.getAverageDataLen("g"), 100);
     assertTrue(_input.isSingleValueColumn("j"));
     assertFalse(_input.isSingleValueColumn("i"));
-    assertEquals(_input.getPrimaryTimeCol(),"t");
+    assertTrue(_input.getTimeColumns().contains("t"));
   }
 
   @Test
@@ -176,7 +176,6 @@ public class TestConfigEngine {
     loadInput("recommenderInput/InvalidInput2.json");
   }
 
-
   @Test
   void testFlagQueryRule()
       throws InvalidInputException, IOException {
@@ -185,8 +184,13 @@ public class TestConfigEngine {
     AbstractRule abstractRule =
         RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.FlagQueryRule, _input, output);
     abstractRule.run();
-    assertEquals(output.getFlaggedQueries().getFlaggedQueries().toString(),
-        "{select g from tableName LIMIT 1000000000=Warning: The size of LIMIT is longer than 100000 | Warning: No filtering in ths query, not a valid query=Error: query not able to parse, skipped, select f from tableName=Warning: No filtering in ths query, select f from tableName where a =3=Warning: No time column used in ths query}");
+
+    assertFalse(output.getFlaggedQueries().getFlaggedQueries().containsKey("select f from tableName where x = 2"));
+    assertFalse(output.getFlaggedQueries().getFlaggedQueries().containsKey("select f from tableName where t = 3"));
+    assertTrue(output.getFlaggedQueries().getFlaggedQueries().containsKey("select * from tableName"));
+    assertTrue(output.getFlaggedQueries().getFlaggedQueries().containsKey("select f from tableName"));
+    assertTrue(output.getFlaggedQueries().getFlaggedQueries().containsKey("select f from tableName where a =3"));
+    assertTrue(output.getFlaggedQueries().getFlaggedQueries().containsKey("select g from tableName LIMIT 1000000000"));
   }
 
   @Test
@@ -209,6 +213,17 @@ public class TestConfigEngine {
         RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.BloomFilterRule, _input, output);
     abstractRule.run();
     assertEquals(output.getIndexConfig().getBloomFilterColumns().toString(), "[c]");
+  }
+
+  @Test
+  void testBloomFilterRuleWithTimeSpecColumn()
+      throws InvalidInputException, IOException {
+    loadInput("recommenderInput/BloomFilterInputWithDateTimeColumn.json");
+    ConfigManager output = new ConfigManager();
+    AbstractRule abstractRule =
+        RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.BloomFilterRule, _input, output);
+    abstractRule.run();
+    assertEquals(output.getIndexConfig().getBloomFilterColumns().toString(), "[b, t, x]");
   }
 
   @Test

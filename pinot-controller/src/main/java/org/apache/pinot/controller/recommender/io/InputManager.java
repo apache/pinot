@@ -229,9 +229,8 @@ public class InputManager {
     _metricNames = new HashSet<>(_schema.getMetricNames());
     _dateTimeNames = new HashSet<>(_schema.getDateTimeNames());
 
-    String primaryTimeCol;
-    if ((primaryTimeCol = getPrimaryTimeCol()) != null) {
-      _dateTimeNames.add(primaryTimeCol);
+    if (_schema.getTimeFieldSpec() != null) {
+      _dateTimeNames.add(_schema.getTimeFieldSpec().getName());
     }
 
     _intToColNameMap = new String[_dimNames.size() + _metricNames.size() + _dateTimeNames.size()];
@@ -444,15 +443,10 @@ public class InputManager {
     return _colNameToIntMap.size();
   }
 
-  //TODO: Currently Pinot is using only ONE time column specified by TimeFieldSpec
-  // Change the implementation after the new schema with multiple _dateTimeNames is in use
-  // Return the time column used in server level filtering
-  public String getPrimaryTimeCol() {
-    if (_schema.getTimeFieldSpec() != null) {
-      return _schema.getTimeFieldSpec().getName();
-    } else {
-      return null;
-    }
+  // Provides set of time columns.
+  // This could be at most 1 from TimeFieldSpec and 1 or more from DatetimeFieldSpec
+  public Set<String> getTimeColumns() {
+    return _dateTimeNames;
   }
 
   public Set<String> getColNamesNoDictionary() {
@@ -580,8 +574,8 @@ public class InputManager {
     return _dimNames.contains(colName);
   }
 
-  public boolean isPrimaryDateTime(String colName) {
-    return colName != null && colName.equalsIgnoreCase(getPrimaryTimeCol());
+  public boolean isTimeOrDateTimeColumn(String colName) {
+    return colName != null && getTimeColumns().stream().anyMatch(d -> colName.equalsIgnoreCase(d));
   }
 
   public void estimateSizePerRecord()
