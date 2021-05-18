@@ -395,10 +395,10 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
       }
     } else if (comparison < 0) {
       // Literal value is less than the converted value, so rewrite:
-      //      //   "column >  literal" to "column >= converted"
-      //      //   "column >= literal" to "column >= converted"
-      //      //   "column <  literal" to "column <  converted"
-      //      //   "column <= literal" to "column <  converted"
+      //   "column >  literal" to "column >= converted"
+      //   "column >= literal" to "column >= converted"
+      //   "column <  literal" to "column <  converted"
+      //   "column <= literal" to "column <  converted"
       if (kind == FilterKind.GREATER_THAN || kind == FilterKind.GREATER_THAN_OR_EQUAL) {
         range.getFunctionCall().setOperator(FilterKind.GREATER_THAN_OR_EQUAL.name());
       } else if (kind == FilterKind.LESS_THAN || kind == FilterKind.LESS_THAN_OR_EQUAL) {
