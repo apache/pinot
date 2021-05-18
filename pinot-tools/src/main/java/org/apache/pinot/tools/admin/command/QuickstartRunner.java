@@ -125,26 +125,26 @@ public class QuickstartRunner {
 
   private void startBrokers()
       throws Exception {
-    for (int i = 0; i < _numBrokers; i++) {
-      StartBrokerCommand brokerStarter = new StartBrokerCommand();
-      brokerStarter.setPort(DEFAULT_BROKER_PORT + i).setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME)
-          .setConfigOverrides(_configOverrides);
-      brokerStarter.execute();
-      _brokerPorts.add(DEFAULT_BROKER_PORT + i);
-    }
+//    for (int i = 0; i < _numBrokers; i++) {
+//      StartBrokerCommand brokerStarter = new StartBrokerCommand();
+//      brokerStarter.setPort(DEFAULT_BROKER_PORT + i).setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME)
+//          .setConfigOverrides(_configOverrides);
+//      brokerStarter.execute();
+//      _brokerPorts.add(DEFAULT_BROKER_PORT + i);
+//    }
   }
 
   private void startServers()
       throws Exception {
-    for (int i = 0; i < _numServers; i++) {
-      StartServerCommand serverStarter = new StartServerCommand();
-      serverStarter.setPort(DEFAULT_SERVER_NETTY_PORT + i).setAdminPort(DEFAULT_SERVER_ADMIN_API_PORT + i)
-          .setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME)
-          .setDataDir(new File(_tempDir, DEFAULT_SERVER_DATA_DIR + i).getAbsolutePath())
-          .setSegmentDir(new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath())
-          .setConfigOverrides(_configOverrides);
-      serverStarter.execute();
-    }
+//    for (int i = 0; i < _numServers; i++) {
+//      StartServerCommand serverStarter = new StartServerCommand();
+//      serverStarter.setPort(DEFAULT_SERVER_NETTY_PORT + i).setAdminPort(DEFAULT_SERVER_ADMIN_API_PORT + i)
+//          .setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME)
+//          .setDataDir(new File(_tempDir, DEFAULT_SERVER_DATA_DIR + i).getAbsolutePath())
+//          .setSegmentDir(new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath())
+//          .setConfigOverrides(_configOverrides);
+//      serverStarter.execute();
+//    }
   }
 
   private void startMinions()
