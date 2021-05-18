@@ -273,7 +273,7 @@ public class JsonUtilsTest {
     final File file = new File(classLoader.getResource(JSON_FILE).getFile());
     Map<String, FieldSpec.FieldType> fieldSpecMap =
         new ImmutableMap.Builder<String, FieldSpec.FieldType>().put("d1", FieldSpec.FieldType.DIMENSION)
-            .put("hoursSinceEpoch", FieldSpec.FieldType.TIME).put("m1", FieldSpec.FieldType.METRIC).build();
+            .put("hoursSinceEpoch", FieldSpec.FieldType.DATE_TIME).put("m1", FieldSpec.FieldType.METRIC).build();
     Schema inferredPinotSchema =
         JsonUtils.getPinotSchemaFromJsonFile(file, fieldSpecMap, TimeUnit.HOURS, new ArrayList<>(), ".");
     Schema expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", FieldSpec.DataType.STRING)
@@ -282,7 +282,8 @@ public class JsonUtilsTest {
         .addSingleValueDimension("tuple.address.city", FieldSpec.DataType.STRING)
         .addSingleValueDimension("entries", FieldSpec.DataType.STRING)
         .addMultiValueDimension("d2", FieldSpec.DataType.INT)
-        .addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.HOURS, "hoursSinceEpoch"), null).build();
+        .addDateTime("hoursSinceEpoch",FieldSpec.DataType.INT, "1:HOURS:EPOCH","1:HOURS")
+        .build();
     Assert.assertEquals(inferredPinotSchema, expectedSchema);
 
     // unnest collection entries
@@ -295,7 +296,7 @@ public class JsonUtilsTest {
         .addSingleValueDimension("entries.id", FieldSpec.DataType.INT)
         .addSingleValueDimension("entries.description", FieldSpec.DataType.STRING)
         .addMultiValueDimension("d2", FieldSpec.DataType.INT)
-        .addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.HOURS, "hoursSinceEpoch"), null).build();
+        .addDateTime("hoursSinceEpoch",FieldSpec.DataType.INT, "1:HOURS:EPOCH","1:HOURS").build();
     Assert.assertEquals(inferredPinotSchema, expectedSchema);
 
     // change delimiter
@@ -307,7 +308,7 @@ public class JsonUtilsTest {
         .addSingleValueDimension("tuple_address_city", FieldSpec.DataType.STRING)
         .addSingleValueDimension("entries", FieldSpec.DataType.STRING)
         .addMultiValueDimension("d2", FieldSpec.DataType.INT)
-        .addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.HOURS, "hoursSinceEpoch"), null).build();
+        .addDateTime("hoursSinceEpoch",FieldSpec.DataType.INT, "1:HOURS:EPOCH","1:HOURS").build();
     Assert.assertEquals(inferredPinotSchema, expectedSchema);
   }
 }
