@@ -23,11 +23,13 @@ public class MinionConstants {
   }
 
   public static final String TASK_TIME_SUFFIX = ".time";
+  public static final String TASK_BUCKET_GRANULARITY_SUFFIX = ".bucketGranularity";
 
   public static final String TABLE_NAME_KEY = "tableName";
   public static final String SEGMENT_NAME_KEY = "segmentName";
   public static final String DOWNLOAD_URL_KEY = "downloadURL";
   public static final String UPLOAD_URL_KEY = "uploadURL";
+  public static final String DOT_SEPARATOR = ".";
   public static final String URL_SEPARATOR = ",";
   public static final String AUTH_TOKEN = "authToken";
 
@@ -58,8 +60,21 @@ public class MinionConstants {
   }
 
   public static class MergeRollupTask {
-    public static final String TASK_TYPE = "mergeRollupTask";
-    public static final String MERGE_TYPE_KEY = "mergeTypeKey";
+    public static final String TASK_TYPE = "MergeRollupTask";
+
+    public static final String MERGE_TYPE_KEY = "mergeType";
+    public static final String GRANULARITY_KEY = "granularity";
+
+    // Rollup aggregate function related configs
+    public static final String AGGREGATE_KEY_PREFIX = "aggregate";
+
+    // Merge properties related configs
+    public static final String MERGE_KEY_PREFIX = "merge";
+    public static final String BUFFER_TIME = "bufferTime";
+    public static final String MAX_NUM_RECORDS_PER_SEGMENT = "maxNumRecordsPerSegment";
+    public static final String MAX_NUM_RECORDS_PER_TASK = "maxNumRecordsPerTask";
+
+    // Segment name generator related configs
     public static final String MERGED_SEGMENT_NAME_KEY = "mergedSegmentNameKey";
   }
 
