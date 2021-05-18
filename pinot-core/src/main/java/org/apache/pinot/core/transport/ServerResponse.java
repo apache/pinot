@@ -30,6 +30,7 @@ public class ServerResponse {
   private final long _startTimeMs;
   private volatile long _submitRequestTimeMs;
   private volatile long _receiveDataTableTimeMs;
+  private volatile long _serverProcessingTimeMs;
   private volatile DataTable _dataTable;
   private volatile int _responseSize;
   private volatile int _deserializationTimeMs;
@@ -58,6 +59,10 @@ public class ServerResponse {
     }
   }
 
+  public long getServerProcessingTimeMs() {
+    return _serverProcessingTimeMs;
+  }
+
   public int getResponseSize() {
     return _responseSize;
   }
@@ -81,5 +86,7 @@ public class ServerResponse {
     _dataTable = dataTable;
     _responseSize = responseSize;
     _deserializationTimeMs = deserializationTimeMs;
+    _serverProcessingTimeMs =
+        Long.parseLong(_dataTable.getMetadata().getOrDefault(DataTable.MetadataKey.TIME_USED_MS.getName(), "-1"));
   }
 }
