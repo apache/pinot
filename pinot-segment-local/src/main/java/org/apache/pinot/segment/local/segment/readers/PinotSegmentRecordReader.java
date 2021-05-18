@@ -122,6 +122,15 @@ public class PinotSegmentRecordReader implements RecordReader {
   }
 
   /**
+   * Initializes the record reader from an immutable segment.
+   *
+   * @param immutableSegment Immutable segment
+   */
+  public void init(ImmutableSegment immutableSegment) {
+    init(immutableSegment, false, null, null, null, false);
+  }
+
+  /**
    * Initializes the record reader from a mutable segment.
    * NOTE: The mutable segment should have already finished consumption and ready to be sealed. In order to read records
    *       from consuming segment, use {@link MutableSegment#getRecord(int, GenericRow)} instead.
@@ -131,15 +140,6 @@ public class PinotSegmentRecordReader implements RecordReader {
    */
   public void init(MutableSegment mutableSegment, @Nullable int[] sortedDocIds) {
     init(mutableSegment, false, null, sortedDocIds, null, false);
-  }
-
-  /**
-   * Initializes the record reader from a immutable segment.
-   *
-   * @param immutableSegment Immutable segment
-   */
-  public void init(ImmutableSegment immutableSegment) {
-    init(immutableSegment, false, null, null, null, false);
   }
 
   /**

@@ -58,6 +58,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private ThreadSafeMutableRoaringBitmap _validDocIds;
   private ValidDocIndexReader _validDocIndex;
+  private PinotSegmentRecordReader _pinotSegmentRecordReader;
 
   public ImmutableSegmentImpl(SegmentDirectory segmentDirectory, SegmentMetadataImpl segmentMetadata,
       Map<String, ColumnIndexContainer> columnIndexContainerMap,
@@ -76,6 +77,8 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
     _validDocIds = validDocIds;
     _validDocIndex = new ValidDocIndexReaderImpl(validDocIds);
+    _pinotSegmentRecordReader = new PinotSegmentRecordReader();
+    _pinotSegmentRecordReader.init(this);
   }
 
   @Override
@@ -171,14 +174,10 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
 
   @Override
   public GenericRow getRecord(int docId, GenericRow reuse) {
-    // NOTE: Use PinotSegmentRecordReader to read immutable segment
     try {
-      PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader();
-      pinotSegmentRecordReader.init(this);
-      pinotSegmentRecordReader.getRecord(reuse, docId);
+      _pinotSegmentRecordReader.getRecord(reuse, docId);
       return reuse;
     } catch (Exception e) {
-      LOGGER.error("Failed to use PinotSegmentRecordReader to read immutable segment", e);
       throw new RuntimeException("Failed to use PinotSegmentRecordReader to read immutable segment");
     }
   }
