@@ -244,58 +244,60 @@ public class MemoryEstimator {
       }
     }
 
-    for (int i = 0; i < numHours.length; i++) {
-      int numHoursToConsume = numHours[i];
-      if (numHoursToConsume > retentionHours) {
-        continue;
-      }
-      long secondsToConsume = numHoursToConsume * 3600;
-      // consuming for _numHoursSampleSegmentConsumed, gives size sampleCompletedSegmentSizeBytes
-      // hence, consuming for numHoursToConsume would give:
-      long completedSegmentSizeBytes =
-          (long) (((double) secondsToConsume / _sampleSegmentConsumedSeconds) * _sampleCompletedSegmentSizeBytes);
+    try {
+      for (int i = 0; i < numHours.length; i++) {
+        int numHoursToConsume = numHours[i];
+        if (numHoursToConsume > retentionHours) {
+          continue;
+        }
+        long secondsToConsume = numHoursToConsume * 3600;
+        // consuming for _numHoursSampleSegmentConsumed, gives size sampleCompletedSegmentSizeBytes
+        // hence, consuming for numHoursToConsume would give:
+        long completedSegmentSizeBytes =
+            (long) (((double) secondsToConsume / _sampleSegmentConsumedSeconds) * _sampleCompletedSegmentSizeBytes);
 
-      // numHoursSampleSegmentConsumed created totalDocsInSampleSegment num rows
-      // numHoursToConsume will create ? rows
-      int totalDocs = (int) (((double) secondsToConsume / _sampleSegmentConsumedSeconds) * _totalDocsInSampleSegment);
-      long memoryForConsumingSegmentPerPartition = getMemoryForConsumingSegmentPerPartition(statsFile, totalDocs);
+        // numHoursSampleSegmentConsumed created totalDocsInSampleSegment num rows
+        // numHoursToConsume will create ? rows
+        int totalDocs = (int) (((double) secondsToConsume / _sampleSegmentConsumedSeconds) * _totalDocsInSampleSegment);
+        long memoryForConsumingSegmentPerPartition = getMemoryForConsumingSegmentPerPartition(statsFile, totalDocs);
 
-      memoryForConsumingSegmentPerPartition += getMemoryForInvertedIndex(memoryForConsumingSegmentPerPartition);
+        memoryForConsumingSegmentPerPartition += getMemoryForInvertedIndex(memoryForConsumingSegmentPerPartition);
 
-      int numActiveSegmentsPerPartition = (retentionHours + numHoursToConsume - 1) / numHoursToConsume;
-      long activeMemoryForCompletedSegmentsPerPartition =
-          completedSegmentSizeBytes * (numActiveSegmentsPerPartition - 1);
-      int numCompletedSegmentsPerPartition = (_tableRetentionHours + numHoursToConsume - 1) / numHoursToConsume - 1;
+        int numActiveSegmentsPerPartition = (retentionHours + numHoursToConsume - 1) / numHoursToConsume;
+        long activeMemoryForCompletedSegmentsPerPartition =
+            completedSegmentSizeBytes * (numActiveSegmentsPerPartition - 1);
+        int numCompletedSegmentsPerPartition = (_tableRetentionHours + numHoursToConsume - 1) / numHoursToConsume - 1;
 
-      for (int j = 0; j < numHosts.length; j++) {
-        int numHostsToProvision = numHosts[j];
-        // adjustment because we want ceiling of division and not floor, as some hosts will have an extra partition due to the remainder of the division
-        int totalConsumingPartitionsPerHost =
-            (totalConsumingPartitions + numHostsToProvision - 1) / numHostsToProvision;
+        for (int j = 0; j < numHosts.length; j++) {
+          int numHostsToProvision = numHosts[j];
+          // adjustment because we want ceiling of division and not floor, as some hosts will have an extra partition due to the remainder of the division
+          int totalConsumingPartitionsPerHost =
+              (totalConsumingPartitions + numHostsToProvision - 1) / numHostsToProvision;
 
-        long activeMemoryForCompletedSegmentsPerHost =
-            activeMemoryForCompletedSegmentsPerPartition * totalConsumingPartitionsPerHost;
-        long totalMemoryForConsumingSegmentsPerHost =
-            memoryForConsumingSegmentPerPartition * totalConsumingPartitionsPerHost;
-        long activeMemoryPerHostBytes =
-            activeMemoryForCompletedSegmentsPerHost + totalMemoryForConsumingSegmentsPerHost;
-        long mappedMemoryPerHost =
-            totalMemoryForConsumingSegmentsPerHost + (numCompletedSegmentsPerPartition * totalConsumingPartitionsPerHost
-                * completedSegmentSizeBytes);
+          long activeMemoryForCompletedSegmentsPerHost =
+              activeMemoryForCompletedSegmentsPerPartition * totalConsumingPartitionsPerHost;
+          long totalMemoryForConsumingSegmentsPerHost =
+              memoryForConsumingSegmentPerPartition * totalConsumingPartitionsPerHost;
+          long activeMemoryPerHostBytes =
+              activeMemoryForCompletedSegmentsPerHost + totalMemoryForConsumingSegmentsPerHost;
+          long mappedMemoryPerHost =
+              totalMemoryForConsumingSegmentsPerHost + (numCompletedSegmentsPerPartition * totalConsumingPartitionsPerHost
+                  * completedSegmentSizeBytes);
 
-        if (activeMemoryPerHostBytes <= _maxUsableHostMemory) {
-          _activeMemoryPerHost[i][j] =
-              DataSizeUtils.fromBytes(activeMemoryPerHostBytes) + "/" + DataSizeUtils.fromBytes(mappedMemoryPerHost);
-          _consumingMemoryPerHost[i][j] = DataSizeUtils.fromBytes(totalMemoryForConsumingSegmentsPerHost);
-          _optimalSegmentSize[i][j] = DataSizeUtils.fromBytes(completedSegmentSizeBytes);
-          _numSegmentsQueriedPerHost[i][j] =
-              String.valueOf(numActiveSegmentsPerPartition * totalConsumingPartitionsPerHost);
+          if (activeMemoryPerHostBytes <= _maxUsableHostMemory) {
+            _activeMemoryPerHost[i][j] =
+                DataSizeUtils.fromBytes(activeMemoryPerHostBytes) + "/" + DataSizeUtils.fromBytes(mappedMemoryPerHost);
+            _consumingMemoryPerHost[i][j] = DataSizeUtils.fromBytes(totalMemoryForConsumingSegmentsPerHost);
+            _optimalSegmentSize[i][j] = DataSizeUtils.fromBytes(completedSegmentSizeBytes);
+            _numSegmentsQueriedPerHost[i][j] =
+                String.valueOf(numActiveSegmentsPerPartition * totalConsumingPartitionsPerHost);
+          }
         }
       }
+    } finally {
+      // cleanup
+      FileUtils.deleteQuietly(_workingDir);
     }
-
-    // cleanup
-    FileUtils.deleteQuietly(_workingDir);
   }
 
   private long getMemoryForConsumingSegmentPerPartition(File statsFile, int totalDocs)
@@ -460,7 +462,8 @@ public class MemoryEstimator {
       File csvDataFile = generateData();
       File segment = createSegment(csvDataFile);
       if (_deleteCsv) {
-        csvDataFile.delete();
+        File csvDir = csvDataFile.getParentFile();
+        FileUtils.deleteQuietly(csvDir);
       }
       return segment;
     }
