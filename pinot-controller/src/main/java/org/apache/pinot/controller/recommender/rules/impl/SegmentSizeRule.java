@@ -20,8 +20,8 @@
 package org.apache.pinot.controller.recommender.rules.impl;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.io.Files;
 import java.io.File;
-import java.io.IOException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.controller.recommender.exceptions.InvalidInputException;
 import org.apache.pinot.controller.recommender.io.ConfigManager;
@@ -82,20 +82,17 @@ public class SegmentSizeRule extends AbstractRule {
         && segmentSizeRuleParams.getNumRowsInActualSegment() == RecommenderConstants.SegmentSizeRule.NOT_PROVIDED) {
 
       // generate a segment
-      TableConfig tableConfig = createTableConfig(_input.getSchema());
-      int numRowsInGeneratedSegment = segmentSizeRuleParams.getNumRowsInGeneratedSegment();
-      File generatedSegmentDir =
-          new MemoryEstimator.SegmentGenerator(_input._schemaWithMetaData, _input._schema, tableConfig,
-              numRowsInGeneratedSegment, true).generate();
-      segmentSize = Math.round(FileUtils.sizeOfDirectory(generatedSegmentDir)
-          * RecommenderConstants.SegmentSizeRule.INDEX_OVERHEAD_RATIO_FOR_SEGMENT_SIZE);
-      numRows = numRowsInGeneratedSegment;
-
-      // cleanup
+      File workingDir = Files.createTempDir();
       try {
-        FileUtils.deleteDirectory(generatedSegmentDir);
-      } catch (IOException e) {
-        throw new RuntimeException("Cannot delete the generated segment directory", e);
+        TableConfig tableConfig = createTableConfig(_input.getSchema());
+        int numRowsInGeneratedSegment = segmentSizeRuleParams.getNumRowsInGeneratedSegment();
+        File generatedSegmentDir =
+            new MemoryEstimator.SegmentGenerator(_input._schemaWithMetaData, _input._schema, tableConfig,
+                numRowsInGeneratedSegment, true, workingDir).generate();
+        segmentSize = Math.round(FileUtils.sizeOfDirectory(generatedSegmentDir) * RecommenderConstants.SegmentSizeRule.INDEX_OVERHEAD_RATIO_FOR_SEGMENT_SIZE);
+        numRows = numRowsInGeneratedSegment;
+      } finally {
+        FileUtils.deleteQuietly(workingDir);
       }
     } else {
       segmentSize = segmentSizeRuleParams.getActualSegmentSizeMB() * MEGA_BYTE;
