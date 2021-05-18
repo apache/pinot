@@ -32,6 +32,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
+import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.name.FixedSegmentNameGenerator;
@@ -298,6 +299,8 @@ public final class IngestionUtils {
     Set<String> fieldsForRecordExtractor = new HashSet<>();
     extractFieldsFromIngestionConfig(ingestionConfig, fieldsForRecordExtractor);
     extractFieldsFromSchema(schema, fieldsForRecordExtractor);
+    fieldsForRecordExtractor =
+        ComplexTypeTransformer.getFieldsToReadWithComplexType(fieldsForRecordExtractor, ingestionConfig);
     return fieldsForRecordExtractor;
   }
 

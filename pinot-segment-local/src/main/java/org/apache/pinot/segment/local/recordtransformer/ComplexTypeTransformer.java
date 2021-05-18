@@ -23,12 +23,16 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.scalar.JsonFunctions;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -143,6 +147,21 @@ public class ComplexTypeTransformer implements RecordTransformer {
     } else {
       return DEFAULT_COLLECTION_TO_JSON_MODE;
     }
+  }
+
+  public static Set<String> getFieldsToReadWithComplexType(Set<String> fieldsToRead, IngestionConfig ingestionConfig) {
+    if (ingestionConfig == null || ingestionConfig.getComplexTypeConfig() == null) {
+      // do nothing
+      return fieldsToRead;
+    }
+    ComplexTypeConfig complexTypeConfig = ingestionConfig.getComplexTypeConfig();
+    Set<String> result = new HashSet<>();
+    String delimiter = complexTypeConfig.getDelimiter() == null ? DEFAULT_DELIMITER : complexTypeConfig.getDelimiter();
+    for (String field : fieldsToRead) {
+      // need to quote because split takes regex as arg
+      result.add(field.split(Pattern.quote(delimiter))[0]);
+    }
+    return result;
   }
 
   @Nullable

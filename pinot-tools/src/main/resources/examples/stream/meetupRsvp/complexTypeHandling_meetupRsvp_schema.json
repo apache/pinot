@@ -2,21 +2,35 @@
   "schemaName": "meetupRsvp",
   "dimensionFieldSpecs": [
     {
-      "name": "group_json",
-      "dataType": "STRING",
-      "maxLength": 2147483647
-    },
-    {
-      "name": "group.group_topics.urlkey",
-      "dataType": "STRING"
-    },
-    {
-      "name": "group.group_topics.topic_name",
-      "dataType": "STRING"
-    },
-    {
-      "name": "group.group_id",
-      "dataType": "LONG"
+      "name" : "group.group_topics.urlkey",
+      "dataType" : "STRING"
+    }, {
+      "name" : "group.group_topics.topic_name",
+      "dataType" : "STRING"
+    }, {
+      "name" : "group.group_city",
+      "dataType" : "STRING"
+    }, {
+      "name" : "group.group_country",
+      "dataType" : "STRING"
+    }, {
+      "name" : "group.group_id",
+      "dataType" : "INT"
+    }, {
+      "name" : "group.group_name",
+      "dataType" : "STRING"
+    }, {
+      "name" : "group.group_lon",
+      "dataType" : "DOUBLE"
+    }, {
+      "name" : "group.group_urlname",
+      "dataType" : "STRING"
+    }, {
+      "name" : "group.group_state",
+      "dataType" : "STRING"
+    }, {
+      "name" : "group.group_lat",
+      "dataType" : "DOUBLE"
     },
     {
       "name": "rsvp_id",
