@@ -391,10 +391,13 @@ public class JsonUtils {
   }
 
   public static Schema getPinotSchemaFromJsonFile(File jsonFile,
-      @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit, List<String> unnestFields,
-      String delimiter)
+      @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit,
+      @Nullable List<String> unnestFields, String delimiter)
       throws IOException {
     JsonNode jsonNode = fileToJsonNode(jsonFile);
+    if (unnestFields == null) {
+      unnestFields = new ArrayList<>();
+    }
     Preconditions.checkState(jsonNode.isObject(), "the JSON data shall be an object");
     return getPinotSchemaFromJsonNode(jsonNode, fieldTypeMap, timeUnit, unnestFields, delimiter);
   }
@@ -487,11 +490,6 @@ public class JsonUtils {
         case METRIC:
           Preconditions.checkState(isSingleValueField, "Metric field: %s cannot be multi-valued", name);
           pinotSchema.addField(new MetricFieldSpec(name, dataType));
-          break;
-        case TIME:
-          Preconditions.checkState(isSingleValueField, "Time field: %s cannot be multi-valued", name);
-          Preconditions.checkNotNull(timeUnit, "Time unit cannot be null");
-          pinotSchema.addField(new TimeFieldSpec(new TimeGranularitySpec(dataType, timeUnit, name)));
           break;
         case DATE_TIME:
           Preconditions.checkState(isSingleValueField, "Time field: %s cannot be multi-valued", name);

@@ -94,7 +94,49 @@ public class PinotAdministrator {
 
   //@formatter:off
   @Argument(handler = SubCommandHandler.class, metaVar = "<subCommand>")
-  @SubCommands({@SubCommand(name = "QuickStart", impl = QuickStartCommand.class), @SubCommand(name = "OperateClusterConfig", impl = OperateClusterConfigCommand.class), @SubCommand(name = "GenerateData", impl = GenerateDataCommand.class), @SubCommand(name = "LaunchDataIngestionJob", impl = LaunchDataIngestionJobCommand.class), @SubCommand(name = "CreateSegment", impl = CreateSegmentCommand.class), @SubCommand(name = "ImportData", impl = ImportDataCommand.class), @SubCommand(name = "StartZookeeper", impl = StartZookeeperCommand.class), @SubCommand(name = "StartKafka", impl = StartKafkaCommand.class), @SubCommand(name = "StreamAvroIntoKafka", impl = StreamAvroIntoKafkaCommand.class), @SubCommand(name = "StartController", impl = StartControllerCommand.class), @SubCommand(name = "StartBroker", impl = StartBrokerCommand.class), @SubCommand(name = "StartServer", impl = StartServerCommand.class), @SubCommand(name = "StartMinion", impl = StartMinionCommand.class), @SubCommand(name = "StartServiceManager", impl = StartServiceManagerCommand.class), @SubCommand(name = "AddTable", impl = AddTableCommand.class), @SubCommand(name = "ChangeTableState", impl = ChangeTableState.class), @SubCommand(name = "AddTenant", impl = AddTenantCommand.class), @SubCommand(name = "AddSchema", impl = AddSchemaCommand.class), @SubCommand(name = "UpdateSchema", impl = AddSchemaCommand.class), @SubCommand(name = "UploadSegment", impl = UploadSegmentCommand.class), @SubCommand(name = "PostQuery", impl = PostQueryCommand.class), @SubCommand(name = "StopProcess", impl = StopProcessCommand.class), @SubCommand(name = "DeleteCluster", impl = DeleteClusterCommand.class), @SubCommand(name = "ShowClusterInfo", impl = ShowClusterInfoCommand.class), @SubCommand(name = "AvroSchemaToPinotSchema", impl = AvroSchemaToPinotSchema.class), @SubCommand(name = "JsonToPinotSchema", impl = JsonToPinotSchema.class), @SubCommand(name = "RebalanceTable", impl = RebalanceTableCommand.class), @SubCommand(name = "ChangeNumReplicas", impl = ChangeNumReplicasCommand.class), @SubCommand(name = "ValidateConfig", impl = ValidateConfigCommand.class), @SubCommand(name = "VerifySegmentState", impl = VerifySegmentState.class), @SubCommand(name = "ConvertPinotSegment", impl = PinotSegmentConvertCommand.class), @SubCommand(name = "MoveReplicaGroup", impl = MoveReplicaGroup.class), @SubCommand(name = "VerifyClusterState", impl = VerifyClusterStateCommand.class), @SubCommand(name = "RealtimeProvisioningHelper", impl = RealtimeProvisioningHelperCommand.class), @SubCommand(name = "MergeSegments", impl = SegmentMergeCommand.class), @SubCommand(name = "CheckOfflineSegmentIntervals", impl = OfflineSegmentIntervalCheckerCommand.class), @SubCommand(name = "AnonymizeData", impl = AnonymizeDataCommand.class), @SubCommand(name = "GitHubEventsQuickStart", impl = GitHubEventsQuickStartCommand.class), @SubCommand(name = "StreamGitHubEvents", impl = StreamGitHubEventsCommand.class), @SubCommand(name = "BootstrapTable", impl = BootstrapTableCommand.class), @SubCommand(name = "SegmentProcessorFramework", impl = SegmentProcessorFrameworkCommand.class)})
+  @SubCommands({
+      @SubCommand(name = "QuickStart", impl = QuickStartCommand.class),
+      @SubCommand(name = "OperateClusterConfig", impl = OperateClusterConfigCommand.class),
+      @SubCommand(name = "GenerateData", impl = GenerateDataCommand.class),
+      @SubCommand(name = "LaunchDataIngestionJob", impl = LaunchDataIngestionJobCommand.class),
+      @SubCommand(name = "CreateSegment", impl = CreateSegmentCommand.class),
+      @SubCommand(name = "ImportData", impl = ImportDataCommand.class),
+      @SubCommand(name = "StartZookeeper", impl = StartZookeeperCommand.class),
+      @SubCommand(name = "StartKafka", impl = StartKafkaCommand.class),
+      @SubCommand(name = "StreamAvroIntoKafka", impl = StreamAvroIntoKafkaCommand.class),
+      @SubCommand(name = "StartController", impl = StartControllerCommand.class),
+      @SubCommand(name = "StartBroker", impl = StartBrokerCommand.class),
+      @SubCommand(name = "StartServer", impl = StartServerCommand.class),
+      @SubCommand(name = "StartMinion", impl = StartMinionCommand.class),
+      @SubCommand(name = "StartServiceManager", impl = StartServiceManagerCommand.class),
+      @SubCommand(name = "AddTable", impl = AddTableCommand.class),
+      @SubCommand(name = "ChangeTableState", impl = ChangeTableState.class),
+      @SubCommand(name = "AddTenant", impl = AddTenantCommand.class),
+      @SubCommand(name = "AddSchema", impl = AddSchemaCommand.class),
+      @SubCommand(name = "UpdateSchema", impl = AddSchemaCommand.class),
+      @SubCommand(name = "UploadSegment", impl = UploadSegmentCommand.class),
+      @SubCommand(name = "PostQuery", impl = PostQueryCommand.class),
+      @SubCommand(name = "StopProcess", impl = StopProcessCommand.class),
+      @SubCommand(name = "DeleteCluster", impl = DeleteClusterCommand.class),
+      @SubCommand(name = "ShowClusterInfo", impl = ShowClusterInfoCommand.class),
+      @SubCommand(name = "AvroSchemaToPinotSchema", impl = AvroSchemaToPinotSchema.class),
+      @SubCommand(name = "JsonToPinotSchema", impl = JsonToPinotSchema.class),
+      @SubCommand(name = "RebalanceTable", impl = RebalanceTableCommand.class),
+      @SubCommand(name = "ChangeNumReplicas", impl = ChangeNumReplicasCommand.class),
+      @SubCommand(name = "ValidateConfig", impl = ValidateConfigCommand.class),
+      @SubCommand(name = "VerifySegmentState", impl = VerifySegmentState.class),
+      @SubCommand(name = "ConvertPinotSegment", impl = PinotSegmentConvertCommand.class),
+      @SubCommand(name = "MoveReplicaGroup", impl = MoveReplicaGroup.class),
+      @SubCommand(name = "VerifyClusterState", impl = VerifyClusterStateCommand.class),
+      @SubCommand(name = "RealtimeProvisioningHelper", impl = RealtimeProvisioningHelperCommand.class),
+      @SubCommand(name = "MergeSegments", impl = SegmentMergeCommand.class),
+      @SubCommand(name = "CheckOfflineSegmentIntervals", impl = OfflineSegmentIntervalCheckerCommand.class),
+      @SubCommand(name = "AnonymizeData", impl = AnonymizeDataCommand.class),
+      @SubCommand(name = "GitHubEventsQuickStart", impl = GitHubEventsQuickStartCommand.class),
+      @SubCommand(name = "StreamGitHubEvents", impl = StreamGitHubEventsCommand.class),
+      @SubCommand(name = "BootstrapTable", impl = BootstrapTableCommand.class),
+      @SubCommand(name = "SegmentProcessorFramework", impl = SegmentProcessorFrameworkCommand.class)
+  })
   Command _subCommand;
   //@formatter:on
 
