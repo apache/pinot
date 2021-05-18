@@ -151,7 +151,8 @@ public class SegmentMetadataFetcher {
   /**
    * Get the JSON object containing star tree index details for a segment.
    */
-  private static List<Map<String, Object>> getStartreeIndexForSegmentColumns(SegmentDataManager segmentDataManager) {
+  @Nullable
+  private static List<Map<String, Object>> getStarTreeIndexes(SegmentDataManager segmentDataManager) {
     List<StarTreeV2> starTrees = segmentDataManager.getSegment().getStarTrees();
     return starTrees != null ? getImmutableSegmentStartreeIndexes(starTrees) : null;
   }
