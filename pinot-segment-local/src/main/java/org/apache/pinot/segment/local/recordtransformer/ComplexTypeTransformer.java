@@ -284,6 +284,10 @@ public class ComplexTypeTransformer implements RecordTransformer {
     return !(element instanceof Map || element instanceof Collection || isArray(element));
   }
 
+  /**
+   * This function assumes the collection is a homogeneous data structure that elements have same data type.
+   * So it checks the first element only.
+   */
   private boolean containPrimitives(Collection value) {
     if (value.isEmpty()) {
       return true;
@@ -292,7 +296,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
     return !(element instanceof Map || element instanceof Collection || isArray(element));
   }
 
-  static boolean isArray(Object obj) {
+  private static boolean isArray(Object obj) {
     if (obj == null) {
       return false;
     }
