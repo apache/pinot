@@ -296,7 +296,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
     return !(element instanceof Map || element instanceof Collection || isArray(element));
   }
 
-  private static boolean isArray(Object obj) {
+  protected static boolean isArray(Object obj) {
     if (obj == null) {
       return false;
     }
