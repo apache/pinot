@@ -36,10 +36,10 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
-import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
-import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.core.util.SegmentProcessorAvroUtils;
+import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
+import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
@@ -145,7 +145,7 @@ public class FileBasedSegmentWriter implements SegmentWriter {
    * Successful completion of segment will return the segment URI.
    * The buffer will be reset and ready to accept further records via <code>collect()</code>
    *
-   * If an exception is throw, the buffer will not be reset
+   * If an exception is thrown, the buffer will not be reset
    * and so, <code>flush()</code> can be invoked repeatedly in a retry loop.
    * If a successful invocation is not achieved,<code>close()</code> followed by <code>init</code> will have to be
    * called in order to reset the buffer and resume record writing.

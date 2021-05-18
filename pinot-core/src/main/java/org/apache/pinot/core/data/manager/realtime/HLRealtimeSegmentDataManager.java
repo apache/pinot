@@ -35,15 +35,13 @@ import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
-import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
-import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
-import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
-import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
-import org.apache.pinot.core.realtime.converter.RealtimeSegmentConverter;
-import org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig;
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.core.util.IngestionUtils;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
+import org.apache.pinot.segment.local.realtime.converter.RealtimeSegmentConverter;
+import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
+import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -57,6 +55,8 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamLevelConsumer;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.SegmentType;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -286,6 +286,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           File tempSegmentFolder = new File(_resourceTmpDir, "tmp-" + System.currentTimeMillis());
 
           // lets convert the segment now
+
           RealtimeSegmentConverter converter =
               new RealtimeSegmentConverter(_realtimeSegment, tempSegmentFolder.getAbsolutePath(), schema,
                   _tableNameWithType, tableConfig, realtimeSegmentZKMetadata.getSegmentName(), _sortedColumn,

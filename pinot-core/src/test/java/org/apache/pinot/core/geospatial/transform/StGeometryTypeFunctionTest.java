@@ -18,12 +18,13 @@
  */
 package org.apache.pinot.core.geospatial.transform;
 
-import java.util.Arrays;
-import org.apache.pinot.spi.data.FieldSpec;
+import java.util.Collections;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.Test;
 
 
 public class StGeometryTypeFunctionTest extends GeoFunctionTest {
+
   @Test
   public void testGeometryType()
       throws Exception {
@@ -39,10 +40,10 @@ public class StGeometryTypeFunctionTest extends GeoFunctionTest {
   private void assertType(String wkt, String type)
       throws Exception {
     // assert geometry
-    assertStringFunction(String.format("ST_GeometryType(ST_GeomFromText(%s))))", STRING_SV_COLUMN), new String[]{type},
-        Arrays.asList(new GeoFunctionTest.Column(STRING_SV_COLUMN, FieldSpec.DataType.STRING, new String[]{wkt})));
+    assertStringFunction(String.format("ST_GeometryType(ST_GeomFromText(%s))", STRING_SV_COLUMN), new String[]{type},
+        Collections.singletonList(new Column(STRING_SV_COLUMN, DataType.STRING, new String[]{wkt})));
     // assert geography
-    assertStringFunction(String.format("ST_GeometryType(ST_GeogFromText(%s))))", STRING_SV_COLUMN), new String[]{type},
-        Arrays.asList(new GeoFunctionTest.Column(STRING_SV_COLUMN, FieldSpec.DataType.STRING, new String[]{wkt})));
+    assertStringFunction(String.format("ST_GeometryType(ST_GeogFromText(%s))", STRING_SV_COLUMN), new String[]{type},
+        Collections.singletonList(new Column(STRING_SV_COLUMN, DataType.STRING, new String[]{wkt})));
   }
 }

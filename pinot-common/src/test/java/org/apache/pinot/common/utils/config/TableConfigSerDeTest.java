@@ -28,11 +28,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.tier.TierFactory;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
-import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
@@ -50,9 +47,13 @@ import org.apache.pinot.spi.config.table.assignment.InstanceConstraintConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
+import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
@@ -228,8 +229,8 @@ public class TableConfigSerDeTest {
       properties.put("foo", "bar");
       properties.put("foobar", "potato");
       List<FieldConfig> fieldConfigList = Arrays.asList(
-          new FieldConfig("column1", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED, properties),
-          new FieldConfig("column2", null, null, null));
+          new FieldConfig("column1", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED, null,
+              properties), new FieldConfig("column2", null, null, null, null));
       TableConfig tableConfig = tableConfigBuilder.setFieldConfigList(fieldConfigList).build();
 
       checkFieldConfig(tableConfig);
@@ -273,9 +274,11 @@ public class TableConfigSerDeTest {
       streamConfigMaps.add(streamConfigMap);
       List<Map<String, String>> batchConfigMaps = new ArrayList<>();
       batchConfigMaps.add(batchConfigMap);
+      List<String> unnestFields = Arrays.asList("c1, c2");
       IngestionConfig ingestionConfig =
           new IngestionConfig(new BatchIngestionConfig(batchConfigMaps, "APPEND", "HOURLY"),
-              new StreamIngestionConfig(streamConfigMaps), new FilterConfig("filterFunc(foo)"), transformConfigs);
+              new StreamIngestionConfig(streamConfigMaps), new FilterConfig("filterFunc(foo)"), transformConfigs,
+              new ComplexTypeConfig(unnestFields, ".", ComplexTypeConfig.CollectionToJsonMode.NON_PRIMITIVE));
       TableConfig tableConfig = tableConfigBuilder.setIngestionConfig(ingestionConfig).build();
 
       checkIngestionConfig(tableConfig);

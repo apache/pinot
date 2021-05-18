@@ -23,13 +23,13 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -129,9 +129,9 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    DataType valueType = blockValSet.getValueType();
-    IdSet idSet = getIdSet(aggregationResultHolder, valueType);
-    switch (valueType) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    IdSet idSet = getIdSet(aggregationResultHolder, storedType);
+    switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < length; i++) {
@@ -169,7 +169,7 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
         }
         break;
       default:
-        throw new IllegalStateException("Illegal data type for ID_SET aggregation function: " + valueType);
+        throw new IllegalStateException("Illegal data type for ID_SET aggregation function: " + storedType);
     }
   }
 
@@ -177,8 +177,8 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    DataType valueType = blockValSet.getValueType();
-    switch (valueType) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < length; i++) {
@@ -216,7 +216,7 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
         }
         break;
       default:
-        throw new IllegalStateException("Illegal data type for ID_SET aggregation function: " + valueType);
+        throw new IllegalStateException("Illegal data type for ID_SET aggregation function: " + storedType);
     }
   }
 
@@ -224,8 +224,8 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    DataType valueType = blockValSet.getValueType();
-    switch (valueType) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < length; i++) {
@@ -281,7 +281,7 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
         }
         break;
       default:
-        throw new IllegalStateException("Illegal data type for ID_SET aggregation function: " + valueType);
+        throw new IllegalStateException("Illegal data type for ID_SET aggregation function: " + storedType);
     }
   }
 

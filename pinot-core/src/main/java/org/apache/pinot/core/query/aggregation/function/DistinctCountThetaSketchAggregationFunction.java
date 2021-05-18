@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.datasketches.Util;
 import org.apache.datasketches.memory.Memory;
@@ -35,6 +34,11 @@ import org.apache.datasketches.theta.Sketch;
 import org.apache.datasketches.theta.Union;
 import org.apache.datasketches.theta.UpdateSketch;
 import org.apache.datasketches.theta.UpdateSketchBuilder;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -43,11 +47,6 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.FilterContext;
-import org.apache.pinot.core.query.request.context.FunctionContext;
-import org.apache.pinot.core.query.request.context.predicate.Predicate;
-import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -128,13 +127,8 @@ public class DistinctCountThetaSketchAggregationFunction extends BaseSingleInput
         ExpressionContext filterExpression = arguments.get(i);
         Preconditions.checkArgument(filterExpression.getType() == ExpressionContext.Type.LITERAL,
             "Third to second last argument of DISTINCT_COUNT_THETA_SKETCH aggregation function must be literal (filter expression)");
-        FilterContext filter;
-        try {
-          filter =
-              QueryContextConverterUtils.getFilter(CalciteSqlParser.compileToExpression(filterExpression.getLiteral()));
-        } catch (SqlParseException e) {
-          throw new IllegalArgumentException("Invalid filter expression: " + filterExpression.getLiteral());
-        }
+        FilterContext filter =
+            RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterExpression.getLiteral()));
         // NOTE: Collect expressions before constructing the FilterInfo so that expressionIndexMap always include the
         //       expressions in the filter.
         collectExpressions(filter, _inputExpressions, expressionIndexMap);
@@ -145,13 +139,8 @@ public class DistinctCountThetaSketchAggregationFunction extends BaseSingleInput
       ExpressionContext postAggregationExpression = arguments.get(numArguments - 1);
       Preconditions.checkArgument(postAggregationExpression.getType() == ExpressionContext.Type.LITERAL,
           "Last argument of DISTINCT_COUNT_THETA_SKETCH aggregation function must be literal (post-aggregation expression)");
-      try {
-        _postAggregationExpression = QueryContextConverterUtils
-            .getExpression(CalciteSqlParser.compileToExpression(postAggregationExpression.getLiteral()));
-      } catch (SqlParseException e) {
-        throw new IllegalArgumentException(
-            "Invalid post-aggregation expression: " + postAggregationExpression.getLiteral());
-      }
+      _postAggregationExpression = RequestContextUtils
+          .getExpression(CalciteSqlParser.compileToExpression(postAggregationExpression.getLiteral()));
 
       // Validate the post-aggregation expression
       _includeDefaultSketch = validatePostAggregationExpression(_postAggregationExpression, _filterEvaluators.size());
@@ -1113,11 +1102,11 @@ public class DistinctCountThetaSketchAggregationFunction extends BaseSingleInput
     for (int i = 0; i < numExpressions; i++) {
       BlockValSet blockValSet = blockValSetMap.get(_inputExpressions.get(i));
       boolean singleValue = blockValSet.isSingleValue();
-      DataType valueType = blockValSet.getValueType();
+      DataType storedType = blockValSet.getValueType().getStoredType();
       singleValues[i] = singleValue;
-      valueTypes[i] = valueType;
+      valueTypes[i] = storedType;
       if (singleValue) {
-        switch (valueType) {
+        switch (storedType) {
           case INT:
             valueArrays[i] = blockValSet.getIntValuesSV();
             break;
@@ -1140,7 +1129,7 @@ public class DistinctCountThetaSketchAggregationFunction extends BaseSingleInput
             throw new IllegalStateException();
         }
       } else {
-        switch (valueType) {
+        switch (storedType) {
           case INT:
             valueArrays[i] = blockValSet.getIntValuesMV();
             break;

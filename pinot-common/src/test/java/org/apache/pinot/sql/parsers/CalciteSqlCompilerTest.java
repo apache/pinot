@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -509,9 +510,10 @@ public class CalciteSqlCompilerTest {
 
     // nested functions in group by
     try {
-      pinotQuery = CalciteSqlParser.compileToPinotQuery("select concat(upper(playerName), lower(teamID), '-') playerTeam, "
-          + "upper(league) leagueUpper, count(playerName) cnt from baseballStats group by playerTeam, lower(teamID), leagueUpper "
-          + "having cnt > 1 order by cnt desc limit 10");
+      pinotQuery = CalciteSqlParser.compileToPinotQuery(
+          "select concat(upper(playerName), lower(teamID), '-') playerTeam, "
+              + "upper(league) leagueUpper, count(playerName) cnt from baseballStats group by playerTeam, lower(teamID), leagueUpper "
+              + "having cnt > 1 order by cnt desc limit 10");
     } catch (SqlCompilationException e) {
       throw e;
     }
@@ -574,7 +576,7 @@ public class CalciteSqlCompilerTest {
       CalciteSqlParser.compileToPinotQuery(query);
     } catch (SqlCompilationException e) {
       // Expected
-      Assert.assertTrue(e.getMessage().contains("at line 1, column 31."),
+      Assert.assertTrue(e.getCause().getMessage().contains("at line 1, column 31."),
           "Compilation exception should contain line and character for error message. Error message is " + e
               .getMessage());
       return;
@@ -1409,7 +1411,8 @@ public class CalciteSqlCompilerTest {
     } catch (Exception e) {
       Assert.assertTrue(e instanceof SqlCompilationException);
       Assert.assertTrue(e.getCause() instanceof SqlParseException);
-      Assert.assertTrue(e.getMessage().contains("Encountered") && e.getMessage().contains("table"));
+      String message = e.getCause().getMessage();
+      Assert.assertTrue(message.startsWith("Encountered") && message.contains("table"));
     }
     // date - need to escape
     try {
@@ -1418,7 +1421,8 @@ public class CalciteSqlCompilerTest {
     } catch (Exception e) {
       Assert.assertTrue(e instanceof SqlCompilationException);
       Assert.assertTrue(e.getCause() instanceof SqlParseException);
-      Assert.assertTrue(e.getMessage().contains("Encountered") && e.getMessage().contains("Date"));
+      String message = e.getCause().getMessage();
+      Assert.assertTrue(message.startsWith("Encountered") && message.contains("Date"));
     }
 
     // timestamp - need to escape
@@ -1428,7 +1432,8 @@ public class CalciteSqlCompilerTest {
     } catch (Exception e) {
       Assert.assertTrue(e instanceof SqlCompilationException);
       Assert.assertTrue(e.getCause() instanceof SqlParseException);
-      Assert.assertTrue(e.getMessage().contains("Encountered") && e.getMessage().contains("timestamp"));
+      String message = e.getCause().getMessage();
+      Assert.assertTrue(message.startsWith("Encountered") && message.contains("timestamp"));
     }
 
     // time - need to escape
@@ -1438,7 +1443,8 @@ public class CalciteSqlCompilerTest {
     } catch (Exception e) {
       Assert.assertTrue(e instanceof SqlCompilationException);
       Assert.assertTrue(e.getCause() instanceof SqlParseException);
-      Assert.assertTrue(e.getMessage().contains("Encountered") && e.getMessage().contains("time"));
+      String message = e.getCause().getMessage();
+      Assert.assertTrue(message.startsWith("Encountered") && message.contains("time"));
     }
 
     // group - need to escape
@@ -1448,7 +1454,8 @@ public class CalciteSqlCompilerTest {
     } catch (Exception e) {
       Assert.assertTrue(e instanceof SqlCompilationException);
       Assert.assertTrue(e.getCause() instanceof SqlParseException);
-      Assert.assertTrue(e.getMessage().contains("Encountered") && e.getMessage().contains("group"));
+      String message = e.getCause().getMessage();
+      Assert.assertTrue(message.startsWith("Encountered") && message.contains("group"));
     }
 
     // escaping the above works
@@ -1631,11 +1638,16 @@ public class CalciteSqlCompilerTest {
 
   @Test
   public void testOrdinalsQueryRewriteWithDistinctOrderby() {
-    String query = "SELECT baseballStats.playerName AS playerName FROM baseballStats GROUP BY baseballStats.playerName ORDER BY 1 ASC";
+    String query =
+        "SELECT baseballStats.playerName AS playerName FROM baseballStats GROUP BY baseballStats.playerName ORDER BY 1 ASC";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "baseballStats.playerName");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "baseballStats.playerName");
     Assert.assertTrue(pinotQuery.getGroupByList().isEmpty());
-    Assert.assertEquals(pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "baseballStats.playerName");
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "baseballStats.playerName");
   }
 
   @Test
@@ -1693,8 +1705,7 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
-  public void testCompileTimeExpression()
-      throws SqlParseException {
+  public void testCompileTimeExpression() {
     long lowerBound = System.currentTimeMillis();
     Expression expression = CalciteSqlParser.compileToExpression("now()");
     Assert.assertNotNull(expression.getFunctionCall());
@@ -1749,8 +1760,7 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
-  public void testLiteralExpressionCheck()
-      throws SqlParseException {
+  public void testLiteralExpressionCheck() {
     Assert.assertTrue(CalciteSqlParser.isLiteralOnlyExpression(CalciteSqlParser.compileToExpression("1123")));
     Assert.assertTrue(CalciteSqlParser.isLiteralOnlyExpression(CalciteSqlParser.compileToExpression("'ab'")));
     Assert.assertTrue(
@@ -2174,5 +2184,80 @@ public class CalciteSqlCompilerTest {
             .getIdentifier().getName(), "a");
     Assert.assertEquals(
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getLongValue(), 1L);
+  }
+
+  /**
+   * This test shows that Calcite {@link SqlNumericLiteral#isInteger()} throws NPE. The issue has been fixed in
+   * Calcite through CALCITE-4199 (https://issues.apache.org/jira/browse/CALCITE-4199), but has not made it into a
+   * release yet.
+   */
+  @Test
+  public void testSqlNumericalLiteralisIntegerNPE() {
+    CalciteSqlCompiler compiler = new CalciteSqlCompiler();
+    BrokerRequest sqlBrokerRequest = compiler.compileToBrokerRequest("SELECT * FROM testTable WHERE floatColumn > " + Double.MAX_VALUE);
+  }
+
+  @Test
+  public void testUnsupportedDistinctQueries() {
+    String sql = "SELECT DISTINCT col1, col2 FROM foo GROUP BY col1";
+    testUnsupportedDistinctQuery(sql, "DISTINCT with GROUP BY is not supported");
+
+    sql = "SELECT DISTINCT col1, col2 FROM foo LIMIT 0";
+    testUnsupportedDistinctQuery(sql, "DISTINCT must have positive LIMIT");
+
+    sql = "SELECT DISTINCT col1, col2 FROM foo ORDER BY col3";
+    testUnsupportedDistinctQuery(sql, "ORDER-BY columns should be included in the DISTINCT columns");
+
+    sql =
+        "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY col1, col2, col3";
+    testUnsupportedDistinctQuery(sql, "ORDER-BY columns should be included in the DISTINCT columns");
+
+    sql =
+        "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY col1, mod(col2, 10)";
+    testUnsupportedDistinctQuery(sql, "ORDER-BY columns should be included in the DISTINCT columns");
+  }
+
+  @Test
+  public void testSupportedDistinctQueries() {
+    String sql = "SELECT DISTINCT col1, col2 FROM foo ORDER BY col1, col2";
+    testSupportedDistinctQuery(sql);
+
+    sql = "SELECT DISTINCT col1, col2 FROM foo ORDER BY col2, col1";
+    testSupportedDistinctQuery(sql);
+
+    sql = "SELECT DISTINCT col1, col2 FROM foo ORDER BY col1 DESC, col2";
+    testSupportedDistinctQuery(sql);
+
+    sql = "SELECT DISTINCT col1, col2 FROM foo ORDER BY col1, col2 DESC";
+    testSupportedDistinctQuery(sql);
+
+    sql = "SELECT DISTINCT col1, col2 FROM foo ORDER BY col1 DESC, col2 DESC";
+    testSupportedDistinctQuery(sql);
+
+    sql =
+        "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY add(col1, sub(col2, 3))";
+    testSupportedDistinctQuery(sql);
+
+    sql =
+        "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY mod(col2, 10), add(col1, sub(col2, 3))";
+    testSupportedDistinctQuery(sql);
+
+    sql =
+        "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) DESC";
+    testSupportedDistinctQuery(sql);
+  }
+
+  private void testUnsupportedDistinctQuery(String query, String errorMessage) {
+    try {
+      PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+      Assert.fail("Query should have failed");
+    } catch (Exception e) {
+      Assert.assertEquals(errorMessage, e.getMessage());
+    }
+  }
+
+  private void testSupportedDistinctQuery(String query) {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertNotNull(pinotQuery);
   }
 }

@@ -32,7 +32,6 @@ import org.apache.avro.reflect.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
@@ -43,11 +42,13 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -100,6 +101,13 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     super.setUp();
   }
 
+  @AfterClass
+  @Override
+  public void tearDown()
+      throws Exception {
+    FileUtils.deleteDirectory(new File(CONSUMER_DIRECTORY));
+    super.tearDown();
+  }
 
   @Override
   public void startServer() {

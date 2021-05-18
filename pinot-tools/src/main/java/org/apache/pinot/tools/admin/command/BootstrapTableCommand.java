@@ -18,13 +18,11 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.NetUtil;
-import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.plugin.PluginManager;
-import org.apache.pinot.tools.Command;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.BootstrapTableTool;
+import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -125,7 +123,7 @@ public class BootstrapTableCommand extends AbstractBaseAdminCommand implements C
       throws Exception {
     PluginManager.get().init();
     if (_controllerHost == null) {
-      _controllerHost = NetUtil.getHostAddress();
+      _controllerHost = NetUtils.getHostAddress();
     }
     String token = makeAuthToken(_authToken, _user, _password);
     return new BootstrapTableTool(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort), _dir, token).execute();

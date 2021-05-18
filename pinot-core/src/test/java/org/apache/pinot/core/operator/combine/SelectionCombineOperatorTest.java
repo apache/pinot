@@ -26,11 +26,7 @@ import java.util.PriorityQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.common.utils.CommonConstants.Server;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.data.readers.GenericRowRecordReader;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.plan.CombinePlanNode;
 import org.apache.pinot.core.plan.PlanNode;
@@ -38,7 +34,9 @@ import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.plan.maker.PlanMaker;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
-import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -46,6 +44,8 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -60,7 +60,7 @@ import static org.testng.Assert.assertTrue;
  * Test for {@link SelectionOnlyCombineOperator} and {@link SelectionOrderByCombineOperator}.
  */
 public class SelectionCombineOperatorTest {
-  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "SelectionCombineEarlyTerminationTest");
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "SelectionCombineOperatorTest");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME_PREFIX = "testSegment_";
 
@@ -223,15 +223,14 @@ public class SelectionCombineOperatorTest {
   }
 
   private IntermediateResultsBlock getCombineResult(String query) {
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(query);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
     List<PlanNode> planNodes = new ArrayList<>(NUM_SEGMENTS);
     for (IndexSegment indexSegment : _indexSegments) {
       planNodes.add(PLAN_MAKER.makeSegmentPlanNode(indexSegment, queryContext));
     }
     CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, EXECUTOR,
         System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS,
-        InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, null,
-        InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD);
+        InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, null, InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD);
     return combinePlanNode.run().nextBlock();
   }
 

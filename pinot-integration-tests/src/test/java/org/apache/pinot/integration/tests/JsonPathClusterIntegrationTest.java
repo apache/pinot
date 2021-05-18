@@ -35,7 +35,6 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.requesthandler.PinotQueryRequest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -92,7 +91,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
         new TransformConfig(MY_MAP_STR_K2_FIELD_NAME, "jsonPathString(" + MY_MAP_STR_FIELD_NAME + ", '$.k2')"),
         new TransformConfig(COMPLEX_MAP_STR_K3_FIELD_NAME, "jsonPathArray(" + COMPLEX_MAP_STR_FIELD_NAME + ", '$.k3')"));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName)
-        .setIngestionConfig(new IngestionConfig(null, null, null, transformConfigs)).build();
+        .setIngestionConfig(new IngestionConfig(null, null, null, transformConfigs, null)).build();
     addTableConfig(tableConfig);
 
     // Create and upload segments

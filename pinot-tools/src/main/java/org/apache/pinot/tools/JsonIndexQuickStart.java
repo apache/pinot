@@ -27,6 +27,7 @@ import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.tools.Quickstart.Color;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
+import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
 import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
@@ -40,7 +41,6 @@ public class JsonIndexQuickStart {
     Preconditions.checkState(dataDir.mkdirs());
 
     File schemaFile = new File(baseDir, "githubEvents_schema.json");
-    File dataFile = new File(baseDir, "githubEvents.csv");
     File tableConfigFile = new File(baseDir, "githubEvents_offline_table_config.json");
     File ingestionJobSpecFile = new File(baseDir, "ingestionJobSpec.yaml");
 
@@ -51,9 +51,6 @@ public class JsonIndexQuickStart {
     resource = classLoader.getResource("examples/batch/githubEvents/githubEvents_schema.json");
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, schemaFile);
-    resource = classLoader.getResource("examples/batch/githubEvents/rawdata/githubEvents_data.json");
-    Preconditions.checkNotNull(resource);
-    FileUtils.copyURLToFile(resource, dataFile);
     resource = classLoader.getResource("examples/batch/githubEvents/ingestionJobSpec.yaml");
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, ingestionJobSpecFile);
@@ -78,7 +75,16 @@ public class JsonIndexQuickStart {
     printStatus(Color.CYAN, "***** Waiting for 5 seconds for the server to fetch the assigned segment *****");
     Thread.sleep(5000);
 
-    printStatus(Color.YELLOW, "***** Offline quickstart setup complete *****");
+    printStatus(Color.YELLOW, "***** Offline json-index quickstart setup complete *****");
+
+    String q1 =
+        "select json_extract_scalar(repo, '$.name', 'STRING'), count(*) from githubEvents where json_match(actor, '\"$.login\"=''LombiqBot''') group by 1 order by 2 desc limit 10";
+    printStatus(Color.YELLOW, "Most contributed repos by 'LombiqBot'");
+    printStatus(Color.CYAN, "Query : " + q1);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));
+
+    printStatus(Color.GREEN, "***************************************************");
+    printStatus(Color.GREEN, "You can always go to http://localhost:9000 to play around in the query console");
   }
 
   public static void main(String[] args)

@@ -26,15 +26,12 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
 import org.apache.commons.configuration.CompositeConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.MapConfiguration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**

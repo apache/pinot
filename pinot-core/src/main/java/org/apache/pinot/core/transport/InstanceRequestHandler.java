@@ -35,6 +35,7 @@ import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
@@ -153,7 +154,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       DataTable dataTable, Exception e) {
     try {
       Map<String, String> dataTableMetadata = dataTable.getMetadata();
-      dataTableMetadata.put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(requestId));
+      dataTableMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
       dataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
       byte[] serializedDataTable = dataTable.toBytes();
       sendResponse(ctx, queryArrivalTimeMs, serializedDataTable);

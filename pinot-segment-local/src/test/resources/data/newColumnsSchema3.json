@@ -1,0 +1,48 @@
+{
+  "metricFieldSpecs": [
+    {
+      "dataType": "INT",
+      "name": "newIntMetric",
+      "defaultNullValue": 2
+    },
+    {
+      "dataType": "LONG",
+      "name": "newLongMetric"
+    },
+    {
+      "dataType": "FLOAT",
+      "name": "newFloatMetric"
+    },
+    {
+      "dataType": "DOUBLE",
+      "name": "newDoubleMetric"
+    },
+    {
+      "dataType": "BYTES",
+      "defaultNullValue": "00000008000000ac00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "name": "newHLLByteMetric"
+    },
+    {
+      "dataType": "BYTES",
+      "defaultNullValue": "0000000141ba085ee15d2f3241ba085ee15d2f324059000000000000000000013ff000000000000041ba085ee15d2f32",
+      "name": "newTDigestByteMetric"
+    }
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "BOOLEAN",
+      "name": "newBooleanSVDimension",
+      "defaultNullValue": "false"
+    },
+    {
+      "dataType": "INT",
+      "name": "newIntSVDimension"
+    },
+    {
+      "dataType": "STRING",
+      "name": "newStringMVDimension",
+      "singleValueField": false,
+      "defaultNullValue": "notSameLength"
+    }
+  ]
+}

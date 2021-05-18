@@ -19,8 +19,10 @@
 package org.apache.pinot.integration.tests;
 
 import com.google.common.base.Function;
+import java.io.IOException;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
@@ -34,10 +36,7 @@ import org.apache.helix.participant.statemachine.Transition;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.NetUtil;
-import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
@@ -45,6 +44,8 @@ import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.helix.SegmentOnlineOfflineStateModelFactory;
 import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -73,6 +74,8 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
   @BeforeClass
   public void setUp()
       throws Exception {
+    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
+
     // Start the Pinot cluster
     startZk();
     startController();
@@ -94,12 +97,12 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
    */
   private void startFakeServer()
       throws Exception {
-    _serverInstance = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + NetUtil.getHostAddress() + "_"
+    _serverInstance = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + NetUtils.getHostAddress() + "_"
         + CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
 
     // Create server instance with the fake server state model
     _serverHelixManager = HelixManagerFactory
-        .getZKHelixManager(getHelixClusterName(), _serverInstance, InstanceType.PARTICIPANT, ZkStarter.DEFAULT_ZK_STR);
+        .getZKHelixManager(getHelixClusterName(), _serverInstance, InstanceType.PARTICIPANT, getZkUrl());
     _serverHelixManager.getStateMachineEngine()
         .registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelName(),
             new FakeServerSegmentStateModelFactory());
@@ -193,12 +196,15 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
   }
 
   @AfterClass
-  public void tearDown() {
+  public void tearDown()
+      throws IOException {
+    dropRealtimeTable(getTableName());
     stopFakeServer();
     stopBroker();
     stopController();
     stopKafka();
     stopZk();
+    FileUtils.deleteDirectory(_tempDir);
   }
 
   private void stopFakeServer() {

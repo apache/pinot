@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
@@ -33,7 +34,6 @@ import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctTable;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.util.QueryOptions;
@@ -59,10 +59,11 @@ public class DataTableUtils {
     int numColumns = columnOffsets.length;
     assert numColumns == dataSchema.size();
 
+    ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     int rowSizeInBytes = 0;
     for (int i = 0; i < numColumns; i++) {
       columnOffsets[i] = rowSizeInBytes;
-      switch (dataSchema.getColumnDataType(i)) {
+      switch (storedColumnDataTypes[i]) {
         case INT:
           rowSizeInBytes += 4;
           break;

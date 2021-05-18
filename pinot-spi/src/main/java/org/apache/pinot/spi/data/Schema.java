@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.utils.EqualityUtils;
@@ -421,8 +422,8 @@ public final class Schema implements Serializable {
    * Validates a pinot schema.
    * <p>The following validations are performed:
    * <ul>
-   *   <li>For dimension, time, date time fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, STRING, BYTES</li>
-   *   <li>For non-derived metric fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE</li>
+   *   <li>For dimension, time, date time fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, BOOLEAN, TIMESTAMP, STRING, BYTES</li>
+   *   <li>For metric fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, BYTES</li>
    * </ul>
    */
   public void validate() {
@@ -439,7 +440,10 @@ public final class Schema implements Serializable {
             case LONG:
             case FLOAT:
             case DOUBLE:
+            case BOOLEAN:
+            case TIMESTAMP:
             case STRING:
+            case JSON:
             case BYTES:
               break;
             default:
@@ -646,7 +650,6 @@ public final class Schema implements Serializable {
    *
    * @param oldSchema old schema
    */
-
   public boolean isBackwardCompatibleWith(Schema oldSchema) {
     Set<String> columnNames = getColumnNames();
     for (Map.Entry<String, FieldSpec> entry : oldSchema.getFieldSpecMap().entrySet()) {
@@ -692,7 +695,7 @@ public final class Schema implements Serializable {
     int outgoingTimeSize = outgoingGranularitySpec.getTimeUnitSize();
     TimeUnit outgoingTimeUnit = outgoingGranularitySpec.getTimeType();
     String outgoingTimeFormat = outgoingGranularitySpec.getTimeFormat();
-    String[] split = outgoingTimeFormat.split(DateTimeFormatSpec.COLON_SEPARATOR);
+    String[] split = StringUtils.split(outgoingTimeFormat, DateTimeFormatSpec.COLON_SEPARATOR, 2);
     DateTimeFormatSpec formatSpec;
     if (split[0].equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString())) {
       formatSpec = new DateTimeFormatSpec(outgoingTimeSize, outgoingTimeUnit.toString(), split[0]);

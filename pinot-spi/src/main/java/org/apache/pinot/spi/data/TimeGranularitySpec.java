@@ -75,7 +75,7 @@ public class TimeGranularitySpec implements Serializable {
     Preconditions.checkNotNull(timeType);
     Preconditions.checkNotNull(name);
 
-    _dataType = dataType.getStoredType();
+    _dataType = dataType;
     _timeType = timeType;
     _name = name;
   }
@@ -87,7 +87,7 @@ public class TimeGranularitySpec implements Serializable {
     Preconditions.checkArgument(timeFormat.equals(TimeFormat.EPOCH.toString()) || (timeFormat
         .startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())));
 
-    _dataType = dataType.getStoredType();
+    _dataType = dataType;
     _timeType = timeType;
     _name = name;
     _timeFormat = timeFormat;
@@ -97,7 +97,7 @@ public class TimeGranularitySpec implements Serializable {
     Preconditions.checkNotNull(timeType);
     Preconditions.checkNotNull(name);
 
-    _dataType = dataType.getStoredType();
+    _dataType = dataType;
     _timeType = timeType;
     _timeUnitSize = timeUnitSize;
     _name = name;
@@ -110,7 +110,7 @@ public class TimeGranularitySpec implements Serializable {
     Preconditions.checkArgument(timeFormat.equals(TimeFormat.EPOCH.toString()) || (timeFormat
         .startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())));
 
-    _dataType = dataType.getStoredType();
+    _dataType = dataType;
     _timeType = timeType;
     _timeUnitSize = timeUnitSize;
     _name = name;
@@ -132,7 +132,7 @@ public class TimeGranularitySpec implements Serializable {
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setDataType(DataType dataType) {
-    _dataType = dataType.getStoredType();
+    _dataType = dataType;
   }
 
   public TimeUnit getTimeType() {

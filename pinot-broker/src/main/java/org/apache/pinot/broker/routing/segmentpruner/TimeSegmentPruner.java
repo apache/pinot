@@ -38,14 +38,19 @@ import org.apache.pinot.broker.routing.segmentpruner.interval.Interval;
 import org.apache.pinot.broker.routing.segmentpruner.interval.IntervalTree;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.CommonConstants.Query.Range;
+import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.Function;
+import org.apache.pinot.common.request.Identifier;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Query.Range;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -151,11 +156,25 @@ public class TimeSegmentPruner implements SegmentPruner {
   @Override
   public Set<String> prune(BrokerRequest brokerRequest, Set<String> segments) {
     IntervalTree<String> intervalTree = _intervalTree;
-    FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
-    if (filterQueryTree == null) {
-      return segments;
+
+    List<Interval> intervals;
+    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
+    if (pinotQuery != null) {
+      // SQL
+      Expression filterExpression = pinotQuery.getFilterExpression();
+      if (filterExpression == null) {
+        return segments;
+      }
+      intervals = getFilterTimeIntervals(filterExpression);
+    } else {
+      // PQL
+      FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
+      if (filterQueryTree == null) {
+        return segments;
+      }
+      intervals = getFilterTimeIntervals(filterQueryTree);
     }
-    List<Interval> intervals = getFilterTimeIntervals(filterQueryTree);
+
     if (intervals == null) { // cannot prune based on time for input request
       return segments;
     }
@@ -176,8 +195,140 @@ public class TimeSegmentPruner implements SegmentPruner {
 
   /**
    * @return Null if no time condition or cannot filter base on the condition (e.g. 'SELECT * from myTable where time < 50 OR firstName = Jason')
+   *         Empty list if time condition is specified but invalid (e.g. 'SELECT * from myTable where time < 50 AND time > 100')
+   */
+  @Nullable
+  private List<Interval> getFilterTimeIntervals(Expression filterExpression) {
+    Function function = filterExpression.getFunctionCall();
+    FilterKind filterKind = FilterKind.valueOf(function.getOperator());
+    List<Expression> operands = function.getOperands();
+    switch (filterKind) {
+      case AND:
+        List<List<Interval>> andIntervals = new ArrayList<>();
+        for (Expression child : operands) {
+          List<Interval> childIntervals = getFilterTimeIntervals(child);
+          if (childIntervals != null) {
+            if (childIntervals.isEmpty()) {
+              return Collections.emptyList();
+            }
+            andIntervals.add(childIntervals);
+          }
+        }
+        if (andIntervals.isEmpty()) {
+          return null;
+        }
+        return getIntersectionSortedIntervals(andIntervals);
+      case OR:
+        List<List<Interval>> orIntervals = new ArrayList<>();
+        for (Expression child : operands) {
+          List<Interval> childIntervals = getFilterTimeIntervals(child);
+          if (childIntervals == null) {
+            return null;
+          } else {
+            orIntervals.add(childIntervals);
+          }
+        }
+        return getUnionSortedIntervals(orIntervals);
+      case EQUALS: {
+        Identifier identifier = operands.get(0).getIdentifier();
+        if (identifier != null && identifier.getName().equals(_timeColumn)) {
+          long timeStamp = _timeFormatSpec.fromFormatToMillis(operands.get(1).getLiteral().getFieldValue().toString());
+          return Collections.singletonList(new Interval(timeStamp, timeStamp));
+        } else {
+          return null;
+        }
+      }
+      case IN: {
+        Identifier identifier = operands.get(0).getIdentifier();
+        if (identifier != null && identifier.getName().equals(_timeColumn)) {
+          int numOperands = operands.size();
+          List<Interval> intervals = new ArrayList<>(numOperands - 1);
+          for (int i = 1; i < numOperands; i++) {
+            long timeStamp =
+                _timeFormatSpec.fromFormatToMillis(operands.get(i).getLiteral().getFieldValue().toString());
+            intervals.add(new Interval(timeStamp, timeStamp));
+          }
+          return intervals;
+        } else {
+          return null;
+        }
+      }
+      case GREATER_THAN: {
+        Identifier identifier = operands.get(0).getIdentifier();
+        if (identifier != null && identifier.getName().equals(_timeColumn)) {
+          long timeStamp = _timeFormatSpec.fromFormatToMillis(operands.get(1).getLiteral().getFieldValue().toString());
+          return Collections.singletonList(new Interval(timeStamp + 1, MAX_END_TIME));
+        } else {
+          return null;
+        }
+      }
+      case GREATER_THAN_OR_EQUAL: {
+        Identifier identifier = operands.get(0).getIdentifier();
+        if (identifier != null && identifier.getName().equals(_timeColumn)) {
+          long timeStamp = _timeFormatSpec.fromFormatToMillis(operands.get(1).getLiteral().getFieldValue().toString());
+          return Collections.singletonList(new Interval(timeStamp, MAX_END_TIME));
+        } else {
+          return null;
+        }
+      }
+      case LESS_THAN: {
+        Identifier identifier = operands.get(0).getIdentifier();
+        if (identifier != null && identifier.getName().equals(_timeColumn)) {
+          long timeStamp = _timeFormatSpec.fromFormatToMillis(operands.get(1).getLiteral().getFieldValue().toString());
+          if (timeStamp > MIN_START_TIME) {
+            return Collections.singletonList(new Interval(MIN_START_TIME, timeStamp - 1));
+          } else {
+            return Collections.emptyList();
+          }
+        } else {
+          return null;
+        }
+      }
+      case LESS_THAN_OR_EQUAL: {
+        Identifier identifier = operands.get(0).getIdentifier();
+        if (identifier != null && identifier.getName().equals(_timeColumn)) {
+          long timeStamp = _timeFormatSpec.fromFormatToMillis(operands.get(1).getLiteral().getFieldValue().toString());
+          if (timeStamp >= MIN_START_TIME) {
+            return Collections.singletonList(new Interval(MIN_START_TIME, timeStamp));
+          } else {
+            return Collections.emptyList();
+          }
+        } else {
+          return null;
+        }
+      }
+      case BETWEEN: {
+        Identifier identifier = operands.get(0).getIdentifier();
+        if (identifier != null && identifier.getName().equals(_timeColumn)) {
+          long startTimestamp =
+              _timeFormatSpec.fromFormatToMillis(operands.get(1).getLiteral().getFieldValue().toString());
+          long endTimestamp =
+              _timeFormatSpec.fromFormatToMillis(operands.get(2).getLiteral().getFieldValue().toString());
+          if (endTimestamp >= startTimestamp) {
+            return Collections.singletonList(new Interval(startTimestamp, endTimestamp));
+          } else {
+            return Collections.emptyList();
+          }
+        } else {
+          return null;
+        }
+      }
+      case RANGE: {
+        Identifier identifier = operands.get(0).getIdentifier();
+        if (identifier != null && identifier.getName().equals(_timeColumn)) {
+          return parseInterval(operands.get(1).getLiteral().getFieldValue().toString());
+        }
+      }
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * @return Null if no time condition or cannot filter base on the condition (e.g. 'SELECT * from myTable where time < 50 OR firstName = Jason')
    * @return Empty list if time condition is specified but invalid (e.g. 'SELECT * from myTable where time < 50 AND time > 100')
    */
+  @Deprecated
   @Nullable
   private List<Interval> getFilterTimeIntervals(FilterQueryTree filterQueryTree) {
     switch (filterQueryTree.getOperator()) {
@@ -225,7 +376,7 @@ public class TimeSegmentPruner implements SegmentPruner {
         return null;
       case RANGE:
         if (filterQueryTree.getColumn().equals(_timeColumn)) {
-          return parseInterval(filterQueryTree.getValue());
+          return parseInterval(filterQueryTree.getValue().get(0));
         }
         return null;
       default:
@@ -324,16 +475,13 @@ public class TimeSegmentPruner implements SegmentPruner {
    * Parse interval to millisecond as [min, max] with both sides included.
    * E.g. '(* 16311]' is parsed as [0, 16311], '(1455 16311)' is parsed as [1456, 16310]
    */
-  private List<Interval> parseInterval(List<String> intervalExpressions) {
-    Preconditions.checkState(intervalExpressions != null && intervalExpressions.size() == 1,
-        "Cannot parse range expressions from query: %s", intervalExpressions);
+  private List<Interval> parseInterval(String rangeString) {
     long startTime = MIN_START_TIME;
     long endTime = MAX_END_TIME;
-    String intervalExpression = intervalExpressions.get(0);
-    int length = intervalExpression.length();
-    boolean startExclusive = intervalExpression.charAt(0) == Range.LOWER_EXCLUSIVE;
-    boolean endExclusive = intervalExpression.charAt(length - 1) == Range.UPPER_EXCLUSIVE;
-    String interval = intervalExpression.substring(1, length - 1);
+    int length = rangeString.length();
+    boolean startExclusive = rangeString.charAt(0) == Range.LOWER_EXCLUSIVE;
+    boolean endExclusive = rangeString.charAt(length - 1) == Range.UPPER_EXCLUSIVE;
+    String interval = rangeString.substring(1, length - 1);
     String[] split = StringUtils.split(interval, Range.DELIMITER);
     if (!split[0].equals(Range.UNBOUNDED)) {
       startTime = _timeFormatSpec.fromFormatToMillis(split[0]);

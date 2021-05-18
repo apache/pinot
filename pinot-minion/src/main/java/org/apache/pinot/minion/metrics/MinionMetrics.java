@@ -20,7 +20,7 @@ package org.apache.pinot.minion.metrics;
 
 import org.apache.pinot.common.metrics.AbstractMetrics;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 public class MinionMetrics extends AbstractMetrics<MinionQueryPhase, MinionMeter, MinionGauge, MinionTimer> {

@@ -18,14 +18,13 @@
  */
 package org.apache.pinot.controller.recommender.data.generator;
 
+import java.util.Map;
 import org.apache.commons.configuration.PropertyConverter;
 import org.apache.commons.math3.distribution.AbstractRealDistribution;
 import org.apache.commons.math3.distribution.ExponentialDistribution;
 import org.apache.commons.math3.distribution.LogNormalDistribution;
 import org.apache.commons.math3.distribution.UniformRealDistribution;
 import org.apache.commons.math3.random.Well19937c;
-
-import java.util.Map;
 
 /**
  * PatternSpikeGenerator produces a series of log-normal spikes with log-normal arrival times, with optional smoothing.

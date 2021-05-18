@@ -20,7 +20,6 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -29,9 +28,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -50,7 +47,6 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
-import org.apache.pinot.common.config.tuner.TableConfigTunerRegistry;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -60,28 +56,21 @@ import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
+import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
+import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.recommender.RecommenderDriver;
-import org.apache.pinot.core.common.MinionConstants;
-import org.apache.pinot.core.util.ReplicationUtils;
-import org.apache.pinot.core.util.TableConfigUtils;
-import org.apache.pinot.spi.config.table.QuotaConfig;
-import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStats;
-import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.TunerConfig;
-import org.apache.pinot.spi.config.table.tuner.TableConfigTuner;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.glassfish.grizzly.http.server.Request;
-import org.quartz.CronScheduleBuilder;
 import org.slf4j.LoggerFactory;
 
 
@@ -149,12 +138,7 @@ public class PinotTableRestletResource {
 
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
 
-      TunerConfig tunerConfig = tableConfig.getTunerConfig();
-      if (tunerConfig != null && tunerConfig.getName() != null && !tunerConfig.getName().isEmpty()) {
-        TableConfigTuner tuner = TableConfigTunerRegistry.getTuner(tunerConfig.getName());
-        tuner.init(tunerConfig, schema);
-        tableConfig = tuner.apply(tableConfig);
-      }
+      TableConfigUtils.applyTunerConfig(tableConfig, schema);
 
       // TableConfigUtils.validate(...) is used across table create/update.
       TableConfigUtils.validate(tableConfig, schema);
@@ -165,19 +149,23 @@ public class PinotTableRestletResource {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     }
     try {
-      ensureMinReplicas(tableConfig);
-      ensureStorageQuotaConstraints(tableConfig);
-      verifyTableConfigs(tableConfig);
+      try {
+        TableConfigUtils.ensureMinReplicas(tableConfig, _controllerConf.getDefaultTableMinReplicas());
+        TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
+        checkHybridTableConfig(TableNameBuilder.extractRawTableName(tableName), tableConfig);
+      } catch (Exception e) {
+        throw new InvalidTableConfigException(e);
+      }
       _pinotHelixResourceManager.addTable(tableConfig);
       // TODO: validate that table was created successfully
       // (in realtime case, metadata might not have been created but would be created successfully in the next run of the validation manager)
       return new SuccessResponse("Table " + tableName + " succesfully added");
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_ADD_ERROR, 1L);
-      if (e instanceof PinotHelixResourceManager.InvalidTableConfigException) {
+      if (e instanceof InvalidTableConfigException) {
         String errStr = String.format("Invalid table config for table %s: %s", tableName, e.getMessage());
         throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST, e);
-      } else if (e instanceof PinotHelixResourceManager.TableAlreadyExistsException) {
+      } else if (e instanceof TableAlreadyExistsException) {
         throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
       } else {
         throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
@@ -252,14 +240,14 @@ public class PinotTableRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}")
-  @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Get/Enable/Disable/Drop a table", notes =
       "Get/Enable/Disable/Drop a table. If table name is the only parameter specified "
           + ", the tableconfig will be printed")
   public String alterTableStateOrListTableConfig(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "enable|disable|drop") @QueryParam("state") String stateStr,
-      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
+      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr,
+      @Context HttpHeaders httpHeaders, @Context Request request) {
     try {
       if (stateStr == null) {
         return listTableConfigs(tableName, tableTypeStr);
@@ -267,6 +255,11 @@ public class PinotTableRestletResource {
 
       StateType stateType = Constants.validateState(stateStr);
       TableType tableType = Constants.validateTableType(tableTypeStr);
+
+      // validate if user has permission to change the table state
+      String endpointUrl = request.getRequestURL().toString();
+      _accessControlUtils
+          .validatePermission(tableName, AccessType.UPDATE, httpHeaders, endpointUrl, _accessControlFactory.create());
 
       ArrayNode ret = JsonUtils.newArrayNode();
       boolean tableExists = false;
@@ -374,7 +367,7 @@ public class PinotTableRestletResource {
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
-      String msg = String.format("Invalid table config: %s", tableName);
+      String msg = String.format("Invalid table config: %s with error: %s", tableName, e.getMessage());
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
 
@@ -392,11 +385,15 @@ public class PinotTableRestletResource {
             Response.Status.NOT_FOUND);
       }
 
-      ensureMinReplicas(tableConfig);
-      ensureStorageQuotaConstraints(tableConfig);
-      verifyTableConfigs(tableConfig);
+      try {
+        TableConfigUtils.ensureMinReplicas(tableConfig, _controllerConf.getDefaultTableMinReplicas());
+        TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
+        checkHybridTableConfig(TableNameBuilder.extractRawTableName(tableName), tableConfig);
+      } catch (Exception e) {
+        throw new InvalidTableConfigException(e);
+      }
       _pinotHelixResourceManager.updateTableConfig(tableConfig);
-    } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
+    } catch (InvalidTableConfigException e) {
       String errStr = String.format("Failed to update configuration for %s due to: %s", tableName, e.getMessage());
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST, e);
@@ -425,12 +422,14 @@ public class PinotTableRestletResource {
     return validateConfig(tableConfig, _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig));
   }
 
+  @Deprecated
   @POST
   @Path("/tables/validateTableAndSchema")
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Validate table config for a table along with specified schema", notes =
-      "Validate given table config and schema. If specified schema is null, attempt to retrieve schema using the "
+      "Deprecated. Use /tableConfigs/validate instead."
+          + "Validate given table config and schema. If specified schema is null, attempt to retrieve schema using the "
           + "table name. This API returns the table config that matches the one you get from 'GET /tables/{tableName}'."
           + " This allows us to validate table config before apply.")
   public String validateTableAndSchema(TableAndSchemaConfig tableSchemaConfig) {
@@ -460,151 +459,6 @@ public class PinotTableRestletResource {
       String msg = String.format("Invalid table config: %s. %s", tableConfig.getTableName(), e.getMessage());
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
-  }
-
-  private void ensureMinReplicas(TableConfig tableConfig) {
-    // For self-serviced cluster, ensure that the tables are created with at least min replication factor irrespective
-    // of table configuration value
-    SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();
-    int configMinReplication = _controllerConf.getDefaultTableMinReplicas();
-    boolean verifyReplicasPerPartition;
-    boolean verifyReplication;
-
-    try {
-      verifyReplicasPerPartition = ReplicationUtils.useReplicasPerPartition(tableConfig);
-      verifyReplication = ReplicationUtils.useReplication(tableConfig);
-    } catch (Exception e) {
-      String errorMsg = String.format("Invalid tableIndexConfig or streamConfig: %s", e.getMessage());
-      throw new PinotHelixResourceManager.InvalidTableConfigException(errorMsg, e);
-    }
-
-    if (verifyReplication) {
-      int requestReplication;
-      try {
-        requestReplication = segmentsConfig.getReplicationNumber();
-        if (requestReplication < configMinReplication) {
-          LOGGER.info("Creating table with minimum replication factor of: {} instead of requested replication: {}",
-              configMinReplication, requestReplication);
-          segmentsConfig.setReplication(String.valueOf(configMinReplication));
-        }
-      } catch (NumberFormatException e) {
-        throw new PinotHelixResourceManager.InvalidTableConfigException("Invalid replication number", e);
-      }
-    }
-
-    if (verifyReplicasPerPartition) {
-      String replicasPerPartitionStr = segmentsConfig.getReplicasPerPartition();
-      if (replicasPerPartitionStr == null) {
-        throw new PinotHelixResourceManager.InvalidTableConfigException(
-            "Field replicasPerPartition needs to be specified");
-      }
-      try {
-        int replicasPerPartition = Integer.valueOf(replicasPerPartitionStr);
-        if (replicasPerPartition < configMinReplication) {
-          LOGGER.info(
-              "Creating table with minimum replicasPerPartition of: {} instead of requested replicasPerPartition: {}",
-              configMinReplication, replicasPerPartition);
-          segmentsConfig.setReplicasPerPartition(String.valueOf(configMinReplication));
-        }
-      } catch (NumberFormatException e) {
-        throw new PinotHelixResourceManager.InvalidTableConfigException(
-            "Invalid value for replicasPerPartition: '" + replicasPerPartitionStr + "'", e);
-      }
-    }
-  }
-
-  private void ensureStorageQuotaConstraints(TableConfig tableConfig) {
-    // Dim tables must adhere to cluster level storage size limits
-    if (tableConfig.isDimTable()) {
-      QuotaConfig quotaConfig = tableConfig.getQuotaConfig();
-      String maxAllowedSize = _controllerConf.getDimTableMaxSize();
-      long maxAllowedSizeInBytes = DataSizeUtils.toBytes(maxAllowedSize);
-
-      if (quotaConfig == null) {
-        // set a default storage quota
-        tableConfig.setQuotaConfig(new QuotaConfig(maxAllowedSize, null));
-        LOGGER.info("Assigning default storage quota ({}) for dimension table: {}", maxAllowedSize,
-            tableConfig.getTableName());
-      } else {
-        if (quotaConfig.getStorage() == null) {
-          // set a default storage quota and keep the RPS value
-          tableConfig.setQuotaConfig(new QuotaConfig(maxAllowedSize, quotaConfig.getMaxQueriesPerSecond()));
-          LOGGER.info("Assigning default storage quota ({}) for dimension table: {}", maxAllowedSize,
-              tableConfig.getTableName());
-        } else {
-          if (quotaConfig.getStorageInBytes() > maxAllowedSizeInBytes) {
-            throw new PinotHelixResourceManager.InvalidTableConfigException(String
-                .format("Invalid storage quota: %d, max allowed size: %d", quotaConfig.getStorageInBytes(),
-                    maxAllowedSizeInBytes));
-          }
-        }
-      }
-    }
-  }
-
-  /**
-   * Verify table configs if it's a hybrid table, i.e. having both offline and real-time sub-tables.
-   */
-  private void verifyTableConfigs(TableConfig newTableConfig) {
-    String rawTableName = TableNameBuilder.extractRawTableName(newTableConfig.getTableName());
-    LOGGER.info("Validating table configs for Table: {}", rawTableName);
-
-    TableConfig tableConfigToCompare = null;
-    if (newTableConfig.getTableType() == TableType.REALTIME) {
-      if (_pinotHelixResourceManager.hasOfflineTable(rawTableName)) {
-        tableConfigToCompare = _pinotHelixResourceManager.getOfflineTableConfig(rawTableName);
-      }
-    } else {
-      if (_pinotHelixResourceManager.hasRealtimeTable(rawTableName)) {
-        tableConfigToCompare = _pinotHelixResourceManager.getRealtimeTableConfig(rawTableName);
-      }
-    }
-
-    // Check if task schedule is valid.
-    TableTaskConfig taskConfig = newTableConfig.getTaskConfig();
-    if (taskConfig != null && taskConfig.isTaskTypeEnabled(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE)) {
-      Map<String, String> taskTypeConfig =
-          taskConfig.getConfigsForTaskType(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE);
-      if (taskTypeConfig != null && taskTypeConfig.containsKey(PinotTaskManager.SCHEDULE_KEY)) {
-        String cronExprStr = taskTypeConfig.get(PinotTaskManager.SCHEDULE_KEY);
-        try {
-          CronScheduleBuilder.cronSchedule(cronExprStr);
-        } catch (Exception e) {
-          throw new PinotHelixResourceManager.InvalidTableConfigException(
-              String.format("SegmentGenerationAndPushTask contains an invalid cron schedule: %s", cronExprStr), e);
-        }
-      }
-    }
-
-    // Check if it is a hybrid table or not. If not, there's no need to verify anything.
-    if (tableConfigToCompare == null) {
-      LOGGER.info(
-          "Table: {} is not a hybrid table. Skipping consistency check across realtime and offline parts of the table.",
-          rawTableName);
-      return;
-    }
-
-    SegmentsValidationAndRetentionConfig newSegmentConfig = newTableConfig.getValidationConfig();
-    SegmentsValidationAndRetentionConfig SegmentConfigToCompare = tableConfigToCompare.getValidationConfig();
-
-    String newTimeColumnName = newSegmentConfig.getTimeColumnName();
-    String existingTimeColumnName = SegmentConfigToCompare.getTimeColumnName();
-    if (!Objects.equal(existingTimeColumnName, newTimeColumnName)) {
-      throw new PinotHelixResourceManager.InvalidTableConfigException(String
-          .format("Time column names are different! Existing time column name: %s. New time column name: %s",
-              existingTimeColumnName, newTimeColumnName));
-    }
-
-    TimeUnit existingTimeColumnType = SegmentConfigToCompare.getTimeType();
-    TimeUnit newTimeColumnType = newSegmentConfig.getTimeType();
-    if (existingTimeColumnType != newTimeColumnType) {
-      throw new PinotHelixResourceManager.InvalidTableConfigException(String
-          .format("Time column types are different! Existing time column type: %s. New time column type: %s",
-              existingTimeColumnType, newTimeColumnType));
-    }
-
-    // TODO: validate time unit size but now there's no metadata for that in table config.
-    LOGGER.info("Finished validating tables config for Table: {}", rawTableName);
   }
 
   @POST
@@ -716,5 +570,20 @@ public class PinotTableRestletResource {
           Response.Status.BAD_REQUEST);
     }
     return TableNameBuilder.forType(tableType).tableNameWithType(tableName);
+  }
+
+  private void checkHybridTableConfig(String rawTableName, TableConfig tableConfig) {
+    if (tableConfig.getTableType() == TableType.REALTIME) {
+      if (_pinotHelixResourceManager.hasOfflineTable(rawTableName)) {
+        TableConfigUtils
+            .verifyHybridTableConfigs(rawTableName, _pinotHelixResourceManager.getOfflineTableConfig(rawTableName),
+                tableConfig);
+      }
+    } else {
+      if (_pinotHelixResourceManager.hasRealtimeTable(rawTableName)) {
+        TableConfigUtils.verifyHybridTableConfigs(rawTableName, tableConfig,
+            _pinotHelixResourceManager.getRealtimeTableConfig(rawTableName));
+      }
+    }
   }
 }

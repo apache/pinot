@@ -28,9 +28,9 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -50,14 +50,8 @@ import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
-import org.apache.pinot.common.utils.CommonConstants.Broker;
-import org.apache.pinot.common.utils.CommonConstants.Helix;
-import org.apache.pinot.common.utils.CommonConstants.Minion;
-import org.apache.pinot.common.utils.CommonConstants.Server;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.helix.ControllerTest;
-import org.apache.pinot.core.requesthandler.PinotQueryRequest;
 import org.apache.pinot.minion.MinionStarter;
 import org.apache.pinot.minion.event.MinionEventObserverFactory;
 import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
@@ -69,7 +63,12 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.CommonConstants.Minion;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,12 +83,14 @@ import static org.testng.Assert.assertTrue;
 public abstract class ClusterTest extends ControllerTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(ClusterTest.class);
   private static final int DEFAULT_BROKER_PORT = 18099;
+  protected static final Random RANDOM = new Random(System.currentTimeMillis());
 
   protected String _brokerBaseApiUrl;
 
   private List<HelixBrokerStarter> _brokerStarters;
   private List<HelixServerStarter> _serverStarters;
   private MinionStarter _minionStarter;
+  private List<Integer> _brokerPorts;
 
   protected PinotConfiguration getDefaultBrokerConfiguration() {
     return new PinotConfiguration();
@@ -107,17 +108,19 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void startBrokers(int numBrokers)
       throws Exception {
-    startBrokers(numBrokers, DEFAULT_BROKER_PORT, ZkStarter.DEFAULT_ZK_STR);
+    startBrokers(numBrokers, DEFAULT_BROKER_PORT, getZkUrl());
   }
 
   protected void startBrokers(int numBrokers, int basePort, String zkStr)
       throws Exception {
-    _brokerBaseApiUrl = "http://localhost:" + basePort;
     _brokerStarters = new ArrayList<>(numBrokers);
+    _brokerPorts = new ArrayList<>();
     for (int i = 0; i < numBrokers; i++) {
       Map<String, Object> properties = getDefaultBrokerConfiguration().toMap();
       properties.put(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
-      properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, basePort + i);
+      int port = NetUtils.findOpenPort(basePort + i);
+      _brokerPorts.add(port);
+      properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, port);
       properties.put(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
       PinotConfiguration configuration = new PinotConfiguration(properties);
       overrideBrokerConf(configuration);
@@ -127,6 +130,19 @@ public abstract class ClusterTest extends ControllerTest {
       brokerStarter.start();
       _brokerStarters.add(brokerStarter);
     }
+    _brokerBaseApiUrl = "http://localhost:" + _brokerPorts.get(0);
+  }
+
+  protected int getRandomBrokerPort() {
+    return _brokerPorts.get(RANDOM.nextInt(_brokerPorts.size()));
+  }
+
+  protected int getBrokerPort(int index) {
+    return _brokerPorts.get(index);
+  }
+
+  protected List<Integer> getBrokerPorts() {
+    return ImmutableList.copyOf(_brokerPorts);
   }
 
   protected PinotConfiguration getDefaultServerConfiguration() {
@@ -145,12 +161,12 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void startServer(PinotConfiguration configuration) {
     startServers(1, configuration, Server.DEFAULT_ADMIN_API_PORT, Helix.DEFAULT_SERVER_NETTY_PORT,
-        ZkStarter.DEFAULT_ZK_STR);
+        getZkUrl());
   }
 
   protected void startServers(int numServers) {
     startServers(numServers, getDefaultServerConfiguration(), Server.DEFAULT_ADMIN_API_PORT,
-        Helix.DEFAULT_SERVER_NETTY_PORT, ZkStarter.DEFAULT_ZK_STR);
+        Helix.DEFAULT_SERVER_NETTY_PORT, getZkUrl());
   }
 
   protected void startServers(int numServers, int baseAdminApiPort, int baseNettyPort, String zkStr) {
@@ -191,7 +207,7 @@ public abstract class ClusterTest extends ControllerTest {
       @Nullable List<MinionEventObserverFactory> eventObserverFactories) {
     FileUtils.deleteQuietly(new File(Minion.DEFAULT_INSTANCE_BASE_DIR));
     try {
-      _minionStarter = new MinionStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, getDefaultMinionConfiguration());
+      _minionStarter = new MinionStarter(getHelixClusterName(), getZkUrl(), getDefaultMinionConfiguration());
       // Register task executor factories
       if (taskExecutorFactories != null) {
         for (PinotTaskExecutorFactory taskExecutorFactory : taskExecutorFactories) {
@@ -368,23 +384,23 @@ public abstract class ClusterTest extends ControllerTest {
    */
   protected JsonNode postQuery(String query)
       throws Exception {
-    return postQuery(new PinotQueryRequest("pql", query), _brokerBaseApiUrl);
+    return postQuery(query, _brokerBaseApiUrl);
   }
 
   /**
    * Queries the broker's pql query endpoint (/query)
    */
-  public static JsonNode postQuery(PinotQueryRequest r, String brokerBaseApiUrl)
+  public static JsonNode postQuery(String query, String brokerBaseApiUrl)
       throws Exception {
-    return postQuery(r.getQuery(), brokerBaseApiUrl, false, r.getQueryFormat(), null);
+    return postQuery(query, brokerBaseApiUrl, null);
   }
 
   /**
    * Queries the broker's pql query endpoint (/query)
    */
-  public static JsonNode postQuery(PinotQueryRequest r, String brokerBaseApiUrl, Map<String, String> headers)
+  public static JsonNode postQuery(String query, String brokerBaseApiUrl, Map<String, String> headers)
       throws Exception {
-    return postQuery(r.getQuery(), brokerBaseApiUrl, false, r.getQueryFormat(), headers);
+    return postQuery(query, brokerBaseApiUrl, false, Broker.Request.PQL, headers);
   }
 
   /**

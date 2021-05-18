@@ -20,11 +20,9 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.util.Random;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.core.query.exception.BadQueryRequestException;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.testng.Assert;
-import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
@@ -94,7 +92,7 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
 
   private void testCaseQueryWithIntResults(String predicate, int[] expectedValues) {
     ExpressionContext expression =
-        QueryContextConverterUtils.getExpression(String.format("CASE(%s, 100, 10)", predicate));
+        RequestContextUtils.getExpressionFromSQL(String.format("CASE WHEN %s THEN 100 ELSE 10 END", predicate));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CaseTransformFunction);
     Assert.assertEquals(transformFunction.getName(), CaseTransformFunction.FUNCTION_NAME);
@@ -103,7 +101,7 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
 
   private void testCaseQueryWithDoubleResults(String predicate, double[] expectedValues) {
     ExpressionContext expression =
-        QueryContextConverterUtils.getExpression(String.format("CASE(%s, 100.0, 10.0)", predicate));
+        RequestContextUtils.getExpressionFromSQL(String.format("CASE WHEN %s THEN 100.0 ELSE 10.0 END", predicate));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CaseTransformFunction);
     Assert.assertEquals(transformFunction.getName(), CaseTransformFunction.FUNCTION_NAME);
@@ -112,23 +110,11 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
 
   private void testCaseQueryWithStringResults(String predicate, String[] expectedValues) {
     ExpressionContext expression =
-        QueryContextConverterUtils.getExpression(String.format("CASE(%s, 'aaa', 'bbb')", predicate));
+        RequestContextUtils.getExpressionFromSQL(String.format("CASE WHEN %s THEN 'aaa' ELSE 'bbb' END", predicate));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CaseTransformFunction);
     Assert.assertEquals(transformFunction.getName(), CaseTransformFunction.FUNCTION_NAME);
     testTransformFunction(transformFunction, expectedValues);
-  }
-
-  @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
-  public void testIllegalArguments(String expressionStr) {
-    ExpressionContext expression = QueryContextConverterUtils.getExpression(expressionStr);
-    TransformFunctionFactory.get(expression, _dataSourceMap);
-  }
-
-  @DataProvider(name = "testIllegalArguments")
-  public Object[][] testIllegalArguments() {
-    return new Object[][]{new Object[]{String.format("case(%s)", INT_SV_COLUMN)}, new Object[]{String.format(
-        "case(%s, %s)", LONG_SV_COLUMN, 10)}};
   }
 
   private int[] getExpectedIntResults(String column, TransformFunctionType type) {

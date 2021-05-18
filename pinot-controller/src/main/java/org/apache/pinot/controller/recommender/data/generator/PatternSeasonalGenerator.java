@@ -18,13 +18,12 @@
  */
 package org.apache.pinot.controller.recommender.data.generator;
 
-import org.apache.commons.configuration.PropertyConverter;
-import org.apache.commons.math3.distribution.NormalDistribution;
-import org.apache.commons.math3.random.Well19937c;
-
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.configuration.PropertyConverter;
+import org.apache.commons.math3.distribution.NormalDistribution;
+import org.apache.commons.math3.random.Well19937c;
 
 /**
  * PatternSeasonalGenerator generates sinus wave patterns with a linear trend, gaussian noise, and cyclically repeating

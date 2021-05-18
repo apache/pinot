@@ -19,6 +19,10 @@
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixProperty;
@@ -30,11 +34,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
 
 import static org.apache.helix.model.InstanceConfig.InstanceConfigProperty.TAG_LIST;
 import static org.mockito.Mockito.mock;

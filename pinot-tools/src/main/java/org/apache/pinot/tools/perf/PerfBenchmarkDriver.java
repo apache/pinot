@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.tools.perf;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.base.Preconditions;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -33,16 +36,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import javax.annotation.Nullable;
-
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.tools.ClusterVerifiers.StrictMatchExternalViewVerifier;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
@@ -55,16 +55,13 @@ import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.base.Preconditions;
 
 
 public class PerfBenchmarkDriver {
@@ -332,10 +329,9 @@ public class PerfBenchmarkDriver {
    *
    * @param segmentMetadata segment metadata.
    */
-  public void addSegment(String tableName, SegmentMetadata segmentMetadata) {
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+  public void addSegment(String tableNameWithType, SegmentMetadata segmentMetadata) {
     _helixResourceManager
-        .addNewSegment(rawTableName, segmentMetadata, "http://" + _controllerAddress + "/" + segmentMetadata.getName());
+        .addNewSegment(tableNameWithType, segmentMetadata, "http://" + _controllerAddress + "/" + segmentMetadata.getName());
   }
 
   public static void waitForExternalViewUpdate(String zkAddress, final String clusterName, long timeoutInMilliseconds) {
@@ -386,22 +382,13 @@ public class PerfBenchmarkDriver {
 
   public JsonNode postQuery(String query)
       throws Exception {
-    return postQuery(_conf.getDialect(), query, null);
+    return postQuery(_conf.getDialect(), query);
   }
 
-  public JsonNode postQuery(String query, String optimizationFlags)
-          throws Exception {
-    return postQuery(_conf.getDialect(), query, optimizationFlags);
-  }
-
-  public JsonNode postQuery(String dialect, String query, String optimizationFlags)
+  public JsonNode postQuery(String dialect, String query)
       throws Exception {
     ObjectNode requestJson = JsonUtils.newObjectNode();
     requestJson.put(dialect, query);
-
-    if (optimizationFlags != null && !optimizationFlags.isEmpty()) {
-      requestJson.put("debugOptions", "optimizationFlags=" + optimizationFlags);
-    }
 
     long start = System.currentTimeMillis();
     String queryUrl = _brokerBaseApiUrl + "/query";

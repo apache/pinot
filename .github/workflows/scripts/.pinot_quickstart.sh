@@ -21,6 +21,10 @@
 # Print environment variables
 printenv
 
+# Check network
+ifconfig
+netstat -i
+
 # Java version
 java -version
 
@@ -39,12 +43,15 @@ if [ "${PASS}" != 1 ]; then
 fi
 
 # Quickstart
-DIST_BIN_DIR=`ls -d pinot-distribution/target/apache-pinot-*/apache-pinot-*`
+DIST_BIN_DIR=`ls -d pinot-distribution/target/apache-pinot-*/apache-pinot-*`/bin
 cd "${DIST_BIN_DIR}"
 
 # Test quick-start-batch
-bin/quick-start-batch.sh &
+./quick-start-batch.sh &
 PID=$!
+
+# Print the JVM settings
+jps -lvm
 
 PASS=0
 
@@ -82,8 +89,11 @@ if [ "${PASS}" -eq 0 ]; then
 fi
 
 # Test quick-start-batch-with-minion
-bin/quick-start-batch-with-minion.sh &
+./quick-start-batch-with-minion.sh &
 PID=$!
+
+# Print the JVM settings
+jps -lvm
 
 PASS=0
 
@@ -109,7 +119,7 @@ if [ "${PASS}" -eq 0 ]; then
 fi
 
 # Test quick-start-streaming
-bin/quick-start-streaming.sh &
+./quick-start-streaming.sh &
 PID=$!
 
 PASS=0
@@ -146,9 +156,11 @@ if [ "${PASS}" -eq 0 ]; then
 fi
 
 # Test quick-start-hybrid
-cd bin
 ./quick-start-hybrid.sh &
 PID=$!
+
+# Print the JVM settings
+jps -lvm
 
 PASS=0
 RES_1=0

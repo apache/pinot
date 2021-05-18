@@ -27,7 +27,6 @@ on:
       - "docs/**"
       - "licenses/**"
       - "licenses-binary/**"
-      - "website/**"
       - "**.md"
   pull_request:
     branches:
@@ -36,7 +35,6 @@ on:
       - "docs/**"
       - "licenses/**"
       - "licenses-binary/**"
-      - "website/**"
       - "**.md"
 
 jobs:
@@ -51,6 +49,7 @@ jobs:
       - name: Unit Test
         env:
           RUN_INTEGRATION_TESTS: false
+          MAVEN_OPTS: -Xmx2G -Dmaven.wagon.httpconnectionManager.ttlSeconds=25 -Dmaven.wagon.http.retryHandler.count=3 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
         run: .github/workflows/scripts/.pinot_test.sh
       - name: Upload coverage to Codecov
         run: |
@@ -67,6 +66,7 @@ jobs:
       - name: Integration Test
         env:
           RUN_INTEGRATION_TESTS: true
+          MAVEN_OPTS: -Xmx2G -Dmaven.wagon.httpconnectionManager.ttlSeconds=25 -Dmaven.wagon.http.retryHandler.count=3 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
         run: .github/workflows/scripts/.pinot_test.sh
       - name: Upload coverage to Codecov
         run: |

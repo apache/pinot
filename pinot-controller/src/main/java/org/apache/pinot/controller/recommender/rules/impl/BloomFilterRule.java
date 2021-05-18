@@ -19,16 +19,15 @@
 package org.apache.pinot.controller.recommender.rules.impl;
 
 import com.google.common.util.concurrent.AtomicDouble;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.controller.recommender.io.ConfigManager;
 import org.apache.pinot.controller.recommender.io.InputManager;
 import org.apache.pinot.controller.recommender.rules.AbstractRule;
 import org.apache.pinot.controller.recommender.rules.io.params.BloomFilterRuleParams;
 import org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.predicate.Predicate;
-import org.apache.pinot.core.requesthandler.BrokerRequestOptimizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,7 +40,6 @@ import org.slf4j.LoggerFactory;
 public class  BloomFilterRule extends AbstractRule {
   private final Logger LOGGER = LoggerFactory.getLogger(BloomFilterRule.class);
   private final BloomFilterRuleParams _params;
-  protected final BrokerRequestOptimizer _brokerRequestOptimizer = new BrokerRequestOptimizer();
 
   public BloomFilterRule(InputManager input, ConfigManager output) {
     super(input, output);

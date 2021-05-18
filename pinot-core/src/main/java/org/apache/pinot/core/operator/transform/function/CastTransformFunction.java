@@ -18,18 +18,22 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class CastTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "cast";
 
+  private String[] _stringValuesSV;
+
   private TransformFunction _transformFunction;
-  private String _toFormat;
   private TransformResultMetadata _resultMetadata;
 
   @Override
@@ -48,23 +52,35 @@ public class CastTransformFunction extends BaseTransformFunction {
     TransformFunction castFormatTransformFunction = arguments.get(1);
 
     if (castFormatTransformFunction instanceof LiteralTransformFunction) {
-      _toFormat = ((LiteralTransformFunction)castFormatTransformFunction).getLiteral().toUpperCase();
-      switch (_toFormat) {
+      String targetType = ((LiteralTransformFunction) castFormatTransformFunction).getLiteral().toUpperCase();
+      switch (targetType) {
         case "INT":
         case "INTEGER":
+          _resultMetadata = INT_SV_NO_DICTIONARY_METADATA;
+          break;
         case "LONG":
           _resultMetadata = LONG_SV_NO_DICTIONARY_METADATA;
           break;
         case "FLOAT":
+          _resultMetadata = FLOAT_SV_NO_DICTIONARY_METADATA;
+          break;
         case "DOUBLE":
           _resultMetadata = DOUBLE_SV_NO_DICTIONARY_METADATA;
           break;
+        case "BOOLEAN":
+          _resultMetadata = BOOLEAN_SV_NO_DICTIONARY_METADATA;
+          break;
+        case "TIMESTAMP":
+          _resultMetadata = TIMESTAMP_SV_NO_DICTIONARY_METADATA;
         case "STRING":
         case "VARCHAR":
           _resultMetadata = STRING_SV_NO_DICTIONARY_METADATA;
           break;
+        case "JSON":
+          _resultMetadata = JSON_SV_NO_DICTIONARY_METADATA;
+          break;
         default:
-          throw new IllegalArgumentException("Unable to cast expression to type - " + _toFormat);
+          throw new IllegalArgumentException("Unable to cast expression to type - " + targetType);
       }
     } else {
       throw new IllegalArgumentException("Invalid cast to type - " + castFormatTransformFunction.getName());
@@ -98,6 +114,31 @@ public class CastTransformFunction extends BaseTransformFunction {
 
   @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-    return _transformFunction.transformToStringValuesSV(projectionBlock);
+    DataType dataType = _transformFunction.getResultMetadata().getDataType();
+    if (dataType.getStoredType() != dataType) {
+      if (_stringValuesSV == null) {
+        _stringValuesSV = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      }
+      int numDocs = projectionBlock.getNumDocs();
+      switch (dataType) {
+        case BOOLEAN:
+          int[] intValuesSV = _transformFunction.transformToIntValuesSV(projectionBlock);
+          for (int i = 0; i < numDocs; i++) {
+            _stringValuesSV[i] = Boolean.toString(intValuesSV[i] == 1);
+          }
+          break;
+        case TIMESTAMP:
+          long[] longValuesSV = _transformFunction.transformToLongValuesSV(projectionBlock);
+          for (int i = 0; i < numDocs; i++) {
+            _stringValuesSV[i] = new Timestamp(longValuesSV[i]).toString();
+          }
+          break;
+        default:
+          throw new IllegalStateException();
+      }
+      return _stringValuesSV;
+    } else {
+      return _transformFunction.transformToStringValuesSV(projectionBlock);
+    }
   }
 }

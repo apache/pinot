@@ -18,10 +18,9 @@
  */
 package org.apache.pinot.controller.recommender.data.generator;
 
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-
-import java.util.Map;
 
 
 /**

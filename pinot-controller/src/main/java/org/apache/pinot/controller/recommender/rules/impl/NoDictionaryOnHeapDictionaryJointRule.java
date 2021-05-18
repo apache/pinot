@@ -23,17 +23,16 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.controller.recommender.exceptions.InvalidInputException;
 import org.apache.pinot.controller.recommender.io.ConfigManager;
 import org.apache.pinot.controller.recommender.io.InputManager;
 import org.apache.pinot.controller.recommender.rules.AbstractRule;
 import org.apache.pinot.controller.recommender.rules.io.params.NoDictionaryOnHeapDictionaryJointRuleParams;
 import org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.predicate.Predicate;
-import org.apache.pinot.core.requesthandler.BrokerRequestOptimizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,7 +55,6 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
  */
 public class NoDictionaryOnHeapDictionaryJointRule extends AbstractRule {
   private final Logger LOGGER = LoggerFactory.getLogger(NoDictionaryOnHeapDictionaryJointRule.class);
-  private final BrokerRequestOptimizer _brokerRequestOptimizer = new BrokerRequestOptimizer();
   private final NoDictionaryOnHeapDictionaryJointRuleParams _params;
 
   public NoDictionaryOnHeapDictionaryJointRule(InputManager input, ConfigManager output) {

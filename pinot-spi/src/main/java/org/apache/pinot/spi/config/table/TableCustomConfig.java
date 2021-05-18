@@ -20,10 +20,9 @@ package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.apache.pinot.spi.config.BaseJsonConfig;
-
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
 public class TableCustomConfig extends BaseJsonConfig {

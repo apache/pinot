@@ -37,7 +37,7 @@ import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
-import org.apache.pinot.parsers.AbstractCompiler;
+import org.apache.pinot.parsers.QueryCompiler;
 import org.apache.pinot.parsers.utils.BrokerRequestComparisonUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.AstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
  * PQL 2 compiler.
  */
 @ThreadSafe
-public class Pql2Compiler implements AbstractCompiler {
+public class Pql2Compiler implements QueryCompiler {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Pql2Compiler.class);
 

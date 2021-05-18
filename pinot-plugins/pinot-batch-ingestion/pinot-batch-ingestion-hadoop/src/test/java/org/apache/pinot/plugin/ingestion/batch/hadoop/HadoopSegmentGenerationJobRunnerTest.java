@@ -18,18 +18,18 @@
  */
 package org.apache.pinot.plugin.ingestion.batch.hadoop;
 
+import com.google.common.collect.Lists;
+import com.google.gson.Gson;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.WordUtils;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReader;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
-import org.apache.pinot.plugin.inputformat.json.JSONRecordReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -45,9 +45,6 @@ import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import com.google.common.collect.Lists;
-import com.google.gson.Gson;
 
 public class HadoopSegmentGenerationJobRunnerTest {
 

@@ -20,16 +20,12 @@ package org.apache.pinot.core.segment.processing.framework;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.core.segment.processing.collector.CollectorConfig;
 import org.apache.pinot.core.segment.processing.filter.RecordFilterConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
-import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
 import org.apache.pinot.core.segment.processing.transformer.RecordTransformerConfig;
-import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 

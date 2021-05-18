@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;

@@ -23,7 +23,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import org.apache.commons.lang.StringUtils;
-import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.BytesUtils;
 
@@ -61,6 +61,7 @@ public class PinotSegmentToCsvConverter implements PinotSegmentConverter {
       }
       writeRow(recordWriter, row, fields);
       while (recordReader.hasNext()) {
+        row.clear();
         row = recordReader.next(row);
         writeRow(recordWriter, row, fields);
       }

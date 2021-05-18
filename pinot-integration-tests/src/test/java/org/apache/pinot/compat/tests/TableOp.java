@@ -108,7 +108,7 @@ public class TableOp extends BaseOp {
       }};
       ControllerTest
           .sendPostRequest(ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forSchemaCreate(),
-              FileUtils.readFileToString(new File(_schemaFileName)), headers);
+              FileUtils.readFileToString(new File(getAbsoluteFileName(_schemaFileName))), headers);
       return true;
     } catch (IOException e) {
       LOGGER.error("Failed to create schema with file: {}", _schemaFileName, e);
@@ -120,7 +120,7 @@ public class TableOp extends BaseOp {
     try {
       ControllerTest
           .sendPostRequest(ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forTableCreate(),
-              FileUtils.readFileToString(new File(_tableConfigFileName)));
+              FileUtils.readFileToString(new File(getAbsoluteFileName(_tableConfigFileName))));
       return true;
     } catch (IOException e) {
       LOGGER.error("Failed to create table with file: {}", _tableConfigFileName, e);
@@ -130,7 +130,7 @@ public class TableOp extends BaseOp {
 
   private boolean deleteTable() {
     try {
-      TableConfig tableConfig = JsonUtils.fileToObject(new File(_tableConfigFileName), TableConfig.class);
+      TableConfig tableConfig = JsonUtils.fileToObject(new File(getAbsoluteFileName(_tableConfigFileName)), TableConfig.class);
       ControllerTest.sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL)
           .forTableDelete(tableConfig.getTableName()));
       return true;

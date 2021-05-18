@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * A registry of metric instances in Pinot. This interface is to decouple from concrete metrics related classes, like Yammer.
+ * This interface should be thread-safe against adds and removes of the same metric.
  */
 public interface PinotMetricsRegistry {
 

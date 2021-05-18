@@ -19,12 +19,9 @@
 package org.apache.pinot.controller.recommender.data.generator;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Random;
-import java.util.Set;
 import org.apache.commons.lang.RandomStringUtils;
+import org.apache.commons.lang.StringUtils;
 
 
 /**
@@ -38,30 +35,28 @@ public class StringGenerator implements Generator {
   private final int cardinality;
   private final Random rand;
   private final double numberOfValuesPerEntry;
-  private final int lengthOfEachString;
 
-  private List<String> vals;
+  private final String initialValue;
+  private final int counterLength;
   private int counter = 0;
 
   public StringGenerator(Integer cardinality, Double numberOfValuesPerEntry, Integer lengthOfEachString) {
     this.cardinality = cardinality;
     this.numberOfValuesPerEntry =
         numberOfValuesPerEntry != null ? numberOfValuesPerEntry : DEFAULT_NUMBER_OF_VALUES_PER_ENTRY;
-    this.lengthOfEachString = lengthOfEachString != null ? lengthOfEachString : DEFAULT_LENGTH_OF_EACH_STRING;
+    lengthOfEachString = lengthOfEachString != null ? lengthOfEachString : DEFAULT_LENGTH_OF_EACH_STRING;
     Preconditions.checkState(this.numberOfValuesPerEntry >= 1,
         "Number of values per entry (should be >= 1): " + this.numberOfValuesPerEntry);
+    counterLength = String.valueOf(this.cardinality).length();
+    int initValueSize = lengthOfEachString - counterLength;
+    Preconditions.checkState(initValueSize >= 0,
+        String.format("Cannot generate %d unique string with length %d", this.cardinality, lengthOfEachString));
+    initialValue = RandomStringUtils.randomAlphabetic(initValueSize);
     rand = new Random(System.currentTimeMillis());
   }
 
   @Override
   public void init() {
-    final Set<String> uniqueStrings = new HashSet<>();
-    for (int i = 0; i < cardinality; i++) {
-      while (!uniqueStrings.add(RandomStringUtils.randomAlphabetic(lengthOfEachString))) {
-        uniqueStrings.add(RandomStringUtils.randomAlphabetic(lengthOfEachString));
-      }
-    }
-    vals = new ArrayList<>(uniqueStrings);
   }
 
   @Override
@@ -76,7 +71,8 @@ public class StringGenerator implements Generator {
     if (counter == cardinality) {
       counter = 0;
     }
-    return vals.get(counter++);
+    counter++;
+    return initialValue + StringUtils.leftPad(String.valueOf(counter), counterLength, '0');
   }
 
   public static void main(String[] args) {

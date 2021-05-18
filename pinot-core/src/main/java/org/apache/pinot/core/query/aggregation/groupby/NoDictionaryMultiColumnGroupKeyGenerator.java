@@ -24,17 +24,17 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.Arrays;
 import java.util.Iterator;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.query.aggregation.groupby.utils.ValueToIdMap;
 import org.apache.pinot.core.query.aggregation.groupby.utils.ValueToIdMapFactory;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.util.FixedIntArray;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.FixedIntArray;
 
 
 /**
@@ -49,7 +49,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerator {
   private final ExpressionContext[] _groupByExpressions;
   private final int _numGroupByExpressions;
-  private final DataType[] _dataTypes;
+  private final DataType[] _storedTypes;
   private final Dictionary[] _dictionaries;
   private final ValueToIdMap[] _onTheFlyDictionaries;
   private final Object2IntOpenHashMap<FixedIntArray> _groupKeyMap;
@@ -62,7 +62,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
       ExpressionContext[] groupByExpressions, int numGroupsLimit) {
     _groupByExpressions = groupByExpressions;
     _numGroupByExpressions = groupByExpressions.length;
-    _dataTypes = new DataType[_numGroupByExpressions];
+    _storedTypes = new DataType[_numGroupByExpressions];
     _dictionaries = new Dictionary[_numGroupByExpressions];
     _onTheFlyDictionaries = new ValueToIdMap[_numGroupByExpressions];
     _isSingleValueExpressions = new boolean[_numGroupByExpressions];
@@ -70,11 +70,11 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
     for (int i = 0; i < _numGroupByExpressions; i++) {
       ExpressionContext groupByExpression = groupByExpressions[i];
       TransformResultMetadata transformResultMetadata = transformOperator.getResultMetadata(groupByExpression);
-      _dataTypes[i] = transformResultMetadata.getDataType();
+      _storedTypes[i] = transformResultMetadata.getDataType().getStoredType();
       if (transformResultMetadata.hasDictionary()) {
         _dictionaries[i] = transformOperator.getDictionary(groupByExpression);
       } else {
-        _onTheFlyDictionaries[i] = ValueToIdMapFactory.get(_dataTypes[i]);
+        _onTheFlyDictionaries[i] = ValueToIdMapFactory.get(_storedTypes[i]);
       }
       _isSingleValueExpressions[i] = transformResultMetadata.isSingleValue();
     }
@@ -102,7 +102,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
         }
       } else {
         ValueToIdMap onTheFlyDictionary = _onTheFlyDictionaries[i];
-        switch (_dataTypes[i]) {
+        switch (_storedTypes[i]) {
           case INT:
             int[] intValues = blockValSet.getIntValuesSV();
             for (int j = 0; j < numDocs; j++) {
@@ -140,7 +140,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
             }
             break;
           default:
-            throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _dataTypes[i]);
+            throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _storedTypes[i]);
         }
       }
     }
@@ -170,7 +170,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
       } else {
         ValueToIdMap onTheFlyDictionary = _onTheFlyDictionaries[i];
         if (_isSingleValueExpressions[i]) {
-          switch (_dataTypes[i]) {
+          switch (_storedTypes[i]) {
             case INT:
               int[] intValues = blockValSet.getIntValuesSV();
               for (int j = 0; j < numDocs; j++) {
@@ -208,10 +208,11 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
               }
               break;
             default:
-              throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _dataTypes[i]);
+              throw new IllegalArgumentException(
+                  "Illegal data type for no-dictionary key generator: " + _storedTypes[i]);
           }
         } else {
-          switch (_dataTypes[i]) {
+          switch (_storedTypes[i]) {
             case INT:
               int[][] intValues = blockValSet.getIntValuesMV();
               for (int j = 0; j < numDocs; j++) {
@@ -268,7 +269,8 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
               }
               break;
             default:
-              throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _dataTypes[i]);
+              throw new IllegalArgumentException(
+                  "Illegal data type for no-dictionary key generator: " + _storedTypes[i]);
           }
         }
       }

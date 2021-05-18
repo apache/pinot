@@ -17,7 +17,7 @@
 # under the License.
 #
 
-apiVersion: skaffold/v1beta7
+apiVersion: skaffold/v2beta14
 kind: Config
 build:
   artifacts:

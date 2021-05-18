@@ -33,9 +33,9 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
-import org.apache.pinot.core.query.exception.EarlyTerminationException;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,7 +71,7 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
 
   @Override
   protected void processSegments(int threadIndex) {
-    for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numThreads) {
+    for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
       Operator<IntermediateResultsBlock> operator = _operators.get(operatorIndex);
       try {
         IntermediateResultsBlock resultsBlock;

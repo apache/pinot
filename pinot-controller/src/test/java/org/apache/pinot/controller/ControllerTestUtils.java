@@ -61,14 +61,12 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.api.AccessControlTest;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -76,15 +74,19 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 
-import static org.apache.pinot.common.utils.CommonConstants.Helix.Instance.*;
-import static org.apache.pinot.common.utils.CommonConstants.Helix.*;
-import static org.apache.pinot.common.utils.CommonConstants.Server.*;
-import static org.testng.Assert.*;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.Instance.ADMIN_PORT_KEY;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE;
+import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 
 
 /**
@@ -145,7 +147,7 @@ public abstract class ControllerTestUtils {
     properties.put(ControllerConf.CONTROLLER_HOST, LOCAL_HOST);
     properties.put(ControllerConf.CONTROLLER_PORT, DEFAULT_CONTROLLER_PORT);
     properties.put(ControllerConf.DATA_DIR, DEFAULT_DATA_DIR);
-    properties.put(ControllerConf.ZK_STR, ZkStarter.DEFAULT_ZK_STR);
+    properties.put(ControllerConf.ZK_STR, _zookeeperInstance.getZkUrl());
     properties.put(ControllerConf.HELIX_CLUSTER_NAME, getHelixClusterName());
 
     return properties;
@@ -232,7 +234,7 @@ public abstract class ControllerTestUtils {
       throws Exception {
     HelixManager helixManager =
         HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
-            ZkStarter.DEFAULT_ZK_STR);
+            _zookeeperInstance.getZkUrl());
     helixManager.getStateMachineEngine()
         .registerStateModelFactory(FakeBrokerResourceOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
             FakeBrokerResourceOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
@@ -331,7 +333,7 @@ public abstract class ControllerTestUtils {
       int adminPort) throws Exception {
     HelixManager helixManager =
         HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
-            ZkStarter.DEFAULT_ZK_STR);
+            _zookeeperInstance.getZkUrl());
     helixManager.getStateMachineEngine()
         .registerStateModelFactory(FakeSegmentOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
             FakeSegmentOnlineOfflineStateModelFactory.FACTORY_INSTANCE);

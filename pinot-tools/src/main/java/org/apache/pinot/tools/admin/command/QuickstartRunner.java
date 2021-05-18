@@ -25,24 +25,22 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
-import java.net.InetAddress;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.tools.QuickstartTableRequest;
 import org.apache.pinot.tools.BootstrapTableTool;
+import org.apache.pinot.tools.QuickstartTableRequest;
 import org.apache.pinot.tools.utils.JarUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -205,8 +203,8 @@ public class QuickstartRunner {
   public void bootstrapTable()
       throws Exception {
     for (QuickstartTableRequest request : _tableRequests) {
-      if (!new BootstrapTableTool("http", InetAddress.getLocalHost().getHostName(), _controllerPorts.get(0),
-          request.getBootstrapTableDir(), _authToken).execute()) {
+      if (!new BootstrapTableTool("http", "localhost", _controllerPorts.get(0), request.getBootstrapTableDir(),
+          _authToken).execute()) {
         throw new RuntimeException("Failed to bootstrap table with request - " + request);
       }
     }

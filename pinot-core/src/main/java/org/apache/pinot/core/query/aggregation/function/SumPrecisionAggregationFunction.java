@@ -24,13 +24,13 @@ import java.math.MathContext;
 import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 
@@ -87,7 +87,7 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BigDecimal sum = getDefaultResult(aggregationResultHolder);
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    switch (blockValSet.getValueType()) {
+    switch (blockValSet.getValueType().getStoredType()) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < length; i++) {
@@ -124,7 +124,7 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    switch (blockValSet.getValueType()) {
+    switch (blockValSet.getValueType().getStoredType()) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < length; i++) {
@@ -172,7 +172,7 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    switch (blockValSet.getValueType()) {
+    switch (blockValSet.getValueType().getStoredType()) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < length; i++) {

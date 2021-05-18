@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.spi.index.creator;
 
-import org.apache.pinot.segment.spi.index.creator.InvertedIndexCreator;
 
 
 public interface RawValueBasedInvertedIndexCreator extends InvertedIndexCreator {

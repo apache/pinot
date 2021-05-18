@@ -22,7 +22,7 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -30,9 +30,9 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregationFunction<HyperLogLog, Long> {
@@ -70,11 +70,10 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    DataType valueType = blockValSet.getValueType();
-
-    if (valueType != DataType.BYTES) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    if (storedType != DataType.BYTES) {
       HyperLogLog hyperLogLog = getDefaultHyperLogLog(aggregationResultHolder);
-      switch (valueType) {
+      switch (storedType) {
         case INT:
           int[] intValues = blockValSet.getIntValuesSV();
           for (int i = 0; i < length; i++) {
@@ -107,7 +106,7 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
           break;
         default:
           throw new IllegalStateException(
-              "Illegal data type for DISTINCT_COUNT_HLL aggregation function: " + valueType);
+              "Illegal data type for DISTINCT_COUNT_HLL aggregation function: " + storedType);
       }
     } else {
       // Serialized HyperLogLog
@@ -135,9 +134,8 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    DataType valueType = blockValSet.getValueType();
-
-    switch (valueType) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < length; i++) {
@@ -187,7 +185,7 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
         }
         break;
       default:
-        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_HLL aggregation function: " + valueType);
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_HLL aggregation function: " + storedType);
     }
   }
 
@@ -195,9 +193,8 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    DataType valueType = blockValSet.getValueType();
-
-    switch (valueType) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < length; i++) {
@@ -265,7 +262,7 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
         }
         break;
       default:
-        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_HLL aggregation function: " + valueType);
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_HLL aggregation function: " + storedType);
     }
   }
 

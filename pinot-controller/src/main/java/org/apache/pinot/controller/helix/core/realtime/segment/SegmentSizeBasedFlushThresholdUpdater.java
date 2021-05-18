@@ -22,8 +22,8 @@ import com.google.common.annotations.VisibleForTesting;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

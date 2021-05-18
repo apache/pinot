@@ -23,12 +23,14 @@ import com.google.common.base.Function;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordReader;
+import org.apache.pinot.plugin.segmentuploader.SegmentUploaderDefault;
 import org.apache.pinot.plugin.segmentwriter.filebased.FileBasedSegmentWriter;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -37,6 +39,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
+import org.apache.pinot.spi.ingestion.segment.uploader.SegmentUploader;
 import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -85,8 +88,9 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
     Map<String, String> batchConfigMap = new HashMap<>();
     batchConfigMap.put(BatchConfigProperties.OUTPUT_DIR_URI, _tarDir.getAbsolutePath());
     batchConfigMap.put(BatchConfigProperties.OVERWRITE_OUTPUT, "false");
+    batchConfigMap.put(BatchConfigProperties.PUSH_CONTROLLER_URI, _controllerBaseApiUrl);
     return new IngestionConfig(new BatchIngestionConfig(Lists.newArrayList(batchConfigMap), "APPEND", "HOURLY"), null,
-        null, null);
+        null, null, null);
   }
 
   /**
@@ -95,7 +99,7 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
    * Checks the number of segments created and total docs from the query
    */
   @Test
-  public void testFileBasedSegmentWriter()
+  public void testFileBasedSegmentWriterAndDefaultUploader()
       throws Exception {
 
     TableConfig offlineTableConfig = createOfflineTableConfig();
@@ -103,6 +107,8 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
 
     SegmentWriter segmentWriter = new FileBasedSegmentWriter();
     segmentWriter.init(offlineTableConfig, _schema);
+    SegmentUploader segmentUploader = new SegmentUploaderDefault();
+    segmentUploader.init(offlineTableConfig);
 
     GenericRow reuse = new GenericRow();
     long totalDocs = 0;
@@ -110,34 +116,36 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
       AvroRecordReader avroRecordReader = new AvroRecordReader();
       avroRecordReader.init(_avroFiles.get(i), null, null);
 
+      long numDocsInSegment = 0;
       while (avroRecordReader.hasNext()) {
         avroRecordReader.next(reuse);
         segmentWriter.collect(reuse);
+        numDocsInSegment++;
         totalDocs++;
       }
-      segmentWriter.flush();
+      // flush to segment
+      URI segmentTarURI = segmentWriter.flush();
+      // upload
+      segmentUploader.uploadSegment(segmentTarURI, null);
+
+      // check num segments
+      Assert.assertEquals(getNumSegments(), i + 1);
+      // check numDocs in latest segment
+      Assert.assertEquals(getNumDocsInLatestSegment(), numDocsInSegment);
+      // check totalDocs in query
+      checkTotalDocsInQuery(totalDocs);
     }
     segmentWriter.close();
 
-    // Manually upload
-    // TODO: once an implementation of SegmentUploader is available, use that instead
-    uploadSegments(_tableNameWithType, _tarDir);
+    dropAllSegments(_tableNameWithType, TableType.OFFLINE);
+    checkNumSegments(0);
 
+    // upload all together using dir
+    segmentUploader.uploadSegmentsFromDir(_tarDir.toURI(), null);
     // check num segments
     Assert.assertEquals(getNumSegments(), 3);
-    final long expectedDocs = totalDocs;
-    TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Nullable
-      @Override
-      public Boolean apply(@Nullable Void aVoid) {
-        try {
-          return getTotalDocsFromQuery() == expectedDocs;
-        } catch (Exception e) {
-          LOGGER.error("Caught exception when getting totalDocs from query: {}", e.getMessage());
-          return null;
-        }
-      }
-    }, 100L, 120_000, "Failed to load " + expectedDocs + " documents", true);
+    // check totalDocs in query
+    checkTotalDocsInQuery(totalDocs);
 
     dropOfflineTable(_tableNameWithType);
   }
@@ -154,6 +162,50 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
       throws Exception {
     JsonNode response = postSqlQuery(String.format("select count(*) from %s", _tableNameWithType), _brokerBaseApiUrl);
     return response.get("resultTable").get("rows").get(0).get(0).asInt();
+  }
+
+  private int getNumDocsInLatestSegment()
+      throws IOException {
+    String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.
+        forSegmentListAPIWithTableType(_tableNameWithType, TableType.OFFLINE.toString()));
+    JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
+    JsonNode segments = array.get(0).get("OFFLINE");
+    String segmentName = segments.get(segments.size() - 1).asText();
+
+    jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.
+        forSegmentMetadata(_tableNameWithType, segmentName));
+    JsonNode metadata = JsonUtils.stringToJsonNode(jsonOutputStr);
+    return metadata.get("segment.total.docs").asInt();
+  }
+
+  private void checkTotalDocsInQuery(long expectedTotalDocs) {
+    TestUtils.waitForCondition(new Function<Void, Boolean>() {
+      @Nullable
+      @Override
+      public Boolean apply(@Nullable Void aVoid) {
+        try {
+          return getTotalDocsFromQuery() == expectedTotalDocs;
+        } catch (Exception e) {
+          LOGGER.error("Caught exception when getting totalDocs from query: {}", e.getMessage());
+          return null;
+        }
+      }
+    }, 100L, 120_000, "Failed to load " + expectedTotalDocs + " documents", true);
+  }
+
+  private void checkNumSegments(int expectedNumSegments) {
+    TestUtils.waitForCondition(new Function<Void, Boolean>() {
+      @Nullable
+      @Override
+      public Boolean apply(@Nullable Void aVoid) {
+        try {
+          return getNumSegments() == expectedNumSegments;
+        } catch (Exception e) {
+          LOGGER.error("Caught exception when getting num segments: {}", e.getMessage());
+          return null;
+        }
+      }
+    }, 100L, 120_000, "Failed to load get num segments", true);
   }
 
   @AfterClass

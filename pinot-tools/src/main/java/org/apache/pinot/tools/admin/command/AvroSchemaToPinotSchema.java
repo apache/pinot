@@ -20,10 +20,13 @@ package org.apache.pinot.tools.admin.command;
 
 import java.io.File;
 import java.io.FileWriter;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
+import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.tools.Command;
@@ -64,6 +67,15 @@ public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements
   @Option(name = "-timeUnit", metaVar = "<string>", usage = "Unit of the time column (default DAYS).")
   TimeUnit _timeUnit = TimeUnit.DAYS;
 
+  @Option(name = "-unnestFields", metaVar = "<string>", usage = "Comma separated fields to unnest")
+  String _unnestFields;
+
+  @Option(name = "-delimiter", metaVar = "<string>", usage = "The delimiter separating components in nested structure, default to dot")
+  String _delimiter;
+
+  @Option(name = "-complexType", metaVar = "<boolean>", usage = "allow complex-type handling, default to false")
+  boolean _complexType;
+
   @SuppressWarnings("FieldCanBeLocal")
   @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
@@ -79,7 +91,9 @@ public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements
 
     Schema schema;
     if (_avroSchemaFile != null) {
-      schema = AvroUtils.getPinotSchemaFromAvroSchemaFile(new File(_avroSchemaFile), buildFieldTypesMap(), _timeUnit);
+      schema = AvroUtils
+          .getPinotSchemaFromAvroSchemaFile(new File(_avroSchemaFile), buildFieldTypesMap(), _timeUnit, _complexType,
+              buildUnnestFields(), getDelimiter());
     } else if (_avroDataFile != null) {
       schema = AvroUtils.getPinotSchemaFromAvroDataFile(new File(_avroDataFile), buildFieldTypesMap(), _timeUnit);
     } else {
@@ -143,5 +157,19 @@ public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements
       fieldTypes.put(_timeColumnName, FieldSpec.FieldType.TIME);
     }
     return fieldTypes;
+  }
+
+  private List<String> buildUnnestFields() {
+    List<String> unnestFields = new ArrayList<>();
+    if (_unnestFields != null) {
+      for (String field : _unnestFields.split(",")) {
+        unnestFields.add(field);
+      }
+    }
+    return unnestFields;
+  }
+
+  private String getDelimiter() {
+    return _delimiter == null ? ComplexTypeTransformer.DEFAULT_DELIMITER : _delimiter;
   }
 }

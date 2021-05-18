@@ -36,6 +36,7 @@ import org.apache.pinot.controller.recommender.io.InputManager;
 import org.apache.pinot.controller.recommender.rules.AbstractRule;
 import org.apache.pinot.controller.recommender.rules.RulesToExecute;
 import org.apache.pinot.controller.recommender.rules.impl.InvertedSortedIndexJointRule;
+import org.apache.pinot.controller.recommender.rules.io.configs.SegmentSizeRecommendations;
 import org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset;
 import org.apache.pinot.controller.recommender.rules.utils.QueryInvertedSortedIndexRecommender;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -47,9 +48,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.controller.recommender.rules.impl.RealtimeProvisioningRule.CONSUMING_MEMORY_PER_HOST;
 import static org.apache.pinot.controller.recommender.rules.impl.RealtimeProvisioningRule.OPTIMAL_SEGMENT_SIZE;
 import static org.apache.pinot.controller.recommender.rules.impl.RealtimeProvisioningRule.TOTAL_MEMORY_USED_PER_HOST;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class TestConfigEngine {
@@ -229,6 +228,10 @@ public class TestConfigEngine {
       throws InvalidInputException, IOException {
     loadInput("recommenderInput/PinotTablePartitionRuleInput.json");
 
+    // segment size recommendations get populated by SegmentSize Rule; hard-coding the values here
+    _input._overWrittenConfigs.setSegmentSizeRecommendations(
+        new SegmentSizeRecommendations(/*numRows=*/1_000_000, /*numSegments=*/4, /*segmentSize=*/1_000_000));
+
     AbstractRule abstractRule = RulesToExecute.RuleFactory
         .getRule(RulesToExecute.Rule.KafkaPartitionRule, _input, _input._overWrittenConfigs);
     abstractRule.run();
@@ -370,14 +373,61 @@ public class TestConfigEngine {
     testRealtimeProvisioningRule("recommenderInput/RealtimeProvisioningInput_dateTimeColumn.json");
   }
 
+  @Test
+  void testAggregateMetricsRule() throws Exception {
+    ConfigManager output = runRecommenderDriver("recommenderInput/AggregateMetricsRuleInput.json");
+    assertTrue(output.isAggregateMetrics());
+  }
+
+  @Test
+  void testSegmentSizeRule() throws Exception {
+    ConfigManager output = runRecommenderDriver("recommenderInput/SegmentSizeRuleInput.json");
+    SegmentSizeRecommendations segmentSizeRecommendations = output.getSegmentSizeRecommendations();
+    assertEquals(segmentSizeRecommendations.getNumSegments(), 2);
+    assertEquals(segmentSizeRecommendations.getNumRowsPerSegment(), 50_000);
+  }
+
+  @Test
+  void testSegmentSizeRule_noNeedToGenerateSegment() throws Exception {
+    ConfigManager output = runRecommenderDriver("recommenderInput/SegmentSizeRuleInput_noNeedToGenerateSegment.json");
+    SegmentSizeRecommendations segmentSizeRecommendations = output.getSegmentSizeRecommendations();
+    assertEquals(segmentSizeRecommendations.getNumSegments(), 2);
+    assertEquals(segmentSizeRecommendations.getNumRowsPerSegment(), 50_000);
+  }
+
+  @Test
+  void testSegmentSizeRule_ruleIsDisabledButItNeedsToBeSilentlyRun() throws Exception {
+    ConfigManager output =
+        runRecommenderDriver("recommenderInput/SegmentSizeRuleInput_ruleIsDisableButItNeedsToBeSilentlyRun.json");
+    assertNull(output.getSegmentSizeRecommendations()); // output is null because the rule silently ran
+    assertEquals(output.getPartitionConfig().getPartitionDimension(), "e");
+    assertEquals(output.getPartitionConfig().getNumPartitionsOffline(), 2);
+  }
+
+  @Test
+  void testSegmentSizeRule_realtimeOnlyTable() throws Exception {
+    ConfigManager output =
+        runRecommenderDriver("recommenderInput/SegmentSizeRuleInput_realtimeOnlyTable.json");
+    assertEquals(output.getSegmentSizeRecommendations().getMessage(),
+        "Segment sizing for realtime-only tables is done via Realtime Provisioning Rule");
+    assertEquals(output.getSegmentSizeRecommendations().getNumSegments(), 0);
+    assertEquals(output.getSegmentSizeRecommendations().getSegmentSize(), 0);
+    assertEquals(output.getSegmentSizeRecommendations().getNumRowsPerSegment(), 0);
+  }
+
   private void testRealtimeProvisioningRule(String fileName) throws Exception {
-    String input = readInputToStr(fileName);
-    String output = RecommenderDriver.run(input);
-    ConfigManager configManager = objectMapper.readValue(output, ConfigManager.class);
-    Map<String, Map<String, String>> recommendations = configManager.getRealtimeProvisioningRecommendations();
+    ConfigManager output = runRecommenderDriver(fileName);
+    Map<String, Map<String, String>> recommendations = output.getRealtimeProvisioningRecommendations();
     assertRealtimeProvisioningRecommendation(recommendations.get(OPTIMAL_SEGMENT_SIZE));
     assertRealtimeProvisioningRecommendation(recommendations.get(CONSUMING_MEMORY_PER_HOST));
     assertRealtimeProvisioningRecommendation(recommendations.get(TOTAL_MEMORY_USED_PER_HOST));
+  }
+
+  private ConfigManager runRecommenderDriver(String fileName)
+      throws IOException, InvalidInputException {
+    String input = readInputToStr(fileName);
+    String output = RecommenderDriver.run(input);
+    return objectMapper.readValue(output, ConfigManager.class);
   }
 
   private void assertRealtimeProvisioningRecommendation(Map<String, String> matrix) {

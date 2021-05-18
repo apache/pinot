@@ -26,7 +26,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.7.0-SNAPSHOT</version>
+    <version>0.8.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-plugins</artifactId>
@@ -47,6 +47,8 @@
     <module>pinot-minion-tasks</module>
     <module>pinot-metrics</module>
     <module>pinot-segment-writer</module>
+    <module>pinot-segment-uploader</module>
+    <module>pinot-environment</module>
   </modules>
 
   <dependencies>

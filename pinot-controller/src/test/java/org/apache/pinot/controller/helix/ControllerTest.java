@@ -60,7 +60,6 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -75,15 +74,18 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 
-import static org.apache.pinot.common.utils.CommonConstants.Helix.Instance.*;
-import static org.apache.pinot.common.utils.CommonConstants.Helix.*;
-import static org.apache.pinot.common.utils.CommonConstants.Server.*;
-import static org.testng.Assert.*;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.*;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.Instance.ADMIN_PORT_KEY;
+import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 
 
 public abstract class ControllerTest {
@@ -131,13 +133,17 @@ public abstract class ControllerTest {
     }
   }
 
+  protected String getZkUrl() {
+    return _zookeeperInstance.getZkUrl();
+  }
+
   public Map<String, Object> getDefaultControllerConfiguration() {
     Map<String, Object> properties = new HashMap<>();
 
     properties.put(ControllerConf.CONTROLLER_HOST, LOCAL_HOST);
-    properties.put(ControllerConf.CONTROLLER_PORT, DEFAULT_CONTROLLER_PORT);
+    properties.put(ControllerConf.CONTROLLER_PORT, NetUtils.findOpenPort(DEFAULT_CONTROLLER_PORT));
     properties.put(ControllerConf.DATA_DIR, DEFAULT_DATA_DIR);
-    properties.put(ControllerConf.ZK_STR, ZkStarter.DEFAULT_ZK_STR);
+    properties.put(ControllerConf.ZK_STR, getZkUrl());
     properties.put(ControllerConf.HELIX_CLUSTER_NAME, getHelixClusterName());
 
     return properties;
@@ -192,6 +198,10 @@ public abstract class ControllerTest {
     return new ControllerStarter(config);
   }
 
+  protected int getControllerPort() {
+    return _controllerPort;
+  }
+
   protected void stopController() {
     _controllerStarter.stop();
     _controllerStarter = null;
@@ -209,7 +219,7 @@ public abstract class ControllerTest {
       throws Exception {
     HelixManager helixManager =
         HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
-            ZkStarter.DEFAULT_ZK_STR);
+            getZkUrl());
     helixManager.getStateMachineEngine()
         .registerStateModelFactory(FakeBrokerResourceOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
             FakeBrokerResourceOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
@@ -294,7 +304,7 @@ public abstract class ControllerTest {
       throws Exception {
     HelixManager helixManager =
         HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
-            ZkStarter.DEFAULT_ZK_STR);
+            getZkUrl());
     helixManager.getStateMachineEngine()
         .registerStateModelFactory(FakeSegmentOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
             FakeSegmentOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
@@ -393,7 +403,7 @@ public abstract class ControllerTest {
       throws Exception {
     HelixManager helixManager =
         HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
-            ZkStarter.DEFAULT_ZK_STR);
+            getZkUrl());
     helixManager.getStateMachineEngine()
         .registerStateModelFactory(FakeMinionResourceOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
             FakeMinionResourceOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
@@ -529,6 +539,11 @@ public abstract class ControllerTest {
   protected void dropRealtimeTable(String tableName) throws IOException {
     sendDeleteRequest(
         _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType(tableName)));
+  }
+
+  protected void dropAllSegments(String tableName, TableType tableType) throws IOException {
+    sendDeleteRequest(
+        _controllerRequestURLBuilder.forSegmentDeleteAllAPI(tableName, tableType.toString()));
   }
 
   protected void reloadOfflineTable(String tableName) throws IOException {

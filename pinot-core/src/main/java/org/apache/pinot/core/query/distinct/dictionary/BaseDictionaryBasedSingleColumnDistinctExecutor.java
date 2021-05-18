@@ -23,15 +23,14 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctTable;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -40,13 +39,16 @@ import org.apache.pinot.spi.utils.ByteArray;
 abstract class BaseDictionaryBasedSingleColumnDistinctExecutor implements DistinctExecutor {
   final ExpressionContext _expression;
   final Dictionary _dictionary;
+  final DataType _dataType;
   final int _limit;
 
   final IntSet _dictIdSet;
 
-  BaseDictionaryBasedSingleColumnDistinctExecutor(ExpressionContext expression, Dictionary dictionary, int limit) {
+  BaseDictionaryBasedSingleColumnDistinctExecutor(ExpressionContext expression, Dictionary dictionary,
+      DataType dataType, int limit) {
     _expression = expression;
     _dictionary = dictionary;
+    _dataType = dataType;
     _limit = limit;
 
     _dictIdSet = new IntOpenHashSet(Math.min(limit, MAX_INITIAL_CAPACITY));
@@ -55,17 +57,11 @@ abstract class BaseDictionaryBasedSingleColumnDistinctExecutor implements Distin
   @Override
   public DistinctTable getResult() {
     DataSchema dataSchema = new DataSchema(new String[]{_expression.toString()},
-        new ColumnDataType[]{ColumnDataType.fromDataTypeSV(_dictionary.getValueType())});
+        new ColumnDataType[]{ColumnDataType.fromDataTypeSV(_dataType)});
     List<Record> records = new ArrayList<>(_dictIdSet.size());
     IntIterator dictIdIterator = _dictIdSet.iterator();
-    if (_dictionary.getValueType() == DataType.BYTES) {
-      while (dictIdIterator.hasNext()) {
-        records.add(new Record(new Object[]{new ByteArray(_dictionary.getBytesValue(dictIdIterator.nextInt()))}));
-      }
-    } else {
-      while (dictIdIterator.hasNext()) {
-        records.add(new Record(new Object[]{_dictionary.get(dictIdIterator.nextInt())}));
-      }
+    while (dictIdIterator.hasNext()) {
+      records.add(new Record(new Object[]{_dictionary.getInternal(dictIdIterator.nextInt())}));
     }
     return new DistinctTable(dataSchema, records);
   }

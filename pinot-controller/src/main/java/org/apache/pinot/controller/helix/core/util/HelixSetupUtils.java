@@ -43,14 +43,14 @@ import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.builder.CustomModeISBuilder;
 import org.apache.helix.model.builder.FullAutoModeISBuilder;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixBrokerResourceOnlineOfflineStateModelGenerator;
 import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.common.utils.CommonConstants.Helix.*;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.*;
 
 
 public class HelixSetupUtils {

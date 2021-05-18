@@ -21,7 +21,6 @@ package org.apache.pinot.spi.ingestion.batch;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.spi.data.readers.FileFormat;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;

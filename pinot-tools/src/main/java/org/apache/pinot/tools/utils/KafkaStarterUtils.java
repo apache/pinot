@@ -22,15 +22,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.ServiceLoader;
+import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
+import org.apache.pinot.spi.utils.NetUtils;
 
 
 public class KafkaStarterUtils {
   public static final int DEFAULT_BROKER_ID = 0;
-  public static final int DEFAULT_ZK_TEST_PORT = 2191;
-  public static final String DEFAULT_ZK_STR = "localhost:" + DEFAULT_ZK_TEST_PORT + "/kafka";
   public static int DEFAULT_KAFKA_PORT = 19092;
   public static final String DEFAULT_KAFKA_BROKER = "localhost:" + DEFAULT_KAFKA_PORT;
 
@@ -69,7 +69,7 @@ public class KafkaStarterUtils {
     configureOffsetsTopicReplicationFactor(configuration, (short) 1);
     configuration.put(PORT, DEFAULT_KAFKA_PORT);
     configuration.put(BROKER_ID, DEFAULT_BROKER_ID);
-    configuration.put(ZOOKEEPER_CONNECT, DEFAULT_ZK_STR);
+    configuration.put(ZOOKEEPER_CONNECT, getDefaultKafkaZKAddress());
     configuration.put(LOG_DIRS, "/tmp/kafka-" + Double.toHexString(Math.random()));
 
     return configuration;
@@ -91,6 +91,10 @@ public class KafkaStarterUtils {
     configuration.put("host.name", hostName);
   }
 
+  public static String getDefaultKafkaZKAddress() {
+    return ZkStarter.getDefaultZkStr() + "/kafka";
+  }
+
   public static Properties getTopicCreationProps(int numKafkaPartitions) {
     Properties topicProps = new Properties();
     topicProps.put("partition", numKafkaPartitions);
@@ -100,7 +104,6 @@ public class KafkaStarterUtils {
   public static List<StreamDataServerStartable> startServers(final int brokerCount, final int port, final String zkStr,
       final Properties configuration) {
     List<StreamDataServerStartable> startables = new ArrayList<>(brokerCount);
-
     for (int i = 0; i < brokerCount; i++) {
       startables.add(startServer(port + i, i, zkStr, configuration));
     }
@@ -108,11 +111,13 @@ public class KafkaStarterUtils {
   }
 
   public static StreamDataServerStartable startServer(final int port, final int brokerId, final String zkStr,
-      final Properties configuration) {
+      final Properties baseConf) {
     StreamDataServerStartable kafkaStarter;
+    Properties configuration = new Properties(baseConf);
+    int kafkaPort = NetUtils.findOpenPort(port);
     try {
       configureOffsetsTopicReplicationFactor(configuration, (short) 1);
-      configuration.put(KafkaStarterUtils.PORT, port);
+      configuration.put(KafkaStarterUtils.PORT, kafkaPort);
       configuration.put(KafkaStarterUtils.BROKER_ID, brokerId);
       configuration.put(KafkaStarterUtils.ZOOKEEPER_CONNECT, zkStr);
       configuration.put(KafkaStarterUtils.LOG_DIRS, "/tmp/kafka-" + Double.toHexString(Math.random()));
@@ -122,5 +127,11 @@ public class KafkaStarterUtils {
     }
     kafkaStarter.start();
     return kafkaStarter;
+  }
+
+  public static Properties getDefaultKafkaConfiguration(ZkStarter.ZookeeperInstance zookeeperInstance) {
+    Properties kafkaConfiguration = getDefaultKafkaConfiguration();
+    kafkaConfiguration.put(ZOOKEEPER_CONNECT, zookeeperInstance.getZkUrl() + "/kafka");
+    return kafkaConfiguration;
   }
 }

@@ -25,13 +25,13 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -76,9 +76,9 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
     }
 
     // For non-dictionary-encoded expression, store values into the value set
-    DataType valueType = blockValSet.getValueType();
-    Set valueSet = getValueSet(aggregationResultHolder, valueType);
-    switch (valueType) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    Set valueSet = getValueSet(aggregationResultHolder, storedType);
+    switch (storedType) {
       case INT:
         IntOpenHashSet intSet = (IntOpenHashSet) valueSet;
         int[] intValues = blockValSet.getIntValuesSV();
@@ -123,7 +123,7 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
         }
         break;
       default:
-        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT aggregation function: " + valueType);
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT aggregation function: " + storedType);
     }
   }
 
@@ -143,8 +143,8 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
     }
 
     // For non-dictionary-encoded expression, store values into the value set
-    DataType valueType = blockValSet.getValueType();
-    switch (valueType) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < length; i++) {
@@ -185,7 +185,7 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
         }
         break;
       default:
-        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT aggregation function: " + valueType);
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT aggregation function: " + storedType);
     }
   }
 
@@ -205,8 +205,8 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
     }
 
     // For non-dictionary-encoded expression, store values into the value set
-    DataType valueType = blockValSet.getValueType();
-    switch (valueType) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < length; i++) {
@@ -244,7 +244,7 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
         }
         break;
       default:
-        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT aggregation function: " + valueType);
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT aggregation function: " + storedType);
     }
   }
 
@@ -457,8 +457,8 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
     RoaringBitmap dictIdBitmap = dictIdsWrapper._dictIdBitmap;
     int numValues = dictIdBitmap.getCardinality();
     PeekableIntIterator iterator = dictIdBitmap.getIntIterator();
-    DataType valueType = dictionary.getValueType();
-    switch (valueType) {
+    DataType storedType = dictionary.getValueType();
+    switch (storedType) {
       case INT:
         IntOpenHashSet intSet = new IntOpenHashSet(numValues);
         while (iterator.hasNext()) {
@@ -496,7 +496,7 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
         }
         return bytesSet;
       default:
-        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT aggregation function: " + valueType);
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT aggregation function: " + storedType);
     }
   }
 

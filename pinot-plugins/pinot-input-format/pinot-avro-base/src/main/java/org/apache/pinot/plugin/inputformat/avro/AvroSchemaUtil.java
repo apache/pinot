@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.avro.Schema;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -29,31 +30,50 @@ public class AvroSchemaUtil {
   /**
    * Returns the data type stored in Pinot that is associated with the given Avro type.
    */
-  public static FieldSpec.DataType valueOf(Schema.Type avroType) {
+  public static DataType valueOf(Schema.Type avroType) {
     switch (avroType) {
       case INT:
-        return FieldSpec.DataType.INT;
+        return DataType.INT;
       case LONG:
-        return FieldSpec.DataType.LONG;
+        return DataType.LONG;
       case FLOAT:
-        return FieldSpec.DataType.FLOAT;
+        return DataType.FLOAT;
       case DOUBLE:
-        return FieldSpec.DataType.DOUBLE;
+        return DataType.DOUBLE;
+      case BOOLEAN:
+        return DataType.BOOLEAN;
+      case STRING:
+      case ENUM:
+        return DataType.STRING;
+      case BYTES:
+        return DataType.BYTES;
+      default:
+        throw new UnsupportedOperationException("Unsupported Avro type: " + avroType);
+    }
+  }
+
+  /**
+   * @return if the given avro type is a primitive type.
+   */
+  public static boolean isPrimitiveType(Schema.Type avroType) {
+    switch (avroType) {
+      case INT:
+      case LONG:
+      case FLOAT:
+      case DOUBLE:
       case BOOLEAN:
       case STRING:
       case ENUM:
-        return FieldSpec.DataType.STRING;
-      case BYTES:
-        return FieldSpec.DataType.BYTES;
+        return true;
       default:
-        throw new UnsupportedOperationException("Unsupported Avro type: " + avroType);
+        return false;
     }
   }
 
   public static ObjectNode toAvroSchemaJsonObject(FieldSpec fieldSpec) {
     ObjectNode jsonSchema = JsonUtils.newObjectNode();
     jsonSchema.put("name", fieldSpec.getName());
-    switch (fieldSpec.getDataType()) {
+    switch (fieldSpec.getDataType().getStoredType()) {
       case INT:
         jsonSchema.set("type", convertStringsToJsonArray("null", "int"));
         return jsonSchema;
@@ -68,6 +88,9 @@ public class AvroSchemaUtil {
         return jsonSchema;
       case STRING:
         jsonSchema.set("type", convertStringsToJsonArray("null", "string"));
+        return jsonSchema;
+      case BYTES:
+        jsonSchema.set("type", convertStringsToJsonArray("null", "bytes"));
         return jsonSchema;
       default:
         throw new UnsupportedOperationException();

@@ -49,7 +49,7 @@ services:
     depends_on:
       - zookeeper
   pinot-controller:
-    image: apachepinot/pinot:0.3.0-SNAPSHOT
+    image: apachepinot/pinot:release-0.7.1
     hostname: pinot-controller
     volumes:
       - ./pinot-docker-demo/pinot/controller:/tmp/data/controller
@@ -59,7 +59,7 @@ services:
     depends_on:
       - kafka
   pinot-broker:
-    image: apachepinot/pinot:0.3.0-SNAPSHOT
+    image: apachepinot/pinot:release-0.7.1
     hostname: pinot-broker
     ports:
       - "8099:8099"
@@ -69,7 +69,7 @@ services:
       - kafka
       - pinot-controller
   pinot-server:
-    image: apachepinot/pinot:0.3.0-SNAPSHOT
+    image: apachepinot/pinot:release-0.7.1
     hostname: pinot-server
     volumes:
       - ./pinot-docker-demo/pinot/server:/tmp/data/server

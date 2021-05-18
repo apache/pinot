@@ -20,8 +20,8 @@ package org.apache.pinot.core.startree.v2;
 
 import java.math.BigDecimal;
 import java.util.Random;
-import org.apache.pinot.core.data.aggregator.SumPrecisionValueAggregator;
-import org.apache.pinot.core.data.aggregator.ValueAggregator;
+import org.apache.pinot.segment.local.aggregator.SumPrecisionValueAggregator;
+import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 import static org.testng.Assert.assertEquals;

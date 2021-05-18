@@ -19,6 +19,7 @@
 package org.apache.pinot.tools.admin.command;
 
 import com.google.common.base.Preconditions;
+import com.google.common.io.Files;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -27,12 +28,12 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.controller.recommender.io.metadata.SchemaWithMetaData;
+import org.apache.pinot.controller.recommender.realtime.provisioning.MemoryEstimator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.Command;
-import org.apache.pinot.controller.recommender.realtime.provisioning.MemoryEstimator;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -244,12 +245,13 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
 
     long maxUsableHostMemBytes = DataSizeUtils.toBytes(_maxUsableHostMemory);
 
+    File workingDir = Files.createTempDir();
     MemoryEstimator memoryEstimator;
     if (segmentProvided) {
       // use the provided segment to estimate memory
       memoryEstimator =
           new MemoryEstimator(tableConfig, new File(_sampleCompletedSegmentDir), _ingestionRate, maxUsableHostMemBytes,
-              tableRetentionHours);
+              tableRetentionHours, workingDir);
     } else {
       // no segments provided;
       // generate a segment based on the provided characteristics and then use it to estimate memory
@@ -261,7 +263,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
       SchemaWithMetaData schemaWithMetaData = deserialize(file, SchemaWithMetaData.class);
       memoryEstimator =
           new MemoryEstimator(tableConfig, schema, schemaWithMetaData, _numRows, _ingestionRate, maxUsableHostMemBytes,
-              tableRetentionHours);
+              tableRetentionHours, workingDir);
     }
     File sampleStatsHistory = memoryEstimator.initializeStatsHistory();
     memoryEstimator

@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.Map;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -26,7 +27,6 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -66,8 +66,8 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     // Treat BYTES value as serialized RoaringBitmap
-    DataType valueType = blockValSet.getValueType();
-    if (valueType == DataType.BYTES) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    if (storedType == DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       RoaringBitmap valueBitmap = aggregationResultHolder.getResult();
       if (valueBitmap != null) {
@@ -94,7 +94,7 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
 
     // For non-dictionary-encoded expression, store hash code of the values into the bitmap
     RoaringBitmap valueBitmap = getValueBitmap(aggregationResultHolder);
-    switch (valueType) {
+    switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         valueBitmap.addN(intValues, 0, length);
@@ -125,7 +125,7 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
         break;
       default:
         throw new IllegalStateException(
-            "Illegal data type for DISTINCT_COUNT_BITMAP aggregation function: " + valueType);
+            "Illegal data type for DISTINCT_COUNT_BITMAP aggregation function: " + storedType);
     }
   }
 
@@ -135,8 +135,8 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     // Treat BYTES value as serialized RoaringBitmap
-    DataType valueType = blockValSet.getValueType();
-    if (valueType == DataType.BYTES) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    if (storedType == DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
         RoaringBitmap value = ObjectSerDeUtils.ROARING_BITMAP_SER_DE.deserialize(bytesValues[i]);
@@ -162,7 +162,7 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     }
 
     // For non-dictionary-encoded expression, store hash code of the values into the bitmap
-    switch (valueType) {
+    switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < length; i++) {
@@ -195,7 +195,7 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
         break;
       default:
         throw new IllegalStateException(
-            "Illegal data type for DISTINCT_COUNT_BITMAP aggregation function: " + valueType);
+            "Illegal data type for DISTINCT_COUNT_BITMAP aggregation function: " + storedType);
     }
   }
 
@@ -205,8 +205,8 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     // Treat BYTES value as serialized RoaringBitmap
-    DataType valueType = blockValSet.getValueType();
-    if (valueType == DataType.BYTES) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    if (storedType == DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
         RoaringBitmap value = ObjectSerDeUtils.ROARING_BITMAP_SER_DE.deserialize(bytesValues[i]);
@@ -234,7 +234,7 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     }
 
     // For non-dictionary-encoded expression, store hash code of the values into the bitmap
-    switch (valueType) {
+    switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < length; i++) {
@@ -267,7 +267,7 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
         break;
       default:
         throw new IllegalStateException(
-            "Illegal data type for DISTINCT_COUNT_BITMAP aggregation function: " + valueType);
+            "Illegal data type for DISTINCT_COUNT_BITMAP aggregation function: " + storedType);
     }
   }
 
@@ -407,8 +407,8 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     RoaringBitmap dictIdBitmap = dictIdsWrapper._dictIdBitmap;
     RoaringBitmap valueBitmap = new RoaringBitmap();
     PeekableIntIterator iterator = dictIdBitmap.getIntIterator();
-    DataType valueType = dictionary.getValueType();
-    switch (valueType) {
+    DataType storedType = dictionary.getValueType();
+    switch (storedType) {
       case INT:
         while (iterator.hasNext()) {
           valueBitmap.add(dictionary.getIntValue(iterator.next()));
@@ -436,7 +436,7 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
         break;
       default:
         throw new IllegalStateException(
-            "Illegal data type for DISTINCT_COUNT_BITMAP aggregation function: " + valueType);
+            "Illegal data type for DISTINCT_COUNT_BITMAP aggregation function: " + storedType);
     }
     return valueBitmap;
   }

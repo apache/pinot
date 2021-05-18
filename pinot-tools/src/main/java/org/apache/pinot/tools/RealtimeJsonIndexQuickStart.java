@@ -70,7 +70,7 @@ public class RealtimeJsonIndexQuickStart {
     ZkStarter.ZookeeperInstance zookeeperInstance = ZkStarter.startLocalZkServer();
     try {
       _kafkaStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME,
-          KafkaStarterUtils.getDefaultKafkaConfiguration());
+          KafkaStarterUtils.getDefaultKafkaConfiguration(zookeeperInstance));
     } catch (Exception e) {
       throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
     }
@@ -100,12 +100,13 @@ public class RealtimeJsonIndexQuickStart {
 
     printStatus(Color.YELLOW, "***** Realtime json-index quickstart setup complete *****");
 
-    String q1 = "select json_extract_scalar(event, '$.event_name', 'STRING') from meetupRsvp where json_match(\"group\", 'group_topics.topic_name=''Fitness''') limit 10";
+    String q1 =
+        "select json_extract_scalar(event_json, '$.event_name', 'STRING') from meetupRsvp where json_match(group_json, '\"$.group_topics[*].topic_name\"=''Fitness''') limit 10";
     printStatus(Color.YELLOW, "Events related to fitness");
     printStatus(Color.CYAN, "Query : " + q1);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));
-    printStatus(Color.GREEN, "***************************************************");
 
+    printStatus(Color.GREEN, "***************************************************");
     printStatus(Color.GREEN, "You can always go to http://localhost:9000 to play around in the query console");
   }
 }

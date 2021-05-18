@@ -20,9 +20,12 @@ package org.apache.pinot.spi.data;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import java.sql.Timestamp;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
 import org.apache.pinot.spi.utils.EqualityUtils;
+import org.apache.pinot.spi.utils.TimestampUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
 
@@ -52,14 +55,20 @@ public class DateTimeFormatSpec {
   public DateTimeFormatSpec(String format) {
     _format = format;
     validateFormat(format);
-    String[] formatTokens = format.split(COLON_SEPARATOR, MAX_FORMAT_TOKENS);
-    _size = Integer.parseInt(formatTokens[FORMAT_SIZE_POSITION]);
-    _unitSpec = new DateTimeFormatUnitSpec(formatTokens[FORMAT_UNIT_POSITION]);
+    String[] formatTokens = StringUtils.split(format, COLON_SEPARATOR, MAX_FORMAT_TOKENS);
     if (formatTokens.length == MAX_FORMAT_TOKENS) {
       _patternSpec = new DateTimeFormatPatternSpec(formatTokens[FORMAT_TIMEFORMAT_POSITION],
           formatTokens[FORMAT_PATTERN_POSITION]);
     } else {
       _patternSpec = new DateTimeFormatPatternSpec(formatTokens[FORMAT_TIMEFORMAT_POSITION], null);
+    }
+    if (_patternSpec.getTimeFormat() == TimeFormat.TIMESTAMP) {
+      // TIMESTAMP type stores millis since epoch
+      _size = 1;
+      _unitSpec = new DateTimeFormatUnitSpec("MILLISECONDS");
+    } else {
+      _size = Integer.parseInt(formatTokens[FORMAT_SIZE_POSITION]);
+      _unitSpec = new DateTimeFormatUnitSpec(formatTokens[FORMAT_UNIT_POSITION]);
     }
   }
 
@@ -125,14 +134,20 @@ public class DateTimeFormatSpec {
    * <ul>
    *   <li>Given timeMs=1498892400000 and format='1:HOURS:EPOCH', returns 1498892400000/(1000*60*60)='416359'</li>
    *   <li>Given timeMs=1498892400000 and format='5:MINUTES:EPOCH', returns 1498892400000/(1000*60*5)='4996308'</li>
+   *   <li>Given timeMs=1498892400000 and format='1:MILLISECONDS:TIMESTAMP', returns '2017-07-01 00:00:00.0'</li>
    *   <li>Given timeMs=1498892400000 and format='1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd', returns '20170701'</li>
    * </ul>
    */
   public String fromMillisToFormat(long timeMs) {
-    if (_patternSpec.getTimeFormat() == TimeFormat.EPOCH) {
-      return Long.toString(_unitSpec.getTimeUnit().convert(timeMs, TimeUnit.MILLISECONDS) / _size);
-    } else {
-      return _patternSpec.getDateTimeFormatter().print(timeMs);
+    switch (_patternSpec.getTimeFormat()) {
+      case EPOCH:
+        return Long.toString(_unitSpec.getTimeUnit().convert(timeMs, TimeUnit.MILLISECONDS) / _size);
+      case TIMESTAMP:
+        return new Timestamp(timeMs).toString();
+      case SIMPLE_DATE_FORMAT:
+        return _patternSpec.getDateTimeFormatter().print(timeMs);
+      default:
+        throw new IllegalStateException("Unsupported time format: " + _patternSpec.getTimeFormat());
     }
   }
 
@@ -141,14 +156,21 @@ public class DateTimeFormatSpec {
    * <ul>
    *   <li>Given dateTimeValue='416359' and format='1:HOURS:EPOCH', returns 416359*(1000*60*60)=1498892400000</li>
    *   <li>Given dateTimeValue='4996308' and format='5:MINUTES:EPOCH', returns 4996308*(1000*60*5)=1498892400000</li>
+   *   <li>Given dateTimeValue='2017-07-01 00:00:00' and format='1:MILLISECONDS:TIMESTAMP', returns 1498892400000</li>
+   *   <li>Given dateTimeValue='1498892400000' and format='1:DAYS:TIMESTAMP', returns 1498892400000</li>
    *   <li>Given dateTimeValue='20170701' and format='1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd', returns 1498892400000</li>
    * </ul>
    */
   public long fromFormatToMillis(String dateTimeValue) {
-    if (_patternSpec.getTimeFormat() == TimeFormat.EPOCH) {
-      return TimeUnit.MILLISECONDS.convert(Long.parseLong(dateTimeValue) * _size, _unitSpec.getTimeUnit());
-    } else {
-      return _patternSpec.getDateTimeFormatter().parseMillis(dateTimeValue);
+    switch (_patternSpec.getTimeFormat()) {
+      case EPOCH:
+        return TimeUnit.MILLISECONDS.convert(Long.parseLong(dateTimeValue) * _size, _unitSpec.getTimeUnit());
+      case TIMESTAMP:
+        return TimestampUtils.toMillisSinceEpoch(dateTimeValue);
+      case SIMPLE_DATE_FORMAT:
+        return _patternSpec.getDateTimeFormatter().parseMillis(dateTimeValue);
+      default:
+        throw new IllegalStateException("Unsupported time format: " + _patternSpec.getTimeFormat());
     }
   }
 
@@ -157,7 +179,7 @@ public class DateTimeFormatSpec {
    */
   public static void validateFormat(String format) {
     Preconditions.checkNotNull(format, "Format string in dateTimeFieldSpec must not be null");
-    String[] formatTokens = format.split(COLON_SEPARATOR, MAX_FORMAT_TOKENS);
+    String[] formatTokens = StringUtils.split(format, COLON_SEPARATOR, MAX_FORMAT_TOKENS);
     Preconditions.checkState(formatTokens.length >= MIN_FORMAT_TOKENS && formatTokens.length <= MAX_FORMAT_TOKENS,
         "Incorrect format: %s. Must be of format 'size:timeunit:timeformat(:pattern)'", format);
     Preconditions.checkState(formatTokens[FORMAT_SIZE_POSITION].matches(NUMBER_REGEX),
@@ -167,8 +189,9 @@ public class DateTimeFormatSpec {
     DateTimeFormatUnitSpec.validateUnitSpec(formatTokens[FORMAT_UNIT_POSITION]);
 
     if (formatTokens.length == MIN_FORMAT_TOKENS) {
-      Preconditions.checkState(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.EPOCH.toString()),
-          "Incorrect format type: %s in format: %s. Must be of '[0-9]+:<TimeUnit>:EPOCH'",
+      Preconditions.checkState(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.EPOCH.toString())
+              || formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.TIMESTAMP.toString()),
+          "Incorrect format type: %s in format: %s. Must be of '[0-9]+:<TimeUnit>:EPOCH|TIMESTAMP'",
           formatTokens[FORMAT_TIMEFORMAT_POSITION], format);
     } else {
       Preconditions

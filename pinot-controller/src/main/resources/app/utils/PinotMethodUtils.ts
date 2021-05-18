@@ -288,7 +288,9 @@ const getQueryResults = (params, url, checkedOptions) => {
       'numEntriesScannedPostFilter',
       'numGroupsLimitReached',
       'partialResponse',
-      'minConsumingFreshnessTimeMs'];
+      'minConsumingFreshnessTimeMs',
+      'offlineThreadCpuTimeNs',
+      'realtimeThreadCpuTimeNs'];
 
     return {
       result: {
@@ -300,7 +302,8 @@ const getQueryResults = (params, url, checkedOptions) => {
         records: [[data.timeUsedMs, data.numDocsScanned, data.totalDocs, data.numServersQueried, data.numServersResponded,
           data.numSegmentsQueried, data.numSegmentsProcessed, data.numSegmentsMatched, data.numConsumingSegmentsQueried,
           data.numEntriesScannedInFilter, data.numEntriesScannedPostFilter, data.numGroupsLimitReached,
-          data.partialResponse ? data.partialResponse : '-', data.minConsumingFreshnessTimeMs]]
+          data.partialResponse ? data.partialResponse : '-', data.minConsumingFreshnessTimeMs,
+          data.offlineThreadCpuTimeNs, data.realtimeThreadCpuTimeNs]]
       },
       data,
     };

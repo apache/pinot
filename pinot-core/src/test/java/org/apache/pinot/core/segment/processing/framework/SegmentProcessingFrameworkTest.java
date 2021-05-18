@@ -27,10 +27,6 @@ import java.util.Map;
 import java.util.stream.IntStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.core.data.readers.GenericRowRecordReader;
-import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
-import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.processing.collector.CollectorConfig;
 import org.apache.pinot.core.segment.processing.collector.CollectorFactory;
 import org.apache.pinot.core.segment.processing.filter.RecordFilterConfig;
@@ -38,6 +34,10 @@ import org.apache.pinot.core.segment.processing.filter.RecordFilterFactory;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
 import org.apache.pinot.core.segment.processing.transformer.RecordTransformerConfig;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -71,22 +71,22 @@ public class SegmentProcessingFrameworkTest {
   private Schema _pinotSchemaMV;
   private TableConfig _tableConfig;
   private final List<Object[]> _rawDataMultipleDays = Lists
-      .newArrayList(new Object[]{"abc", 1000, 1597719600000L}, new Object[]{"pqr", 2000, 1597773600000L},
+      .newArrayList(new Object[]{"abc", 1000, 1597719600000L}, new Object[]{null, 2000, 1597773600000L},
           new Object[]{"abc", 1000, 1597777200000L}, new Object[]{"abc", 4000, 1597795200000L},
-          new Object[]{"abc", 3000, 1597802400000L}, new Object[]{"pqr", 1000, 1597838400000L},
-          new Object[]{"xyz", 4000, 1597856400000L}, new Object[]{"pqr", 1000, 1597878000000L},
+          new Object[]{"abc", 3000, 1597802400000L}, new Object[]{null, 1000, 1597838400000L},
+          new Object[]{"xyz", 4000, 1597856400000L}, new Object[]{null, 1000, 1597878000000L},
           new Object[]{"abc", 7000, 1597881600000L}, new Object[]{"xyz", 6000, 1597892400000L});
 
   private final List<Object[]> _rawDataSingleDay = Lists
-      .newArrayList(new Object[]{"abc", 1000, 1597795200000L}, new Object[]{"pqr", 2000, 1597795200000L},
+      .newArrayList(new Object[]{"abc", 1000, 1597795200000L}, new Object[]{null, 2000, 1597795200000L},
           new Object[]{"abc", 1000, 1597795200000L}, new Object[]{"abc", 4000, 1597795200000L},
-          new Object[]{"abc", 3000, 1597795200000L}, new Object[]{"pqr", 1000, 1597795200000L},
-          new Object[]{"xyz", 4000, 1597795200000L}, new Object[]{"pqr", 1000, 1597795200000L},
+          new Object[]{"abc", 3000, 1597795200000L}, new Object[]{null, 1000, 1597795200000L},
+          new Object[]{"xyz", 4000, 1597795200000L}, new Object[]{null, 1000, 1597795200000L},
           new Object[]{"abc", 7000, 1597795200000L}, new Object[]{"xyz", 6000, 1597795200000L});
 
   private final List<Object[]> _multiValue = Lists
       .newArrayList(new Object[]{new String[]{"a", "b"}, 1000, 1597795200000L},
-          new Object[]{new String[]{"a"}, 1000, 1597795200000L}, new Object[]{new String[]{"a"}, 1000, 1597795200000L},
+          new Object[]{null, 1000, 1597795200000L}, new Object[]{null, 1000, 1597795200000L},
           new Object[]{new String[]{"a", "b"}, 1000, 1597795200000L});
 
   @BeforeClass
@@ -95,10 +95,10 @@ public class SegmentProcessingFrameworkTest {
     _tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTimeColumnName("timeValue").build();
     _pinotSchema = new Schema.SchemaBuilder().setSchemaName("mySchema")
-        .addSingleValueDimension("campaign", FieldSpec.DataType.STRING).addMetric("clicks", FieldSpec.DataType.INT)
+        .addSingleValueDimension("campaign", FieldSpec.DataType.STRING, "").addMetric("clicks", FieldSpec.DataType.INT)
         .addDateTime("timeValue", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
     _pinotSchemaMV = new Schema.SchemaBuilder().setSchemaName("mySchema")
-        .addMultiValueDimension("campaign", FieldSpec.DataType.STRING).addMetric("clicks", FieldSpec.DataType.INT)
+        .addMultiValueDimension("campaign", FieldSpec.DataType.STRING, "").addMetric("clicks", FieldSpec.DataType.INT)
         .addDateTime("timeValue", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
 
     _baseDir = new File(FileUtils.getTempDirectory(), "segment_processor_framework_test_" + System.currentTimeMillis());

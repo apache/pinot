@@ -25,13 +25,13 @@ import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.Collection;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -85,8 +85,8 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     }
 
     // For non-dictionary-encoded expression, store INT values into a RoaringBitmap, other types into an OpenHashSet
-    DataType valueType = blockValSet.getValueType();
-    switch (valueType) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         RoaringBitmap bitmap = aggregationResultHolder.getResult();
@@ -154,7 +154,7 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
         break;
       default:
         throw new IllegalStateException(
-            "Illegal data type for PARTITIONED_DISTINCT_COUNT aggregation function: " + valueType);
+            "Illegal data type for PARTITIONED_DISTINCT_COUNT aggregation function: " + storedType);
     }
   }
 
@@ -173,8 +173,8 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     }
 
     // For non-dictionary-encoded expression, store INT values into a RoaringBitmap, other types into an OpenHashSet
-    DataType valueType = blockValSet.getValueType();
-    switch (valueType) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < length; i++) {
@@ -213,7 +213,7 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
         break;
       default:
         throw new IllegalStateException(
-            "Illegal data type for PARTITIONED_DISTINCT_COUNT aggregation function: " + valueType);
+            "Illegal data type for PARTITIONED_DISTINCT_COUNT aggregation function: " + storedType);
     }
   }
 
@@ -235,8 +235,8 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     }
 
     // For non-dictionary-encoded expression, store INT values into a RoaringBitmap, other types into an OpenHashSet
-    DataType valueType = blockValSet.getValueType();
-    switch (valueType) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < length; i++) {
@@ -293,7 +293,7 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
         break;
       default:
         throw new IllegalStateException(
-            "Illegal data type for PARTITIONED_DISTINCT_COUNT aggregation function: " + valueType);
+            "Illegal data type for PARTITIONED_DISTINCT_COUNT aggregation function: " + storedType);
     }
   }
 

@@ -20,11 +20,12 @@ package org.apache.pinot.core.query.distinct.raw;
 
 import it.unimi.dsi.fastutil.PriorityQueue;
 import it.unimi.dsi.fastutil.objects.ObjectHeapPriorityQueue;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -34,9 +35,9 @@ import org.apache.pinot.spi.utils.ByteArray;
 public class RawBytesSingleColumnDistinctOrderByExecutor extends BaseRawBytesSingleColumnDistinctExecutor {
   private final PriorityQueue<ByteArray> _priorityQueue;
 
-  public RawBytesSingleColumnDistinctOrderByExecutor(ExpressionContext expression,
+  public RawBytesSingleColumnDistinctOrderByExecutor(ExpressionContext expression, DataType dataType,
       OrderByExpressionContext orderByExpression, int limit) {
-    super(expression, limit);
+    super(expression, dataType, limit);
 
     assert orderByExpression.getExpression().equals(expression);
     int comparisonFactor = orderByExpression.isAsc() ? -1 : 1;

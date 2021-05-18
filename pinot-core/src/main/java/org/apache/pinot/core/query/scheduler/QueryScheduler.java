@@ -163,30 +163,30 @@ public abstract class QueryScheduler {
     }
     long requestId = queryRequest.getRequestId();
     Map<String, String> dataTableMetadata = dataTable.getMetadata();
-    dataTableMetadata.put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(requestId));
+    dataTableMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
 
     byte[] responseBytes = serializeDataTable(queryRequest, dataTable);
 
     // Log the statistics
     String tableNameWithType = queryRequest.getTableNameWithType();
     long numDocsScanned =
-        Long.parseLong(dataTableMetadata.getOrDefault(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, INVALID_NUM_SCANNED));
+        Long.parseLong(dataTableMetadata.getOrDefault(MetadataKey.NUM_DOCS_SCANNED.getName(), INVALID_NUM_SCANNED));
     long numEntriesScannedInFilter = Long.parseLong(
-        dataTableMetadata.getOrDefault(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, INVALID_NUM_SCANNED));
+        dataTableMetadata.getOrDefault(MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName(), INVALID_NUM_SCANNED));
     long numEntriesScannedPostFilter = Long.parseLong(
-        dataTableMetadata.getOrDefault(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, INVALID_NUM_SCANNED));
-    long numSegmentsProcessed =
-        Long.parseLong(dataTableMetadata.getOrDefault(DataTable.NUM_SEGMENTS_PROCESSED, INVALID_SEGMENTS_COUNT));
-    long numSegmentsMatched =
-        Long.parseLong(dataTableMetadata.getOrDefault(DataTable.NUM_SEGMENTS_MATCHED, INVALID_SEGMENTS_COUNT));
+        dataTableMetadata.getOrDefault(MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName(), INVALID_NUM_SCANNED));
+    long numSegmentsProcessed = Long.parseLong(
+        dataTableMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_PROCESSED.getName(), INVALID_SEGMENTS_COUNT));
+    long numSegmentsMatched = Long.parseLong(
+        dataTableMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_MATCHED.getName(), INVALID_SEGMENTS_COUNT));
     long numSegmentsConsuming = Long.parseLong(
-        dataTableMetadata.getOrDefault(DataTable.NUM_CONSUMING_SEGMENTS_PROCESSED, INVALID_SEGMENTS_COUNT));
-    long minConsumingFreshnessMs =
-        Long.parseLong(dataTableMetadata.getOrDefault(DataTable.MIN_CONSUMING_FRESHNESS_TIME_MS, INVALID_FRESHNESS_MS));
+        dataTableMetadata.getOrDefault(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(), INVALID_SEGMENTS_COUNT));
+    long minConsumingFreshnessMs = Long.parseLong(
+        dataTableMetadata.getOrDefault(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(), INVALID_FRESHNESS_MS));
     int numResizes =
-        Integer.parseInt(dataTableMetadata.getOrDefault(DataTable.NUM_RESIZES_METADATA_KEY, INVALID_NUM_RESIZES));
+        Integer.parseInt(dataTableMetadata.getOrDefault(MetadataKey.NUM_RESIZES.getName(), INVALID_NUM_RESIZES));
     long resizeTimeMs =
-        Long.parseLong(dataTableMetadata.getOrDefault(DataTable.RESIZE_TIME_MS_METADATA_KEY, INVALID_RESIZE_TIME_MS));
+        Long.parseLong(dataTableMetadata.getOrDefault(MetadataKey.RESIZE_TIME_MS.getName(), INVALID_RESIZE_TIME_MS));
     long threadCpuTimeNs =
         Long.parseLong(dataTableMetadata.getOrDefault(MetadataKey.THREAD_CPU_TIME_NS.getName(), "0"));
 
@@ -208,7 +208,7 @@ public abstract class QueryScheduler {
       serverMetrics.addValueToTableGauge(tableNameWithType, ServerGauge.RESIZE_TIME_MS, resizeTimeMs);
     }
     if (threadCpuTimeNs > 0) {
-      serverMetrics.addValueToTableGauge(tableNameWithType, ServerGauge.EXECUTION_THREAD_CPU_TIME_NS, threadCpuTimeNs);
+      serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.EXECUTION_THREAD_CPU_TIME_NS, threadCpuTimeNs, TimeUnit.NANOSECONDS);
     }
 
     TimerContext timerContext = queryRequest.getTimerContext();
@@ -311,7 +311,7 @@ public abstract class QueryScheduler {
     DataTable result = DataTableBuilder.getEmptyDataTable();
 
     Map<String, String> dataTableMetadata = result.getMetadata();
-    dataTableMetadata.put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(queryRequest.getRequestId()));
+    dataTableMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(queryRequest.getRequestId()));
 
     result.addException(error);
     return Futures.immediateFuture(serializeDataTable(queryRequest, result));

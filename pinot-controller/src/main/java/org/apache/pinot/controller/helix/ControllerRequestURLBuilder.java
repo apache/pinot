@@ -231,8 +231,32 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "schemas", schemaName);
   }
 
-  public String forSegmentDownload(String tableName, String segmentName) {
-    return URIUtils.constructDownloadUrl(_baseUrl, tableName, segmentName);
+  public String forTableConfigsCreate() {
+    return StringUtil.join("/", _baseUrl, "tableConfigs");
+  }
+
+  public String forTableConfigsGet(String configName) {
+    return StringUtil.join("/", _baseUrl, "tableConfigs", configName);
+  }
+
+  public String forTableConfigsList() {
+    return StringUtil.join("/", _baseUrl, "tableConfigs");
+  }
+
+  public String forTableConfigsUpdate(String configName) {
+    return StringUtil.join("/", _baseUrl, "tableConfigs", configName);
+  }
+
+  public String forTableConfigsDelete(String configName) {
+    return StringUtil.join("/", _baseUrl, "tableConfigs", configName);
+  }
+
+  public String forTableConfigsValidate() {
+    return StringUtil.join("/", _baseUrl, "tableConfigs", "validate");
+  }
+
+  public String forSegmentDownload(String tableNameWithType, String segmentName) {
+    return URIUtils.constructDownloadUrl(_baseUrl, tableNameWithType, segmentName);
   }
 
   public String forSegmentDelete(String tableName, String segmentName) {
@@ -339,5 +363,9 @@ public class ControllerRequestURLBuilder {
 
   public String forClusterConfigs() {
     return StringUtil.join("/", _baseUrl, "cluster/configs");
+  }
+
+  public String forAppConfigs() {
+    return StringUtil.join("/", _baseUrl, "appconfigs");
   }
 }

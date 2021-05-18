@@ -19,8 +19,8 @@
 package org.apache.pinot.controller.util;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.joda.time.Duration;
 
 

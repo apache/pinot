@@ -30,11 +30,12 @@ import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.PartitionGroupMetadataFetcher;
-import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -111,7 +112,7 @@ public class PinotTableIdealStateBuilder {
     try {
       nReplicas = Integer.valueOf(replicasPerPartitionStr);
     } catch (NumberFormatException e) {
-      throw new PinotHelixResourceManager.InvalidTableConfigException(
+      throw new InvalidTableConfigException(
           "Invalid value for replicasPerPartition, expected a number: " + replicasPerPartitionStr, e);
     }
     if (idealState == null) {

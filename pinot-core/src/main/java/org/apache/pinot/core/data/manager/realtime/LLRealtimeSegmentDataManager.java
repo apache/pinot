@@ -45,21 +45,21 @@ import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.CompletionMode;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
-import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
-import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
-import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
-import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import org.apache.pinot.core.realtime.converter.RealtimeSegmentConverter;
-import org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig;
-import org.apache.pinot.core.segment.creator.impl.V1Constants;
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
-import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
-import org.apache.pinot.core.util.IngestionUtils;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
+import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
+import org.apache.pinot.segment.local.partition.PartitionFunctionFactory;
+import org.apache.pinot.segment.local.realtime.converter.RealtimeSegmentConverter;
+import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
+import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
+import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
+import org.apache.pinot.segment.local.segment.creator.impl.V1Constants;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.store.SegmentDirectoryPaths;
+import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
@@ -85,6 +85,7 @@ import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 import org.apache.pinot.spi.stream.TransientConsumerException;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.CompletionMode;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -255,6 +256,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   final String _clientId;
   private final LLCSegmentName _llcSegmentName;
   private final RecordTransformer _recordTransformer;
+  private final ComplexTypeTransformer _complexTypeTransformer;
   private PartitionGroupConsumer _partitionGroupConsumer = null;
   private StreamMetadataProvider _streamMetadataProvider = null;
   private final File _resourceTmpDir;
@@ -483,6 +485,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               messagesAndOffsets.getMessageLengthAtIndex(index), reuse);
       if (decodedRow != null) {
         try {
+          if (_complexTypeTransformer != null) {
+            // TODO: consolidate complex type transformer into composite type transformer
+            decodedRow = _complexTypeTransformer.transform(decodedRow);
+          }
           if (decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
             for (Object singleRow : (Collection) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
               GenericRow transformedRow = _recordTransformer.transform((GenericRow) singleRow);
@@ -923,6 +929,17 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
+  /**
+   * Cleans up the metrics that reflects the state of the realtime segment.
+   * This step is essential as the instance may not be the target location for some of the partitions.
+   * E.g. if the number of partitions increases, or a host swap is needed, the target location for some partitions may change,
+   * and the current host remains to run. In this case, the current server would still keep the state of the old partitions,
+   * which no longer resides in this host any more, thus causes false positive information to the metric system.
+   */
+  private void cleanupMetrics() {
+    _serverMetrics.removeTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING);
+  }
+
   protected void hold() {
     try {
       Thread.sleep(SegmentCompletionProtocol.MAX_HOLD_TIME_MS);
@@ -1083,6 +1100,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
     _realtimeSegment.destroy();
     closeStreamConsumers();
+    cleanupMetrics();
   }
 
   protected void start() {
@@ -1113,8 +1131,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   // If the transition is OFFLINE to ONLINE, the caller should have downloaded the segment and we don't reach here.
   public LLRealtimeSegmentDataManager(RealtimeSegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
       RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, IndexLoadingConfig indexLoadingConfig,
-      Schema schema, LLCSegmentName llcSegmentName, Semaphore partitionGroupConsumerSemaphore, ServerMetrics serverMetrics,
-      @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
+      Schema schema, LLCSegmentName llcSegmentName, Semaphore partitionGroupConsumerSemaphore,
+      ServerMetrics serverMetrics, @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
     _segBuildSemaphore = realtimeTableDataManager.getSegmentBuildSemaphore();
     _segmentZKMetadata = (LLCRealtimeSegmentZKMetadata) segmentZKMetadata;
     _tableConfig = tableConfig;
@@ -1141,11 +1159,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _llcSegmentName = llcSegmentName;
     _partitionGroupId = _llcSegmentName.getPartitionGroupId();
-    _partitionGroupConsumptionStatus = new PartitionGroupConsumptionStatus(_partitionGroupId, _llcSegmentName.getSequenceNumber(),
-        _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getStartOffset()),
-        _segmentZKMetadata.getEndOffset() == null ? null
-            : _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getEndOffset()),
-        _segmentZKMetadata.getStatus().toString());
+    _partitionGroupConsumptionStatus =
+        new PartitionGroupConsumptionStatus(_partitionGroupId, _llcSegmentName.getSequenceNumber(),
+            _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getStartOffset()),
+            _segmentZKMetadata.getEndOffset() == null ? null
+                : _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getEndOffset()),
+            _segmentZKMetadata.getStatus().toString());
     _partitionGroupConsumerSemaphore = partitionGroupConsumerSemaphore;
     _acquiredConsumerSemaphore = new AtomicBoolean(false);
     _metricKeyName = _tableNameWithType + "-" + _streamTopic + "-" + _partitionGroupId;
@@ -1230,6 +1249,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     // Create record transformer
     _recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
+
+    // Create complex type transformer
+    _complexTypeTransformer = ComplexTypeTransformer.getComplexTypeTransformer(tableConfig);
 
     // Acquire semaphore to create stream consumers
     try {
@@ -1335,8 +1357,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       closePartitionGroupConsumer();
     }
     segmentLogger.info("Creating new stream consumer, reason: {}", reason);
-    _partitionGroupConsumer = _streamConsumerFactory.createPartitionGroupConsumer(_clientId,
-        _partitionGroupConsumptionStatus);
+    _partitionGroupConsumer =
+        _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
   }
 
   /**

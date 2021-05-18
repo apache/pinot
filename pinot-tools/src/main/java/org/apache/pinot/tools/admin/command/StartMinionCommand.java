@@ -23,11 +23,9 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map;
-
 import org.apache.commons.configuration.ConfigurationException;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.minion.MinionStarter;
 import org.apache.pinot.spi.services.ServiceRole;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
 import org.kohsuke.args4j.Option;

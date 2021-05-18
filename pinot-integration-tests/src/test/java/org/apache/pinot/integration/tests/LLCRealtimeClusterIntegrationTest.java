@@ -18,31 +18,30 @@
  */
 package org.apache.pinot.integration.tests;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
-
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
-import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -110,6 +109,14 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
     FileUtils.deleteQuietly(new File(CONSUMER_DIRECTORY));
 
     super.setUp();
+  }
+
+  @AfterClass
+  @Override
+  public void tearDown()
+      throws Exception {
+    FileUtils.deleteDirectory(new File(CONSUMER_DIRECTORY));
+    super.tearDown();
   }
 
   @Test
