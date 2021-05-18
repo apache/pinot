@@ -22,9 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.core.minion.segment.DefaultRecordPartitioner;
@@ -97,18 +95,18 @@ public class SegmentConverter {
     _skipTimeValueCheck = skipTimeValueCheck;
 
     // Validate that segment schemas from all segments are the same
-    Set<Schema> schemas = new HashSet<>();
     for (File indexDir : inputIndexDirs) {
+      Schema schema;
       try {
-        schemas.add(new SegmentMetadataImpl(indexDir).getSchema());
+        schema = new SegmentMetadataImpl(indexDir).getSchema();
       } catch (IOException e) {
         throw new RuntimeException("Caught exception while reading schema from: " + indexDir);
       }
-    }
-    if (schemas.size() == 1) {
-      _schema = schemas.iterator().next();
-    } else {
-      throw new IllegalStateException("Schemas from input segments are not the same");
+      if (_schema == null) {
+        _schema = schema;
+      } else {
+        Preconditions.checkState(_schema.equals(schema), "Schemas from input segments are not the same");
+      }
     }
   }
 
