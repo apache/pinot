@@ -77,8 +77,6 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
     _validDocIds = validDocIds;
     _validDocIndex = new ValidDocIndexReaderImpl(validDocIds);
-    _pinotSegmentRecordReader = new PinotSegmentRecordReader();
-    _pinotSegmentRecordReader.init(this);
   }
 
   @Override
@@ -159,6 +157,13 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     if (_partitionUpsertMetadataManager != null) {
       _partitionUpsertMetadataManager.removeSegment(segmentName, _validDocIds);
     }
+    if (_pinotSegmentRecordReader != null) {
+      try {
+        _pinotSegmentRecordReader.close();
+      } catch (IOException e) {
+        LOGGER.error("Failed to close record reader. Continuing with error.", e);
+      }
+    }
   }
 
   @Override
@@ -175,6 +180,10 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   @Override
   public GenericRow getRecord(int docId, GenericRow reuse) {
     try {
+      if (_pinotSegmentRecordReader == null) {
+        _pinotSegmentRecordReader = new PinotSegmentRecordReader();
+        _pinotSegmentRecordReader.init(this);
+      }
       _pinotSegmentRecordReader.getRecord(reuse, docId);
       return reuse;
     } catch (Exception e) {
