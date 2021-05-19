@@ -531,10 +531,6 @@ public class QueryInvertedSortedIndexRecommender {
           .setRecommendationPriorityEnum(RecommendationPriorityEnum.NON_CANDIDATE_SCAN) // won't recommend index
           .setnESI(nESI).setPercentSelected(_params.PERCENT_SELECT_FOR_FUNCTION).setnESIWithIdx(nESI).build();
     }
-    // Skip time columns
-    else if (_inputManager.isPrimaryDateTime(colName)) {
-      return null;
-    }
     // Not a valid dimension name
     else if (!_inputManager.isDim(colName)) {
       LOGGER.error("Error: Column {} should not appear in filter", colName);

@@ -222,7 +222,7 @@ public class NoDictionaryOnHeapDictionaryJointRule extends AbstractRule {
       Predicate predicate = filterContext.getPredicate();
       ExpressionContext lhs = predicate.getLhs();
       String colName = lhs.toString();
-      if (lhs.getType() == ExpressionContext.Type.FUNCTION || _input.isPrimaryDateTime(colName)) {
+      if (lhs.getType() == ExpressionContext.Type.FUNCTION || _input.isTimeOrDateTimeColumn(colName)) {
         LOGGER.trace("Skipping this column {}", colName);
       } else if (!_input.isDim(colName)) {
         LOGGER.error("Error: Column {} should not appear in filter", colName);

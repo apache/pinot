@@ -77,10 +77,10 @@ public class RecommenderConstants {
 
   public static class FlagQueryRuleParams{
     public static final long DEFAULT_THRESHOLD_MAX_LIMIT_SIZE = 100000;
-    public static final String WARNING_NO_FILTERING = "Warning: No filtering in ths query";
-    public static final String WARNING_NO_TIME_COL = "Warning: No time column used in ths query";
-    public static final String WARNING_TOO_LONG_LIMIT = "Warning: The size of LIMIT is longer than " + DEFAULT_THRESHOLD_MAX_LIMIT_SIZE;
-    public static final String ERROR_INVALID_QUERY = "Error: query not able to parse, skipped";
+    public static final String WARNING_NO_FILTERING = "Warning: Query seems to scan the entire table. No filters are used in the query. Please verify if filters are not needed.";
+    public static final String WARNING_NO_TIME_COL = "Warning: No time column used in filter in the query. Table with time columns typically use it in filters to make the queries more selective.";
+    public static final String WARNING_TOO_LONG_LIMIT = "Warning: Please verify if you need to pull out huge number of records for this query. Consider using smaller limit than " + DEFAULT_THRESHOLD_MAX_LIMIT_SIZE;
+    public static final String ERROR_INVALID_QUERY = "Error: Invalid query syntax. Please fix the query";
   }
 
   public static class RealtimeProvisioningRule {
