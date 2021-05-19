@@ -20,7 +20,7 @@ package org.apache.pinot.core.data.manager.realtime;
 
 import java.util.Map;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.core.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.io.writer.impl.MmapMemoryManager;

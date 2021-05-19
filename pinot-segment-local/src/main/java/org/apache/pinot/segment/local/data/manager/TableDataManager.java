@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.manager;
+package org.apache.pinot.segment.local.data.manager;
 
 import java.io.File;
 import java.util.List;
@@ -26,7 +26,6 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -125,7 +124,6 @@ public interface TableDataManager {
 
   /**
    * Returns the dir which contains the data segments.
-   * @return
    */
   File getTableDataDir();
 }

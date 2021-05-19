@@ -16,13 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.upsert;
+package org.apache.pinot.segment.local.upsert;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 
 
 /**
@@ -40,7 +39,7 @@ public class TableUpsertMetadataManager {
   }
 
   public PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
-    return _partitionMetadataManagerMap.computeIfAbsent(partitionId,
-        k -> new PartitionUpsertMetadataManager(_tableNameWithType, k, _serverMetrics));
+    return _partitionMetadataManagerMap
+        .computeIfAbsent(partitionId, k -> new PartitionUpsertMetadataManager(_tableNameWithType, k, _serverMetrics));
   }
 }
