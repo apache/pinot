@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
+import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -70,6 +71,9 @@ public class JsonToPinotSchema extends AbstractBaseAdminCommand implements Comma
   @Option(name = "-delimiter", metaVar = "<string>", usage = "The delimiter separating components in nested structure, default to dot")
   String _delimiter;
 
+  @Option(name = "-collectionToJsonMode", metaVar = "<string>", usage = "The mode of converting collection to JSON string, can be NONE/NON_PRIMITIVE/ALL")
+  String _collectionToJsonMode;
+
   @SuppressWarnings("FieldCanBeLocal")
   @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
@@ -86,7 +90,7 @@ public class JsonToPinotSchema extends AbstractBaseAdminCommand implements Comma
     Schema schema;
     schema = JsonUtils
         .getPinotSchemaFromJsonFile(new File(_jsonFile), buildFieldTypesMap(), _timeUnit, buildUnnestFields(),
-            getDelimiter());
+            getDelimiter(), getCollectionToJsonMode());
     schema.setSchemaName(_pinotSchemaName);
 
     File outputDir = new File(_outputDir);
@@ -118,7 +122,8 @@ public class JsonToPinotSchema extends AbstractBaseAdminCommand implements Comma
   public String toString() {
     return "JsonToPinotSchema -jsonFile " + _jsonFile + " -outputDir " + _outputDir + " -pinotSchemaName "
         + _pinotSchemaName + " -dimensions " + _dimensions + " -metrics " + _metrics + " -timeColumnName "
-        + _dateTimeColumnName + " -timeUnit " + _timeUnit;
+        + _dateTimeColumnName + " -timeUnit " + _timeUnit + " _unnestFields " + _unnestFields + " _delimiter "
+        + _delimiter + " _collectionToJsonMode " + _collectionToJsonMode;
   }
 
   /**
@@ -153,6 +158,13 @@ public class JsonToPinotSchema extends AbstractBaseAdminCommand implements Comma
       }
     }
     return unnestFields;
+  }
+
+  private ComplexTypeConfig.CollectionToJsonMode getCollectionToJsonMode() {
+    if (_collectionToJsonMode == null) {
+      return ComplexTypeTransformer.DEFAULT_COLLECTION_TO_JSON_MODE;
+    }
+    return ComplexTypeConfig.CollectionToJsonMode.valueOf(_collectionToJsonMode);
   }
 
   private String getDelimiter() {
