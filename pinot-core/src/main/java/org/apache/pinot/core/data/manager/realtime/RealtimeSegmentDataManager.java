@@ -25,17 +25,10 @@ import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManag
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.io.writer.impl.MmapMemoryManager;
 import org.apache.pinot.segment.spi.MutableSegment;
+import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
 
 
 public abstract class RealtimeSegmentDataManager extends SegmentDataManager {
-
-  /**
-   * The state of the consumer of this segment
-   */
-  public enum ConsumerState {
-    CONSUMING,
-    NOT_CONSUMING // In error state
-  }
 
   @Override
   public abstract MutableSegment getSegment();

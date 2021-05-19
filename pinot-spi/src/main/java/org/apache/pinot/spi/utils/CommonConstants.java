@@ -33,6 +33,14 @@ public class CommonConstants {
 
   public static final String KEY_OF_AUTH_TOKEN = "auth.token";
 
+  /**
+   * The state of the consumer for a given segment
+   */
+  public enum ConsumerState {
+    CONSUMING,
+    NOT_CONSUMING // In error state
+  }
+
   public static class Table {
     public static final String PUSH_FREQUENCY_HOURLY = "hourly";
     public static final String PUSH_FREQUENCY_DAILY = "daily";
