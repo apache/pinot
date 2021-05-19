@@ -20,11 +20,7 @@ package org.apache.pinot.core.operator.blocks;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
@@ -40,6 +36,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.Table;
+import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
@@ -57,6 +54,7 @@ public class IntermediateResultsBlock implements Block {
   private AggregationGroupByResult _aggregationGroupByResult;
   private List<Map<String, Object>> _combinedAggregationGroupByResult;
   private List<ProcessingException> _processingExceptions;
+  private Collection<TableResizer.fullIntermediateResult> _intermediateCollection;
   private long _numDocsScanned;
   private long _numEntriesScannedInFilter;
   private long _numEntriesScannedPostFilter;
@@ -111,10 +109,13 @@ public class IntermediateResultsBlock implements Block {
    * Constructor for aggregation group-by order-by result with {@link AggregationGroupByResult}.
    */
   public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions,
-      @Nullable AggregationGroupByResult aggregationGroupByResults, DataSchema dataSchema) {
+                                  @Nullable AggregationGroupByResult aggregationGroupByResults,
+                                  @Nullable Collection<TableResizer.fullIntermediateResult> intermediateCollection,
+                                  DataSchema dataSchema) {
     _aggregationFunctions = aggregationFunctions;
     _aggregationGroupByResult = aggregationGroupByResults;
     _dataSchema = dataSchema;
+    _intermediateCollection = intermediateCollection;
   }
 
   public IntermediateResultsBlock(Table table) {
@@ -279,6 +280,10 @@ public class IntermediateResultsBlock implements Block {
 
   public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
     _numGroupsLimitReached = numGroupsLimitReached;
+  }
+
+  public Iterator<TableResizer.fullIntermediateResult> getIntermediateResultIterator() {
+    return _intermediateCollection.iterator();
   }
 
   public DataTable getDataTable()

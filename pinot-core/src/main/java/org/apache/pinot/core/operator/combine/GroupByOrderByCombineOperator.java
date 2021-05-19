@@ -33,10 +33,8 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
-import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.data.table.*;
 import org.apache.pinot.core.data.table.Record;
-import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
@@ -128,21 +126,14 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
       }
 
       // Merge aggregation group-by result.
-      AggregationGroupByResult aggregationGroupByResult = intermediateResultsBlock.getAggregationGroupByResult();
-      if (aggregationGroupByResult != null) {
         // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
-        Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+        //TODO: change upsert api so that it accepts intermediateRecord directly
+        Iterator<TableResizer.fullIntermediateResult> groupKeyIterator = intermediateResultsBlock.getIntermediateResultIterator();
         while (groupKeyIterator.hasNext()) {
-          GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-          Object[] keys = groupKey._keys;
-          Object[] values = Arrays.copyOf(keys, _numColumns);
-          int groupId = groupKey._groupId;
-          for (int i = 0; i < _numAggregationFunctions; i++) {
-            values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
-          }
-          _indexedTable.upsert(new Key(keys), new Record(values));
+          TableResizer.fullIntermediateResult intermediateResult = groupKeyIterator.next();
+          _indexedTable.upsert(intermediateResult.getKey(), intermediateResult.getRecord());
         }
-      }
+
     } catch (EarlyTerminationException e) {
       // Early-terminated because query times out or is already satisfied
     } catch (Exception e) {

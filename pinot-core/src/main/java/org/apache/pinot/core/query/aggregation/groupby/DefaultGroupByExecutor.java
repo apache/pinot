@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby;
 
-import java.util.Map;
+import java.util.*;
+
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -125,6 +127,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       groupByResultHolder.ensureCapacity(capacityNeeded);
       aggregate(transformBlock, length, i);
     }
+
   }
 
   protected void aggregate(TransformBlock transformBlock, int length, int functionIndex) {
@@ -144,4 +147,22 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   public AggregationGroupByResult getResult() {
     return new AggregationGroupByResult(_groupKeyGenerator, _aggregationFunctions, _groupByResultHolders);
   }
+
+  @Override
+  public Collection<TableResizer.fullIntermediateResult> trimGroupByResult(int threshold, TableResizer tableResizer) {
+    // Check if a trim is necessary
+    int keyNum = 0;
+    if (_hasMVGroupByExpression) {
+      keyNum = _mvGroupKeys.length;
+    } else {
+      keyNum = _svGroupKeys.length;
+    }
+    Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = _groupKeyGenerator.getGroupKeys();
+    if (keyNum > threshold) {
+      return tableResizer.trimInSegmentResults(groupKeyIterator, _groupByResultHolders, threshold);
+    }
+    // Generate a list of intermediateResults if we don't need to trim
+    return tableResizer.buildInSegmentResults(groupKeyIterator, _groupByResultHolders, threshold);
+  }
+
 }

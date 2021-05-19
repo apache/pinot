@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
+import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -47,6 +49,7 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
   private final ExpressionContext[] _groupByExpressions;
   private final TransformPlanNode _transformPlanNode;
   private final StarTreeTransformPlanNode _starTreeTransformPlanNode;
+  private QueryContext _queryContext;
 
   public AggregationGroupByOrderByPlanNode(IndexSegment indexSegment, QueryContext queryContext,
       int maxInitialResultHolderCapacity, int numGroupsLimit) {
@@ -58,6 +61,7 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     assert groupByExpressions != null;
     _groupByExpressions = groupByExpressions.toArray(new ExpressionContext[0]);
+    _queryContext = queryContext;
 
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();
     if (starTrees != null && !StarTreeUtils.isStarTreeDisabled(queryContext)) {
@@ -95,11 +99,11 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
     if (_transformPlanNode != null) {
       // Do not use star-tree
       return new AggregationGroupByOrderByOperator(_aggregationFunctions, _groupByExpressions,
-          _maxInitialResultHolderCapacity, _numGroupsLimit, _transformPlanNode.run(), numTotalDocs, false);
+          _maxInitialResultHolderCapacity, _numGroupsLimit, _transformPlanNode.run(), numTotalDocs, _queryContext, false);
     } else {
       // Use star-tree
       return new AggregationGroupByOrderByOperator(_aggregationFunctions, _groupByExpressions,
-          _maxInitialResultHolderCapacity, _numGroupsLimit, _starTreeTransformPlanNode.run(), numTotalDocs, true);
+          _maxInitialResultHolderCapacity, _numGroupsLimit, _starTreeTransformPlanNode.run(), numTotalDocs, _queryContext, true);
     }
   }
 }
