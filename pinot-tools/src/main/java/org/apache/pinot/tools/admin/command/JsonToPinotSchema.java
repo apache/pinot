@@ -140,7 +140,7 @@ public class JsonToPinotSchema extends AbstractBaseAdminCommand implements Comma
       }
     }
     if (_dateTimeColumnName != null) {
-      fieldTypes.put(_dateTimeColumnName, FieldSpec.FieldType.TIME);
+      fieldTypes.put(_dateTimeColumnName, FieldSpec.FieldType.DATE_TIME);
     }
     return fieldTypes;
   }
@@ -149,7 +149,7 @@ public class JsonToPinotSchema extends AbstractBaseAdminCommand implements Comma
     List<String> unnestFields = new ArrayList<>();
     if (_unnestFields != null) {
       for (String field : _unnestFields.split(",")) {
-        unnestFields.add(field);
+        unnestFields.add(field.trim());
       }
     }
     return unnestFields;

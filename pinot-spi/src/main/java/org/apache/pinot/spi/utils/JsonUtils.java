@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.spi.utils;
 
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -101,6 +103,23 @@ public class JsonUtils {
       throws IOException {
     try (InputStream inputStream = new FileInputStream(jsonFile)) {
       return DEFAULT_READER.readTree(inputStream);
+    }
+  }
+
+  /**
+   * Reads the first json object from the file that can contain multiple objects
+   */
+  public static JsonNode fileToFirstJsonNode(File jsonFile)
+      throws IOException {
+    try (InputStream inputStream = new FileInputStream(jsonFile)) {
+      JsonFactory jf = new JsonFactory();
+      JsonParser jp = jf.createParser(inputStream);
+      jp.setCodec(DEFAULT_MAPPER);
+      jp.nextToken();
+      if (jp.hasCurrentToken()) {
+        return DEFAULT_MAPPER.readTree(jp);
+      }
+      return null;
     }
   }
 
@@ -394,7 +413,7 @@ public class JsonUtils {
       @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit,
       @Nullable List<String> unnestFields, String delimiter)
       throws IOException {
-    JsonNode jsonNode = fileToJsonNode(jsonFile);
+    JsonNode jsonNode = fileToFirstJsonNode(jsonFile);
     if (unnestFields == null) {
       unnestFields = new ArrayList<>();
     }
