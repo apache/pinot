@@ -48,6 +48,7 @@ import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.broker.routing.RoutingTable;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
+import org.apache.pinot.common.exception.InvalidColumnNameException;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.metrics.BrokerGauge;
@@ -327,7 +328,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     // Validate the request
     try {
-      validateRequest(pinotQuery, _queryResponseLimit);
+      validateRequest(pinotQuery, _queryResponseLimit, _tableCache.getColumnNames(rawTableName));
+    } catch (InvalidColumnNameException ie) {
+      // TODO: return response with exception containing invalid column names.
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.INVALID_COLUMN_NAMES_IN_QUERY, 1L);
+      return BrokerResponseNative.EMPTY_RESULT;
     } catch (Exception e) {
       LOGGER.info("Caught exception while validating request {}: {}, {}", requestId, query, e.getMessage());
       requestStatistics.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
@@ -1678,9 +1683,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    *   <li>Value for 'LIMIT' <= configured value</li>
    *   <li>Query options must be set to SQL mode</li>
    * </ul>
+   * This method also validates column names from query, and emit a broker metric if invalid column name is detected.
    */
   @VisibleForTesting
-  static void validateRequest(PinotQuery pinotQuery, int queryResponseLimit) {
+  static void validateRequest(PinotQuery pinotQuery, int queryResponseLimit, Set<String> columnNamesFromSchema)
+      throws InvalidColumnNameException {
     // Verify LIMIT
     int limit = pinotQuery.getLimit();
     if (limit > queryResponseLimit) {
@@ -1693,6 +1700,74 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     QueryOptions queryOptions = new QueryOptions(pinotQuery.getQueryOptions());
     if (!queryOptions.isGroupByModeSQL() || !queryOptions.isResponseFormatSQL()) {
       throw new IllegalStateException("SQL query should always have response format and group-by mode set to SQL");
+    }
+
+    // Validate column names from query
+    Set<String> columnsFromQuery = getColumnsFromQuery(pinotQuery);
+    if (!columnNamesFromSchema.containsAll(columnsFromQuery)) {
+      columnsFromQuery.removeAll(columnNamesFromSchema);
+      throw new InvalidColumnNameException(columnsFromQuery.toString());
+    }
+  }
+
+  /**
+   * Fetch column names from the SQL query.
+   * @param pinotQuery pinot query
+   */
+  private static Set<String> getColumnsFromQuery(PinotQuery pinotQuery) {
+    Set<String> columnsFromQuery = new HashSet<>();
+    // Fetch columns from selection list.
+    if (pinotQuery.isSetSelectList()) {
+      List<Expression> selectionList = pinotQuery.getSelectList();
+      for (Expression expression : selectionList) {
+        computeColumnNamesFromExpression(expression, columnsFromQuery);
+      }
+    }
+    // Fetch columns from filter clause.
+    if (pinotQuery.isSetFilterExpression()) {
+      Expression filterExpression = pinotQuery.getFilterExpression();
+      computeColumnNamesFromExpression(filterExpression, columnsFromQuery);
+    }
+    // Fetch columns from group by list.
+    if (pinotQuery.isSetGroupByList()) {
+      List<Expression> groupByList = pinotQuery.getGroupByList();
+      for (Expression expression : groupByList) {
+        computeColumnNamesFromExpression(expression, columnsFromQuery);
+      }
+    }
+    // Fetch columns from order by list.
+    if (pinotQuery.isSetOrderByList()) {
+      List<Expression> orderByList = pinotQuery.getOrderByList();
+      for (Expression expression : orderByList) {
+        computeColumnNamesFromExpression(expression, columnsFromQuery);
+      }
+    }
+    if (pinotQuery.isSetHavingExpression()) {
+      Expression havingExpression = pinotQuery.getHavingExpression();
+      computeColumnNamesFromExpression(havingExpression, columnsFromQuery);
+    }
+    return columnsFromQuery;
+  }
+
+  /**
+   * Fetch column names from an expression.
+   */
+  private static void computeColumnNamesFromExpression(Expression e, Set<String> columnNames) {
+    if (e.getType() == ExpressionType.IDENTIFIER) {
+      Identifier identifier = e.getIdentifier();
+      if (!"*".equals(identifier.getName())) {
+        columnNames.add(identifier.getName());
+      }
+    } else if (e.getType() == ExpressionType.FUNCTION) {
+      String operator = e.getFunctionCall().getOperator().toUpperCase();
+      if (operator.equals(SqlKind.AS.toString()) || operator.equals(SqlKind.IN.toString())) {
+        computeColumnNamesFromExpression(e.getFunctionCall().getOperands().get(0), columnNames);
+      } else {
+        List<Expression> expressions = e.getFunctionCall().getOperands();
+        for (Expression expression : expressions) {
+          computeColumnNamesFromExpression(expression, columnNames);
+        }
+      }
     }
   }
 

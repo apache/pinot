@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.I0Itec.zkclient.IZkChildListener;
@@ -131,6 +132,14 @@ public class TableCache {
   }
 
   /**
+   * Returns a set of column names given the raw table name, or {@code null} if the table schema does not exist.
+   */
+  public Set<String> getColumnNames(String rawTableName) {
+    SchemaInfo schemaInfo = _schemaInfoMap.get(rawTableName);
+    return schemaInfo != null ? schemaInfo._columnNames : null;
+  }
+
+  /**
    * Returns the table config for the given table, or {@code null} if it does not exist.
    */
   @Nullable
@@ -221,9 +230,9 @@ public class TableCache {
       for (String columnName : schema.getColumnNames()) {
         columnNameMap.put(columnName.toLowerCase(), columnName);
       }
-      _schemaInfoMap.put(rawTableName, new SchemaInfo(schema, columnNameMap));
+      _schemaInfoMap.put(rawTableName, new SchemaInfo(schema, columnNameMap, schema.getColumnNames()));
     } else {
-      _schemaInfoMap.put(rawTableName, new SchemaInfo(schema, null));
+      _schemaInfoMap.put(rawTableName, new SchemaInfo(schema, null, schema.getColumnNames()));
     }
   }
 
@@ -316,10 +325,12 @@ public class TableCache {
   private static class SchemaInfo {
     final Schema _schema;
     final Map<String, String> _columnNameMap;
+    final Set<String> _columnNames;
 
-    private SchemaInfo(Schema schema, Map<String, String> columnNameMap) {
+    private SchemaInfo(Schema schema, Map<String, String> columnNameMap, Set<String> columnNames) {
       _schema = schema;
       _columnNameMap = columnNameMap;
+      _columnNames = columnNames;
     }
   }
 }

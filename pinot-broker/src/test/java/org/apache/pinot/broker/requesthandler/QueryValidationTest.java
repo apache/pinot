@@ -19,6 +19,12 @@
 
 package org.apache.pinot.broker.requesthandler;
 
+import com.google.common.collect.Sets;
+import java.util.Set;
+import org.apache.pinot.common.exception.InvalidColumnNameException;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
@@ -131,10 +137,83 @@ public class QueryValidationTest {
   private void testUnsupportedSQLQuery(String query, String errorMessage) {
     try {
       PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-      BaseBrokerRequestHandler.validateRequest(pinotQuery, 1000);
+      BaseBrokerRequestHandler.validateRequest(pinotQuery, 1000, null);
       Assert.fail("Query should have failed");
     } catch (Exception e) {
       Assert.assertEquals(errorMessage, e.getMessage());
     }
+  }
+
+  @Test
+  public void testInvalidColumnNames() {
+    BrokerMetrics brokerMetrics = new BrokerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    Set<String> columnNamesFromSchema = Sets.newHashSet("column1", "column2", "column3");
+
+    String sql = "SELECT * FROM testTable LIMIT 100";
+    Assert.assertEquals(getInvalidColumnNamesCount(sql, columnNamesFromSchema, brokerMetrics), 0L);
+
+    sql = "SELECT column1 FROM testTable LIMIT 100";
+    Assert.assertEquals(getInvalidColumnNamesCount(sql, columnNamesFromSchema, brokerMetrics), 0L);
+
+    sql = "SELECT column1 FROM testTable WHERE column2 = '1' LIMIT 100";
+    Assert.assertEquals(getInvalidColumnNamesCount(sql, columnNamesFromSchema, brokerMetrics), 0L);
+
+    sql =
+        "SELECT SUM(column1), COUNT(column3) FROM testTable WHERE column2 = '1' group by column3 order by column1 LIMIT 100";
+    Assert.assertEquals(getInvalidColumnNamesCount(sql, columnNamesFromSchema, brokerMetrics), 0L);
+
+    sql = "SELECT COUNT(*) FROM testTable";
+    Assert.assertEquals(getInvalidColumnNamesCount(sql, columnNamesFromSchema, brokerMetrics), 0L);
+
+    sql = "SELECT AVG(column2) FROM testTable WHERE column3 IN (column4) LIMIT 100";
+    Assert.assertEquals(getInvalidColumnNamesCount(sql, columnNamesFromSchema, brokerMetrics), 0L);
+
+    long metricCount = 0L;
+    // column4 doesn't exist in the schema
+    sql = "SELECT column4 FROM testTable WHERE column2 = '1' order by column4 LIMIT 100";
+    Assert.assertEquals(getInvalidColumnNamesCount(sql, columnNamesFromSchema, brokerMetrics), ++metricCount);
+
+    // column4 doesn't exist in the schema
+    sql =
+        "SELECT SUM(column4), COUNT(column3) FROM testTable WHERE column2 = '1' group by column3 order by column1 LIMIT 100";
+    Assert.assertEquals(getInvalidColumnNamesCount(sql, columnNamesFromSchema, brokerMetrics), ++metricCount);
+
+    // column5 doesn't exist in the schema
+    sql =
+        "SELECT SUM(column1), COUNT(column3) FROM testTable WHERE column5 = '1' group by column3 order by column1 LIMIT 100";
+    Assert.assertEquals(getInvalidColumnNamesCount(sql, columnNamesFromSchema, brokerMetrics), ++metricCount);
+
+    // column6 doesn't exist in the schema
+    sql =
+        "SELECT SUM(column1), COUNT(column3) FROM testTable WHERE column2 = '1' group by column6 order by column1 LIMIT 100";
+    Assert.assertEquals(getInvalidColumnNamesCount(sql, columnNamesFromSchema, brokerMetrics), ++metricCount);
+
+    // column7 doesn't exist in the schema
+    sql =
+        "SELECT SUM(column1), COUNT(column3) FROM testTable WHERE column2 = '1' group by column3 order by column7 LIMIT 100";
+    Assert.assertEquals(getInvalidColumnNamesCount(sql, columnNamesFromSchema, brokerMetrics), ++metricCount);
+
+    // column8 doesn't exist in the schema
+    sql = "SELECT SUM(column8), column2 FROM testTable WHERE true GROUP BY column2 HAVING SUM(column8) > 10";
+    Assert.assertEquals(getInvalidColumnNamesCount(sql, columnNamesFromSchema, brokerMetrics), ++metricCount);
+
+    // column9 and column10 don't exist in the schema
+    sql = "SELECT column9 AS column1, column10 AS column2 FROM testTable";
+    Assert.assertEquals(getInvalidColumnNamesCount(sql, columnNamesFromSchema, brokerMetrics), ++metricCount);
+
+    // column11 doesn't exist in the schema
+    sql = "SELECT column2 FROM testTable WHERE column11 in (1, 2, 3)";
+    Assert.assertEquals(getInvalidColumnNamesCount(sql, columnNamesFromSchema, brokerMetrics), ++metricCount);
+  }
+
+  private long getInvalidColumnNamesCount(String query, Set<String> columnNamesFromSchema,
+      BrokerMetrics brokerMetrics) {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query + "option(groupByMode=sql,responseFormat=sql)");
+    try {
+      BaseBrokerRequestHandler.validateRequest(pinotQuery, 1000, columnNamesFromSchema);
+    } catch (InvalidColumnNameException e) {
+      brokerMetrics.addMeteredTableValue("testTable", BrokerMeter.INVALID_COLUMN_NAMES_IN_QUERY, 1L);
+    }
+    return brokerMetrics.getMeteredTableValue("testTable", BrokerMeter.INVALID_COLUMN_NAMES_IN_QUERY).count();
   }
 }
