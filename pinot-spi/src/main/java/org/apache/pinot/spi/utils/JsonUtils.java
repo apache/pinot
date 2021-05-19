@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.spi.utils;
 
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -39,9 +41,16 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
+import org.apache.pinot.spi.data.DateTimeGranularitySpec;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.Schema;
 
 
 public class JsonUtils {
@@ -92,6 +101,23 @@ public class JsonUtils {
       throws IOException {
     try (InputStream inputStream = new FileInputStream(jsonFile)) {
       return DEFAULT_READER.readTree(inputStream);
+    }
+  }
+
+  /**
+   * Reads the first json object from the file that can contain multiple objects
+   */
+  public static JsonNode fileToFirstJsonNode(File jsonFile)
+      throws IOException {
+    try (InputStream inputStream = new FileInputStream(jsonFile)) {
+      JsonFactory jf = new JsonFactory();
+      JsonParser jp = jf.createParser(inputStream);
+      jp.setCodec(DEFAULT_MAPPER);
+      jp.nextToken();
+      if (jp.hasCurrentToken()) {
+        return DEFAULT_MAPPER.readTree(jp);
+      }
+      return null;
     }
   }
 
@@ -378,6 +404,120 @@ public class JsonUtils {
         }
       }
       unnestResults(newCurrentResults, nestedResultsList, index + 1, nonNestedResult, outputResults);
+    }
+  }
+
+  public static Schema getPinotSchemaFromJsonFile(File jsonFile,
+      @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit,
+      @Nullable List<String> unnestFields, String delimiter)
+      throws IOException {
+    JsonNode jsonNode = fileToFirstJsonNode(jsonFile);
+    if (unnestFields == null) {
+      unnestFields = new ArrayList<>();
+    }
+    Preconditions.checkState(jsonNode.isObject(), "the JSON data shall be an object");
+    return getPinotSchemaFromJsonNode(jsonNode, fieldTypeMap, timeUnit, unnestFields, delimiter);
+  }
+
+  public static Schema getPinotSchemaFromJsonNode(JsonNode jsonNode,
+      @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit, List<String> unnestFields,
+      String delimiter) {
+    Schema pinotSchema = new Schema();
+    Iterator<Map.Entry<String, JsonNode>> fieldIterator = jsonNode.fields();
+    while (fieldIterator.hasNext()) {
+      Map.Entry<String, JsonNode> fieldEntry = fieldIterator.next();
+      JsonNode childNode = fieldEntry.getValue();
+      inferPinotSchemaFromJsonNode(childNode, pinotSchema, fieldEntry.getKey(), fieldTypeMap, timeUnit, unnestFields,
+          delimiter);
+    }
+    return pinotSchema;
+  }
+
+  private static void inferPinotSchemaFromJsonNode(JsonNode jsonNode, Schema pinotSchema, String path,
+      @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit, List<String> unnestFields,
+      String delimiter) {
+    if (jsonNode.isNull()) {
+      // do nothing
+      return;
+    } else if (jsonNode.isValueNode()) {
+      DataType dataType = valueOf(jsonNode);
+      addFieldToPinotSchema(pinotSchema, dataType, path, true, fieldTypeMap, timeUnit);
+    } else if (jsonNode.isArray()) {
+      int numChildren = jsonNode.size();
+      if (numChildren == 0) {
+        // do nothing
+        return;
+      }
+      JsonNode childNode = jsonNode.get(0);
+
+      if (unnestFields.contains(path)) {
+        inferPinotSchemaFromJsonNode(childNode, pinotSchema, path, fieldTypeMap, timeUnit, unnestFields, delimiter);
+      } else if (childNode.isValueNode()) {
+        addFieldToPinotSchema(pinotSchema, valueOf(childNode), path, false, fieldTypeMap, timeUnit);
+      } else {
+        addFieldToPinotSchema(pinotSchema, DataType.STRING, path, true, fieldTypeMap, timeUnit);
+      }
+    } else if (jsonNode.isObject()) {
+      Iterator<Map.Entry<String, JsonNode>> fieldIterator = jsonNode.fields();
+      while (fieldIterator.hasNext()) {
+        Map.Entry<String, JsonNode> fieldEntry = fieldIterator.next();
+        JsonNode childNode = fieldEntry.getValue();
+        inferPinotSchemaFromJsonNode(childNode, pinotSchema, String.join(delimiter, path, fieldEntry.getKey()),
+            fieldTypeMap, timeUnit, unnestFields, delimiter);
+      }
+    } else {
+      throw new IllegalArgumentException(String.format("Unsupported json node type", jsonNode.getClass()));
+    }
+  }
+
+  /**
+   * Returns the data type stored in Pinot that is associated with the given Avro type.
+   */
+  public static DataType valueOf(JsonNode jsonNode) {
+    if (jsonNode.isInt()) {
+      return DataType.INT;
+    } else if (jsonNode.isLong()) {
+      return DataType.LONG;
+    } else if (jsonNode.isFloat()) {
+      return DataType.FLOAT;
+    } else if (jsonNode.isDouble()) {
+      return DataType.DOUBLE;
+    } else if (jsonNode.isBoolean()) {
+      return DataType.BOOLEAN;
+    } else if (jsonNode.isBinary()) {
+      return DataType.BYTES;
+    } else {
+      return DataType.STRING;
+    }
+  }
+
+  private static void addFieldToPinotSchema(Schema pinotSchema, DataType dataType, String name,
+      boolean isSingleValueField, @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap,
+      @Nullable TimeUnit timeUnit) {
+    if (fieldTypeMap == null) {
+      pinotSchema.addField(new DimensionFieldSpec(name, dataType, isSingleValueField));
+    } else {
+      FieldSpec.FieldType fieldType =
+          fieldTypeMap.containsKey(name) ? fieldTypeMap.get(name) : FieldSpec.FieldType.DIMENSION;
+      Preconditions.checkNotNull(fieldType, "Field type not specified for field: %s", name);
+      switch (fieldType) {
+        case DIMENSION:
+          pinotSchema.addField(new DimensionFieldSpec(name, dataType, isSingleValueField));
+          break;
+        case METRIC:
+          Preconditions.checkState(isSingleValueField, "Metric field: %s cannot be multi-valued", name);
+          pinotSchema.addField(new MetricFieldSpec(name, dataType));
+          break;
+        case DATE_TIME:
+          Preconditions.checkState(isSingleValueField, "Time field: %s cannot be multi-valued", name);
+          Preconditions.checkNotNull(timeUnit, "Time unit cannot be null");
+          pinotSchema.addField(new DateTimeFieldSpec(name, dataType,
+              new DateTimeFormatSpec(1, timeUnit.toString(), DateTimeFieldSpec.TimeFormat.EPOCH.toString()).getFormat(),
+              new DateTimeGranularitySpec(1, timeUnit).getGranularity()));
+          break;
+        default:
+          throw new UnsupportedOperationException("Unsupported field type: " + fieldType + " for field: " + name);
+      }
     }
   }
 }
