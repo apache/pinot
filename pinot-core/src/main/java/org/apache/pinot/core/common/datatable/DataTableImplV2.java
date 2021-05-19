@@ -55,7 +55,6 @@ public class DataTableImplV2 extends BaseDataTable {
    * Construct empty data table. (Server side)
    */
   public DataTableImplV2() {
-    super();
   }
 
   /**

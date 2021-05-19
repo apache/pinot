@@ -86,7 +86,6 @@ public class DataTableImplV3 extends BaseDataTable {
    * Construct empty data table. (Server side)
    */
   public DataTableImplV3() {
-    super();
     _errCodeToExceptionMap = new HashMap<>();
   }
 

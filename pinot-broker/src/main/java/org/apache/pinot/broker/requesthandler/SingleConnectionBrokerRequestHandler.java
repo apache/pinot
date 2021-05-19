@@ -87,12 +87,11 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
         .submitQuery(requestId, rawTableName, offlineBrokerRequest, offlineRoutingTable, realtimeBrokerRequest,
             realtimeRoutingTable, timeoutMs);
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getResponse();
-    long scatterGatherDurationNs = System.nanoTime() - scatterGatherStartTimeNs;
-    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.SCATTER_GATHER, scatterGatherDurationNs);
+    _brokerMetrics
+        .addPhaseTiming(rawTableName, BrokerQueryPhase.SCATTER_GATHER, System.nanoTime() - scatterGatherStartTimeNs);
     // TODO Use scatterGatherStats as serverStats
     serverStats.setServerStats(asyncQueryResponse.getStats());
 
-    long serverMaxProcessingTimeMs = 0;
     int numServersQueried = response.size();
     long totalResponseSize = 0;
     Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>(HashUtil.getHashMapCapacity(numServersQueried));
@@ -103,17 +102,8 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
         dataTableMap.put(entry.getKey(), dataTable);
         totalResponseSize += serverResponse.getResponseSize();
       }
-      long serverProcessingTimeMs = serverResponse.getServerProcessingTimeMs();
-      if (serverProcessingTimeMs > -1) {
-        // Get the maximum value of serverProcessingTimeMs across all the server responses.
-        serverMaxProcessingTimeMs = Math.max(serverMaxProcessingTimeMs, serverProcessingTimeMs);
-      }
     }
     int numServersResponded = dataTableMap.size();
-    long serverMaxProcessingTimeNs = TimeUnit.MILLISECONDS.toNanos(serverMaxProcessingTimeMs);
-    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.SERVER_PROCESSING, serverMaxProcessingTimeNs);
-    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.NETTY_CONNECTION,
-        scatterGatherDurationNs - serverMaxProcessingTimeNs);
 
     long reduceStartTimeNs = System.nanoTime();
     long reduceTimeOutMs = timeoutMs - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - scatterGatherStartTimeNs);
