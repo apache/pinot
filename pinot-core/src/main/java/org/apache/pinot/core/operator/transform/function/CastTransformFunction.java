@@ -26,12 +26,11 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ArrayCopyUtils;
 
 
 public class CastTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "cast";
-
-  private String[] _stringValuesSV;
 
   private TransformFunction _transformFunction;
   private TransformResultMetadata _resultMetadata;
@@ -72,6 +71,7 @@ public class CastTransformFunction extends BaseTransformFunction {
           break;
         case "TIMESTAMP":
           _resultMetadata = TIMESTAMP_SV_NO_DICTIONARY_METADATA;
+          break;
         case "STRING":
         case "VARCHAR":
           _resultMetadata = STRING_SV_NO_DICTIONARY_METADATA;
@@ -94,51 +94,210 @@ public class CastTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    return _transformFunction.transformToIntValuesSV(projectionBlock);
+    // When casting to types other than INT, need to first read as the result type then convert to int values
+    DataType resultStoredType = _resultMetadata.getDataType().getStoredType();
+    if (resultStoredType == DataType.INT) {
+      return _transformFunction.transformToIntValuesSV(projectionBlock);
+    } else {
+      if (_intValuesSV == null) {
+        _intValuesSV = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      }
+      int numDocs = projectionBlock.getNumDocs();
+      switch (resultStoredType) {
+        case LONG:
+          long[] longValues = _transformFunction.transformToLongValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(longValues, _intValuesSV, numDocs);
+          break;
+        case FLOAT:
+          float[] floatValues = _transformFunction.transformToFloatValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(floatValues, _intValuesSV, numDocs);
+          break;
+        case DOUBLE:
+          double[] doubleValues = _transformFunction.transformToDoubleValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(doubleValues, _intValuesSV, numDocs);
+          break;
+        case STRING:
+          String[] stringValues = _transformFunction.transformToStringValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(stringValues, _intValuesSV, numDocs);
+          break;
+        default:
+          throw new IllegalStateException();
+      }
+      return _intValuesSV;
+    }
   }
 
   @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
-    return _transformFunction.transformToLongValuesSV(projectionBlock);
+    // When casting to types other than LONG, need to first read as the result type then convert to long values
+    DataType resultStoredType = _resultMetadata.getDataType().getStoredType();
+    if (resultStoredType == DataType.LONG) {
+      return _transformFunction.transformToLongValuesSV(projectionBlock);
+    } else {
+      if (_longValuesSV == null) {
+        _longValuesSV = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      }
+      int numDocs = projectionBlock.getNumDocs();
+      switch (resultStoredType) {
+        case INT:
+          int[] intValues = _transformFunction.transformToIntValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(intValues, _longValuesSV, numDocs);
+          break;
+        case FLOAT:
+          float[] floatValues = _transformFunction.transformToFloatValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(floatValues, _longValuesSV, numDocs);
+          break;
+        case DOUBLE:
+          double[] doubleValues = _transformFunction.transformToDoubleValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(doubleValues, _longValuesSV, numDocs);
+          break;
+        case STRING:
+          String[] stringValues = _transformFunction.transformToStringValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(stringValues, _longValuesSV, numDocs);
+          break;
+        default:
+          throw new IllegalStateException();
+      }
+      return _longValuesSV;
+    }
   }
 
   @Override
   public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
-    return _transformFunction.transformToFloatValuesSV(projectionBlock);
+    // When casting to types other than FLOAT, need to first read as the result type then convert to float values
+    DataType resultStoredType = _resultMetadata.getDataType().getStoredType();
+    if (resultStoredType == DataType.FLOAT) {
+      return _transformFunction.transformToFloatValuesSV(projectionBlock);
+    } else {
+      if (_floatValuesSV == null) {
+        _floatValuesSV = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      }
+      int numDocs = projectionBlock.getNumDocs();
+      switch (resultStoredType) {
+        case INT:
+          int[] intValues = _transformFunction.transformToIntValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(intValues, _floatValuesSV, numDocs);
+          break;
+        case LONG:
+          long[] longValues = _transformFunction.transformToLongValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(longValues, _floatValuesSV, numDocs);
+          break;
+        case DOUBLE:
+          double[] doubleValues = _transformFunction.transformToDoubleValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(doubleValues, _floatValuesSV, numDocs);
+          break;
+        case STRING:
+          String[] stringValues = _transformFunction.transformToStringValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(stringValues, _floatValuesSV, numDocs);
+          break;
+        default:
+          throw new IllegalStateException();
+      }
+      return _floatValuesSV;
+    }
   }
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    return _transformFunction.transformToDoubleValuesSV(projectionBlock);
+    // When casting to types other than DOUBLE, need to first read as the result type then convert to double values
+    DataType resultStoredType = _resultMetadata.getDataType().getStoredType();
+    if (resultStoredType == DataType.DOUBLE) {
+      return _transformFunction.transformToDoubleValuesSV(projectionBlock);
+    } else {
+      if (_doubleValuesSV == null) {
+        _doubleValuesSV = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      }
+      int numDocs = projectionBlock.getNumDocs();
+      switch (resultStoredType) {
+        case INT:
+          int[] intValues = _transformFunction.transformToIntValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(intValues, _doubleValuesSV, numDocs);
+          break;
+        case LONG:
+          long[] longValues = _transformFunction.transformToLongValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(longValues, _doubleValuesSV, numDocs);
+          break;
+        case FLOAT:
+          float[] floatValues = _transformFunction.transformToFloatValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(floatValues, _doubleValuesSV, numDocs);
+          break;
+        case STRING:
+          String[] stringValues = _transformFunction.transformToStringValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(stringValues, _doubleValuesSV, numDocs);
+          break;
+        default:
+          throw new IllegalStateException();
+      }
+      return _doubleValuesSV;
+    }
   }
 
   @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-    DataType dataType = _transformFunction.getResultMetadata().getDataType();
-    if (dataType.getStoredType() != dataType) {
+    // When casting to types other than STRING, need to first read as the result type then convert to string values
+    DataType resultDataType = _resultMetadata.getDataType();
+    DataType resultStoredType = resultDataType.getStoredType();
+    int numDocs = projectionBlock.getNumDocs();
+    if (resultStoredType == DataType.STRING) {
+      // Specialize BOOlEAN and TIMESTAMP when casting to STRING
+      DataType inputDataType = _transformFunction.getResultMetadata().getDataType();
+      if (inputDataType.getStoredType() != inputDataType) {
+        if (_stringValuesSV == null) {
+          _stringValuesSV = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+        }
+        if (inputDataType == DataType.BOOLEAN) {
+          int[] intValues = _transformFunction.transformToIntValuesSV(projectionBlock);
+          for (int i = 0; i < numDocs; i++) {
+            _stringValuesSV[i] = Boolean.toString(intValues[i] == 1);
+          }
+        } else {
+          assert inputDataType == DataType.TIMESTAMP;
+          long[] longValues = _transformFunction.transformToLongValuesSV(projectionBlock);
+          for (int i = 0; i < numDocs; i++) {
+            _stringValuesSV[i] = new Timestamp(longValues[i]).toString();
+          }
+        }
+        return _stringValuesSV;
+      } else {
+        return _transformFunction.transformToStringValuesSV(projectionBlock);
+      }
+    } else {
       if (_stringValuesSV == null) {
         _stringValuesSV = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
       }
-      int numDocs = projectionBlock.getNumDocs();
-      switch (dataType) {
+      switch (resultDataType) {
+        case INT:
+          int[] intValues = _transformFunction.transformToIntValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(intValues, _stringValuesSV, numDocs);
+          break;
+        case LONG:
+          long[] longValues = _transformFunction.transformToLongValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(longValues, _stringValuesSV, numDocs);
+          break;
+        case FLOAT:
+          float[] floatValues = _transformFunction.transformToFloatValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(floatValues, _stringValuesSV, numDocs);
+          break;
+        case DOUBLE:
+          double[] doubleValues = _transformFunction.transformToDoubleValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(doubleValues, _stringValuesSV, numDocs);
+          break;
         case BOOLEAN:
-          int[] intValuesSV = _transformFunction.transformToIntValuesSV(projectionBlock);
+          intValues = _transformFunction.transformToIntValuesSV(projectionBlock);
           for (int i = 0; i < numDocs; i++) {
-            _stringValuesSV[i] = Boolean.toString(intValuesSV[i] == 1);
+            _stringValuesSV[i] = Boolean.toString(intValues[i] == 1);
           }
           break;
         case TIMESTAMP:
-          long[] longValuesSV = _transformFunction.transformToLongValuesSV(projectionBlock);
+          longValues = _transformFunction.transformToLongValuesSV(projectionBlock);
           for (int i = 0; i < numDocs; i++) {
-            _stringValuesSV[i] = new Timestamp(longValuesSV[i]).toString();
+            _stringValuesSV[i] = new Timestamp(longValues[i]).toString();
           }
           break;
         default:
           throw new IllegalStateException();
       }
       return _stringValuesSV;
-    } else {
-      return _transformFunction.transformToStringValuesSV(projectionBlock);
     }
   }
 }
