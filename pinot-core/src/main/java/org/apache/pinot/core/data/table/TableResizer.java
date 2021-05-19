@@ -20,14 +20,8 @@ package org.apache.pinot.core.data.table;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.PriorityQueue;
-import java.util.Random;
+
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -36,6 +30,8 @@ import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.postaggregation.PostAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -501,5 +497,83 @@ public class TableResizer {
         return (Comparable) result;
       }
     }
+  }
+
+  public static class fullIntermediateResult extends IntermediateRecord {
+    final Record _record;
+
+    fullIntermediateResult(Key key, Comparable[] values, Record record) {
+      super(key, values);
+      _record = record;
+    }
+
+    public Key getKey() {
+      return _key;
+    }
+
+    public Record getRecord() {
+      return _record;
+    }
+  }
+
+  private fullIntermediateResult getInSegmentIntermediateRecord(Key key, Record record) {
+    Comparable[] intermediateRecordValues = new Comparable[_numOrderByExpressions];
+    for (int i = 0; i < _numOrderByExpressions; i++) {
+      intermediateRecordValues[i] = _orderByValueExtractors[i].extract(record);
+    }
+    return new fullIntermediateResult(key, intermediateRecordValues, record);
+  }
+
+  public PriorityQueue<fullIntermediateResult> trimInSegmentResults(Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator,
+                                                                    GroupByResultHolder[] _groupByResultHolders, int size) {
+    int numAggregationFunctions = _aggregationFunctions.length;
+    int numColumns = numAggregationFunctions + _numGroupByExpressions;
+
+    // Get comparator
+    Comparator<IntermediateRecord> comparator =  _intermediateRecordComparator.reversed();
+    PriorityQueue<fullIntermediateResult> priorityQueue = new PriorityQueue<>(size, comparator);
+    while (groupKeyIterator.hasNext()) {
+      // Iterate over keys
+      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
+      Object[] keys = groupKey._keys;
+      Object[] values = Arrays.copyOf(keys, numColumns);
+      int groupId = groupKey._groupId;
+      for (int i = 0; i < numAggregationFunctions; i++) {
+        values[_numGroupByExpressions + i] = _aggregationFunctions[i].extractGroupByResult(_groupByResultHolders[i], groupId);;
+      }
+      // {key, intermediate_record, record}
+      fullIntermediateResult intermediateRecord = getInSegmentIntermediateRecord(new Key(keys), new Record(values));
+      if (priorityQueue.size() < size) {
+        priorityQueue.offer(intermediateRecord);
+      } else {
+        IntermediateRecord peek = priorityQueue.peek();
+        if (comparator.compare(peek, intermediateRecord) < 0) {
+          priorityQueue.poll();
+          priorityQueue.offer(intermediateRecord);
+        }
+      }
+    }
+    return priorityQueue;
+  }
+
+  public List<fullIntermediateResult> buildInSegmentResults(Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator,
+                                                            GroupByResultHolder[] _groupByResultHolders, int size) {
+    int numAggregationFunctions = _aggregationFunctions.length;
+    int numColumns = numAggregationFunctions + _numGroupByExpressions;
+    List<fullIntermediateResult> list = new ArrayList<>(size);
+    while (groupKeyIterator.hasNext()) {
+      // Iterate over keys
+      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
+      Object[] keys = groupKey._keys;
+      Object[] values = Arrays.copyOf(keys, numColumns);
+      int groupId = groupKey._groupId;
+      for (int i = 0; i < numAggregationFunctions; i++) {
+        values[_numGroupByExpressions + i] = _aggregationFunctions[i].extractGroupByResult(_groupByResultHolders[i], groupId);;
+      }
+      // {key, intermediate_record, record}
+      fullIntermediateResult intermediateRecord = getInSegmentIntermediateRecord(new Key(keys), new Record(values));
+      list.add(intermediateRecord);
+    }
+    return list;
   }
 }

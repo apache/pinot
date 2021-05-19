@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby;
 
+import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
+
+import java.util.Collection;
 
 
 /**
@@ -40,4 +43,12 @@ public interface GroupByExecutor {
    * @return Result of aggregation
    */
   AggregationGroupByResult getResult();
+
+  /**
+   * Trim the GroupBy result up to the threshold max(configurable_threshold * 5, 5000)
+   * TODO: benchmark the performance of PQ vs. topK
+   * <p>Should be called after all transform blocks has been processed.
+   *
+   */
+  Collection<TableResizer.fullIntermediateResult> trimGroupByResult(int threshold, TableResizer tableResizer);
 }

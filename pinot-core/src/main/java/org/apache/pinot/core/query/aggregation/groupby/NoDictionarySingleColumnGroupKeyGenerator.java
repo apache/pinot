@@ -29,8 +29,10 @@ import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
-import java.util.Iterator;
-import java.util.Map;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
@@ -48,7 +50,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenerator {
   private final ExpressionContext _groupByExpression;
   private final DataType _dataType;
-  private final Map _groupKeyMap;
+  private Map _groupKeyMap;
   private final int _globalGroupIdUpperBound;
 
   private int _numGroups = 0;
@@ -539,4 +541,5 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
       throw new UnsupportedOperationException();
     }
   }
+
 }
