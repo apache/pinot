@@ -29,6 +29,7 @@ import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSour
 import org.apache.pinot.segment.local.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.local.segment.index.readers.ValidDocIndexReaderImpl;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.store.SegmentDirectory;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexContainer;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
@@ -57,6 +58,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private ThreadSafeMutableRoaringBitmap _validDocIds;
   private ValidDocIndexReader _validDocIndex;
+  private PinotSegmentRecordReader _pinotSegmentRecordReader;
 
   public ImmutableSegmentImpl(SegmentDirectory segmentDirectory, SegmentMetadataImpl segmentMetadata,
       Map<String, ColumnIndexContainer> columnIndexContainerMap,
@@ -155,6 +157,13 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     if (_partitionUpsertMetadataManager != null) {
       _partitionUpsertMetadataManager.removeSegment(segmentName, _validDocIds);
     }
+    if (_pinotSegmentRecordReader != null) {
+      try {
+        _pinotSegmentRecordReader.close();
+      } catch (IOException e) {
+        LOGGER.error("Failed to close record reader. Continuing with error.", e);
+      }
+    }
   }
 
   @Override
@@ -170,8 +179,16 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
 
   @Override
   public GenericRow getRecord(int docId, GenericRow reuse) {
-    // NOTE: Use PinotSegmentRecordReader to read immutable segment
-    throw new UnsupportedOperationException();
+    try {
+      if (_pinotSegmentRecordReader == null) {
+        _pinotSegmentRecordReader = new PinotSegmentRecordReader();
+        _pinotSegmentRecordReader.init(this);
+      }
+      _pinotSegmentRecordReader.getRecord(reuse, docId);
+      return reuse;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to use PinotSegmentRecordReader to read immutable segment");
+    }
   }
 
   public Map<String, ColumnIndexContainer> getIndexContainerMap() {

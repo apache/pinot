@@ -28,6 +28,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.readers.sort.PinotSegmentSorter;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.spi.data.Schema;
@@ -121,6 +122,15 @@ public class PinotSegmentRecordReader implements RecordReader {
   }
 
   /**
+   * Initializes the record reader from an immutable segment.
+   *
+   * @param immutableSegment Immutable segment
+   */
+  public void init(ImmutableSegment immutableSegment) {
+    init(immutableSegment, false, null, null, null, false);
+  }
+
+  /**
    * Initializes the record reader from a mutable segment.
    * NOTE: The mutable segment should have already finished consumption and ready to be sealed. In order to read records
    *       from consuming segment, use {@link MutableSegment#getRecord(int, GenericRow)} instead.
@@ -208,7 +218,7 @@ public class PinotSegmentRecordReader implements RecordReader {
     return reuse;
   }
 
-  private void getRecord(GenericRow reuse, int docId) {
+  public void getRecord(GenericRow reuse, int docId) {
     for (Map.Entry<String, PinotSegmentColumnReader> entry : _columnReaderMap.entrySet()) {
       String column = entry.getKey();
       PinotSegmentColumnReader columnReader = entry.getValue();
