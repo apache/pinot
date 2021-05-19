@@ -68,6 +68,22 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   }
 
   @Override
+  protected void setUpTask() {
+    // Prefetch the LLC segment without segment store copy from ZK, which helps to alleviate ZK access.
+    if (_llcRealtimeSegmentManager.isUploadingRealtimeMissingSegmentStoreCopyEnabled()) {
+      for (String tableNameWithType : _pinotHelixResourceManager.getAllTables()) {
+        try {
+          if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {
+            _llcRealtimeSegmentManager.prefetchLLCSegmentWithoutDeepStoreCopy(tableNameWithType);
+          }
+        } catch (Exception e) {
+          LOGGER.error("Failed to pre fetch LLC segment for table {}", tableNameWithType);
+        }
+      }
+    }
+  }
+
+  @Override
   protected Context preprocess() {
     Context context = new Context();
     // Update realtime document counts only if certain time has passed after previous run
@@ -100,7 +116,9 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
           IngestionConfigUtils.getStreamConfigMap(tableConfig));
       if (streamConfig.hasLowLevelConsumerType()) {
         _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig);
-        _llcRealtimeSegmentManager.uploadToSegmentStoreIfMissing(tableConfig);
+        if (_llcRealtimeSegmentManager.isUploadingRealtimeMissingSegmentStoreCopyEnabled()) {
+          _llcRealtimeSegmentManager.uploadToSegmentStoreIfMissing(tableConfig);
+        }
       }
     }
   }
