@@ -122,8 +122,8 @@ public class QueryException {
     DATA_TABLE_DESERIALIZATION_ERROR.setMessage("DataTableDeserializationError");
     FUTURE_CALL_ERROR.setMessage("FutureCallError");
     BROKER_TIMEOUT_ERROR.setMessage("BrokerTimeoutError");
-    BROKER_RESOURCE_MISSING_ERROR.setMessage("BrokerResourceMissingError");
-    BROKER_INSTANCE_MISSING_ERROR.setMessage("BrokerInstanceMissingError");
+    BROKER_RESOURCE_MISSING_ERROR.setMessage("BrokerResourceNotFoundForTableError");
+    BROKER_INSTANCE_MISSING_ERROR.setMessage("BrokerInstanceNotFoundForTableError");
     INTERNAL_ERROR.setMessage("InternalError");
     MERGE_RESPONSE_ERROR.setMessage("MergeResponseError");
     FEDERATED_BROKER_UNAVAILABLE_ERROR.setMessage("FederatedBrokerUnavailableError");
