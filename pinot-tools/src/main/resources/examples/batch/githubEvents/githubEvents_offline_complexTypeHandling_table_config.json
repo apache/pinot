@@ -16,10 +16,6 @@
       {
         "columnName": "created_at_timestamp",
         "transformFunction": "fromDateTime(created_at, 'yyyy-MM-dd''T''HH:mm:ss''Z''')"
-      },
-      {
-        "columnName": "payload_json",
-        "transformFunction": "jsonFormat(\"payload\")"
       }
     ],
     "complexTypeConfig": {

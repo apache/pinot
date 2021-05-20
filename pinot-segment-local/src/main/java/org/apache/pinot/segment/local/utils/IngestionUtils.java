@@ -32,6 +32,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
+import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.name.FixedSegmentNameGenerator;
@@ -41,6 +42,7 @@ import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.spi.auth.AuthContext;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
@@ -298,7 +300,27 @@ public final class IngestionUtils {
     Set<String> fieldsForRecordExtractor = new HashSet<>();
     extractFieldsFromIngestionConfig(ingestionConfig, fieldsForRecordExtractor);
     extractFieldsFromSchema(schema, fieldsForRecordExtractor);
+    fieldsForRecordExtractor = getFieldsToReadWithComplexType(fieldsForRecordExtractor, ingestionConfig);
     return fieldsForRecordExtractor;
+  }
+
+  /**
+   * Extracts the root-level names from the fields, to support the complex-type handling. For example,
+   * a field a.b.c will return the top-level name a.
+   */
+  private static Set<String> getFieldsToReadWithComplexType(Set<String> fieldsToRead, IngestionConfig ingestionConfig) {
+    if (ingestionConfig == null || ingestionConfig.getComplexTypeConfig() == null) {
+      // do nothing
+      return fieldsToRead;
+    }
+    ComplexTypeConfig complexTypeConfig = ingestionConfig.getComplexTypeConfig();
+    Set<String> result = new HashSet<>();
+    String delimiter = complexTypeConfig.getDelimiter() == null ? ComplexTypeTransformer.DEFAULT_DELIMITER
+        : complexTypeConfig.getDelimiter();
+    for (String field : fieldsToRead) {
+      result.add(StringUtils.split(field, delimiter)[0]);
+    }
+    return result;
   }
 
   /**
