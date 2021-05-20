@@ -180,7 +180,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       }
     } else {
       // Raw index
-      _forwardIndex = loadRawForwardIndex(fwdIndexBuffer, metadata.getDataType());
+      _forwardIndex = loadRawForwardIndex(fwdIndexBuffer, metadata.getDataType().getStoredType());
       _dictionary = null;
       _rangeIndex = null;
       _invertedIndex = null;
