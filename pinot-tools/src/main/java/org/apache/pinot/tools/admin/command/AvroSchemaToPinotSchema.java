@@ -68,8 +68,8 @@ public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements
   @Option(name = "-timeUnit", metaVar = "<string>", usage = "Unit of the time column (default DAYS).")
   TimeUnit _timeUnit = TimeUnit.DAYS;
 
-  @Option(name = "-unnestFields", metaVar = "<string>", usage = "Comma separated fields to unnest")
-  String _unnestFields;
+  @Option(name = "-fieldsToUnnest", metaVar = "<string>", usage = "Comma separated fields to unnest")
+  String _fieldsToUnnest;
 
   @Option(name = "-delimiter", metaVar = "<string>", usage = "The delimiter separating components in nested structure, default to dot")
   String _delimiter;
@@ -77,8 +77,8 @@ public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements
   @Option(name = "-complexType", metaVar = "<boolean>", usage = "allow complex-type handling, default to false")
   boolean _complexType;
 
-  @Option(name = "-collectionToJsonMode", metaVar = "<string>", usage = "The mode of converting collection to JSON string, can be NONE/NON_PRIMITIVE/ALL")
-  String _collectionToJsonMode;
+  @Option(name = "-collectionNotUnnestedToJson", metaVar = "<string>", usage = "The mode of converting collection to JSON string, can be NONE/NON_PRIMITIVE/ALL")
+  String _collectionNotUnnestedToJson;
 
   @SuppressWarnings("FieldCanBeLocal")
   @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
@@ -97,7 +97,7 @@ public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements
     if (_avroSchemaFile != null) {
       schema = AvroUtils
           .getPinotSchemaFromAvroSchemaFile(new File(_avroSchemaFile), buildFieldTypesMap(), _timeUnit, _complexType,
-              buildUnnestFields(), getDelimiter(), getCollectionToJsonMode());
+              buildfieldsToUnnest(), getDelimiter(), getcollectionNotUnnestedToJson());
     } else if (_avroDataFile != null) {
       schema = AvroUtils.getPinotSchemaFromAvroDataFile(new File(_avroDataFile), buildFieldTypesMap(), _timeUnit);
     } else {
@@ -137,8 +137,8 @@ public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements
     return "AvroSchemaToPinotSchema -avroSchemaFile " + _avroSchemaFile + " -avroDataFile " + _avroDataFile
         + " -outputDir " + _outputDir + " -pinotSchemaName " + _pinotSchemaName + " -dimensions " + _dimensions
         + " -metrics " + _metrics + " -timeColumnName " + _timeColumnName + " -timeUnit " + _timeUnit
-        + " _unnestFields " + _unnestFields + " _delimiter " + _delimiter + " _complexType " + _complexType
-        + " _collectionToJsonMode " + _collectionToJsonMode;
+        + " _fieldsToUnnest " + _fieldsToUnnest + " _delimiter " + _delimiter + " _complexType " + _complexType
+        + " _collectionNotUnnestedToJson " + _collectionNotUnnestedToJson;
   }
 
   /**
@@ -165,21 +165,21 @@ public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements
     return fieldTypes;
   }
 
-  private List<String> buildUnnestFields() {
-    List<String> unnestFields = new ArrayList<>();
-    if (_unnestFields != null) {
-      for (String field : _unnestFields.split(",")) {
-        unnestFields.add(field);
+  private List<String> buildfieldsToUnnest() {
+    List<String> fieldsToUnnest = new ArrayList<>();
+    if (_fieldsToUnnest != null) {
+      for (String field : _fieldsToUnnest.split(",")) {
+        fieldsToUnnest.add(field);
       }
     }
-    return unnestFields;
+    return fieldsToUnnest;
   }
 
-  private ComplexTypeConfig.CollectionToJsonMode getCollectionToJsonMode() {
-    if (_collectionToJsonMode == null) {
+  private ComplexTypeConfig.CollectionNotUnnestedToJson getcollectionNotUnnestedToJson() {
+    if (_collectionNotUnnestedToJson == null) {
       return ComplexTypeTransformer.DEFAULT_COLLECTION_TO_JSON_MODE;
     }
-    return ComplexTypeConfig.CollectionToJsonMode.valueOf(_collectionToJsonMode);
+    return ComplexTypeConfig.CollectionNotUnnestedToJson.valueOf(_collectionNotUnnestedToJson);
   }
 
   private String getDelimiter() {
