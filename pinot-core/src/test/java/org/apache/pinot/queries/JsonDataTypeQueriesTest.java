@@ -154,10 +154,10 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
   @Test
   public void testSimpleSelectOnJsonColumn() {
     try {
-      Operator operator = getOperatorForSqlQuery("select jsonColumn FROM testTable");
+      Operator operator = getOperatorForSqlQuery("select jsonColumn FROM testTable limit 100");
       IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
       Collection<Object[]> rows = block.getSelectionResult();
-      Assert.assertEquals(rows.size(), 10);
+      Assert.assertEquals(rows.size(), 13);
       Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.JSON);
     } catch (IllegalStateException ise) {
       Assert.assertTrue(true);
@@ -351,20 +351,6 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
     GroupKeyGenerator.StringGroupKey groupKey2 = iterator.next();
     Assert.assertEquals(groupKey2._stringKey, "multi-dimensional-1");
     Assert.assertEquals(((Long) result.getResultForKey(groupKey1, 0)).intValue(), 2l);
-  }
-
-  @Test
-  public void testSimpleSelectWithIndex() {
-    Operator operator = getOperatorForSqlQuery("select jsonColumn from testTable");
-
-    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
-    Collection<Object[]> rows = block.getSelectionResult();
-    Iterator<Object[]> iterator = rows.iterator();
-    while (iterator.hasNext()) {
-      Object[] row = iterator.next();
-      System.out.println(Arrays.toString(row));
-    }
-
   }
 
   @AfterClass
