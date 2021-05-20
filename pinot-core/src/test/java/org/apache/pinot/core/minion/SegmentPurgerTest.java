@@ -27,14 +27,14 @@ import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
-import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
+import org.apache.pinot.segment.local.segment.store.LocalSegmentDirectoryLoader;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -161,11 +161,9 @@ public class SegmentPurgerTest {
 
     // Check inverted index
     Map<String, Object> props = new HashMap<>();
-    props.put("readMode", ReadMode.mmap.toString());
-    PinotConfiguration configuration = new PinotConfiguration(props);
-    SegmentDirectoryLoader localSegmentDirectoryLoader =
-        SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader("localSegmentDirectoryLoader");
-    try (SegmentDirectory segmentDirectory = localSegmentDirectoryLoader.load(purgedIndexDir.toURI(), configuration);
+    props.put(LocalSegmentDirectoryLoader.READ_MODE_KEY, ReadMode.mmap.toString());
+    try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
+        .load(purgedIndexDir.toURI(), new PinotConfiguration(props));
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
       assertTrue(reader.hasIndexFor(D1, ColumnIndexType.INVERTED_INDEX));
       assertFalse(reader.hasIndexFor(D2, ColumnIndexType.INVERTED_INDEX));

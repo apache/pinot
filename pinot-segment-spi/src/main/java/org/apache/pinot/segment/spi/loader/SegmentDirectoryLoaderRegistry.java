@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
  * Helper class to dynamically register all annotated {@link SegmentLoader} methods
  */
 public class SegmentDirectoryLoaderRegistry {
+  private static final String LOCAL_SEGMENT_DIRECTORY_LOADER_NAME = "localSegmentDirectoryLoader";
   private SegmentDirectoryLoaderRegistry() {
   }
 
@@ -72,7 +73,17 @@ public class SegmentDirectoryLoaderRegistry {
         _segmentDirectoryLoaderMap.size(), _segmentDirectoryLoaderMap.keySet());
   }
 
+  /**
+   * Returns the segment directory loader instance from instantiated map
+   */
   public static SegmentDirectoryLoader getSegmentDirectoryLoader(String name) {
     return _segmentDirectoryLoaderMap.get(name);
+  }
+
+  /**
+   * Returns the instance of 'localSegmentDirectoryLoader'
+   */
+  public static SegmentDirectoryLoader getLocalSegmentDirectoryLoader() {
+    return _segmentDirectoryLoaderMap.get(LOCAL_SEGMENT_DIRECTORY_LOADER_NAME);
   }
 }

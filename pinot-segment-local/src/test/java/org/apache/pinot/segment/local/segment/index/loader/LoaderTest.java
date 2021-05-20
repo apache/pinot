@@ -30,6 +30,7 @@ import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
+import org.apache.pinot.segment.local.segment.store.LocalSegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
 import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
@@ -98,10 +99,9 @@ public class LoaderTest {
     _v3IndexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
 
     Map<String, Object> props = new HashMap<>();
-    props.put("readMode", ReadMode.heap.toString());
+    props.put(LocalSegmentDirectoryLoader.READ_MODE_KEY, ReadMode.heap.toString());
     _pinotConfiguration = new PinotConfiguration(props);
-    _localSegmentDirectoryLoader =
-        SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader("localSegmentDirectoryLoader");
+    _localSegmentDirectoryLoader = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader();
   }
 
   private Schema constructV1Segment()

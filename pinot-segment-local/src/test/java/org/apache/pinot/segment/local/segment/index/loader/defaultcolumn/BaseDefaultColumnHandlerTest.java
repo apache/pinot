@@ -30,6 +30,7 @@ import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
 import org.apache.pinot.segment.local.segment.index.SegmentMetadataImplTest;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.store.LocalSegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
@@ -80,11 +81,9 @@ public class BaseDefaultColumnHandlerTest {
     segmentDirectory = new File(INDEX_DIR, driver.getSegmentName());
     committedSegmentMetadata = new SegmentMetadataImpl(segmentDirectory);
     Map<String, Object> props = new HashMap<>();
-    props.put("readMode", ReadMode.mmap.toString());
-    PinotConfiguration configuration = new PinotConfiguration(props);
-    SegmentDirectoryLoader localSegmentDirectoryLoader =
-        SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader("localSegmentDirectoryLoader");
-    writer = localSegmentDirectoryLoader.load(INDEX_DIR.toURI(), configuration).createWriter();
+    props.put(LocalSegmentDirectoryLoader.READ_MODE_KEY, ReadMode.mmap.toString());
+    writer = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
+        .load(INDEX_DIR.toURI(), new PinotConfiguration(props)).createWriter();
   }
 
   @AfterMethod

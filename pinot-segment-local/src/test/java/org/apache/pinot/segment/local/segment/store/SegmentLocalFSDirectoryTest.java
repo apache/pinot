@@ -19,15 +19,14 @@
 package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
@@ -130,10 +129,10 @@ public class SegmentLocalFSDirectoryTest {
     // So, we do what we can do best....HACK HACK HACK
     File sizeTestDirectory = null;
     Map<String, Object> props = new HashMap<>();
-    props.put("readMode", ReadMode.mmap.toString());
     PinotConfiguration configuration = new PinotConfiguration(props);
+    props.put(LocalSegmentDirectoryLoader.READ_MODE_KEY, ReadMode.mmap.toString());
     SegmentDirectoryLoader localSegmentDirectoryLoader =
-        SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader("localSegmentDirectoryLoader");
+        SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader();
     try {
       sizeTestDirectory = new File(SegmentLocalFSDirectoryTest.class.getName() + "-size_test");
       if (sizeTestDirectory.exists()) {

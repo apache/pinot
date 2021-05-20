@@ -93,25 +93,6 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
  */
 public abstract class SegmentDirectory implements Closeable {
 
-//  /**
-//   * Create segment directory from local file system
-//   * @param directory File object representing segment directory on disk
-//   * @param metadata segment metadata
-//   * @param readMode mmap vs heap ReadMode for data
-//   * @return segmentDirectory
-//   */
-//  // NOTE: this needs to be metadata impl to read all columns.
-//  // In future, we will have this class load metadata rather than
-//  // passing it in.
-//  public static SegmentDirectory createFromLocalFS(File directory, SegmentMetadataImpl metadata, ReadMode readMode) {
-//    return new SegmentLocalFSDirectory(directory, metadata, readMode);
-//  }
-//
-//  public static SegmentDirectory createFromLocalFS(File directory, ReadMode readMode)
-//      throws IOException, ConfigurationException {
-//    return new SegmentLocalFSDirectory(directory, readMode);
-//  }
-
   public abstract URI getIndexDir();
 
   public abstract SegmentMetadataImpl getSegmentMetadata();
@@ -121,7 +102,6 @@ public abstract class SegmentDirectory implements Closeable {
 
   /**
    * Get the path/URL for the directory
-   * @return
    */
   public abstract Path getPath();
 

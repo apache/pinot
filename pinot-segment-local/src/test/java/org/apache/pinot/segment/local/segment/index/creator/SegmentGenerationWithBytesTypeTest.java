@@ -40,13 +40,12 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.local.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
-import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
-import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
-import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.segment.local.segment.store.LocalSegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -271,11 +270,9 @@ public class SegmentGenerationWithBytesTypeTest {
     driver.build();
 
     Map<String, Object> props = new HashMap<>();
-    props.put("readMode", ReadMode.mmap.toString());
-    PinotConfiguration configuration = new PinotConfiguration(props);
-    SegmentDirectoryLoader localSegmentDirectoryLoader =
-        SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader("localSegmentDirectoryLoader");
-    localSegmentDirectoryLoader.load(driver.getOutputDirectory().toURI(), configuration);
+    props.put(LocalSegmentDirectoryLoader.READ_MODE_KEY, ReadMode.mmap.toString());
+    SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
+        .load(driver.getOutputDirectory().toURI(), new PinotConfiguration(props));
     recordReader.rewind();
     return recordReader;
   }

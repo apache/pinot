@@ -67,9 +67,9 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public static final String AUTH_TOKEN = "auth.token";
   // SegmentDirectoryLoader class
   public static final String SEGMENT_DIRECTORY_LOADER = "segment.directory.loader";
+  public static final String DEFAULT_SEGMENT_DIRECTORY_LOADER = "localSegmentDirectoryLoader";
   // Prefix for segment directory config
-  public static final String SEGMENT_DIR_CONFIG_PREFIX = "segment.directory";
-
+  public static final String SEGMENT_DIR_CONFIG_PREFIX = "segment.directory.";
 
   // Key of how many parallel realtime segments can be built.
   // A value of <= 0 indicates unlimited.
@@ -110,7 +110,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
       throws ConfigurationException {
     _instanceDataManagerConfiguration = serverConfig;
 
-    for (String key: serverConfig.getKeys()) {
+    for (String key : serverConfig.getKeys()) {
       LOGGER.info("InstanceDataManagerConfig, key: {} , value: {}", key, serverConfig.getProperty(key));
     }
 
@@ -216,14 +216,16 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   @Override
   public String getSegmentDirectoryLoader() {
-    return _instanceDataManagerConfiguration.getProperty(SEGMENT_DIRECTORY_LOADER);
+    return _instanceDataManagerConfiguration.getProperty(SEGMENT_DIRECTORY_LOADER, DEFAULT_SEGMENT_DIRECTORY_LOADER);
   }
 
   @Override
   public PinotConfiguration getSegmentDirectoryConfig() {
     Map<String, Object> segmentDirectoryProps =
         new HashMap<>(_instanceDataManagerConfiguration.subset(SEGMENT_DIR_CONFIG_PREFIX).toMap());
-    segmentDirectoryProps.put(READ_MODE, getReadMode());
+    if (!segmentDirectoryProps.containsKey(READ_MODE)) {
+      segmentDirectoryProps.put(READ_MODE, getReadMode());
+    }
     return new PinotConfiguration(segmentDirectoryProps);
   }
 

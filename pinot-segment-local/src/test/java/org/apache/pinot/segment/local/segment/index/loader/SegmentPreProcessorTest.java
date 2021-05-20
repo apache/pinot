@@ -32,6 +32,7 @@ import java.util.Set;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
+import org.apache.pinot.segment.local.segment.store.LocalSegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.index.creator.TextIndexType;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -176,11 +177,9 @@ public class SegmentPreProcessorTest {
 
     _indexDir = new File(INDEX_DIR, driver.getSegmentName());
     Map<String, Object> props = new HashMap<>();
-    props.put("readMode", ReadMode.mmap.toString());
-    PinotConfiguration configuration = new PinotConfiguration(props);
-    SegmentDirectoryLoader localSegmentDirectoryLoader =
-        SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader("localSegmentDirectoryLoader");
-    _segmentDirectory = localSegmentDirectoryLoader.load(_indexDir.toURI(), configuration);
+    props.put(LocalSegmentDirectoryLoader.READ_MODE_KEY, ReadMode.mmap.toString());
+    _segmentDirectory = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
+        .load(_indexDir.toURI(), new PinotConfiguration(props));
   }
 
   private void constructV3Segment()

@@ -26,10 +26,22 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.ReadMode;
 
 
+/**
+ * Implementation of {@link SegmentDirectoryLoader} for local FS
+ */
 public class LocalSegmentDirectoryLoader implements SegmentDirectoryLoader {
+
+  public static final String READ_MODE_KEY = "readMode";
+
+  /**
+   * Creates and loads the {@link SegmentLocalFSDirectory} which is the local implementation of {@link SegmentDirectory}
+   * @param indexDir segment index directory
+   * @param config config containing values for instantiation of the SegmentDirectory
+   * @return instance of {@link SegmentLocalFSDirectory}
+   */
   @Override
   public SegmentDirectory load(URI indexDir, PinotConfiguration config)
       throws Exception {
-    return new SegmentLocalFSDirectory(new File(indexDir), ReadMode.valueOf(config.getProperty("readMode")));
+    return new SegmentLocalFSDirectory(new File(indexDir), ReadMode.valueOf(config.getProperty(READ_MODE_KEY)));
   }
 }

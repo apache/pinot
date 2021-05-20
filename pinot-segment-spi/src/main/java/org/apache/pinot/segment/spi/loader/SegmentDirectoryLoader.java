@@ -23,8 +23,16 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
+/**
+ * Interface for creating and loading the {@link SegmentDirectory} instance using provided config
+ */
 public interface SegmentDirectoryLoader {
 
+  /**
+   * Creates the {@link SegmentDirectory} instance
+   * @param indexDir index directory
+   * @param config config for SegmentDirectory
+   */
   SegmentDirectory load(URI indexDir, PinotConfiguration config)
       throws Exception;
 }
