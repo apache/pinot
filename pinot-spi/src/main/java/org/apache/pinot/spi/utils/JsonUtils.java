@@ -43,6 +43,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DateTimeGranularitySpec;
@@ -409,33 +410,34 @@ public class JsonUtils {
 
   public static Schema getPinotSchemaFromJsonFile(File jsonFile,
       @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit,
-      @Nullable List<String> unnestFields, String delimiter)
+      @Nullable List<String> unnestFields, String delimiter,
+      ComplexTypeConfig.CollectionToJsonMode collectionToJsonMode)
       throws IOException {
     JsonNode jsonNode = fileToFirstJsonNode(jsonFile);
     if (unnestFields == null) {
       unnestFields = new ArrayList<>();
     }
     Preconditions.checkState(jsonNode.isObject(), "the JSON data shall be an object");
-    return getPinotSchemaFromJsonNode(jsonNode, fieldTypeMap, timeUnit, unnestFields, delimiter);
+    return getPinotSchemaFromJsonNode(jsonNode, fieldTypeMap, timeUnit, unnestFields, delimiter, collectionToJsonMode);
   }
 
   public static Schema getPinotSchemaFromJsonNode(JsonNode jsonNode,
       @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit, List<String> unnestFields,
-      String delimiter) {
+      String delimiter, ComplexTypeConfig.CollectionToJsonMode collectionToJsonMode) {
     Schema pinotSchema = new Schema();
     Iterator<Map.Entry<String, JsonNode>> fieldIterator = jsonNode.fields();
     while (fieldIterator.hasNext()) {
       Map.Entry<String, JsonNode> fieldEntry = fieldIterator.next();
       JsonNode childNode = fieldEntry.getValue();
       inferPinotSchemaFromJsonNode(childNode, pinotSchema, fieldEntry.getKey(), fieldTypeMap, timeUnit, unnestFields,
-          delimiter);
+          delimiter, collectionToJsonMode);
     }
     return pinotSchema;
   }
 
   private static void inferPinotSchemaFromJsonNode(JsonNode jsonNode, Schema pinotSchema, String path,
       @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit, List<String> unnestFields,
-      String delimiter) {
+      String delimiter, ComplexTypeConfig.CollectionToJsonMode collectionToJsonMode) {
     if (jsonNode.isNull()) {
       // do nothing
       return;
@@ -451,22 +453,39 @@ public class JsonUtils {
       JsonNode childNode = jsonNode.get(0);
 
       if (unnestFields.contains(path)) {
-        inferPinotSchemaFromJsonNode(childNode, pinotSchema, path, fieldTypeMap, timeUnit, unnestFields, delimiter);
-      } else if (childNode.isValueNode()) {
-        addFieldToPinotSchema(pinotSchema, valueOf(childNode), path, false, fieldTypeMap, timeUnit);
-      } else {
+        inferPinotSchemaFromJsonNode(childNode, pinotSchema, path, fieldTypeMap, timeUnit, unnestFields, delimiter,
+            collectionToJsonMode);
+      } else if (shallConvertToJson(collectionToJsonMode, childNode)) {
         addFieldToPinotSchema(pinotSchema, DataType.STRING, path, true, fieldTypeMap, timeUnit);
+      } else if (collectionToJsonMode == ComplexTypeConfig.CollectionToJsonMode.NON_PRIMITIVE && childNode
+          .isValueNode()) {
+        addFieldToPinotSchema(pinotSchema, valueOf(childNode), path, false, fieldTypeMap, timeUnit);
       }
+      // do not include the node for other cases
     } else if (jsonNode.isObject()) {
       Iterator<Map.Entry<String, JsonNode>> fieldIterator = jsonNode.fields();
       while (fieldIterator.hasNext()) {
         Map.Entry<String, JsonNode> fieldEntry = fieldIterator.next();
         JsonNode childNode = fieldEntry.getValue();
         inferPinotSchemaFromJsonNode(childNode, pinotSchema, String.join(delimiter, path, fieldEntry.getKey()),
-            fieldTypeMap, timeUnit, unnestFields, delimiter);
+            fieldTypeMap, timeUnit, unnestFields, delimiter, collectionToJsonMode);
       }
     } else {
       throw new IllegalArgumentException(String.format("Unsupported json node type", jsonNode.getClass()));
+    }
+  }
+
+  private static boolean shallConvertToJson(ComplexTypeConfig.CollectionToJsonMode collectionToJsonMode,
+      JsonNode childNode) {
+    switch (collectionToJsonMode) {
+      case ALL:
+        return true;
+      case NONE:
+        return false;
+      case NON_PRIMITIVE:
+        return !childNode.isValueNode();
+      default:
+        throw new IllegalArgumentException(String.format("Unsupported collectionToJsonMode %s", collectionToJsonMode));
     }
   }
 

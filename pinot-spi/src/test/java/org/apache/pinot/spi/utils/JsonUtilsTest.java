@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.Assert;
@@ -273,21 +274,22 @@ public class JsonUtilsTest {
     Map<String, FieldSpec.FieldType> fieldSpecMap =
         new ImmutableMap.Builder<String, FieldSpec.FieldType>().put("d1", FieldSpec.FieldType.DIMENSION)
             .put("hoursSinceEpoch", FieldSpec.FieldType.DATE_TIME).put("m1", FieldSpec.FieldType.METRIC).build();
-    Schema inferredPinotSchema =
-        JsonUtils.getPinotSchemaFromJsonFile(file, fieldSpecMap, TimeUnit.HOURS, new ArrayList<>(), ".");
+    Schema inferredPinotSchema = JsonUtils
+        .getPinotSchemaFromJsonFile(file, fieldSpecMap, TimeUnit.HOURS, new ArrayList<>(), ".",
+            ComplexTypeConfig.CollectionToJsonMode.NON_PRIMITIVE);
     Schema expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", FieldSpec.DataType.STRING)
         .addMetric("m1", FieldSpec.DataType.INT)
         .addSingleValueDimension("tuple.address.streetaddress", FieldSpec.DataType.STRING)
         .addSingleValueDimension("tuple.address.city", FieldSpec.DataType.STRING)
         .addSingleValueDimension("entries", FieldSpec.DataType.STRING)
         .addMultiValueDimension("d2", FieldSpec.DataType.INT)
-        .addDateTime("hoursSinceEpoch",FieldSpec.DataType.INT, "1:HOURS:EPOCH","1:HOURS")
-        .build();
+        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS").build();
     Assert.assertEquals(inferredPinotSchema, expectedSchema);
 
     // unnest collection entries
-    inferredPinotSchema =
-        JsonUtils.getPinotSchemaFromJsonFile(file, fieldSpecMap, TimeUnit.HOURS, Lists.newArrayList("entries"), ".");
+    inferredPinotSchema = JsonUtils
+        .getPinotSchemaFromJsonFile(file, fieldSpecMap, TimeUnit.HOURS, Lists.newArrayList("entries"), ".",
+            ComplexTypeConfig.CollectionToJsonMode.NON_PRIMITIVE);
     expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", FieldSpec.DataType.STRING)
         .addMetric("m1", FieldSpec.DataType.INT)
         .addSingleValueDimension("tuple.address.streetaddress", FieldSpec.DataType.STRING)
@@ -295,19 +297,34 @@ public class JsonUtilsTest {
         .addSingleValueDimension("entries.id", FieldSpec.DataType.INT)
         .addSingleValueDimension("entries.description", FieldSpec.DataType.STRING)
         .addMultiValueDimension("d2", FieldSpec.DataType.INT)
-        .addDateTime("hoursSinceEpoch",FieldSpec.DataType.INT, "1:HOURS:EPOCH","1:HOURS").build();
+        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS").build();
     Assert.assertEquals(inferredPinotSchema, expectedSchema);
 
     // change delimiter
-    inferredPinotSchema =
-        JsonUtils.getPinotSchemaFromJsonFile(file, fieldSpecMap, TimeUnit.HOURS, Lists.newArrayList(""), "_");
+    inferredPinotSchema = JsonUtils
+        .getPinotSchemaFromJsonFile(file, fieldSpecMap, TimeUnit.HOURS, Lists.newArrayList(""), "_",
+            ComplexTypeConfig.CollectionToJsonMode.NON_PRIMITIVE);
     expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", FieldSpec.DataType.STRING)
         .addMetric("m1", FieldSpec.DataType.INT)
         .addSingleValueDimension("tuple_address_streetaddress", FieldSpec.DataType.STRING)
         .addSingleValueDimension("tuple_address_city", FieldSpec.DataType.STRING)
         .addSingleValueDimension("entries", FieldSpec.DataType.STRING)
         .addMultiValueDimension("d2", FieldSpec.DataType.INT)
-        .addDateTime("hoursSinceEpoch",FieldSpec.DataType.INT, "1:HOURS:EPOCH","1:HOURS").build();
+        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS").build();
+    Assert.assertEquals(inferredPinotSchema, expectedSchema);
+
+    // change the handling of collection-to-json option, d2 will become string
+    inferredPinotSchema = JsonUtils
+        .getPinotSchemaFromJsonFile(file, fieldSpecMap, TimeUnit.HOURS, Lists.newArrayList("entries"), ".",
+            ComplexTypeConfig.CollectionToJsonMode.ALL);
+    expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", FieldSpec.DataType.STRING)
+        .addMetric("m1", FieldSpec.DataType.INT)
+        .addSingleValueDimension("tuple.address.streetaddress", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("tuple.address.city", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("entries.id", FieldSpec.DataType.INT)
+        .addSingleValueDimension("entries.description", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("d2", FieldSpec.DataType.STRING)
+        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS").build();
     Assert.assertEquals(inferredPinotSchema, expectedSchema);
   }
 }
