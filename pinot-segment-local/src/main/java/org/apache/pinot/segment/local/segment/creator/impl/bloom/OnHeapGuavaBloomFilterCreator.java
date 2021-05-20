@@ -25,7 +25,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import org.apache.pinot.segment.local.segment.creator.impl.V1Constants;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.local.segment.index.readers.bloom.GuavaBloomFilterReaderUtils;
 import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;

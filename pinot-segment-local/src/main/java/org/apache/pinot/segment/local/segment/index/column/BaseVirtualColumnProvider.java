@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.column;
 
-import org.apache.pinot.segment.local.segment.index.metadata.ColumnMetadata;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnIndexContainer;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;

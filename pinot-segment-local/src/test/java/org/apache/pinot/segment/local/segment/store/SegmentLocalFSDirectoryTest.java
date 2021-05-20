@@ -20,10 +20,18 @@ package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.store.ColumnIndexType;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -115,12 +123,17 @@ public class SegmentLocalFSDirectoryTest {
 
   @Test
   public void testDirectorySize()
-      throws IOException {
+      throws Exception {
     // this test verifies that the segment size is returned correctly even if v3/ subdir
     // does not exist. We have not good way to test all the conditions since the
     // format converters are higher level modules that can not be used in this package
     // So, we do what we can do best....HACK HACK HACK
     File sizeTestDirectory = null;
+    Map<String, Object> props = new HashMap<>();
+    props.put("readMode", ReadMode.mmap.toString());
+    PinotConfiguration configuration = new PinotConfiguration(props);
+    SegmentDirectoryLoader localSegmentDirectoryLoader =
+        SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader("localSegmentDirectoryLoader");
     try {
       sizeTestDirectory = new File(SegmentLocalFSDirectoryTest.class.getName() + "-size_test");
       if (sizeTestDirectory.exists()) {
@@ -128,14 +141,14 @@ public class SegmentLocalFSDirectoryTest {
       }
       FileUtils.copyDirectoryToDirectory(segmentDirectory.getPath().toFile(), sizeTestDirectory);
       SegmentDirectory sizeSegment =
-          SegmentLocalFSDirectory.createFromLocalFS(sizeTestDirectory, metadata, ReadMode.mmap);
+          localSegmentDirectoryLoader.load(sizeTestDirectory.toURI(), configuration);
       Assert.assertEquals(sizeSegment.getDiskSizeBytes(), segmentDirectory.getDiskSizeBytes());
 
       Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(sizeTestDirectory, SegmentVersion.v3).exists());
       File v3SizeDir = new File(sizeTestDirectory, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
       // the destination is not exactly v3 but does not matter
       FileUtils.copyDirectoryToDirectory(segmentDirectory.getPath().toFile(), v3SizeDir);
-      SegmentDirectory sizeV3Segment = SegmentDirectory.createFromLocalFS(v3SizeDir, metadata, ReadMode.mmap);
+      SegmentDirectory sizeV3Segment = localSegmentDirectoryLoader.load(v3SizeDir.toURI(), configuration);
       Assert.assertEquals(sizeSegment.getDiskSizeBytes(), sizeV3Segment.getDiskSizeBytes());
 
       // now drop v3

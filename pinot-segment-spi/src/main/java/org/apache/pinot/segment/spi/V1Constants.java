@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.segment.creator.impl;
+package org.apache.pinot.segment.spi;
 
 public class V1Constants {
   public static final String SEGMENT_CREATION_META = "creation.meta";
@@ -42,6 +42,8 @@ public class V1Constants {
     public static final String H3_INDEX_FILE_EXTENSION = ".h3.idx";
     public static final String BLOOM_FILTER_FILE_EXTENSION = ".bloom";
     public static final String NULLVALUE_VECTOR_FILE_EXTENSION = ".bitmap.nullvalue";
+    public static final String LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION = ".lucene.mapping";
+    public static final String LUCENE_TEXT_INDEX_FILE_EXTENSION = ".lucene.index";
   }
 
   public static class MetadataKeys {

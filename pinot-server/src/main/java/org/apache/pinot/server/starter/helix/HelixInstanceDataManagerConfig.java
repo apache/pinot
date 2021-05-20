@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
@@ -63,6 +65,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public static final String INSTANCE_RELOAD_CONSUMING_SEGMENT = "reload.consumingSegment";
   // Key of the auth token
   public static final String AUTH_TOKEN = "auth.token";
+  // SegmentDirectoryLoader class
+  public static final String SEGMENT_DIRECTORY_LOADER = "segment.directory.loader";
+  // Prefix for segment directory config
+  public static final String SEGMENT_DIR_CONFIG_PREFIX = "segment.directory";
+
 
   // Key of how many parallel realtime segments can be built.
   // A value of <= 0 indicates unlimited.
@@ -205,6 +212,19 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public String getAuthToken() {
     return _instanceDataManagerConfiguration.getProperty(AUTH_TOKEN);
+  }
+
+  @Override
+  public String getSegmentDirectoryLoader() {
+    return _instanceDataManagerConfiguration.getProperty(SEGMENT_DIRECTORY_LOADER);
+  }
+
+  @Override
+  public PinotConfiguration getSegmentDirectoryConfig() {
+    Map<String, Object> segmentDirectoryProps =
+        new HashMap<>(_instanceDataManagerConfiguration.subset(SEGMENT_DIR_CONFIG_PREFIX).toMap());
+    segmentDirectoryProps.put(READ_MODE, getReadMode());
+    return new PinotConfiguration(segmentDirectoryProps);
   }
 
   @Override

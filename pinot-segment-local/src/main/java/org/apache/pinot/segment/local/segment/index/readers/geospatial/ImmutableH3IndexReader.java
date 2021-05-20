@@ -24,7 +24,7 @@ import java.nio.ByteOrder;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial.BaseH3IndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.LongDictionary;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
 import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;

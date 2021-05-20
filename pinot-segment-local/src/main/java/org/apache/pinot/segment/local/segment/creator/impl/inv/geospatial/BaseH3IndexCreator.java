@@ -30,7 +30,7 @@ import java.nio.channels.FileChannel;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.creator.impl.V1Constants;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.local.utils.H3Utils;
 import org.apache.pinot.segment.spi.index.creator.GeoSpatialIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;

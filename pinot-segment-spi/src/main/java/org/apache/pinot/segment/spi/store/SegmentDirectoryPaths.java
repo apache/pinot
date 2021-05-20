@@ -16,15 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.segment.store;
+package org.apache.pinot.segment.spi.store;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.local.segment.creator.impl.V1Constants;
-import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
-import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 
 import static org.apache.pinot.segment.spi.creator.SegmentVersion.v3;
@@ -83,7 +81,7 @@ public class SegmentDirectoryPaths {
    */
   @Nullable
   public static File findTextIndexIndexFile(File indexDir, String column) {
-    String luceneIndexDirectory = column + LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION;
+    String luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION;
     return findFormatFile(indexDir, luceneIndexDirectory);
   }
 
@@ -96,7 +94,7 @@ public class SegmentDirectoryPaths {
   @Nullable
   @VisibleForTesting
   public static File findTextIndexDocIdMappingFile(File indexDir, String column) {
-    String file = column + LuceneTextIndexReader.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION;
+    String file = column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION;
     return findFormatFile(indexDir, file);
   }
 

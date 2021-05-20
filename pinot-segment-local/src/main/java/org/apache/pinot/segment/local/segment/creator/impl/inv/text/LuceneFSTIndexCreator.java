@@ -24,7 +24,7 @@ import java.io.IOException;
 import org.apache.lucene.store.OutputStreamDataOutput;
 import org.apache.lucene.util.fst.FST;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.V1Constants;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.local.utils.fst.FSTBuilder;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.slf4j.Logger;

@@ -54,4 +54,8 @@ public interface InstanceDataManagerConfig {
   int getMaxParallelSegmentBuilds();
 
   String getAuthToken();
+
+  String getSegmentDirectoryLoader();
+
+  PinotConfiguration getSegmentDirectoryConfig();
 }

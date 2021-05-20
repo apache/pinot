@@ -24,7 +24,7 @@ import java.util.List;
 import org.apache.pinot.segment.local.io.reader.impl.FixedByteSingleValueMultiColReader;
 import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteSingleValueMultiColWriter;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.index.reader.MutableForwardIndex;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;

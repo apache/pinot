@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.creator.impl.V1Constants;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.local.segment.index.loader.bloomfilter.BloomFilterHandler;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGenerator;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
@@ -35,8 +35,9 @@ import org.apache.pinot.segment.local.segment.index.loader.invertedindex.JsonInd
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.LuceneFSTIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.RangeIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.TextIndexHandler;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.local.segment.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
@@ -65,16 +66,13 @@ public class SegmentPreProcessor implements AutoCloseable {
   private final SegmentDirectory _segmentDirectory;
   private SegmentMetadataImpl _segmentMetadata;
 
-  public SegmentPreProcessor(File indexDir, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema)
+  public SegmentPreProcessor(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema)
       throws Exception {
-    _indexDir = indexDir;
+    _segmentDirectory = segmentDirectory;
+    _indexDir = new File(segmentDirectory.getIndexDir());
     _indexLoadingConfig = indexLoadingConfig;
     _schema = schema;
-    _segmentMetadata = new SegmentMetadataImpl(indexDir);
-
-    // Always use mmap to load the segment because it is safest and performs well without impact from -Xmx params.
-    // This is not the final load of the segment.
-    _segmentDirectory = SegmentDirectory.createFromLocalFS(indexDir, _segmentMetadata, ReadMode.mmap);
+    _segmentMetadata = segmentDirectory.getSegmentMetadata();
   }
 
   public void process()

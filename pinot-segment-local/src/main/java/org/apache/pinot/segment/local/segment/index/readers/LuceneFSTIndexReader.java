@@ -23,7 +23,7 @@ import java.util.List;
 import org.apache.lucene.util.fst.FST;
 import org.apache.lucene.util.fst.OffHeapFSTStore;
 import org.apache.lucene.util.fst.PositiveIntOutputs;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.local.utils.fst.PinotBufferIndexInput;
 import org.apache.pinot.segment.local.utils.fst.RegexpMatcher;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;

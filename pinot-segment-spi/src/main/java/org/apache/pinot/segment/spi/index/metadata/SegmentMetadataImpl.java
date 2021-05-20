@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.segment.index.metadata;
+package org.apache.pinot.segment.spi.index.metadata;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -44,9 +44,8 @@ import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.StringEscapeUtils;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import org.apache.pinot.segment.local.segment.creator.impl.V1Constants;
-import org.apache.pinot.segment.local.segment.store.SegmentDirectoryPaths;
+import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
@@ -120,32 +119,32 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   /**
    * For REALTIME consuming segments.
    */
-  public SegmentMetadataImpl(RealtimeSegmentZKMetadata segmentMetadata, Schema schema) {
+  public SegmentMetadataImpl(String rawTableName, String segmentName, long creationTime, long startTime, long endTime,
+      @Nullable TimeUnit timeUnit, long totalDocs, long crc, Schema schema) {
     _indexDir = null;
     PropertiesConfiguration segmentMetadataPropertiesConfiguration = new PropertiesConfiguration();
     segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_CREATOR_VERSION, null);
     segmentMetadataPropertiesConfiguration
         .addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_PADDING_CHARACTER, V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
     segmentMetadataPropertiesConfiguration
-        .addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME, Long.toString(segmentMetadata.getStartTime()));
-    segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME, Long.toString(segmentMetadata.getEndTime()));
-    segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.TABLE_NAME, segmentMetadata.getTableName());
+        .addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME, Long.toString(startTime));
+    segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME, Long.toString(endTime));
+    segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.TABLE_NAME, rawTableName);
 
-    TimeUnit timeUnit = segmentMetadata.getTimeUnit();
     if (timeUnit != null) {
       segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.TIME_UNIT, timeUnit.toString());
     } else {
       segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.TIME_UNIT, null);
     }
 
-    segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS, segmentMetadata.getTotalDocs());
+    segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS, totalDocs);
 
-    _crc = segmentMetadata.getCrc();
-    _creationTime = segmentMetadata.getCreationTime();
+    _crc = crc;
+    _creationTime = creationTime;
     setTimeInfo(segmentMetadataPropertiesConfiguration);
     _columnMetadataMap = null;
-    _rawTableName = segmentMetadata.getTableName();
-    _segmentName = segmentMetadata.getSegmentName();
+    _rawTableName = rawTableName;
+    _segmentName = segmentName;
     _schema = schema;
     _totalDocs = segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS);
     _customMap = new HashMap<>();

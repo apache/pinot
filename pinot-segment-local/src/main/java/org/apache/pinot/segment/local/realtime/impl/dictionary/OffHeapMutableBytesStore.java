@@ -23,7 +23,7 @@ import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
 /**

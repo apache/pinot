@@ -34,7 +34,7 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
-import org.apache.pinot.segment.local.segment.creator.TextIndexType;
+import org.apache.pinot.segment.spi.index.creator.TextIndexType;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
@@ -50,6 +50,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.inv.text.LuceneFSTInd
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.segment.spi.creator.SegmentCreator;
@@ -78,8 +79,8 @@ import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.segment.local.segment.creator.impl.V1Constants.MetadataKeys.Column.*;
-import static org.apache.pinot.segment.local.segment.creator.impl.V1Constants.MetadataKeys.Segment.*;
+import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.*;
+import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Segment.*;
 
 
 /**

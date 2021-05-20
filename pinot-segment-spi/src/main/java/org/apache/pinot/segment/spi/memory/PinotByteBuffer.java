@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.segment.memory;
+package org.apache.pinot.segment.spi.memory;
 
 import java.io.File;
 import java.io.IOException;
@@ -27,7 +27,6 @@ import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.pinot.segment.local.utils.CleanerUtil;
 
 
 @ThreadSafe

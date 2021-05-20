@@ -22,18 +22,23 @@ import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.nio.file.Files;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
 import org.apache.pinot.segment.local.segment.index.SegmentMetadataImplTest;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.local.segment.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -74,7 +79,12 @@ public class BaseDefaultColumnHandlerTest {
     driver.build();
     segmentDirectory = new File(INDEX_DIR, driver.getSegmentName());
     committedSegmentMetadata = new SegmentMetadataImpl(segmentDirectory);
-    writer = SegmentDirectory.createFromLocalFS(INDEX_DIR, committedSegmentMetadata, ReadMode.mmap).createWriter();
+    Map<String, Object> props = new HashMap<>();
+    props.put("readMode", ReadMode.mmap.toString());
+    PinotConfiguration configuration = new PinotConfiguration(props);
+    SegmentDirectoryLoader localSegmentDirectoryLoader =
+        SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader("localSegmentDirectoryLoader");
+    writer = localSegmentDirectoryLoader.load(INDEX_DIR.toURI(), configuration).createWriter();
   }
 
   @AfterMethod

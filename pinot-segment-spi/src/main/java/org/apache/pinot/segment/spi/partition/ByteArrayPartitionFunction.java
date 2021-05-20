@@ -16,53 +16,33 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.partition;
+package org.apache.pinot.segment.spi.partition;
 
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 
 
 /**
- * Modulo operation based partition function, where:
- * <ul>
- *   <li> partitionId = value % {@link #_numPartitions}</li>
- * </ul>
+ * Implementation of {@link Byte array partitioner}
  *
  */
-public class ModuloPartitionFunction implements PartitionFunction {
-  private static final String NAME = "Modulo";
+public class ByteArrayPartitionFunction implements PartitionFunction {
+  private static final String NAME = "ByteArray";
   private final int _numPartitions;
 
   /**
    * Constructor for the class.
-   * @param numPartitions Number of partitions.
+   * @param numPartitions Number of partitions
    */
-  public ModuloPartitionFunction(int numPartitions) {
+  public ByteArrayPartitionFunction(int numPartitions) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0, specified", numPartitions);
     _numPartitions = numPartitions;
   }
 
-  /**
-   * Returns partition id for a given value. Assumes that the passed in object
-   * is either an Integer, or a string representation of an Integer.
-   *
-   * @param value Value for which to determine the partition id.
-   * @return Partition id for the given value.
-   */
   @Override
-  public int getPartition(Object value) {
-    if (value instanceof Integer) {
-      return ((Integer) value) % _numPartitions;
-    } else if (value instanceof Long) {
-      // Since _numPartitions is int, the modulo should also be int.
-      return (int) (((Long) value) % _numPartitions);
-    } else if (value instanceof String) {
-      // Parse String as Long, to support both Integer and Long.
-      return (int) ((Long.parseLong((String) value)) % _numPartitions);
-    } else {
-      throw new IllegalArgumentException(
-          "Illegal argument for partitioning, expected Integer, got: " + value.getClass().getName());
-    }
+  public int getPartition(Object valueIn) {
+    return abs(Arrays.hashCode(valueIn.toString().getBytes())) % _numPartitions;
   }
 
   @Override
@@ -73,5 +53,9 @@ public class ModuloPartitionFunction implements PartitionFunction {
   @Override
   public String toString() {
     return NAME;
+  }
+
+  private int abs(int n) {
+    return (n == Integer.MIN_VALUE) ? 0 : Math.abs(n);
   }
 }

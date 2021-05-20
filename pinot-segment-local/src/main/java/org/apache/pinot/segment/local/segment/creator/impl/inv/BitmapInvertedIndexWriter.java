@@ -25,7 +25,7 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
-import org.apache.pinot.segment.local.utils.CleanerUtil;
+import org.apache.pinot.segment.spi.memory.CleanerUtil;
 import org.roaringbitmap.RoaringBitmap;
 
 

@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.segment.processing.partitioner;
 
-import org.apache.pinot.segment.local.partition.PartitionFunctionFactory;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.Partitioner;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;

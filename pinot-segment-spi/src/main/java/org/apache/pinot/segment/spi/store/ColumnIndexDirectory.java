@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.segment.store;
+package org.apache.pinot.segment.spi.store;
 
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory;
  * Abstract class to map the columnar indices to their location on disk.
  *
  */
-abstract class ColumnIndexDirectory implements Closeable {
+public abstract class ColumnIndexDirectory implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(ColumnIndexDirectory.class);
 
   protected File segmentDirectory;
@@ -58,6 +58,10 @@ abstract class ColumnIndexDirectory implements Closeable {
     this.segmentDirectory = segmentDirectory;
     this.metadata = metadata;
     this.readMode = readMode;
+  }
+
+  public void setMetadata(SegmentMetadataImpl metadata) {
+    this.metadata = metadata;
   }
 
   /**

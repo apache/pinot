@@ -29,10 +29,12 @@ import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexCo
 import org.apache.pinot.segment.local.segment.index.converter.SegmentFormatConverterFactory;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
-import org.apache.pinot.segment.local.segment.index.metadata.ColumnMetadata;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.local.segment.store.SegmentDirectory;
-import org.apache.pinot.segment.local.segment.store.SegmentDirectoryPaths;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
@@ -43,6 +45,7 @@ import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,35 +99,43 @@ public class ImmutableSegmentLoader {
       }
     }
 
-    // Pre-process the segment
+    PinotConfiguration segmentDirectoryConf = indexLoadingConfig.getSegmentDirectoryConfig();
+    SegmentDirectory localSegmentDirectory =
+        SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader("localSegmentDirectoryLoader")
+            .load(indexDir.toURI(), segmentDirectoryConf);
+
+    // Pre-process the segment on local
     // NOTE: this step may modify the segment metadata
-    try (SegmentPreProcessor preProcessor = new SegmentPreProcessor(indexDir, indexLoadingConfig, schema)) {
+    try (SegmentPreProcessor preProcessor = new SegmentPreProcessor(localSegmentDirectory, indexLoadingConfig, schema)) {
       preProcessor.process();
     }
 
     // Load the metadata again since converter and pre-processor may have changed it
-    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
-    if (segmentMetadata.getTotalDocs() == 0) {
-      return new EmptyIndexSegment(segmentMetadata);
+    SegmentMetadataImpl localSegmentMetadata = new SegmentMetadataImpl(indexDir);
+    if (localSegmentMetadata.getTotalDocs() == 0) {
+      return new EmptyIndexSegment(localSegmentMetadata);
     }
 
     // Remove columns not in schema from the metadata
-    Map<String, ColumnMetadata> columnMetadataMap = segmentMetadata.getColumnMetadataMap();
+    Map<String, ColumnMetadata> columnMetadataMap = localSegmentMetadata.getColumnMetadataMap();
     if (schema != null) {
       Set<String> columnsInMetadata = new HashSet<>(columnMetadataMap.keySet());
       columnsInMetadata.removeIf(schema::hasColumn);
       if (!columnsInMetadata.isEmpty()) {
         LOGGER.info("Skip loading columns only exist in metadata but not in schema: {}", columnsInMetadata);
         for (String column : columnsInMetadata) {
-          segmentMetadata.removeColumn(column);
+          localSegmentMetadata.removeColumn(column);
         }
       }
     }
 
     // Load the segment
     ReadMode readMode = indexLoadingConfig.getReadMode();
-    SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(indexDir, segmentMetadata, readMode);
-    SegmentDirectory.Reader segmentReader = segmentDirectory.createReader();
+    SegmentDirectoryLoader segmentLoaderDirectory =
+        SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
+    SegmentDirectory actualSegmentDirectory = segmentLoaderDirectory.load(indexDir.toURI(), indexLoadingConfig.getSegmentDirectoryConfig());
+    SegmentDirectory.Reader segmentReader = actualSegmentDirectory.createReader();
+
     Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<>();
     for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {
       indexContainerMap.put(entry.getKey(),
@@ -132,12 +143,12 @@ public class ImmutableSegmentLoader {
     }
 
     // Instantiate virtual columns
-    Schema segmentSchema = segmentMetadata.getSchema();
+    Schema segmentSchema = localSegmentMetadata.getSchema();
     VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(segmentSchema, segmentName);
     for (FieldSpec fieldSpec : segmentSchema.getAllFieldSpecs()) {
       if (fieldSpec.isVirtualColumn()) {
         String columnName = fieldSpec.getName();
-        VirtualColumnContext context = new VirtualColumnContext(fieldSpec, segmentMetadata.getTotalDocs());
+        VirtualColumnContext context = new VirtualColumnContext(fieldSpec, localSegmentMetadata.getTotalDocs());
         VirtualColumnProvider provider = VirtualColumnProviderFactory.buildProvider(context);
         indexContainerMap.put(columnName, provider.buildColumnIndexContainer(context));
         columnMetadataMap.put(columnName, provider.buildMetadata(context));
@@ -146,14 +157,14 @@ public class ImmutableSegmentLoader {
 
     // Load star-tree index if it exists
     StarTreeIndexContainer starTreeIndexContainer = null;
-    if (segmentMetadata.getStarTreeV2MetadataList() != null) {
+    if (localSegmentMetadata.getStarTreeV2MetadataList() != null) {
       starTreeIndexContainer =
-          new StarTreeIndexContainer(SegmentDirectoryPaths.findSegmentDirectory(indexDir), segmentMetadata,
+          new StarTreeIndexContainer(SegmentDirectoryPaths.findSegmentDirectory(indexDir), localSegmentMetadata,
               indexContainerMap, readMode);
     }
 
     ImmutableSegmentImpl segment =
-        new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, indexContainerMap, starTreeIndexContainer);
+        new ImmutableSegmentImpl(actualSegmentDirectory, localSegmentMetadata, indexContainerMap, starTreeIndexContainer);
     LOGGER.info("Successfully loaded segment {} with readMode: {}", segmentName, readMode);
     return segment;
   }

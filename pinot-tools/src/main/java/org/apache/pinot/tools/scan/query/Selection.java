@@ -21,7 +21,7 @@ package org.apache.pinot.tools.scan.query;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.utils.Pair;

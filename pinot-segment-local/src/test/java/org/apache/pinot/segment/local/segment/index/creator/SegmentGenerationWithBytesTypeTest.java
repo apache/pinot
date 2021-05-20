@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
@@ -39,7 +40,9 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.local.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
-import org.apache.pinot.segment.local.segment.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -52,6 +55,7 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.ReadMode;
@@ -266,7 +270,12 @@ public class SegmentGenerationWithBytesTypeTest {
     driver.init(config, recordReader);
     driver.build();
 
-    SegmentDirectory.createFromLocalFS(driver.getOutputDirectory(), ReadMode.mmap);
+    Map<String, Object> props = new HashMap<>();
+    props.put("readMode", ReadMode.mmap.toString());
+    PinotConfiguration configuration = new PinotConfiguration(props);
+    SegmentDirectoryLoader localSegmentDirectoryLoader =
+        SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader("localSegmentDirectoryLoader");
+    localSegmentDirectoryLoader.load(driver.getOutputDirectory().toURI(), configuration);
     recordReader.rewind();
     return recordReader;
   }

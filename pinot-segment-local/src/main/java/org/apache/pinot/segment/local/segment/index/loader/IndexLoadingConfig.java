@@ -36,6 +36,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ReadMode;
 
@@ -76,6 +77,8 @@ public class IndexLoadingConfig {
   private Map<String, Map<String, String>> _columnProperties = new HashMap<>();
 
   private TableConfig _tableConfig;
+  private String _segmentDirectoryLoader;
+  private PinotConfiguration _segmentDirectoryConfig;
 
   public IndexLoadingConfig(InstanceDataManagerConfig instanceDataManagerConfig, TableConfig tableConfig) {
     extractFromInstanceConfig(instanceDataManagerConfig);
@@ -237,6 +240,8 @@ public class IndexLoadingConfig {
     }
     _enableSplitCommitEndWithMetadata = instanceDataManagerConfig.isEnableSplitCommitEndWithMetadata();
     _segmentStoreURI = instanceDataManagerConfig.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI);
+    _segmentDirectoryLoader = instanceDataManagerConfig.getSegmentDirectoryLoader();
+    _segmentDirectoryConfig = instanceDataManagerConfig.getSegmentDirectoryConfig();
   }
 
   /**
@@ -441,5 +446,13 @@ public class IndexLoadingConfig {
   @VisibleForTesting
   public void setTableConfig(TableConfig tableConfig) {
     _tableConfig = tableConfig;
+  }
+
+  public String getSegmentDirectoryLoader() {
+    return _segmentDirectoryLoader;
+  }
+
+  public PinotConfiguration getSegmentDirectoryConfig() {
+    return _segmentDirectoryConfig;
   }
 }

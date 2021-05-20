@@ -16,10 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.segment.creator;
+package org.apache.pinot.segment.spi.loader;
 
-public enum TextIndexType {
-  NONE,
-  LUCENE,
-  LUCENE_FST
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+
+/**
+ * Annotation class for {@link SegmentDirectoryLoader} implementations. The corresponding classes
+ * are auto-registered during startup.
+ *
+ * NOTE:
+ * 1. The annotated class must be under the package of name 'org.apache.pinot.segment.*'
+ * to be auto-registered.
+ */
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+public @interface SegmentLoader {
+  boolean enabled() default true;
+
+  String name() default "";
 }

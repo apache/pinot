@@ -26,7 +26,7 @@ import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWrit
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.local.segment.index.readers.forward.BaseChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.Assert;

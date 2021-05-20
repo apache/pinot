@@ -21,7 +21,7 @@ package org.apache.pinot.broker.pruner;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
+import org.apache.pinot.segment.spi.partition.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;

@@ -21,7 +21,7 @@ package org.apache.pinot.segment.local.segment.index.readers;
 import java.lang.ref.SoftReference;
 import java.nio.ByteOrder;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitmapInvertedIndexWriter;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.slf4j.Logger;

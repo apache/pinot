@@ -33,7 +33,7 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
+import org.apache.pinot.segment.spi.partition.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;

@@ -20,7 +20,7 @@ package org.apache.pinot.segment.local.segment.index.readers.bloom;
 
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 
 

@@ -16,11 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.partition;
+package org.apache.pinot.segment.spi.partition;
 
 import java.util.Random;
-import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.segment.spi.partition.ByteArrayPartitionFunction;
+import org.apache.pinot.segment.spi.partition.ModuloPartitionFunction;
+import org.apache.pinot.segment.spi.partition.MurmurPartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
+import org.apache.pinot.spi.utils.StringUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -256,7 +260,7 @@ public class PartitionFunctionTest {
     byte[] array = new byte[7];
     for (int expectedPartition : expectedPartitions) {
       random.nextBytes(array);
-      String nextString = StringUtil.decodeUtf8(array);
+      String nextString = StringUtils.decodeUtf8(array);
       int actualPartition = partitionFunction.getPartition(nextString);
       Assert.assertEquals(actualPartition, expectedPartition);
     }

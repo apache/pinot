@@ -20,7 +20,7 @@ package org.apache.pinot.segment.local.segment.virtualcolumn;
 
 import java.io.IOException;
 import org.apache.pinot.segment.local.segment.index.column.BaseVirtualColumnProvider;
-import org.apache.pinot.segment.local.segment.index.metadata.ColumnMetadata;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
 import org.apache.pinot.segment.local.segment.index.readers.DocIdDictionary;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
