@@ -31,31 +31,31 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
  */
 public class ComplexTypeConfig extends BaseJsonConfig {
 
-  public enum CollectionToJsonMode {
+  public enum CollectionNotUnnestedToJson {
     NONE, NON_PRIMITIVE, ALL
   }
 
   @JsonPropertyDescription("The fields to unnest")
-  private final List<String> _unnestFields;
+  private final List<String> _fieldsToUnnest;
 
   @JsonPropertyDescription("The delimiter used to separate components in a path")
   private final String _delimiter;
 
   @JsonPropertyDescription("The mode of converting collection to JSON string")
-  private final CollectionToJsonMode _collectionToJsonMode;
+  private final CollectionNotUnnestedToJson _collectionNotUnnestedToJson;
 
   @JsonCreator
-  public ComplexTypeConfig(@JsonProperty("unnestFields") @Nullable List<String> unnestFields,
+  public ComplexTypeConfig(@JsonProperty("fieldsToUnnest") @Nullable List<String> fieldsToUnnest,
       @JsonProperty("delimiter") @Nullable String delimiter,
-      @JsonProperty("collectionToJsonMode") @Nullable CollectionToJsonMode collectionToJsonMode) {
-    _unnestFields = unnestFields;
+      @JsonProperty("collectionNotUnnestedToJson") @Nullable CollectionNotUnnestedToJson collectionNotUnnestedToJson) {
+    _fieldsToUnnest = fieldsToUnnest;
     _delimiter = delimiter;
-    _collectionToJsonMode = collectionToJsonMode;
+    _collectionNotUnnestedToJson = collectionNotUnnestedToJson;
   }
 
   @Nullable
-  public List<String> getUnnestFields() {
-    return _unnestFields;
+  public List<String> getFieldsToUnnest() {
+    return _fieldsToUnnest;
   }
 
   @Nullable
@@ -64,7 +64,7 @@ public class ComplexTypeConfig extends BaseJsonConfig {
   }
 
   @Nullable
-  public CollectionToJsonMode getCollectionToJsonMode() {
-    return _collectionToJsonMode;
+  public CollectionNotUnnestedToJson getCollectionNotUnnestedToJson() {
+    return _collectionNotUnnestedToJson;
   }
 }

@@ -90,7 +90,7 @@ public class AvroUtilsTest {
             .put("hoursSinceEpoch", FieldType.TIME).put("m1", FieldType.METRIC).build();
     Schema inferredPinotSchema = AvroUtils
         .getPinotSchemaFromAvroSchemaWithComplexTypeHandling(avroSchema, fieldSpecMap, TimeUnit.HOURS,
-            new ArrayList<>(), ".", ComplexTypeConfig.CollectionToJsonMode.NON_PRIMITIVE);
+            new ArrayList<>(), ".", ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE);
     Schema expectedSchema =
         new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING).addMetric("m1", DataType.INT)
             .addSingleValueDimension("tuple.streetaddress", DataType.STRING)
@@ -102,7 +102,7 @@ public class AvroUtilsTest {
     // unnest collection entries
     inferredPinotSchema = AvroUtils
         .getPinotSchemaFromAvroSchemaWithComplexTypeHandling(avroSchema, fieldSpecMap, TimeUnit.HOURS,
-            Lists.newArrayList("entries"), ".", ComplexTypeConfig.CollectionToJsonMode.NON_PRIMITIVE);
+            Lists.newArrayList("entries"), ".", ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE);
     expectedSchema =
         new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING).addMetric("m1", DataType.INT)
             .addSingleValueDimension("tuple.streetaddress", DataType.STRING)
@@ -114,7 +114,7 @@ public class AvroUtilsTest {
     // change delimiter
     inferredPinotSchema = AvroUtils
         .getPinotSchemaFromAvroSchemaWithComplexTypeHandling(avroSchema, fieldSpecMap, TimeUnit.HOURS,
-            Lists.newArrayList(), "_", ComplexTypeConfig.CollectionToJsonMode.NON_PRIMITIVE);
+            Lists.newArrayList(), "_", ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE);
     expectedSchema =
         new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING).addMetric("m1", DataType.INT)
             .addSingleValueDimension("tuple_streetaddress", DataType.STRING)
@@ -126,7 +126,7 @@ public class AvroUtilsTest {
     // change the handling of collection-to-json option, d2 will become string
     inferredPinotSchema = AvroUtils
         .getPinotSchemaFromAvroSchemaWithComplexTypeHandling(avroSchema, fieldSpecMap, TimeUnit.HOURS,
-            Lists.newArrayList("entries"), ".", ComplexTypeConfig.CollectionToJsonMode.ALL);
+            Lists.newArrayList("entries"), ".", ComplexTypeConfig.CollectionNotUnnestedToJson.ALL);
     expectedSchema =
         new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING).addMetric("m1", DataType.INT)
             .addSingleValueDimension("tuple.streetaddress", DataType.STRING)

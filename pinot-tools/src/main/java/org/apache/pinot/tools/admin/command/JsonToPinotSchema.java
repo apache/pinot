@@ -65,14 +65,14 @@ public class JsonToPinotSchema extends AbstractBaseAdminCommand implements Comma
   @Option(name = "-timeUnit", metaVar = "<string>", usage = "Unit of the time column (default DAYS).")
   TimeUnit _timeUnit = TimeUnit.DAYS;
 
-  @Option(name = "-unnestFields", metaVar = "<string>", usage = "Comma separated fields to unnest")
-  String _unnestFields;
+  @Option(name = "-fieldsToUnnest", metaVar = "<string>", usage = "Comma separated fields to unnest")
+  String _fieldsToUnnest;
 
   @Option(name = "-delimiter", metaVar = "<string>", usage = "The delimiter separating components in nested structure, default to dot")
   String _delimiter;
 
-  @Option(name = "-collectionToJsonMode", metaVar = "<string>", usage = "The mode of converting collection to JSON string, can be NONE/NON_PRIMITIVE/ALL")
-  String _collectionToJsonMode;
+  @Option(name = "-collectionNotUnnestedToJson", metaVar = "<string>", usage = "The mode of converting collection to JSON string, can be NONE/NON_PRIMITIVE/ALL")
+  String _collectionNotUnnestedToJson;
 
   @SuppressWarnings("FieldCanBeLocal")
   @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
@@ -89,8 +89,8 @@ public class JsonToPinotSchema extends AbstractBaseAdminCommand implements Comma
 
     Schema schema;
     schema = JsonUtils
-        .getPinotSchemaFromJsonFile(new File(_jsonFile), buildFieldTypesMap(), _timeUnit, buildUnnestFields(),
-            getDelimiter(), getCollectionToJsonMode());
+        .getPinotSchemaFromJsonFile(new File(_jsonFile), buildFieldTypesMap(), _timeUnit, buildfieldsToUnnest(),
+            getDelimiter(), getcollectionNotUnnestedToJson());
     schema.setSchemaName(_pinotSchemaName);
 
     File outputDir = new File(_outputDir);
@@ -122,8 +122,8 @@ public class JsonToPinotSchema extends AbstractBaseAdminCommand implements Comma
   public String toString() {
     return "JsonToPinotSchema -jsonFile " + _jsonFile + " -outputDir " + _outputDir + " -pinotSchemaName "
         + _pinotSchemaName + " -dimensions " + _dimensions + " -metrics " + _metrics + " -timeColumnName "
-        + _dateTimeColumnName + " -timeUnit " + _timeUnit + " _unnestFields " + _unnestFields + " _delimiter "
-        + _delimiter + " _collectionToJsonMode " + _collectionToJsonMode;
+        + _dateTimeColumnName + " -timeUnit " + _timeUnit + " _fieldsToUnnest " + _fieldsToUnnest + " _delimiter "
+        + _delimiter + " _collectionNotUnnestedToJson " + _collectionNotUnnestedToJson;
   }
 
   /**
@@ -150,21 +150,21 @@ public class JsonToPinotSchema extends AbstractBaseAdminCommand implements Comma
     return fieldTypes;
   }
 
-  private List<String> buildUnnestFields() {
-    List<String> unnestFields = new ArrayList<>();
-    if (_unnestFields != null) {
-      for (String field : _unnestFields.split(",")) {
-        unnestFields.add(field.trim());
+  private List<String> buildfieldsToUnnest() {
+    List<String> fieldsToUnnest = new ArrayList<>();
+    if (_fieldsToUnnest != null) {
+      for (String field : _fieldsToUnnest.split(",")) {
+        fieldsToUnnest.add(field.trim());
       }
     }
-    return unnestFields;
+    return fieldsToUnnest;
   }
 
-  private ComplexTypeConfig.CollectionToJsonMode getCollectionToJsonMode() {
-    if (_collectionToJsonMode == null) {
+  private ComplexTypeConfig.CollectionNotUnnestedToJson getcollectionNotUnnestedToJson() {
+    if (_collectionNotUnnestedToJson == null) {
       return ComplexTypeTransformer.DEFAULT_COLLECTION_TO_JSON_MODE;
     }
-    return ComplexTypeConfig.CollectionToJsonMode.valueOf(_collectionToJsonMode);
+    return ComplexTypeConfig.CollectionNotUnnestedToJson.valueOf(_collectionNotUnnestedToJson);
   }
 
   private String getDelimiter() {
