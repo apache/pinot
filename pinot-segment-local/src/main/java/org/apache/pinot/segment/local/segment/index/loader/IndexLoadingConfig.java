@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.segment.local.loader.LocalSegmentDirectoryLoader;
 import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -46,6 +48,7 @@ import org.apache.pinot.spi.utils.ReadMode;
  */
 public class IndexLoadingConfig {
   private static final int DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT = 2;
+  public static final String DEFAULT_SEGMENT_DIRECTORY_LOADER = "localSegmentDirectoryLoader";
 
   private ReadMode _readMode = ReadMode.DEFAULT_MODE;
   private List<String> _sortedColumns = Collections.emptyList();
@@ -449,10 +452,15 @@ public class IndexLoadingConfig {
   }
 
   public String getSegmentDirectoryLoader() {
-    return _segmentDirectoryLoader;
+    return StringUtils.isNotBlank(_segmentDirectoryLoader) ? _segmentDirectoryLoader : DEFAULT_SEGMENT_DIRECTORY_LOADER;
   }
 
   public PinotConfiguration getSegmentDirectoryConfig() {
+    if (_segmentDirectoryConfig == null) {
+      Map<String, Object> props = new HashMap<>();
+      props.put(LocalSegmentDirectoryLoader.READ_MODE_KEY, _readMode);
+      return new PinotConfiguration(props);
+    }
     return _segmentDirectoryConfig;
   }
 }

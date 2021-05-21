@@ -84,9 +84,10 @@ public class ImmutableSegmentLoader {
     // NOTE: this step may modify the segment metadata
     String segmentName = indexDir.getName();
     SegmentVersion segmentVersionToLoad = indexLoadingConfig.getSegmentVersion();
+    SegmentMetadataImpl localSegmentMetadata = new SegmentMetadataImpl(indexDir);
     if (segmentVersionToLoad != null && !SegmentDirectoryPaths.segmentDirectoryFor(indexDir, segmentVersionToLoad)
         .isDirectory()) {
-      SegmentVersion segmentVersionOnDisk = new SegmentMetadataImpl(indexDir).getSegmentVersion();
+      SegmentVersion segmentVersionOnDisk = localSegmentMetadata.getSegmentVersion();
       if (segmentVersionOnDisk != segmentVersionToLoad) {
         LOGGER.info("Segment: {} needs to be converted from version: {} to {}", segmentName, segmentVersionOnDisk,
             segmentVersionToLoad);
@@ -99,42 +100,40 @@ public class ImmutableSegmentLoader {
       }
     }
 
+    if (localSegmentMetadata.getTotalDocs() == 0) {
+      return new EmptyIndexSegment(localSegmentMetadata);
+    }
+
+    // Pre-process the segment on local using local SegmentDirectory
     SegmentDirectory localSegmentDirectory = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
         .load(indexDir.toURI(), indexLoadingConfig.getSegmentDirectoryConfig());
 
-    // Pre-process the segment on local using local SegmentDirectory
     // NOTE: this step may modify the segment metadata
     try (
         SegmentPreProcessor preProcessor = new SegmentPreProcessor(localSegmentDirectory, indexLoadingConfig, schema)) {
       preProcessor.process();
     }
 
-    // Load the metadata again since converter and pre-processor may have changed it
-    SegmentMetadataImpl localSegmentMetadata = new SegmentMetadataImpl(indexDir);
-    if (localSegmentMetadata.getTotalDocs() == 0) {
-      return new EmptyIndexSegment(localSegmentMetadata);
-    }
-
-    // Remove columns not in schema from the metadata
-    Map<String, ColumnMetadata> columnMetadataMap = localSegmentMetadata.getColumnMetadataMap();
-    if (schema != null) {
-      Set<String> columnsInMetadata = new HashSet<>(columnMetadataMap.keySet());
-      columnsInMetadata.removeIf(schema::hasColumn);
-      if (!columnsInMetadata.isEmpty()) {
-        LOGGER.info("Skip loading columns only exist in metadata but not in schema: {}", columnsInMetadata);
-        for (String column : columnsInMetadata) {
-          localSegmentMetadata.removeColumn(column);
-        }
-      }
-    }
-
-    // Load the segment using the configured SegmentDirectoryLoader. Default is 'localSegmentDirectoryLoader'.
+    // Load the segment again using the configured SegmentDirectoryLoader. Default is 'localSegmentDirectoryLoader'.
     SegmentDirectoryLoader segmentLoaderDirectory =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
     SegmentDirectory actualSegmentDirectory =
         segmentLoaderDirectory.load(indexDir.toURI(), indexLoadingConfig.getSegmentDirectoryConfig());
     SegmentDirectory.Reader segmentReader = actualSegmentDirectory.createReader();
     SegmentMetadataImpl segmentMetadata = actualSegmentDirectory.getSegmentMetadata();
+
+    // Remove columns not in schema from the metadata
+    Map<String, ColumnMetadata> columnMetadataMap = segmentMetadata.getColumnMetadataMap();
+    if (schema != null) {
+      Set<String> columnsInMetadata = new HashSet<>(columnMetadataMap.keySet());
+      columnsInMetadata.removeIf(schema::hasColumn);
+      if (!columnsInMetadata.isEmpty()) {
+        LOGGER.info("Skip loading columns only exist in metadata but not in schema: {}", columnsInMetadata);
+        for (String column : columnsInMetadata) {
+          segmentMetadata.removeColumn(column);
+        }
+      }
+    }
 
     Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<>();
     for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {

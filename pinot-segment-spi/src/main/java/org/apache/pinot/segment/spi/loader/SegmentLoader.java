@@ -29,7 +29,7 @@ import java.lang.annotation.Target;
  * are auto-registered during startup.
  *
  * NOTE:
- * 1. The annotated class must be under the package of name 'org.apache.pinot.segment.*'
+ * 1. The annotated class must be under the package of name 'org.apache.pinot.segment.*.loader'
  * to be auto-registered.
  */
 @Retention(RetentionPolicy.RUNTIME)

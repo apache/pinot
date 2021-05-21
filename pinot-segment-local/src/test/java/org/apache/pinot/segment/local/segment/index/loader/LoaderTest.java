@@ -30,7 +30,7 @@ import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
-import org.apache.pinot.segment.local.segment.store.LocalSegmentDirectoryLoader;
+import org.apache.pinot.segment.local.loader.LocalSegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
 import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
@@ -89,6 +89,9 @@ public class LoaderTest {
     URL resourceUrl = getClass().getClassLoader().getResource(AVRO_DATA);
     Assert.assertNotNull(resourceUrl);
     _avroFile = new File(resourceUrl.getFile());
+    Map<String, Object> props = new HashMap<>();
+    props.put(LocalSegmentDirectoryLoader.READ_MODE_KEY, ReadMode.heap.toString());
+    _pinotConfiguration = new PinotConfiguration(props);
 
     _v1IndexLoadingConfig = new IndexLoadingConfig();
     _v1IndexLoadingConfig.setReadMode(ReadMode.mmap);
@@ -98,9 +101,6 @@ public class LoaderTest {
     _v3IndexLoadingConfig.setReadMode(ReadMode.mmap);
     _v3IndexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
 
-    Map<String, Object> props = new HashMap<>();
-    props.put(LocalSegmentDirectoryLoader.READ_MODE_KEY, ReadMode.heap.toString());
-    _pinotConfiguration = new PinotConfiguration(props);
     _localSegmentDirectoryLoader = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader();
   }
 

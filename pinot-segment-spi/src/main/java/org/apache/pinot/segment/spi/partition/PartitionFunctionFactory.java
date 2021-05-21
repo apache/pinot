@@ -21,11 +21,6 @@ package org.apache.pinot.segment.spi.partition;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nonnull;
-import org.apache.pinot.segment.spi.partition.ByteArrayPartitionFunction;
-import org.apache.pinot.segment.spi.partition.HashCodePartitionFunction;
-import org.apache.pinot.segment.spi.partition.ModuloPartitionFunction;
-import org.apache.pinot.segment.spi.partition.MurmurPartitionFunction;
-import org.apache.pinot.segment.spi.partition.PartitionFunction;
 
 
 /**

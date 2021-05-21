@@ -20,7 +20,6 @@ package org.apache.pinot.segment.spi.partition;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.utils.StringUtils;
 
 

@@ -16,11 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.segment.store;
+package org.apache.pinot.segment.local.loader;
 
 import java.io.File;
 import java.net.URI;
+import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
+import org.apache.pinot.segment.spi.loader.SegmentLoader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.ReadMode;
@@ -29,6 +31,7 @@ import org.apache.pinot.spi.utils.ReadMode;
 /**
  * Implementation of {@link SegmentDirectoryLoader} for local FS
  */
+@SegmentLoader(name = "localSegmentDirectoryLoader")
 public class LocalSegmentDirectoryLoader implements SegmentDirectoryLoader {
 
   public static final String READ_MODE_KEY = "readMode";

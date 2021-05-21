@@ -45,8 +45,8 @@ public class SegmentDirectoryLoaderRegistry {
 
   static {
     Reflections reflections = new Reflections(
-        new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache.pinot"))
-            .filterInputsBy(new FilterBuilder.Include(".segment\\..*"))
+        new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache.pinot.segment"))
+            .filterInputsBy(new FilterBuilder.Include(".*\\.loader\\..*"))
             .setScanners(new ResourcesScanner(), new TypeAnnotationsScanner(), new SubTypesScanner()));
     Set<Class<?>> classes = reflections.getTypesAnnotatedWith(SegmentLoader.class);
     classes.forEach(loaderClass -> {
