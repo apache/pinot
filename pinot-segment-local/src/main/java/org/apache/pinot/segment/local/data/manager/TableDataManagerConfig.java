@@ -16,10 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.manager.config;
+package org.apache.pinot.segment.local.data.manager;
 
 import com.google.common.base.Preconditions;
-import javax.annotation.Nonnull;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
@@ -41,7 +40,7 @@ public class TableDataManagerConfig {
 
   private final Configuration _tableDataManagerConfig;
 
-  public TableDataManagerConfig(@Nonnull Configuration tableDataManagerConfig) {
+  public TableDataManagerConfig(Configuration tableDataManagerConfig) {
     _tableDataManagerConfig = tableDataManagerConfig;
   }
 
@@ -74,7 +73,7 @@ public class TableDataManagerConfig {
   }
 
   public static TableDataManagerConfig getDefaultHelixTableDataManagerConfig(
-      @Nonnull InstanceDataManagerConfig instanceDataManagerConfig, @Nonnull String tableNameWithType) {
+      InstanceDataManagerConfig instanceDataManagerConfig, String tableNameWithType) {
     Configuration defaultConfig = new PropertiesConfiguration();
     defaultConfig.addProperty(TABLE_DATA_MANAGER_NAME, tableNameWithType);
     defaultConfig.addProperty(TABLE_DATA_MANAGER_DATA_DIRECTORY,
@@ -88,7 +87,7 @@ public class TableDataManagerConfig {
     return new TableDataManagerConfig(defaultConfig);
   }
 
-  public void overrideConfigs(@Nonnull TableConfig tableConfig, String authToken) {
+  public void overrideConfigs(TableConfig tableConfig, String authToken) {
     // Override table level configs
 
     _tableDataManagerConfig.addProperty(TABLE_IS_DIMENSION, tableConfig.isDimTable());

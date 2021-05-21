@@ -16,58 +16,50 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.indexsegment.mutable;
+package org.apache.pinot.segment.local.indexsegment.mutable;
 
 import java.io.File;
 import java.net.URL;
+import java.util.Arrays;
 import java.util.Collections;
-import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.core.upsert.TableUpsertMetadataManager;
-import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
+import java.util.List;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
-import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.mockito.Mockito;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class MutableSegmentImplUpsertTest {
-  private static final String SCHEMA_FILE_PATH = "data/test_upsert_schema.json";
-  private static final String DATA_FILE_PATH = "data/test_upsert_data.json";
+public class MutableSegmentImplNullValueVectorTest {
+  private static final String PINOT_SCHEMA_FILE_PATH = "data/test_null_value_vector_pinot_schema.json";
+  private static final String DATA_FILE = "data/test_null_value_vector_data.json";
   private static CompositeTransformer _recordTransformer;
   private static Schema _schema;
   private static TableConfig _tableConfig;
   private static MutableSegmentImpl _mutableSegmentImpl;
-  private static PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
+  private static List<String> _finalNullColumns;
 
   @BeforeClass
   public void setup()
       throws Exception {
-    URL schemaResourceUrl = this.getClass().getClassLoader().getResource(SCHEMA_FILE_PATH);
-    URL dataResourceUrl = this.getClass().getClassLoader().getResource(DATA_FILE_PATH);
+    URL schemaResourceUrl = this.getClass().getClassLoader().getResource(PINOT_SCHEMA_FILE_PATH);
+    URL dataResourceUrl = this.getClass().getClassLoader().getResource(DATA_FILE);
     _schema = Schema.fromFile(new File(schemaResourceUrl.getFile()));
-    _tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).build();
+    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
     _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
     File jsonFile = new File(dataResourceUrl.getFile());
-    _partitionUpsertMetadataManager =
-        new TableUpsertMetadataManager("testTable_REALTIME", Mockito.mock(ServerMetrics.class))
-            .getOrCreatePartitionManager(0);
     _mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
-            false, true, new UpsertConfig(UpsertConfig.Mode.FULL), "secondsSinceEpoch",
-            _partitionUpsertMetadataManager);
+            false, true);
     GenericRow reuse = new GenericRow();
     try (RecordReader recordReader = RecordReaderFactory
         .getRecordReader(FileFormat.JSON, jsonFile, _schema.getColumnNames(), null)) {
@@ -78,14 +70,30 @@ public class MutableSegmentImplUpsertTest {
         reuse.clear();
       }
     }
+    _finalNullColumns = Arrays.asList("signup_email", "cityid");
   }
 
   @Test
-  public void testUpsertIngestion() {
-    ImmutableRoaringBitmap bitmap = _mutableSegmentImpl.getValidDocIndex().getValidDocBitmap();
-    Assert.assertFalse(bitmap.contains(0));
-    Assert.assertTrue(bitmap.contains(1));
-    Assert.assertTrue(bitmap.contains(2));
-    Assert.assertFalse(bitmap.contains(3));
+  public void testNullValueVector()
+      throws Exception {
+    DataSource cityIdDataSource = _mutableSegmentImpl.getDataSource("cityid");
+    DataSource descriptionDataSource = _mutableSegmentImpl.getDataSource("description");
+    NullValueVectorReader cityIdNullValueVector = cityIdDataSource.getNullValueVector();
+    NullValueVectorReader descNullValueVector = descriptionDataSource.getNullValueVector();
+    Assert.assertFalse(cityIdNullValueVector.isNull(1));
+    Assert.assertTrue(cityIdNullValueVector.isNull(0));
+    Assert.assertFalse(descNullValueVector.isNull(0));
+    Assert.assertFalse(descNullValueVector.isNull(1));
+  }
+
+  @Test
+  public void testGetRecord() {
+    GenericRow reuse = new GenericRow();
+    _mutableSegmentImpl.getRecord(0, reuse);
+    Assert.assertEquals(reuse.getNullValueFields(), _finalNullColumns);
+
+    reuse.clear();
+    _mutableSegmentImpl.getRecord(1, reuse);
+    Assert.assertTrue(reuse.getNullValueFields().isEmpty());
   }
 }

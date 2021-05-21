@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.manager;
+package org.apache.pinot.segment.local.data.manager;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.pinot.segment.spi.IndexSegment;
