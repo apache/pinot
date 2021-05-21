@@ -103,7 +103,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   //
   private static final String MAX_PARALLEL_REFRESH_THREADS = "max.parallel.refresh.threads";
 
+  // Size of cache that holds errors.
+  private static final String ERROR_CACHE_SIZE = "error.cache.size";
+
   private final static String[] REQUIRED_KEYS = {INSTANCE_ID, INSTANCE_DATA_DIR, READ_MODE};
+  private static final long DEFAULT_ERROR_CACHE_SIZE = 100L;
   private PinotConfiguration _instanceDataManagerConfiguration = null;
 
   public HelixInstanceDataManagerConfig(PinotConfiguration serverConfig)
@@ -229,6 +233,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
       tierConfigs.put(READ_MODE, getReadMode());
     }
     return new PinotConfiguration(tierConfigs);
+  }
+
+  @Override
+  public long getErrorCacheSize() {
+    return _instanceDataManagerConfiguration.getProperty(ERROR_CACHE_SIZE, DEFAULT_ERROR_CACHE_SIZE);
   }
 
   @Override

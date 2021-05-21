@@ -88,30 +88,9 @@ public class TablesResource {
   @ApiOperation(value = "List tables", notes = "List all the tables on this server")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = TablesList.class), @ApiResponse(code = 500, message = "Server initialization error", response = ErrorInfo.class)})
   public String listTables() {
-    InstanceDataManager instanceDataManager = checkGetInstanceDataManager();
+    InstanceDataManager instanceDataManager = ServerResourceUtils.checkGetInstanceDataManager(_serverInstance);
     List<String> tables = new ArrayList<>(instanceDataManager.getAllTables());
     return ResourceUtils.convertToJsonString(new TablesList(tables));
-  }
-
-  private InstanceDataManager checkGetInstanceDataManager() {
-    if (_serverInstance == null) {
-      throw new WebApplicationException("Server initialization error. Missing server instance");
-    }
-    InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
-    if (instanceDataManager == null) {
-      throw new WebApplicationException("Server initialization error. Missing data manager",
-          Response.Status.INTERNAL_SERVER_ERROR);
-    }
-    return instanceDataManager;
-  }
-
-  private TableDataManager checkGetTableDataManager(String tableName) {
-    InstanceDataManager dataManager = checkGetInstanceDataManager();
-    TableDataManager tableDataManager = dataManager.getTableDataManager(tableName);
-    if (tableDataManager == null) {
-      throw new WebApplicationException("Table " + tableName + " does not exist", Response.Status.NOT_FOUND);
-    }
-    return tableDataManager;
   }
 
   @GET
@@ -121,7 +100,7 @@ public class TablesResource {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = TableSegments.class), @ApiResponse(code = 500, message = "Server initialization error", response = ErrorInfo.class)})
   public String listTableSegments(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE") @PathParam("tableName") String tableName) {
-    TableDataManager tableDataManager = checkGetTableDataManager(tableName);
+    TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
     try {
       List<String> segments = new ArrayList<>(segmentDataManagers.size());
@@ -145,7 +124,7 @@ public class TablesResource {
       @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE") @PathParam("tableName") String tableName,
       @ApiParam(value = "Segment name", required = true) @PathParam("segmentName") String segmentName,
       @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") @DefaultValue("") List<String> columns) {
-    TableDataManager tableDataManager = checkGetTableDataManager(tableName);
+    TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
     SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
     if (segmentDataManager == null) {
       throw new WebApplicationException(String.format("Table %s segments %s does not exist", tableName, segmentName),
@@ -170,7 +149,7 @@ public class TablesResource {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class), @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)})
   public String getCrcMetadataForTable(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE") @PathParam("tableName") String tableName) {
-    TableDataManager tableDataManager = checkGetTableDataManager(tableName);
+    TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
     try {
       Map<String, String> segmentCrcForTable = new HashMap<>();
@@ -214,7 +193,8 @@ public class TablesResource {
       throw new WebApplicationException("No data access to table: " + tableNameWithType, Response.Status.FORBIDDEN);
     }
 
-    TableDataManager tableDataManager = checkGetTableDataManager(tableNameWithType);
+    TableDataManager tableDataManager =
+        ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
     SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
     if (segmentDataManager == null) {
       throw new WebApplicationException(
@@ -281,7 +261,8 @@ public class TablesResource {
     }
 
     String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(realtimeTableName);
-    TableDataManager tableDataManager = checkGetTableDataManager(tableNameWithType);
+    TableDataManager tableDataManager =
+        ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
     SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
     if (segmentDataManager == null) {
       throw new WebApplicationException(
@@ -329,7 +310,8 @@ public class TablesResource {
     String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(realtimeTableName);
 
     List<SegmentConsumerInfo> segmentConsumerInfoList = new ArrayList<>();
-    TableDataManager tableDataManager = checkGetTableDataManager(tableNameWithType);
+    TableDataManager tableDataManager =
+        ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {

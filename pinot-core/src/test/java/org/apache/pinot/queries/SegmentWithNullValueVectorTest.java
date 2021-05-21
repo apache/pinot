@@ -145,7 +145,7 @@ public class SegmentWithNullValueVectorTest {
     @SuppressWarnings("unchecked")
     TableDataManager tableDataManager = TableDataManagerProvider
         .getTableDataManager(tableDataManagerConfig, "testInstance", Mockito.mock(ZkHelixPropertyStore.class),
-            Mockito.mock(ServerMetrics.class), Mockito.mock(HelixManager.class));
+            Mockito.mock(ServerMetrics.class), Mockito.mock(HelixManager.class), null);
     tableDataManager.start();
     tableDataManager.addSegment(_segment);
     _instanceDataManager = Mockito.mock(InstanceDataManager.class);
