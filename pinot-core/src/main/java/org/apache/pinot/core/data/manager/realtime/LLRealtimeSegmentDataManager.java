@@ -1259,7 +1259,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
             .setAggregateMetrics(indexingConfig.isAggregateMetrics()).setNullHandlingEnabled(_nullHandlingEnabled)
             .setConsumerDir(consumerDir).setUpsertMode(tableConfig.getUpsertMode())
-            .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager);
+            .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
+            .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
+            .setGlobalUpsertStrategy(tableConfig.getUpsertConfig().getGlobalUpsertStrategy())
+            .setPartialUpsertStrategy(tableConfig.getUpsertConfig().getPartialUpsertStrategy())
+            .setCustomUpsertStrategy(tableConfig.getUpsertConfig().getCustomUpsertStrategy());
+    ;
 
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig.getIngestionConfig(), _schema);

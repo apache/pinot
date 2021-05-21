@@ -58,6 +58,7 @@ import org.apache.pinot.segment.local.segment.index.readers.ValidDocIndexReaderI
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
+import org.apache.pinot.segment.local.upsert.PartialUpsertHandler;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.utils.FixedIntArrayOffHeapIdMap;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
@@ -163,6 +164,8 @@ public class MutableSegmentImpl implements MutableSegment {
   //        the valid doc ids won't be updated.
   private final ThreadSafeMutableRoaringBitmap _validDocIds;
   private final ValidDocIndexReader _validDocIndex;
+
+  private final PartialUpsertHandler _partialUpsertHandler = new PartialUpsertHandler();
 
   public MutableSegmentImpl(RealtimeSegmentConfig config, @Nullable ServerMetrics serverMetrics) {
     _serverMetrics = serverMetrics;
@@ -380,6 +383,13 @@ public class MutableSegmentImpl implements MutableSegment {
       _partitionUpsertMetadataManager = null;
       _validDocIds = null;
       _validDocIndex = null;
+
+      if (isPartialUpsertEnabled()) {
+        // init partial upsert handler with partial upsert config
+        _partialUpsertHandler
+            .init(config.getSchema(), config.getGlobalUpsertStrategy(), config.getPartialUpsertStrategy(),
+                config.getCustomUpsertStrategy());
+      }
     }
   }
 
@@ -479,14 +489,19 @@ public class MutableSegmentImpl implements MutableSegment {
 
     boolean canTakeMore;
     if (docId == _numDocsIndexed) {
+
+      if (isUpsertEnabled()) {
+        PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
+        Object timeValue = row.getValue(_timeColumnName);
+        Preconditions.checkArgument(timeValue instanceof Comparable, "time column shall be comparable");
+        long timestamp = IngestionUtils.extractTimeValue((Comparable) timeValue);
+        _partitionUpsertMetadataManager.handleUpsert(row, docId, primaryKey, timestamp, this);
+      }
+
       // New row
       addNewRow(row);
       // Update number of documents indexed at last to make the latest row queryable
       canTakeMore = _numDocsIndexed++ < _capacity;
-
-      if (isUpsertEnabled()) {
-        handleUpsert(row, docId);
-      }
     } else {
       Preconditions.checkArgument(!isUpsertEnabled(), "metrics aggregation cannot be used with upsert");
       assert _aggregateMetrics;
@@ -505,6 +520,10 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private boolean isUpsertEnabled() {
     return _upsertMode != UpsertConfig.Mode.NONE;
+  }
+
+  public boolean isPartialUpsertEnabled() {
+    return _upsertMode == UpsertConfig.Mode.PARTIAL;
   }
 
   private void handleUpsert(GenericRow row, int docId) {
@@ -717,6 +736,14 @@ public class MutableSegmentImpl implements MutableSegment {
   public Set<String> getColumnNames() {
     // Return all column names, virtual and physical.
     return Sets.union(_schema.getColumnNames(), _newlyAddedColumnsFieldMap.keySet());
+  }
+
+  public PartialUpsertHandler getPartialUpsertHandler() {
+    return _partialUpsertHandler;
+  }
+
+  public ThreadSafeMutableRoaringBitmap getValidDocIds() {
+    return _validDocIds;
   }
 
   @Override

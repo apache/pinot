@@ -21,6 +21,8 @@ package org.apache.pinot.spi.config.table;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
@@ -30,16 +32,56 @@ public class UpsertConfig extends BaseJsonConfig {
     FULL, PARTIAL, NONE
   }
 
-  private final Mode _mode;
+  public enum STRATEGY {
+    OVERWRITE, IGNORE, INCREMENT
+  }
 
-  @JsonCreator
+  private final Mode _mode;
+  private final STRATEGY _globalUpsertStrategy;
+  private final Map<String, STRATEGY> _partialUpsertStrategy;
+  private final Map<String, String> _customUpsertStrategy;
+
   public UpsertConfig(@JsonProperty(value = "mode", required = true) Mode mode) {
     Preconditions.checkArgument(mode != null, "Upsert mode must be configured");
     Preconditions.checkArgument(mode != Mode.PARTIAL, "Partial upsert mode is not supported");
     _mode = mode;
+    _globalUpsertStrategy = null;
+    _partialUpsertStrategy = null;
+    _customUpsertStrategy = null;
+  }
+
+  @JsonCreator
+  public UpsertConfig(@JsonProperty(value = "mode", required = true) Mode mode,
+      @JsonProperty(value = "globalUpsertStategy") STRATEGY globalUpsertStrategy,
+      @JsonProperty(value = "partialUpsertStrategy") Map<String, STRATEGY> partialUpsertStrategy,
+      @JsonProperty(value = "customUpsertStrategy") Map<String, String> customUpsertStrategy) {
+    Preconditions.checkArgument(mode != null, "Upsert mode must be configured");
+    _mode = mode;
+
+    if (mode == Mode.PARTIAL) {
+      _globalUpsertStrategy = globalUpsertStrategy != null ? globalUpsertStrategy : STRATEGY.OVERWRITE;
+      _partialUpsertStrategy = partialUpsertStrategy != null ? partialUpsertStrategy : new HashMap<>();
+      _customUpsertStrategy = customUpsertStrategy != null ? customUpsertStrategy : new HashMap<>();
+    } else {
+      _globalUpsertStrategy = STRATEGY.OVERWRITE;
+      _partialUpsertStrategy = new HashMap<>();
+      _customUpsertStrategy = new HashMap<>();
+    }
   }
 
   public Mode getMode() {
     return _mode;
+  }
+
+  public STRATEGY getGlobalUpsertStrategy() {
+    return _globalUpsertStrategy;
+  }
+
+  public Map<String, STRATEGY> getPartialUpsertStrategy() {
+    return _partialUpsertStrategy;
+  }
+
+  public Map<String, String> getCustomUpsertStrategy() {
+    return _customUpsertStrategy;
   }
 }

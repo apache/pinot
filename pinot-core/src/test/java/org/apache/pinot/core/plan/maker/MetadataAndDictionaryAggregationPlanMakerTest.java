@@ -34,6 +34,7 @@ import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.plan.SelectionPlanNode;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.realtime.impl.ThreadSafeMutableRoaringBitmap;
@@ -123,9 +124,9 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     _indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
     ServerMetrics serverMetrics = Mockito.mock(ServerMetrics.class);
     _upsertIndexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
-    ((ImmutableSegmentImpl) _upsertIndexSegment)
-        .enableUpsert(new PartitionUpsertMetadataManager("testTable_REALTIME", 0, serverMetrics),
-            new ThreadSafeMutableRoaringBitmap());
+    ((ImmutableSegmentImpl) _upsertIndexSegment).enableUpsert(
+        new PartitionUpsertMetadataManager("testTable_REALTIME", 0, serverMetrics,
+            Mockito.mock(TableDataManager.class)), new ThreadSafeMutableRoaringBitmap());
   }
 
   @AfterClass

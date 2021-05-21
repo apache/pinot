@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.utils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -66,6 +67,11 @@ import org.apache.pinot.spi.utils.TimeUtils;
 import org.quartz.CronScheduleBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.spi.data.FieldSpec.DataType.DOUBLE;
+import static org.apache.pinot.spi.data.FieldSpec.DataType.FLOAT;
+import static org.apache.pinot.spi.data.FieldSpec.DataType.INT;
+import static org.apache.pinot.spi.data.FieldSpec.DataType.LONG;
 
 
 /**
@@ -348,6 +354,26 @@ public final class TableConfigUtils {
     Preconditions.checkState(
         CollectionUtils.isEmpty(tableConfig.getIndexingConfig().getStarTreeIndexConfigs()) && !tableConfig
             .getIndexingConfig().isEnableDefaultStarTree(), "The upsert table cannot have star-tree index.");
+
+    Preconditions.checkState(validatePartialUpsertStrategies(schema, tableConfig.getUpsertConfig()),
+        "The partial upsert strategies is not correct");
+  }
+
+  private static boolean validatePartialUpsertStrategies(Schema schema, UpsertConfig upsertConfig) {
+    Map<String, UpsertConfig.STRATEGY> partialUpsertStrategies = upsertConfig.getPartialUpsertStrategy();
+
+    for (Map.Entry<String, UpsertConfig.STRATEGY> entry : partialUpsertStrategies.entrySet()) {
+
+      Set<FieldSpec.DataType> numericsDataType =
+          new HashSet<FieldSpec.DataType>(Arrays.asList(INT, LONG, FLOAT, DOUBLE));
+
+      if (entry.getValue() == UpsertConfig.STRATEGY.INCREMENT) {
+        if (!numericsDataType.contains(schema.getFieldSpecFor(entry.getKey()).getDataType())) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   /**

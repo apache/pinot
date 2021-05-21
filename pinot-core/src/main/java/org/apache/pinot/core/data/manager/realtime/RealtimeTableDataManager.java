@@ -160,7 +160,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     if (isUpsertEnabled()) {
       Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
-      _tableUpsertMetadataManager = new TableUpsertMetadataManager(_tableNameWithType, _serverMetrics);
+      _tableUpsertMetadataManager = new TableUpsertMetadataManager(_tableNameWithType, _serverMetrics, this);
       _primaryKeyColumns = schema.getPrimaryKeyColumns();
       Preconditions.checkState(!CollectionUtils.isEmpty(_primaryKeyColumns),
           "Primary key columns must be configured for upsert");
@@ -300,11 +300,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       // The segment is uploaded to an upsert enabled realtime table. Download the segment and load.
       Preconditions.checkArgument(realtimeSegmentZKMetadata instanceof LLCRealtimeSegmentZKMetadata,
           "Upload segment is not LLC segment");
-      String downURL = ((LLCRealtimeSegmentZKMetadata)realtimeSegmentZKMetadata).getDownloadUrl();
+      String downURL = ((LLCRealtimeSegmentZKMetadata) realtimeSegmentZKMetadata).getDownloadUrl();
       Preconditions.checkNotNull(downURL, "Upload segment metadata has no download url");
       downloadSegmentFromDeepStore(segmentName, indexLoadingConfig, downURL);
-      _logger.info("Downloaded, untarred and add segment {} of table {} from {}", segmentName, tableConfig.getTableName(),
-          downURL);
+      _logger
+          .info("Downloaded, untarred and add segment {} of table {} from {}", segmentName, tableConfig.getTableName(),
+              downURL);
       return;
     }
 
