@@ -19,11 +19,6 @@
 package org.apache.pinot.segment.spi.partition;
 
 import java.util.Random;
-import org.apache.pinot.segment.spi.partition.ByteArrayPartitionFunction;
-import org.apache.pinot.segment.spi.partition.ModuloPartitionFunction;
-import org.apache.pinot.segment.spi.partition.MurmurPartitionFunction;
-import org.apache.pinot.segment.spi.partition.PartitionFunction;
-import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.utils.StringUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
