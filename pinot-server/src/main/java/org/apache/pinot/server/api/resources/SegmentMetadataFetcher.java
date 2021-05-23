@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
@@ -76,13 +77,14 @@ public class SegmentMetadataFetcher {
     }
     ObjectNode segmentMetadataJson = (ObjectNode) segmentMetadata.toJson(columnSet);
     segmentMetadataJson.set(COLUMN_INDEX_KEY, JsonUtils.objectToJsonNode(getIndexesForSegmentColumns(segmentDataManager)));
-    segmentMetadataJson.set(STAR_TREE_INDEX_KEY, JsonUtils.objectToJsonNode((getStartreeIndexForSegmentColumns(segmentDataManager))));
+    segmentMetadataJson.set(STAR_TREE_INDEX_KEY, JsonUtils.objectToJsonNode((getStarTreeIndexesForSegment(segmentDataManager))));
     return JsonUtils.objectToString(segmentMetadataJson);
   }
 
   /**
    * Get the JSON object with the segment column's indexing metadata.
    */
+  @Nullable
   private static Map<String, Map<String, String>> getIndexesForSegmentColumns(SegmentDataManager segmentDataManager) {
     IndexSegment segment = segmentDataManager.getSegment();
     if (segment instanceof ImmutableSegmentImpl) {
@@ -152,15 +154,15 @@ public class SegmentMetadataFetcher {
    * Get the JSON object containing star tree index details for a segment.
    */
   @Nullable
-  private static List<Map<String, Object>> getStarTreeIndexes(SegmentDataManager segmentDataManager) {
+  private static List<Map<String, Object>> getStarTreeIndexesForSegment(SegmentDataManager segmentDataManager) {
     List<StarTreeV2> starTrees = segmentDataManager.getSegment().getStarTrees();
-    return starTrees != null ? getImmutableSegmentStartreeIndexes(starTrees) : null;
+    return starTrees != null ? getStartreeIndexes(starTrees) : null;
   }
 
   /**
    * Helper to loop over star trees of a segment to create a map containing star tree details.
    */
-  private static List<Map<String, Object>> getImmutableSegmentStartreeIndexes(List<StarTreeV2> starTrees){
+  private static List<Map<String, Object>> getStartreeIndexes(List<StarTreeV2> starTrees){
     List<Map<String, Object>> startreeDetails = new ArrayList<>();
     for (StarTreeV2 starTree : starTrees) {
       StarTreeV2Metadata starTreeMetadata = starTree.getMetadata();
