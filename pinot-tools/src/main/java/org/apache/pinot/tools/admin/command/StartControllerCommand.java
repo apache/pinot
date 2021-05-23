@@ -33,6 +33,8 @@ import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.tools.utils.PinotConfigUtils.TMP_DIR;
+
 
 /**
  * Class to implement StartController command.
@@ -40,6 +42,10 @@ import org.slf4j.LoggerFactory;
  */
 public class StartControllerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartControllerCommand.class);
+
+  @Option(name = "-controllerMode", required = false, metaVar = "<String>", usage = "Pinot controller mode.")
+  private ControllerConf.ControllerMode _controllerMode = ControllerConf.ControllerMode.DUAL;
+
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
@@ -50,16 +56,13 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
   @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Path to directory containging data.")
-  private String _dataDir = CURRENT_USER_DIR + "data/PinotController";
+  private String _dataDir = TMP_DIR + "data/PinotController";
 
   @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "Http address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
 
   @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = DEFAULT_CLUSTER_NAME;
-
-  @Option(name = "-controllerMode", required = false, metaVar = "<String>", usage = "Pinot controller mode.")
-  private ControllerConf.ControllerMode _controllerMode = ControllerConf.ControllerMode.DUAL;
 
   @Option(name = "-configFileName", required = false, aliases = {"-config", "-configFile", "-controllerConfig", "-controllerConf"}, metaVar = "<FilePathName>", usage = "Controller Starter config file", forbids = {"-controllerHost", "-controllerPort", "-dataDir", "-zkAddress", "-clusterName", "-controllerMode"})
   private String _configFileName;

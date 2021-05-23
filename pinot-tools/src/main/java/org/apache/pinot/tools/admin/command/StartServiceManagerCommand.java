@@ -208,7 +208,7 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
       case BROKER:
         return PinotConfigUtils.generateBrokerConf(_clusterName, _zkAddress, null, CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT);
       case SERVER:
-        return PinotConfigUtils.generateServerConf(_clusterName, _zkAddress,null, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT,
+        return PinotConfigUtils.generateServerConf(_clusterName, _zkAddress, null, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT,
             CommonConstants.Server.DEFAULT_ADMIN_API_PORT, null, null);
       default:
         throw new RuntimeException("No default config found for service role: " + serviceRole);

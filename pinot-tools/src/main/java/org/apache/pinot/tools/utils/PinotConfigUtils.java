@@ -40,6 +40,7 @@ import org.slf4j.LoggerFactory;
 
 
 public class PinotConfigUtils {
+
   public static final String TMP_DIR = System.getProperty("java.io.tmpdir") + File.separator;
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotConfigUtils.class);
   private static final String CONTROLLER_CONFIG_VALIDATION_ERROR_MESSAGE_FORMAT =
@@ -54,6 +55,7 @@ public class PinotConfigUtils {
     if (StringUtils.isEmpty(clusterName)) {
       throw new RuntimeException("clusterName cannot be empty.");
     }
+
     Map<String, Object> properties = new HashMap<>();
     properties.put(ControllerConf.ZK_STR, zkAddress);
     properties.put(ControllerConf.HELIX_CLUSTER_NAME, clusterName);

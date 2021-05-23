@@ -43,7 +43,7 @@ java -version
 
 # Build
 PASS=0
-for i in $(seq 1 5)
+for i in $(seq 1 2)
 do
   mvn clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true
   if [ $? -eq 0 ]; then
@@ -71,12 +71,15 @@ PINOT_PID=$!
 # Print the JVM settings
 jps -lvm
 
-sleep 30
+# Wait for at most 6 minutes for all services up.
+sleep 60
 for i in $(seq 1 150)
 do
   if [[ `curl localhost:9000/health` = "OK" ]]; then
-    if [[ `curl localhost:8097/health` = "OK" ]]; then
-      break
+    if [[ `curl localhost:8099/health` = "OK" ]]; then
+      if [[ `curl localhost:8097/health` = "OK" ]]; then
+        break
+      fi
     fi
   fi
   sleep 2
@@ -84,17 +87,24 @@ done
 
 # Add Table
 bin/pinot-admin.sh AddTable -tableConfigFile examples/batch/baseballStats/baseballStats_offline_table_config.json -schemaFile examples/batch/baseballStats/baseballStats_schema.json -exec
+if [ $? -ne 0 ]; then
+  echo 'Failed to create table baseballStats.'
+  exit 1
+fi
 
 # Ingest Data
 bin/pinot-admin.sh LaunchDataIngestionJob -jobSpecFile examples/batch/baseballStats/ingestionJobSpec.yaml
-
+if [ $? -ne 0 ]; then
+  echo 'Failed to ingest data for table baseballStats.'
+  exit 1
+fi
 PASS=0
 
-# Wait for 1 minute for table to be set up, then at most 5 minutes to reach the desired state
-sleep 30
+# Wait for 10 Seconds for table to be set up, then query the total count.
+sleep 10
 for i in $(seq 1 150)
 do
-  QUERY_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from baseballStats limit 1","trace":false}' http://localhost:8000/query/sql`
+  QUERY_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from baseballStats limit 1","trace":false}' http://localhost:8099/query/sql`
   if [ $? -eq 0 ]; then
     COUNT_STAR_RES=`echo "${QUERY_RES}" | jq '.resultTable.rows[0][0]'`
     if [[ "${COUNT_STAR_RES}" =~ ^[0-9]+$ ]] && [ "${COUNT_STAR_RES}" -eq 97889 ]; then
@@ -105,10 +115,10 @@ do
   sleep 2
 done
 
-cleanup "${ZK_PID}"
 cleanup "${PINOT_PID}"
+cleanup "${ZK_PID}"
 if [ "${PASS}" -eq 0 ]; then
-  echo 'Batch Quickstart with Minion failed: Cannot get correct result for count star query.'
+  echo 'Standalone test failed: Cannot get correct result for count star query.'
   exit 1
 fi
 
