@@ -180,7 +180,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       }
     } else {
       // Raw index
-      _forwardIndex = loadRawForwardIndex(fwdIndexBuffer, metadata.getDataType().getStoredType());
+      _forwardIndex = loadRawForwardIndex(fwdIndexBuffer, metadata.getDataType());
       _dictionary = null;
       _rangeIndex = null;
       _invertedIndex = null;
@@ -281,17 +281,18 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   }
 
   private static ForwardIndexReader<?> loadRawForwardIndex(PinotDataBuffer forwardIndexBuffer, DataType dataType) {
-    switch (dataType.getStoredType()) {
+    DataType storedType = dataType.getStoredType();
+    switch (storedType) {
       case INT:
       case LONG:
       case FLOAT:
       case DOUBLE:
-        return new FixedByteChunkSVForwardIndexReader(forwardIndexBuffer, dataType);
+        return new FixedByteChunkSVForwardIndexReader(forwardIndexBuffer, storedType);
       case STRING:
       case BYTES:
-        return new VarByteChunkSVForwardIndexReader(forwardIndexBuffer, dataType);
+        return new VarByteChunkSVForwardIndexReader(forwardIndexBuffer, storedType);
       default:
-        throw new IllegalStateException("Illegal data type for raw forward index: " + dataType);
+        throw new IllegalStateException("Illegal data type for raw forward index: " + storedType);
     }
   }
 
