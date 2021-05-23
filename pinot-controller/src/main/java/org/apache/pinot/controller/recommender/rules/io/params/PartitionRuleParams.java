@@ -33,9 +33,6 @@ public class PartitionRuleParams {
   // Below this QPS we do not need any partitioning
   public Long THRESHOLD_MIN_QPS_PARTITION = DEFAULT_THRESHOLD_MIN_QPS_PARTITION;
 
-  // The optimal size for an offline segment
-  public Long OPTIMAL_SIZE_PER_SEGMENT = DEFAULT_OPTIMAL_SIZE_PER_SEGMENT;
-
   // In the over all recommendation for partitioning, iff the frequency of top N-th candidate is larger than
   // THRESHOLD_RATIO_MIN_DIMENSION_PARTITION_TOP_CANDIDATES * frequency_of_top_one_candidate,
   // we will pick from [1st, nth] candidates with the largest cardinality as partitioning column
@@ -75,15 +72,6 @@ public class PartitionRuleParams {
   @JsonSetter(value = "THRESHOLD_MIN_QPS_PARTITION", nulls = Nulls.SKIP)
   public void setTHRESHOLD_MIN_QPS_PARTITION(long THRESHOLD_MIN_QPS_PARTITION) {
     this.THRESHOLD_MIN_QPS_PARTITION = THRESHOLD_MIN_QPS_PARTITION;
-  }
-
-  public Long getOPTIMAL_SIZE_PER_SEGMENT() {
-    return OPTIMAL_SIZE_PER_SEGMENT;
-  }
-
-  @JsonSetter(value = "OPTIMAL_SIZE_PER_SEGMENT", nulls = Nulls.SKIP)
-  public void setOPTIMAL_SIZE_PER_SEGMENT(long OPTIMAL_SIZE_PER_SEGMENT) {
-    this.OPTIMAL_SIZE_PER_SEGMENT = OPTIMAL_SIZE_PER_SEGMENT;
   }
 
   public Double getTHRESHOLD_RATIO_MIN_DIMENSION_PARTITION_TOP_CANDIDATES() {

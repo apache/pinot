@@ -47,36 +47,29 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
     columnStatsCollectorMap = new HashMap<>();
 
     Schema dataSchema = _statsCollectorConfig.getSchema();
-    for (final FieldSpec spec : dataSchema.getAllFieldSpecs()) {
-      String column = spec.getName();
-      switch (spec.getDataType()) {
-        case BOOLEAN:
-        case STRING:
-          columnStatsCollectorMap
-              .put(spec.getName(), new StringColumnPreIndexStatsCollector(column, _statsCollectorConfig));
-          break;
+    for (FieldSpec fieldSpec : dataSchema.getAllFieldSpecs()) {
+      String column = fieldSpec.getName();
+      switch (fieldSpec.getDataType().getStoredType()) {
         case INT:
-          columnStatsCollectorMap
-              .put(spec.getName(), new IntColumnPreIndexStatsCollector(column, _statsCollectorConfig));
+          columnStatsCollectorMap.put(column, new IntColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           break;
         case LONG:
-          columnStatsCollectorMap
-              .put(spec.getName(), new LongColumnPreIndexStatsCollector(column, _statsCollectorConfig));
+          columnStatsCollectorMap.put(column, new LongColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           break;
         case FLOAT:
-          columnStatsCollectorMap
-              .put(spec.getName(), new FloatColumnPreIndexStatsCollector(column, _statsCollectorConfig));
+          columnStatsCollectorMap.put(column, new FloatColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           break;
         case DOUBLE:
-          columnStatsCollectorMap
-              .put(spec.getName(), new DoubleColumnPreIndexStatsCollector(column, _statsCollectorConfig));
+          columnStatsCollectorMap.put(column, new DoubleColumnPreIndexStatsCollector(column, _statsCollectorConfig));
+          break;
+        case STRING:
+          columnStatsCollectorMap.put(column, new StringColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           break;
         case BYTES:
-          columnStatsCollectorMap
-              .put(spec.getName(), new BytesColumnPredIndexStatsCollector(column, _statsCollectorConfig));
+          columnStatsCollectorMap.put(column, new BytesColumnPredIndexStatsCollector(column, _statsCollectorConfig));
           break;
         default:
-          break;
+          throw new IllegalStateException("Unsupported data type: " + fieldSpec.getDataType());
       }
     }
   }

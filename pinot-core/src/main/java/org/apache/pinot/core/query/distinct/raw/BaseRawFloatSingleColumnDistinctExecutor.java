@@ -29,6 +29,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctTable;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
@@ -36,12 +37,14 @@ import org.apache.pinot.core.query.distinct.DistinctTable;
  */
 abstract class BaseRawFloatSingleColumnDistinctExecutor implements DistinctExecutor {
   final ExpressionContext _expression;
+  final DataType _dataType;
   final int _limit;
 
   final FloatSet _valueSet;
 
-  BaseRawFloatSingleColumnDistinctExecutor(ExpressionContext expression, int limit) {
+  BaseRawFloatSingleColumnDistinctExecutor(ExpressionContext expression, DataType dataType, int limit) {
     _expression = expression;
+    _dataType = dataType;
     _limit = limit;
 
     _valueSet = new FloatOpenHashSet(Math.min(limit, MAX_INITIAL_CAPACITY));
@@ -49,8 +52,8 @@ abstract class BaseRawFloatSingleColumnDistinctExecutor implements DistinctExecu
 
   @Override
   public DistinctTable getResult() {
-    DataSchema dataSchema =
-        new DataSchema(new String[]{_expression.toString()}, new ColumnDataType[]{ColumnDataType.FLOAT});
+    DataSchema dataSchema = new DataSchema(new String[]{_expression.toString()},
+        new ColumnDataType[]{ColumnDataType.fromDataTypeSV(_dataType)});
     List<Record> records = new ArrayList<>(_valueSet.size());
     FloatIterator valueIterator = _valueSet.iterator();
     while (valueIterator.hasNext()) {

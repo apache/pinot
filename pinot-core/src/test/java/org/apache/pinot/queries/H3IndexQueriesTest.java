@@ -72,7 +72,7 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
       .setFieldConfigList(Collections.singletonList(
           new FieldConfig(H3_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.H3,
-              H3_INDEX_PROPERTIES))).build();
+              null, H3_INDEX_PROPERTIES))).build();
 
   private IndexSegment _indexSegment;
 

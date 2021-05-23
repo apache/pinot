@@ -34,8 +34,7 @@ public class ResultTable {
   private final List<Object[]> _rows;
 
   @JsonCreator
-  public ResultTable(@JsonProperty("dataSchema") DataSchema dataSchema,
-      @JsonProperty("rows") List<Object[]> rows) {
+  public ResultTable(@JsonProperty("dataSchema") DataSchema dataSchema, @JsonProperty("rows") List<Object[]> rows) {
     _dataSchema = dataSchema;
     _rows = rows;
   }

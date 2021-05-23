@@ -130,7 +130,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
           }
         }
       } else {
-        switch (resultMetadata.getDataType()) {
+        switch (resultMetadata.getDataType().getStoredType()) {
           case INT:
             int[] intValues = _transformFunction.transformToIntValuesSV(projectionBlock);
             for (int i = 0; i < _numDocIdsFilled; i++) {
@@ -195,7 +195,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
           }
         }
       } else {
-        switch (resultMetadata.getDataType()) {
+        switch (resultMetadata.getDataType().getStoredType()) {
           case INT:
             int[][] intValuesArray = _transformFunction.transformToIntValuesMV(projectionBlock);
             for (int i = 0; i < _numDocIdsFilled; i++) {

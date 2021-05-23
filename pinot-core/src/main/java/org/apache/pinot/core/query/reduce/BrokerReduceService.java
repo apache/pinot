@@ -28,11 +28,11 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
@@ -91,8 +91,8 @@ public class BrokerReduceService {
     if (resultTable == null) {
       return;
     }
-    Map<ExpressionContext, String> aliasMap = queryContext.getAliasMap();
-    if (aliasMap.isEmpty()) {
+    List<String> aliasList = queryContext.getAliasList();
+    if (aliasList.isEmpty()) {
       return;
     }
 
@@ -104,7 +104,7 @@ public class BrokerReduceService {
       return;
     }
     for (int i = 0; i < numSelectExpressions; i++) {
-      String alias = aliasMap.get(selectExpressions.get(i));
+      String alias = aliasList.get(i);
       if (alias != null) {
         columnNames[i] = alias;
       }
@@ -133,6 +133,12 @@ public class BrokerReduceService {
     long realtimeThreadCpuTimeNs = 0L;
     boolean numGroupsLimitReached = false;
 
+    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
+    Map<String, String> queryOptions =
+        pinotQuery != null ? pinotQuery.getQueryOptions() : brokerRequest.getQueryOptions();
+    boolean enableTrace =
+        queryOptions != null && Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE));
+
     // Cache a data schema from data tables (try to cache one with data rows associated with it).
     DataSchema cachedDataSchema = null;
 
@@ -144,7 +150,7 @@ public class BrokerReduceService {
       Map<String, String> metadata = dataTable.getMetadata();
 
       // Reduce on trace info.
-      if (brokerRequest.isEnableTrace()) {
+      if (enableTrace) {
         brokerResponseNative.getTraceInfo()
             .put(entry.getKey().getHostname(), metadata.get(MetadataKey.TRACE_INFO.getName()));
       }
@@ -250,9 +256,9 @@ public class BrokerReduceService {
           .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER, numEntriesScannedInFilter);
       brokerMetrics
           .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER, numEntriesScannedPostFilter);
-      brokerMetrics.addValueToTableGauge(rawTableName, BrokerGauge.OFFLINE_THREAD_CPU_TIME_NS, offlineThreadCpuTimeNs);
+      brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.OFFLINE_THREAD_CPU_TIME_NS, offlineThreadCpuTimeNs, TimeUnit.NANOSECONDS);
       brokerMetrics
-          .addValueToTableGauge(rawTableName, BrokerGauge.REALTIME_THREAD_CPU_TIME_NS, realtimeThreadCpuTimeNs);
+          .addTimedTableValue(rawTableName, BrokerTimer.REALTIME_THREAD_CPU_TIME_NS, realtimeThreadCpuTimeNs, TimeUnit.NANOSECONDS);
       if (numConsumingSegmentsProcessed > 0 && minConsumingFreshnessTimeMs > 0) {
         brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.FRESHNESS_LAG_MS,
             System.currentTimeMillis() - minConsumingFreshnessTimeMs, TimeUnit.MILLISECONDS);

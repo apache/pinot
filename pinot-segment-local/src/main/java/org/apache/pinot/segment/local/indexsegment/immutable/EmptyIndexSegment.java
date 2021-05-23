@@ -95,8 +95,7 @@ public class EmptyIndexSegment implements ImmutableSegment {
 
   @Override
   public GenericRow getRecord(int docId, GenericRow reuse) {
-    // NOTE: Use PinotSegmentRecordReader to read immutable segment
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException("Cannot read record from empty segment");
   }
 
   @Override

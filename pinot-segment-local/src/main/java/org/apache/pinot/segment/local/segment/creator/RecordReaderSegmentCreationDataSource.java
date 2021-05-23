@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.creator;
 
 import java.util.Collection;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.SegmentPreIndexStatsCollectorImpl;
@@ -52,6 +53,8 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
     try {
       RecordTransformer recordTransformer = CompositeTransformer
           .getDefaultTransformer(statsCollectorConfig.getTableConfig(), statsCollectorConfig.getSchema());
+      ComplexTypeTransformer complexTypeTransformer =
+          ComplexTypeTransformer.getComplexTypeTransformer(statsCollectorConfig.getTableConfig());
 
       SegmentPreIndexStatsCollector collector = new SegmentPreIndexStatsCollectorImpl(statsCollectorConfig);
       collector.init();
@@ -62,6 +65,10 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
         reuse.clear();
 
         reuse = _recordReader.next(reuse);
+        if (complexTypeTransformer != null) {
+          // TODO: consolidate complex type transformer into composite type transformer
+          reuse = complexTypeTransformer.transform(reuse);
+        }
         if (reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
           for (Object singleRow : (Collection) reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
             GenericRow transformedRow = recordTransformer.transform((GenericRow) singleRow);

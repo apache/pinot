@@ -35,4 +35,11 @@ public abstract class AbstractRule {
     _input = input;
     _output = output;
   }
+
+  /**
+   * Some rules have to be run even if user has disabled them. The reason is the output of these rules are used in other
+   * rules. This method is used to hide the output from the final result that's going to be presented to the user.
+   */
+  public void hideOutput() {
+  }
 }

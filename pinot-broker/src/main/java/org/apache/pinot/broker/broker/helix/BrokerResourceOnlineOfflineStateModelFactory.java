@@ -79,7 +79,7 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
       try {
         _routingManager.buildRouting(tableNameWithType);
         TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-        _queryQuotaManager.initTableQueryQuota(tableConfig,
+        _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig,
             _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().externalView(BROKER_RESOURCE_INSTANCE)));
       } catch (Exception e) {
         LOGGER.error("Caught exception while processing transition from OFFLINE to ONLINE for table: {}",

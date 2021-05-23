@@ -20,10 +20,8 @@ package org.apache.pinot.core.query.request.context.utils;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -63,8 +61,8 @@ public class BrokerRequestToQueryContextConverter {
 
     // SELECT
     List<ExpressionContext> selectExpressions;
-    Map<ExpressionContext, String> aliasMap = new HashMap<>();
     List<Expression> selectList = pinotQuery.getSelectList();
+    List<String> aliasList = new ArrayList<>(selectList.size());
     selectExpressions = new ArrayList<>(selectList.size());
     for (Expression thriftExpression : selectList) {
       ExpressionContext expression;
@@ -73,9 +71,11 @@ public class BrokerRequestToQueryContextConverter {
         // Handle alias
         List<Expression> operands = thriftExpression.getFunctionCall().getOperands();
         expression = RequestContextUtils.getExpression(operands.get(0));
-        aliasMap.put(expression, operands.get(1).getIdentifier().getName());
+        aliasList.add(operands.get(1).getIdentifier().getName());
       } else {
         expression = RequestContextUtils.getExpression(thriftExpression);
+        // Add null as a place holder for alias.
+        aliasList.add(null);
       }
       selectExpressions.add(expression);
     }
@@ -123,7 +123,7 @@ public class BrokerRequestToQueryContextConverter {
     }
 
     return new QueryContext.Builder().setTableName(pinotQuery.getDataSource().getTableName())
-        .setSelectExpressions(selectExpressions).setAliasMap(aliasMap).setFilter(filter)
+        .setSelectExpressions(selectExpressions).setAliasList(aliasList).setFilter(filter)
         .setGroupByExpressions(groupByExpressions).setOrderByExpressions(orderByExpressions)
         .setHavingFilter(havingFilter).setLimit(pinotQuery.getLimit()).setOffset(pinotQuery.getOffset())
         .setQueryOptions(pinotQuery.getQueryOptions()).setDebugOptions(pinotQuery.getDebugOptions())
@@ -212,7 +212,7 @@ public class BrokerRequestToQueryContextConverter {
     }
 
     return new QueryContext.Builder().setTableName(brokerRequest.getQuerySource().getTableName())
-        .setSelectExpressions(selectExpressions).setAliasMap(Collections.emptyMap()).setFilter(filter)
+        .setSelectExpressions(selectExpressions).setAliasList(Collections.emptyList()).setFilter(filter)
         .setGroupByExpressions(groupByExpressions).setOrderByExpressions(orderByExpressions).setLimit(limit)
         .setOffset(offset).setQueryOptions(brokerRequest.getQueryOptions())
         .setDebugOptions(brokerRequest.getDebugOptions()).setBrokerRequest(brokerRequest).build();

@@ -37,9 +37,10 @@ public class KafkaDataServerStartable implements StreamDataServerStartable {
   private static final String ZOOKEEPER_CONNECT = "zookeeper.connect";
   private static final String LOG_DIRS = "log.dirs";
 
-  private KafkaServerStartable serverStartable;
-  private String zkStr;
-  private String logDirPath;
+  private KafkaServerStartable _serverStartable;
+  private String _zkStr;
+  private String _logDirPath;
+  private int _port;
 
   private static void invokeTopicCommand(String[] args) {
     // jfim: Use Java security to trap System.exit in Kafka 0.9's TopicCommand
@@ -67,43 +68,49 @@ public class KafkaDataServerStartable implements StreamDataServerStartable {
   }
 
   public void init(Properties props) {
-    zkStr = props.getProperty(ZOOKEEPER_CONNECT);
-    logDirPath = props.getProperty(LOG_DIRS);
+    _zkStr = props.getProperty(ZOOKEEPER_CONNECT);
+    _logDirPath = props.getProperty(LOG_DIRS);
 
     // Create the ZK nodes for Kafka, if needed
-    int indexOfFirstSlash = zkStr.indexOf('/');
+    int indexOfFirstSlash = _zkStr.indexOf('/');
     if (indexOfFirstSlash != -1) {
-      String bareZkUrl = zkStr.substring(0, indexOfFirstSlash);
-      String zkNodePath = zkStr.substring(indexOfFirstSlash);
+      String bareZkUrl = _zkStr.substring(0, indexOfFirstSlash);
+      String zkNodePath = _zkStr.substring(indexOfFirstSlash);
       ZkClient client = new ZkClient(bareZkUrl);
       client.createPersistent(zkNodePath, true);
       client.close();
     }
 
-    File logDir = new File(logDirPath);
+    File logDir = new File(_logDirPath);
     logDir.mkdirs();
 
     props.put("zookeeper.session.timeout.ms", "60000");
     KafkaConfig config = new KafkaConfig(props);
 
-    serverStartable = new KafkaServerStartable(config);
+    _port = config.port();
+    _serverStartable = new KafkaServerStartable(config);
   }
 
   @Override
   public void start() {
-    serverStartable.startup();
+    _serverStartable.startup();
   }
 
   @Override
   public void stop() {
-    serverStartable.shutdown();
-    FileUtils.deleteQuietly(new File(serverStartable.serverConfig().logDirs().apply(0)));
+    _serverStartable.shutdown();
+    FileUtils.deleteQuietly(new File(_serverStartable.serverConfig().logDirs().apply(0)));
   }
 
   @Override
   public void createTopic(String topic, Properties props) {
     invokeTopicCommand(
-        new String[]{"--create", "--zookeeper", this.zkStr, "--replication-factor", "1", "--partitions", Integer.toString(
+        new String[]{"--create", "--zookeeper", this._zkStr, "--replication-factor", "1", "--partitions", Integer.toString(
             (Integer) props.get("partition")), "--topic", topic});
+  }
+
+  @Override
+  public int getPort() {
+    return _port;
   }
 }

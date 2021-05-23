@@ -36,6 +36,7 @@ import org.apache.pinot.controller.recommender.io.InputManager;
 import org.apache.pinot.controller.recommender.rules.AbstractRule;
 import org.apache.pinot.controller.recommender.rules.RulesToExecute;
 import org.apache.pinot.controller.recommender.rules.impl.InvertedSortedIndexJointRule;
+import org.apache.pinot.controller.recommender.rules.io.configs.SegmentSizeRecommendations;
 import org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset;
 import org.apache.pinot.controller.recommender.rules.utils.QueryInvertedSortedIndexRecommender;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -47,9 +48,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.controller.recommender.rules.impl.RealtimeProvisioningRule.CONSUMING_MEMORY_PER_HOST;
 import static org.apache.pinot.controller.recommender.rules.impl.RealtimeProvisioningRule.OPTIMAL_SEGMENT_SIZE;
 import static org.apache.pinot.controller.recommender.rules.impl.RealtimeProvisioningRule.TOTAL_MEMORY_USED_PER_HOST;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class TestConfigEngine {
@@ -89,7 +88,7 @@ public class TestConfigEngine {
     assertEquals(_input.getAverageDataLen("g"), 100);
     assertTrue(_input.isSingleValueColumn("j"));
     assertFalse(_input.isSingleValueColumn("i"));
-    assertEquals(_input.getPrimaryTimeCol(),"t");
+    assertTrue(_input.getTimeColumns().contains("t"));
   }
 
   @Test
@@ -177,7 +176,6 @@ public class TestConfigEngine {
     loadInput("recommenderInput/InvalidInput2.json");
   }
 
-
   @Test
   void testFlagQueryRule()
       throws InvalidInputException, IOException {
@@ -186,8 +184,13 @@ public class TestConfigEngine {
     AbstractRule abstractRule =
         RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.FlagQueryRule, _input, output);
     abstractRule.run();
-    assertEquals(output.getFlaggedQueries().getFlaggedQueries().toString(),
-        "{select g from tableName LIMIT 1000000000=Warning: The size of LIMIT is longer than 100000 | Warning: No filtering in ths query, not a valid query=Error: query not able to parse, skipped, select f from tableName=Warning: No filtering in ths query, select f from tableName where a =3=Warning: No time column used in ths query}");
+
+    assertFalse(output.getFlaggedQueries().getFlaggedQueries().containsKey("select f from tableName where x = 2"));
+    assertFalse(output.getFlaggedQueries().getFlaggedQueries().containsKey("select f from tableName where t = 3"));
+    assertTrue(output.getFlaggedQueries().getFlaggedQueries().containsKey("select * from tableName"));
+    assertTrue(output.getFlaggedQueries().getFlaggedQueries().containsKey("select f from tableName"));
+    assertTrue(output.getFlaggedQueries().getFlaggedQueries().containsKey("select f from tableName where a =3"));
+    assertTrue(output.getFlaggedQueries().getFlaggedQueries().containsKey("select g from tableName LIMIT 1000000000"));
   }
 
   @Test
@@ -213,6 +216,17 @@ public class TestConfigEngine {
   }
 
   @Test
+  void testBloomFilterRuleWithTimeSpecColumn()
+      throws InvalidInputException, IOException {
+    loadInput("recommenderInput/BloomFilterInputWithDateTimeColumn.json");
+    ConfigManager output = new ConfigManager();
+    AbstractRule abstractRule =
+        RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.BloomFilterRule, _input, output);
+    abstractRule.run();
+    assertEquals(output.getIndexConfig().getBloomFilterColumns().toString(), "[b, t, x]");
+  }
+
+  @Test
   void testNoDictionaryOnHeapDictionaryJointRule()
       throws InvalidInputException, IOException {
     loadInput("recommenderInput/NoDictionaryOnHeapDictionaryJointRuleInput.json");
@@ -228,6 +242,10 @@ public class TestConfigEngine {
   void testPinotTablePartitionRule()
       throws InvalidInputException, IOException {
     loadInput("recommenderInput/PinotTablePartitionRuleInput.json");
+
+    // segment size recommendations get populated by SegmentSize Rule; hard-coding the values here
+    _input._overWrittenConfigs.setSegmentSizeRecommendations(
+        new SegmentSizeRecommendations(/*numRows=*/1_000_000, /*numSegments=*/4, /*segmentSize=*/1_000_000));
 
     AbstractRule abstractRule = RulesToExecute.RuleFactory
         .getRule(RulesToExecute.Rule.KafkaPartitionRule, _input, _input._overWrittenConfigs);
@@ -374,6 +392,42 @@ public class TestConfigEngine {
   void testAggregateMetricsRule() throws Exception {
     ConfigManager output = runRecommenderDriver("recommenderInput/AggregateMetricsRuleInput.json");
     assertTrue(output.isAggregateMetrics());
+  }
+
+  @Test
+  void testSegmentSizeRule() throws Exception {
+    ConfigManager output = runRecommenderDriver("recommenderInput/SegmentSizeRuleInput.json");
+    SegmentSizeRecommendations segmentSizeRecommendations = output.getSegmentSizeRecommendations();
+    assertEquals(segmentSizeRecommendations.getNumSegments(), 2);
+    assertEquals(segmentSizeRecommendations.getNumRowsPerSegment(), 50_000);
+  }
+
+  @Test
+  void testSegmentSizeRule_noNeedToGenerateSegment() throws Exception {
+    ConfigManager output = runRecommenderDriver("recommenderInput/SegmentSizeRuleInput_noNeedToGenerateSegment.json");
+    SegmentSizeRecommendations segmentSizeRecommendations = output.getSegmentSizeRecommendations();
+    assertEquals(segmentSizeRecommendations.getNumSegments(), 2);
+    assertEquals(segmentSizeRecommendations.getNumRowsPerSegment(), 50_000);
+  }
+
+  @Test
+  void testSegmentSizeRule_ruleIsDisabledButItNeedsToBeSilentlyRun() throws Exception {
+    ConfigManager output =
+        runRecommenderDriver("recommenderInput/SegmentSizeRuleInput_ruleIsDisableButItNeedsToBeSilentlyRun.json");
+    assertNull(output.getSegmentSizeRecommendations()); // output is null because the rule silently ran
+    assertEquals(output.getPartitionConfig().getPartitionDimension(), "e");
+    assertEquals(output.getPartitionConfig().getNumPartitionsOffline(), 2);
+  }
+
+  @Test
+  void testSegmentSizeRule_realtimeOnlyTable() throws Exception {
+    ConfigManager output =
+        runRecommenderDriver("recommenderInput/SegmentSizeRuleInput_realtimeOnlyTable.json");
+    assertEquals(output.getSegmentSizeRecommendations().getMessage(),
+        "Segment sizing for realtime-only tables is done via Realtime Provisioning Rule");
+    assertEquals(output.getSegmentSizeRecommendations().getNumSegments(), 0);
+    assertEquals(output.getSegmentSizeRecommendations().getSegmentSize(), 0);
+    assertEquals(output.getSegmentSizeRecommendations().getNumRowsPerSegment(), 0);
   }
 
   private void testRealtimeProvisioningRule(String fileName) throws Exception {

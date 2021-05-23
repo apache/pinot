@@ -85,8 +85,8 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     }
 
     // For non-dictionary-encoded expression, store INT values into a RoaringBitmap, other types into an OpenHashSet
-    DataType valueType = blockValSet.getValueType();
-    switch (valueType) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         RoaringBitmap bitmap = aggregationResultHolder.getResult();
@@ -154,7 +154,7 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
         break;
       default:
         throw new IllegalStateException(
-            "Illegal data type for PARTITIONED_DISTINCT_COUNT aggregation function: " + valueType);
+            "Illegal data type for PARTITIONED_DISTINCT_COUNT aggregation function: " + storedType);
     }
   }
 
@@ -173,8 +173,8 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     }
 
     // For non-dictionary-encoded expression, store INT values into a RoaringBitmap, other types into an OpenHashSet
-    DataType valueType = blockValSet.getValueType();
-    switch (valueType) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < length; i++) {
@@ -213,7 +213,7 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
         break;
       default:
         throw new IllegalStateException(
-            "Illegal data type for PARTITIONED_DISTINCT_COUNT aggregation function: " + valueType);
+            "Illegal data type for PARTITIONED_DISTINCT_COUNT aggregation function: " + storedType);
     }
   }
 
@@ -235,8 +235,8 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     }
 
     // For non-dictionary-encoded expression, store INT values into a RoaringBitmap, other types into an OpenHashSet
-    DataType valueType = blockValSet.getValueType();
-    switch (valueType) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < length; i++) {
@@ -293,7 +293,7 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
         break;
       default:
         throw new IllegalStateException(
-            "Illegal data type for PARTITIONED_DISTINCT_COUNT aggregation function: " + valueType);
+            "Illegal data type for PARTITIONED_DISTINCT_COUNT aggregation function: " + storedType);
     }
   }
 

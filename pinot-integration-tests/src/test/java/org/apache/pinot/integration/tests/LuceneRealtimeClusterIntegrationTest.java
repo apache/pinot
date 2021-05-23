@@ -102,7 +102,7 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
   @Override
   protected List<FieldConfig> getFieldConfigs() {
     return Collections.singletonList(
-        new FieldConfig(TEXT_COLUMN_NAME, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null));
+        new FieldConfig(TEXT_COLUMN_NAME, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null, null));
   }
 
   @BeforeClass

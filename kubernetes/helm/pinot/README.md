@@ -61,6 +61,7 @@ eksctl create cluster \
 --nodes-max 4 \
 --node-ami auto
 ```
+
 You can monitor cluster status by command:
 
 ```bash
@@ -80,6 +81,7 @@ aws eks update-kubeconfig --name ${EKS_CLUSTER_NAME}
 ```
 
 To verify the connection, you can run
+
 ```bash
 kubectl get nodes
 ```
@@ -114,7 +116,7 @@ GCLOUD_EMAIL=pinot-demo@example.com
 ./setup_gke.sh
 ```
 
-### (Optional) How to connect to an existing cluster
+### (Optional) How to connect to an existing GKE cluster
 
 Simply run below command to get the credential for the cluster you just created or your existing cluster.
 Please modify the Env variables `${GCLOUD_PROJECT}`, `${GCLOUD_ZONE}`, `${GCLOUD_CLUSTER}` accordingly in below script.
@@ -125,7 +127,6 @@ GCLOUD_ZONE=us-west1-b
 GCLOUD_CLUSTER=pinot-quickstart
 gcloud container clusters get-credentials ${GCLOUD_CLUSTER} --zone ${GCLOUD_ZONE} --project ${GCLOUD_PROJECT}
 ```
-
 
 ## (Optional) Setup a Kubernetes cluster on Microsoft Azure
 
@@ -160,7 +161,7 @@ az aks create --resource-group ${AKS_RESOURCE_GROUP}  --name ${AKS_CLUSTER_NAME}
 az provider register --namespace Microsoft.Network
 ```
 
-### (Optional) How to connect to an existing cluster
+### (Optional) How to connect to an existing AKS cluster
 
 Simply run below command to get the credential for the cluster you just created or your existing cluster.
 
@@ -171,6 +172,7 @@ az aks get-credentials --resource-group ${AKS_RESOURCE_GROUP} --name ${AKS_CLUST
 ```
 
 To verify the connection, you can run
+
 ```bash
 kubectl get nodes
 ```
@@ -185,17 +187,22 @@ helm dependency update
 
 ### Start Pinot with Helm
 
-- For helm v3.1.2
+- For helm v3.X.X
 
 ```bash
 kubectl create ns pinot-quickstart
 helm install pinot -n pinot-quickstart .
 ```
 
-- For helm v3.0.0
+- For helm v3.X.X
 
 ```bash
 kubectl create ns pinot-quickstart
+
+# First run dry-run with debug to verify:
+helm install -n pinot-quickstart pinot . --dry-run --debug
+
+# Install the Helm chart with:
 helm install -n pinot-quickstart pinot .
 ```
 
@@ -213,7 +220,8 @@ Then deploy pinot cluster by:
 helm install --namespace "pinot-quickstart" --name "pinot" .
 ```
 
-#### Troubleshooting (For helm v2.12.1)
+### Troubleshooting (For helm v2.12.1)
+
 - Error: Please run below command if encountering issue:
 
 ```
@@ -248,7 +256,7 @@ kubectl get all -n pinot-quickstart
 
 #### Bring up a Kafka Cluster for realtime data ingestion
 
-- For helm v3.0.0
+- For helm v3.X.X
 
 ```bash
 helm repo add incubator https://charts.helm.sh/incubator
@@ -292,7 +300,7 @@ following configurable parameters:
 | Parameter                                      | Description                                                                                                                                                                | Default                                                            |
 |------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------|
 | `image.repository`                             | Pinot Container image repo                                                                                                                                                 | `apachepinot/pinot`                                                |
-| `image.tag`                                    | Pinot Container image tag                                                                                                                                                  | `0.3.0-SNAPSHOT`                                                   |
+| `image.tag`                                    | Pinot Container image tag                                                                                                                                                  | `release-0.7.1`                                                   |
 | `image.pullPolicy`                             | Pinot Container image pull policy                                                                                                                                          | `IfNotPresent`                                                     |
 | `cluster.name`                                 | Pinot Cluster name                                                                                                                                                         | `pinot-quickstart`                                                 |
 |------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------|
@@ -309,7 +317,7 @@ following configurable parameters:
 | `controller.persistence.mountPath`             | Mount path of controller data volume                                                                                                                                       | `/var/pinot/controller/data`                                       |
 | `controller.persistence.storageClass`          | Storage class of backing PVC                                                                                                                                               | `""`                                                               |
 | `controller.jvmOpts`                           | Pinot Controller JVM Options                                                                                                                                               | `-Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCApplicationStoppedTime -XX:+PrintGCApplicationConcurrentTime -Xloggc:/opt/pinot/gc-pinot-controller.log`                                                  |
-| `controller.log4j2ConfFile`                    | Pinot Controller log4j2 configuration file                                                                                                                                 | `/opt/pinot/conf/pinot-controller-log4j2.xml`                      |
+| `controller.log4j2ConfFile`                    | Pinot Controller log4j2 configuration file                                                                                                                                 | `/opt/pinot/conf/log4j2.xml`                                       |
 | `controller.pluginsDir`                        | Pinot Controller plugins directory                                                                                                                                         | `/opt/pinot/plugins`                                               |
 | `controller.service.port`                      | Service Port                                                                                                                                                               | `9000`                                                             |
 | `controller.external.enabled`                  | If True, exposes Pinot Controller externally                                                                                                                               | `true`                                                             |
@@ -327,7 +335,7 @@ following configurable parameters:
 | `broker.port`                                  | Pinot broker port                                                                                                                                                          | `8099`                                                             |
 | `broker.replicaCount`                          | Pinot broker replicas                                                                                                                                                      | `1`                                                                |
 | `broker.jvmOpts`                               | Pinot Broker JVM Options                                                                                                                                                   | `-Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCApplicationStoppedTime -XX:+PrintGCApplicationConcurrentTime -Xloggc:/opt/pinot/gc-pinot-broker.log`                                                  |
-| `broker.log4j2ConfFile`                        | Pinot Broker log4j2 configuration file                                                                                                                                     | `/opt/pinot/conf/pinot-broker-log4j2.xml`                          |
+| `broker.log4j2ConfFile`                        | Pinot Broker log4j2 configuration file                                                                                                                                     | `/opt/pinot/conf/log4j2.xml`                                       |
 | `broker.pluginsDir`                            | Pinot Broker plugins directory                                                                                                                                             | `/opt/pinot/plugins`                                               |
 | `broker.service.port`                          | Service Port                                                                                                                                                               | `8099`                                                             |
 | `broker.external.enabled`                      | If True, exposes Pinot Broker externally                                                                                                                                   | `true`                                                             |
@@ -354,7 +362,7 @@ following configurable parameters:
 | `server.persistence.mountPath`                 | Mount path of server data volume                                                                                                                                           | `/var/pinot/server/data`                                           |
 | `server.persistence.storageClass`              | Storage class of backing PVC                                                                                                                                               | `""`                                                               |
 | `server.jvmOpts`                               | Pinot Server JVM Options                                                                                                                                                   | `-Xms512M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCApplicationStoppedTime -XX:+PrintGCApplicationConcurrentTime -Xloggc:/opt/pinot/gc-pinot-server.log` |
-| `server.log4j2ConfFile`                        | Pinot Server log4j2 configuration file                                                                                                                                     | `/opt/pinot/conf/pinot-server-log4j2.xml`                          |
+| `server.log4j2ConfFile`                        | Pinot Server log4j2 configuration file                                                                                                                                     | `/opt/pinot/conf/log4j2.xml`                                       |
 | `server.pluginsDir`                            | Pinot Server plugins directory                                                                                                                                             | `/opt/pinot/plugins`                                               |
 | `server.service.port`                          | Service Port                                                                                                                                                               | `8098`                                                             |
 | `server.resources`                             | Pinot Server resource requests and limits                                                                                                                                  | `{}`                                                               |
@@ -375,7 +383,7 @@ following configurable parameters:
 | `minion.persistence.mountPath`                 | Mount path of minion data volume                                                                                                                                           | `/var/pinot/minion/data`                                           |
 | `minion.persistence.storageClass`              | Storage class of backing PVC                                                                                                                                               | `""`                                                               |
 | `minion.jvmOpts`                               | Pinot minion JVM Options                                                                                                                                                   | `-Xms512M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCApplicationStoppedTime -XX:+PrintGCApplicationConcurrentTime -Xloggc:/opt/pinot/gc-pinot-minion.log` |
-| `minion.log4j2ConfFile`                        | Pinot minion log4j2 configuration file                                                                                                                                     | `/opt/pinot/conf/pinot-minion-log4j2.xml`                          |
+| `minion.log4j2ConfFile`                        | Pinot minion log4j2 configuration file                                                                                                                                     | `/opt/pinot/conf/log4j2.xml`                                       |
 | `minion.pluginsDir`                            | Pinot minion plugins directory                                                                                                                                             | `/opt/pinot/plugins`                                               |
 | `minion.service.port`                          | Service Port                                                                                                                                                               | `9514`                                                             |
 | `minion.resources`                             | Pinot minion resource requests and limits                                                                                                                                  | `{}`                                                               |

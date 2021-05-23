@@ -88,6 +88,12 @@
       <destName>plugins/pinot-file-system/pinot-s3/pinot-s3-${project.version}-shaded.jar</destName>
     </file>
     <!-- End Include Pinot File System Plugins-->
+    <!-- Start Include Pinot Environment Plugins-->
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-environment/pinot-azure/target/pinot-azure-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-environment/pinot-azure/pinot-azure-${project.version}-shaded.jar</destName>
+    </file>
+    <!-- End Include Pinot Environment Plugins-->
     <!-- Start Include Pinot Input Format Plugins-->
     <file>
       <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-avro/target/pinot-avro-${project.version}-shaded.jar</source>

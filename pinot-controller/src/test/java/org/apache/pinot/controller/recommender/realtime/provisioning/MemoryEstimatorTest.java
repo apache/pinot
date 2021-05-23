@@ -98,6 +98,7 @@ public class MemoryEstimatorTest {
   private void runTest(String schemaFileName, Consumer<String> assertFunc) throws Exception {
 
     // arrange inputs
+    File workingDir = Files.createTempDirectory("working-dir").toFile();
     File schemaFile = readFile(schemaFileName);
     File tableConfigFile = readFile("memory_estimation/table-config.json");
     Schema schema = JsonUtils.fileToObject(schemaFile, Schema.class);
@@ -107,7 +108,7 @@ public class MemoryEstimatorTest {
 
     // act
     MemoryEstimator.SegmentGenerator segmentGenerator =
-        new MemoryEstimator.SegmentGenerator(schemaWithMetadata, schema, tableConfig, numberOfRows, true);
+        new MemoryEstimator.SegmentGenerator(schemaWithMetadata, schema, tableConfig, numberOfRows, true, workingDir);
     File generatedSegment = segmentGenerator.generate();
 
     // assert
@@ -116,7 +117,7 @@ public class MemoryEstimatorTest {
     assertFunc.accept(metadata);
 
     // cleanup
-    FileUtils.deleteDirectory(generatedSegment);
+    FileUtils.deleteDirectory(workingDir);
   }
 
   private String extract(String metadataContent, String patternStr) {

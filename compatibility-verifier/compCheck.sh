@@ -43,7 +43,7 @@
 # get usage of the script
 function usage() {
   command=$1
-  echo "Usage: $command [workingDir]"
+  echo "Usage: $command workingDir testSuiteDir"
   exit 1
 }
 
@@ -70,21 +70,30 @@ function waitForClusterReady() {
   sleep 2
   echo "Cluster ready."
 }
+
+#set config file is present or not
+function setConfigFileArg() {
+  if [[ -f $1 ]]; then
+    echo "-configFileName ${1}"
+  fi
+}
+
 # Given a component and directory, start that version of the specific component
 function startService() {
   serviceName=$1
   dirName=$2
+  local configFileArg=$(setConfigFileArg "$3")
   # Upon start, save the pid of the process for a component into a file in /working_dir/{component}.pid, which is then used to stop it
   pushd "$dirName"/pinot-tools/target/pinot-tools-pkg/bin  || exit 1
   if [ "$serviceName" = "zookeeper" ]; then
     sh -c 'rm -rf ${0}/zkdir'
     sh -c 'echo $$ > $0/zookeeper.pid; exec ./pinot-admin.sh StartZookeeper -dataDir ${0}/zkdir > ${0}/zookeeper.log 2>&1' "${dirName}" &
   elif [ "$serviceName" = "controller" ]; then
-    sh -c 'echo $$ > $0/controller.pid; exec ./pinot-admin.sh StartController > ${0}/controller.log 2>&1' "${dirName}" &
+    sh -c 'echo $$ > $0/controller.pid; exec ./pinot-admin.sh StartController ${1} > ${0}/controller.log 2>&1' "${dirName}" "${configFileArg}" &
   elif [ "$serviceName" = "broker" ]; then
-    sh -c 'echo $$ > $0/broker.pid; exec ./pinot-admin.sh StartBroker > ${0}/broker.log 2>&1' "${dirName}" &
+    sh -c 'echo $$ > $0/broker.pid; exec ./pinot-admin.sh StartBroker ${1} > ${0}/broker.log 2>&1' "${dirName}" "${configFileArg}" &
   elif [ "$serviceName" = "server" ]; then
-    sh -c 'echo $$ > $0/server.pid; exec ./pinot-admin.sh StartServer > ${0}/server.log 2>&1' "${dirName}" &
+    sh -c 'echo $$ > $0/server.pid; exec ./pinot-admin.sh StartServer ${1} > ${0}/server.log 2>&1' "${dirName}" "${configFileArg}" &
   elif [ "$serviceName" = "kafka" ]; then
     sh -c 'echo $$ > $0/kafka.pid; exec ./pinot-admin.sh StartKafka -zkAddress localhost:2181/kafka > ${0}/kafka.log 2>&1' "${dirName}" &
   fi
@@ -115,11 +124,11 @@ function startServices() {
   startService zookeeper "$dirName"
   # Controller depends on zookeeper, if not wait zookeeper to be ready, controller will crash.
   waitForZkReady
-  startService controller "$dirName"
+  startService controller "$dirName" "$CONTROLLER_CONF"
   # Broker depends on controller, if not wait controller to be ready, broker will crash.
   waitForControllerReady
-  startService broker "$dirName"
-  startService server "$dirName"
+  startService broker "$dirName" "$BROKER_CONF"
+  startService server "$dirName" "$SERVER_CONF"
   startService kafka "$dirName"
   waitForKafkaReady
   echo "Cluster started."
@@ -146,11 +155,21 @@ function setupCompatTester() {
   export CLASSPATH_PREFIX
 }
 
+#compute absolute path for testSuiteDir if given relative
+function absPath() {
+  local testSuiteDirPath=$1
+  if [[ ! "$testSuiteDirPath" = /* ]]; then
+    #relative path
+    testSuiteDirPath=$(cd "$testSuiteDirPath"; pwd)
+  fi
+  echo "$testSuiteDirPath"
+}
+
 #
 # Main
 #
 
-if [ $# -ne 1 ] ; then
+if [ $# -ne 2 ] ; then
   usage compCheck
 fi
 
@@ -158,6 +177,12 @@ COMPAT_TESTER_PATH="pinot-integration-tests/target/pinot-integration-tests-pkg/b
 
 # create subdirectories for given commits
 workingDir=$1
+testSuiteDir=$(absPath "$2")
+
+BROKER_CONF=${testSuiteDir}/config/BrokerConfig.conf
+CONTROLLER_CONF=${testSuiteDir}/config/ControllerConfig.conf
+SERVER_CONF=${testSuiteDir}/config/ServerConfig.conf
+
 oldTargetDir="$workingDir"/oldTargetDir
 newTargetDir="$workingDir"/newTargetDir
 
@@ -172,30 +197,31 @@ fi
 
 
 # Setup initial cluster with olderCommit and do rolling upgrade
-startServices "$oldTargetDir"
-#$COMPAT_TESTER pre-controller-upgrade.yaml 1; if [ $? -ne 0 ]; then exit 1; fi
+# Provide abspath of filepath to $COMPAT_TESTER
+startServices "$oldTargetDir" "${testSuiteDir}/config"
+#$COMPAT_TESTER $testSuiteDir/pre-controller-upgrade.yaml 1; if [ $? -ne 0 ]; then exit 1; fi
 stopService controller "$oldTargetDir"
-startService controller "$newTargetDir"
+startService controller "$newTargetDir" "$CONTROLLER_CONF"
 waitForControllerReady
-#$COMPAT_TESTER pre-broker-upgrade.yaml 2; if [ $? -ne 0 ]; then exit 1; fi
+#$COMPAT_TESTER $testSuiteDir/pre-broker-upgrade.yaml 2; if [ $? -ne 0 ]; then exit 1; fi
 stopService broker "$oldTargetDir"
-startService broker "$newTargetDir"
-#$COMPAT_TESTER pre-server-upgrade.yaml 3; if [ $? -ne 0 ]; then exit 1; fi
+startService broker "$newTargetDir" "$BROKER_CONF"
+#$COMPAT_TESTER $testSuiteDir/pre-server-upgrade.yaml 3; if [ $? -ne 0 ]; then exit 1; fi
 stopService server "$oldTargetDir"
-startService server "$newTargetDir"
-#$COMPAT_TESTER post-server-upgrade.yaml 4; if [ $? -ne 0 ]; then exit 1; fi
+startService server "$newTargetDir" "$SERVER_CONF"
+#$COMPAT_TESTER $testSuiteDir/post-server-upgrade.yaml 4; if [ $? -ne 0 ]; then exit 1; fi
 
 # Upgrade completed, now do a rollback
 stopService server "$newTargetDir"
-startService server "$oldTargetDir"
-#$COMPAT_TESTER post-server-rollback.yaml 5; if [ $? -ne 0 ]; then exit 1; fi
+startService server "$oldTargetDir" "$SERVER_CONF"
+#$COMPAT_TESTER $testSuiteDir/post-server-rollback.yaml 5; if [ $? -ne 0 ]; then exit 1; fi
 stopService broker "$newTargetDir"
-startService broker "$oldTargetDir"
-#$COMPAT_TESTER post-broker-rollback.yaml 6; if [ $? -ne 0 ]; then exit 1; fi
+startService broker "$oldTargetDir" "$BROKER_CONF"
+#$COMPAT_TESTER $testSuiteDir/post-broker-rollback.yaml 6; if [ $? -ne 0 ]; then exit 1; fi
 stopService controller "$newTargetDir"
-startService controller "$oldTargetDir"
+startService controller "$oldTargetDir" "$CONTROLLER_CONF"
 waitForControllerReady
-#$COMPAT_TESTER post-controller-rollback.yaml 7; if [ $? -ne 0 ]; then exit 1; fi
+#$COMPAT_TESTER $testSuiteDir/post-controller-rollback.yaml 7; if [ $? -ne 0 ]; then exit 1; fi
 stopServices "$oldTargetDir"
 
 exit 0

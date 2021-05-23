@@ -33,6 +33,7 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
+import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.slf4j.Logger;
@@ -54,21 +55,21 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
   protected final QueryContext _queryContext;
   protected final ExecutorService _executorService;
   protected final long _endTimeMs;
-  protected final int _numThreads;
+  protected final int _numTasks;
   protected final Future[] _futures;
   // Use a _blockingQueue to store the intermediate results blocks
   protected final BlockingQueue<IntermediateResultsBlock> _blockingQueue = new LinkedBlockingQueue<>();
   protected final AtomicLong totalWorkerThreadCpuTimeNs = new AtomicLong(0);
 
   protected BaseCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
-      long endTimeMs, int numThreads) {
+      long endTimeMs, int numTasks) {
     _operators = operators;
     _numOperators = _operators.size();
     _queryContext = queryContext;
     _executorService = executorService;
     _endTimeMs = endTimeMs;
-    _numThreads = numThreads;
-    _futures = new Future[_numThreads];
+    _numTasks = numTasks;
+    _futures = new Future[_numTasks];
   }
 
   protected BaseCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
@@ -85,8 +86,8 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
     // behavior (even JVM crash) when processing queries against it.
     Phaser phaser = new Phaser(1);
 
-    for (int i = 0; i < _numThreads; i++) {
-      int threadIndex = i;
+    for (int i = 0; i < _numTasks; i++) {
+      int taskIndex = i;
       _futures[i] = _executorService.submit(new TraceRunnable() {
         @Override
         public void runJob() {
@@ -101,7 +102,7 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
             return;
           }
           try {
-            processSegments(threadIndex);
+            processSegments(taskIndex);
           } finally {
             phaser.arriveAndDeregister();
           }
@@ -127,15 +128,24 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
       // Deregister the main thread and wait for all threads done
       phaser.awaitAdvance(phaser.arriveAndDeregister());
     }
-    CombineOperatorUtils.setExecutionStatistics(mergedBlock, _operators, totalWorkerThreadCpuTimeNs.get());
+    /*
+     * _numTasks are number of async tasks submitted to the _executorService, but it does not mean Pinot server
+     * use those number of threads to concurrently process segments. Instead, if _executorService thread pool has
+     * less number of threads than _numTasks, the number of threads that used to concurrently process segments equals
+     * to the pool size.
+     * TODO: Get the actual number of query worker threads instead of using the default value.
+     */
+    int numServerThreads = Math.min(_numTasks, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
+    CombineOperatorUtils
+        .setExecutionStatistics(mergedBlock, _operators, totalWorkerThreadCpuTimeNs.get(), numServerThreads);
     return mergedBlock;
   }
 
   /**
    * Executes query on one or more segments in a worker thread.
    */
-  protected void processSegments(int threadIndex) {
-    for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numThreads) {
+  protected void processSegments(int taskIndex) {
+    for (int operatorIndex = taskIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
       try {
         IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) _operators.get(operatorIndex).nextBlock();
         if (isQuerySatisfied(resultsBlock)) {

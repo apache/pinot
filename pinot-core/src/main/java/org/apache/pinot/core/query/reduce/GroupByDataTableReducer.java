@@ -326,7 +326,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     }
 
     int cnt = 0;
-    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+    ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     for (List<DataTable> reduceGroup : reduceGroups) {
       futures[cnt++] = reducerContext.getExecutorService().submit(new TraceRunnable() {
         @Override
@@ -338,7 +338,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
               for (int rowId = 0; rowId < numRows; rowId++) {
                 Object[] values = new Object[_numColumns];
                 for (int colId = 0; colId < _numColumns; colId++) {
-                  switch (columnDataTypes[colId]) {
+                  switch (storedColumnDataTypes[colId]) {
                     case INT:
                       values[colId] = dataTable.getInt(rowId, colId);
                       break;

@@ -37,7 +37,6 @@ import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
@@ -125,36 +124,14 @@ public class MergeRangeFilterOptimizer implements FilterOptimizer {
     boolean lowerInclusive = lower.charAt(0) == RangePredicate.LOWER_INCLUSIVE;
     String stringLowerBound = lower.substring(1);
     Comparable lowerBound =
-        stringLowerBound.equals(RangePredicate.UNBOUNDED) ? null : getComparable(stringLowerBound, dataType);
+        stringLowerBound.equals(RangePredicate.UNBOUNDED) ? null : dataType.convertInternal(stringLowerBound);
     String upper = split[1];
     int upperLength = upper.length();
     boolean upperInclusive = upper.charAt(upperLength - 1) == RangePredicate.UPPER_INCLUSIVE;
     String stringUpperBound = upper.substring(0, upperLength - 1);
     Comparable upperBound =
-        stringUpperBound.equals(RangePredicate.UNBOUNDED) ? null : getComparable(stringUpperBound, dataType);
+        stringUpperBound.equals(RangePredicate.UNBOUNDED) ? null : dataType.convertInternal(stringUpperBound);
     return new Range(lowerBound, lowerInclusive, upperBound, upperInclusive);
-  }
-
-  /**
-   * Helper method to create a Comparable from the given string value and data type.
-   */
-  private static Comparable getComparable(String stringValue, DataType dataType) {
-    switch (dataType) {
-      case INT:
-        return Integer.parseInt(stringValue);
-      case LONG:
-        return Long.parseLong(stringValue);
-      case FLOAT:
-        return Float.parseFloat(stringValue);
-      case DOUBLE:
-        return Double.parseDouble(stringValue);
-      case STRING:
-        return stringValue;
-      case BYTES:
-        return BytesUtils.toByteArray(stringValue);
-      default:
-        throw new IllegalStateException();
-    }
   }
 
   /**
@@ -166,7 +143,7 @@ public class MergeRangeFilterOptimizer implements FilterOptimizer {
 
   @Override
   public Expression optimize(Expression filterExpression, @Nullable Schema schema) {
-    if (schema == null) {
+    if (schema == null || filterExpression.getType() != ExpressionType.FUNCTION) {
       return filterExpression;
     }
     Function function = filterExpression.getFunctionCall();
@@ -265,7 +242,7 @@ public class MergeRangeFilterOptimizer implements FilterOptimizer {
    * Helper method to create a Comparable from the given literal expression and data type.
    */
   private static Comparable getComparable(Expression literalExpression, DataType dataType) {
-    return getComparable(literalExpression.getLiteral().getFieldValue().toString(), dataType);
+    return dataType.convertInternal(literalExpression.getLiteral().getFieldValue().toString());
   }
 
   /**

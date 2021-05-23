@@ -75,6 +75,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -132,13 +133,17 @@ public abstract class ControllerTest {
     }
   }
 
+  protected String getZkUrl() {
+    return _zookeeperInstance.getZkUrl();
+  }
+
   public Map<String, Object> getDefaultControllerConfiguration() {
     Map<String, Object> properties = new HashMap<>();
 
     properties.put(ControllerConf.CONTROLLER_HOST, LOCAL_HOST);
-    properties.put(ControllerConf.CONTROLLER_PORT, DEFAULT_CONTROLLER_PORT);
+    properties.put(ControllerConf.CONTROLLER_PORT, NetUtils.findOpenPort(DEFAULT_CONTROLLER_PORT));
     properties.put(ControllerConf.DATA_DIR, DEFAULT_DATA_DIR);
-    properties.put(ControllerConf.ZK_STR, ZkStarter.DEFAULT_ZK_STR);
+    properties.put(ControllerConf.ZK_STR, getZkUrl());
     properties.put(ControllerConf.HELIX_CLUSTER_NAME, getHelixClusterName());
 
     return properties;
@@ -193,6 +198,10 @@ public abstract class ControllerTest {
     return new ControllerStarter(config);
   }
 
+  protected int getControllerPort() {
+    return _controllerPort;
+  }
+
   protected void stopController() {
     _controllerStarter.stop();
     _controllerStarter = null;
@@ -210,7 +219,7 @@ public abstract class ControllerTest {
       throws Exception {
     HelixManager helixManager =
         HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
-            ZkStarter.DEFAULT_ZK_STR);
+            getZkUrl());
     helixManager.getStateMachineEngine()
         .registerStateModelFactory(FakeBrokerResourceOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
             FakeBrokerResourceOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
@@ -295,7 +304,7 @@ public abstract class ControllerTest {
       throws Exception {
     HelixManager helixManager =
         HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
-            ZkStarter.DEFAULT_ZK_STR);
+            getZkUrl());
     helixManager.getStateMachineEngine()
         .registerStateModelFactory(FakeSegmentOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
             FakeSegmentOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
@@ -394,7 +403,7 @@ public abstract class ControllerTest {
       throws Exception {
     HelixManager helixManager =
         HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
-            ZkStarter.DEFAULT_ZK_STR);
+            getZkUrl());
     helixManager.getStateMachineEngine()
         .registerStateModelFactory(FakeMinionResourceOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
             FakeMinionResourceOnlineOfflineStateModelFactory.FACTORY_INSTANCE);

@@ -19,7 +19,7 @@
 package org.apache.pinot.core.requesthandler;
 
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.parsers.AbstractCompiler;
+import org.apache.pinot.parsers.QueryCompiler;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 
@@ -28,11 +28,10 @@ import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.SQL;
 
 
 public class PinotQueryParserFactory {
-
   private static final Pql2Compiler PQL_2_COMPILER = new Pql2Compiler();
   private static final CalciteSqlCompiler CALCITE_SQL_COMPILER = new CalciteSqlCompiler();
 
-  public static AbstractCompiler get(String queryFormat) {
+  public static QueryCompiler get(String queryFormat) {
     switch (queryFormat.toLowerCase()) {
       case PQL:
         return PQL_2_COMPILER;
@@ -43,7 +42,11 @@ public class PinotQueryParserFactory {
     }
   }
 
-  public static BrokerRequest parsePinotQueryRequest(PinotQueryRequest pinotQueryRequest) {
-    return get(pinotQueryRequest.getQueryFormat()).compileToBrokerRequest(pinotQueryRequest.getQuery());
+  public static BrokerRequest parseSQLQuery(String query) {
+    return CALCITE_SQL_COMPILER.compileToBrokerRequest(query);
+  }
+
+  public static BrokerRequest parsePQLQuery(String query) {
+    return PQL_2_COMPILER.compileToBrokerRequest(query);
   }
 }

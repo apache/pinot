@@ -84,7 +84,7 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
         new TransformConfig(STRING_KEY_MAP_STR_FIELD_NAME, "toJsonMapStr(" + STRING_KEY_MAP_FIELD_NAME + ")"),
         new TransformConfig(INT_KEY_MAP_STR_FIELD_NAME, "toJsonMapStr(" + INT_KEY_MAP_FIELD_NAME + ")"));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName)
-        .setIngestionConfig(new IngestionConfig(null, null, null, transformConfigs)).build();
+        .setIngestionConfig(new IngestionConfig(null, null, null, transformConfigs, null)).build();
     addTableConfig(tableConfig);
 
     // Create and upload segments

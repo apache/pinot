@@ -44,6 +44,7 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -220,21 +221,22 @@ public class PinotBrokerRestletResource {
       throw new ControllerApplicationException(LOGGER,
           String.format("'%s' is not a valid broker instance name.", brokerInstanceName), Response.Status.BAD_REQUEST);
     }
-    validateQueryQuotaStateChange(state);
+    String stateInUpperCases = state.toUpperCase();
+    validateQueryQuotaStateChange(stateInUpperCases);
     List<String> liveInstances = _pinotHelixResourceManager.getOnlineInstanceList();
     if (!liveInstances.contains(brokerInstanceName)) {
       throw new ControllerApplicationException(LOGGER, String.format("Instance '%s' not found.", brokerInstanceName),
           Response.Status.NOT_FOUND);
     }
-    _pinotHelixResourceManager.toggleQueryQuotaStateForBroker(brokerInstanceName, state);
+    _pinotHelixResourceManager.toggleQueryQuotaStateForBroker(brokerInstanceName, stateInUpperCases);
     String msg =
-        String.format("Set query rate limiting to: %s for all tables in broker: %s", state, brokerInstanceName);
+        String.format("Set query rate limiting to: %s for all tables in broker: %s", stateInUpperCases, brokerInstanceName);
     LOGGER.info(msg);
     return new SuccessResponse(msg);
   }
 
   private void validateQueryQuotaStateChange(String state) {
-    if (!"ENABLE".equalsIgnoreCase(state) && !"DISABLE".equalsIgnoreCase(state)) {
+    if (!"ENABLE".equals(state) && !"DISABLE".equals(state)) {
       throw new ControllerApplicationException(LOGGER, "Invalid query quota state: " + state,
           Response.Status.BAD_REQUEST);
     }

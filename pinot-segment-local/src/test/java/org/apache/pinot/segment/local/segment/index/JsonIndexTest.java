@@ -36,7 +36,6 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-
 /**
  * Unit test for {@link JsonIndexCreator} and {@link JsonIndexReader}.
  */
@@ -59,8 +58,11 @@ public class JsonIndexTest {
   public void testSmallIndex()
       throws Exception {
     //@formatter:off
-    String[] records =
-        new String[]{"{\"name\":\"adam\",\"age\":20,\"addresses\":[{\"street\":\"street-00\",\"country\":\"us\"},{\"street\":\"street-01\",\"country\":\"us\"},{\"street\":\"street-02\",\"country\":\"ca\"}],\"skills\":[\"english\",\"programming\"]}", "{\"name\":\"bob\",\"age\":25,\"addresses\":[{\"street\":\"street-10\",\"country\":\"ca\"},{\"street\":\"street-11\",\"country\":\"us\"},{\"street\":\"street-12\",\"country\":\"in\"}],\"skills\":[]}", "{\"name\":\"charles\",\"age\":30,\"addresses\":[{\"street\":\"street-20\",\"country\":\"jp\"},{\"street\":\"street-21\",\"country\":\"kr\"},{\"street\":\"street-22\",\"country\":\"cn\"}],\"skills\":[\"japanese\",\"korean\",\"chinese\"]}", "{\"name\":\"david\",\"age\":35,\"addresses\":[{\"street\":\"street-30\",\"country\":\"ca\",\"types\":[\"home\",\"office\"]},{\"street\":\"street-31\",\"country\":\"ca\"},{\"street\":\"street-32\",\"country\":\"ca\"}],\"skills\":null}"};
+    String[] records = new String[]{
+        "{\"name\":\"adam\",\"age\":20,\"addresses\":[{\"street\":\"street-00\",\"country\":\"us\"},{\"street\":\"street-01\",\"country\":\"us\"},{\"street\":\"street-02\",\"country\":\"ca\"}],\"skills\":[\"english\",\"programming\"]}",
+        "{\"name\":\"bob\",\"age\":25,\"addresses\":[{\"street\":\"street-10\",\"country\":\"ca\"},{\"street\":\"street-11\",\"country\":\"us\"},{\"street\":\"street-12\",\"country\":\"in\"}],\"skills\":[]}",
+        "{\"name\":\"charles\",\"age\":30,\"addresses\":[{\"street\":\"street-20\",\"country\":\"jp\"},{\"street\":\"street-21\",\"country\":\"kr\"},{\"street\":\"street-22\",\"country\":\"cn\"}],\"skills\":[\"japanese\",\"korean\",\"chinese\"]}",
+        "{\"name\":\"david\",\"age\":35,\"addresses\":[{\"street\":\"street-30\",\"country\":\"ca\",\"types\":[\"home\",\"office\"]},{\"street\":\"street-31\",\"country\":\"ca\"},{\"street\":\"street-32\",\"country\":\"ca\"}],\"skills\":null}"};
     //@formatter:on
 
     String onHeapColumnName = "onHeap";
@@ -96,40 +98,41 @@ public class JsonIndexTest {
         MutableRoaringBitmap matchingDocIds = getMatchingDocIds(indexReader, "name='bob'");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{1});
 
-        matchingDocIds = getMatchingDocIds(indexReader, "addresses.street = 'street-21'");
+        matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[*].street\" = 'street-21'");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{2});
 
-        matchingDocIds = getMatchingDocIds(indexReader, "addresses.street NOT IN ('street-10', 'street-22')");
+        matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[*].street\" NOT IN ('street-10', 'street-22')");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 3});
 
         matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[0].country\" IN ('ca', 'us')");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1, 3});
 
-        matchingDocIds = getMatchingDocIds(indexReader, "\"addresses.types[1]\" = 'office'");
+        matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[*].types[1]\" = 'office'");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{3});
 
         matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[0].types[0]\" = 'home'");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{3});
 
-        matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[1].types\" = 'home'");
+        matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[1].types[*]\" = 'home'");
         Assert.assertEquals(matchingDocIds.toArray(), new int[0]);
 
-        matchingDocIds = getMatchingDocIds(indexReader, "addresses.types IS NULL");
+        matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[*].types[*]\" IS NULL");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1, 2});
 
-        matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[1].types\" IS NULL");
+        matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[1].types[*]\" IS NULL");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1, 2, 3});
 
         matchingDocIds = getMatchingDocIds(indexReader, "abc IS NULL");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1, 2, 3});
 
-        matchingDocIds = getMatchingDocIds(indexReader, "skills IS NOT NULL");
+        matchingDocIds = getMatchingDocIds(indexReader, "\"skills[*]\" IS NOT NULL");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 2});
 
-        matchingDocIds = getMatchingDocIds(indexReader, "addresses.country = 'ca' AND skills IS NOT NULL");
+        matchingDocIds =
+            getMatchingDocIds(indexReader, "\"addresses[*].country\" = 'ca' AND \"skills[*]\" IS NOT NULL");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{0});
 
-        matchingDocIds = getMatchingDocIds(indexReader, "addresses.country = 'us' OR skills IS NOT NULL");
+        matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[*].country\" = 'us' OR \"skills[*]\" IS NOT NULL");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1, 2});
       }
     }
@@ -179,20 +182,22 @@ public class JsonIndexTest {
         MutableRoaringBitmap matchingDocIds = getMatchingDocIds(indexReader, "name = 'adam-123'");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{123});
 
-        matchingDocIds = getMatchingDocIds(indexReader, "addresses.street = 'us-456'");
+        matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[*].street\" = 'us-456'");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{456});
 
         matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[1].street\" = 'us-456'");
         Assert.assertEquals(matchingDocIds.toArray(), new int[0]);
 
-        matchingDocIds = getMatchingDocIds(indexReader, "addresses.street = 'us-456' AND addresses.country = 'ca'");
+        matchingDocIds =
+            getMatchingDocIds(indexReader, "\"addresses[*].street\" = 'us-456' AND \"addresses[*].country\" = 'ca'");
         Assert.assertEquals(matchingDocIds.toArray(), new int[0]);
 
         matchingDocIds = getMatchingDocIds(indexReader,
-            "name = 'adam-100000' AND addresses.street = 'us-100000' AND addresses.country = 'us'");
+            "name = 'adam-100000' AND \"addresses[*].street\" = 'us-100000' AND \"addresses[*].country\" = 'us'");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{100000});
 
-        matchingDocIds = getMatchingDocIds(indexReader, "name = 'adam-100000' AND addresses.street = 'us-100001'");
+        matchingDocIds =
+            getMatchingDocIds(indexReader, "name = 'adam-100000' AND \"addresses[*].street\" = 'us-100001'");
         Assert.assertEquals(matchingDocIds.toArray(), new int[0]);
 
         matchingDocIds = getMatchingDocIds(indexReader, "name != 'adam-100000'");

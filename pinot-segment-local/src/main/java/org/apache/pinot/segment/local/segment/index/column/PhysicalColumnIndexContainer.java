@@ -180,7 +180,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       }
     } else {
       // Raw index
-      _forwardIndex = loadRawForwardIndex(fwdIndexBuffer, metadata.getDataType());
+      _forwardIndex = loadRawForwardIndex(fwdIndexBuffer, metadata.getDataType().getStoredType());
       _dictionary = null;
       _rangeIndex = null;
       _invertedIndex = null;
@@ -248,7 +248,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     }
 
     int length = metadata.getCardinality();
-    switch (dataType) {
+    switch (dataType.getStoredType()) {
       case INT:
         return (loadOnHeap) ? new OnHeapIntDictionary(dictionaryBuffer, length)
             : new IntDictionary(dictionaryBuffer, length);
@@ -280,9 +280,8 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     }
   }
 
-  private static ForwardIndexReader<?> loadRawForwardIndex(PinotDataBuffer forwardIndexBuffer,
-      DataType dataType) {
-    switch (dataType) {
+  private static ForwardIndexReader<?> loadRawForwardIndex(PinotDataBuffer forwardIndexBuffer, DataType dataType) {
+    switch (dataType.getStoredType()) {
       case INT:
       case LONG:
       case FLOAT:

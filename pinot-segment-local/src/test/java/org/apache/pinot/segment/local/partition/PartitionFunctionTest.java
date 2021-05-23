@@ -57,9 +57,28 @@ public class PartitionFunctionTest {
       Assert.assertEquals(partitionFunction.toString().toLowerCase(), functionName.toLowerCase());
       Assert.assertEquals(partitionFunction.getNumPartitions(), expectedNumPartitions);
 
+      // Test int values.
       for (int j = 0; j < 1000; j++) {
         int value = random.nextInt();
         Assert.assertEquals(partitionFunction.getPartition(value), (value % expectedNumPartitions));
+      }
+
+      // Test long values.
+      for (int j = 0; j < 1000; j++) {
+        long value = random.nextLong();
+        Assert.assertEquals(partitionFunction.getPartition(value), (value % expectedNumPartitions));
+      }
+
+      // Test Integer represented as String.
+      for (int j = 0; j < 1000; j++) {
+        int value = random.nextInt();
+        Assert.assertEquals(partitionFunction.getPartition(Integer.toString(value)), (value % expectedNumPartitions));
+      }
+
+      // Test Long represented as String.
+      for (int j = 0; j < 1000; j++) {
+        long value = random.nextLong();
+        Assert.assertEquals(partitionFunction.getPartition(Long.toString(value)), (value % expectedNumPartitions));
       }
     }
   }
@@ -92,9 +111,10 @@ public class PartitionFunctionTest {
       Assert.assertEquals(partitionFunction.getNumPartitions(), expectedNumPartitions);
 
       for (int j = 0; j < 1000; j++) {
-        Integer value = random.nextInt();
-        Assert.assertTrue(partitionFunction.getPartition(value.toString()) < expectedNumPartitions,
-            "Illegal: " + partitionFunction.getPartition(value.toString()) + " " + expectedNumPartitions);
+        int value = random.nextInt();
+        String stringValue = Integer.toString(value);
+        Assert.assertTrue(partitionFunction.getPartition(stringValue) < expectedNumPartitions,
+            "Illegal: " + partitionFunction.getPartition(stringValue) + " " + expectedNumPartitions);
       }
     }
   }
@@ -169,8 +189,7 @@ public class PartitionFunctionTest {
     // 10 values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
     // Applied org.apache.kafka.common.utils.Utils::murmur2 to those values and stored in expectedMurmurValues
     int[] expectedMurmurValues =
-        new int[]{-1044832774, -594851693, 1441878663, 1766739604, 1034724141, -296671913, 443511156, 1483601453,
-            1819695080, -931669296};
+        new int[]{-1044832774, -594851693, 1441878663, 1766739604, 1034724141, -296671913, 443511156, 1483601453, 1819695080, -931669296};
 
     long seed = 100;
     Random random = new Random(seed);

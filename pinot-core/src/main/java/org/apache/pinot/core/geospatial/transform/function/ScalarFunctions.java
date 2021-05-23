@@ -41,8 +41,7 @@ public class ScalarFunctions {
    */
   @ScalarFunction
   public static byte[] stPoint(double x, double y) {
-    return GeometrySerializer
-        .serialize(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(x, y)));
+    return GeometrySerializer.serialize(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(x, y)));
   }
 
   /**
@@ -54,9 +53,9 @@ public class ScalarFunctions {
    * @return the created point
    */
   @ScalarFunction
-  public static byte[] stPoint(double x, double y, int isGeography) {
+  public static byte[] stPoint(double x, double y, boolean isGeography) {
     Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(x, y));
-    if (isGeography > 0) {
+    if (isGeography) {
       GeometryUtils.setGeography(point);
     }
     return GeometrySerializer.serialize(point);

@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.Comparator;
 import java.util.List;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -36,18 +37,18 @@ public class GenericRowSorter {
 
   public GenericRowSorter(List<String> sortOrder, Schema schema) {
     int sortOrderSize = sortOrder.size();
-    FieldSpec.DataType[] dataTypes = new FieldSpec.DataType[sortOrderSize];
+    DataType[] storedTypes = new DataType[sortOrderSize];
     for (int i = 0; i < sortOrderSize; i++) {
       String column = sortOrder.get(i);
       FieldSpec fieldSpec = schema.getFieldSpecFor(column);
       Preconditions.checkState(fieldSpec != null, "Column in sort order: %s does not exist in schema", column);
       Preconditions.checkState(fieldSpec.isSingleValueField(), "Cannot use multi value column: %s for sorting", column);
-      dataTypes[i] = fieldSpec.getDataType();
+      storedTypes[i] = fieldSpec.getDataType().getStoredType();
     }
     _genericRowComparator = (o1, o2) -> {
       for (int i = 0; i < sortOrderSize; i++) {
         String column = sortOrder.get(i);
-        FieldSpec.DataType dataType = dataTypes[i];
+        DataType dataType = storedTypes[i];
         Object value1 = o1.getValue(column);
         Object value2 = o2.getValue(column);
         int result;
@@ -79,6 +80,10 @@ public class GenericRowSorter {
       }
       return 0;
     };
+  }
+
+  public Comparator<GenericRow> getGenericRowComparator() {
+    return _genericRowComparator;
   }
 
   /**

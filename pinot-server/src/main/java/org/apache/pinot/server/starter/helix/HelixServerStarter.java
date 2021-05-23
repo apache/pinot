@@ -30,6 +30,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -56,7 +58,9 @@ import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.core.transport.ListenerConfig;
+import org.apache.pinot.core.transport.TlsConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.core.util.TlsUtils;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
 import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
 import org.apache.pinot.server.api.access.AccessControlFactory;
@@ -66,6 +70,8 @@ import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.ServerQueriesDisabledTracker;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.environmentprovider.PinotEnvironmentProvider;
+import org.apache.pinot.spi.environmentprovider.PinotEnvironmentProviderFactory;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.services.ServiceRole;
@@ -118,6 +124,7 @@ public class HelixServerStarter implements ServiceStartable {
   private AdminApiApplication _adminApiApplication;
   private ServerQueriesDisabledTracker _serverQueriesDisabledTracker;
   private RealtimeLuceneIndexRefreshState _realtimeLuceneIndexRefreshState;
+  private PinotEnvironmentProvider _pinotEnvironmentProvider;
 
   public HelixServerStarter(String helixClusterName, String zkAddress, PinotConfiguration serverConf)
       throws Exception {
@@ -143,6 +150,9 @@ public class HelixServerStarter implements ServiceStartable {
         new HelixConfigScopeBuilder(ConfigScopeProperty.PARTICIPANT, _helixClusterName).forParticipant(_instanceId)
             .build();
 
+    // Initialize Pinot Environment Provider
+    _pinotEnvironmentProvider = initializePinotEnvironmentProvider();
+
     // Enable/disable thread CPU time measurement through instance config.
     ThreadTimer.setThreadCpuTimeMeasurementEnabled(_serverConf
         .getProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
@@ -152,6 +162,32 @@ public class HelixServerStarter implements ServiceStartable {
     DataTableBuilder.setCurrentDataTableVersion(_serverConf
         .getProperty(Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION,
             Server.DEFAULT_CURRENT_DATA_TABLE_VERSION));
+  }
+
+  /**
+   *  Invoke pinot environment provider factory's init method to register the environment provider &
+   *  return the instantiated environment provider.
+   */
+  @Nullable
+  private PinotEnvironmentProvider initializePinotEnvironmentProvider() {
+    PinotConfiguration environmentProviderConfigs = _serverConf.subset(Server.PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY);
+    if (environmentProviderConfigs.toMap().isEmpty()) {
+      LOGGER.info("No environment provider config values provided for server property: {}",
+          Server.PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY);
+      return null;
+    }
+
+    // Invoke pinot environment provider factory's init method
+    PinotEnvironmentProviderFactory.init(environmentProviderConfigs);
+
+    String environmentProviderClassName = _serverConf.getProperty(Server.ENVIRONMENT_PROVIDER_CLASS_NAME);
+    if (environmentProviderClassName == null) {
+      LOGGER.info("No className value provided for property: {}", Server.ENVIRONMENT_PROVIDER_CLASS_NAME);
+      return null;
+    }
+
+    // Fetch environment provider instance
+    return PinotEnvironmentProviderFactory.getEnvironmentProvider(environmentProviderClassName.toLowerCase());
   }
 
   /**
@@ -244,6 +280,24 @@ public class HelixServerStarter implements ServiceStartable {
       needToUpdateInstanceConfig = true;
     }
 
+    // Update instance config with environment properties
+    if (_pinotEnvironmentProvider != null) {
+      // Retrieve failure domain information and add to the environment properties map
+      String failureDomain = _pinotEnvironmentProvider.getFailureDomain();
+      Map<String, String> environmentProperties = new HashMap<>();
+      environmentProperties.put(CommonConstants.INSTANCE_FAILURE_DOMAIN, failureDomain);
+
+      // Fetch existing environment properties map from instance configs
+      Map<String, String> existingEnvironmentConfigsMap = instanceConfig.getRecord().getMapField(
+          CommonConstants.ENVIRONMENT_IDENTIFIER);
+
+      if (existingEnvironmentConfigsMap != null && !existingEnvironmentConfigsMap.equals(environmentProperties)) {
+        instanceConfig.getRecord().setMapField(CommonConstants.ENVIRONMENT_IDENTIFIER, environmentProperties);
+        LOGGER.info("Adding environment properties: {} for instance: {}", environmentProperties, _instanceId);
+        needToUpdateInstanceConfig = true;
+      }
+    }
+
     if (needToUpdateInstanceConfig) {
       LOGGER.info("Updating instance config for instance: {} with instance tags: {}, host: {}, port: {}", _instanceId,
           instanceTags, host, port);
@@ -317,6 +371,14 @@ public class HelixServerStarter implements ServiceStartable {
       throws Exception {
     LOGGER.info("Starting Pinot server");
     long startTimeMs = System.currentTimeMillis();
+
+    // install default SSL context if necessary (even if not force-enabled everywhere)
+    TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_serverConf, Server.SERVER_TLS_PREFIX);
+    if (StringUtils.isNotBlank(tlsDefaults.getKeyStorePath()) || StringUtils
+        .isNotBlank(tlsDefaults.getTrustStorePath())) {
+      LOGGER.info("Installing default SSL context for any client requests");
+      TlsUtils.installDefaultSSLSocketFactory(tlsDefaults);
+    }
 
     LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,
         _helixClusterName, _instanceId);

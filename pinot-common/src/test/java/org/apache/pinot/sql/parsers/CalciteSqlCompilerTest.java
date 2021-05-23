@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -2183,5 +2184,80 @@ public class CalciteSqlCompilerTest {
             .getIdentifier().getName(), "a");
     Assert.assertEquals(
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getLongValue(), 1L);
+  }
+
+  /**
+   * This test shows that Calcite {@link SqlNumericLiteral#isInteger()} throws NPE. The issue has been fixed in
+   * Calcite through CALCITE-4199 (https://issues.apache.org/jira/browse/CALCITE-4199), but has not made it into a
+   * release yet.
+   */
+  @Test
+  public void testSqlNumericalLiteralisIntegerNPE() {
+    CalciteSqlCompiler compiler = new CalciteSqlCompiler();
+    BrokerRequest sqlBrokerRequest = compiler.compileToBrokerRequest("SELECT * FROM testTable WHERE floatColumn > " + Double.MAX_VALUE);
+  }
+
+  @Test
+  public void testUnsupportedDistinctQueries() {
+    String sql = "SELECT DISTINCT col1, col2 FROM foo GROUP BY col1";
+    testUnsupportedDistinctQuery(sql, "DISTINCT with GROUP BY is not supported");
+
+    sql = "SELECT DISTINCT col1, col2 FROM foo LIMIT 0";
+    testUnsupportedDistinctQuery(sql, "DISTINCT must have positive LIMIT");
+
+    sql = "SELECT DISTINCT col1, col2 FROM foo ORDER BY col3";
+    testUnsupportedDistinctQuery(sql, "ORDER-BY columns should be included in the DISTINCT columns");
+
+    sql =
+        "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY col1, col2, col3";
+    testUnsupportedDistinctQuery(sql, "ORDER-BY columns should be included in the DISTINCT columns");
+
+    sql =
+        "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY col1, mod(col2, 10)";
+    testUnsupportedDistinctQuery(sql, "ORDER-BY columns should be included in the DISTINCT columns");
+  }
+
+  @Test
+  public void testSupportedDistinctQueries() {
+    String sql = "SELECT DISTINCT col1, col2 FROM foo ORDER BY col1, col2";
+    testSupportedDistinctQuery(sql);
+
+    sql = "SELECT DISTINCT col1, col2 FROM foo ORDER BY col2, col1";
+    testSupportedDistinctQuery(sql);
+
+    sql = "SELECT DISTINCT col1, col2 FROM foo ORDER BY col1 DESC, col2";
+    testSupportedDistinctQuery(sql);
+
+    sql = "SELECT DISTINCT col1, col2 FROM foo ORDER BY col1, col2 DESC";
+    testSupportedDistinctQuery(sql);
+
+    sql = "SELECT DISTINCT col1, col2 FROM foo ORDER BY col1 DESC, col2 DESC";
+    testSupportedDistinctQuery(sql);
+
+    sql =
+        "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY add(col1, sub(col2, 3))";
+    testSupportedDistinctQuery(sql);
+
+    sql =
+        "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY mod(col2, 10), add(col1, sub(col2, 3))";
+    testSupportedDistinctQuery(sql);
+
+    sql =
+        "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) DESC";
+    testSupportedDistinctQuery(sql);
+  }
+
+  private void testUnsupportedDistinctQuery(String query, String errorMessage) {
+    try {
+      PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+      Assert.fail("Query should have failed");
+    } catch (Exception e) {
+      Assert.assertEquals(errorMessage, e.getMessage());
+    }
+  }
+
+  private void testSupportedDistinctQuery(String query) {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertNotNull(pinotQuery);
   }
 }

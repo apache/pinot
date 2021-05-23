@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.segment.processing.collector;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.Iterator;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
@@ -25,19 +27,21 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 /**
  * Collects and stores GenericRows
  */
-public interface Collector {
+public interface Collector extends Closeable {
 
   /**
    * Collects the given GenericRow and stores it
    * @param genericRow the generic row to add to the collection
    */
-  void collect(GenericRow genericRow);
+  void collect(GenericRow genericRow)
+      throws IOException;
 
   /**
    * Finish any pre-exit processing and seal the collection for reading
    * Provide an iterator for the GenericRows in the collection
    */
-  Iterator<GenericRow> iterator();
+  Iterator<GenericRow> iterator()
+      throws IOException;
 
   /**
    * The number of rows in the collection
@@ -47,5 +51,6 @@ public interface Collector {
   /**
    * Resets the collection of this collector by deleting all existing GenericRows
    */
-  void reset();
+  void reset()
+      throws IOException;
 }

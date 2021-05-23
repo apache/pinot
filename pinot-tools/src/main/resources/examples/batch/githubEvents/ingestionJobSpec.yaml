@@ -42,7 +42,7 @@ executionFrameworkSpec:
 jobType: SegmentCreationAndTarPush
 
 # inputDirURI: Root directory of input data, expected to have scheme configured in PinotFS.
-inputDirURI: 'examples/batch/githubEvents/rawdata'
+inputDirURI: 'examples/batch/githubEvents/rawdata_json_index'
 
 # includeFileNamePattern: include file name pattern, supported glob pattern.
 # Sample usage:

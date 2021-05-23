@@ -38,6 +38,7 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -159,15 +160,19 @@ public class TimeBoundaryManager {
    * ONLINE/CONSUMING instances in the ideal state and selected by the pre-selector).
    * <p>NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
    * ones. The refreshed segment ZK metadata change won't be picked up.
-   * <p>NOTE: {@code externalView} and {@code idealState} are unused, but intentionally passed in in case they are
-   * needed in the future.
+   * <p>NOTE: {@code idealState} is unused, but intentionally passed in in case it is needed in the future.
    */
   @SuppressWarnings("unused")
   public synchronized void onExternalViewChange(ExternalView externalView, IdealState idealState,
       Set<String> onlineSegments) {
     for (String segment : onlineSegments) {
-      _endTimeMsMap.computeIfAbsent(segment, k -> extractEndTimeMsFromSegmentZKMetadataZNRecord(segment,
-          _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT)));
+      // NOTE: Only update the segment end time when there are ONLINE instances in the external view to prevent moving
+      //       the time boundary before the new segment is picked up by the servers
+      Map<String, String> instanceStateMap = externalView.getStateMap(segment);
+      if (instanceStateMap != null && instanceStateMap.containsValue(SegmentStateModel.ONLINE)) {
+        _endTimeMsMap.computeIfAbsent(segment, k -> extractEndTimeMsFromSegmentZKMetadataZNRecord(segment,
+            _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT)));
+      }
     }
     _endTimeMsMap.keySet().retainAll(onlineSegments);
     updateTimeBoundaryInfo(getMaxEndTimeMs());

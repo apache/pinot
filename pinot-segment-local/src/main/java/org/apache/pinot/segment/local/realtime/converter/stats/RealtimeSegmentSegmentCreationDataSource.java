@@ -18,12 +18,11 @@
  */
 package org.apache.pinot.segment.local.realtime.converter.stats;
 
-import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
-import org.apache.pinot.segment.local.realtime.converter.RealtimeSegmentRecordReader;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
+import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentCreationDataSource;
 import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsContainer;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.RecordReader;
 
 
@@ -31,29 +30,22 @@ import org.apache.pinot.spi.data.readers.RecordReader;
  * Segment creation data source that is based on an in-memory realtime segment.
  */
 public class RealtimeSegmentSegmentCreationDataSource implements SegmentCreationDataSource {
-  private final MutableSegmentImpl _realtimeSegment;
-  private final RealtimeSegmentRecordReader _realtimeSegmentRecordReader;
-  private final Schema _schema;
+  private final MutableSegment _mutableSegment;
+  private final PinotSegmentRecordReader _recordReader;
 
-  public RealtimeSegmentSegmentCreationDataSource(MutableSegmentImpl realtimeSegment,
-      RealtimeSegmentRecordReader realtimeSegmentRecordReader, Schema schema) {
-    _realtimeSegment = realtimeSegment;
-    _realtimeSegmentRecordReader = realtimeSegmentRecordReader;
-    _schema = schema;
+  public RealtimeSegmentSegmentCreationDataSource(MutableSegment mutableSegment,
+      PinotSegmentRecordReader recordReader) {
+    _mutableSegment = mutableSegment;
+    _recordReader = recordReader;
   }
 
   @Override
   public SegmentPreIndexStatsContainer gatherStats(StatsCollectorConfig statsCollectorConfig) {
-    if (!statsCollectorConfig.getSchema().equals(_schema)) {
-      throw new RuntimeException("Incompatible schemas used for conversion and extraction");
-    }
-
-    return new RealtimeSegmentStatsContainer(
-            _realtimeSegment, _realtimeSegmentRecordReader);
+    return new RealtimeSegmentStatsContainer(_mutableSegment, _recordReader.getSortedDocIds());
   }
 
   @Override
   public RecordReader getRecordReader() {
-    return _realtimeSegmentRecordReader;
+    return _recordReader;
   }
 }

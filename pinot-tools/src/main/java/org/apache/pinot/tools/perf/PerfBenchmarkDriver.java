@@ -382,22 +382,13 @@ public class PerfBenchmarkDriver {
 
   public JsonNode postQuery(String query)
       throws Exception {
-    return postQuery(_conf.getDialect(), query, null);
+    return postQuery(_conf.getDialect(), query);
   }
 
-  public JsonNode postQuery(String query, String optimizationFlags)
-          throws Exception {
-    return postQuery(_conf.getDialect(), query, optimizationFlags);
-  }
-
-  public JsonNode postQuery(String dialect, String query, String optimizationFlags)
+  public JsonNode postQuery(String dialect, String query)
       throws Exception {
     ObjectNode requestJson = JsonUtils.newObjectNode();
     requestJson.put(dialect, query);
-
-    if (optimizationFlags != null && !optimizationFlags.isEmpty()) {
-      requestJson.put("debugOptions", "optimizationFlags=" + optimizationFlags);
-    }
 
     long start = System.currentTimeMillis();
     String queryUrl = _brokerBaseApiUrl + "/query";

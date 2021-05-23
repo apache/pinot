@@ -102,6 +102,10 @@
       <groupId>com.clearspring.analytics</groupId>
       <artifactId>stream</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.quartz-scheduler</groupId>
+      <artifactId>quartz</artifactId>
+    </dependency>
 
     <!-- Test dependencies -->
     <dependency>

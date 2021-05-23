@@ -67,6 +67,7 @@ public class IntermediateResultsBlock implements Block {
   private int _numResizes;
   private long _resizeTimeMs;
   private long _executionThreadCpuTimeNs;
+  private int _numServerThreads;
 
   private Table _table;
 
@@ -209,6 +210,14 @@ public class IntermediateResultsBlock implements Block {
     _executionThreadCpuTimeNs = executionThreadCpuTimeNs;
   }
 
+  public void setNumServerThreads(int numServerThreads) {
+    _numServerThreads = numServerThreads;
+  }
+
+  public int getNumServerThreads() {
+    return _numServerThreads;
+  }
+
   @VisibleForTesting
   public long getNumDocsScanned() {
     return _numDocsScanned;
@@ -298,15 +307,14 @@ public class IntermediateResultsBlock implements Block {
   private DataTable getResultDataTable()
       throws IOException {
     DataTableBuilder dataTableBuilder = new DataTableBuilder(_dataSchema);
-
+    ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
     Iterator<Record> iterator = _table.iterator();
-    ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
     while (iterator.hasNext()) {
       Record record = iterator.next();
       dataTableBuilder.startRow();
       int columnIndex = 0;
       for (Object value : record.getValues()) {
-        setDataTableColumn(columnDataTypes[columnIndex], dataTableBuilder, columnIndex, value);
+        setDataTableColumn(storedColumnDataTypes[columnIndex], dataTableBuilder, columnIndex, value);
         columnIndex++;
       }
       dataTableBuilder.finishRow();

@@ -44,6 +44,8 @@ public abstract class BaseOp {
   private final OpType _opType;
   private String _description = "No description provided";
   protected static final String GENERATION_NUMBER_PLACEHOLDER = "__GENERATION_NUMBER__";
+  protected static final String CONFIG_PLACEHOLDER = "/config/";
+  private String _parentDir;
 
   protected BaseOp(OpType opType) {
     _opType = opType;
@@ -63,6 +65,18 @@ public abstract class BaseOp {
 
   public String getDescription() {
     return _description;
+  }
+
+  public String getParentDir() {
+    return _parentDir;
+  }
+
+  public void setParentDir(String parentDir) {
+    _parentDir = parentDir;
+  }
+
+  public String getAbsoluteFileName(String fileName) {
+    return _parentDir + CONFIG_PLACEHOLDER + fileName;
   }
 
   public  boolean run(int generationNumber) {

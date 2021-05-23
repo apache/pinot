@@ -37,6 +37,7 @@ public class RecommenderConstants {
   }
 
   public static class RulesToExecute {
+    public static final boolean DEFAULT_RECOMMEND_SEGMENT_SIZE = true;
     public static final boolean DEFAULT_RECOMMEND_FLAG_QUERY = true;
     public static final boolean DEFAULT_RECOMMEND_VARIED_LENGTH_DICTIONARY = true;
     public static final boolean DEFAULT_RECOMMEND_KAFKA_PARTITION = true;
@@ -53,10 +54,10 @@ public class RecommenderConstants {
 
     public static final long DEFAULT_THRESHOLD_MAX_LATENCY_SLA_PARTITION = 1000;
     public static final long DEFAULT_THRESHOLD_MIN_QPS_PARTITION = 200;
-    public static final long DEFAULT_OPTIMAL_SIZE_PER_SEGMENT = 1000_000_000; //1GB
     public static final long DEFAULT_KAFKA_NUM_MESSAGES_PER_SEC_PER_PARTITION = 250;
     public static final double DEFAULT_THRESHOLD_RATIO_MIN_DIMENSION_PARTITION_TOP_CANDIDATES = 0.8d;
     public static final int DEFAULT_THRESHOLD_MAX_IN_LENGTH = 4;
+    public static final double ACCEPTABLE_CARDINALITY_TO_NUM_PARTITIONS_RATIO = 0.7;
   }
 
   public static class BloomFilterRule {
@@ -76,10 +77,10 @@ public class RecommenderConstants {
 
   public static class FlagQueryRuleParams{
     public static final long DEFAULT_THRESHOLD_MAX_LIMIT_SIZE = 100000;
-    public static final String WARNING_NO_FILTERING = "Warning: No filtering in ths query";
-    public static final String WARNING_NO_TIME_COL = "Warning: No time column used in ths query";
-    public static final String WARNING_TOO_LONG_LIMIT = "Warning: The size of LIMIT is longer than " + DEFAULT_THRESHOLD_MAX_LIMIT_SIZE;
-    public static final String ERROR_INVALID_QUERY = "Error: query not able to parse, skipped";
+    public static final String WARNING_NO_FILTERING = "Warning: Query seems to scan the entire table. No filters are used in the query. Please verify if filters are not needed.";
+    public static final String WARNING_NO_TIME_COL = "Warning: No time column used in filter in the query. Table with time columns typically use it in filters to make the queries more selective.";
+    public static final String WARNING_TOO_LONG_LIMIT = "Warning: Please verify if you need to pull out huge number of records for this query. Consider using smaller limit than " + DEFAULT_THRESHOLD_MAX_LIMIT_SIZE;
+    public static final String ERROR_INVALID_QUERY = "Error: Invalid query syntax. Please fix the query";
   }
 
   public static class RealtimeProvisioningRule {
@@ -87,6 +88,13 @@ public class RecommenderConstants {
     public static final String DEFAULT_MAX_USABLE_HOST_MEMORY = "48G";
     public static final int[] DEFAULT_NUM_HOURS = {2, 4, 6, 8, 10, 12};
     public static final int[] DEFAULT_NUM_HOSTS = {3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+  }
+
+  public static class SegmentSizeRule {
+    public static final int DEFAULT_NUM_SEGMENTS = 1;
+    public static final int DEFAULT_DESIRED_SEGMENT_SIZE_MB = 500;
+    public static final int NOT_PROVIDED = -1;
+    public static final double INDEX_OVERHEAD_RATIO_FOR_SEGMENT_SIZE = 1.2;
   }
 
   public static final String PQL = "pql";
@@ -119,4 +127,5 @@ public class RecommenderConstants {
   public static final int FIRST = 0;
   public static final int SECOND = 1;
 
+  public static final int DEFAULT_NUM_ROWS_IN_GENERATED_SEGMENT = 50_000;
 }

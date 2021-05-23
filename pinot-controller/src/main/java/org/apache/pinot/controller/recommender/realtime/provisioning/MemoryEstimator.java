@@ -21,9 +21,7 @@ package org.apache.pinot.controller.recommender.realtime.provisioning;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -72,7 +70,6 @@ import org.slf4j.LoggerFactory;
 public class MemoryEstimator {
 
   private static final String NOT_APPLICABLE = "NA";
-  private static final String TMP_DIR = System.getProperty("java.io.tmpdir") + File.separator;
   private static final String STATS_FILE_NAME = "stats.ser";
   private static final String STATS_FILE_COPY_NAME = "stats.copy.ser";
 
@@ -90,7 +87,10 @@ public class MemoryEstimator {
   private Set<String> _noDictionaryColumns = new HashSet<>();
   private Set<String> _varLengthDictionaryColumns = new HashSet<>();
   int _avgMultiValues;
-  private File _tableDataDir;
+
+  // Working dir will contain statsFile and also the generated segment if requested.
+  // It will get deleted after memory estimation is done.
+  private File _workingDir;
 
   private String[][] _activeMemoryPerHost;
   private String[][] _optimalSegmentSize;
@@ -101,7 +101,7 @@ public class MemoryEstimator {
    * Constructor used for processing the given completed segment
    */
   public MemoryEstimator(TableConfig tableConfig, File sampleCompletedSegment, int ingestionRatePerPartition,
-      long maxUsableHostMemory, int tableRetentionHours) {
+      long maxUsableHostMemory, int tableRetentionHours, File workingDir) {
     _maxUsableHostMemory = maxUsableHostMemory;
     _tableConfig = tableConfig;
     _tableNameWithType = tableConfig.getTableName();
@@ -127,26 +127,21 @@ public class MemoryEstimator {
       _invertedIndexColumns.addAll(_tableConfig.getIndexingConfig().getInvertedIndexColumns());
     }
     _avgMultiValues = getAvgMultiValues();
-
-    _tableDataDir = new File(TMP_DIR, _tableNameWithType);
-    try {
-      FileUtils.deleteDirectory(_tableDataDir);
-    } catch (IOException e) {
-      throw new RuntimeException("Exception in deleting directory " + _tableDataDir.getAbsolutePath(), e);
-    }
-    _tableDataDir.mkdir();
+    _workingDir = workingDir;
   }
 
   /**
    * Constructor used for processing the given data characteristics (instead of completed segment)
    */
   public MemoryEstimator(TableConfig tableConfig, Schema schema, SchemaWithMetaData schemaWithMetadata,
-      int numberOfRows, int ingestionRatePerPartition, long maxUsableHostMemory, int tableRetentionHours) {
+      int numberOfRows, int ingestionRatePerPartition, long maxUsableHostMemory, int tableRetentionHours,
+      File workingDir) {
     this(tableConfig,
-        generateCompletedSegment(schemaWithMetadata, schema, tableConfig, numberOfRows),
+        generateCompletedSegment(schemaWithMetadata, schema, tableConfig, numberOfRows, workingDir),
         ingestionRatePerPartition,
         maxUsableHostMemory,
-        tableRetentionHours);
+        tableRetentionHours,
+        workingDir);
   }
 
   /**
@@ -157,7 +152,7 @@ public class MemoryEstimator {
    */
   public File initializeStatsHistory() {
 
-    File statsFile = new File(_tableDataDir, STATS_FILE_NAME);
+    File statsFile = new File(_workingDir, STATS_FILE_NAME);
     RealtimeSegmentStatsHistory sampleStatsHistory;
     try {
       sampleStatsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
@@ -249,54 +244,59 @@ public class MemoryEstimator {
       }
     }
 
-    for (int i = 0; i < numHours.length; i++) {
-      int numHoursToConsume = numHours[i];
-      if (numHoursToConsume > retentionHours) {
-        continue;
-      }
-      long secondsToConsume = numHoursToConsume * 3600;
-      // consuming for _numHoursSampleSegmentConsumed, gives size sampleCompletedSegmentSizeBytes
-      // hence, consuming for numHoursToConsume would give:
-      long completedSegmentSizeBytes =
-          (long) (((double) secondsToConsume / _sampleSegmentConsumedSeconds) * _sampleCompletedSegmentSizeBytes);
+    try {
+      for (int i = 0; i < numHours.length; i++) {
+        int numHoursToConsume = numHours[i];
+        if (numHoursToConsume > retentionHours) {
+          continue;
+        }
+        long secondsToConsume = numHoursToConsume * 3600;
+        // consuming for _numHoursSampleSegmentConsumed, gives size sampleCompletedSegmentSizeBytes
+        // hence, consuming for numHoursToConsume would give:
+        long completedSegmentSizeBytes =
+            (long) (((double) secondsToConsume / _sampleSegmentConsumedSeconds) * _sampleCompletedSegmentSizeBytes);
 
-      // numHoursSampleSegmentConsumed created totalDocsInSampleSegment num rows
-      // numHoursToConsume will create ? rows
-      int totalDocs = (int) (((double) secondsToConsume / _sampleSegmentConsumedSeconds) * _totalDocsInSampleSegment);
-      long memoryForConsumingSegmentPerPartition = getMemoryForConsumingSegmentPerPartition(statsFile, totalDocs);
+        // numHoursSampleSegmentConsumed created totalDocsInSampleSegment num rows
+        // numHoursToConsume will create ? rows
+        int totalDocs = (int) (((double) secondsToConsume / _sampleSegmentConsumedSeconds) * _totalDocsInSampleSegment);
+        long memoryForConsumingSegmentPerPartition = getMemoryForConsumingSegmentPerPartition(statsFile, totalDocs);
 
-      memoryForConsumingSegmentPerPartition += getMemoryForInvertedIndex(memoryForConsumingSegmentPerPartition);
+        memoryForConsumingSegmentPerPartition += getMemoryForInvertedIndex(memoryForConsumingSegmentPerPartition);
 
-      int numActiveSegmentsPerPartition = (retentionHours + numHoursToConsume - 1) / numHoursToConsume;
-      long activeMemoryForCompletedSegmentsPerPartition =
-          completedSegmentSizeBytes * (numActiveSegmentsPerPartition - 1);
-      int numCompletedSegmentsPerPartition = (_tableRetentionHours + numHoursToConsume - 1) / numHoursToConsume - 1;
+        int numActiveSegmentsPerPartition = (retentionHours + numHoursToConsume - 1) / numHoursToConsume;
+        long activeMemoryForCompletedSegmentsPerPartition =
+            completedSegmentSizeBytes * (numActiveSegmentsPerPartition - 1);
+        int numCompletedSegmentsPerPartition = (_tableRetentionHours + numHoursToConsume - 1) / numHoursToConsume - 1;
 
-      for (int j = 0; j < numHosts.length; j++) {
-        int numHostsToProvision = numHosts[j];
-        // adjustment because we want ceiling of division and not floor, as some hosts will have an extra partition due to the remainder of the division
-        int totalConsumingPartitionsPerHost =
-            (totalConsumingPartitions + numHostsToProvision - 1) / numHostsToProvision;
+        for (int j = 0; j < numHosts.length; j++) {
+          int numHostsToProvision = numHosts[j];
+          // adjustment because we want ceiling of division and not floor, as some hosts will have an extra partition due to the remainder of the division
+          int totalConsumingPartitionsPerHost =
+              (totalConsumingPartitions + numHostsToProvision - 1) / numHostsToProvision;
 
-        long activeMemoryForCompletedSegmentsPerHost =
-            activeMemoryForCompletedSegmentsPerPartition * totalConsumingPartitionsPerHost;
-        long totalMemoryForConsumingSegmentsPerHost =
-            memoryForConsumingSegmentPerPartition * totalConsumingPartitionsPerHost;
-        long activeMemoryPerHostBytes =
-            activeMemoryForCompletedSegmentsPerHost + totalMemoryForConsumingSegmentsPerHost;
-        long mappedMemoryPerHost =
-            totalMemoryForConsumingSegmentsPerHost + (numCompletedSegmentsPerPartition * totalConsumingPartitionsPerHost
-                * completedSegmentSizeBytes);
+          long activeMemoryForCompletedSegmentsPerHost =
+              activeMemoryForCompletedSegmentsPerPartition * totalConsumingPartitionsPerHost;
+          long totalMemoryForConsumingSegmentsPerHost =
+              memoryForConsumingSegmentPerPartition * totalConsumingPartitionsPerHost;
+          long activeMemoryPerHostBytes =
+              activeMemoryForCompletedSegmentsPerHost + totalMemoryForConsumingSegmentsPerHost;
+          long mappedMemoryPerHost =
+              totalMemoryForConsumingSegmentsPerHost + (numCompletedSegmentsPerPartition * totalConsumingPartitionsPerHost
+                  * completedSegmentSizeBytes);
 
-        if (activeMemoryPerHostBytes <= _maxUsableHostMemory) {
-          _activeMemoryPerHost[i][j] =
-              DataSizeUtils.fromBytes(activeMemoryPerHostBytes) + "/" + DataSizeUtils.fromBytes(mappedMemoryPerHost);
-          _consumingMemoryPerHost[i][j] = DataSizeUtils.fromBytes(totalMemoryForConsumingSegmentsPerHost);
-          _optimalSegmentSize[i][j] = DataSizeUtils.fromBytes(completedSegmentSizeBytes);
-          _numSegmentsQueriedPerHost[i][j] =
-              String.valueOf(numActiveSegmentsPerPartition * totalConsumingPartitionsPerHost);
+          if (activeMemoryPerHostBytes <= _maxUsableHostMemory) {
+            _activeMemoryPerHost[i][j] =
+                DataSizeUtils.fromBytes(activeMemoryPerHostBytes) + "/" + DataSizeUtils.fromBytes(mappedMemoryPerHost);
+            _consumingMemoryPerHost[i][j] = DataSizeUtils.fromBytes(totalMemoryForConsumingSegmentsPerHost);
+            _optimalSegmentSize[i][j] = DataSizeUtils.fromBytes(completedSegmentSizeBytes);
+            _numSegmentsQueriedPerHost[i][j] =
+                String.valueOf(numActiveSegmentsPerPartition * totalConsumingPartitionsPerHost);
+          }
         }
       }
+    } finally {
+      // cleanup
+      FileUtils.deleteQuietly(_workingDir);
     }
   }
 
@@ -304,7 +304,7 @@ public class MemoryEstimator {
       throws IOException {
     // We don't want the stats history to get updated from all our dummy runs
     // So we copy over the original stats history every time we start
-    File statsFileCopy = new File(_tableDataDir, STATS_FILE_COPY_NAME);
+    File statsFileCopy = new File(_workingDir, STATS_FILE_COPY_NAME);
     FileUtils.copyFile(statsFile, statsFileCopy);
     RealtimeSegmentStatsHistory statsHistory;
     try {
@@ -351,7 +351,7 @@ public class MemoryEstimator {
         GenericRow row = new GenericRow();
 
         while (segmentRecordReader.hasNext()) {
-          segmentRecordReader.next(row);
+          row = segmentRecordReader.next(row);
           for (String multiValueColumn : multiValueColumns) {
             multiValuesSum += ((Object[]) (row.getValue(multiValueColumn))).length;
             numValues++;
@@ -431,8 +431,8 @@ public class MemoryEstimator {
   }
 
   private static File generateCompletedSegment(SchemaWithMetaData schemaWithMetadata, Schema schema,
-      TableConfig tableConfig, int numberOfRows) {
-    return new SegmentGenerator(schemaWithMetadata, schema, tableConfig, numberOfRows, true).generate();
+      TableConfig tableConfig, int numberOfRows, File workingDir) {
+    return new SegmentGenerator(schemaWithMetadata, schema, tableConfig, numberOfRows, true, workingDir).generate();
   }
 
   /**
@@ -440,34 +440,35 @@ public class MemoryEstimator {
    */
   public static class SegmentGenerator {
     private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGenerator.class);
-    private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd_HH:mm:ss");
 
     private SchemaWithMetaData _schemaWithMetadata;
     private Schema _schema;
     private TableConfig _tableConfig;
     private int _numberOfRows;
     private boolean _deleteCsv;
+    private File _workingDir;
 
     public SegmentGenerator(SchemaWithMetaData schemaWithMetadata, Schema schema, TableConfig tableConfig,
-        int numberOfRows, boolean deleteCsv) {
+        int numberOfRows, boolean deleteCsv, File workingDir) {
       _schemaWithMetadata = schemaWithMetadata;
       _schema = schema;
       _tableConfig = tableConfig;
       _numberOfRows = numberOfRows;
       _deleteCsv = deleteCsv;
+      _workingDir = workingDir;
     }
 
     public File generate() {
-      Date now = new Date();
-      File csvDataFile = generateData(now);
-      File segment = createSegment(csvDataFile, now);
+      File csvDataFile = generateData();
+      File segment = createSegment(csvDataFile);
       if (_deleteCsv) {
-        csvDataFile.delete();
+        File csvDir = csvDataFile.getParentFile();
+        FileUtils.deleteQuietly(csvDir);
       }
       return segment;
     }
 
-    private File generateData(Date now) {
+    private File generateData() {
 
       // create maps of "column name" to ...
       Map<String, Integer> lengths = new HashMap<>();
@@ -507,7 +508,7 @@ public class MemoryEstimator {
       }
 
       // generate data
-      String outputDir = getOutputDir(now, "-csv");
+      String outputDir = new File(_workingDir, "csv").getAbsolutePath();
       DataGeneratorSpec spec =
           new DataGeneratorSpec(colNames, cardinalities, new HashMap<>(), new HashMap<>(), mvCounts, lengths, dataTypes,
               fieldTypes, timeUnits, FileFormat.CSV, outputDir, true);
@@ -519,21 +520,25 @@ public class MemoryEstimator {
         LOGGER.info("Successfully generated data file: {}", outputFile);
         return outputFile;
       } catch (Exception e) {
+        FileUtils.deleteQuietly(new File(outputDir));
         throw new RuntimeException(e);
       }
     }
 
-    private File createSegment(File csvDataFile, Date now) {
+    private File createSegment(File csvDataFile) {
 
       // create segment
       LOGGER.info("Started creating segment from file: {}", csvDataFile);
-      String outDir = getOutputDir(now, "-segment");
+      String outDir = new File(_workingDir, "segment").getAbsolutePath();
       SegmentGeneratorConfig segmentGeneratorConfig = getSegmentGeneratorConfig(csvDataFile, outDir);
       SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
       try {
         driver.init(segmentGeneratorConfig);
         driver.build();
       } catch (Exception e) {
+        FileUtils.deleteQuietly(new File(outDir));
+        File csvDir = csvDataFile.getParentFile();
+        FileUtils.deleteQuietly(csvDir);
         throw new RuntimeException("Caught exception while generating segment from file: " + csvDataFile, e);
       }
       String segmentName = driver.getSegmentName();
@@ -563,10 +568,6 @@ public class MemoryEstimator {
       segmentGeneratorConfig.setTableName(_tableConfig.getTableName());
       segmentGeneratorConfig.setSequenceId(0);
       return segmentGeneratorConfig;
-    }
-
-    private String getOutputDir(Date date, String suffix) {
-      return Paths.get(System.getProperty("java.io.tmpdir"), DATE_FORMAT.format(date) + suffix).toString();
     }
   }
 }

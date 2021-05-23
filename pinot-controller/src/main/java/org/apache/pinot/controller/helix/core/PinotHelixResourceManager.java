@@ -98,7 +98,9 @@ import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
 import org.apache.pinot.common.utils.helix.TableCache;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.api.resources.ControllerApplicationException;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
+import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
+import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.api.resources.StateType;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
@@ -1309,30 +1311,6 @@ public class PinotHelixResourceManager {
     return _helixDataAccessor.getBaseDataAccessor().getStat(path, -1);
   }
 
-  public static class InvalidTableConfigException extends RuntimeException {
-    public InvalidTableConfigException(String message) {
-      super(message);
-    }
-
-    public InvalidTableConfigException(String message, Throwable cause) {
-      super(message, cause);
-    }
-
-    public InvalidTableConfigException(Throwable cause) {
-      super(cause);
-    }
-  }
-
-  public static class TableAlreadyExistsException extends RuntimeException {
-    public TableAlreadyExistsException(String message) {
-      super(message);
-    }
-
-    public TableAlreadyExistsException(String message, Throwable cause) {
-      super(message, cause);
-    }
-  }
-
   public void registerPinotLLCRealtimeSegmentManager(PinotLLCRealtimeSegmentManager pinotLLCRealtimeSegmentManager) {
     _pinotLLCRealtimeSegmentManager = pinotLLCRealtimeSegmentManager;
   }
@@ -2137,6 +2115,17 @@ public class PinotHelixResourceManager {
       }
     }
     return consumingSegments;
+  }
+
+  /**
+   * Utility function to return set of servers corresponding to a given segment.
+   */
+  public Set<String> getServersForSegment(String tableNameWithType, String segmentName) {
+    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
+    if (idealState == null) {
+      throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
+    }
+    return new HashSet<>(idealState.getInstanceStateMap(segmentName).keySet());
   }
 
   public synchronized Map<String, String> getSegmentsCrcForTable(String tableNameWithType) {

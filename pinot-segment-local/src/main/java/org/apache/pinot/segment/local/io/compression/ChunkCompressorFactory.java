@@ -48,6 +48,9 @@ public class ChunkCompressorFactory {
       case SNAPPY:
         return new SnappyCompressor();
 
+      case ZSTANDARD:
+        return new ZstandardCompressor();
+
       default:
         throw new IllegalArgumentException("Illegal compressor name " + compressionType);
     }
@@ -66,6 +69,9 @@ public class ChunkCompressorFactory {
 
       case SNAPPY:
         return new SnappyDecompressor();
+
+      case ZSTANDARD:
+        return new ZstandardDecompressor();
 
       default:
         throw new IllegalArgumentException("Illegal compressor name " + compressionType);
