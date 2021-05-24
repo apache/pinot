@@ -227,26 +227,28 @@ public class GenericRow implements Serializable {
   }
 
   private boolean compareMap(Map<String, Object> thisMap, Map<String, Object> thatMap) {
-    if (thisMap.size() == thatMap.size()) {
-      for (String key : thisMap.keySet()) {
-        Object fieldValue = thisMap.get(key);
-        Object thatFieldValue = thatMap.get(key);
-        if (fieldValue == null) {
-          if (thatFieldValue != null) {
-            return false;
-          }
-        } else if (!fieldValue.equals(thatFieldValue)) {
-          if (fieldValue instanceof Map && thatFieldValue instanceof Map) {
-            return compareMap((Map<String, Object>) fieldValue, (Map<String, Object>) thatFieldValue);
-          }
-          if ((fieldValue instanceof byte[]) && (thatFieldValue instanceof byte[])) {
-            return Arrays.equals((byte[]) fieldValue, (byte[]) thatFieldValue);
-          }
-          if (fieldValue.getClass().isArray() && thatFieldValue.getClass().isArray()) {
-            return compareArray((Object[]) fieldValue, (Object[]) thatFieldValue);
-          }
+    if (thisMap.size() != thatMap.size()) {
+      return false;
+    }
+
+    for (String key : thisMap.keySet()) {
+      Object fieldValue = thisMap.get(key);
+      Object thatFieldValue = thatMap.get(key);
+      if (fieldValue == null) {
+        if (thatFieldValue != null) {
           return false;
         }
+      } else if (!fieldValue.equals(thatFieldValue)) {
+        if (fieldValue instanceof Map && thatFieldValue instanceof Map) {
+          return compareMap((Map<String, Object>) fieldValue, (Map<String, Object>) thatFieldValue);
+        }
+        if ((fieldValue instanceof byte[]) && (thatFieldValue instanceof byte[])) {
+          return Arrays.equals((byte[]) fieldValue, (byte[]) thatFieldValue);
+        }
+        if (fieldValue.getClass().isArray() && thatFieldValue.getClass().isArray()) {
+          return compareArray((Object[]) fieldValue, (Object[]) thatFieldValue);
+        }
+        return false;
       }
     }
     return true;
