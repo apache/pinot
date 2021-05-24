@@ -48,7 +48,7 @@ import org.apache.pinot.spi.utils.ReadMode;
  */
 public class IndexLoadingConfig {
   private static final int DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT = 2;
-  public static final String DEFAULT_SEGMENT_DIRECTORY_LOADER = "localSegmentDirectoryLoader";
+  public static final String DEFAULT_TIER_BACKEND = "local";
 
   private ReadMode _readMode = ReadMode.DEFAULT_MODE;
   private List<String> _sortedColumns = Collections.emptyList();
@@ -80,8 +80,8 @@ public class IndexLoadingConfig {
   private Map<String, Map<String, String>> _columnProperties = new HashMap<>();
 
   private TableConfig _tableConfig;
-  private String _segmentDirectoryLoader;
-  private PinotConfiguration _segmentDirectoryConfig;
+  private String _tierBackend;
+  private PinotConfiguration _tierConfigs;
 
   public IndexLoadingConfig(InstanceDataManagerConfig instanceDataManagerConfig, TableConfig tableConfig) {
     extractFromInstanceConfig(instanceDataManagerConfig);
@@ -243,8 +243,8 @@ public class IndexLoadingConfig {
     }
     _enableSplitCommitEndWithMetadata = instanceDataManagerConfig.isEnableSplitCommitEndWithMetadata();
     _segmentStoreURI = instanceDataManagerConfig.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI);
-    _segmentDirectoryLoader = instanceDataManagerConfig.getSegmentDirectoryLoader();
-    _segmentDirectoryConfig = instanceDataManagerConfig.getSegmentDirectoryConfig();
+    _tierBackend = instanceDataManagerConfig.getTierBackend();
+    _tierConfigs = instanceDataManagerConfig.getTierConfigs();
   }
 
   /**
@@ -278,10 +278,8 @@ public class IndexLoadingConfig {
 
   /**
    * Used in two places:
-   * (1) In {@link PhysicalColumnIndexContainer}
-   * to create the index loading info for immutable segments
-   * (2) In {@link org.apache.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager}
-   * to create the {@link org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig}.
+   * (1) In {@link PhysicalColumnIndexContainer} to create the index loading info for immutable segments
+   * (2) In LLRealtimeSegmentDataManager to create the RealtimeSegmentConfig.
    * RealtimeSegmentConfig is used to specify the text index column info for newly
    * to-be-created Mutable Segments
    * @return a set containing names of text index columns
@@ -451,16 +449,16 @@ public class IndexLoadingConfig {
     _tableConfig = tableConfig;
   }
 
-  public String getSegmentDirectoryLoader() {
-    return StringUtils.isNotBlank(_segmentDirectoryLoader) ? _segmentDirectoryLoader : DEFAULT_SEGMENT_DIRECTORY_LOADER;
+  public String getTierBackend() {
+    return StringUtils.isNotBlank(_tierBackend) ? _tierBackend : DEFAULT_TIER_BACKEND;
   }
 
-  public PinotConfiguration getSegmentDirectoryConfig() {
-    if (_segmentDirectoryConfig == null) {
+  public PinotConfiguration getTierConfigs() {
+    if (_tierConfigs == null) {
       Map<String, Object> props = new HashMap<>();
       props.put(LocalSegmentDirectoryLoader.READ_MODE_KEY, _readMode);
       return new PinotConfiguration(props);
     }
-    return _segmentDirectoryConfig;
+    return _tierConfigs;
   }
 }

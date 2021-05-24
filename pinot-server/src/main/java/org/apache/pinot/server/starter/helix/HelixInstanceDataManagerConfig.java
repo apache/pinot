@@ -65,11 +65,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public static final String INSTANCE_RELOAD_CONSUMING_SEGMENT = "reload.consumingSegment";
   // Key of the auth token
   public static final String AUTH_TOKEN = "auth.token";
-  // SegmentDirectoryLoader class
-  public static final String SEGMENT_DIRECTORY_LOADER = "segment.directory.loader";
-  public static final String DEFAULT_SEGMENT_DIRECTORY_LOADER = "localSegmentDirectoryLoader";
-  // Prefix for segment directory config
-  public static final String SEGMENT_DIR_CONFIG_PREFIX = "segment.directory.";
+  // Tier properties
+  public static final String TIER_BACKEND = "tier.backend";
+  public static final String DEFAULT_TIER_BACKEND = "local";
+  // Prefix for tier config
+  public static final String TIER_CONFIGS_PREFIX = "tier";
 
   // Key of how many parallel realtime segments can be built.
   // A value of <= 0 indicates unlimited.
@@ -215,18 +215,20 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   @Override
-  public String getSegmentDirectoryLoader() {
-    return _instanceDataManagerConfiguration.getProperty(SEGMENT_DIRECTORY_LOADER, DEFAULT_SEGMENT_DIRECTORY_LOADER);
+  public String getTierBackend() {
+    return _instanceDataManagerConfiguration.getProperty(TIER_BACKEND, DEFAULT_TIER_BACKEND);
   }
 
   @Override
-  public PinotConfiguration getSegmentDirectoryConfig() {
-    Map<String, Object> segmentDirectoryProps =
-        new HashMap<>(_instanceDataManagerConfiguration.subset(SEGMENT_DIR_CONFIG_PREFIX).toMap());
-    if (!segmentDirectoryProps.containsKey(READ_MODE)) {
-      segmentDirectoryProps.put(READ_MODE, getReadMode());
+  public PinotConfiguration getTierConfigs() {
+    String tierBackend = getTierBackend();
+    String tierConfigsPrefix = String.format("%s.%s.", TIER_CONFIGS_PREFIX, tierBackend);
+    Map<String, Object> tierConfigs =
+        new HashMap<>(_instanceDataManagerConfiguration.subset(tierConfigsPrefix).toMap());
+    if (!tierConfigs.containsKey(READ_MODE)) {
+      tierConfigs.put(READ_MODE, getReadMode());
     }
-    return new PinotConfiguration(segmentDirectoryProps);
+    return new PinotConfiguration(tierConfigs);
   }
 
   @Override

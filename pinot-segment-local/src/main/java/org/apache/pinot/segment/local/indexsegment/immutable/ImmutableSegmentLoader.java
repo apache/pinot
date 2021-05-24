@@ -106,7 +106,7 @@ public class ImmutableSegmentLoader {
 
     // Pre-process the segment on local using local SegmentDirectory
     SegmentDirectory localSegmentDirectory = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
-        .load(indexDir.toURI(), indexLoadingConfig.getSegmentDirectoryConfig());
+        .load(indexDir.toURI(), indexLoadingConfig.getTierConfigs());
 
     // NOTE: this step may modify the segment metadata
     try (
@@ -114,11 +114,11 @@ public class ImmutableSegmentLoader {
       preProcessor.process();
     }
 
-    // Load the segment again using the configured SegmentDirectoryLoader. Default is 'localSegmentDirectoryLoader'.
+    // Load the segment again for the configured tier backend. Default is 'local'.
     SegmentDirectoryLoader segmentLoaderDirectory =
-        SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
+        SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getTierBackend());
     SegmentDirectory actualSegmentDirectory =
-        segmentLoaderDirectory.load(indexDir.toURI(), indexLoadingConfig.getSegmentDirectoryConfig());
+        segmentLoaderDirectory.load(indexDir.toURI(), indexLoadingConfig.getTierConfigs());
     SegmentDirectory.Reader segmentReader = actualSegmentDirectory.createReader();
     SegmentMetadataImpl segmentMetadata = actualSegmentDirectory.getSegmentMetadata();
 
@@ -165,10 +165,8 @@ public class ImmutableSegmentLoader {
     }
 
     ImmutableSegmentImpl segment =
-        new ImmutableSegmentImpl(actualSegmentDirectory, segmentMetadata, indexContainerMap,
-            starTreeIndexContainer);
-    LOGGER.info("Successfully loaded segment {} with config: {}", segmentName,
-        indexLoadingConfig.getSegmentDirectoryConfig());
+        new ImmutableSegmentImpl(actualSegmentDirectory, segmentMetadata, indexContainerMap, starTreeIndexContainer);
+    LOGGER.info("Successfully loaded segment {} with config: {}", segmentName, indexLoadingConfig.getTierConfigs());
     return segment;
   }
 }

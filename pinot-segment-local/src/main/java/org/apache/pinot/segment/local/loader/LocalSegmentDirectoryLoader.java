@@ -31,7 +31,7 @@ import org.apache.pinot.spi.utils.ReadMode;
 /**
  * Implementation of {@link SegmentDirectoryLoader} for local FS
  */
-@SegmentLoader(name = "localSegmentDirectoryLoader")
+@SegmentLoader(name = "local")
 public class LocalSegmentDirectoryLoader implements SegmentDirectoryLoader {
 
   public static final String READ_MODE_KEY = "readMode";
