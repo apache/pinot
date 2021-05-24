@@ -26,7 +26,7 @@ import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
-import org.apache.pinot.segment.spi.partition.ColumnPartitionMetadata;
+import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

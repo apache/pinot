@@ -31,8 +31,11 @@ public interface SegmentDirectoryLoader {
   /**
    * Creates the {@link SegmentDirectory} instance
    * @param indexDir index directory
-   * @param config config for SegmentDirectory
+   * @param segmentDirectoryConfig config for SegmentDirectory, containing all properties needed to instantiate the
+   *                               {@link SegmentDirectory}
+   *                               e.g. readMode (MMAP/HEAP) or
+   *                               properties specific to the tier backend (deep store access configs)
    */
-  SegmentDirectory load(URI indexDir, PinotConfiguration config)
+  SegmentDirectory load(URI indexDir, PinotConfiguration segmentDirectoryConfig)
       throws Exception;
 }

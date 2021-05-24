@@ -39,12 +39,12 @@ public class LocalSegmentDirectoryLoader implements SegmentDirectoryLoader {
   /**
    * Creates and loads the {@link SegmentLocalFSDirectory} which is the local implementation of {@link SegmentDirectory}
    * @param indexDir segment index directory
-   * @param config config containing values for instantiation of the SegmentDirectory
+   * @param segmentDirectoryConfig config containing values for instantiation of the SegmentDirectory
    * @return instance of {@link SegmentLocalFSDirectory}
    */
   @Override
-  public SegmentDirectory load(URI indexDir, PinotConfiguration config)
+  public SegmentDirectory load(URI indexDir, PinotConfiguration segmentDirectoryConfig)
       throws Exception {
-    return new SegmentLocalFSDirectory(new File(indexDir), ReadMode.valueOf(config.getProperty(READ_MODE_KEY)));
+    return new SegmentLocalFSDirectory(new File(indexDir), ReadMode.valueOf(segmentDirectoryConfig.getProperty(READ_MODE_KEY)));
   }
 }
