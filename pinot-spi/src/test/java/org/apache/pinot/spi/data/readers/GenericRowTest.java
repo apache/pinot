@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.data.readers;
 
+import java.util.HashMap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -88,6 +89,52 @@ public class GenericRowTest {
     first.putValue("one", 1);
     GenericRow second = new GenericRow();
     second.putValue("one", 1);
+    Assert.assertEquals(first, second);
+  }
+
+  @Test
+  public void testMapValuesSameSizeNotEqual() {
+    GenericRow first = new GenericRow();
+    first.putValue("one", 1);
+    HashMap<String, Object> firstData = new HashMap<String, Object>();
+    firstData.put("two", 2);
+
+    GenericRow second = new GenericRow();
+    HashMap<String, Object> secondData = new HashMap<String, Object>();
+    secondData.put("two", "two");
+    second.putValue("one", secondData);
+
+    Assert.assertNotEquals(first, second);
+  }
+
+  @Test
+  public void testMapValuesDifferentSizeNotEqual() {
+    GenericRow first = new GenericRow();
+    first.putValue("one", 1);
+    HashMap<String, Object> firstData = new HashMap<String, Object>();
+    firstData.put("two", 2);
+    firstData.put("three", 3);
+
+    GenericRow second = new GenericRow();
+    HashMap<String, Object> secondData = new HashMap<String, Object>();
+    secondData.put("two", 2);
+    second.putValue("one", secondData);
+
+    Assert.assertNotEquals(first, second);
+  }
+
+  @Test
+  public void testMapValuesEqual() {
+    GenericRow first = new GenericRow();
+    HashMap<String, Integer> firstData = new HashMap<String, Integer>();
+    firstData.put("two", 2);
+    first.putValue("one", 1);
+    first.putValue("two", firstData);
+
+    GenericRow second = new GenericRow();
+    second.putValue("one", 1);
+    second.putValue("two", firstData.clone());
+
     Assert.assertEquals(first, second);
   }
 }
