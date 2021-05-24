@@ -48,6 +48,7 @@ import org.apache.pinot.core.segment.creator.SegmentPreIndexStatsContainer;
 import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
 import org.apache.pinot.core.segment.index.converter.SegmentFormatConverter;
 import org.apache.pinot.core.segment.index.converter.SegmentFormatConverterFactory;
+import org.apache.pinot.core.segment.processing.utils.SegmentProcessorUtils;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.core.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.core.util.CrcUtils;
@@ -217,6 +218,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
           recordReadStopTime = System.currentTimeMillis();
           totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
           if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
+            // LOGGER.warn("================================");
+            // LOGGER.warn("Indexer: pinot record: {}", transformedRow.toString());
             indexCreator.indexRow(transformedRow);
             indexStopTime = System.currentTimeMillis();
             totalIndexTime += (indexStopTime - recordReadStopTime);
