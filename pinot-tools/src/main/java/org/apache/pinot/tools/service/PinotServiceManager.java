@@ -31,6 +31,7 @@ import org.apache.pinot.server.starter.helix.HelixServerStarter;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.service.api.resources.PinotInstanceStatus;
 import org.slf4j.Logger;
@@ -121,10 +122,15 @@ public class PinotServiceManager {
   public String startBroker(PinotConfiguration brokerConf)
       throws Exception {
     LOGGER.info("Trying to start Pinot Broker...");
-    String brokerHost = brokerConf.getProperty("broker.host");
+    if (!brokerConf.containsKey(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME)) {
+      brokerConf.setProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
+    }
+    if (!brokerConf.containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER)) {
+      brokerConf.setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
+    }
     HelixBrokerStarter brokerStarter;
     try {
-      brokerStarter = new HelixBrokerStarter(brokerConf, _clusterName, _zkAddress, brokerHost);
+      brokerStarter = new HelixBrokerStarter(brokerConf);
     } catch (Exception e) {
       LOGGER.error("Failed to initialize Pinot Broker Starter", e);
       throw e;
@@ -144,7 +150,15 @@ public class PinotServiceManager {
   public String startServer(PinotConfiguration serverConf)
       throws Exception {
     LOGGER.info("Trying to start Pinot Server...");
-    HelixServerStarter serverStarter = new HelixServerStarter(_clusterName, _zkAddress, serverConf);
+
+    if (!serverConf.containsKey(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME)) {
+      serverConf.setProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
+    }
+
+    if (!serverConf.containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER)) {
+      serverConf.setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
+    }
+    HelixServerStarter serverStarter = new HelixServerStarter(serverConf);
     serverStarter.start();
 
     String instanceId = serverStarter.getInstanceId();
@@ -156,7 +170,13 @@ public class PinotServiceManager {
   public String startMinion(PinotConfiguration minionConf)
       throws Exception {
     LOGGER.info("Trying to start Pinot Minion...");
-    MinionStarter minionStarter = new MinionStarter(_clusterName, _zkAddress, minionConf);
+    if (!minionConf.containsKey(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME)) {
+      minionConf.setProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
+    }
+    if (!minionConf.containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER)) {
+      minionConf.setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
+    }
+    MinionStarter minionStarter = new MinionStarter(minionConf);
     minionStarter.start();
 
     String instanceId = minionStarter.getInstanceId();

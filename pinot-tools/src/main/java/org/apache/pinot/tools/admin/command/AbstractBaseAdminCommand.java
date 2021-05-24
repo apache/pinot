@@ -20,7 +20,6 @@ package org.apache.pinot.tools.admin.command;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -48,8 +47,6 @@ import org.apache.pinot.tools.utils.PinotConfigUtils;
 public class AbstractBaseAdminCommand extends AbstractBaseCommand {
   static final String DEFAULT_CONTROLLER_PORT = "9000";
   static final String URI_TABLES_PATH = "/tables/";
-
-  static final String TMP_DIR = System.getProperty("java.io.tmpdir") + File.separator;
 
   public AbstractBaseAdminCommand(boolean addShutdownHook) {
     super(addShutdownHook);

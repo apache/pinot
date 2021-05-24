@@ -27,6 +27,8 @@ import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.tools.utils.PinotConfigUtils.TMP_DIR;
+
 
 /**
  * Class for command to start ZooKeeper.

@@ -43,7 +43,7 @@ public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand impl
   private static final Logger LOGGER = LoggerFactory.getLogger(LaunchDataIngestionJobCommand.class);
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
-  @Option(name = "-jobSpecFile", required = true, metaVar = "<string>", usage = "Ingestion job spec file")
+  @Option(name = "-jobSpecFile", required = true, metaVar = "<string>", aliases = {"-jobSpec"}, usage = "Ingestion job spec file")
   private String _jobSpecFile;
   @Option(name = "-values", required = false, metaVar = "<template context>", handler = StringArrayOptionHandler.class, usage = "Context values set to the job spec template")
   private List<String> _values;

@@ -25,6 +25,7 @@ import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
@@ -57,7 +58,9 @@ public class PinotServiceManagerAdminApiApplication extends ResourceConfig {
     Preconditions.checkArgument(httpPort > 0);
     _baseUri = URI.create("http://0.0.0.0:" + httpPort + "/");
     _httpServer = GrizzlyHttpServerFactory.createHttpServer(_baseUri, this);
-    setupSwagger();
+    synchronized (PinotReflectionUtils.getReflectionLock()) {
+      setupSwagger();
+    }
   }
 
   private void setupSwagger() {

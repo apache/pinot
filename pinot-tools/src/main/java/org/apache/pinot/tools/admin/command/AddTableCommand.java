@@ -44,7 +44,7 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
   @Option(name = "-tableConfigFile", required = true, metaVar = "<string>", aliases = {"-tableConf", "-tableConfig", "-filePath"}, usage = "Path to table config file.")
   private String _tableConfigFile;
 
-  @Option(name = "-schemaFile", required = false, metaVar = "<string>", aliases = {"-schema"}, usage = "Path to table schema file.")
+  @Option(name = "-schemaFile", required = false, metaVar = "<string>", aliases = {"-schemaFileName","-schema"}, usage = "Path to table schema file.")
   private String _schemaFile = null;
 
   @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
