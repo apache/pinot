@@ -292,7 +292,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       case BYTES:
         return new VarByteChunkSVForwardIndexReader(forwardIndexBuffer, storedType);
       default:
-        throw new IllegalStateException("Illegal data type for raw forward index: " + storedType);
+        throw new IllegalStateException("Illegal data type for raw forward index: " + dataType);
     }
   }
 
