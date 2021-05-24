@@ -39,9 +39,9 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 public class TransformOperator extends BaseOperator<TransformBlock> {
   private static final String OPERATOR_NAME = "TransformOperator";
 
-  private final ProjectionOperator _projectionOperator;
-  private final Map<String, DataSource> _dataSourceMap;
-  private final Map<ExpressionContext, TransformFunction> _transformFunctionMap = new HashMap<>();
+  protected final ProjectionOperator _projectionOperator;
+  protected final Map<String, DataSource> _dataSourceMap;
+  protected final Map<ExpressionContext, TransformFunction> _transformFunctionMap = new HashMap<>();
 
   /**
    * Constructor for the class
