@@ -19,9 +19,9 @@
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
 import org.apache.pinot.segment.local.io.reader.impl.FixedBitIntReader;
-import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 

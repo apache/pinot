@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.segment.local.segment.index.column;
 
-import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
 import org.apache.pinot.segment.local.segment.index.readers.ConstantValueDoubleDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.ConstantValueFloatDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.ConstantValueIntDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.ConstantValueLongDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.ConstantValueStringDictionary;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;

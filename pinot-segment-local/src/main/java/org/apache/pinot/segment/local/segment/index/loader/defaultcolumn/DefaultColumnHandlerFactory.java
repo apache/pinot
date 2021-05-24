@@ -20,9 +20,9 @@ package org.apache.pinot.segment.local.segment.index.loader.defaultcolumn;
 
 import java.io.File;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.spi.data.Schema;
 
 

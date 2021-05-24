@@ -20,11 +20,11 @@ package org.apache.pinot.segment.local.segment.index.loader.defaultcolumn;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.V3RemoveIndexException;
 import org.apache.pinot.segment.local.segment.index.loader.V3UpdateIndexException;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;

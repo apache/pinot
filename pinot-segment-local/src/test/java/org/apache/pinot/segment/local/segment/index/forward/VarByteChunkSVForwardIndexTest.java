@@ -30,10 +30,10 @@ import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexW
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.forward.BaseChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotNativeOrderLBuffer;
 import org.apache.pinot.segment.spi.memory.PinotNonNativeOrderLBuffer;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.Assert;
 import org.testng.annotations.Test;

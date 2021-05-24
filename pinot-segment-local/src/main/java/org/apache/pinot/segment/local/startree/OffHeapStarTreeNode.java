@@ -19,8 +19,8 @@
 package org.apache.pinot.segment.local.startree;
 
 import java.util.Iterator;
-import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.index.startree.StarTreeNode;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 import static org.apache.pinot.segment.local.startree.StarTreeBuilderUtils.INVALID_ID;
 
