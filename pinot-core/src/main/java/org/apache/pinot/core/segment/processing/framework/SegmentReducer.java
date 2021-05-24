@@ -57,6 +57,7 @@ public class SegmentReducer {
   private final Collector _collector;
   private final int _numRecordsPerPart;
 
+
   public SegmentReducer(String reducerId, File reducerInputDir, SegmentReducerConfig reducerConfig,
       File reducerOutputDir) {
     _reducerInputDir = reducerInputDir;
@@ -114,7 +115,11 @@ public class SegmentReducer {
     DataFileWriter<GenericData.Record> recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema));
     recordWriter.create(_avroSchema, new File(_reducerOutputDir, fileName));
     while (collectionIt.hasNext()) {
-      SegmentProcessorUtils.convertGenericRowToAvroRecord(collectionIt.next(), reusableRecord);
+      GenericRow reusableRow = collectionIt.next();
+      // LOGGER.warn("================================");
+      SegmentProcessorUtils.convertGenericRowToAvroRecord(reusableRow, reusableRecord);
+      // LOGGER.warn("Reducer: pinot record: {}", reusableRow.toString());
+      // LOGGER.warn("Reducer: avro record: {}", reusableRecord.toString());
       recordWriter.append(reusableRecord);
     }
     recordWriter.close();

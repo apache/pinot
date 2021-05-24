@@ -33,6 +33,7 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
+import org.apache.pinot.core.data.recordtransformer.NullValueTransformer;
 import org.apache.pinot.core.segment.processing.filter.RecordFilter;
 import org.apache.pinot.core.segment.processing.filter.RecordFilterFactory;
 import org.apache.pinot.core.segment.processing.partitioner.Partitioner;
@@ -62,6 +63,7 @@ public class SegmentMapper {
 
   private final String _mapperId;
   private final Schema _avroSchema;
+  private final org.apache.pinot.core.data.recordtransformer.RecordTransformer _nullTransformer;
   private final RecordTransformer _recordTransformer;
   private final RecordFilter _recordFilter;
   private final int _numPartitioners;
@@ -75,6 +77,7 @@ public class SegmentMapper {
     _mapperId = mapperId;
     _avroSchema = SegmentProcessorUtils.convertPinotSchemaToAvroSchema(mapperConfig.getPinotSchema());
     _recordFilter = RecordFilterFactory.getRecordFilter(mapperConfig.getRecordFilterConfig());
+    _nullTransformer = new NullValueTransformer(mapperConfig.getPinotSchema());
     _recordTransformer = RecordTransformerFactory.getRecordTransformer(mapperConfig.getRecordTransformerConfig());
     for (PartitionerConfig partitionerConfig : mapperConfig.getPartitionerConfigs()) {
       _partitioners.add(PartitionerFactory.getPartitioner(partitionerConfig));
@@ -99,6 +102,7 @@ public class SegmentMapper {
     String[] partitions = new String[_numPartitioners];
 
     while (segmentRecordReader.hasNext()) {
+      reusableRow.clear();
       reusableRow = segmentRecordReader.next(reusableRow);
 
       // Record filtering
@@ -107,6 +111,7 @@ public class SegmentMapper {
       }
 
       // Record transformation
+      reusableRow = _nullTransformer.transform(reusableRow);
       reusableRow = _recordTransformer.transformRecord(reusableRow);
 
       // Partitioning
@@ -129,7 +134,10 @@ public class SegmentMapper {
       }
 
       // Write record to avro file for its partition
+      //LOGGER.warn("================================");
       SegmentProcessorUtils.convertGenericRowToAvroRecord(reusableRow, reusableRecord);
+      // LOGGER.warn("Mapper: pinot record: {}", reusableRow.toString());
+      // LOGGER.warn("Mapper: avro record: {}", reusableRecord.toString());
       recordWriter.append(reusableRecord);
 
       reusableRow.clear();
