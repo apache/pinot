@@ -292,12 +292,12 @@ public class PinotSegmentUploadDownloadRestletResource {
                 tableNameWithType);
         zkDownloadUri = downloadUri;
       } else {
-        zkDownloadUri = getZkDownloadURIForSegmentUpload(tableNameWithType, segmentName);
+        zkDownloadUri = getZkDownloadURIForSegmentUpload(tableName, segmentName);
       }
 
       // Zk operations
-      completeZkOperations(enableParallelPushProtection, headers, finalSegmentFile, tableNameWithType, segmentMetadata,
-          segmentName, zkDownloadUri, moveSegmentToFinalLocation, crypterClassName);
+      completeZkOperations(enableParallelPushProtection, headers, finalSegmentFile, tableName, tableNameWithType,
+          segmentMetadata, segmentName, zkDownloadUri, moveSegmentToFinalLocation, crypterClassName);
 
       return new SuccessResponse("Successfully uploaded segment: " + segmentName + " of table: " + tableNameWithType);
     } catch (WebApplicationException e) {
@@ -386,11 +386,11 @@ public class PinotSegmentUploadDownloadRestletResource {
   }
 
   private void completeZkOperations(boolean enableParallelPushProtection, HttpHeaders headers, File uploadedSegmentFile,
-      String tableNameWithType, SegmentMetadata segmentMetadata, String segmentName, String zkDownloadURI,
-      boolean moveSegmentToFinalLocation, String crypter)
+      String rawTableName, String tableNameWithType, SegmentMetadata segmentMetadata, String segmentName,
+      String zkDownloadURI, boolean moveSegmentToFinalLocation, String crypter)
       throws Exception {
     URI finalSegmentLocationURI = URIUtils
-        .getUri(ControllerFilePathProvider.getInstance().getDataDirURI().toString(), tableNameWithType,
+        .getUri(ControllerFilePathProvider.getInstance().getDataDirURI().toString(), rawTableName,
             URIUtils.encode(segmentName));
     ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
     zkOperator.completeSegmentOperations(tableNameWithType, segmentMetadata, finalSegmentLocationURI, uploadedSegmentFile,
