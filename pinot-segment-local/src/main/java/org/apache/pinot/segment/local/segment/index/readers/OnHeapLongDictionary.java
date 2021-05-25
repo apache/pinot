@@ -20,8 +20,8 @@ package org.apache.pinot.segment.local.segment.index.readers;
 
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import java.util.Arrays;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 

@@ -24,7 +24,7 @@ import java.io.FileOutputStream;
 import java.io.RandomAccessFile;
 import java.util.Random;
 import org.apache.pinot.segment.local.io.reader.impl.FixedByteSingleValueMultiColReader;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

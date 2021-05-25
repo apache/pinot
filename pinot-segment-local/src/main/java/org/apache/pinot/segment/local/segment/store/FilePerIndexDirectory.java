@@ -25,10 +25,11 @@ import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.segment.local.segment.creator.impl.V1Constants;
-import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
+import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.spi.utils.ReadMode;
 
 
@@ -130,7 +131,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
         filename = metadata.getNullValueVectorFileName(column);
         break;
       case TEXT_INDEX:
-        filename = column + LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION;
+        filename = column + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION;
         break;
       case FST_INDEX:
         filename = column + V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;

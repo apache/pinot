@@ -18,16 +18,22 @@
  */
 package org.apache.pinot.segment.local.segment.store;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
+import org.apache.pinot.segment.spi.store.ColumnIndexType;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,43 +44,42 @@ import static org.apache.pinot.segment.spi.creator.SegmentVersion.v3;
 import static org.apache.pinot.segment.spi.creator.SegmentVersion.valueOf;
 
 
-class SegmentLocalFSDirectory extends SegmentDirectory {
-  private static Logger LOGGER = LoggerFactory.getLogger(SegmentLocalFSDirectory.class);
+public class SegmentLocalFSDirectory extends SegmentDirectory {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentLocalFSDirectory.class);
 
   // matches most systems
   private static final int PAGE_SIZE_BYTES = 4096;
   // Prefetch limit...arbitrary but related to common server memory and data size profiles
   private static final long MAX_MMAP_PREFETCH_PAGES = 100 * 1024 * 1024 * 1024L / PAGE_SIZE_BYTES;
   private static final double PREFETCH_SLOWDOWN_PCT = 0.67;
-  private static AtomicLong prefetchedPages = new AtomicLong(0);
+  private static final AtomicLong prefetchedPages = new AtomicLong(0);
 
-  private final File segmentDirectory;
+  private final File _indexDir;
+  private final File _segmentDirectory;
   SegmentLock segmentLock;
   private SegmentMetadataImpl segmentMetadata;
-  private ReadMode readMode;
+  private final ReadMode _readMode;
 
   private ColumnIndexDirectory columnIndexDirectory;
 
-  SegmentLocalFSDirectory(String directoryPath, SegmentMetadataImpl metadata, ReadMode readMode) {
-    this(new File(directoryPath), metadata, readMode);
+  public SegmentLocalFSDirectory(File directory, ReadMode readMode)
+      throws IOException {
+    this(directory, new SegmentMetadataImpl(directory), readMode);
   }
 
-  SegmentLocalFSDirectory(File directory, ReadMode readMode)
-      throws IOException, ConfigurationException {
-    this(directory, loadSegmentMetadata(directory), readMode);
-  }
-
-  SegmentLocalFSDirectory(File directoryFile, SegmentMetadataImpl metadata, ReadMode readMode) {
+  @VisibleForTesting
+  public SegmentLocalFSDirectory(File directoryFile, SegmentMetadataImpl metadata, ReadMode readMode) {
 
     Preconditions.checkNotNull(directoryFile);
     Preconditions.checkNotNull(metadata);
 
-    segmentDirectory = getSegmentPath(directoryFile, metadata.getSegmentVersion());
-    Preconditions.checkState(segmentDirectory.exists(), "Segment directory: " + directoryFile + " must exist");
+    _indexDir = directoryFile;
+    _segmentDirectory = getSegmentPath(directoryFile, metadata.getSegmentVersion());
+    Preconditions.checkState(_segmentDirectory.exists(), "Segment directory: " + directoryFile + " must exist");
 
     segmentLock = new SegmentLock();
-    this.segmentMetadata = metadata;
-    this.readMode = readMode;
+    segmentMetadata = metadata;
+    _readMode = readMode;
     try {
       load();
     } catch (IOException | ConfigurationException e) {
@@ -84,10 +89,20 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
   }
 
   @Override
+  public URI getIndexDir() {
+    return _indexDir.toURI();
+  }
+
+  @Override
+  public SegmentMetadataImpl getSegmentMetadata() {
+    return segmentMetadata;
+  }
+
+  @Override
   public void reloadMetadata()
       throws Exception {
-    this.segmentMetadata = loadSegmentMetadata(segmentDirectory);
-    columnIndexDirectory.metadata = this.segmentMetadata;
+    segmentMetadata = new SegmentMetadataImpl(_indexDir);
+    columnIndexDirectory.setMetadata(segmentMetadata);
   }
 
   private File getSegmentPath(File segmentDirectory, SegmentVersion segmentVersion) {
@@ -109,14 +124,9 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     throw new IllegalArgumentException("Unknown segment version: " + segmentVersion);
   }
 
-  public static SegmentMetadataImpl loadSegmentMetadata(File segmentDirectory)
-      throws IOException, ConfigurationException {
-    return new SegmentMetadataImpl(segmentDirectory);
-  }
-
   @Override
   public Path getPath() {
-    return segmentDirectory.toPath();
+    return _segmentDirectory.toPath();
   }
 
   @Override
@@ -128,23 +138,23 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     // or default columns will not exist.
 
     // check that v3 subdirectory exists since the format may not have been converted
-    if (segmentDirectory.exists()) {
+    if (_segmentDirectory.exists()) {
       try {
-        return FileUtils.sizeOfDirectory(segmentDirectory.toPath().toFile());
+        return FileUtils.sizeOfDirectory(_segmentDirectory.toPath().toFile());
       } catch (IllegalArgumentException e) {
-        LOGGER.error("Failed to read disk size for directory: ", segmentDirectory.getAbsolutePath());
+        LOGGER.error("Failed to read disk size for directory: ", _segmentDirectory.getAbsolutePath());
         return -1;
       }
     } else {
-      if (!SegmentDirectoryPaths.isV3Directory(segmentDirectory)) {
+      if (!SegmentDirectoryPaths.isV3Directory(_segmentDirectory)) {
         LOGGER
-            .error("Segment directory: {} not found on disk and is not v3 format", segmentDirectory.getAbsolutePath());
+            .error("Segment directory: {} not found on disk and is not v3 format", _segmentDirectory.getAbsolutePath());
         return -1;
       }
-      File[] files = segmentDirectory.getParentFile().listFiles();
+      File[] files = _segmentDirectory.getParentFile().listFiles();
       if (files == null) {
-        LOGGER.warn("Empty list of files for path: {}, segmentDirectory: {}", segmentDirectory.getParentFile(),
-            segmentDirectory);
+        LOGGER.warn("Empty list of files for path: {}, segmentDirectory: {}", _segmentDirectory.getParentFile(),
+            _segmentDirectory);
         return -1;
       }
 
@@ -181,7 +191,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
 
   @Override
   public String toString() {
-    return segmentDirectory.toString();
+    return _segmentDirectory.toString();
   }
 
   protected void load()
@@ -202,11 +212,11 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     switch (segmentVersion) {
       case v1:
       case v2:
-        columnIndexDirectory = new FilePerIndexDirectory(segmentDirectory, segmentMetadata, readMode);
+        columnIndexDirectory = new FilePerIndexDirectory(_segmentDirectory, segmentMetadata, _readMode);
         break;
       case v3:
         try {
-          columnIndexDirectory = new SingleFileIndexDirectory(segmentDirectory, segmentMetadata, readMode);
+          columnIndexDirectory = new SingleFileIndexDirectory(_segmentDirectory, segmentMetadata, _readMode);
         } catch (ConfigurationException e) {
           LOGGER.error("Failed to create columnar index directory", e);
           throw new RuntimeException(e);
@@ -233,7 +243,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
 
     buffer = columnIndexDirectory.getBuffer(column, type);
 
-    if (readMode == ReadMode.mmap) {
+    if (_readMode == ReadMode.mmap) {
       prefetchMmapData(buffer);
     }
     return buffer;
@@ -306,7 +316,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
 
     @Override
     public String toString() {
-      return segmentDirectory.toString();
+      return _segmentDirectory.toString();
     }
   }
 
@@ -346,7 +356,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
 
     @Override
     public String toString() {
-      return segmentDirectory.toString();
+      return _segmentDirectory.toString();
     }
 
     @Override

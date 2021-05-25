@@ -23,7 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import org.apache.pinot.segment.local.io.util.FixedBitIntReaderWriter;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
 /**
