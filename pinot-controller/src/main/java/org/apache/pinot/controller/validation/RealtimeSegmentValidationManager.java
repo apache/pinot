@@ -43,7 +43,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Validates realtime ideal states and segment metadata, fixing any partitions which have stopped consuming, and uploading segments to segment store if missing.
+ * Validates realtime ideal states and segment metadata, fixing any partitions which have stopped consuming, and uploading segments to segment store if segment download url is missing in the metadata.
  */
 public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<RealtimeSegmentValidationManager.Context> {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentValidationManager.class);
@@ -74,7 +74,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       for (String tableNameWithType : _pinotHelixResourceManager.getAllTables()) {
         try {
           if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {
-            _llcRealtimeSegmentManager.prefetchLLCSegmentWithoutDeepStoreCopy(tableNameWithType);
+            _llcRealtimeSegmentManager.prefetchLLCSegmentsWithoutDeepStoreCopy(tableNameWithType);
           }
         } catch (Exception e) {
           LOGGER.error("Failed to pre fetch LLC segment for table {}", tableNameWithType);

@@ -1009,7 +1009,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     List<ZNRecord> znRecords = segmentsZKMetadata.stream().map(LLCRealtimeSegmentZKMetadata::toZNRecord).collect(Collectors.toList());
     when(zkHelixPropertyStore.getChildren(anyString(), eq(null), anyInt(), anyInt(), anyInt())).thenReturn(znRecords);
     when(pinotHelixResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(segmentManager._tableConfig);
-    segmentManager.prefetchLLCSegmentWithoutDeepStoreCopy(REALTIME_TABLE_NAME);
+    segmentManager.prefetchLLCSegmentsWithoutDeepStoreCopy(REALTIME_TABLE_NAME);
     assertEquals(segmentManager.cachedLLCSegmentNameWithoutDeepStoreCopy.size(), 3);
     assertEquals(segmentManager.cachedLLCSegmentNameWithoutDeepStoreCopy.get(0), segmentsZKMetadata.get(0).getSegmentName());
     assertEquals(segmentManager.cachedLLCSegmentNameWithoutDeepStoreCopy.get(1), segmentsZKMetadata.get(1).getSegmentName());

@@ -138,9 +138,9 @@ public class PinotLLCRealtimeSegmentManager {
    */
   private static final long MAX_SEGMENT_COMPLETION_TIME_MILLIS = 300_000L; // 5 MINUTES
   /**
-   * Controller waits this amount of time before asking servers to upload LLC segments without deep store copy. The reason is after step 1 of segment completion is done (segment ZK metadata status changed to be DONE), servers are still in the process of loading segments. Only after that segments are in ONLINE status in external view.
+   * Controller waits this amount of time before asking servers to upload LLC segments without deep store copy. The reason is after step 1 of segment completion is done (segment ZK metadata status changed to be DONE), servers are still in the process of loading segments. Only after that segments are in ONLINE status in external view for the controller to discover.
    */
-  private static final long MIN_TIME_BEFORE_FIX_SEGMENT_STORE_COPY_MILLIS = 300_000L; // 5 MINUTES
+  private static final long MIN_TIME_BEFORE_FIXING_SEGMENT_STORE_COPY_MILLIS = 300_000L; // 5 MINUTES
   private static final Random RANDOM = new Random();
 
   private final HelixAdmin _helixAdmin;
@@ -1303,8 +1303,8 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
-  // Pre fetch the LLC segment without deep store copy.
-  public void prefetchLLCSegmentWithoutDeepStoreCopy(String tableNameWithType) {
+  // Pre-fetch the LLC segment without deep store copy.
+  public void prefetchLLCSegmentsWithoutDeepStoreCopy(String tableNameWithType) {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
       if (tableType == TableType.REALTIME) {
         TableConfig tableConfig = _helixResourceManager.getTableConfig(tableNameWithType);
@@ -1404,10 +1404,10 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   /**
-   * Returns true if more than {@link PinotLLCRealtimeSegmentManager#MIN_TIME_BEFORE_FIX_SEGMENT_STORE_COPY_MILLIS} ms have elapsed since segment metadata update
+   * Returns true if more than {@link PinotLLCRealtimeSegmentManager#MIN_TIME_BEFORE_FIXING_SEGMENT_STORE_COPY_MILLIS} ms have elapsed since segment metadata update
    */
   @VisibleForTesting
   boolean isExceededMinTimeToFixSegmentStoreCopy(Stat stat) {
-    return getCurrentTimeMs() > stat.getMtime() + MIN_TIME_BEFORE_FIX_SEGMENT_STORE_COPY_MILLIS;
+    return getCurrentTimeMs() > stat.getMtime() + MIN_TIME_BEFORE_FIXING_SEGMENT_STORE_COPY_MILLIS;
   }
 }
