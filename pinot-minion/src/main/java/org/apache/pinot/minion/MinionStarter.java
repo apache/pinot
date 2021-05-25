@@ -77,10 +77,25 @@ public class MinionStarter implements ServiceStartable {
   private MinionAdminApiApplication _minionAdminApplication;
   private final List<ListenerConfig> _listenerConfigs;
 
-  public MinionStarter(String helixClusterName, String zkAddress, PinotConfiguration config)
+  @Deprecated
+  public MinionStarter(String clusterName, String zkServers, PinotConfiguration minionConfig)
+      throws Exception {
+    this(applyMinionConfigs(minionConfig, clusterName, zkServers));
+  }
+
+  @Deprecated
+  private static PinotConfiguration applyMinionConfigs(PinotConfiguration minionConfig, String clusterName, String zkServers) {
+    minionConfig.setProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
+    minionConfig.setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkServers);
+    return minionConfig;
+  }
+
+  public MinionStarter(PinotConfiguration config)
       throws Exception {
     _config = config;
-    String host = _config.getProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST,
+    String helixClusterName = _config.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
+    String zkAddress = _config.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER);
+    String host = _config.getProperty(CommonConstants.Helix.KEY_OF_MINION_HOST,
         _config.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils
             .getHostnameOrAddress() : NetUtils.getHostAddress());
     int port = _config.getProperty(CommonConstants.Helix.KEY_OF_MINION_PORT, CommonConstants.Minion.DEFAULT_HELIX_PORT);

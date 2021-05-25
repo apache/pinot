@@ -4,6 +4,13 @@ Copyright 2018-2021 Apache Software Foundation
 This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
 
+--------------------------------------------------------------------------------
+
+Apache Log4j Core
+Copyright 1999-2012 Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
 
 Apache Commons Configuration
 Copyright 2001-2013 The Apache Software Foundation
@@ -15,7 +22,7 @@ This product includes software developed by
 The Apache Software Foundation (http://www.apache.org/).
 
 --------------------------------------------------------------------------------
-src/test/org/apache/commons/codec/language/DoubleMetaphoneTest.java contains 
+src/test/org/apache/commons/codec/language/DoubleMetaphoneTest.java contains
 test data from http://aspell.sourceforge.net/test/batch0.tab.
 
 Copyright (C) 2002 Kevin Atkinson (kevina@gnu.org). Verbatim copying
@@ -78,15 +85,7 @@ in some artifacts (usually source distributions); but is always available
 from the source code management (SCM) system project uses.
 
 Apache Avro
-Copyright 2009-2014 The Apache Software Foundation
-
-This product currently only contains code developed by authors
-of specific components, as identified by the source code files;
-if such notes are missing files have been created by
-Tatu Saloranta.
-
-For additional credits (generally to people who reported problems)
-see CREDITS file.
+Copyright 2009-2020 The Apache Software Foundation
 
 Apache Groovy
 Copyright 2003-2020 The Apache Software Foundation
@@ -154,16 +153,16 @@ are met:
 1. Redistributions of source code must retain the above copyright
    notice, this list of conditions and the following disclaimer.
 
-2. The origin of this software must not be misrepresented; you must 
-   not claim that you wrote the original software.  If you use this 
-   software in a product, an acknowledgment in the product 
+2. The origin of this software must not be misrepresented; you must
+   not claim that you wrote the original software.  If you use this
+   software in a product, an acknowledgment in the product
    documentation would be appreciated but is not required.
 
 3. Altered source versions must be plainly marked as such, and must
    not be misrepresented as being the original software.
 
-4. The name of the author may not be used to endorse or promote 
-   products derived from this software without specific prior written 
+4. The name of the author may not be used to endorse or promote
+   products derived from this software without specific prior written
    permission.
 
 THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS
@@ -182,6 +181,14 @@ Julian Seward, jseward@acm.org
 
 Apache Helix :: Core
 Copyright 2020 The Apache Software Foundation
+
+This product currently only contains code developed by authors
+of specific components, as identified by the source code files;
+if such notes are missing files have been created by
+Tatu Saloranta.
+
+For additional credits (generally to people who reported problems)
+see CREDITS file.
 
                             The Netty Project
                             =================
@@ -306,7 +313,7 @@ Apache ZooKeeper - Jute
 Copyright 2008-2020 The Apache Software Foundation
 
 Apache Yetus - Audience Annotations
-Copyright 2015-2017 The Apache Software Foundation
+Copyright 2015-2019 The Apache Software Foundation
 
 Apache Commons Math
 Copyright 2001-2010 The Apache Software Foundation
@@ -566,41 +573,25 @@ To find the details that apply to this artifact see the accompanying LICENSE fil
 For more information, including possible other licensing options, contact
 FasterXML.com (http://fasterxml.com).
 
-ORC Core
-Copyright 2013-2020 The Apache Software Foundation
+Apache Commons CSV
+Copyright 2005-2014 The Apache Software Foundation
 
-ORC Shims
-Copyright 2013-2020 The Apache Software Foundation
+src/main/resources/contract.txt
+This file was downloaded from http://www.ferc.gov/docs-filing/eqr/soft-tools/sample-csv/contract.txt and contains neither copyright notice nor license.
 
-Hive Storage API
-Copyright 2019 The Apache Software Foundation
+src/main/resources/transaction.txt
+This file was downloaded from http://www.ferc.gov/docs-filing/eqr/soft-tools/sample-csv/transaction.txt and contains neither copyright notice nor license.
 
-Apache Parquet Avro
-Copyright 2015 The Apache Software Foundation
-
-Apache Parquet Column
-Copyright 2015 The Apache Software Foundation
-
-Apache Parquet Common
-Copyright 2015 The Apache Software Foundation
-
-Apache Parquet Encodings
-Copyright 2015 The Apache Software Foundation
-
-Apache Parquet Hadoop
-Copyright 2015 The Apache Software Foundation
-
-Apache Parquet Jackson
-Copyright 2015 The Apache Software Foundation
-
-Apache Parquet Format (Incubating)
-Copyright 2015 The Apache Software Foundation
-
-Apache Log4j Core
-Copyright 1999-2012 Apache Software Foundation
-
-ResolverUtil.java
-Copyright 2005-2006 Tim Fennell
+src/test/resources/CSVFileParser/bom.csv
+src/test/resources/CSVFileParser/test.csv
+src/test/resources/CSVFileParser/test_default.txt
+src/test/resources/CSVFileParser/test_default_comment.txt
+src/test/resources/CSVFileParser/test_rfc4180.txt
+src/test/resources/CSVFileParser/test_rfc4180_trim.txt
+src/test/resources/CSVFileParser/testCSV85.csv
+src/test/resources/CSVFileParser/testCSV85_default.txt
+src/test/resources/CSVFileParser/testCSV85_ignoreEmpty.txt
+These files are used as test data and test result specifications.
 
 Apache Commons Math
 Copyright 2001-2013 The Apache Software Foundation
@@ -673,3 +664,31 @@ The creation of the package "o.a.c.m.analysis.integration.gauss" was inspired
 by an original code donated by Sébastien Brisard.
 ===============================================================================
 
+ORC Core
+Copyright 2013-2020 The Apache Software Foundation
+
+ORC Shims
+Copyright 2013-2020 The Apache Software Foundation
+
+Hive Storage API
+Copyright 2019 The Apache Software Foundation
+
+Apache Parquet MR (Incubating)
+Copyright 2014-2015 The Apache Software Foundation
+
+--------------------------------------------------------------------------------
+
+This product includes code from Apache Avro, which includes the following in
+its NOTICE file:
+
+  Apache Avro
+  Copyright 2010-2015 The Apache Software Foundation
+
+  This product includes software developed at
+  The Apache Software Foundation (http://www.apache.org/).
+
+Apache Commons Pool
+Copyright 2001-2012 The Apache Software Foundation
+
+ResolverUtil.java
+Copyright 2005-2006 Tim Fennell

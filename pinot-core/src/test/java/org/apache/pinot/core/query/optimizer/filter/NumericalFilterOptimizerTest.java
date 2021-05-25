@@ -156,8 +156,6 @@ public class NumericalFilterOptimizerTest {
 
     Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
         "Expression(type:LITERAL, literal:<Literal boolValue:true>)");
-
-    System.out.println(Float.MAX_VALUE);
   }
 
   @Test

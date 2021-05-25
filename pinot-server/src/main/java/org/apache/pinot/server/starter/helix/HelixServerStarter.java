@@ -62,7 +62,7 @@ import org.apache.pinot.core.transport.TlsConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.core.util.TlsUtils;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.server.api.access.AccessControlFactory;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
@@ -126,13 +126,25 @@ public class HelixServerStarter implements ServiceStartable {
   private RealtimeLuceneIndexRefreshState _realtimeLuceneIndexRefreshState;
   private PinotEnvironmentProvider _pinotEnvironmentProvider;
 
+  @Deprecated
   public HelixServerStarter(String helixClusterName, String zkAddress, PinotConfiguration serverConf)
       throws Exception {
-    _helixClusterName = helixClusterName;
-    _zkAddress = zkAddress;
+    this(applyServerConfig(serverConf, helixClusterName, zkAddress));
+  }
+
+  @Deprecated
+  private static PinotConfiguration applyServerConfig(PinotConfiguration serverConf, String helixClusterName, String zkAddress) {
+    serverConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, helixClusterName);
+    serverConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkAddress);
+    return serverConf;
+  }
+
+  public HelixServerStarter(PinotConfiguration serverConf) throws Exception {
     // Make a clone so that changes to the config won't propagate to the caller
     _serverConf = serverConf.clone();
     _listenerConfigs = ListenerConfigUtil.buildServerAdminConfigs(_serverConf);
+    _helixClusterName = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
+    _zkAddress = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER);
 
     _host = _serverConf.getProperty(Helix.KEY_OF_SERVER_NETTY_HOST,
         _serverConf.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils.getHostnameOrAddress()
@@ -713,12 +725,13 @@ public class HelixServerStarter implements ServiceStartable {
       throws Exception {
     Map<String, Object> properties = new HashMap<>();
     int port = 8003;
+    properties.put(Helix.CONFIG_OF_CLUSTER_NAME, "quickstart");
+    properties.put(Helix.CONFIG_OF_ZOOKEEPR_SERVER, "localhost:2191");
     properties.put(Helix.KEY_OF_SERVER_NETTY_PORT, port);
     properties.put(Server.CONFIG_OF_INSTANCE_DATA_DIR, "/tmp/PinotServer/test" + port + "/index");
     properties.put(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, "/tmp/PinotServer/test" + port + "/segmentTar");
 
-    HelixServerStarter serverStarter =
-        new HelixServerStarter("quickstart", "localhost:2191", new PinotConfiguration(properties));
+    HelixServerStarter serverStarter = new HelixServerStarter(new PinotConfiguration(properties));
     serverStarter.start();
     return serverStarter;
   }

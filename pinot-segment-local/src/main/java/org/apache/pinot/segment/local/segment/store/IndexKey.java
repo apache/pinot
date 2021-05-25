@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.store;
 
+import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

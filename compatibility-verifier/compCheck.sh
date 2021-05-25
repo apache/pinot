@@ -39,6 +39,8 @@
 #  one more segment to table, adding some more rows to the stream topic, and
 #  running some queries with the new data.
 
+RM="/bin/rm"
+logCount=1
 
 # get usage of the script
 function usage() {
@@ -48,27 +50,62 @@ function usage() {
 }
 
 function waitForZkReady() {
-  # TODO: check ZK to be ready instead of sleep
-  sleep 60
-  echo "zookeeper is ready"
+  status=1
+  while [ $status -ne 0 ]; do
+    sleep 1
+    echo Checking port 2181 for zk ready
+    echo x |nc localhost 2181 1>/dev/null 2>&1
+    status=$(echo $?)
+  done
 }
 
 function waitForControllerReady() {
-  # TODO: check Controller to be ready instead of sleep
-  sleep 60
-  echo "controller is ready"
+  # TODO: Check real controller port if config file is specified.
+  status=1
+  while [ $status -ne 0 ]; do
+    sleep 1
+    echo Checking port 9000 for controller ready
+    curl localhost:9000/health 1>/dev/null 2>&1
+    status=$(echo $?)
+  done
 }
 
 function waitForKafkaReady() {
-  # TODO: check kafka to be ready instead of sleep
-  sleep 10
-  echo "kafka is ready"
+  status=1
+  while [ $status -ne 0 ]; do
+    sleep 1
+    echo Checking port 19092 for kafka ready
+    echo x |nc localhost 19092 1>/dev/null 2>&1
+    status=$(echo $?)
+  done
+}
+
+function waitForBrokerReady() {
+# TODO We are checking for port 8099. Check for real broker port from config if needed.
+  local status=1
+  while [ $status -ne 0 ]; do
+    sleep 1
+    echo Checking port 8099 for broker ready
+    curl localhost:8099/debug/routingTable 1>/dev/null 2>&1
+    status=$(echo $?)
+  done
+}
+
+function waitForServerReady() {
+  # TODO We are checjing for port 8097. Check for real server port from config if needed,
+  local status=1
+  while [ $status -ne 0 ]; do
+    sleep 1
+    echo Checking port 8097 for server ready
+    curl localhost:8097/health 1>/dev/null 2>&1
+    status=$(echo $?)
+  done
 }
 
 function waitForClusterReady() {
-  # TODO: check cluster to be ready instead of sleep
-  sleep 2
-  echo "Cluster ready."
+  waitForBrokerReady
+  waitForServerReady
+  waitForKafkaReady
 }
 
 #set config file is present or not
@@ -79,49 +116,68 @@ function setConfigFileArg() {
 }
 
 # Given a component and directory, start that version of the specific component
+# Start the service in background.
+# Record the pid file in $2/$1.pid
+# $1 is service name
+# $2 is directory name
+# TODO get rid of exit from this function. Exit only returns from a function.
 function startService() {
   serviceName=$1
   dirName=$2
+  echo Starting $serviceName in $dirName
   local configFileArg=$(setConfigFileArg "$3")
   # Upon start, save the pid of the process for a component into a file in /working_dir/{component}.pid, which is then used to stop it
-  pushd "$dirName"/pinot-tools/target/pinot-tools-pkg/bin  || exit 1
+  pushd "$dirName"/pinot-tools/target/pinot-tools-pkg/bin 1>/dev/null || exit 1
   if [ "$serviceName" = "zookeeper" ]; then
-    sh -c 'rm -rf ${0}/zkdir'
-    sh -c 'echo $$ > $0/zookeeper.pid; exec ./pinot-admin.sh StartZookeeper -dataDir ${0}/zkdir > ${0}/zookeeper.log 2>&1' "${dirName}" &
+    # Remove all previous zk data
+    ${RM} -rf ${dirName}/zkdir
+    ./pinot-admin.sh StartZookeeper -dataDir ${LOG_DIR}/zkdir 1>${LOG_DIR}/zookeeper.${logCount}.log 2>&1 &
+    echo $! > ${PID_DIR}/zookeeper.pid
   elif [ "$serviceName" = "controller" ]; then
-    sh -c 'echo $$ > $0/controller.pid; exec ./pinot-admin.sh StartController ${1} > ${0}/controller.log 2>&1' "${dirName}" "${configFileArg}" &
+    ./pinot-admin.sh StartController ${configFileArg} 1>${LOG_DIR}/controller.${logCount}.log 2>&1 &
+    echo $! > ${PID_DIR}/controller.pid
   elif [ "$serviceName" = "broker" ]; then
-    sh -c 'echo $$ > $0/broker.pid; exec ./pinot-admin.sh StartBroker ${1} > ${0}/broker.log 2>&1' "${dirName}" "${configFileArg}" &
+    ./pinot-admin.sh StartBroker ${configFileArg} 1>${LOG_DIR}/broker.${logCount}.log 2>&1 &
+    echo $! > ${PID_DIR}/broker.pid
   elif [ "$serviceName" = "server" ]; then
-    sh -c 'echo $$ > $0/server.pid; exec ./pinot-admin.sh StartServer ${1} > ${0}/server.log 2>&1' "${dirName}" "${configFileArg}" &
+    ./pinot-admin.sh StartServer ${configFileArg} 1>${LOG_DIR}/server.${logCount}.log 2>&1 &
+    echo $! > ${PID_DIR}/server.pid
   elif [ "$serviceName" = "kafka" ]; then
-    sh -c 'echo $$ > $0/kafka.pid; exec ./pinot-admin.sh StartKafka -zkAddress localhost:2181/kafka > ${0}/kafka.log 2>&1' "${dirName}" &
+    ./pinot-admin.sh StartKafka -zkAddress localhost:2181/kafka 1>${LOG_DIR}/kafka.${logCount}.log 2>&1 &
+    echo $! > ${PID_DIR}/kafka.pid
   fi
+  # Keep log files distinct so we can debug
+  logCount=$((logCount+1))
 
   echo "${serviceName} started"
-  popd || exit 1
+  popd 1>/dev/null || exit 1
 }
 
 # Given a component, check if it known to be running and stop that specific component
 function stopService() {
   serviceName=$1
-  dirName=$2
-  if [ -f "${dirName}/${serviceName}".pid ]; then
-    servicePid=$(<"${dirName}/${serviceName}".pid)
-    rm "${dirName}/${serviceName}".pid
-    if [ -n "$servicePid" ]; then
-      kill -9 "$servicePid"
-    fi
+  if [ -f "${PID_DIR}/${serviceName}".pid ]; then
+    pid=$(cat "${PID_DIR}/${serviceName}".pid)
+    kill -9 $pid
+    # TODO Kill without -9 and add a while loop waiting for process to die
+    status=0
+    while [ $status -ne 1 ]; do
+      echo "Waiting for $serviceName (pid $pid) to die"
+      sleep 1
+      ps -p $pid
+      status=$(echo $?)
+    done
+    ${RM} -f "${PID_DIR}/${serviceName}".pid
+    echo "${serviceName} stopped"
   else
-    echo "Pid file ${dirName}/${serviceName}.pid  not found. Failed to stop component ${serviceName}"
+    echo "Pid file ${PID_DIR}/${serviceName}.pid  not found. Failed to stop component ${serviceName}"
   fi
-  echo "${serviceName} stopped"
 }
 
 # Starts a Pinot cluster given a specific target directory
 function startServices() {
   dirName=$1
-  startService zookeeper "$dirName"
+  startService zookeeper "$dirName" "unused"
   # Controller depends on zookeeper, if not wait zookeeper to be ready, controller will crash.
   waitForZkReady
   startService controller "$dirName" "$CONTROLLER_CONF"
@@ -129,20 +185,18 @@ function startServices() {
   waitForControllerReady
   startService broker "$dirName" "$BROKER_CONF"
   startService server "$dirName" "$SERVER_CONF"
-  startService kafka "$dirName"
-  waitForKafkaReady
+  startService kafka "$dirName" "unused"
   echo "Cluster started."
   waitForClusterReady
 }
 
 # Stops the currently running Pinot cluster
 function stopServices() {
-  dirName=$1
-  stopService controller "$dirName"
-  stopService broker "$dirName"
-  stopService server "$dirName"
-  stopService zookeeper "$dirName"
-  stopService kafka "$dirName"
+  stopService controller
+  stopService broker
+  stopService server
+  stopService zookeeper
+  stopService kafka
   echo "Cluster stopped."
 }
 
@@ -176,12 +230,19 @@ fi
 COMPAT_TESTER_PATH="pinot-integration-tests/target/pinot-integration-tests-pkg/bin/pinot-compat-test-runner.sh"
 
 # create subdirectories for given commits
-workingDir=$1
-testSuiteDir=$(absPath "$2")
+workingDir=$(absPath $1)
+testSuiteDir=$(absPath $2)
 
 BROKER_CONF=${testSuiteDir}/config/BrokerConfig.conf
 CONTROLLER_CONF=${testSuiteDir}/config/ControllerConfig.conf
 SERVER_CONF=${testSuiteDir}/config/ServerConfig.conf
+PID_DIR=${workingDir}/pids
+LOG_DIR=${workingDir}/logs
+${RM} -rf ${PID_DIR}
+${RM} -rf ${LOG_DIR}
+
+mkdir ${PID_DIR}
+mkdir ${LOG_DIR}
 
 oldTargetDir="$workingDir"/oldTargetDir
 newTargetDir="$workingDir"/newTargetDir
@@ -195,33 +256,80 @@ if [ "$(lsof -t -i:8097 -s TCP:LISTEN)" ] || [ "$(lsof -t -i:8098 -sTCP:LISTEN)"
   exit 1
 fi
 
-
 # Setup initial cluster with olderCommit and do rolling upgrade
 # Provide abspath of filepath to $COMPAT_TESTER
-startServices "$oldTargetDir" "${testSuiteDir}/config"
-#$COMPAT_TESTER $testSuiteDir/pre-controller-upgrade.yaml 1; if [ $? -ne 0 ]; then exit 1; fi
-stopService controller "$oldTargetDir"
+startServices "$oldTargetDir"
+
+echo "Setting up cluster before upgrade"
+$COMPAT_TESTER $testSuiteDir/pre-controller-upgrade.yaml 1;
+if [ $? -ne 0 ]; then
+  stopServices
+  exit 1;
+fi
+echo "Upgrading controller"
+stopService controller
 startService controller "$newTargetDir" "$CONTROLLER_CONF"
 waitForControllerReady
-#$COMPAT_TESTER $testSuiteDir/pre-broker-upgrade.yaml 2; if [ $? -ne 0 ]; then exit 1; fi
-stopService broker "$oldTargetDir"
+echo "Running tests after controller upgrade"
+$COMPAT_TESTER $testSuiteDir/pre-broker-upgrade.yaml 2;
+if [ $? -ne 0 ]; then
+  stopServices
+  exit 1;
+fi
+echo "Upgrading broker"
+stopService broker
 startService broker "$newTargetDir" "$BROKER_CONF"
-#$COMPAT_TESTER $testSuiteDir/pre-server-upgrade.yaml 3; if [ $? -ne 0 ]; then exit 1; fi
-stopService server "$oldTargetDir"
+waitForBrokerReady
+echo "Running tests after broker upgrade"
+$COMPAT_TESTER $testSuiteDir/pre-server-upgrade.yaml 3;
+if [ $? -ne 0 ]; then
+  stopServices
+  exit 1;
+fi
+echo "Upgrading server"
+stopService server
 startService server "$newTargetDir" "$SERVER_CONF"
-#$COMPAT_TESTER $testSuiteDir/post-server-upgrade.yaml 4; if [ $? -ne 0 ]; then exit 1; fi
+waitForServerReady
+echo "Running tests after server upgrade"
+$COMPAT_TESTER $testSuiteDir/post-server-upgrade.yaml 4;
+if [ $? -ne 0 ]; then
+  stopServices
+  exit 1;
+fi
 
+echo "Downgrading server"
 # Upgrade completed, now do a rollback
-stopService server "$newTargetDir"
+stopService server
 startService server "$oldTargetDir" "$SERVER_CONF"
-#$COMPAT_TESTER $testSuiteDir/post-server-rollback.yaml 5; if [ $? -ne 0 ]; then exit 1; fi
-stopService broker "$newTargetDir"
+waitForServerReady
+echo "Running tests after server downgrade"
+$COMPAT_TESTER $testSuiteDir/post-server-rollback.yaml 5;
+if [ $? -ne 0 ]; then
+  stopServices
+  exit 1;
+fi
+echo "Downgrading broker"
+stopService broker
 startService broker "$oldTargetDir" "$BROKER_CONF"
-#$COMPAT_TESTER $testSuiteDir/post-broker-rollback.yaml 6; if [ $? -ne 0 ]; then exit 1; fi
-stopService controller "$newTargetDir"
+waitForBrokerReady
+echo "Running tests after broker downgrade"
+$COMPAT_TESTER $testSuiteDir/post-broker-rollback.yaml 6;
+if [ $? -ne 0 ]; then
+  stopServices
+  exit 1;
+fi
+echo "Downgrading controller"
+stopService controller
 startService controller "$oldTargetDir" "$CONTROLLER_CONF"
 waitForControllerReady
-#$COMPAT_TESTER $testSuiteDir/post-controller-rollback.yaml 7; if [ $? -ne 0 ]; then exit 1; fi
-stopServices "$oldTargetDir"
+waitForControllerReady
+echo "Running tests after controller downgrade"
+$COMPAT_TESTER $testSuiteDir/post-controller-rollback.yaml 7;
+if [ $? -ne 0 ]; then
+  stopServices
+  exit 1;
+fi
+stopServices
 
+echo "All tests passed"
 exit 0
