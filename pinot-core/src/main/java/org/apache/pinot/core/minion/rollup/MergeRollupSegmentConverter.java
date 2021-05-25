@@ -27,7 +27,7 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.core.minion.SegmentConverter;
 import org.apache.pinot.core.minion.segment.RecordAggregator;
 import org.apache.pinot.core.segment.processing.transformer.RecordTransformer;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;

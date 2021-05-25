@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.tools.perf.PerfBenchmarkDriver;
 import org.apache.pinot.tools.perf.PerfBenchmarkDriverConf;
 import org.openjdk.jmh.annotations.Benchmark;

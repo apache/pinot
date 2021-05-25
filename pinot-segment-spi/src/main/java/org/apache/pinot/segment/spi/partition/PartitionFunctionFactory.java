@@ -16,12 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.partition;
+package org.apache.pinot.segment.spi.partition;
 
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nonnull;
-import org.apache.pinot.segment.spi.partition.PartitionFunction;
 
 
 /**

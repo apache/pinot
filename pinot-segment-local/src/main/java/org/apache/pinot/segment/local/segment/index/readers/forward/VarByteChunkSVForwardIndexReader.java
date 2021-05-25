@@ -22,7 +22,7 @@ import java.nio.ByteBuffer;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriter;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 

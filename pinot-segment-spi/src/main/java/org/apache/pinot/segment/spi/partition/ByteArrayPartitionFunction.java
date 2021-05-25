@@ -16,11 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.partition;
+package org.apache.pinot.segment.spi.partition;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
-import org.apache.pinot.segment.spi.partition.PartitionFunction;
 
 
 /**

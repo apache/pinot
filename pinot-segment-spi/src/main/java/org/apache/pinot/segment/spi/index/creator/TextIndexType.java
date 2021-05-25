@@ -16,36 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.segment.store;
+package org.apache.pinot.segment.spi.index.creator;
 
-public enum ColumnIndexType {
-  DICTIONARY("dictionary"),
-  FORWARD_INDEX("forward_index"),
-  INVERTED_INDEX("inverted_index"),
-  BLOOM_FILTER("bloom_filter"),
-  NULLVALUE_VECTOR("nullvalue_vector"),
-  TEXT_INDEX("text_index"),
-  FST_INDEX("fst_index"),
-  JSON_INDEX("json_index"),
-  RANGE_INDEX("range_index"),
-  H3_INDEX("h3_index");
-
-  private final String indexName;
-
-  ColumnIndexType(String name) {
-    indexName = name;
-  }
-
-  public String getIndexName() {
-    return indexName;
-  }
-
-  public static ColumnIndexType getValue(String val) {
-    for (ColumnIndexType type : values()) {
-      if (type.getIndexName().equalsIgnoreCase(val)) {
-        return type;
-      }
-    }
-    throw new IllegalArgumentException("Unknown value: " + val);
-  }
+public enum TextIndexType {
+  NONE,
+  LUCENE,
+  LUCENE_FST
 }

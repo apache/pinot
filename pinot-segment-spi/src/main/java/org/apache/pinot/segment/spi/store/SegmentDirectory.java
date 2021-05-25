@@ -16,16 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.segment.store;
+package org.apache.pinot.segment.spi.store;
 
 import java.io.Closeable;
-import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Path;
 import org.apache.commons.configuration.ConfigurationException;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
-import org.apache.pinot.spi.utils.ReadMode;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
 /**
@@ -94,36 +93,15 @@ import org.apache.pinot.spi.utils.ReadMode;
  */
 public abstract class SegmentDirectory implements Closeable {
 
-  /**
-   * Create segment directory from local file system
-   * @param directory File object representing segment directory on disk
-   * @param metadata segment metadata
-   * @param readMode mmap vs heap ReadMode for data
-   * @return segmentDirectory
-   */
-  // NOTE: this needs to be metadata impl to read all columns.
-  // In future, we will have this class load metadata rather than
-  // passing it in.
-  public static SegmentDirectory createFromLocalFS(File directory, SegmentMetadataImpl metadata, ReadMode readMode) {
-    return new SegmentLocalFSDirectory(directory, metadata, readMode);
-  }
+  public abstract URI getIndexDir();
 
-  public static SegmentDirectory createFromLocalFS(File directory, ReadMode readMode)
-      throws IOException, ConfigurationException {
-    return new SegmentLocalFSDirectory(directory, readMode);
-  }
-
-  public static SegmentMetadataImpl loadSegmentMetadata(File directory)
-      throws IOException, ConfigurationException {
-    return SegmentLocalFSDirectory.loadSegmentMetadata(directory);
-  }
+  public abstract SegmentMetadataImpl getSegmentMetadata();
 
   public abstract void reloadMetadata()
       throws Exception;
 
   /**
    * Get the path/URL for the directory
-   * @return
    */
   public abstract Path getPath();
 

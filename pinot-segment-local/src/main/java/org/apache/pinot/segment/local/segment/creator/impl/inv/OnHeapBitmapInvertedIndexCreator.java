@@ -20,7 +20,7 @@ package org.apache.pinot.segment.local.segment.creator.impl.inv;
 
 import java.io.File;
 import java.io.IOException;
-import org.apache.pinot.segment.local.segment.creator.impl.V1Constants;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
 import org.roaringbitmap.Container;
 import org.roaringbitmap.RoaringBitmap;

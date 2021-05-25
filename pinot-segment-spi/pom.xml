@@ -72,6 +72,10 @@
       <groupId>org.locationtech.jts</groupId>
       <artifactId>jts-core</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.xerial.larray</groupId>
+      <artifactId>larray-mmap</artifactId>
+    </dependency>
 
     <!-- test -->
     <dependency>
