@@ -944,7 +944,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     // init fake PinotLLCRealtimeSegmentManager
     ControllerConf controllerConfig = new ControllerConf();
-    controllerConfig.setProperty(ControllerConf.ControllerPeriodicTasksConf.REALTIME_SEGMENT_UPLOAD_TO_SEGMENT_STORE_IF_MISSING, true);
+    controllerConfig.setProperty(ControllerConf.ControllerPeriodicTasksConf.ENABLE_UPLOAD_MISSING_LLC_SEGMENT_TO_SEGMENT_STORE, true);
     FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(pinotHelixResourceManager, controllerConfig);
     Assert.assertTrue(segmentManager.isUploadingRealtimeMissingSegmentStoreCopyEnabled());
 
@@ -1006,14 +1006,15 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // Keep 5th, 6th segment status as IN_PROGRESS.
 
     // prefetch the LLC segments, verify that 1st, 2nd and 3rd segment names are cached
-    List<ZNRecord> znRecords = segmentsZKMetadata.stream().map(LLCRealtimeSegmentZKMetadata::toZNRecord).collect(Collectors.toList());
-    when(zkHelixPropertyStore.getChildren(anyString(), eq(null), anyInt(), anyInt(), anyInt())).thenReturn(znRecords);
+    List<String> segmentNames = segmentsZKMetadata.stream().map(LLCRealtimeSegmentZKMetadata::getSegmentName).collect(Collectors.toList());
+    when(zkHelixPropertyStore.exists(anyString(), anyInt())).thenReturn(true);
+    when(zkHelixPropertyStore.getChildNames(anyString(), anyInt())).thenReturn(segmentNames);
     when(pinotHelixResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(segmentManager._tableConfig);
     segmentManager.prefetchLLCSegmentsWithoutDeepStoreCopy(REALTIME_TABLE_NAME);
     assertEquals(segmentManager.cachedLLCSegmentNameWithoutDeepStoreCopy.size(), 3);
-    assertEquals(segmentManager.cachedLLCSegmentNameWithoutDeepStoreCopy.get(0), segmentsZKMetadata.get(0).getSegmentName());
-    assertEquals(segmentManager.cachedLLCSegmentNameWithoutDeepStoreCopy.get(1), segmentsZKMetadata.get(1).getSegmentName());
-    assertEquals(segmentManager.cachedLLCSegmentNameWithoutDeepStoreCopy.get(2), segmentsZKMetadata.get(2).getSegmentName());
+    assertEquals(segmentManager.cachedLLCSegmentNameWithoutDeepStoreCopy.get(0), segmentNames.get(0));
+    assertEquals(segmentManager.cachedLLCSegmentNameWithoutDeepStoreCopy.get(1), segmentNames.get(1));
+    assertEquals(segmentManager.cachedLLCSegmentNameWithoutDeepStoreCopy.get(2), segmentNames.get(2));
 
     // 6th segment cached for fix from committing phase: status changed to be DONE without segment store download url. Verify later the download url is fixed after upload success.
     LLCRealtimeSegmentZKMetadata committingLLCSegmentToBeFixed = segmentsZKMetadata.get(5);
@@ -1038,17 +1039,17 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager.cachedLLCSegmentNameWithoutDeepStoreCopy.clear();
     segmentManager._exceededMinTimeToFixSegmentStoreCopy = true;
     segmentManager.uploadToSegmentStoreIfMissing(segmentManager._tableConfig);
-    assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentsZKMetadata.get(0).getSegmentName(), null).getDownloadUrl(), segmentDownloadUrl_0);
-    assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentsZKMetadata.get(1).getSegmentName(), null).getDownloadUrl(), CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
-    assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentsZKMetadata.get(2).getSegmentName(), null).getDownloadUrl(), CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
-    assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentsZKMetadata.get(3).getSegmentName(), null).getDownloadUrl(), defaultDownloadUrl);
-    assertNull(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentsZKMetadata.get(4).getSegmentName(), null).getDownloadUrl());
-    assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, committingLLCSegmentToBeFixed.getSegmentName(), null).getDownloadUrl(), segmentDownloadUrl_6);
+    assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(0), null).getDownloadUrl(), segmentDownloadUrl_0);
+    assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(1), null).getDownloadUrl(), CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
+    assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(2), null).getDownloadUrl(), CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
+    assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(3), null).getDownloadUrl(), defaultDownloadUrl);
+    assertNull(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(4), null).getDownloadUrl());
+    assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(5), null).getDownloadUrl(), segmentDownloadUrl_6);
 
     // verify the segments which are not fixed in this round: 2nd and 3rd
     assertEquals(segmentManager.cachedLLCSegmentNameWithoutDeepStoreCopy.size(), 2);
-    assertEquals(segmentManager.cachedLLCSegmentNameWithoutDeepStoreCopy.get(0), segmentsZKMetadata.get(1).getSegmentName());
-    assertEquals(segmentManager.cachedLLCSegmentNameWithoutDeepStoreCopy.get(1), segmentsZKMetadata.get(2).getSegmentName());
+    assertEquals(segmentManager.cachedLLCSegmentNameWithoutDeepStoreCopy.get(0), segmentNames.get(1));
+    assertEquals(segmentManager.cachedLLCSegmentNameWithoutDeepStoreCopy.get(1), segmentNames.get(2));
   }
 
   //////////////////////////////////////////////////////////////////////////////////

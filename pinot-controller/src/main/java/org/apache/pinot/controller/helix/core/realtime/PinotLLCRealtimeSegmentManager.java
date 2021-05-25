@@ -73,10 +73,10 @@ import org.apache.pinot.controller.helix.core.realtime.segment.FlushThresholdUpd
 import org.apache.pinot.controller.util.SegmentCompletionUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
-import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -163,6 +163,8 @@ public class PinotLLCRealtimeSegmentManager {
   // Map caching the LLC segment names without deep store download uri. Controller gets the LLC segment names from this map, and asks servers to upload the segments to segment store. This helps to alleviates excessive ZK access when fetching LLC segment list.
   // Key: table name; Value: LLC segment names to be uploaded to segment store.
   private Map<String, Queue<String>> _llcSegmentMapForUpload;
+  // Fix the missing deep store copy of LLC segments created within this range
+  private long _validationRangeForLLCSegmentsDeepStoreCopyMs;
 
   public PinotLLCRealtimeSegmentManager(PinotHelixResourceManager helixResourceManager, ControllerConf controllerConf,
       ControllerMetrics controllerMetrics) {
@@ -186,6 +188,7 @@ public class PinotLLCRealtimeSegmentManager {
     if (_isUploadingRealtimeMissingSegmentStoreCopyEnabled) {
       _fileUploadDownloadClient = initFileUploadDownloadClient();
       _llcSegmentMapForUpload = new ConcurrentHashMap<>();
+      _validationRangeForLLCSegmentsDeepStoreCopyMs = (long)controllerConf.getValidationRangeInDaysToCheckMissingSegmentStoreCopy() * 24 * 3600 * 1000;
     }
   }
 
@@ -1306,28 +1309,46 @@ public class PinotLLCRealtimeSegmentManager {
   // Pre-fetch the LLC segment without deep store copy.
   public void prefetchLLCSegmentsWithoutDeepStoreCopy(String tableNameWithType) {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-      if (tableType == TableType.REALTIME) {
-        TableConfig tableConfig = _helixResourceManager.getTableConfig(tableNameWithType);
-        if (tableConfig == null) {
-          LOGGER.warn("Failed to find table config for table: {}", tableNameWithType);
-          return;
-        }
+      if (tableType != TableType.REALTIME) {
+        return;
+      }
 
-        PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig.getTableName(),
-            IngestionConfigUtils.getStreamConfigMap(tableConfig));
-        if (!streamConfig.hasLowLevelConsumerType()) {
-          return;
-        }
+      TableConfig tableConfig = _helixResourceManager.getTableConfig(tableNameWithType);
+      if (tableConfig == null) {
+        LOGGER.warn("Failed to find table config for table: {}", tableNameWithType);
+        return;
+      }
 
-        List<LLCRealtimeSegmentZKMetadata> segmentZKMetadataList = ZKMetadataProvider.getLLCRealtimeSegmentZKMetadataListForTable(_propertyStore, tableNameWithType);
-        for (LLCRealtimeSegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
-          // Cache the committed llc segment without segment store copy
-          // TODO: only cache the recently created LLC segment for optimization
-          if (segmentZKMetadata.getStatus() == Status.DONE && CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(segmentZKMetadata.getDownloadUrl())) {
-            cacheLLCSegmentNameForUpload(tableNameWithType, segmentZKMetadata.getSegmentName());
+      PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig.getTableName(),
+          IngestionConfigUtils.getStreamConfigMap(tableConfig));
+      if (!streamConfig.hasLowLevelConsumerType()) {
+        return;
+      }
+
+      long currentTimeMs = getCurrentTimeMs();
+      List<String> segmentNames = ZKMetadataProvider.getLLCRealtimeSegments(_propertyStore, tableNameWithType);
+      for (String segmentName : segmentNames) {
+        try {
+          if (!isLLCSegmentWithinValidationRange(segmentName, currentTimeMs)) {
+            continue;
           }
+
+          LLCRealtimeSegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(tableNameWithType, segmentName, new Stat());
+          // Cache the committed llc segments without segment store download url
+          if (segmentZKMetadata.getStatus() == Status.DONE && CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(segmentZKMetadata.getDownloadUrl())) {
+            cacheLLCSegmentNameForUpload(tableNameWithType, segmentName);
+          }
+        } catch (Exception e) {
+          LOGGER.error("failed to fetch the LLC segment {} ZK metadata", segmentName);
         }
       }
+  }
+
+  // Only validate recently created LLC segment for missing deep store download url. The time range check is based on segment name. This step helps to alleviate ZK access.
+  private boolean isLLCSegmentWithinValidationRange(String segmentName, long currentTimeMs) {
+    LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+    long creationTimeMs = llcSegmentName.getCreationTimeMs();
+    return currentTimeMs - creationTimeMs < _validationRangeForLLCSegmentsDeepStoreCopyMs;
   }
 
   /**

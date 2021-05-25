@@ -21,10 +21,14 @@ package org.apache.pinot.common.utils;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 
 
 public class LLCSegmentName extends SegmentName implements Comparable {
   private final static String DATE_FORMAT = "yyyyMMdd'T'HHmm'Z'";
+  private final static DateTimeFormatter DATE_FORMATTER = DateTimeFormat.forPattern(DATE_FORMAT).withZoneUTC();
+
   private final String _tableName;
   private final int _partitionGroupId;
   private final int _sequenceNumber;
@@ -91,6 +95,11 @@ public class LLCSegmentName extends SegmentName implements Comparable {
 
   public String getCreationTime() {
     return _creationTime;
+  }
+
+  public long getCreationTimeMs() {
+    DateTime dateTime = DATE_FORMATTER.parseDateTime(_creationTime);
+    return dateTime.getMillis();
   }
 
   @Override
