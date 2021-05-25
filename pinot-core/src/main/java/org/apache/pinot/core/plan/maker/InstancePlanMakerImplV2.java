@@ -124,7 +124,12 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   @Override
   public PlanNode makeSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
-    indexSegment.prefetch(queryContext.getColumns());
+    List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
+    if (selectExpressions.size() == 1 && "*".equals(selectExpressions.get(0).getIdentifier())) {
+      indexSegment.prefetch(indexSegment.getPhysicalColumnNames());
+    } else {
+      indexSegment.prefetch(queryContext.getColumns());
+    }
     if (QueryContextUtils.isAggregationQuery(queryContext)) {
       List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
       if (groupByExpressions != null) {
