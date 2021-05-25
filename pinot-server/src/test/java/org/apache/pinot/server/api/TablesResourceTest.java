@@ -273,7 +273,7 @@ public class TablesResourceTest extends BaseResourceTest {
             .get(String.class));
     Assert.assertEquals(jsonResponse.get("columns").size(), 2);
     Assert.assertEquals(jsonResponse.get("indexes").size(), 17);
-    Assert.assertNull(jsonResponse.get("star-tree-index"));
+    Assert.assertEquals(jsonResponse.get("star-tree-index").size(), 0);
 
     jsonResponse = JsonUtils.stringToJsonNode(
         (_webTarget.path(segmentMetadataPath).queryParam("columns", "*").request().get(String.class)));
