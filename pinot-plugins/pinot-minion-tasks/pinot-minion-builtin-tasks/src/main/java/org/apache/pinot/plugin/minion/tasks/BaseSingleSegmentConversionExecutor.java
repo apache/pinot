@@ -58,11 +58,6 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
   protected abstract SegmentConversionResult convert(PinotTaskConfig pinotTaskConfig, File indexDir, File workingDir)
       throws Exception;
 
-  /**
-   * Returns the segment ZK metadata custom map modifier.
-   */
-  protected abstract SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier();
-
   @Override
   public SegmentConversionResult executeTask(PinotTaskConfig pinotTaskConfig)
       throws Exception {
@@ -118,7 +113,8 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       // Set segment ZK metadata custom map modifier into HTTP header to modify the segment ZK metadata
       // NOTE: even segment is not changed, still need to upload the segment to update the segment ZK metadata so that
       // segment will not be submitted again
-      SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier = getSegmentZKMetadataCustomMapModifier();
+      SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier =
+          getSegmentZKMetadataCustomMapModifier(pinotTaskConfig, segmentConversionResult);
       Header segmentZKMetadataCustomMapModifierHeader =
           new BasicHeader(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER,
               segmentZKMetadataCustomMapModifier.toJsonString());

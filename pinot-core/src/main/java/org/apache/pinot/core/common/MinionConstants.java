@@ -48,6 +48,7 @@ public class MinionConstants {
   public static final String RETRY_SCALE_FACTOR_KEY = "retryScaleFactor";
 
   public static final String TABLE_MAX_NUM_TASKS_KEY = "tableMaxNumTasks";
+  public static final String ENABLE_REPLACE_SEGMENTS_KEY = "enableReplaceSegments";
 
   public static class ConvertToRawIndexTask {
     public static final String TASK_TYPE = "ConvertToRawIndexTask";
