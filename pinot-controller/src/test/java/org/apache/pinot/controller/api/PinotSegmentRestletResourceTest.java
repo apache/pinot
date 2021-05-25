@@ -61,8 +61,7 @@ public class PinotSegmentRestletResourceTest {
     // Upload Segments
     for (int i = 0; i < 5; ++i) {
       SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME);
-      ControllerTestUtils.getHelixResourceManager()
-          .addNewSegment(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME), segmentMetadata, "downloadUrl");
+      ControllerTestUtils.getHelixResourceManager().addNewSegment(TABLE_NAME, segmentMetadata, "downloadUrl");
       segmentMetadataTable.put(segmentMetadata.getName(), segmentMetadata);
     }
 
@@ -72,8 +71,7 @@ public class PinotSegmentRestletResourceTest {
     // Add more segments
     for (int i = 0; i < 5; ++i) {
       SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME);
-      ControllerTestUtils.getHelixResourceManager()
-          .addNewSegment(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME), segmentMetadata, "downloadUrl");
+      ControllerTestUtils.getHelixResourceManager().addNewSegment(TABLE_NAME, segmentMetadata, "downloadUrl");
       segmentMetadataTable.put(segmentMetadata.getName(), segmentMetadata);
     }
 

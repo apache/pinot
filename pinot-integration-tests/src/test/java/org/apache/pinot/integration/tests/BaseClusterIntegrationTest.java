@@ -38,15 +38,10 @@ import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
-import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
-import org.apache.pinot.spi.config.table.RoutingConfig;
-import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -362,26 +357,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
         .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setLLC(useLlc())
         .setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled()).build();
-  }
-
-  /**
-   * Creates a new Upsert enabled table config.
-   */
-  protected TableConfig createUpsertTableConfig(File sampleAvroFile, String primaryKeyColumn, int numPartitions) {
-    AvroFileSchemaKafkaAvroMessageDecoder.avroFile = sampleAvroFile;
-    Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
-    columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Murmur", numPartitions));
-
-    return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName()).setSchemaName(getSchemaName())
-        .setTimeColumnName(getTimeColumnName())
-        .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
-        .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setLLC(useLlc())
-        .setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled())
-        .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
-        .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
-        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
-        .setUpsertConfig(new UpsertConfig((UpsertConfig.Mode.FULL))).build();
   }
 
   /**

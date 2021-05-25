@@ -70,7 +70,7 @@ public class ControllerInstanceToggleTest {
 
     // Add segments
     for (int i = 0; i < ControllerTestUtils.NUM_SERVER_INSTANCES; i++) {
-      ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_TABLE_NAME,
+      ControllerTestUtils.getHelixResourceManager().addNewSegment(RAW_TABLE_NAME,
           SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME), "downloadUrl");
       Assert.assertEquals(
           ControllerTestUtils

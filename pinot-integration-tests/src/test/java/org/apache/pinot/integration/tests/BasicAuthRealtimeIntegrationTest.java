@@ -182,9 +182,9 @@ public class BasicAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest
     // download and sanity-check size of offline segment(s)
     for (int i = 0; i < offlineSegments.size(); i++) {
       String segment = offlineSegments.get(i).asText();
-      Assert.assertTrue(sendGetRequest(_controllerRequestURLBuilder
-          .forSegmentDownload(TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), segment), AUTH_HEADER)
-          .length() > 200000); // download segment
+      Assert.assertTrue(
+          sendGetRequest(_controllerRequestURLBuilder.forSegmentDownload(getTableName(), segment), AUTH_HEADER).length()
+              > 200000); // download segment
     }
   }
 }

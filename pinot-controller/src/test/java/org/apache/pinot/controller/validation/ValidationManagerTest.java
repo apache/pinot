@@ -50,7 +50,7 @@ import static org.testng.Assert.assertEquals;
  */
 public class ValidationManagerTest {
   private static final String TEST_TABLE_NAME = "validationTable";
-  private static final String OFFLINE_TEST_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(TEST_TABLE_NAME);
+  private static final String TEST_TABLE_TWO = "validationTable2";
   private static final String TEST_SEGMENT_NAME = "testSegment";
 
   private TableConfig _offlineTableConfig;
@@ -68,7 +68,7 @@ public class ValidationManagerTest {
   public void testPushTimePersistence() {
     SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
 
-    ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_TEST_TABLE_NAME, segmentMetadata, "downloadUrl");
+    ControllerTestUtils.getHelixResourceManager().addNewSegment(TEST_TABLE_NAME, segmentMetadata, "downloadUrl");
     OfflineSegmentZKMetadata offlineSegmentZKMetadata =
         ControllerTestUtils.getHelixResourceManager().getOfflineSegmentZKMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
     long pushTime = offlineSegmentZKMetadata.getPushTime();

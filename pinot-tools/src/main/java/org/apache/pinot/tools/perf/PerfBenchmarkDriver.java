@@ -329,9 +329,10 @@ public class PerfBenchmarkDriver {
    *
    * @param segmentMetadata segment metadata.
    */
-  public void addSegment(String tableNameWithType, SegmentMetadata segmentMetadata) {
+  public void addSegment(String tableName, SegmentMetadata segmentMetadata) {
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     _helixResourceManager
-        .addNewSegment(tableNameWithType, segmentMetadata, "http://" + _controllerAddress + "/" + segmentMetadata.getName());
+        .addNewSegment(rawTableName, segmentMetadata, "http://" + _controllerAddress + "/" + segmentMetadata.getName());
   }
 
   public static void waitForExternalViewUpdate(String zkAddress, final String clusterName, long timeoutInMilliseconds) {

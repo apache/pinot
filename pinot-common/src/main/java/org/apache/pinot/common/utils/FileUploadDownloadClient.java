@@ -62,7 +62,6 @@ import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -92,7 +91,6 @@ public class FileUploadDownloadClient implements Closeable {
   public static class QueryParameters {
     public static final String ENABLE_PARALLEL_PUSH_PROTECTION = "enableParallelPushProtection";
     public static final String TABLE_NAME = "tableName";
-    public static final String TABLE_TYPE = "tableType";
   }
 
   public enum FileUploadType {
@@ -686,28 +684,6 @@ public class FileUploadDownloadClient implements Closeable {
     // Add table name as a request parameter
     NameValuePair tableNameValuePair = new BasicNameValuePair(QueryParameters.TABLE_NAME, tableName);
     List<NameValuePair> parameters = Collections.singletonList(tableNameValuePair);
-    return uploadSegment(uri, segmentName, segmentFile, null, parameters, DEFAULT_SOCKET_TIMEOUT_MS);
-  }
-
-  /**
-   * Upload segment with segment file using default settings. Include table name and type as a request parameters.
-   *
-   * @param uri URI
-   * @param segmentName Segment name
-   * @param segmentFile Segment file
-   * @param tableName Table name with or without type suffix
-   * @param tableType Table type
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
-  public SimpleHttpResponse uploadSegment(URI uri, String segmentName, File segmentFile, String tableName,
-      TableType tableType)
-      throws IOException, HttpErrorStatusException {
-    // Add table name and type request parameters
-    NameValuePair tableNameValuePair = new BasicNameValuePair(QueryParameters.TABLE_NAME, tableName);
-    NameValuePair tableTypeValuePair = new BasicNameValuePair(QueryParameters.TABLE_TYPE, tableType.name());
-    List<NameValuePair> parameters = Arrays.asList(tableNameValuePair, tableTypeValuePair);
     return uploadSegment(uri, segmentName, segmentFile, null, parameters, DEFAULT_SOCKET_TIMEOUT_MS);
   }
 

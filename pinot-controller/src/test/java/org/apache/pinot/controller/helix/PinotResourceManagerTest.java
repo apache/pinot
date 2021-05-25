@@ -18,23 +18,16 @@
  */
 package org.apache.pinot.controller.helix;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
-import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
-import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.UpsertConfig;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
@@ -44,30 +37,15 @@ import org.testng.annotations.Test;
 
 
 public class PinotResourceManagerTest {
-  private static final String OFFLINE_TABLE_NAME = "offlineResourceManagerTestTable_OFFLINE";
-  private static final String REALTIME_TABLE_NAME = "realtimeResourceManagerTestTable_REALTIME";
-  private static final String NUM_REPLICAS_STRING = "2";
-  private static final String PARTITION_COLUMN = "Partition_Column";
+  private static final String TABLE_NAME = "resourceManagerTestTable";
 
   @BeforeClass
   public void setUp() throws Exception {
     ControllerTestUtils.setupClusterAndValidate();
 
-    // Adding an offline table
-    TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(OFFLINE_TABLE_NAME).build();
-    ControllerTestUtils.getHelixResourceManager().addTable(offlineTableConfig);
-
-    // Adding an upsert enabled realtime table which consumes from a stream with 2 partitions
-    Schema dummySchema = ControllerTestUtils.createDummySchema(REALTIME_TABLE_NAME);
-    ControllerTestUtils.addSchema(dummySchema);
-    Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
-    TableConfig realtimeTableConfig = new TableConfigBuilder(TableType.REALTIME).setStreamConfigs(streamConfigs).
-        setTableName(REALTIME_TABLE_NAME).setSchemaName(dummySchema.getSchemaName()).build();
-    realtimeTableConfig.getValidationConfig().setReplicasPerPartition(NUM_REPLICAS_STRING);
-    realtimeTableConfig.getValidationConfig()
-        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(PARTITION_COLUMN, 1));
-    realtimeTableConfig.setUpsertConfig(new UpsertConfig((UpsertConfig.Mode.FULL)));
-    ControllerTestUtils.getHelixResourceManager().addTable(realtimeTableConfig);
+    // Adding table
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    ControllerTestUtils.getHelixResourceManager().addTable(tableConfig);
   }
 
   @Test
@@ -77,21 +55,21 @@ public class PinotResourceManagerTest {
 
     // Segment ZK metadata does not exist
     Assert.assertFalse(
-        ControllerTestUtils.getHelixResourceManager().updateZkMetadata(OFFLINE_TABLE_NAME + "_OFFLINE", segmentZKMetadata, 0));
+        ControllerTestUtils.getHelixResourceManager().updateZkMetadata(TABLE_NAME + "_OFFLINE", segmentZKMetadata, 0));
 
     // Set segment ZK metadata
     Assert.assertTrue(
-        ControllerTestUtils.getHelixResourceManager().updateZkMetadata(OFFLINE_TABLE_NAME + "_OFFLINE", segmentZKMetadata));
+        ControllerTestUtils.getHelixResourceManager().updateZkMetadata(TABLE_NAME + "_OFFLINE", segmentZKMetadata));
 
     // Update ZK metadata
     Assert.assertEquals(
-        ControllerTestUtils.getHelixResourceManager().getSegmentMetadataZnRecord(OFFLINE_TABLE_NAME + "_OFFLINE", "testSegment").getVersion(), 0);
+        ControllerTestUtils.getHelixResourceManager().getSegmentMetadataZnRecord(TABLE_NAME + "_OFFLINE", "testSegment").getVersion(), 0);
     Assert.assertTrue(
-        ControllerTestUtils.getHelixResourceManager().updateZkMetadata(OFFLINE_TABLE_NAME + "_OFFLINE", segmentZKMetadata, 0));
+        ControllerTestUtils.getHelixResourceManager().updateZkMetadata(TABLE_NAME + "_OFFLINE", segmentZKMetadata, 0));
     Assert.assertEquals(
-        ControllerTestUtils.getHelixResourceManager().getSegmentMetadataZnRecord(OFFLINE_TABLE_NAME + "_OFFLINE", "testSegment").getVersion(), 1);
+        ControllerTestUtils.getHelixResourceManager().getSegmentMetadataZnRecord(TABLE_NAME + "_OFFLINE", "testSegment").getVersion(), 1);
     Assert.assertFalse(
-        ControllerTestUtils.getHelixResourceManager().updateZkMetadata(OFFLINE_TABLE_NAME + "_OFFLINE", segmentZKMetadata, 0));
+        ControllerTestUtils.getHelixResourceManager().updateZkMetadata(TABLE_NAME + "_OFFLINE", segmentZKMetadata, 0));
   }
 
   /**
@@ -104,12 +82,11 @@ public class PinotResourceManagerTest {
 
   @Test
   public void testBasicAndConcurrentAddingAndDeletingSegments() throws Exception {
-    final String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(OFFLINE_TABLE_NAME);
+    final String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
 
     // Basic add/delete case
     for (int i = 1; i <= 2; i++) {
-      ControllerTestUtils.getHelixResourceManager().addNewSegment(
-          OFFLINE_TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME),
+      ControllerTestUtils.getHelixResourceManager().addNewSegment(TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME),
           "downloadUrl");
     }
     IdealState idealState = ControllerTestUtils
@@ -131,8 +108,8 @@ public class PinotResourceManagerTest {
         @Override
         public void run() {
           for (int i = 0; i < 10; i++) {
-            ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_TABLE_NAME,
-                SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME), "downloadUrl");
+            ControllerTestUtils.getHelixResourceManager().addNewSegment(TABLE_NAME,
+                SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME), "downloadUrl");
           }
         }
       });
@@ -159,54 +136,6 @@ public class PinotResourceManagerTest {
     idealState = ControllerTestUtils
         .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(), offlineTableName);
     Assert.assertEquals(idealState.getPartitionSet().size(), 0);
-  }
-
-  @Test
-  public void testAddingRealtimeTableSegmentsWithPartitionIdInZkMetadata() {
-    // Add three segments: two from partition 0 and 1 from partition 1;
-    String partition0Segment0 = "realtimeResourceManagerTestTable__aa";
-    String partition0Segment1 = "realtimeResourceManagerTestTable__bb";
-    String partition1Segment1 = "realtimeResourceManagerTestTable__cc";
-    ControllerTestUtils.getHelixResourceManager().addNewSegment(REALTIME_TABLE_NAME, SegmentMetadataMockUtils
-            .mockSegmentMetadataWithPartitionInfo(REALTIME_TABLE_NAME, partition0Segment0, PARTITION_COLUMN, 0),
-        "downloadUrl");
-    ControllerTestUtils.getHelixResourceManager().addNewSegment(REALTIME_TABLE_NAME, SegmentMetadataMockUtils
-            .mockSegmentMetadataWithPartitionInfo(REALTIME_TABLE_NAME, partition0Segment1, PARTITION_COLUMN, 0),
-        "downloadUrl");
-    ControllerTestUtils.getHelixResourceManager().addNewSegment(REALTIME_TABLE_NAME, SegmentMetadataMockUtils
-            .mockSegmentMetadataWithPartitionInfo(REALTIME_TABLE_NAME, partition1Segment1, PARTITION_COLUMN, 1),
-        "downloadUrl");
-    Map<String, Integer> segment2PartitionId = new HashMap<>();
-    segment2PartitionId.put(partition0Segment0, 0);
-    segment2PartitionId.put(partition0Segment1, 0);
-    segment2PartitionId.put(partition1Segment1, 1);
-
-    IdealState idealState = ControllerTestUtils.getHelixAdmin()
-        .getResourceIdealState(ControllerTestUtils.getHelixClusterName(),
-            TableNameBuilder.REALTIME.tableNameWithType(REALTIME_TABLE_NAME));
-    Set<String> segments = idealState.getPartitionSet();
-    Assert.assertEquals(segments.size(), 5);
-    Assert.assertTrue(segments.contains(partition0Segment0));
-    Assert.assertTrue(segments.contains(partition0Segment1));
-    Assert.assertTrue(segments.contains(partition1Segment1));
-
-    // Check the segments of the same partition is assigned to the same set of servers.
-    Map<Integer, Set<String>> segmentAssignment = new HashMap<>();
-    for (String segment : segments) {
-      Integer partitionId;
-      if (LLCSegmentName.isLowLevelConsumerSegmentName(segment)) {
-        partitionId = new LLCSegmentName(segment).getPartitionGroupId();
-      } else {
-        partitionId = segment2PartitionId.get(segment);
-      }
-      Assert.assertNotNull(partitionId);
-      Set<String> instances = idealState.getInstanceSet(segment);
-      if (segmentAssignment.containsKey(partitionId)) {
-        Assert.assertEquals(instances, segmentAssignment.get(partitionId));
-      } else {
-        segmentAssignment.put(partitionId, instances);
-      }
-    }
   }
 
   @AfterClass
