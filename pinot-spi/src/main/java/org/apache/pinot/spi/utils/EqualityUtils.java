@@ -22,6 +22,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -74,6 +76,9 @@ public class EqualityUtils {
 
   public static boolean isEqual(@Nullable Object left, @Nullable Object right) {
     if (left != null && right != null) {
+      if ((left instanceof Map) && (right instanceof Map)) {
+        return EqualityUtils.isEqualMap((Map)left, (Map)right);
+      }
       return left.equals(right);
     } else {
       return left == right;
@@ -82,6 +87,21 @@ public class EqualityUtils {
 
   public static boolean isEqual(@Nullable Object[] left, @Nullable Object[] right) {
     return Arrays.deepEquals(left, right);
+  }
+
+  public static boolean isEqualMap(@Nullable Map left, @Nullable Map right) {
+    if (left != null && right != null) {
+      if (left.size() != right.size()) {
+        return false;
+      }
+      for (Object key : left.keySet()) {
+        if ((!right.containsKey(key)) || (!EqualityUtils.isEqual(left.get(key), right.get(key)))) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return left == right;
   }
 
   @SuppressWarnings("unchecked")
@@ -95,6 +115,13 @@ public class EqualityUtils {
     } else {
       return left == right;
     }
+  }
+
+  public static boolean isEqualSet(@Nullable Set left, @Nullable Set right) {
+    if (left != null && right != null) {
+      return isEqualIgnoreOrder(Arrays.asList(left.toArray()), Arrays.asList(right.toArray()));
+    }
+    return left == right;
   }
 
   public static boolean isNullOrNotSameClass(@Nonnull Object left, @Nullable Object right) {
