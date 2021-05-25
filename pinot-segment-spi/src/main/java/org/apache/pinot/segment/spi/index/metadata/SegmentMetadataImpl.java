@@ -26,6 +26,7 @@ import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -92,6 +93,26 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   @Deprecated
   private String _rawTableName;
+
+  /**
+   * For segments that can only provide the inputstream to the metadata
+   */
+  public SegmentMetadataImpl(InputStream metadataPropertiesInputStream, InputStream creationMetaInputStream)
+      throws IOException {
+    _indexDir = null;
+    _columnMetadataMap = new HashMap<>();
+    _schema = new Schema();
+    _customMap = new HashMap<>();
+
+    PropertiesConfiguration segmentMetadataPropertiesConfiguration =
+        CommonsConfigurationUtils.fromInputStream(metadataPropertiesInputStream);
+    init(segmentMetadataPropertiesConfiguration);
+    loadCreationMeta(creationMetaInputStream);
+
+    setTimeInfo(segmentMetadataPropertiesConfiguration);
+    _totalDocs = segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS);
+  }
+
 
   /**
    * For segments on disk.
@@ -201,6 +222,14 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       _crc = ds.readLong();
       _creationTime = ds.readLong();
       ds.close();
+    }
+  }
+
+  private void loadCreationMeta(InputStream crcFileInputStream)
+      throws IOException {
+    try (DataInputStream ds = new DataInputStream(crcFileInputStream)) {
+      _crc = ds.readLong();
+      _creationTime = ds.readLong();
     }
   }
 

@@ -115,4 +115,10 @@ public abstract class ColumnIndexDirectory implements Closeable {
    * @return true if the index removal is supported
    */
   public abstract boolean isIndexRemovalSupported();
+
+  /**
+   * Fetch the buffer for this column
+   */
+  public void prefetchBuffer(String columns) {
+  }
 }
