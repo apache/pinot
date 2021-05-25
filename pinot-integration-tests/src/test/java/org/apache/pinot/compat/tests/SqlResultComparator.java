@@ -22,17 +22,29 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import org.apache.calcite.config.Lex;
+import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.SqlOrderBy;
+import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.parser.babel.SqlBabelParserImpl;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
+import org.apache.pinot.common.function.FunctionDefinitionRegistry;
+import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.ExpressionType;
+import org.apache.pinot.common.request.Function;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,6 +58,7 @@ public class SqlResultComparator {
   private static final String FIELD_COLUMN_NAMES = "columnNames";
   private static final String FIELD_COLUMN_DATA_TYPES = "columnDataTypes";
   private static final String FIELD_ROWS = "rows";
+  private static final String FIELD_VALUE = "value";
   private static final String FIELD_IS_SUPERSET = "isSuperset";
   private static final String FIELD_NUM_DOCS_SCANNED = "numDocsScanned";
   private static final String FIELD_EXCEPTIONS = "exceptions";
@@ -113,9 +126,147 @@ public class SqlResultComparator {
     if (expected.has(FIELD_IS_SUPERSET) && expected.get(FIELD_IS_SUPERSET).asBoolean(false)) {
       return areElementsSubset(actualElementsSerialized, expectedElementsSerialized);
     } else {
-      return areLengthsEqual(actual, expected) && areElementsEqual(actualElementsSerialized, expectedElementsSerialized,
-          query) && areMetadataEqual(actual, expected);
+      if (!areLengthsEqual(actual, expected)) {
+        return false;
+      }
+      /*
+       * Pinot server do some early termination optimization (process in parallel and early return if get enough
+       * documents to fulfill the LIMIT and OFFSET requirement) for queries:
+       * - selection without order by
+       * - selection with order by (by sorting the segments on min-max value)
+       * - DISTINCT queries.
+       * numDocsScanned is no-deterministic for those queries so numDocsScanned comparison should be skipped.
+       *
+       * NOTE: DISTINCT queries are modeled as non-selection queries during query processing, but all DISTINCT
+       * queries are selection queries during Calcite parsing (DISTINCT queries are selection queries with
+       * selectNode.getModifierNode(SqlSelectKeyword.DISTINCT) != null).
+       */
+      if (!isSelectionQuery(query) && !areNumDocsScannedEqual(actual, expected)) {
+        return false;
+      }
+      return isOrderByQuery(query) ? areOrderByQueryElementsEqual(actualRows, expectedRows, actualElementsSerialized,
+          expectedElementsSerialized, query)
+          : areNonOrderByQueryElementsEqual(actualElementsSerialized, expectedElementsSerialized);
     }
+  }
+
+  private static boolean areOrderByQueryElementsEqual(ArrayNode actualElements, ArrayNode expectedElements,
+      List<String> actualElementsSerialized, List<String> expectedElementsSerialized, String query) {
+    // Happy path, the results match exactly.
+    if (actualElementsSerialized.equals(expectedElementsSerialized)) {
+      LOGGER.debug("The results of the ordered query match exactly!");
+      return true;
+    }
+
+    /*
+     * Unhappy path, it possible that the returned results:
+     * - are not ordered by all columns.
+     * - to be a subset of total qualified results.
+     * In this case, we divide the results into groups (based on the ordered by column values), then compare the actual
+     * results and expected results group by group:
+     * - ordered by column values should be the same.
+     * - other column values (columns not in the order-by list) should be in the same set.
+     * - for the last group, since it's possible that the returned results to be a subset of total qualified results,
+     *   skipping the value comparison for other columns.
+     *
+     * Let's say we have a table:
+     * column_name: A, B, C
+     * row 0 value: 1, 2, 3
+     * row 1 value: 2, 2, 4
+     * row 2 value: 3, 7, 5
+     * row 3 value: 3, 2, 3
+     * row 4 value: 4, 2, 5
+     * row 5 value: 4, 7, 6
+     *
+     * There are 4 possible result for query `SELECT * from table ordered by A LIMIT 5`:
+     * 1) [row 0, row 1, row 2, row 3, row 4]
+     * 2) [row 0, row 1, row 3, row 2, row 4]
+     * 3) [row 0, row 1, row 2, row 3, row 5]
+     * 4) [row 0, row 1, row 3, row 2, row 5]
+     *
+     * So we will divide the result into 4 groups (based on value of A):
+     * group 1: [row 0]
+     * group 2: [row 1]
+     * group 3: [row 2, row 3], or [row 3, row 2]
+     * group 4: [row 4] or [row 5]
+     *
+     * During comparison:
+     * - for group 1, 2, 3: value of A should be the same, value of (B, C) should be in the same set.
+     * - for group 4: only verify the value of A should be the same.
+     */
+
+    List<Integer> orderByColumnIndexs = getOrderByColumnIndexs(query);
+    LinkedHashMap<String, List<String>> actualOrderByColumnValuesToOtherColumnValuesMap = new LinkedHashMap<>();
+    LinkedHashMap<String, List<String>> expectedOrderByColumnValuesToOtherColumnValuesMap = new LinkedHashMap<>();
+    String lastGroupOrderByColumnValues = "";
+    for (int i = 0; i < actualElements.size(); i++) {
+      String actualOrderByColumnValues = "";
+      String expectedOrderByColumnValues = "";
+      String actualOtherColumnValues = "";
+      String expectOtherColumnValues = "";
+      ArrayNode actualValue = (ArrayNode) actualElements.get(i).get(FIELD_VALUE);
+      ArrayNode expectedValue = (ArrayNode) expectedElements.get(i).get(FIELD_VALUE);
+
+      for (int j = 0; j < actualValue.size(); j++) {
+        if (orderByColumnIndexs.contains(j)) {
+          actualOrderByColumnValues += ", " + actualValue.get(j).toString();
+          expectedOrderByColumnValues += ", " + expectedValue.get(j).toString();
+        } else {
+          actualOtherColumnValues += ", " + actualValue.get(j).toString();
+          expectOtherColumnValues += ", " + expectedValue.get(j).toString();
+        }
+      }
+      lastGroupOrderByColumnValues = actualOrderByColumnValues;
+
+      actualOrderByColumnValuesToOtherColumnValuesMap.
+          computeIfAbsent(actualOrderByColumnValues, k -> new LinkedList<>()).
+          add(actualOtherColumnValues);
+      expectedOrderByColumnValuesToOtherColumnValuesMap.
+          computeIfAbsent(expectedOrderByColumnValues, k -> new LinkedList<>()).
+          add(expectOtherColumnValues);
+    }
+
+    if (!actualOrderByColumnValuesToOtherColumnValuesMap.keySet().
+        equals(expectedOrderByColumnValuesToOtherColumnValuesMap.keySet())) {
+      LOGGER.error("The results of the ordered query has different groups, actual: {}, expected: {}",
+          actualOrderByColumnValuesToOtherColumnValuesMap.keySet(),
+          expectedOrderByColumnValuesToOtherColumnValuesMap.keySet());
+      return false;
+    }
+
+    for (Map.Entry<String, List<String>> entry : actualOrderByColumnValuesToOtherColumnValuesMap.entrySet()) {
+      String orderByColumnValues = entry.getKey();
+      // For the last group, skip the value comparison for other columns.
+      if (orderByColumnValues.equals(lastGroupOrderByColumnValues)) {
+        continue;
+      }
+      List<String> actualOtherColumnValues = entry.getValue();
+      List<String> expectedOtherColumnValues =
+          expectedOrderByColumnValuesToOtherColumnValuesMap.get(orderByColumnValues);
+      Collections.sort(actualOtherColumnValues);
+      Collections.sort(expectedOtherColumnValues);
+      if (!actualOtherColumnValues.equals(expectedOtherColumnValues)) {
+        LOGGER.error(
+            "The results of the ordered query has different non-order-by column values for group: {}, actual: {}, expected: {}",
+            orderByColumnValues, actualOtherColumnValues, expectedOtherColumnValues);
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  private static boolean areNonOrderByQueryElementsEqual(List<String> actualElementsSerialized,
+      List<String> expectedElementsSerialized) {
+    // sort elements
+    actualElementsSerialized.sort(null);
+    expectedElementsSerialized.sort(null);
+    if (!actualElementsSerialized.equals(expectedElementsSerialized)) {
+      LOGGER.error("The results of the non-ordered query don't match. Sorted-expected: '{}', sorted-actual: '{}'",
+          expectedElementsSerialized, actualElementsSerialized);
+      return false;
+    }
+    return true;
   }
 
   public static boolean hasExceptions(JsonNode actual) {
@@ -272,14 +423,15 @@ public class SqlResultComparator {
 
   private static boolean areDataSchemaEqual(JsonNode actual, JsonNode expected) {
     /*
-    * Field "dataSchema" is an array, which contains "columnNames" and "columnDataTypes". However there is no orders
-    * between "columnNames" and "columnDataTypes", so we extract and append them when compare instead of compare
-    * "dataSchema" directly.
-    * */
+     * Field "dataSchema" is an array, which contains "columnNames" and "columnDataTypes". However there is no orders
+     * between "columnNames" and "columnDataTypes", so we extract and append them when compare instead of compare
+     * "dataSchema" directly.
+     */
     JsonNode actualColumnNames = actual.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).get(FIELD_COLUMN_NAMES);
     JsonNode expectedColumnNames = expected.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).get(FIELD_COLUMN_NAMES);
     JsonNode actualColumnDataTypes = actual.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).get(FIELD_COLUMN_DATA_TYPES);
-    JsonNode expectedColumnDataTypes = expected.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).get(FIELD_COLUMN_DATA_TYPES);
+    JsonNode expectedColumnDataTypes =
+        expected.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).get(FIELD_COLUMN_DATA_TYPES);
 
     String actualDataSchemaStr = actualColumnNames.toString() + actualColumnDataTypes.toString();
     String expectedDataSchemaStr = expectedColumnNames.toString() + expectedColumnDataTypes.toString();
@@ -297,28 +449,6 @@ public class SqlResultComparator {
       LOGGER.error("Actual result '{}' is not a subset of '{}'", actualElementsSerialized, expectedElementsSerialized);
     }
     return result;
-  }
-
-  private static boolean areElementsEqual(List<String> actualElementsSerialized,
-      List<String> expectedElementsSerialized, String query) {
-    if (isOrdered(query)) {
-      if (!actualElementsSerialized.equals(expectedElementsSerialized)) {
-        LOGGER.error("The results of the ordered query don't match! Actual: {}, Expected: {}", actualElementsSerialized,
-            expectedElementsSerialized);
-        return false;
-      }
-      return true;
-    }
-
-    // sort elements
-    actualElementsSerialized.sort(null);
-    expectedElementsSerialized.sort(null);
-    if (!actualElementsSerialized.equals(expectedElementsSerialized)) {
-      LOGGER.error("The results of the non-ordered query don't match. Sorted-expected: '{}', sorted-actual: '{}'",
-          expectedElementsSerialized, actualElementsSerialized);
-      return false;
-    }
-    return true;
   }
 
   private static void convertNumbersToString(ArrayNode rows, ArrayNode columnDataTypes)
@@ -344,7 +474,7 @@ public class SqlResultComparator {
     }
   }
 
-  private static boolean isOrdered(String query) {
+  private static boolean isOrderByQuery(String query) {
     SqlParser sqlParser = SqlParser.create(query, SQL_PARSER_CONFIG);
     try {
       SqlNode sqlNode = sqlParser.parseQuery();
@@ -355,6 +485,75 @@ public class SqlResultComparator {
       SqlOrderBy sqlOrderBy = (SqlOrderBy) sqlNode;
       SqlNodeList orderByColumns = sqlOrderBy.orderList;
       return orderByColumns != null && orderByColumns.size() != 0;
+    } catch (SqlParseException e) {
+      throw new RuntimeException("Cannot parse query: " + query, e);
+    }
+  }
+
+  // Selection query is the one that doesn't have group by or aggregation functions.
+  private static boolean isSelectionQuery(String query) {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    if (pinotQuery.getSelectList() == null) {
+      return false;
+    }
+    if (pinotQuery.isSetGroupByList()) {
+      return false;
+    }
+    for (Expression expression : pinotQuery.getSelectList()) {
+      if (expression.getType() == ExpressionType.FUNCTION) {
+        Function functionCall = expression.getFunctionCall();
+        String functionName = functionCall.getOperator();
+        if (FunctionDefinitionRegistry.isAggFunc(functionName)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  private static List<Integer> getOrderByColumnIndexs(String query) {
+    SqlSelect selectNodeWithOrderBy = getSelectNodeWithOrderBy(query);
+    SqlNodeList selectList = selectNodeWithOrderBy.getSelectList();
+    List<String> selectColumnNames = new ArrayList<>();
+    for (SqlNode node : selectList) {
+      selectColumnNames.add(node.toString());
+    }
+    SqlNodeList orderList = selectNodeWithOrderBy.getOrderList();
+    List<String> orderByColumnNames = new ArrayList<>();
+    for (SqlNode node : orderList) {
+      String columnName =
+          node instanceof SqlCall ? ((SqlCall) node).getOperandList().get(0).toString() : node.toString();
+      orderByColumnNames.add(columnName);
+    }
+    List<Integer> orderByColumnIndexs = new LinkedList<>();
+    int i = 0;
+    int j = 0;
+    while (i < orderByColumnNames.size()) {
+      while (j < selectColumnNames.size() && !selectColumnNames.get(j).equals(orderByColumnNames.get(i))) {
+        j++;
+      }
+      orderByColumnIndexs.add(j);
+      i++;
+    }
+    return orderByColumnIndexs;
+  }
+
+  private static SqlSelect getSelectNodeWithOrderBy(String query) {
+    SqlParser sqlParser = SqlParser.create(query, SQL_PARSER_CONFIG);
+    try {
+      SqlNode sqlNode = sqlParser.parseQuery();
+      SqlSelect selectNode;
+      if (sqlNode instanceof SqlOrderBy) {
+        // Store order-by info into the select sql node
+        SqlOrderBy orderByNode = (SqlOrderBy) sqlNode;
+        selectNode = (SqlSelect) orderByNode.query;
+        selectNode.setOrderBy(orderByNode.orderList);
+        selectNode.setFetch(orderByNode.fetch);
+        selectNode.setOffset(orderByNode.offset);
+      } else {
+        selectNode = (SqlSelect) sqlNode;
+      }
+      return selectNode;
     } catch (SqlParseException e) {
       throw new RuntimeException("Cannot parse query: " + query, e);
     }
