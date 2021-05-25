@@ -379,17 +379,16 @@ public class MutableSegmentImpl implements MutableSegment {
       _partitionUpsertMetadataManager = config.getPartitionUpsertMetadataManager();
       _validDocIds = new ThreadSafeMutableRoaringBitmap();
       _validDocIndex = new ValidDocIndexReaderImpl(_validDocIds);
-    } else {
-      _partitionUpsertMetadataManager = null;
-      _validDocIds = null;
-      _validDocIndex = null;
-
       if (isPartialUpsertEnabled()) {
         // init partial upsert handler with partial upsert config
         _partialUpsertHandler
             .init(config.getSchema(), config.getGlobalUpsertStrategy(), config.getPartialUpsertStrategy(),
                 config.getCustomUpsertStrategy());
       }
+    } else {
+      _partitionUpsertMetadataManager = null;
+      _validDocIds = null;
+      _validDocIndex = null;
     }
   }
 
@@ -495,7 +494,8 @@ public class MutableSegmentImpl implements MutableSegment {
         Object timeValue = row.getValue(_timeColumnName);
         Preconditions.checkArgument(timeValue instanceof Comparable, "time column shall be comparable");
         long timestamp = IngestionUtils.extractTimeValue((Comparable) timeValue);
-        _partitionUpsertMetadataManager.handleUpsert(row, docId, primaryKey, timestamp, this);
+        row = _partitionUpsertMetadataManager.handleUpsert(row, docId, primaryKey, timestamp, this);
+        updateDictionary(row);
       }
 
       // New row

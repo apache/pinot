@@ -148,19 +148,14 @@ public class PartitionUpsertMetadataManager {
     return validDocIds;
   }
 
-  public RecordLocation findLastRecord(PrimaryKey primaryKey) {
-    RecordLocation currentRecordLocation = _primaryKeyToRecordLocationMap.get(primaryKey);
-    return currentRecordLocation;
-  }
-
-  public void handleUpsert(GenericRow row, int docId, PrimaryKey primaryKey, long timestamp,
+  public GenericRow handleUpsert(GenericRow row, int docId, PrimaryKey primaryKey, long timestamp,
       MutableSegmentImpl mutableSegmentImpl) {
     if (mutableSegmentImpl.isPartialUpsertEnabled()) {
       // get primary key and timestamp for the incoming record.
       GenericRow previousRow = new GenericRow();
       // look up the previous full record with pk. Merge record if the incoming record is newer than previous record.
-      RecordLocation lastRecord = findLastRecord(primaryKey);
-      if (timestamp >= lastRecord.getTimestamp()) {
+      RecordLocation lastRecord = _primaryKeyToRecordLocationMap.get(primaryKey);
+      if (lastRecord != null && timestamp >= lastRecord.getTimestamp()) {
         if (lastRecord.getSegmentName() == mutableSegmentImpl.getSegmentName()) {
           previousRow = mutableSegmentImpl.getRecord(lastRecord.getDocId(), previousRow);
         } else {
@@ -173,6 +168,8 @@ public class PartitionUpsertMetadataManager {
 
     updateRecord(mutableSegmentImpl.getSegmentName(), new RecordInfo(primaryKey, docId, timestamp),
         mutableSegmentImpl.getValidDocIds());
+
+    return row;
   }
 
   /**
