@@ -132,6 +132,11 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   @Override
+  public void prefetch(Set<String> columns) {
+    _segmentDirectory.prefetch(columns);
+  }
+
+  @Override
   public void destroy() {
     String segmentName = getSegmentName();
     LOGGER.info("Trying to destroy segment : {}", segmentName);

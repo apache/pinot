@@ -124,6 +124,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   @Override
   public PlanNode makeSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
+    indexSegment.prefetch(queryContext.getColumns());
     if (QueryContextUtils.isAggregationQuery(queryContext)) {
       List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
       if (groupByExpressions != null) {

@@ -87,6 +87,13 @@ public interface IndexSegment {
   GenericRow getRecord(int docId, GenericRow reuse);
 
   /**
+   * This is a hint to the the implementation, to prefetch buffers for specified columns
+   * @param columns columns to prefetch
+   */
+  default void prefetch(Set<String> columns) {
+  }
+
+  /**
    * Destroys segment in memory and closes file handlers if in MMAP mode.
    */
   void destroy();
