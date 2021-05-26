@@ -19,6 +19,9 @@
 package org.apache.pinot.core.query.reduce;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -40,13 +43,17 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
+import org.apache.pinot.core.query.explain.ExplainPlanTreeNode;
+import org.apache.pinot.core.query.explain.SelectNode;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -108,6 +115,186 @@ public class BrokerReduceService {
       if (alias != null) {
         columnNames[i] = alias;
       }
+    }
+  }
+
+  public void reduceExplainPlanLiteralOnly(PinotQuery pinotQuery, BrokerResponseNative brokerResponse) {
+    ResultTable literalResultTable = brokerResponse.getResultTable();
+    List<String> columnNames = new ArrayList<>();
+    List<DataSchema.ColumnDataType> columnTypes = new ArrayList<>();
+    columnNames.add("Operator");
+    columnNames.add("Operator_Id");
+    columnNames.add("Parent_Id");
+    columnTypes.add(DataSchema.ColumnDataType.STRING);
+    columnTypes.add(DataSchema.ColumnDataType.INT);
+    columnTypes.add(DataSchema.ColumnDataType.INT);
+    DataSchema dataSchema =
+        new DataSchema(columnNames.toArray(new String[0]), columnTypes.toArray(new DataSchema.ColumnDataType[0]));
+    List<Object[]> resultRows = new ArrayList<>();
+    // add query rewrite operations
+    int[] idArray = new int[1];
+    idArray[0] = 0;
+    addQueryRewriteToTable(pinotQuery, resultRows, idArray);
+    Object[] selectRow = new Object[3];
+    Object[] literalResultRow = literalResultTable.getRows().get(0);
+    Object[] literalResultSchema = literalResultTable.getDataSchema().getColumnNames();
+    for (int i = 0; i < literalResultRow.length; i++) {
+      if (!literalResultRow[i].toString().equals(literalResultSchema[i])) {
+        // alias is used
+        literalResultRow[i] = literalResultRow[i] + "->" + literalResultSchema[i];
+      }
+    }
+    String selectList = Arrays.toString(literalResultRow);
+    selectRow[0] = "SELECT(selectList:" + selectList.substring(1, selectList.length() - 1) + ')';
+    selectRow[1] = idArray[0];
+    // parent id for select node is always -1
+    selectRow[2] = -1;
+    resultRows.add(selectRow);
+    ResultTable resultTable = new ResultTable(dataSchema, resultRows);
+    brokerResponse.setResultTable(resultTable);
+    // TODO: add stats to metadata
+    brokerResponse.setResultTable(resultTable);
+  }
+
+  public BrokerResponseNative reduceExplainPlanQueryOutputNontabular(QueryContext queryContext, TableConfig tableConfig) {
+    BrokerResponseNative brokerResponse = new BrokerResponseNative();
+    List<String> columnNames = new ArrayList<>();
+    List<DataSchema.ColumnDataType> columnTypes = new ArrayList<>();
+    columnNames.add("Plan");
+    columnTypes.add(DataSchema.ColumnDataType.STRING);
+    DataSchema dataSchema =
+        new DataSchema(columnNames.toArray(new String[0]), columnTypes.toArray(new DataSchema.ColumnDataType[0]));
+    String[] resultRow = new String[1];
+    List<Object[]> resultRows = new ArrayList<>();
+    List<Object[]> queryRewriteRows = new ArrayList<>();
+    // add query rewrite nodes
+    int[] idArray = new int[1];
+    idArray[0] = 0;
+    addQueryRewriteToTable(queryContext, queryRewriteRows, idArray);
+    StringBuilder sb = new StringBuilder();
+    buildPlan(queryRewriteRows, sb);
+    // create the plan tree
+    SelectNode selectRoot = new SelectNode(queryContext, tableConfig);
+    buildPlan(selectRoot, 0, sb);
+    resultRow[0] = sb.toString();
+    resultRows.add(resultRow);
+    ResultTable resultTable = new ResultTable(dataSchema, resultRows);
+    brokerResponse.setResultTable(resultTable);
+    // TODO: add stats to metadata
+    return brokerResponse;
+  }
+
+  /** Builds a plan tree using the resultRows. Note that this function is only used for query rewrite operators */
+  private void buildPlan(List<Object[]> resultRows, StringBuilder sb) {
+    for (Object[] row: resultRows) {
+      int parentId = (Integer) row[2];
+      for (int i = 0; i < (parentId + 1) * 4; i++) {
+        sb.append(" ");
+      }
+      sb.append((String) row[0]).append("\n");
+    }
+  }
+
+
+  /** Builds a plan tree with node being the root.
+   * Note that this function is only used for regular operators (not query rewrite) */
+  private void buildPlan(ExplainPlanTreeNode node, int indentation, StringBuilder sb) {
+    if (node == null) {
+      return;
+    }
+    for (int i=0; i < indentation; i++){
+      sb.append(" ");
+    }
+    sb.append(node).append("\n");
+    for (ExplainPlanTreeNode child : node.getChildNodes()) {
+      buildPlan(child, indentation + 4, sb);
+    }
+  }
+
+  public BrokerResponseNative reduceExplainPlanQueryOutput(QueryContext queryContext, TableConfig tableConfig) {
+    BrokerResponseNative brokerResponse = new BrokerResponseNative();
+    List<String> columnNames = new ArrayList<>();
+    List<DataSchema.ColumnDataType> columnTypes = new ArrayList<>();
+    columnNames.add("Operator");
+    columnNames.add("Operator_Id");
+    columnNames.add("Parent_Id");
+    columnTypes.add(DataSchema.ColumnDataType.STRING);
+    columnTypes.add(DataSchema.ColumnDataType.INT);
+    columnTypes.add(DataSchema.ColumnDataType.INT);
+    DataSchema dataSchema =
+        new DataSchema(columnNames.toArray(new String[0]), columnTypes.toArray(new DataSchema.ColumnDataType[0]));
+    List<Object[]> resultRows = new ArrayList<>();
+    // add query rewrite nodes
+    int[] idArray = new int[1];
+    idArray[0] = 0;
+    addQueryRewriteToTable(queryContext, resultRows, idArray);
+    // create the plan tree
+    SelectNode selectRoot = new SelectNode(queryContext, tableConfig);
+    // walking down the tree to populate the result table
+    addOperatorToTable(resultRows, selectRoot, idArray, -1);
+    ResultTable resultTable = new ResultTable(dataSchema, resultRows);
+    brokerResponse.setResultTable(resultTable);
+    // TODO: add stats to metadata
+    return brokerResponse;
+  }
+
+  private void addQueryRewriteToTable(Object o, List<Object[]> resultRows, int[] globalId) {
+    Map<String, String> options;
+    if (o instanceof PinotQuery) {
+      options = ((PinotQuery) o).getQueryOptions() == null ? new HashMap<>() : ((PinotQuery) o).getQueryOptions();
+    } else {
+      options = ((QueryContext) o).getQueryOptions() == null ? new HashMap<>() : ((QueryContext) o).getQueryOptions();
+    }
+    if (!options.containsKey(CalciteSqlParser.QUERY_REWRITE)) {
+      return;
+    }
+    // add the parent node for all query rewrite operations
+    Object[] firstRow = new Object[3];
+    firstRow[0] = CalciteSqlParser.QUERY_REWRITE;
+    firstRow[1] = globalId[0];
+    globalId[0] = globalId[0] + 1;
+    firstRow[2] = -1;
+    resultRows.add(firstRow);
+    // add all possible query rewrite operations
+    tryAddRewriteOperationToTable(options, resultRows, globalId, CalciteSqlParser.INVOKE_COMPILATION_TIME_FUNCTIONS);
+    tryAddRewriteOperationToTable(options, resultRows, globalId, CalciteSqlParser.REWRITE_SELECTIONS);
+    tryAddRewriteOperationToTable(options, resultRows, globalId, CalciteSqlParser.UPDATE_COMPARISON_PREDICATES);
+    tryAddRewriteOperationToTable(options, resultRows, globalId, CalciteSqlParser.APPLY_ORDINALS);
+    tryAddRewriteOperationToTable(options, resultRows, globalId, CalciteSqlParser.REWRITE_NON_AGGREGATION_GROUPBY_TO_DISTINCT);
+    tryAddRewriteOperationToTable(options, resultRows, globalId, CalciteSqlParser.APPLY_ALIAS);
+  }
+
+  private void tryAddRewriteOperationToTable
+      (Map<String, String> options, List<Object[]> resultRows, int[] globalId, String operationToAdd) {
+    if (options.containsKey(operationToAdd)) {
+      Object[] newRow = new Object[3];
+      if (operationToAdd.equals(CalciteSqlParser.REWRITE_NON_AGGREGATION_GROUPBY_TO_DISTINCT)) {
+        // no attributes for rewriting non-agg group-by to distinct
+        newRow[0] = operationToAdd;
+      } else {
+        newRow[0] = operationToAdd + '(' + options.get(operationToAdd) + ')';
+      }
+      newRow[1] = globalId[0];
+      globalId[0] = globalId[0] + 1;
+      // parentId is always 0 for query rewrite operations
+      newRow[2] = 0;
+      resultRows.add(newRow);
+    }
+  }
+
+  private void addOperatorToTable(List<Object[]> resultRows, ExplainPlanTreeNode node, int[] globalId, int parentId) {
+    if (node == null) {
+      return;
+    }
+    Object[] resultRow = new Object[3];
+    resultRow[0] = node.toString();
+    resultRow[1] = globalId[0];
+    resultRow[2] = parentId;
+    resultRows.add(resultRow);
+    parentId = globalId[0];
+    globalId[0] = globalId[0] + 1;
+    for (ExplainPlanTreeNode child : node.getChildNodes()) {
+      addOperatorToTable(resultRows, child, globalId, parentId);
     }
   }
 

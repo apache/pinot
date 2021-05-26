@@ -445,4 +445,42 @@ public class QueryContext {
       query._columns = columns;
     }
   }
+
+  /**
+   * Get project cols/IDENTIFIERS from query context (the cols that only appear in the filter should not appear)
+   */
+  public Set<String> getProjectCols() {
+    Set<String> columns = new HashSet<>();
+
+    for (ExpressionContext expression : _selectExpressions) {
+      expression.getColumns(columns);
+    }
+
+    if (_groupByExpressions != null) {
+      for (ExpressionContext expression : _groupByExpressions) {
+        expression.getColumns(columns);
+      }
+    }
+    if (_havingFilter != null) {
+      _havingFilter.getColumns(columns);
+    }
+    if (_orderByExpressions != null) {
+      for (OrderByExpressionContext orderByExpression : _orderByExpressions) {
+        orderByExpression.getColumns(columns);
+      }
+    }
+
+    // NOTE: Also gather columns from the input expressions of the aggregation functions because for certain types of
+    //       aggregation (e.g. DistinctCountThetaSketch), some input expressions are compiled while constructing the
+    //       aggregation function.
+    if (_aggregationFunctions != null) {
+      for (AggregationFunction aggregationFunction : _aggregationFunctions) {
+        List<ExpressionContext> inputExpressions = aggregationFunction.getInputExpressions();
+        for (ExpressionContext expression : inputExpressions) {
+          expression.getColumns(columns);
+        }
+      }
+    }
+    return columns;
+  }
 }

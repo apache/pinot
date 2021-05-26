@@ -175,4 +175,69 @@ public class LiteralOnlyBrokerRequestTest {
     Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0)[1], 1577836800000L);
     Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
   }
+
+  /**
+   * Tests for EXPLAIN PLAN for literal only queries
+   */
+  @Test
+  public void testExplainPlanLiteralOnly()
+      throws Exception {
+    SingleConnectionBrokerRequestHandler requestHandler =
+        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), null, ACCESS_CONTROL_FACTORY, null, null,
+            new BrokerMetrics("", PinotMetricUtils.getPinotMetricsRegistry(), true, Collections.emptySet()), null);
+
+    // Test 1: select constant
+    long randNum = RANDOM.nextLong();
+    byte[] randBytes = new byte[12];
+    RANDOM.nextBytes(randBytes);
+    String ranStr = BytesUtils.toHexString(randBytes);
+    JsonNode request = new ObjectMapper().readTree(String.format("{\"sql\":\"EXPLAIN PLAN FOR SELECT %d, '%s'\"}", randNum, ranStr));
+    RequestStatistics requestStats = new RequestStatistics();
+    BrokerResponseNative brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), "Operator");
+    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(0),
+        DataSchema.ColumnDataType.STRING);
+    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(1), "Operator_Id");
+    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(1),
+        DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(2), "Parent_Id");
+    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(2),
+        DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().size(), 1);
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0).length, 3);
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0)[0], "SELECT(selectList:" + randNum + ", " + ranStr + ')');
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0)[1], 0);
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0)[2], -1);
+    Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
+
+    // Test 2: invoke compile time function -> literal only
+    long currentTsMin = System.currentTimeMillis();
+    request = new ObjectMapper().readTree(
+        "{\"sql\":\"EXPLAIN PLAN FOR SELECT 6+8 as addition, fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') as firstDayOf2020\"}");
+    requestStats = new RequestStatistics();
+    brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    long currentTsMax = System.currentTimeMillis();
+    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), "Operator");
+    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(0),
+        DataSchema.ColumnDataType.STRING);
+    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(1), "Operator_Id");
+    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(1),
+        DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(2), "Parent_Id");
+    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(2),
+        DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().size(), 3);
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0).length, 3);
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0)[0], CalciteSqlParser.QUERY_REWRITE);
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0)[1], 0);
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0)[2], -1);
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(1)[0], CalciteSqlParser.INVOKE_COMPILATION_TIME_FUNCTIONS +
+        "([PLUS(6.0, 8.0)->14.0, FROMDATETIME(2020-01-01 UTC, yyyy-MM-dd z)->1577836800000])");
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(1)[1], 1);
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(1)[2], 0);
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(2)[0], "SELECT(selectList:14.0->addition, 1577836800000->firstDayOf2020)");
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(2)[1], 2);
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(2)[2], -1);
+    Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
+  }
 }

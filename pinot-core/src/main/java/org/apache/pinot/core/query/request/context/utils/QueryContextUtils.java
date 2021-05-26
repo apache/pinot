@@ -18,6 +18,12 @@
  */
 package org.apache.pinot.core.query.request.context.utils;
 
+import java.util.List;
+import java.util.Set;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -52,4 +58,91 @@ public class QueryContextUtils {
     return aggregationFunctions != null && aggregationFunctions.length == 1
         && aggregationFunctions[0] instanceof DistinctAggregationFunction;
   }
+
+  /**
+   * Returns a set of transformation functions (except for the ones in filter)
+   */
+  public static void generateTransforms(QueryContext queryContext, Set<String> postAggregations, Set<String> regularTransforms) {
+
+    // select
+    for (ExpressionContext selectExpression : queryContext.getSelectExpressions()) {
+      collectTransforms(selectExpression, postAggregations, regularTransforms);
+    }
+
+    // having
+    if (queryContext.getHavingFilter() != null) {
+      collectTransforms(queryContext.getHavingFilter(), postAggregations, regularTransforms);
+    }
+
+    // order-by
+    if (queryContext.getOrderByExpressions() != null) {
+      for (OrderByExpressionContext orderByExpression : queryContext.getOrderByExpressions()) {
+        collectTransforms(orderByExpression.getExpression(), postAggregations, regularTransforms);
+      }
+    }
+
+    // group-by
+    if (queryContext.getGroupByExpressions() != null) {
+      for (ExpressionContext groupByExpression : queryContext.getGroupByExpressions()) {
+        collectTransforms(groupByExpression, postAggregations, regularTransforms);
+      }
+    }
+  }
+
+
+  /**
+   * Collect transform functions from an ExpressionContext
+   */
+  public static void collectTransforms(ExpressionContext expression, Set<String> postAggregations, Set<String> regularTransforms) {
+    FunctionContext function = expression.getFunction();
+    if (function == null) {
+      // literal / identifier
+      return;
+    }
+    if (function.getType() == FunctionContext.Type.TRANSFORM) {
+      // transform
+      if (isPostAggregation(function)) {
+        postAggregations.add(function.toString());
+      } else {
+        regularTransforms.add(function.toString());
+      }
+    } else {
+      // aggregation
+      for (ExpressionContext argument : function.getArguments()) {
+        collectTransforms(argument, postAggregations, regularTransforms);
+      }
+    }
+  }
+
+  public static boolean isPostAggregation(FunctionContext function) {
+    if (function == null) {
+      return false;
+    }
+    if (function.getType() == FunctionContext.Type.AGGREGATION) {
+      return true;
+    } else {
+      // transform function
+      for (ExpressionContext argument : function.getArguments()) {
+        if (isPostAggregation(argument.getFunction())) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Collect transform functions from a FilterContext
+   */
+  public static void collectTransforms(FilterContext filter, Set<String> postAggregations, Set<String> regularTransforms) {
+    List<FilterContext> children = filter.getChildren();
+    if (children != null) {
+      for (FilterContext child : children) {
+        collectTransforms(child, postAggregations, regularTransforms);
+      }
+    } else {
+      collectTransforms(filter.getPredicate().getLhs(), postAggregations, regularTransforms);
+    }
+  }
+
 }

@@ -33,6 +33,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.config.Lex;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlDataTypeSpec;
+import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
@@ -60,6 +61,8 @@ import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -96,6 +99,14 @@ public class CalciteSqlParser {
   //   `OPTION (<k1> = <v1>) OPTION (<k2> = <v2>) OPTION (<k3> = <v3>)`
   private static final Pattern OPTIONS_REGEX_PATTEN =
       Pattern.compile("option\\s*\\(([^\\)]+)\\)", Pattern.CASE_INSENSITIVE);
+
+  public static final String QUERY_REWRITE = "QUERY_REWRITE";
+  public static final String INVOKE_COMPILATION_TIME_FUNCTIONS = "INVOKE_COMPILATION_TIME_FUNCTIONS";
+  public static final String REWRITE_SELECTIONS = "REWRITE_SELECTIONS";
+  public static final String UPDATE_COMPARISON_PREDICATES = "UPDATE_COMPARISON_PREDICATES";
+  public static final String APPLY_ORDINALS = "APPLY_ORDINALS";
+  public static final String REWRITE_NON_AGGREGATION_GROUPBY_TO_DISTINCT = "REWRITE_NON_AGGREGATION_GROUPBY_TO_DISTINCT";
+  public static final String APPLY_ALIAS = "APPLY_ALIASES";
 
   public static PinotQuery compileToPinotQuery(String sql)
       throws SqlCompilationException {
@@ -302,7 +313,7 @@ public class CalciteSqlParser {
     if (optionsStatements.isEmpty()) {
       return;
     }
-    Map<String, String> options = new HashMap<>();
+    Map<String, String> options = pinotQuery.isSetQueryOptions() ? pinotQuery.getQueryOptions() : new HashMap<>();
     for (String optionsStatement : optionsStatements) {
       for (String option : optionsStatement.split(",")) {
         final String[] splits = option.split("=");
@@ -324,6 +335,15 @@ public class CalciteSqlParser {
       throw new SqlCompilationException("Caught exception while parsing query: " + sql, e);
     }
 
+    PinotQuery pinotQuery = new PinotQuery();
+    boolean isExplain = false;
+    if (sqlNode instanceof SqlExplain) {
+      isExplain = true;
+      // Extract sql node for the query
+      SqlExplain explainNode = (SqlExplain) sqlNode;
+      sqlNode = explainNode.getExplicandum();
+      pinotQuery.putToQueryOptions("explainPlan", "true");
+    }
     SqlSelect selectNode;
     if (sqlNode instanceof SqlOrderBy) {
       // Store order-by info into the select sql node
@@ -336,7 +356,6 @@ public class CalciteSqlParser {
       selectNode = (SqlSelect) sqlNode;
     }
 
-    PinotQuery pinotQuery = new PinotQuery();
     // SELECT
     if (selectNode.getModifierNode(SqlSelectKeyword.DISTINCT) != null) {
       // SELECT DISTINCT
@@ -386,48 +405,84 @@ public class CalciteSqlParser {
       pinotQuery.setOffset(((SqlNumericLiteral) offsetNode).intValue(false));
     }
 
-    queryRewrite(pinotQuery);
+    if (isExplain) {
+      Map<String, Set<String>> trackQueryRewriteOperationsForExplain = new HashMap<>();
+      queryRewrite(pinotQuery, trackQueryRewriteOperationsForExplain);
+      setTrackedRewriteOperationsInQueryOptions(pinotQuery, trackQueryRewriteOperationsForExplain);
+    } else {
+      queryRewrite(pinotQuery, null);
+    }
     return pinotQuery;
   }
 
-  private static void queryRewrite(PinotQuery pinotQuery) {
+  /**
+   * For EXPLAIN PLAN queries, we record Query Rewrite procedures and set them in query options
+   * so that the broker request handler can use these to build the query plan tree.
+   */
+  private static void setTrackedRewriteOperationsInQueryOptions(PinotQuery pinotQuery, Map<String, Set<String>> trackQueryRewriteOperationsForExplain) {
+    Map<String, String> options = pinotQuery.isSetQueryOptions() ? pinotQuery.getQueryOptions() : new HashMap<>();
+    addRewriteOption(options, trackQueryRewriteOperationsForExplain, INVOKE_COMPILATION_TIME_FUNCTIONS);
+    addRewriteOption(options, trackQueryRewriteOperationsForExplain, REWRITE_SELECTIONS);
+    addRewriteOption(options, trackQueryRewriteOperationsForExplain, UPDATE_COMPARISON_PREDICATES);
+    addRewriteOption(options, trackQueryRewriteOperationsForExplain, APPLY_ORDINALS);
+    addRewriteOption(options, trackQueryRewriteOperationsForExplain, REWRITE_NON_AGGREGATION_GROUPBY_TO_DISTINCT);
+    addRewriteOption(options, trackQueryRewriteOperationsForExplain, APPLY_ALIAS);
+    if (!options.isEmpty()) {
+      pinotQuery.setQueryOptions(options);
+    }
+  }
+
+  private static void addRewriteOption(Map<String, String> options, Map<String, Set<String>> trackQueryRewriteOperationsForExplain, String operationToAdd) {
+    if (trackQueryRewriteOperationsForExplain.get(operationToAdd) != null) {
+      String attributes = trackQueryRewriteOperationsForExplain.get(operationToAdd).toString();
+      options.put(operationToAdd, attributes);
+      options.put(QUERY_REWRITE, "true");
+    }
+  }
+
+  private static void queryRewrite(PinotQuery pinotQuery, Map<String, Set<String>> trackQueryRewriteOperationsForExplain) {
     // Invoke compilation time functions
-    invokeCompileTimeFunctions(pinotQuery);
+    invokeCompileTimeFunctions(pinotQuery, trackQueryRewriteOperationsForExplain);
 
     // Rewrite Selection list
-    rewriteSelections(pinotQuery.getSelectList());
+    rewriteSelections(pinotQuery.getSelectList(), trackQueryRewriteOperationsForExplain);
 
     // Update Predicate Comparison
     Expression filterExpression = pinotQuery.getFilterExpression();
     if (filterExpression != null) {
-      pinotQuery.setFilterExpression(updateComparisonPredicate(filterExpression));
+      pinotQuery.setFilterExpression(updateComparisonPredicate(filterExpression, trackQueryRewriteOperationsForExplain));
     }
     Expression havingExpression = pinotQuery.getHavingExpression();
     if (havingExpression != null) {
-      pinotQuery.setHavingExpression(updateComparisonPredicate(havingExpression));
+      pinotQuery.setHavingExpression(updateComparisonPredicate(havingExpression, trackQueryRewriteOperationsForExplain));
     }
 
     // Update Ordinals
-    applyOrdinals(pinotQuery);
+    applyOrdinals(pinotQuery, trackQueryRewriteOperationsForExplain);
 
     // Rewrite GroupBy to Distinct
-    rewriteNonAggregationGroupByToDistinct(pinotQuery);
+    rewriteNonAggregationGroupByToDistinct(pinotQuery, trackQueryRewriteOperationsForExplain);
 
     // Update alias
     Map<Identifier, Expression> aliasMap = extractAlias(pinotQuery.getSelectList());
-    applyAlias(aliasMap, pinotQuery);
+    applyAlias(aliasMap, pinotQuery, trackQueryRewriteOperationsForExplain);
 
     // Validate
     validate(aliasMap, pinotQuery);
   }
 
-  private static void applyOrdinals(PinotQuery pinotQuery) {
+  private static void applyOrdinals(PinotQuery pinotQuery, Map<String, Set<String>> trackQueryRewriteOperationsForExplain) {
     // handle GROUP BY clause
     for (int i = 0; i < pinotQuery.getGroupByListSize(); i++) {
       final Expression groupByExpr = pinotQuery.getGroupByList().get(i);
       if (groupByExpr.isSetLiteral() && groupByExpr.getLiteral().isSetLongValue()) {
         final int ordinal = (int) groupByExpr.getLiteral().getLongValue();
-        pinotQuery.getGroupByList().set(i, getExpressionFromOrdinal(pinotQuery.getSelectList(), ordinal));
+        Expression expression = getExpressionFromOrdinal(pinotQuery.getSelectList(), ordinal);
+        pinotQuery.getGroupByList().set(i, expression);
+        if (trackQueryRewriteOperationsForExplain != null) {
+          trackQueryRewriteOperationsForExplain.putIfAbsent(APPLY_ORDINALS, new HashSet<>());
+          trackQueryRewriteOperationsForExplain.get(APPLY_ORDINALS).add(ordinal + "->" + RequestContextUtils.getExpression(expression));
+        }
       }
     }
 
@@ -436,8 +491,12 @@ public class CalciteSqlParser {
       final Expression orderByExpr = pinotQuery.getOrderByList().get(i).getFunctionCall().getOperands().get(0);
       if (orderByExpr.isSetLiteral() && orderByExpr.getLiteral().isSetLongValue()) {
         final int ordinal = (int) orderByExpr.getLiteral().getLongValue();
-        pinotQuery.getOrderByList().get(i).getFunctionCall()
-            .setOperands(Arrays.asList(getExpressionFromOrdinal(pinotQuery.getSelectList(), ordinal)));
+        Expression expression = getExpressionFromOrdinal(pinotQuery.getSelectList(), ordinal);
+        pinotQuery.getOrderByList().get(i).getFunctionCall().setOperands(Arrays.asList(expression));
+        if (trackQueryRewriteOperationsForExplain != null) {
+          trackQueryRewriteOperationsForExplain.putIfAbsent(APPLY_ORDINALS, new HashSet<>());
+          trackQueryRewriteOperationsForExplain.get(APPLY_ORDINALS).add(ordinal + "->" +  RequestContextUtils.getExpression(expression));
+        }
       }
     }
   }
@@ -456,14 +515,14 @@ public class CalciteSqlParser {
     }
   }
 
-  private static void rewriteSelections(List<Expression> selectList) {
+  private static void rewriteSelections(List<Expression> selectList, Map<String, Set<String>> trackQueryRewriteOperationsForExplain) {
     for (Expression expression : selectList) {
       // Rewrite aggregation
-      tryToRewriteArrayFunction(expression);
+      tryToRewriteArrayFunction(expression, trackQueryRewriteOperationsForExplain);
     }
   }
 
-  private static void tryToRewriteArrayFunction(Expression expression) {
+  private static void tryToRewriteArrayFunction(Expression expression, Map<String, Set<String>> trackQueryRewriteOperationsForExplain) {
     if (!expression.isSetFunctionCall()) {
       return;
     }
@@ -478,7 +537,13 @@ public class CalciteSqlParser {
           if (isSameFunction(innerFunction.getOperator(), TransformFunctionType.ARRAYSUM.getName())) {
             Function sumMvFunc = new Function(AggregationFunctionType.SUMMV.getName());
             sumMvFunc.setOperands(innerFunction.getOperands());
+            String originalFunc = RequestContextUtils.getExpression(expression).toString();
             expression.setFunctionCall(sumMvFunc);
+            String newFunction = RequestContextUtils.getExpression(expression).toString();
+            if (trackQueryRewriteOperationsForExplain != null) {
+              trackQueryRewriteOperationsForExplain.putIfAbsent(REWRITE_SELECTIONS, new HashSet<>());
+              trackQueryRewriteOperationsForExplain.get(REWRITE_SELECTIONS).add(originalFunc + "->" + newFunction);
+            }
           }
         }
         return;
@@ -491,7 +556,13 @@ public class CalciteSqlParser {
           if (isSameFunction(innerFunction.getOperator(), TransformFunctionType.ARRAYMIN.getName())) {
             Function sumMvFunc = new Function(AggregationFunctionType.MINMV.getName());
             sumMvFunc.setOperands(innerFunction.getOperands());
+            String originalFunc = RequestContextUtils.getExpression(expression).toString();
             expression.setFunctionCall(sumMvFunc);
+            String newFunction = RequestContextUtils.getExpression(expression).toString();
+            if (trackQueryRewriteOperationsForExplain != null) {
+              trackQueryRewriteOperationsForExplain.putIfAbsent(REWRITE_SELECTIONS, new HashSet<>());
+              trackQueryRewriteOperationsForExplain.get(REWRITE_SELECTIONS).add(originalFunc + "->" + newFunction);
+            }
           }
         }
         return;
@@ -504,13 +575,19 @@ public class CalciteSqlParser {
           if (isSameFunction(innerFunction.getOperator(), TransformFunctionType.ARRAYMAX.getName())) {
             Function sumMvFunc = new Function(AggregationFunctionType.MAXMV.getName());
             sumMvFunc.setOperands(innerFunction.getOperands());
+            String originalFunc = RequestContextUtils.getExpression(expression).toString();
             expression.setFunctionCall(sumMvFunc);
+            String newFunction = RequestContextUtils.getExpression(expression).toString();
+            if (trackQueryRewriteOperationsForExplain != null) {
+              trackQueryRewriteOperationsForExplain.putIfAbsent(REWRITE_SELECTIONS, new HashSet<>());
+              trackQueryRewriteOperationsForExplain.get(REWRITE_SELECTIONS).add(originalFunc + "->" + newFunction);
+            }
           }
         }
         return;
     }
     for (Expression operand : functionCall.getOperands()) {
-      tryToRewriteArrayFunction(operand);
+      tryToRewriteArrayFunction(operand, trackQueryRewriteOperationsForExplain);
     }
   }
 
@@ -531,7 +608,7 @@ public class CalciteSqlParser {
    * ```
    * @param pinotQuery
    */
-  private static void rewriteNonAggregationGroupByToDistinct(PinotQuery pinotQuery) {
+  private static void rewriteNonAggregationGroupByToDistinct(PinotQuery pinotQuery, Map<String, Set<String>> trackQueryRewriteOperationsForExplain) {
     boolean hasAggregation = false;
     for (Expression select : pinotQuery.getSelectList()) {
       if (isAggregateExpression(select)) {
@@ -560,6 +637,10 @@ public class CalciteSqlParser {
         }
         pinotQuery.setSelectList(Arrays.asList(distinctExpression));
         pinotQuery.setGroupByList(Collections.emptyList());
+        if (trackQueryRewriteOperationsForExplain != null) {
+          trackQueryRewriteOperationsForExplain.putIfAbsent(REWRITE_NON_AGGREGATION_GROUPBY_TO_DISTINCT, new HashSet<>());
+          trackQueryRewriteOperationsForExplain.get(REWRITE_NON_AGGREGATION_GROUPBY_TO_DISTINCT).add("true");
+        }
       } else {
         selectIdentifiers.removeAll(groupByIdentifiers);
         throw new SqlCompilationException(String.format(
@@ -573,22 +654,22 @@ public class CalciteSqlParser {
     return expression.getFunctionCall() != null && expression.getFunctionCall().getOperator().equalsIgnoreCase("AS");
   }
 
-  private static void invokeCompileTimeFunctions(PinotQuery pinotQuery) {
+  private static void invokeCompileTimeFunctions(PinotQuery pinotQuery, Map<String, Set<String>> trackQueryRewriteOperationsForExplain) {
     for (int i = 0; i < pinotQuery.getSelectListSize(); i++) {
-      Expression expression = invokeCompileTimeFunctionExpression(pinotQuery.getSelectList().get(i));
+      Expression expression = invokeCompileTimeFunctionExpression(pinotQuery.getSelectList().get(i), trackQueryRewriteOperationsForExplain);
       pinotQuery.getSelectList().set(i, expression);
     }
     for (int i = 0; i < pinotQuery.getGroupByListSize(); i++) {
-      Expression expression = invokeCompileTimeFunctionExpression(pinotQuery.getGroupByList().get(i));
+      Expression expression = invokeCompileTimeFunctionExpression(pinotQuery.getGroupByList().get(i), trackQueryRewriteOperationsForExplain);
       pinotQuery.getGroupByList().set(i, expression);
     }
     for (int i = 0; i < pinotQuery.getOrderByListSize(); i++) {
-      Expression expression = invokeCompileTimeFunctionExpression(pinotQuery.getOrderByList().get(i));
+      Expression expression = invokeCompileTimeFunctionExpression(pinotQuery.getOrderByList().get(i), trackQueryRewriteOperationsForExplain);
       pinotQuery.getOrderByList().set(i, expression);
     }
-    Expression filterExpression = invokeCompileTimeFunctionExpression(pinotQuery.getFilterExpression());
+    Expression filterExpression = invokeCompileTimeFunctionExpression(pinotQuery.getFilterExpression(), trackQueryRewriteOperationsForExplain);
     pinotQuery.setFilterExpression(filterExpression);
-    Expression havingExpression = invokeCompileTimeFunctionExpression(pinotQuery.getHavingExpression());
+    Expression havingExpression = invokeCompileTimeFunctionExpression(pinotQuery.getHavingExpression(), trackQueryRewriteOperationsForExplain);
     pinotQuery.setHavingExpression(havingExpression);
   }
 
@@ -596,7 +677,7 @@ public class CalciteSqlParser {
   // For comparison expression, left operand could be any expression, but right operand only
   // supports literal.
   // E.g. 'WHERE a > b' will be updated to 'WHERE a - b > 0'
-  private static Expression updateComparisonPredicate(Expression expression) {
+  private static Expression updateComparisonPredicate(Expression expression, Map<String, Set<String>> trackQueryRewriteOperationsForExplain) {
     Function function = expression.getFunctionCall();
     if (function != null) {
       String operator = function.getOperator().toUpperCase();
@@ -610,7 +691,9 @@ public class CalciteSqlParser {
       switch (filterKind) {
         case AND:
         case OR:
-          operands.replaceAll(CalciteSqlParser::updateComparisonPredicate);
+          for (int i = 0; i < operands.size(); i++) {
+            operands.set(i, updateComparisonPredicate(operands.get(i), trackQueryRewriteOperationsForExplain));
+          }
           break;
         case EQUALS:
         case NOT_EQUALS:
@@ -624,19 +707,31 @@ public class CalciteSqlParser {
           // Handle predicate like '10 = a' -> 'a = 10'
           if (firstOperand.isSetLiteral()) {
             if (!secondOperand.isSetLiteral()) {
+              String originalPredicate = RequestContextUtils.getExpression(expression).toString();
               function.setOperator(getOppositeOperator(filterKind).name());
               operands.set(0, secondOperand);
               operands.set(1, firstOperand);
+              String newPredicate = RequestContextUtils.getExpression(expression).toString();
+              if (trackQueryRewriteOperationsForExplain != null) {
+                trackQueryRewriteOperationsForExplain.putIfAbsent(UPDATE_COMPARISON_PREDICATES, new HashSet<>());
+                trackQueryRewriteOperationsForExplain.get(UPDATE_COMPARISON_PREDICATES).add(originalPredicate + "->" + newPredicate);
+              }
             }
             break;
           }
 
           // Handle predicate like 'a > b' -> 'a - b > 0'
           if (!secondOperand.isSetLiteral()) {
+            String originalPredicate = RequestContextUtils.getExpression(expression).toString();
             Expression minusExpression = RequestUtils.getFunctionExpression(SqlKind.MINUS.name());
             minusExpression.getFunctionCall().setOperands(Arrays.asList(firstOperand, secondOperand));
             operands.set(0, minusExpression);
             operands.set(1, RequestUtils.getLiteralExpression(0));
+            String newPredicate = RequestContextUtils.getExpression(expression).toString();
+            if (trackQueryRewriteOperationsForExplain != null) {
+              trackQueryRewriteOperationsForExplain.putIfAbsent(UPDATE_COMPARISON_PREDICATES, new HashSet<>());
+              trackQueryRewriteOperationsForExplain.get(UPDATE_COMPARISON_PREDICATES).add(originalPredicate + "->" + newPredicate);
+            }
             break;
           }
 
@@ -679,34 +774,38 @@ public class CalciteSqlParser {
     }
   }
 
-  private static void applyAlias(Map<Identifier, Expression> aliasMap, PinotQuery pinotQuery) {
+  private static void applyAlias(Map<Identifier, Expression> aliasMap, PinotQuery pinotQuery, Map<String, Set<String>> trackQueryRewriteOperationsForExplain) {
     Expression filterExpression = pinotQuery.getFilterExpression();
     if (filterExpression != null) {
-      applyAlias(aliasMap, filterExpression);
+      applyAlias(aliasMap, filterExpression, trackQueryRewriteOperationsForExplain);
     }
     List<Expression> groupByList = pinotQuery.getGroupByList();
     if (groupByList != null) {
       for (Expression expression : groupByList) {
-        applyAlias(aliasMap, expression);
+        applyAlias(aliasMap, expression, trackQueryRewriteOperationsForExplain);
       }
     }
     Expression havingExpression = pinotQuery.getHavingExpression();
     if (havingExpression != null) {
-      applyAlias(aliasMap, havingExpression);
+      applyAlias(aliasMap, havingExpression, trackQueryRewriteOperationsForExplain);
     }
     List<Expression> orderByList = pinotQuery.getOrderByList();
     if (orderByList != null) {
       for (Expression expression : orderByList) {
-        applyAlias(aliasMap, expression);
+        applyAlias(aliasMap, expression, trackQueryRewriteOperationsForExplain);
       }
     }
   }
 
-  private static void applyAlias(Map<Identifier, Expression> aliasMap, Expression expression) {
+  private static void applyAlias(Map<Identifier, Expression> aliasMap, Expression expression, Map<String, Set<String>> trackQueryRewriteOperationsForExplain) {
     Identifier identifierKey = expression.getIdentifier();
     if (identifierKey != null) {
       Expression aliasExpression = aliasMap.get(identifierKey);
       if (aliasExpression != null) {
+        if (trackQueryRewriteOperationsForExplain != null) {
+          trackQueryRewriteOperationsForExplain.putIfAbsent(APPLY_ALIAS, new HashSet<>());
+          trackQueryRewriteOperationsForExplain.get(APPLY_ALIAS).add(RequestContextUtils.getExpression(expression) + "->" + RequestContextUtils.getExpression(aliasExpression));
+        }
         expression.setType(aliasExpression.getType());
         expression.setIdentifier(aliasExpression.getIdentifier());
         expression.setFunctionCall(aliasExpression.getFunctionCall());
@@ -717,7 +816,7 @@ public class CalciteSqlParser {
     Function function = expression.getFunctionCall();
     if (function != null) {
       for (Expression operand : function.getOperands()) {
-        applyAlias(aliasMap, operand);
+        applyAlias(aliasMap, operand, trackQueryRewriteOperationsForExplain);
       }
     }
   }
@@ -1082,7 +1181,8 @@ public class CalciteSqlParser {
     return andExpression;
   }
 
-  protected static Expression invokeCompileTimeFunctionExpression(@Nullable Expression expression) {
+  protected static Expression invokeCompileTimeFunctionExpression(@Nullable Expression expression,
+      Map<String, Set<String>> trackQueryRewriteOperationsForExplain) {
     if (expression == null || expression.getFunctionCall() == null) {
       return expression;
     }
@@ -1091,7 +1191,7 @@ public class CalciteSqlParser {
     int numOperands = operands.size();
     boolean compilable = true;
     for (int i = 0; i < numOperands; i++) {
-      Expression operand = invokeCompileTimeFunctionExpression(operands.get(i));
+      Expression operand = invokeCompileTimeFunctionExpression(operands.get(i), trackQueryRewriteOperationsForExplain);
       if (operand.getLiteral() == null) {
         compilable = false;
       }
@@ -1109,6 +1209,11 @@ public class CalciteSqlParser {
           FunctionInvoker invoker = new FunctionInvoker(functionInfo);
           invoker.convertTypes(arguments);
           Object result = invoker.invoke(arguments);
+          if (trackQueryRewriteOperationsForExplain != null) {
+            trackQueryRewriteOperationsForExplain.putIfAbsent(INVOKE_COMPILATION_TIME_FUNCTIONS, new HashSet<>());
+            trackQueryRewriteOperationsForExplain.get(INVOKE_COMPILATION_TIME_FUNCTIONS).add(functionName + '(' +
+                Arrays.toString(arguments).substring(1, Arrays.toString(arguments).length() - 1) + ')' + "->" + result);
+          }
           return RequestUtils.getLiteralExpression(result);
         } catch (Exception e) {
           throw new SqlCompilationException(

@@ -155,34 +155,34 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
   public static final java.util.Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     java.util.Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new java.util.EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.VERSION, new org.apache.thrift.meta_data.FieldMetaData("version", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.VERSION, new org.apache.thrift.meta_data.FieldMetaData("version", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32)));
-    tmpMap.put(_Fields.DATA_SOURCE, new org.apache.thrift.meta_data.FieldMetaData("dataSource", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.DATA_SOURCE, new org.apache.thrift.meta_data.FieldMetaData("dataSource", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, DataSource.class)));
-    tmpMap.put(_Fields.SELECT_LIST, new org.apache.thrift.meta_data.FieldMetaData("selectList", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
+    tmpMap.put(_Fields.SELECT_LIST, new org.apache.thrift.meta_data.FieldMetaData("selectList", org.apache.thrift.TFieldRequirementType.OPTIONAL,
+        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST,
             new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRUCT            , "Expression"))));
-    tmpMap.put(_Fields.FILTER_EXPRESSION, new org.apache.thrift.meta_data.FieldMetaData("filterExpression", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.FILTER_EXPRESSION, new org.apache.thrift.meta_data.FieldMetaData("filterExpression", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRUCT        , "Expression")));
-    tmpMap.put(_Fields.GROUP_BY_LIST, new org.apache.thrift.meta_data.FieldMetaData("groupByList", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
+    tmpMap.put(_Fields.GROUP_BY_LIST, new org.apache.thrift.meta_data.FieldMetaData("groupByList", org.apache.thrift.TFieldRequirementType.OPTIONAL,
+        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST,
             new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRUCT            , "Expression"))));
-    tmpMap.put(_Fields.ORDER_BY_LIST, new org.apache.thrift.meta_data.FieldMetaData("orderByList", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
+    tmpMap.put(_Fields.ORDER_BY_LIST, new org.apache.thrift.meta_data.FieldMetaData("orderByList", org.apache.thrift.TFieldRequirementType.OPTIONAL,
+        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST,
             new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRUCT            , "Expression"))));
-    tmpMap.put(_Fields.HAVING_EXPRESSION, new org.apache.thrift.meta_data.FieldMetaData("havingExpression", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.HAVING_EXPRESSION, new org.apache.thrift.meta_data.FieldMetaData("havingExpression", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRUCT        , "Expression")));
-    tmpMap.put(_Fields.LIMIT, new org.apache.thrift.meta_data.FieldMetaData("limit", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.LIMIT, new org.apache.thrift.meta_data.FieldMetaData("limit", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32)));
-    tmpMap.put(_Fields.OFFSET, new org.apache.thrift.meta_data.FieldMetaData("offset", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.OFFSET, new org.apache.thrift.meta_data.FieldMetaData("offset", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32)));
-    tmpMap.put(_Fields.DEBUG_OPTIONS, new org.apache.thrift.meta_data.FieldMetaData("debugOptions", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP, 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING), 
+    tmpMap.put(_Fields.DEBUG_OPTIONS, new org.apache.thrift.meta_data.FieldMetaData("debugOptions", org.apache.thrift.TFieldRequirementType.OPTIONAL,
+        new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP,
+            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING),
             new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING))));
-    tmpMap.put(_Fields.QUERY_OPTIONS, new org.apache.thrift.meta_data.FieldMetaData("queryOptions", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP, 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING), 
+    tmpMap.put(_Fields.QUERY_OPTIONS, new org.apache.thrift.meta_data.FieldMetaData("queryOptions", org.apache.thrift.TFieldRequirementType.OPTIONAL,
+        new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP,
+            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING),
             new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING))));
     metaDataMap = java.util.Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(PinotQuery.class, metaDataMap);
@@ -595,93 +595,93 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
 
   public void setFieldValue(_Fields field, @org.apache.thrift.annotation.Nullable java.lang.Object value) {
     switch (field) {
-    case VERSION:
-      if (value == null) {
-        unsetVersion();
-      } else {
-        setVersion((java.lang.Integer)value);
-      }
-      break;
+      case VERSION:
+        if (value == null) {
+          unsetVersion();
+        } else {
+          setVersion((java.lang.Integer)value);
+        }
+        break;
 
-    case DATA_SOURCE:
-      if (value == null) {
-        unsetDataSource();
-      } else {
-        setDataSource((DataSource)value);
-      }
-      break;
+      case DATA_SOURCE:
+        if (value == null) {
+          unsetDataSource();
+        } else {
+          setDataSource((DataSource)value);
+        }
+        break;
 
-    case SELECT_LIST:
-      if (value == null) {
-        unsetSelectList();
-      } else {
-        setSelectList((java.util.List<Expression>)value);
-      }
-      break;
+      case SELECT_LIST:
+        if (value == null) {
+          unsetSelectList();
+        } else {
+          setSelectList((java.util.List<Expression>)value);
+        }
+        break;
 
-    case FILTER_EXPRESSION:
-      if (value == null) {
-        unsetFilterExpression();
-      } else {
-        setFilterExpression((Expression)value);
-      }
-      break;
+      case FILTER_EXPRESSION:
+        if (value == null) {
+          unsetFilterExpression();
+        } else {
+          setFilterExpression((Expression)value);
+        }
+        break;
 
-    case GROUP_BY_LIST:
-      if (value == null) {
-        unsetGroupByList();
-      } else {
-        setGroupByList((java.util.List<Expression>)value);
-      }
-      break;
+      case GROUP_BY_LIST:
+        if (value == null) {
+          unsetGroupByList();
+        } else {
+          setGroupByList((java.util.List<Expression>)value);
+        }
+        break;
 
-    case ORDER_BY_LIST:
-      if (value == null) {
-        unsetOrderByList();
-      } else {
-        setOrderByList((java.util.List<Expression>)value);
-      }
-      break;
+      case ORDER_BY_LIST:
+        if (value == null) {
+          unsetOrderByList();
+        } else {
+          setOrderByList((java.util.List<Expression>)value);
+        }
+        break;
 
-    case HAVING_EXPRESSION:
-      if (value == null) {
-        unsetHavingExpression();
-      } else {
-        setHavingExpression((Expression)value);
-      }
-      break;
+      case HAVING_EXPRESSION:
+        if (value == null) {
+          unsetHavingExpression();
+        } else {
+          setHavingExpression((Expression)value);
+        }
+        break;
 
-    case LIMIT:
-      if (value == null) {
-        unsetLimit();
-      } else {
-        setLimit((java.lang.Integer)value);
-      }
-      break;
+      case LIMIT:
+        if (value == null) {
+          unsetLimit();
+        } else {
+          setLimit((java.lang.Integer)value);
+        }
+        break;
 
-    case OFFSET:
-      if (value == null) {
-        unsetOffset();
-      } else {
-        setOffset((java.lang.Integer)value);
-      }
-      break;
+      case OFFSET:
+        if (value == null) {
+          unsetOffset();
+        } else {
+          setOffset((java.lang.Integer)value);
+        }
+        break;
 
-    case DEBUG_OPTIONS:
-      if (value == null) {
-        unsetDebugOptions();
-      } else {
-        setDebugOptions((java.util.Map<java.lang.String,java.lang.String>)value);
-      }
-      break;
+      case DEBUG_OPTIONS:
+        if (value == null) {
+          unsetDebugOptions();
+        } else {
+          setDebugOptions((java.util.Map<java.lang.String,java.lang.String>)value);
+        }
+        break;
 
-    case QUERY_OPTIONS:
-      if (value == null) {
-        unsetQueryOptions();
-      } else {
-        setQueryOptions((java.util.Map<java.lang.String,java.lang.String>)value);
-      }
-      break;
+      case QUERY_OPTIONS:
+        if (value == null) {
+          unsetQueryOptions();
+        } else {
+          setQueryOptions((java.util.Map<java.lang.String,java.lang.String>)value);
+        }
+        break;
 
     }
   }
@@ -689,38 +689,38 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
   @org.apache.thrift.annotation.Nullable
   public java.lang.Object getFieldValue(_Fields field) {
     switch (field) {
-    case VERSION:
-      return getVersion();
+      case VERSION:
+        return getVersion();
 
-    case DATA_SOURCE:
-      return getDataSource();
+      case DATA_SOURCE:
+        return getDataSource();
 
-    case SELECT_LIST:
-      return getSelectList();
+      case SELECT_LIST:
+        return getSelectList();
 
-    case FILTER_EXPRESSION:
-      return getFilterExpression();
+      case FILTER_EXPRESSION:
+        return getFilterExpression();
 
-    case GROUP_BY_LIST:
-      return getGroupByList();
+      case GROUP_BY_LIST:
+        return getGroupByList();
 
-    case ORDER_BY_LIST:
-      return getOrderByList();
+      case ORDER_BY_LIST:
+        return getOrderByList();
 
-    case HAVING_EXPRESSION:
-      return getHavingExpression();
+      case HAVING_EXPRESSION:
+        return getHavingExpression();
 
-    case LIMIT:
-      return getLimit();
+      case LIMIT:
+        return getLimit();
 
-    case OFFSET:
-      return getOffset();
+      case OFFSET:
+        return getOffset();
 
-    case DEBUG_OPTIONS:
-      return getDebugOptions();
+      case DEBUG_OPTIONS:
+        return getDebugOptions();
 
-    case QUERY_OPTIONS:
-      return getQueryOptions();
+      case QUERY_OPTIONS:
+        return getQueryOptions();
 
     }
     throw new java.lang.IllegalStateException();
@@ -733,28 +733,28 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
     }
 
     switch (field) {
-    case VERSION:
-      return isSetVersion();
-    case DATA_SOURCE:
-      return isSetDataSource();
-    case SELECT_LIST:
-      return isSetSelectList();
-    case FILTER_EXPRESSION:
-      return isSetFilterExpression();
-    case GROUP_BY_LIST:
-      return isSetGroupByList();
-    case ORDER_BY_LIST:
-      return isSetOrderByList();
-    case HAVING_EXPRESSION:
-      return isSetHavingExpression();
-    case LIMIT:
-      return isSetLimit();
-    case OFFSET:
-      return isSetOffset();
-    case DEBUG_OPTIONS:
-      return isSetDebugOptions();
-    case QUERY_OPTIONS:
-      return isSetQueryOptions();
+      case VERSION:
+        return isSetVersion();
+      case DATA_SOURCE:
+        return isSetDataSource();
+      case SELECT_LIST:
+        return isSetSelectList();
+      case FILTER_EXPRESSION:
+        return isSetFilterExpression();
+      case GROUP_BY_LIST:
+        return isSetGroupByList();
+      case ORDER_BY_LIST:
+        return isSetOrderByList();
+      case HAVING_EXPRESSION:
+        return isSetHavingExpression();
+      case LIMIT:
+        return isSetLimit();
+      case OFFSET:
+        return isSetOffset();
+      case DEBUG_OPTIONS:
+        return isSetDebugOptions();
+      case QUERY_OPTIONS:
+        return isSetQueryOptions();
     }
     throw new java.lang.IllegalStateException();
   }
@@ -1207,7 +1207,7 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
       while (true)
       {
         schemeField = iprot.readFieldBegin();
-        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
+        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) {
           break;
         }
         switch (schemeField.id) {
@@ -1215,7 +1215,7 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
             if (schemeField.type == org.apache.thrift.protocol.TType.I32) {
               struct.version = iprot.readI32();
               struct.setVersionIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1224,7 +1224,7 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
               struct.dataSource = new DataSource();
               struct.dataSource.read(iprot);
               struct.setDataSourceIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1243,7 +1243,7 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
                 iprot.readListEnd();
               }
               struct.setSelectListIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1252,7 +1252,7 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
               struct.filterExpression = new Expression();
               struct.filterExpression.read(iprot);
               struct.setFilterExpressionIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1271,7 +1271,7 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
                 iprot.readListEnd();
               }
               struct.setGroupByListIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1290,7 +1290,7 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
                 iprot.readListEnd();
               }
               struct.setOrderByListIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1299,7 +1299,7 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
               struct.havingExpression = new Expression();
               struct.havingExpression.read(iprot);
               struct.setHavingExpressionIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1307,7 +1307,7 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
             if (schemeField.type == org.apache.thrift.protocol.TType.I32) {
               struct.limit = iprot.readI32();
               struct.setLimitIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1315,7 +1315,7 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
             if (schemeField.type == org.apache.thrift.protocol.TType.I32) {
               struct.offset = iprot.readI32();
               struct.setOffsetIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1335,7 +1335,7 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
                 iprot.readMapEnd();
               }
               struct.setDebugOptionsIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1355,7 +1355,7 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
                 iprot.readMapEnd();
               }
               struct.setQueryOptionsIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;

@@ -460,6 +460,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }, 600_000L, "Failed to generate bloom filter");
   }
 
+  @Test
+  public void testExplainPlanMetadata() throws Exception{
+    JsonNode queryResponse = postSqlQuery("EXPLAIN PLAN FOR SELECT * FROM mytable");
+    assertEquals(queryResponse.get("numSegmentsQueried").asLong(), NUM_SEGMENTS);
+  }
+
   /** Check if server returns error response quickly without timing out Broker. */
   @Test
   public void testServerErrorWithBrokerTimeout()
