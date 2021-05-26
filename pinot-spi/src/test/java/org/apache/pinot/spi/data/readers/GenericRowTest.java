@@ -137,4 +137,34 @@ public class GenericRowTest {
 
     Assert.assertEquals(first, second);
   }
+
+  @Test
+  public void testNullValueFieldsNotEqual() {
+    GenericRow first = new GenericRow();
+    first.putDefaultNullValue("one", 1);
+    GenericRow second = new GenericRow();
+    second.putDefaultNullValue("one", 2);
+    Assert.assertNotEquals(first, second);
+
+    first = new GenericRow();
+    first.putDefaultNullValue("one", 1);
+    second = new GenericRow();
+    second.putDefaultNullValue("one", null);
+    Assert.assertNotEquals(first, second);
+  }
+
+  @Test
+  public void testNullValueFieldsEqual() {
+    GenericRow first = new GenericRow();
+    first.putDefaultNullValue("one", 1);
+    GenericRow second = new GenericRow();
+    second.putDefaultNullValue("one", 1);
+    Assert.assertEquals(first, second);
+
+    first = new GenericRow();
+    first.putDefaultNullValue("one", null);
+    second = new GenericRow();
+    second.putDefaultNullValue("one", null);
+    Assert.assertEquals(first, second);
+  }
 }
