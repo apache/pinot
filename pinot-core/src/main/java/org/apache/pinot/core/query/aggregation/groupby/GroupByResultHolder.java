@@ -68,4 +68,3 @@ public interface GroupByResultHolder {
    */
   void ensureCapacity(int capacity);
 }
-

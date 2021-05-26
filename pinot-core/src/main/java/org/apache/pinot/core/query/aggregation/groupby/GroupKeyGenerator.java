@@ -103,5 +103,4 @@ public interface GroupKeyGenerator {
       return StringUtils.splitPreserveAllTokens(_stringKey, GroupKeyGenerator.DELIMITER);
     }
   }
-
 }

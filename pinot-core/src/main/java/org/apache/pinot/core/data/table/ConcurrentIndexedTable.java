@@ -39,6 +39,7 @@ import org.slf4j.LoggerFactory;
 public class ConcurrentIndexedTable extends IndexedTable {
   private static final Logger LOGGER = LoggerFactory.getLogger(ConcurrentIndexedTable.class);
 
+
   protected volatile ConcurrentMap<Key, Record> _lookupMap;
   protected final AtomicBoolean _noMoreNewRecords = new AtomicBoolean();
   private Iterator<Record> _iterator;

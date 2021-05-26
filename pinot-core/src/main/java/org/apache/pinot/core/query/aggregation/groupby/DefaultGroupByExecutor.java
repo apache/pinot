@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby;
 
-import java.util.*;
-
+import java.util.Map;
+import java.util.Iterator;
+import java.util.Collection;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.data.table.TableResizer;
