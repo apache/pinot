@@ -95,7 +95,7 @@ public class CalciteSqlParser {
   //   `OPTION (<k1> = <v1>) OPTION (<k2> = <v2>) OPTION (<k3> = <v3>)`
   private static final Pattern OPTIONS_REGEX_PATTEN =
       Pattern.compile("option\\s*\\(([^\\)]+)\\)", Pattern.CASE_INSENSITIVE);
-
+  // test pr
   public static PinotQuery compileToPinotQuery(String sql)
       throws SqlCompilationException {
     // Extract OPTION statements from sql as Calcite Parser doesn't parse it.
