@@ -49,4 +49,9 @@ public class PassThroughTransformOperator extends TransformOperator {
       return new PassThroughTransformBlock(projectionBlock, _transformFunctionMap);
     }
   }
+
+  @Override
+  public String getOperatorName() {
+    return OPERATOR_NAME;
+  }
 }
