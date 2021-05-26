@@ -156,13 +156,13 @@ public class SegmentMetadataFetcher {
   @Nullable
   private static List<Map<String, Object>> getStarTreeIndexesForSegment(SegmentDataManager segmentDataManager) {
     List<StarTreeV2> starTrees = segmentDataManager.getSegment().getStarTrees();
-    return starTrees != null ? getStartreeIndexes(starTrees) : null;
+    return starTrees != null ? getStarTreeIndexes(starTrees) : null;
   }
 
   /**
    * Helper to loop over star trees of a segment to create a map containing star tree details.
    */
-  private static List<Map<String, Object>> getStartreeIndexes(List<StarTreeV2> starTrees){
+  private static List<Map<String, Object>> getStarTreeIndexes(List<StarTreeV2> starTrees){
     List<Map<String, Object>> startreeDetails = new ArrayList<>();
     for (StarTreeV2 starTree : starTrees) {
       StarTreeV2Metadata starTreeMetadata = starTree.getMetadata();
