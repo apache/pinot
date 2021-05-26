@@ -296,8 +296,8 @@ public class PinotSegmentUploadDownloadRestletResource {
       }
 
       // Zk operations
-      completeZkOperations(enableParallelPushProtection, headers, finalSegmentFile, rawTableName, tableNameWithType,
-          segmentMetadata, segmentName, zkDownloadUri, moveSegmentToFinalLocation, crypterClassName);
+      completeZkOperations(enableParallelPushProtection, headers, finalSegmentFile, tableNameWithType, segmentMetadata,
+          segmentName, zkDownloadUri, moveSegmentToFinalLocation, crypterClassName);
 
       return new SuccessResponse("Successfully uploaded segment: " + segmentName + " of table: " + tableNameWithType);
     } catch (WebApplicationException e) {
@@ -386,12 +386,12 @@ public class PinotSegmentUploadDownloadRestletResource {
   }
 
   private void completeZkOperations(boolean enableParallelPushProtection, HttpHeaders headers, File uploadedSegmentFile,
-      String rawTableName, String tableNameWithType, SegmentMetadata segmentMetadata, String segmentName,
-      String zkDownloadURI, boolean moveSegmentToFinalLocation, String crypter)
+      String tableNameWithType, SegmentMetadata segmentMetadata, String segmentName, String zkDownloadURI,
+      boolean moveSegmentToFinalLocation, String crypter)
       throws Exception {
-    URI finalSegmentLocationURI = URIUtils
-        .getUri(ControllerFilePathProvider.getInstance().getDataDirURI().toString(), rawTableName,
-            URIUtils.encode(segmentName));
+    String basePath = ControllerFilePathProvider.getInstance().getDataDirURI().toString();
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    URI finalSegmentLocationURI = URIUtils.getUri(basePath, rawTableName, URIUtils.encode(segmentName));
     ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
     zkOperator.completeSegmentOperations(tableNameWithType, segmentMetadata, finalSegmentLocationURI, uploadedSegmentFile,
         enableParallelPushProtection, headers, zkDownloadURI, moveSegmentToFinalLocation, crypter);
