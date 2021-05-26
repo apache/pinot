@@ -81,7 +81,7 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
     // The parent setUp() sets up Zookeeper, Kafka, controller, broker and servers
     super.setUp();
 
-    startMinion(null, null);
+    startMinion();
     _helixTaskResourceManager = _controllerStarter.getHelixTaskResourceManager();
     _taskManager = _controllerStarter.getTaskManager();
   }
