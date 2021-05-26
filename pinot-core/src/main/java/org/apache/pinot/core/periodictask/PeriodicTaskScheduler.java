@@ -18,11 +18,15 @@
  */
 package org.apache.pinot.core.periodictask;
 
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,23 +39,41 @@ public class PeriodicTaskScheduler {
 
   private ScheduledExecutorService _executorService;
   private List<PeriodicTask> _tasksWithValidInterval;
+  private Map<String, PeriodicTask> _taskMap;
   private volatile int _taskCount;
+
 
   /**
    * Initializes the periodic task scheduler with a list of periodic tasks.
    */
   public void init(List<PeriodicTask> periodicTasks) {
     _tasksWithValidInterval = new ArrayList<>();
+    _taskMap = new HashMap<>();
     for (PeriodicTask periodicTask : periodicTasks) {
       if (periodicTask.getIntervalInSeconds() > 0) {
         LOGGER.info("Adding periodic task: {}", periodicTask);
         _tasksWithValidInterval.add(periodicTask);
+        /* Create an association of taskName to Task */
+        _taskMap.putIfAbsent(periodicTask.getTaskName(), periodicTask);
       } else {
         LOGGER.info("Skipping periodic task: {}", periodicTask);
       }
     }
 
     _taskCount = _tasksWithValidInterval.size();
+  }
+
+  /**
+   *
+   * @return
+   */
+  public List<PeriodicTaskInfo> getRegisteredTasks() {
+    List<PeriodicTaskInfo> periodicTaskInfoList = new ArrayList<>();
+
+    for (PeriodicTask periodicTask : _tasksWithValidInterval) {
+      periodicTaskInfoList.add(new PeriodicTaskInfo(periodicTask.getTaskName(), periodicTask.getTaskDescription()));
+    }
+    return ImmutableList.copyOf(periodicTaskInfoList);
   }
 
   /**
@@ -91,6 +113,41 @@ public class PeriodicTaskScheduler {
         }, periodicTask.getInitialDelayInSeconds(), periodicTask.getIntervalInSeconds(), TimeUnit.SECONDS);
       }
     }
+  }
+
+  /**
+   *
+   * @param taskName
+   * @return
+   */
+  public synchronized TaskExecutionResult execute(String taskName) {
+    if (_executorService == null) {
+      LOGGER.warn("Task scheduler not started");
+      return new TaskExecutionResult(TaskExecutionResult.Status.NO_OP, "Task is", taskName);
+    }
+
+    if (!_taskMap.containsKey(taskName)) {
+      LOGGER.error("Task {} not registered with periodic task scheduler", taskName);
+      return new TaskExecutionResult(TaskExecutionResult.Status.NO_OP, "Task is not registered", taskName);
+    }
+
+    PeriodicTask task = _taskMap.get(taskName);
+
+    /* Ensure the task has been cleanly transitioned to START phase before executing the task */
+    if (!task.getTaskState().equals(PeriodicTaskState.STARTED)) {
+      LOGGER.warn("Task {} has not been started, not executing task", taskName);
+      return new TaskExecutionResult(TaskExecutionResult.Status.NO_OP, "Task is stopped", taskName);
+    }
+
+    _executorService.schedule(() -> {
+      try {
+        task.run();
+      } catch (Throwable e) {
+        LOGGER.warn("Caught exception while running Task: {}", task.getTaskName(), e);
+      }
+    }, task.getInitialDelayInSeconds(), TimeUnit.SECONDS);
+
+    return new TaskExecutionResult(TaskExecutionResult.Status.DONE, "Submitted task for execution", taskName);
   }
 
   /**

@@ -39,6 +39,8 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.controller.api.resources.Constants.TASK_SEGMENT_RELOCATOR;
+
 
 /**
  * Periodic task to run rebalancer in background to
@@ -54,7 +56,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
   public SegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
       ExecutorService executorService) {
-    super(SegmentRelocator.class.getSimpleName(), config.getSegmentRelocatorFrequencyInSeconds(),
+    super(TASK_SEGMENT_RELOCATOR, config.getSegmentRelocatorFrequencyInSeconds(),
         config.getSegmentRelocatorInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
         controllerMetrics);
     _executorService = executorService;
@@ -108,5 +110,10 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
         LOGGER.error("Caught exception/error while rebalancing table: {}", tableNameWithType, t);
       }
     });
+  }
+
+  @Override
+  public String getTaskDescription() {
+    return "Rebalancer to relocate ONLINE and COMPLETED segments";
   }
 }

@@ -27,6 +27,17 @@ import javax.annotation.concurrent.ThreadSafe;
  */
 @ThreadSafe
 public interface PeriodicTask extends Runnable {
+  /**
+   * Returns the periodic task status.
+   * @return task status.
+   */
+  PeriodicTaskState getTaskState();
+
+  /**
+   * Returns the periodic task description.
+   * @return task description.
+   */
+  String getTaskDescription();
 
   /**
    * Returns the periodic task name.

@@ -516,4 +516,9 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       _taskTypeMetricsUpdaterMap.put(taskType, taskTypeMetricsUpdater);
     }
   }
+
+  @Override
+  public String getTaskDescription() {
+    return "Checks the Pinot cluster status and health status of each type of task and fix if needed";
+  }
 }

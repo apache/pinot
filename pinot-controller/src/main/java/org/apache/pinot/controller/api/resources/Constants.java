@@ -42,6 +42,15 @@ public class Constants {
   public static final String TABLE_NAME = "tableName";
   public static final String ZOOKEEPER = "Zookeeper";
   public static final String APP_CONFIGS = "AppConfigs";
+  public static final String TRIGGER_TAG = "Trigger";
+
+  /* Controller Periodic Tasks */
+  public static final String TASK_SEGMENT_RELOCATOR = "SegmentRelocator";
+  public static final String TASK_SEGMENT_STATUS_CHECKER = "SegmentStatusChecker";
+  public static final String TASK_DELETE_EXPIRED_SEGMENTS = "RetentionManager";
+  public static final String TASK_BROKER_RESOURCE_VALIDATOR = "BrokerResourceValidationManager";
+  public static final String TASK_REALTIME_SEGMENT_VALIDATOR = "RealtimeSegmentValidationManager";
+  public static final String TASK_OFFLINE_SEGMENT_ITVL_CHECKER = "OfflineSegmentIntervalChecker";
 
   public static TableType validateTableType(String tableTypeStr) {
     if (tableTypeStr == null || tableTypeStr.isEmpty()) {

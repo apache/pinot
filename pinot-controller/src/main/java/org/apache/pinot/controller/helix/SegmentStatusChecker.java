@@ -36,6 +36,8 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.controller.api.resources.Constants.TASK_SEGMENT_STATUS_CHECKER;
+
 
 /**
  * Manages the segment status metrics, regarding tables with fewer replicas than requested
@@ -61,7 +63,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
    */
   public SegmentStatusChecker(PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics) {
-    super("SegmentStatusChecker", config.getStatusCheckerFrequencyInSeconds(),
+    super(TASK_SEGMENT_STATUS_CHECKER, config.getStatusCheckerFrequencyInSeconds(),
         config.getStatusCheckerInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
         controllerMetrics);
 
@@ -258,6 +260,11 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   public void cleanUpTask() {
     LOGGER.info("Resetting table metrics for all the tables.");
     setStatusToDefault();
+  }
+
+  @Override
+  public String getTaskDescription() {
+    return "Identifies tables with fewer replicas than requested and segments in error state";
   }
 
   public static final class Context {

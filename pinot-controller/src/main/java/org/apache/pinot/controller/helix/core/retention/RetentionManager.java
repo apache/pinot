@@ -52,6 +52,8 @@ import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.controller.api.resources.Constants.TASK_DELETE_EXPIRED_SEGMENTS;
+
 
 /**
  * The <code>RetentionManager</code> class manages retention for all segments and delete expired segments.
@@ -69,7 +71,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
   public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics) {
-    super("RetentionManager", config.getRetentionControllerFrequencyInSeconds(),
+    super(TASK_DELETE_EXPIRED_SEGMENTS, config.getRetentionControllerFrequencyInSeconds(),
         config.getRetentionManagerInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
         controllerMetrics);
     _deletedSegmentsRetentionInDays = config.getDeletedSegmentsRetentionInDays();
@@ -259,5 +261,10 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       throw new RuntimeException(errorMsg, e);
     }
     LOGGER.info("Segment lineage metadata clean-up is successfully processed for table: {}", tableNameWithType);
+  }
+
+  @Override
+  public String getTaskDescription() {
+    return "Manages retention for all segments and delete expired segments";
   }
 }

@@ -41,6 +41,8 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.controller.api.resources.Constants.TASK_REALTIME_SEGMENT_VALIDATOR;
+
 
 /**
  * Validates realtime ideal states and segment metadata, fixing any partitions which have stopped consuming
@@ -57,7 +59,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   public RealtimeSegmentValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
       ValidationMetrics validationMetrics, ControllerMetrics controllerMetrics) {
-    super("RealtimeSegmentValidationManager", config.getRealtimeSegmentValidationFrequencyInSeconds(),
+    super(TASK_REALTIME_SEGMENT_VALIDATOR, config.getRealtimeSegmentValidationFrequencyInSeconds(),
         config.getRealtimeSegmentValidationManagerInitialDelaySeconds(), pinotHelixResourceManager,
         leadControllerManager, controllerMetrics);
     _llcRealtimeSegmentManager = llcRealtimeSegmentManager;
@@ -155,6 +157,11 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   public void cleanUpTask() {
     LOGGER.info("Unregister all the validation metrics.");
     _validationMetrics.unregisterAllMetrics();
+  }
+
+  @Override
+  public String getTaskDescription() {
+    return "Validates realtime ideal states and segment metadata, fixing any partitions which have stopped consuming";
   }
 
   public static final class Context {

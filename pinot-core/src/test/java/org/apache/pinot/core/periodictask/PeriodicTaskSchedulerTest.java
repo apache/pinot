@@ -40,6 +40,11 @@ public class PeriodicTaskSchedulerTest {
 
     List<PeriodicTask> periodicTasks = Collections.singletonList(new BasePeriodicTask("TestTask", 0L/*Invalid*/, 0L) {
       @Override
+      public String getTaskDescription() {
+        return "Test Task Description";
+      }
+
+      @Override
       protected void setUpTask() {
         startCalled.set(true);
       }
@@ -77,6 +82,11 @@ public class PeriodicTaskSchedulerTest {
     List<PeriodicTask> periodicTasks = new ArrayList<>(numTasks);
     for (int i = 0; i < numTasks; i++) {
       periodicTasks.add(new BasePeriodicTask("TestTask", 1L, 0L) {
+        @Override
+        public String getTaskDescription() {
+          return "Test Task Description";
+        }
+
         @Override
         protected void setUpTask() {
           numTimesStartCalled.getAndIncrement();

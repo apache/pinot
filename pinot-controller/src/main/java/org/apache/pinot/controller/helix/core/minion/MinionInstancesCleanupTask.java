@@ -57,4 +57,9 @@ public class MinionInstancesCleanupTask extends BasePeriodicTask {
       }
     }
   }
+
+  @Override
+  public String getTaskDescription() {
+    return "Task to clean up offline Minion instances to not spam Helix";
+  }
 }

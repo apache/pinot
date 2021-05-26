@@ -55,8 +55,19 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
   }
 
   @Override
-  protected final void runTask() {
+  protected final synchronized void runTask() {
     _controllerMetrics.addMeteredTableValue(_taskName, ControllerMeter.CONTROLLER_PERIODIC_TASK_RUN, 1L);
+    try {
+      if (!isRunning()) {
+        execute();
+      }
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while running task: {}", _taskName, e);
+      _controllerMetrics.addMeteredTableValue(_taskName, ControllerMeter.CONTROLLER_PERIODIC_TASK_ERROR, 1L);
+    }
+  }
+
+  private final void execute() {
     try {
       // Process the tables that are managed by this controller
       List<String> tablesToProcess = new ArrayList<>();
@@ -68,7 +79,6 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
       processTables(tablesToProcess);
     } catch (Exception e) {
       LOGGER.error("Caught exception while running task: {}", _taskName, e);
-      _controllerMetrics.addMeteredTableValue(_taskName, ControllerMeter.CONTROLLER_PERIODIC_TASK_ERROR, 1L);
     }
   }
 

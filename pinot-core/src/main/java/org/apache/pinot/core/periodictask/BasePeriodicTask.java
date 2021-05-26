@@ -37,6 +37,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   protected final long _intervalInSeconds;
   protected final long _initialDelayInSeconds;
 
+  private volatile PeriodicTaskState _periodicTaskState;
   private volatile boolean _started;
   private volatile boolean _running;
 
@@ -76,6 +77,11 @@ public abstract class BasePeriodicTask implements PeriodicTask {
     return _running;
   }
 
+  @Override
+  public PeriodicTaskState getTaskState() {
+    return null;
+  }
+
   /**
    * {@inheritDoc}
    * <p>
@@ -88,7 +94,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
       return;
     }
     _started = true;
-
+    _periodicTaskState = PeriodicTaskState.STARTED;
     try {
       setUpTask();
     } catch (Exception e) {
@@ -112,7 +118,6 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   @Override
   public final void run() {
     _running = true;
-
     if (_started) {
       long startTime = System.currentTimeMillis();
       LOGGER.info("Start running task: {}", _taskName);
@@ -148,7 +153,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
       return;
     }
     _started = false;
-
+    _periodicTaskState = PeriodicTaskState.STOPPED;
     if (_running) {
       long startTimeMs = System.currentTimeMillis();
       long remainingTimeMs = MAX_PERIODIC_TASK_STOP_TIME_MILLIS;

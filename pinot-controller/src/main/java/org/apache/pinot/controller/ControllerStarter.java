@@ -416,6 +416,7 @@ public class ControllerStarter implements ServiceStartable {
         bind(accessControlFactory).to(AccessControlFactory.class);
         bind(metadataEventNotifierFactory).to(MetadataEventNotifierFactory.class);
         bind(_leadControllerManager).to(LeadControllerManager.class);
+        bind(_periodicTaskScheduler).to(PeriodicTaskScheduler.class);
       }
     });
 

@@ -42,6 +42,8 @@ import org.joda.time.base.BaseInterval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.controller.api.resources.Constants.TASK_OFFLINE_SEGMENT_ITVL_CHECKER;
+
 
 /**
  * Manages the segment validation metrics, to ensure that all offline segments are contiguous (no missing segments) and
@@ -55,7 +57,7 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
   public OfflineSegmentIntervalChecker(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ValidationMetrics validationMetrics,
       ControllerMetrics controllerMetrics) {
-    super("OfflineSegmentIntervalChecker", config.getOfflineSegmentIntervalCheckerFrequencyInSeconds(),
+    super(TASK_OFFLINE_SEGMENT_ITVL_CHECKER, config.getOfflineSegmentIntervalCheckerFrequencyInSeconds(),
         config.getOfflineSegmentIntervalCheckerInitialDelayInSeconds(), pinotHelixResourceManager,
         leadControllerManager, controllerMetrics);
     _validationMetrics = validationMetrics;
@@ -198,5 +200,11 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
   public void cleanUpTask() {
     LOGGER.info("Unregister all the validation metrics.");
     _validationMetrics.unregisterAllMetrics();
+  }
+
+  @Override
+  public String getTaskDescription() {
+    return "Ensure that all offline segments are contiguous (no missing segments) and"
+        + " that the offline push delay isn't too high";
   }
 }

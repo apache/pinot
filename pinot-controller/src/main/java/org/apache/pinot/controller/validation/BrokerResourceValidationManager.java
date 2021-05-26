@@ -30,6 +30,8 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.controller.api.resources.Constants.TASK_BROKER_RESOURCE_VALIDATOR;
+
 
 /**
  * Rebuilds the broker resource if the instance set has changed
@@ -39,7 +41,7 @@ public class BrokerResourceValidationManager extends ControllerPeriodicTask<Brok
 
   public BrokerResourceValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerMetrics controllerMetrics) {
-    super("BrokerResourceValidationManager", config.getBrokerResourceValidationFrequencyInSeconds(),
+    super(TASK_BROKER_RESOURCE_VALIDATOR, config.getBrokerResourceValidationFrequencyInSeconds(),
         config.getBrokerResourceValidationInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager, controllerMetrics);
   }
 
@@ -62,6 +64,11 @@ public class BrokerResourceValidationManager extends ControllerPeriodicTask<Brok
     Set<String> brokerInstances = _pinotHelixResourceManager
         .getAllInstancesForBrokerTenant(context._instanceConfigs, tableConfig.getTenantConfig().getBroker());
     _pinotHelixResourceManager.rebuildBrokerResource(tableNameWithType, brokerInstances);
+  }
+
+  @Override
+  public String getTaskDescription() {
+    return "Rebuilds the broker resource if the instance set has changed";
   }
 
   public static final class Context {
