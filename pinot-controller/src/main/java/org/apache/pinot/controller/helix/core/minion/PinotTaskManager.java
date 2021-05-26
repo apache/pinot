@@ -519,6 +519,6 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
 
   @Override
   public String getTaskDescription() {
-    return "Checks the Pinot cluster status and health status of each type of task and fix if needed";
+    return "Checks the Pinot cluster status and health status of each type of task and fixes the task if needed";
   }
 }

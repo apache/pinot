@@ -53,7 +53,7 @@ public class PeriodicTaskScheduler {
       if (periodicTask.getIntervalInSeconds() > 0) {
         LOGGER.info("Adding periodic task: {}", periodicTask);
         _tasksWithValidInterval.add(periodicTask);
-        /* Create an association of taskName to Task */
+        /* Create an association of Periodic taskName to PeriodicTask */
         _taskMap.putIfAbsent(periodicTask.getTaskName(), periodicTask);
       } else {
         LOGGER.info("Skipping periodic task: {}", periodicTask);
@@ -64,8 +64,8 @@ public class PeriodicTaskScheduler {
   }
 
   /**
-   *
-   * @return
+   * Public API to get the entire list of registered periodic tasks scheduled to run via {@link PeriodicTaskScheduler}.
+   * @return list of registered tasks {@link PeriodicTaskInfo}.
    */
   public List<PeriodicTaskInfo> getRegisteredTasks() {
     List<PeriodicTaskInfo> periodicTaskInfoList = new ArrayList<>();
@@ -74,6 +74,19 @@ public class PeriodicTaskScheduler {
       periodicTaskInfoList.add(new PeriodicTaskInfo(periodicTask.getTaskName(), periodicTask.getTaskDescription()));
     }
     return ImmutableList.copyOf(periodicTaskInfoList);
+  }
+
+  /**
+   * Get the current execution state of the task.
+   * @param taskName name of the task.
+   * @return {@link PeriodicTaskState} task state.
+   */
+  public PeriodicTaskState getTaskState(String taskName) {
+    if (!_taskMap.containsKey(taskName)) {
+      LOGGER.warn("Task {} is not registered with the PeriodicTaskScheduler", taskName);
+      return null;
+    }
+    return _taskMap.get(taskName).getTaskState();
   }
 
   /**
@@ -116,29 +129,31 @@ public class PeriodicTaskScheduler {
   }
 
   /**
-   *
-   * @param taskName
-   * @return
+   * Execute an "already" registered {@link PeriodicTask} via external triggers.
+   * Note that, if the task has not been registered with {@link PeriodicTaskScheduler}, this would be a NO-OP.
+   * @param taskName name of the task that needs to be executed.
+   * @return {@link TaskExecutionResult} containing the execution status of the task.
    */
-  public synchronized TaskExecutionResult execute(String taskName) {
+  public synchronized TaskExecutionResult schedule(String taskName) {
     if (_executorService == null) {
-      LOGGER.warn("Task scheduler not started");
-      return new TaskExecutionResult(TaskExecutionResult.Status.NO_OP, "Task is", taskName);
+      LOGGER.warn("Task scheduler is not started");
+      return new TaskExecutionResult(TaskExecutionResult.Status.FAILED, "Task engine is not initialized yet", taskName);
     }
 
     if (!_taskMap.containsKey(taskName)) {
-      LOGGER.error("Task {} not registered with periodic task scheduler", taskName);
-      return new TaskExecutionResult(TaskExecutionResult.Status.NO_OP, "Task is not registered", taskName);
+      LOGGER.error("Task {} is not registered with periodic task scheduler", taskName);
+      return new TaskExecutionResult(TaskExecutionResult.Status.NO_OP, "Task is not registered, not executing the user task", taskName);
     }
 
     PeriodicTask task = _taskMap.get(taskName);
 
-    /* Ensure the task has been cleanly transitioned to START phase before executing the task */
-    if (!task.getTaskState().equals(PeriodicTaskState.STARTED)) {
+    /* Ensure the task has been cleanly transitioned to INIT phase before executing the task */
+    if (task.getTaskState().equals(PeriodicTaskState.AWAITING_START)) {
       LOGGER.warn("Task {} has not been started, not executing task", taskName);
-      return new TaskExecutionResult(TaskExecutionResult.Status.NO_OP, "Task is stopped", taskName);
+      return new TaskExecutionResult(TaskExecutionResult.Status.FAILED, "Task is not in the desired state", taskName);
     }
 
+    /* Execute the task in an asynchronous fashion */
     _executorService.schedule(() -> {
       try {
         task.run();
@@ -147,7 +162,7 @@ public class PeriodicTaskScheduler {
       }
     }, task.getInitialDelayInSeconds(), TimeUnit.SECONDS);
 
-    return new TaskExecutionResult(TaskExecutionResult.Status.DONE, "Submitted task for execution", taskName);
+    return new TaskExecutionResult(TaskExecutionResult.Status.IN_PROGRESS, "Successfully submitted task for execution", taskName);
   }
 
   /**

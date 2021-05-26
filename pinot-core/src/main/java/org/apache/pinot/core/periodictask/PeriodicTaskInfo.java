@@ -18,36 +18,21 @@
  */
 package org.apache.pinot.core.periodictask;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.Map;
-import javax.annotation.Nullable;
-import org.apache.pinot.common.assignment.InstancePartitions;
-import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 
 
 /**
- * Execution status of a task upon trying to enqueue the task with a task execution engine.
+ * Meta information about a {@link PeriodicTask}.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class TaskExecutionResult {
-  private final Status _status;
+public class PeriodicTaskInfo {
   private final String _description;
   private final String _taskName;
 
-  @JsonCreator
-  public TaskExecutionResult(@JsonProperty(value = "status", required = true) Status status,
-      @JsonProperty(value = "description", required = true) String description,
-      @JsonProperty(value = "task_name", required = true) String taskName) {
-    _status = status;
-    _description = description;
-    _taskName = taskName;
-  }
-
-  @JsonProperty
-  public Status getStatus() {
-    return _status;
+  public PeriodicTaskInfo(String taskName, String description) {
+    this._description = description;
+    this._taskName = taskName;
   }
 
   @JsonProperty
@@ -58,9 +43,5 @@ public class TaskExecutionResult {
   @JsonProperty
   public String getTaskName() {
     return _taskName;
-  }
-
-  public enum Status {
-    NO_OP, DONE, FAILED, IN_PROGRESS
   }
 }

@@ -45,6 +45,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
     _taskName = taskName;
     _intervalInSeconds = runFrequencyInSeconds;
     _initialDelayInSeconds = initialDelayInSeconds;
+    _periodicTaskState = PeriodicTaskState.AWAITING_START;
   }
 
   @Override
@@ -79,7 +80,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
 
   @Override
   public PeriodicTaskState getTaskState() {
-    return null;
+    return _periodicTaskState;
   }
 
   /**
@@ -94,7 +95,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
       return;
     }
     _started = true;
-    _periodicTaskState = PeriodicTaskState.STARTED;
+    _periodicTaskState = PeriodicTaskState.INIT;
     try {
       setUpTask();
     } catch (Exception e) {
@@ -118,6 +119,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   @Override
   public final void run() {
     _running = true;
+    _periodicTaskState = PeriodicTaskState.RUNNING;
     if (_started) {
       long startTime = System.currentTimeMillis();
       LOGGER.info("Start running task: {}", _taskName);
@@ -130,7 +132,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
     } else {
       LOGGER.warn("Task: {} is skipped because it is not started or already stopped", _taskName);
     }
-
+    _periodicTaskState = PeriodicTaskState.IDLE;
     _running = false;
   }
 

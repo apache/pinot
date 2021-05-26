@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -104,12 +105,25 @@ public class PeriodicTaskSchedulerTest {
       });
     }
 
+    for (PeriodicTask periodicTask : periodicTasks) {
+      assertEquals(periodicTask.getTaskState(), PeriodicTaskState.AWAITING_START);
+    }
+
     PeriodicTaskScheduler taskScheduler = new PeriodicTaskScheduler();
     taskScheduler.init(periodicTasks);
     taskScheduler.start();
     Thread.sleep(1100L);
+    for (PeriodicTask periodicTask : periodicTasks) {
+      assertEquals(periodicTask.getTaskState(), PeriodicTaskState.IDLE);
+    }
     taskScheduler.stop();
+    for (PeriodicTask periodicTask : periodicTasks) {
+      assertEquals(periodicTask.getTaskState(), PeriodicTaskState.STOPPED);
+    }
 
+    assertEquals("TestTask", taskScheduler.getRegisteredTasks().get(0).getTaskName());
+    assertEquals("Test Task Description", taskScheduler.getRegisteredTasks().get(1).getDescription());
+    assertEquals(numTasks, taskScheduler.getRegisteredTasks().size());
     assertEquals(numTimesStartCalled.get(), numTasks);
     assertEquals(numTimesRunCalled.get(), numTasks * 2);
     assertEquals(numTimesStopCalled.get(), numTasks);
