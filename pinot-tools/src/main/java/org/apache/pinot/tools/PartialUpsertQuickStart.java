@@ -102,8 +102,8 @@ public class PartialUpsertQuickStart {
 
     printStatus(Color.YELLOW, "***** Upsert quickstart setup complete *****");
 
-    String q1 = "select event_id, count(*) from meetupRsvp group by event_id limit 10";
-    printStatus(Color.YELLOW, "Total number of documents per event_id in the table");
+    String q1 = "select event_id, count(*), sum(rsvp_count) from meetupRsvp group by event_id limit 10";
+    printStatus(Color.YELLOW, "Total number of documents, total number of rsvp_counts per event_id in the table");
     printStatus(Color.CYAN, "Query : " + q1);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));
     printStatus(Color.GREEN, "***************************************************");

@@ -32,13 +32,11 @@ public class IncrementMerger implements PartialUpsertMerger {
   /**
    * Increment the new value from incoming row to the given field of previous record.
    */
-  public GenericRow merge(GenericRow previousRecord, GenericRow currentRecord) {
+  public Object merge(GenericRow previousRecord, GenericRow currentRecord) {
 
     assert previousRecord.getValue(_fieldName) instanceof Number;
     assert currentRecord.getValue(_fieldName) instanceof Number;
-    previousRecord.putValue(_fieldName,
-        addNumbers((Number) previousRecord.getValue(_fieldName), (Number) currentRecord.getValue(_fieldName)));
-    return previousRecord;
+    return addNumbers((Number) previousRecord.getValue(_fieldName), (Number) currentRecord.getValue(_fieldName));
   }
 
   private static Number addNumbers(Number a, Number b) {

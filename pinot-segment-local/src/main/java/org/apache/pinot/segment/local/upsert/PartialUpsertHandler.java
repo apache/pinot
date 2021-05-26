@@ -94,10 +94,12 @@ public class PartialUpsertHandler {
    */
   public GenericRow merge(GenericRow previousRecord, GenericRow newRecord) {
 
+    // init new row to avoid mergers conflict.
+    GenericRow row = new GenericRow();
     for (Map.Entry<String, PartialUpsertMerger> entry : _mergers.entrySet()) {
-      newRecord = entry.getValue().merge(previousRecord, newRecord);
+      Object newValue = entry.getValue().merge(previousRecord, newRecord);
+      row.putValue(entry.getKey(), newValue);
     }
-
-    return newRecord;
+    return row;
   }
 }

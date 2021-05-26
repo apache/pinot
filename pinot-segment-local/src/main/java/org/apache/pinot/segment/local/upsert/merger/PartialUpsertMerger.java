@@ -29,5 +29,5 @@ public interface PartialUpsertMerger {
    * @param currentRecord the new consumed record.
    * @return a new row after merge
    */
-  GenericRow merge(GenericRow previousRecord, GenericRow currentRecord);
+  Object merge(GenericRow previousRecord, GenericRow currentRecord);
 }

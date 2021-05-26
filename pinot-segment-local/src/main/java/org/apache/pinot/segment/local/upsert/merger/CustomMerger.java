@@ -32,7 +32,7 @@ public class CustomMerger implements PartialUpsertMerger {
   /**
    * Use the groovyFunction for partial upsert merge.
    */
-  public GenericRow merge(GenericRow previousRecord, GenericRow currentRecord) {
+  public Object merge(GenericRow previousRecord, GenericRow currentRecord) {
     // todo: To be implemented
     return previousRecord;
   }

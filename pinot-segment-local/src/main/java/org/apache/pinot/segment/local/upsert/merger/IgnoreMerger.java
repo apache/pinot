@@ -32,7 +32,7 @@ public class IgnoreMerger implements PartialUpsertMerger {
   /**
    * Ignore the value from incoming row for the given field.
    */
-  public GenericRow merge(GenericRow previousRecord, GenericRow currentRecord) {
-    return previousRecord;
+  public Object merge(GenericRow previousRecord, GenericRow currentRecord) {
+    return previousRecord.getValue(_fieldName);
   }
 }
