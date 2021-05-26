@@ -60,6 +60,11 @@ public class ControllerPeriodicTaskTest {
       _controllerMetrics) {
 
     @Override
+    public String getTaskDescription() {
+      return "Test Description";
+    }
+
+    @Override
     protected void setUpTask() {
       _startTaskCalled.set(true);
     }

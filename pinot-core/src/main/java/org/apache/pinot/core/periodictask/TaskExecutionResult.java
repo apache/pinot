@@ -39,7 +39,7 @@ public class TaskExecutionResult {
   @JsonCreator
   public TaskExecutionResult(@JsonProperty(value = "status", required = true) Status status,
       @JsonProperty(value = "description", required = true) String description,
-      @JsonProperty(value = "task_name", required = true) String taskName) {
+      @JsonProperty(value = "taskName", required = true) String taskName) {
     _status = status;
     _description = description;
     _taskName = taskName;

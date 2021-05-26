@@ -162,7 +162,8 @@ public class PeriodicTaskScheduler {
       }
     }, task.getInitialDelayInSeconds(), TimeUnit.SECONDS);
 
-    return new TaskExecutionResult(TaskExecutionResult.Status.IN_PROGRESS, "Successfully submitted task for execution", taskName);
+    return new TaskExecutionResult(TaskExecutionResult.Status.IN_PROGRESS,
+        "Successfully submitted task for execution, follow Controller logs for further updates", taskName);
   }
 
   /**

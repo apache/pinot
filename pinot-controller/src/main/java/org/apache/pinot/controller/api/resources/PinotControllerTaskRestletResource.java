@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -31,6 +49,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.apache.pinot.core.periodictask.PeriodicTaskInfo;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
+import org.apache.pinot.core.periodictask.PeriodicTaskState;
 import org.apache.pinot.core.periodictask.TaskExecutionResult;
 import org.slf4j.LoggerFactory;
 
@@ -38,7 +57,7 @@ import static org.apache.pinot.controller.api.resources.Constants.*;
 
 
 /**
- * @author Harish Shankar 
+ * API related to triggering periodic controller tasks.
  */
 @Api(tags = Constants.TRIGGER_TAG)
 @Path("/")
@@ -49,7 +68,8 @@ public class PinotControllerTaskRestletResource {
   PeriodicTaskScheduler _periodicTaskScheduler;
 
   @GET
-  @Path("/trigger/tasknames")
+  @Path("/triggers/tasknames")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("List all available controller periodic tasks that can be triggered by the user")
   public List<PeriodicTaskInfo> listTaskTypes() {
     /* The assumption made here is that *any* of the registered periodic tasks could be triggered externally by the user.
@@ -60,11 +80,21 @@ public class PinotControllerTaskRestletResource {
     return taskList;
   }
 
+  /**
+   * <ul>
+   *   <li>Sample CURL request to schedule a task</li>
+   *   curl -i -X PUT -H 'Content-Type: application/json' -d
+   *   '{
+   *     "taskName" : "SegmentRelocator",
+   *   }' http://localhost:1234/triggers/schedule
+   * </ul>
+   */
+
   @PUT
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @Path("/triggers/schedule")
-  @ApiOperation("Schedule task and return a task execution status to the user")
+  @ApiOperation("Schedule a controller task in an async fashion and return the current execution status")
   public TaskExecutionResult schedule(@ApiParam(value = "Task name", required = true) @QueryParam("taskName") String taskName) {
     try {
       return _periodicTaskScheduler.schedule(taskName);
@@ -73,11 +103,21 @@ public class PinotControllerTaskRestletResource {
     }
   }
 
+  /**
+   * <li>GET '/triggers/task/{taskName}/state': Get the task state for the given task</li>
+   * Note that, the task state transitions to {@code IDLE} after a successful run. Might be worth allowing users
+   * to monitor the completion status of a previously scheduled task - needs more book-keeping.
+   */
   @GET
   @Path("/triggers/task/{taskName}/state")
-  @ApiOperation("Get the task state for the given task")
-  public TaskState getTaskState(
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation("Get the state for the given task name")
+  public PeriodicTaskState getTaskState(
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName) {
-    return null;
+    try {
+      return _periodicTaskScheduler.getTaskState(taskName);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, "Failed to fetch task state", Response.Status.BAD_REQUEST);
+    }
   }
 }

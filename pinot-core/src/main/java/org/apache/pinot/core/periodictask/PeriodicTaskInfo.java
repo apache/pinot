@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.periodictask;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -27,10 +28,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class PeriodicTaskInfo {
-  private final String _description;
   private final String _taskName;
+  private final String _description;
 
-  public PeriodicTaskInfo(String taskName, String description) {
+  @JsonCreator
+  public PeriodicTaskInfo(@JsonProperty("taskName") String taskName, @JsonProperty("description") String description) {
     this._description = description;
     this._taskName = taskName;
   }

@@ -18,11 +18,24 @@
  */
 package org.apache.pinot.core.periodictask;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+
 /**
  * Periodic tasks transitions from {@code AWAITING_START} to {@code STOP} states during its lifecycle.
  * Upon initialization, the task can be either in {@code RUNNING} or {@code IDLE} states. The task should NOT be
  * executed after the task transitions to {@code STOPPED} state.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public enum PeriodicTaskState {
-  AWAITING_START, INIT, RUNNING, IDLE, STOPPED
+  @JsonProperty("AWAITING_START") AWAITING_START,
+  @JsonProperty("INITIALIZED") INIT,
+  @JsonProperty("RUNNING") RUNNING,
+  @JsonProperty("IDLE") IDLE,
+  @JsonProperty("STOPPED") STOPPED;
+
+  private PeriodicTaskState() {
+
+  }
 }

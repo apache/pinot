@@ -368,4 +368,28 @@ public class ControllerRequestURLBuilder {
   public String forAppConfigs() {
     return StringUtil.join("/", _baseUrl, "appconfigs");
   }
+
+
+  public String forTriggerTenantsGet(String state) {
+    if (state == null) {
+      return StringUtil.join("/", _baseUrl, "brokers", "tenants");
+    }
+    return StringUtil.join("/", _baseUrl, "brokers", "tenants", "?state=" + state);
+  }
+
+  /* APIs related to Triggers */
+
+  public String forTriggerTasksGet() {
+    return StringUtil.join("/", _baseUrl, "triggers", "tasknames");
+  }
+
+  public String forTriggerTaskSchedule(String taskName) {
+    return StringUtil.join("/", _baseUrl, "triggers", "schedule", "?taskName=" + taskName);
+  }
+
+  public String forTriggerTaskStateGet(String taskName) {
+    return StringUtil.join("/", _baseUrl, "triggers", "task", taskName, "state");
+  }
+
+
 }
