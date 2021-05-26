@@ -21,7 +21,6 @@ package org.apache.pinot.integration.tests;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -55,8 +54,9 @@ public class ServerStarterIntegrationTest extends ControllerTest {
   private void verifyInstanceConfig(PinotConfiguration serverConf, String expectedInstanceId, String expectedHost,
       int expectedPort)
       throws Exception {
-    HelixServerStarter helixServerStarter =
-        new HelixServerStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, serverConf);
+    serverConf.setProperty(CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
+    serverConf.setProperty(CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
+    HelixServerStarter helixServerStarter = new HelixServerStarter(serverConf);
     helixServerStarter.start();
     helixServerStarter.stop();
 

@@ -30,7 +30,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.zip.Adler32;
 import java.util.zip.Checksum;
-import org.apache.pinot.segment.local.segment.creator.impl.V1Constants;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

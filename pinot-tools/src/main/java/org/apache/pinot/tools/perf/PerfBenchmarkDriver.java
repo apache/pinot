@@ -223,10 +223,12 @@ public class PerfBenchmarkDriver {
     Map<String, Object> properties = new HashMap<>();
     properties.put(CommonConstants.Helix.Instance.INSTANCE_ID_KEY, brokerInstanceName);
     properties.put(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS, BROKER_TIMEOUT_MS);
+    properties.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
+    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
 
     LOGGER.info("Starting broker instance: {}", brokerInstanceName);
 
-    new HelixBrokerStarter(new PinotConfiguration(properties), _clusterName, _zkAddress).start();
+    new HelixBrokerStarter(new PinotConfiguration(properties)).start();
   }
 
   private void startServer()
@@ -241,14 +243,15 @@ public class PerfBenchmarkDriver {
     properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, _serverInstanceSegmentTarDir);
     properties.put(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, "localhost");
     properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_ID, _serverInstanceName);
+    properties.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
+    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
     if (_segmentFormatVersion != null) {
       properties.put(CommonConstants.Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, _segmentFormatVersion);
     }
 
     LOGGER.info("Starting server instance: {}", _serverInstanceName);
 
-    HelixServerStarter helixServerStarter =
-        new HelixServerStarter(_clusterName, _zkAddress, new PinotConfiguration(properties));
+    HelixServerStarter helixServerStarter = new HelixServerStarter(new PinotConfiguration(properties));
     helixServerStarter.start();
   }
 
@@ -382,22 +385,13 @@ public class PerfBenchmarkDriver {
 
   public JsonNode postQuery(String query)
       throws Exception {
-    return postQuery(_conf.getDialect(), query, null);
+    return postQuery(_conf.getDialect(), query);
   }
 
-  public JsonNode postQuery(String query, String optimizationFlags)
-          throws Exception {
-    return postQuery(_conf.getDialect(), query, optimizationFlags);
-  }
-
-  public JsonNode postQuery(String dialect, String query, String optimizationFlags)
+  public JsonNode postQuery(String dialect, String query)
       throws Exception {
     ObjectNode requestJson = JsonUtils.newObjectNode();
     requestJson.put(dialect, query);
-
-    if (optimizationFlags != null && !optimizationFlags.isEmpty()) {
-      requestJson.put("debugOptions", "optimizationFlags=" + optimizationFlags);
-    }
 
     long start = System.currentTimeMillis();
     String queryUrl = _brokerBaseApiUrl + "/query";

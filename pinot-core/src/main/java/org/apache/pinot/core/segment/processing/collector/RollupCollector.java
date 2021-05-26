@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.processing.collector;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -34,6 +35,8 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 /**
  * A Collector that rolls up the incoming records on unique dimensions + time columns, based on provided aggregation types for metrics.
  * By default will use the SUM aggregation on metrics.
+ * TODO: Change this to off heap implementation, similar to {@link ConcatCollector}
+ *  {@link RollupCollector} needs to additionally aggregate records after sorting, before returning iterator
  */
 public class RollupCollector implements Collector {
 
@@ -137,6 +140,12 @@ public class RollupCollector implements Collector {
   @Override
   public void reset() {
     _collection.clear();
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+
   }
 
   /**

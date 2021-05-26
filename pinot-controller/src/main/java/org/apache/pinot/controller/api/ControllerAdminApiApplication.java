@@ -31,6 +31,7 @@ import org.apache.pinot.controller.api.access.AuthenticationFilter;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -77,8 +78,9 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     } catch (IOException e) {
       throw new RuntimeException("Failed to start http server", e);
     }
-
-    setupSwagger(_httpServer);
+    synchronized (PinotReflectionUtils.getReflectionLock()) {
+      setupSwagger(_httpServer);
+    }
 
     ClassLoader classLoader = ControllerAdminApiApplication.class.getClassLoader();
 

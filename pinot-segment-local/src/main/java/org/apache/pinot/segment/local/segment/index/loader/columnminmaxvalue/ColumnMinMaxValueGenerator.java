@@ -24,17 +24,17 @@ import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
-import org.apache.pinot.segment.local.segment.index.metadata.ColumnMetadata;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.local.segment.index.readers.BytesDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.DoubleDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.FloatDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.IntDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.LongDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
-import org.apache.pinot.segment.local.segment.store.ColumnIndexType;
-import org.apache.pinot.segment.local.segment.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.store.ColumnIndexType;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.data.Schema;
 
 import static org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -64,7 +64,7 @@ public class ColumnMinMaxValueGenerator {
     Set<String> columnsToAddMinMaxValue = new HashSet<>(schema.getPhysicalColumnNames());
 
     // mode ALL - use all columns
-    // mode NON_METRIC - use all dimensions and time columns 
+    // mode NON_METRIC - use all dimensions and time columns
     // mode TIME - use only time columns
     switch (_columnMinMaxValueGeneratorMode) {
       case TIME:
@@ -89,7 +89,7 @@ public class ColumnMinMaxValueGenerator {
     }
 
     PinotDataBuffer dictionaryBuffer = _segmentWriter.getIndexFor(columnName, ColumnIndexType.DICTIONARY);
-    DataType dataType = columnMetadata.getDataType();
+    DataType dataType = columnMetadata.getDataType().getStoredType();
     int length = columnMetadata.getCardinality();
     switch (dataType) {
       case INT:
@@ -146,8 +146,8 @@ public class ColumnMinMaxValueGenerator {
   private void saveMetadata()
       throws Exception {
     if (_minMaxValueAdded) {
-      // Commons Configuration 1.10 does not support file path containing '%'. 
-      // Explicitly providing the output stream for the file bypasses the problem. 
+      // Commons Configuration 1.10 does not support file path containing '%'.
+      // Explicitly providing the output stream for the file bypasses the problem.
       try (FileOutputStream fileOutputStream = new FileOutputStream(_segmentProperties.getFile())) {
         _segmentProperties.save(fileOutputStream);
       }

@@ -30,7 +30,7 @@ import org.apache.pinot.segment.local.io.util.PinotDataBitSetV2;
 import org.apache.pinot.segment.local.io.writer.impl.FixedBitSVForwardIndexWriter;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;

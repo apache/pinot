@@ -231,6 +231,30 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "schemas", schemaName);
   }
 
+  public String forTableConfigsCreate() {
+    return StringUtil.join("/", _baseUrl, "tableConfigs");
+  }
+
+  public String forTableConfigsGet(String configName) {
+    return StringUtil.join("/", _baseUrl, "tableConfigs", configName);
+  }
+
+  public String forTableConfigsList() {
+    return StringUtil.join("/", _baseUrl, "tableConfigs");
+  }
+
+  public String forTableConfigsUpdate(String configName) {
+    return StringUtil.join("/", _baseUrl, "tableConfigs", configName);
+  }
+
+  public String forTableConfigsDelete(String configName) {
+    return StringUtil.join("/", _baseUrl, "tableConfigs", configName);
+  }
+
+  public String forTableConfigsValidate() {
+    return StringUtil.join("/", _baseUrl, "tableConfigs", "validate");
+  }
+
   public String forSegmentDownload(String tableNameWithType, String segmentName) {
     return URIUtils.constructDownloadUrl(_baseUrl, tableNameWithType, segmentName);
   }

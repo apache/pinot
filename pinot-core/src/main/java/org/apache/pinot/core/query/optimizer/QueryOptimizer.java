@@ -31,12 +31,20 @@ import org.apache.pinot.core.query.optimizer.filter.FilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.FlattenAndOrFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.MergeEqInFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.MergeRangeFilterOptimizer;
+import org.apache.pinot.core.query.optimizer.filter.NumericalFilterOptimizer;
+import org.apache.pinot.core.query.optimizer.filter.TimePredicateFilterOptimizer;
 import org.apache.pinot.spi.data.Schema;
 
 
 public class QueryOptimizer {
+  // DO NOT change the order of these optimizers.
+  // - MergeEqInFilterOptimizer and MergeRangeFilterOptimizer relies on FlattenAndOrFilterOptimizer to flatten the
+  //   AND/OR predicate so that the children are on the same level to be merged
+  // - TimePredicateFilterOptimizer and MergeRangeFilterOptimizer relies on NumericalFilterOptimizer to convert the
+  //   values to the proper format so that they can be properly parsed
   private static final List<FilterOptimizer> FILTER_OPTIMIZERS = Arrays
-      .asList(new FlattenAndOrFilterOptimizer(), new MergeEqInFilterOptimizer(), new MergeRangeFilterOptimizer());
+      .asList(new FlattenAndOrFilterOptimizer(), new MergeEqInFilterOptimizer(), new NumericalFilterOptimizer(),
+          new TimePredicateFilterOptimizer(), new MergeRangeFilterOptimizer());
 
   /**
    * Optimizes the given PQL query.

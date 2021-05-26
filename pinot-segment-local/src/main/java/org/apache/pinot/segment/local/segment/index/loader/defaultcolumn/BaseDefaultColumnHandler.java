@@ -36,10 +36,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
-import org.apache.pinot.segment.local.segment.creator.TextIndexType;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.V1Constants;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
@@ -51,15 +49,17 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.LongColumnPreIn
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
-import org.apache.pinot.segment.local.segment.index.metadata.ColumnMetadata;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
-import org.apache.pinot.segment.local.segment.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
+import org.apache.pinot.segment.spi.index.creator.TextIndexType;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -417,7 +417,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     int dictionaryElementSize = 0;
 
     Object sortedArray;
-    switch (dataType) {
+    switch (dataType.getStoredType()) {
       case INT:
         Preconditions.checkState(defaultValue instanceof Integer);
         sortedArray = new int[]{(Integer) defaultValue};
@@ -529,7 +529,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       StatsCollectorConfig statsCollectorConfig =
           new StatsCollectorConfig(_indexLoadingConfig.getTableConfig(), _schema, null);
       ColumnIndexCreationInfo indexCreationInfo;
-      switch (fieldSpec.getDataType()) {
+      switch (fieldSpec.getDataType().getStoredType()) {
         case INT: {
           for (int i = 0; i < numDocs; i++) {
             outputValues[i] = ((Number) outputValues[i]).intValue();
@@ -664,8 +664,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       } else {
         _dictionary = null;
       }
-      _columnReader =
-          new PinotSegmentColumnReader(_forwardIndexReader, _dictionary, columnMetadata.getMaxNumberOfMultiValues());
+      _columnReader = new PinotSegmentColumnReader(_forwardIndexReader, _dictionary, null,
+          columnMetadata.getMaxNumberOfMultiValues());
     }
 
     Object getValue(int docId) {

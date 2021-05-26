@@ -20,63 +20,33 @@
 
 -->
 <Configuration>
-  <Appenders>
-    <Console name="console" target="SYSTEM_OUT">
-      <PatternLayout>
-        <pattern>%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</pattern>
-      </PatternLayout>
-    </Console>
-    <RandomAccessFile name="controllerLog" fileName="pinotController.log" immediateFlush="false">
-      <PatternLayout>
-        <Pattern>%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Pattern>
-      </PatternLayout>
-    </RandomAccessFile>
-    <RandomAccessFile name="brokerLog" fileName="pinotBroker.log" immediateFlush="false">
-      <PatternLayout>
-        <Pattern>%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Pattern>
-      </PatternLayout>
-    </RandomAccessFile>
-    <RandomAccessFile name="serverLog" fileName="pinotServer.log" immediateFlush="false">
-      <PatternLayout>
-        <Pattern>%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Pattern>
-      </PatternLayout>
-    </RandomAccessFile>
 
-  </Appenders>
-  <Loggers>
-    <Root level="info" additivity="false">
-      <AppenderRef ref="console"/>
-    </Root>
-    <Logger name="org.apache.pinot" level="info" additivity="false"/>
-    <Logger name="org.apache.pinot" level="error" additivity="false">
-      <AppenderRef ref="console"/>
-    </Logger>
-    <Logger name="org.apache.pinot.tools" level="info" additivity="false">
-      <AppenderRef ref="console"/>
-    </Logger>
-
-    <!-- Direct controller package log to the controller log file -->
-    <AsyncLogger name="org.apache.pinot.controller" level="info" additivity="false">
-      <AppenderRef ref="controllerLog"/>
-    </AsyncLogger>
-
-    <!-- Direct broker package log to the broker log file -->
-    <AsyncLogger name="org.apache.pinot.broker" level="info" additivity="false">
-      <AppenderRef ref="brokerLog"/>
-    </AsyncLogger>
-
-    <!-- Including server related package log to the server log file -->
-    <AsyncLogger name="org.apache.pinot.server" level="info" additivity="false">
-      <AppenderRef ref="serverLog"/>
-    </AsyncLogger>
-    <AsyncLogger name="org.apache.pinot.core.plan" level="info" additivity="false">
-      <AppenderRef ref="serverLog"/>
-    </AsyncLogger>
-    <AsyncLogger name="org.apache.pinot.core.realtime" level="info" additivity="false">
-      <AppenderRef ref="serverLog"/>
-    </AsyncLogger>
-    <AsyncLogger name="org.apache.pinot.core.query" level="info" additivity="false">
-      <AppenderRef ref="serverLog"/>
-    </AsyncLogger>
-  </Loggers>
+<Properties>
+  <Property name="LOG_ROOT">logs</Property>
+  <Property name="LOG_PATTERN">%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Property>
+  <Property name="PINOT_COMPONENT">all</Property>
+</Properties>
+<Appenders>
+  <Console name="console" target="SYSTEM_OUT">
+    <PatternLayout pattern="${env:LOG_PATTERN}"/>
+  </Console>
+  <RollingFile name="pinotLog" fileName="${env:LOG_ROOT}/pinot-${env:PINOT_COMPONENT}.log"
+               filePattern="${env:LOG_ROOT}/pinot-${env:PINOT_COMPONENT}-%d{yyyy-MM-dd}-%i.log" immediateFlush="false">
+    <PatternLayout pattern="${env:LOG_PATTERN}"/>
+    <Policies>
+      <SizeBasedTriggeringPolicy size="19500KB" />
+    </Policies>
+    <DefaultRolloverStrategy max="10"/>
+  </RollingFile>
+</Appenders>
+<Loggers>
+  <Root level="info" additivity="false">
+    <AppenderRef ref="pinotLog"/>
+    <AppenderRef ref="console" level="error"/>
+  </Root>
+  <Logger name="org.apache.pinot.tools.admin" level="info" additivity="false">
+    <AppenderRef ref="console"/>
+  </Logger>
+  <AsyncLogger name="org.reflections" level="error" additivity="false"/>
+</Loggers>
 </Configuration>

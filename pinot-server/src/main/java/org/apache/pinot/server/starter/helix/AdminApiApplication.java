@@ -34,6 +34,7 @@ import org.apache.pinot.server.api.access.AccessControlFactory;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -91,7 +92,9 @@ public class AdminApiApplication extends ResourceConfig {
       throw new RuntimeException("Failed to start http server", e);
     }
 
-    setupSwagger(httpServer);
+    synchronized (PinotReflectionUtils.getReflectionLock()) {
+      setupSwagger(httpServer);
+    }
     started = true;
     return true;
   }

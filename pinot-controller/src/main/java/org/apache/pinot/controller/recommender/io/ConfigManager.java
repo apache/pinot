@@ -25,6 +25,7 @@ import java.util.Map;
 import org.apache.pinot.controller.recommender.rules.io.FlaggedQueries;
 import org.apache.pinot.controller.recommender.rules.io.configs.IndexConfig;
 import org.apache.pinot.controller.recommender.rules.io.configs.PartitionConfig;
+import org.apache.pinot.controller.recommender.rules.io.configs.SegmentSizeRecommendations;
 
 
 /**
@@ -37,11 +38,17 @@ import org.apache.pinot.controller.recommender.rules.io.configs.PartitionConfig;
  * The engine will do it's job of recommending by taking into account the overwritten config and honoring it.
  */
 public class ConfigManager {
+  SegmentSizeRecommendations _segmentSizeRecommendations;
   IndexConfig _indexConfig = new IndexConfig();
   PartitionConfig _partitionConfig = new PartitionConfig();
   FlaggedQueries _flaggedQueries = new FlaggedQueries();
   Map<String, Map<String, String>> _realtimeProvisioningRecommendations = new HashMap<>();
   boolean _aggregateMetrics = false;
+
+  @JsonSetter(nulls = Nulls.SKIP)
+  public void setSegmentSizeRecommendations(SegmentSizeRecommendations segmentSizeRecommendations) {
+    _segmentSizeRecommendations = segmentSizeRecommendations;
+  }
 
   @JsonSetter(nulls = Nulls.SKIP)
   public void setIndexConfig(IndexConfig indexConfig) {
@@ -67,6 +74,10 @@ public class ConfigManager {
   @JsonSetter(nulls = Nulls.SKIP)
   public void setAggregateMetrics(boolean aggregateMetrics) {
     _aggregateMetrics = aggregateMetrics;
+  }
+
+  public SegmentSizeRecommendations getSegmentSizeRecommendations() {
+    return _segmentSizeRecommendations;
   }
 
   public IndexConfig getIndexConfig() {

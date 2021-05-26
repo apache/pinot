@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.function;
 
+import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -40,6 +41,9 @@ public class FunctionUtils {
     put(Float.class, PinotDataType.FLOAT);
     put(double.class, PinotDataType.DOUBLE);
     put(Double.class, PinotDataType.DOUBLE);
+    put(boolean.class, PinotDataType.BOOLEAN);
+    put(Boolean.class, PinotDataType.BOOLEAN);
+    put(Timestamp.class, PinotDataType.TIMESTAMP);
     put(String.class, PinotDataType.STRING);
     put(byte[].class, PinotDataType.BYTES);
     put(int[].class, PinotDataType.PRIMITIVE_INT_ARRAY);
@@ -59,6 +63,7 @@ public class FunctionUtils {
     put(Long.class, PinotDataType.LONG);
     put(Float.class, PinotDataType.FLOAT);
     put(Double.class, PinotDataType.DOUBLE);
+    put(Timestamp.class, PinotDataType.TIMESTAMP);
     put(String.class, PinotDataType.STRING);
     put(byte[].class, PinotDataType.BYTES);
     put(int[].class, PinotDataType.PRIMITIVE_INT_ARRAY);
@@ -81,6 +86,9 @@ public class FunctionUtils {
     put(Float.class, DataType.FLOAT);
     put(double.class, DataType.DOUBLE);
     put(Double.class, DataType.DOUBLE);
+    put(boolean.class, DataType.BOOLEAN);
+    put(Boolean.class, DataType.BOOLEAN);
+    put(Timestamp.class, DataType.TIMESTAMP);
     put(String.class, DataType.STRING);
     put(byte[].class, DataType.BYTES);
     put(int[].class, DataType.INT);
@@ -99,6 +107,9 @@ public class FunctionUtils {
     put(Float.class, ColumnDataType.FLOAT);
     put(double.class, ColumnDataType.DOUBLE);
     put(Double.class, ColumnDataType.DOUBLE);
+    put(boolean.class, ColumnDataType.BOOLEAN);
+    put(Boolean.class, ColumnDataType.BOOLEAN);
+    put(Timestamp.class, ColumnDataType.TIMESTAMP);
     put(String.class, ColumnDataType.STRING);
     put(byte[].class, ColumnDataType.BYTES);
     put(int[].class, ColumnDataType.INT_ARRAY);

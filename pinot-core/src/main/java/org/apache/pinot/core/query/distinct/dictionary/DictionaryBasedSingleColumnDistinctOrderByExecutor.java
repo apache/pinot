@@ -26,6 +26,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
@@ -35,8 +36,8 @@ public class DictionaryBasedSingleColumnDistinctOrderByExecutor extends BaseDict
   private final IntPriorityQueue _priorityQueue;
 
   public DictionaryBasedSingleColumnDistinctOrderByExecutor(ExpressionContext expression, Dictionary dictionary,
-      OrderByExpressionContext orderByExpressionContext, int limit) {
-    super(expression, dictionary, limit);
+      DataType dataType, OrderByExpressionContext orderByExpressionContext, int limit) {
+    super(expression, dictionary, dataType, limit);
 
     assert orderByExpressionContext.getExpression().equals(expression);
     int comparisonFactor = orderByExpressionContext.isAsc() ? -1 : 1;

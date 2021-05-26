@@ -29,9 +29,11 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -117,7 +119,7 @@ public class QueryRouter {
       ServerRoutingInstance serverRoutingInstance = entry.getKey();
       ServerChannels serverChannels = serverRoutingInstance.isTlsEnabled() ? _serverChannelsTls : _serverChannels;
       try {
-        serverChannels.sendRequest(serverRoutingInstance, entry.getValue());
+        serverChannels.sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, entry.getValue());
         asyncQueryResponse.markRequestSubmitted(serverRoutingInstance);
       } catch (Exception e) {
         LOGGER.error("Caught exception while sending request {} to server: {}, marking query failed", requestId,
@@ -161,7 +163,12 @@ public class QueryRouter {
     InstanceRequest instanceRequest = new InstanceRequest();
     instanceRequest.setRequestId(requestId);
     instanceRequest.setQuery(brokerRequest);
-    instanceRequest.setEnableTrace(brokerRequest.isEnableTrace());
+    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
+    Map<String, String> queryOptions =
+        pinotQuery != null ? pinotQuery.getQueryOptions() : brokerRequest.getQueryOptions();
+    if (queryOptions != null) {
+      instanceRequest.setEnableTrace(Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE)));
+    }
     instanceRequest.setSearchSegments(segments);
     instanceRequest.setBrokerId(_brokerId);
     return instanceRequest;

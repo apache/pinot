@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.controller.recommender.rules.impl;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -63,16 +65,12 @@ public class PinotTablePartitionRule extends AbstractRule {
 
   public PinotTablePartitionRule(InputManager input, ConfigManager output) {
     super(input, output);
-    this._params = input.getPartitionRuleParams();
+    _params = input.getPartitionRuleParams();
   }
 
   @Override
   public void run()
       throws InvalidInputException {
-    //**********Calculate size per record***************/
-    _input.estimateSizePerRecord();
-    //**************************************************/
-
     LOGGER.info("Recommending partition configurations");
 
     if (_input.getQps()
@@ -105,26 +103,23 @@ public class PinotTablePartitionRule extends AbstractRule {
 
     LOGGER.info("*Recommending number of partitions ");
     int numKafkaPartitions = _output.getPartitionConfig().getNumKafkaPartitions();
-    long offLineDataSizePerPush = _input.getNumRecordsPerPush() * _input.getSizePerRecord();
-    int optimalOfflinePartitions = (int) Math.ceil((double) offLineDataSizePerPush / _params.OPTIMAL_SIZE_PER_SEGMENT);
-    if (_input.getTableType().equalsIgnoreCase(REALTIME) || _input.getTableType().equalsIgnoreCase(HYBRID)) {
+    boolean isRealtimeTable = _input.getTableType().equalsIgnoreCase(REALTIME);
+    boolean isHybridTable = _input.getTableType().equalsIgnoreCase(HYBRID);
+    boolean isOfflineTable = _input.getTableType().equalsIgnoreCase(OFFLINE);
+    if (isRealtimeTable || isHybridTable) {
       //real time num of partitions should be the same value as the number of kafka partitions
       if (!_input.getOverWrittenConfigs().getPartitionConfig().isNumPartitionsRealtimeOverwritten()) {
         _output.getPartitionConfig().setNumPartitionsRealtime(numKafkaPartitions);
       }
     }
-    if (_input.getTableType().equalsIgnoreCase(OFFLINE)) {
+    if (isOfflineTable || isHybridTable) {
       //Offline partition num is dependent on the amount of data coming in on a given day.
       //Using a very high value of numPartitions for small dataset size will result in too many small sized segments.
       //We define have a desirable segment size OPTIMAL_SIZE_PER_SEGMENT
       //Divide the size of data coming in on a given day by OPTIMAL_SIZE_PER_SEGMENT we get the number of partitions.
       if (!_input.getOverWrittenConfigs().getPartitionConfig().isNumPartitionsOfflineOverwritten()) {
-        _output.getPartitionConfig().setNumPartitionsOffline((int) (optimalOfflinePartitions));
-      }
-    }
-    if (_input.getTableType().equalsIgnoreCase(HYBRID)) {
-      if (!_input.getOverWrittenConfigs().getPartitionConfig().isNumPartitionsOfflineOverwritten()) {
-        _output.getPartitionConfig().setNumPartitionsOffline(Math.min(optimalOfflinePartitions, numKafkaPartitions));
+        int optimalOfflinePartitions = (int) _output.getSegmentSizeRecommendations().getNumSegments();
+        _output.getPartitionConfig().setNumPartitionsOffline(optimalOfflinePartitions);
       }
     }
 
@@ -146,25 +141,40 @@ public class PinotTablePartitionRule extends AbstractRule {
       }
     });
 
-    List<Pair<String, Double>> columnNameWeightPairRank = new ArrayList<>();
+    List<Pair<String, Double>> columnNameToWeightPairs = new ArrayList<>();
     for (int i = 0; i < _input.getNumDims(); i++) {
       if (weights[i] > 0) {
-        columnNameWeightPairRank.add(Pair.of(_input.intToColName(i), weights[i]));
+        columnNameToWeightPairs.add(Pair.of(_input.intToColName(i), weights[i]));
       }
     }
-    if (columnNameWeightPairRank.isEmpty()) {
+    if (columnNameToWeightPairs.isEmpty()) {
       return;
     }
-    columnNameWeightPairRank.sort((a, b) -> b.getRight().compareTo(a.getRight()));
-    LOGGER.info("**Goodness of column to partition {}", columnNameWeightPairRank);
-    double topCandidatesThreshold =
-        columnNameWeightPairRank.get(0).getRight() * _params.THRESHOLD_RATIO_MIN_DIMENSION_PARTITION_TOP_CANDIDATES;
-    Optional<Pair<String, Double>> max = columnNameWeightPairRank.stream()
-        .filter(columnNameWeightPair -> columnNameWeightPair.getRight() > topCandidatesThreshold)
-        // filter out the dims with frequency < threshold (THRESHOLD_RATIO_DIMENSION_TO_PARTITION_TOP_CANDIDATES * max frequency)
-        .max(Comparator.comparing(columnNameWeightPair -> _input.getCardinality(columnNameWeightPair.getLeft())));
-    // get the dimension with highest cardinality
-    max.ifPresent(stringDoublePair -> _output.getPartitionConfig().setPartitionDimension(stringDoublePair.getLeft()));
+
+    LOGGER.info("**Goodness of column to partition {}", columnNameToWeightPairs);
+    int numPartitions = isOfflineTable || isHybridTable
+        ? _output.getPartitionConfig().getNumPartitionsOffline()
+        : _output.getPartitionConfig().getNumPartitionsRealtime();
+    Optional<String> colNameOpt = findBestColumnForPartitioning(columnNameToWeightPairs, _input::getCardinality,
+        _params.THRESHOLD_RATIO_MIN_DIMENSION_PARTITION_TOP_CANDIDATES, numPartitions);
+    colNameOpt.ifPresent(colName -> _output.getPartitionConfig().setPartitionDimension(colName));
+  }
+
+  @VisibleForTesting
+  static Optional<String> findBestColumnForPartitioning(List<Pair<String, Double>> columnNameToWeightPairs,
+      Function<String, Double> cardinalityExtractor, double topCandidateRatio, int numPartitions) {
+    return columnNameToWeightPairs.stream()
+        .filter(colToWeight -> cardinalityExtractor.apply(colToWeight.getLeft())
+            > numPartitions * PartitionRule.ACCEPTABLE_CARDINALITY_TO_NUM_PARTITIONS_RATIO)
+        .max(Comparator.comparingDouble(Pair::getRight))
+        .map(Pair::getRight)
+        .flatMap(maxWeight -> {
+          double topCandidatesThreshold = maxWeight * topCandidateRatio;
+          return columnNameToWeightPairs.stream()
+              .filter(colToWeight -> colToWeight.getRight() > topCandidatesThreshold)
+              .max(Comparator.comparingDouble(colToWeight -> cardinalityExtractor.apply(colToWeight.getLeft())))
+              .map(Pair::getLeft);
+        });
   }
 
   /**
@@ -207,7 +217,7 @@ public class PinotTablePartitionRule extends AbstractRule {
       String colName = lhs.toString();
       if (lhs.getType() == ExpressionContext.Type.FUNCTION) {
         LOGGER.trace("Skipping the function {}", colName);
-      } else if (_input.isPrimaryDateTime(colName)) {
+      } else if (_input.isTimeOrDateTimeColumn(colName)) {
         LOGGER.trace("Skipping the DateTime column {}", colName);
         return null;
       } else if (!_input.isDim(colName)) {

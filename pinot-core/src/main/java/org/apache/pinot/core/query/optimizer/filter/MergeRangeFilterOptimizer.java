@@ -25,19 +25,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.Function;
-import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
@@ -47,7 +44,6 @@ import org.apache.pinot.spi.utils.BytesUtils;
  * NOTE: This optimizer follows the {@link FlattenAndOrFilterOptimizer}, so all the AND/OR filters are already
  *       flattened.
  */
-@SuppressWarnings({"rawtypes", "unchecked"})
 public class MergeRangeFilterOptimizer implements FilterOptimizer {
 
   @Override
@@ -80,7 +76,7 @@ public class MergeRangeFilterOptimizer implements FilterOptimizer {
             continue;
           }
           // Create a range and merge with current range if exists
-          Range range = getRange(child.getValue().get(0), fieldSpec.getDataType());
+          Range range = Range.getRange(child.getValue().get(0), fieldSpec.getDataType());
           Range currentRange = rangeMap.get(column);
           if (currentRange == null) {
             rangeMap.put(column, range);
@@ -116,48 +112,6 @@ public class MergeRangeFilterOptimizer implements FilterOptimizer {
   }
 
   /**
-   * Helper method to create a Range from the given string representation of the range and data type. See
-   * {@link RangePredicate} for details.
-   */
-  private static Range getRange(String rangeString, DataType dataType) {
-    String[] split = StringUtils.split(rangeString, RangePredicate.DELIMITER);
-    String lower = split[0];
-    boolean lowerInclusive = lower.charAt(0) == RangePredicate.LOWER_INCLUSIVE;
-    String stringLowerBound = lower.substring(1);
-    Comparable lowerBound =
-        stringLowerBound.equals(RangePredicate.UNBOUNDED) ? null : getComparable(stringLowerBound, dataType);
-    String upper = split[1];
-    int upperLength = upper.length();
-    boolean upperInclusive = upper.charAt(upperLength - 1) == RangePredicate.UPPER_INCLUSIVE;
-    String stringUpperBound = upper.substring(0, upperLength - 1);
-    Comparable upperBound =
-        stringUpperBound.equals(RangePredicate.UNBOUNDED) ? null : getComparable(stringUpperBound, dataType);
-    return new Range(lowerBound, lowerInclusive, upperBound, upperInclusive);
-  }
-
-  /**
-   * Helper method to create a Comparable from the given string value and data type.
-   */
-  private static Comparable getComparable(String stringValue, DataType dataType) {
-    switch (dataType) {
-      case INT:
-        return Integer.parseInt(stringValue);
-      case LONG:
-        return Long.parseLong(stringValue);
-      case FLOAT:
-        return Float.parseFloat(stringValue);
-      case DOUBLE:
-        return Double.parseDouble(stringValue);
-      case STRING:
-        return stringValue;
-      case BYTES:
-        return BytesUtils.toByteArray(stringValue);
-      default:
-        throw new IllegalStateException();
-    }
-  }
-
-  /**
    * Helper method to construct a RANGE predicate FilterQueryTree from the given column and range.
    */
   private static FilterQueryTree getRangeFilterQueryTree(String column, Range range) {
@@ -166,7 +120,7 @@ public class MergeRangeFilterOptimizer implements FilterOptimizer {
 
   @Override
   public Expression optimize(Expression filterExpression, @Nullable Schema schema) {
-    if (schema == null) {
+    if (schema == null || filterExpression.getType() != ExpressionType.FUNCTION) {
       return filterExpression;
     }
     Function function = filterExpression.getFunctionCall();
@@ -256,6 +210,8 @@ public class MergeRangeFilterOptimizer implements FilterOptimizer {
       case BETWEEN:
         return new Range(getComparable(operands.get(1), dataType), true, getComparable(operands.get(2), dataType),
             true);
+      case RANGE:
+        return Range.getRange(operands.get(1).getLiteral().getStringValue(), dataType);
       default:
         throw new IllegalStateException("Unsupported filter kind: " + filterKind);
     }
@@ -264,8 +220,9 @@ public class MergeRangeFilterOptimizer implements FilterOptimizer {
   /**
    * Helper method to create a Comparable from the given literal expression and data type.
    */
+  @SuppressWarnings("rawtypes")
   private static Comparable getComparable(Expression literalExpression, DataType dataType) {
-    return getComparable(literalExpression.getLiteral().getFieldValue().toString(), dataType);
+    return dataType.convertInternal(literalExpression.getLiteral().getFieldValue().toString());
   }
 
   /**
@@ -276,78 +233,5 @@ public class MergeRangeFilterOptimizer implements FilterOptimizer {
     rangeFilter.getFunctionCall().setOperands(Arrays.asList(RequestUtils.createIdentifierExpression(column),
         RequestUtils.getLiteralExpression(range.getRangeString())));
     return rangeFilter;
-  }
-
-  /**
-   * Helper class to represent a value range.
-   */
-  private static class Range {
-    Comparable _lowerBound;
-    boolean _lowerInclusive;
-    Comparable _upperBound;
-    boolean _upperInclusive;
-
-    Range(@Nullable Comparable lowerBound, boolean lowerInclusive, @Nullable Comparable upperBound,
-        boolean upperInclusive) {
-      _lowerBound = lowerBound;
-      _lowerInclusive = lowerInclusive;
-      _upperBound = upperBound;
-      _upperInclusive = upperInclusive;
-    }
-
-    /**
-     * Intersects the current range with another range.
-     */
-    void intersect(Range range) {
-      if (range._lowerBound != null) {
-        if (_lowerBound == null) {
-          _lowerInclusive = range._lowerInclusive;
-          _lowerBound = range._lowerBound;
-        } else {
-          int result = _lowerBound.compareTo(range._lowerBound);
-          if (result < 0) {
-            _lowerBound = range._lowerBound;
-            _lowerInclusive = range._lowerInclusive;
-          } else if (result == 0) {
-            _lowerInclusive &= range._lowerInclusive;
-          }
-        }
-      }
-      if (range._upperBound != null) {
-        if (_upperBound == null) {
-          _upperInclusive = range._upperInclusive;
-          _upperBound = range._upperBound;
-        } else {
-          int result = _upperBound.compareTo(range._upperBound);
-          if (result > 0) {
-            _upperBound = range._upperBound;
-            _upperInclusive = range._upperInclusive;
-          } else if (result == 0) {
-            _upperInclusive &= range._upperInclusive;
-          }
-        }
-      }
-    }
-
-    /**
-     * Returns the string representation of the range. See {@link RangePredicate} for details.
-     */
-    String getRangeString() {
-      StringBuilder stringBuilder = new StringBuilder();
-      if (_lowerBound == null) {
-        stringBuilder.append(RangePredicate.LOWER_EXCLUSIVE).append(RangePredicate.UNBOUNDED);
-      } else {
-        stringBuilder.append(_lowerInclusive ? RangePredicate.LOWER_INCLUSIVE : RangePredicate.LOWER_EXCLUSIVE);
-        stringBuilder.append(_lowerBound.toString());
-      }
-      stringBuilder.append(RangePredicate.DELIMITER);
-      if (_upperBound == null) {
-        stringBuilder.append(RangePredicate.UNBOUNDED).append(RangePredicate.UPPER_EXCLUSIVE);
-      } else {
-        stringBuilder.append(_upperBound.toString());
-        stringBuilder.append(_upperInclusive ? RangePredicate.UPPER_INCLUSIVE : RangePredicate.UPPER_EXCLUSIVE);
-      }
-      return stringBuilder.toString();
-    }
   }
 }

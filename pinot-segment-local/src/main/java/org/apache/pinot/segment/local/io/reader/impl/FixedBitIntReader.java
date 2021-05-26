@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.segment.local.io.reader.impl;
 
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
 /**

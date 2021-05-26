@@ -63,7 +63,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -102,25 +101,43 @@ public class HelixBrokerStarter implements ServiceStartable {
   // Participant Helix manager handles Helix functionality such as state transitions and messages
   private HelixManager _participantHelixManager;
 
+  @Deprecated
   public HelixBrokerStarter(PinotConfiguration brokerConf, String clusterName, String zkServer)
       throws Exception {
     this(brokerConf, clusterName, zkServer, null);
   }
 
+  @Deprecated
   public HelixBrokerStarter(PinotConfiguration brokerConf, String clusterName, String zkServer,
       @Nullable String brokerHost)
       throws Exception {
+    this(applyBrokerConfigs(brokerConf, clusterName, zkServer, brokerHost));
+  }
+
+  @Deprecated
+  private static PinotConfiguration applyBrokerConfigs(PinotConfiguration brokerConf, String clusterName, String zkServers, @Nullable String brokerHost) {
+    brokerConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
+    brokerConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkServers);
+    if (brokerHost == null) {
+      brokerConf.clearProperty(Broker.CONFIG_OF_BROKER_HOSTNAME);
+    } else {
+      brokerConf.setProperty(Broker.CONFIG_OF_BROKER_HOSTNAME, brokerHost);
+    }
+    return brokerConf;
+  }
+
+  public HelixBrokerStarter(PinotConfiguration brokerConf) throws Exception {
     _brokerConf = brokerConf;
     _listenerConfigs = ListenerConfigUtil.buildBrokerConfigs(brokerConf);
     setupHelixSystemProperties();
 
-    _clusterName = clusterName;
+    _clusterName = brokerConf.getProperty(Helix.CONFIG_OF_CLUSTER_NAME);
 
     // Remove all white-spaces from the list of zkServers (if any).
-    _zkServers = zkServer.replaceAll("\\s+", "");
-
+    _zkServers = brokerConf.getProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER).replaceAll("\\s+", "");
+    String brokerHost = brokerConf.getProperty(Broker.CONFIG_OF_BROKER_HOSTNAME);
     if (brokerHost == null) {
-      brokerHost = _brokerConf.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils
+      brokerHost = _brokerConf.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils
           .getHostnameOrAddress() : NetUtils.getHostAddress();
     }
 
@@ -211,7 +228,7 @@ public class HelixBrokerStarter implements ServiceStartable {
         _brokerConf.setProperty(Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.parseInt(log2mStr));
       } catch (NumberFormatException e) {
         LOGGER.warn("Invalid config of '{}': '{}', using: {} as the default log2m for HyperLogLog",
-            Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, log2mStr, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
+            Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, log2mStr, Helix.DEFAULT_HYPERLOGLOG_LOG2M);
       }
     }
 
@@ -420,8 +437,9 @@ public class HelixBrokerStarter implements ServiceStartable {
 
     properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, 5001);
     properties.put(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
-
-    return new HelixBrokerStarter(new PinotConfiguration(properties), "quickstart", "localhost:2122");
+    properties.put(Helix.CONFIG_OF_CLUSTER_NAME, "quickstart");
+    properties.put(Helix.CONFIG_OF_ZOOKEEPR_SERVER, "localhost:2122");
+    return new HelixBrokerStarter(new PinotConfiguration(properties));
   }
 
   public static void main(String[] args)

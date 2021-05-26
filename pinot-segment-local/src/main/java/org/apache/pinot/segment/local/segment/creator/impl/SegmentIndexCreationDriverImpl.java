@@ -30,8 +30,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.segment.creator.IntermediateSegmentSegmentCreationDataSource;
@@ -39,10 +41,10 @@ import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreatio
 import org.apache.pinot.segment.local.segment.index.converter.SegmentFormatConverterFactory;
 import org.apache.pinot.segment.local.segment.readers.IntermediateSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
-import org.apache.pinot.segment.local.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.local.utils.CrcUtils;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
 import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
@@ -54,9 +56,11 @@ import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsContainer;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.IngestionSchemaValidator;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.SchemaValidatorFactory;
@@ -84,6 +88,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private SegmentIndexCreationInfo segmentIndexCreationInfo;
   private Schema dataSchema;
   private RecordTransformer _recordTransformer;
+  private ComplexTypeTransformer _complexTypeTransformer;
   private IngestionSchemaValidator _ingestionSchemaValidator;
   private int totalDocs = 0;
   private File tempIndexDir;
@@ -146,11 +151,12 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       LOGGER.info("RecordReaderSegmentCreationDataSource is used");
       dataSource = new RecordReaderSegmentCreationDataSource(recordReader);
     }
-    init(config, dataSource, CompositeTransformer.getDefaultTransformer(config.getTableConfig(), config.getSchema()));
+    init(config, dataSource, CompositeTransformer.getDefaultTransformer(config.getTableConfig(), config.getSchema()),
+        ComplexTypeTransformer.getComplexTypeTransformer(config.getTableConfig()));
   }
 
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource,
-      RecordTransformer recordTransformer)
+      RecordTransformer recordTransformer, @Nullable ComplexTypeTransformer complexTypeTransformer)
       throws Exception {
     this.config = config;
     recordReader = dataSource.getRecordReader();
@@ -160,6 +166,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
 
     _recordTransformer = recordTransformer;
+    _complexTypeTransformer = complexTypeTransformer;
 
     // Initialize stats collection
     segmentStats = dataSource
@@ -210,6 +217,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         long indexStopTime;
         reuse.clear();
         GenericRow decodedRow = recordReader.next(reuse);
+        if (_complexTypeTransformer != null) {
+          // TODO: consolidate complex type transformer into composite type transformer
+          decodedRow = _complexTypeTransformer.transform(decodedRow);
+        }
         if (decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
           recordReadStopTime = System.currentTimeMillis();
           totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
@@ -388,10 +399,11 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       }
 
       String columnName = fieldSpec.getName();
+      DataType storedType = fieldSpec.getDataType().getStoredType();
       ColumnStatistics columnProfile = segmentStats.getColumnProfileFor(columnName);
       boolean useVarLengthDictionary = varLengthDictionaryColumns.contains(columnName);
       Object defaultNullValue = fieldSpec.getDefaultNullValue();
-      if (fieldSpec.getDataType() == FieldSpec.DataType.BYTES) {
+      if (storedType == DataType.BYTES) {
         if (!columnProfile.isFixedLength()) {
           useVarLengthDictionary = true;
         }

@@ -71,7 +71,7 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
 
   @Override
   protected void processSegments(int threadIndex) {
-    for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numThreads) {
+    for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
       Operator<IntermediateResultsBlock> operator = _operators.get(operatorIndex);
       try {
         IntermediateResultsBlock resultsBlock;

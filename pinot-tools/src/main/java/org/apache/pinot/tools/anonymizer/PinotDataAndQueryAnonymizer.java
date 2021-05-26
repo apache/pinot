@@ -65,11 +65,11 @@ import org.apache.pinot.pql.parsers.pql2.ast.StarExpressionAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.WhereAstNode;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.segment.local.segment.index.metadata.ColumnMetadata;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -419,6 +419,7 @@ public class PinotDataAndQueryAnonymizer {
           row = recordReader.next(row);
           buildAvroRow(avroRecordWriter, row);
           rows++;
+          row.clear();
         }
         totalRows += rows;
         LOGGER.info("Generated Avro File {} with {} rows", pathToAvroFile, rows);

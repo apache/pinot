@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.index.column;
 
-import org.apache.pinot.segment.local.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.segment.local.segment.index.readers.ConstantValueBytesDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.ConstantValueDoubleDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.ConstantValueFloatDictionary;
@@ -29,6 +28,7 @@ import org.apache.pinot.segment.local.segment.index.readers.constant.ConstantMVF
 import org.apache.pinot.segment.local.segment.index.readers.constant.ConstantMVInvertedIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.constant.ConstantSortedIndexReader;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
@@ -52,7 +52,7 @@ public class DefaultNullValueVirtualColumnProvider extends BaseVirtualColumnProv
   @Override
   public Dictionary buildDictionary(VirtualColumnContext context) {
     FieldSpec fieldSpec = context.getFieldSpec();
-    switch (fieldSpec.getDataType()) {
+    switch (fieldSpec.getDataType().getStoredType()) {
       case INT:
         return new ConstantValueIntDictionary((int) fieldSpec.getDefaultNullValue());
       case LONG:

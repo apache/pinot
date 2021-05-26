@@ -22,31 +22,31 @@ kind: StatefulSet
 metadata:
   name: {{ include "pinot.controller.fullname" . }}
   labels:
-    app: {{ include "pinot.name" . }}
-    chart: {{ include "pinot.chart" . }}
-    component: {{ .Values.controller.name }}
-    release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
+    {{- include "pinot.controllerLabels" . | nindent 4 }}
 spec:
   selector:
     matchLabels:
-      app: {{ include "pinot.name" . }}
-      release: {{ .Release.Name }}
-      component: {{ .Values.controller.name }}
+      {{- include "pinot.controllerMatchLabels" . | nindent 6 }}
   serviceName: {{ template "pinot.controller.headless" . }}
   replicas: {{ .Values.controller.replicaCount }}
   updateStrategy:
     type: {{ .Values.controller.updateStrategy.type }}
-  podManagementPolicy: Parallel
+  podManagementPolicy: {{ .Values.controller.podManagementPolicy }}
   template:
     metadata:
       labels:
-        app: {{ include "pinot.name" . }}
-        release: {{ .Release.Name }}
-        component: {{ .Values.controller.name }}
+        {{- include "pinot.controllerLabels" . | nindent 8 }}
       annotations:
 {{ toYaml .Values.controller.podAnnotations | indent 8 }}
     spec:
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      serviceAccountName: {{ include "pinot.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.controller.podSecurityContext | nindent 8 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       nodeSelector:
 {{ toYaml .Values.controller.nodeSelector | indent 8 }}
       affinity:
@@ -55,6 +55,8 @@ spec:
 {{ toYaml .Values.controller.tolerations | indent 8 }}
       containers:
       - name: controller
+        securityContext:
+          {{- toYaml .Values.controller.securityContext | nindent 10 }}
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args: [ "StartController", "-configFileName", "/var/pinot/controller/config/pinot-controller.conf" ]
@@ -67,8 +69,25 @@ spec:
         envFrom:
 {{ toYaml .Values.controller.envFrom | indent 10 }}
         ports:
-          - containerPort: {{ .Values.controller.port }}
-            protocol: TCP
+          - containerPort: {{ .Values.controller.service.port }}
+            protocol: {{ .Values.controller.service.protocol }}
+            name: {{ .Values.controller.service.name }}
+        {{- if .Values.controller.probes.livenessEnabled }}
+        livenessProbe:
+          initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}
+          periodSeconds: {{ .Values.probes.periodSeconds }}
+          httpGet:
+            path: {{ .Values.controller.probes.endpoint }}
+            port: {{ .Values.controller.service.port }}
+        {{- end }}
+        {{- if .Values.controller.probes.livenessEnabled }}
+        readinessProbe:
+          initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}
+          periodSeconds: {{ .Values.probes.periodSeconds }}
+          httpGet:
+            path: {{ .Values.controller.probes.endpoint }}
+            port: {{ .Values.controller.service.port }}
+        {{- end }}
         volumeMounts:
           - name: config
             mountPath: /var/pinot/controller/config

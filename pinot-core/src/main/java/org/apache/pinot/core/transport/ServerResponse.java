@@ -29,6 +29,7 @@ import org.apache.pinot.common.utils.DataTable;
 public class ServerResponse {
   private final long _startTimeMs;
   private volatile long _submitRequestTimeMs;
+  private volatile long _requestSentLatencyMs;
   private volatile long _receiveDataTableTimeMs;
   private volatile DataTable _dataTable;
   private volatile int _responseSize;
@@ -45,6 +46,14 @@ public class ServerResponse {
   public int getSubmitDelayMs() {
     if (_submitRequestTimeMs != 0) {
       return (int) (_submitRequestTimeMs - _startTimeMs);
+    } else {
+      return -1;
+    }
+  }
+
+  public int getRequestSentDelayMs() {
+    if (_requestSentLatencyMs != 0) {
+      return (int) _requestSentLatencyMs;
     } else {
       return -1;
     }
@@ -68,12 +77,16 @@ public class ServerResponse {
 
   @Override
   public String toString() {
-    return String
-        .format("%d,%d,%d,%d", getSubmitDelayMs(), getResponseDelayMs(), getResponseSize(), getDeserializationTimeMs());
+    return String.format("%d,%d,%d,%d,%d", getSubmitDelayMs(), getResponseDelayMs(), getResponseSize(),
+        getDeserializationTimeMs(), getRequestSentDelayMs());
   }
 
   void markRequestSubmitted() {
     _submitRequestTimeMs = System.currentTimeMillis();
+  }
+
+  void markRequestSent(long requestSentLatencyMs) {
+    _requestSentLatencyMs = requestSentLatencyMs;
   }
 
   void receiveDataTable(DataTable dataTable, int responseSize, int deserializationTimeMs) {

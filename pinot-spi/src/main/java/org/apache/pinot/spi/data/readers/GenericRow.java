@@ -22,7 +22,9 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -104,6 +106,10 @@ public class GenericRow implements Serializable {
     return _fieldToValueMap.get(fieldName);
   }
 
+  public Object removeValue(String fieldName) {
+    return _fieldToValueMap.remove(fieldName);
+  }
+
   /**
    * Returns whether the value is {@code null} for the given field.
    * <p>The {@code nullField} will be set when setting the {@code nullDefaultValue} for field by calling
@@ -118,6 +124,49 @@ public class GenericRow implements Serializable {
    */
   public boolean hasNullValues() {
     return !_nullValueFields.isEmpty();
+  }
+
+  /**
+   * @return a deep copy of the generic row
+   */
+  public GenericRow copy() {
+    GenericRow copy = new GenericRow();
+    copy.init(this);
+    for (Map.Entry<String, Object> entry : copy._fieldToValueMap.entrySet()) {
+      entry.setValue(copy(entry.getValue()));
+    }
+    return copy;
+  }
+
+  /**
+   * @return a deep copy of the object.
+   */
+  private Object copy(Object value) {
+    if (value == null) {
+      return null;
+    } else if (value instanceof Map) {
+      Map<String, Object> map = new HashMap<>((Map<String, Object>) value);
+      for (Map.Entry<String, Object> entry : map.entrySet()) {
+        entry.setValue(copy(entry.getValue()));
+      }
+      return map;
+    } else if (value instanceof Collection) {
+      List list = new ArrayList(((Collection) value).size());
+      for (Object object : (Collection) value) {
+        list.add(copy(object));
+      }
+      return list;
+    } else if (value.getClass().isArray()) {
+      Object[] array = new Object[((Object[]) value).length];
+      int idx = 0;
+      for (Object object : (Object[]) value) {
+        array[idx++] = copy(object);
+      }
+      return array;
+    } else {
+      // other values are of primitive type
+      return value;
+    }
   }
 
   /**

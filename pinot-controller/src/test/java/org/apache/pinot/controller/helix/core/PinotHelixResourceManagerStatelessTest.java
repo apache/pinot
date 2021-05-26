@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix.core;
 import java.util.Map;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -35,9 +36,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import static org.apache.pinot.controller.helix.core.PinotHelixResourceManager.InvalidTableConfigException;
-
 
 public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   private static final int BASE_SERVER_ADMIN_PORT = 10000;

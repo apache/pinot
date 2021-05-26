@@ -24,11 +24,10 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
-import org.apache.pinot.segment.local.segment.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
@@ -67,7 +66,7 @@ public class SegmentGenerationWithFilterRecordsTest {
   public void setup() {
     String filterFunction =
         "Groovy({((col2 < 1589007600000L) &&  (col3.max() < 4)) || col1 == \"B\"}, col1, col2, col3)";
-    IngestionConfig ingestionConfig = new IngestionConfig(null, null, new FilterConfig(filterFunction), null);
+    IngestionConfig ingestionConfig = new IngestionConfig(null, null, new FilterConfig(filterFunction), null, null);
     _tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(ingestionConfig).build();
     _schema = new Schema.SchemaBuilder().addSingleValueDimension(STRING_COLUMN, FieldSpec.DataType.STRING)
@@ -84,7 +83,7 @@ public class SegmentGenerationWithFilterRecordsTest {
   public void testNumDocs()
       throws Exception {
     File segmentDir = buildSegment(_tableConfig, _schema);
-    SegmentMetadataImpl metadata = SegmentDirectory.loadSegmentMetadata(segmentDir);
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(segmentDir);
     Assert.assertEquals(metadata.getTotalDocs(), 2);
     PinotSegmentRecordReader segmentRecordReader = new PinotSegmentRecordReader(segmentDir);
     GenericRow next = segmentRecordReader.next();

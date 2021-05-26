@@ -24,6 +24,8 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.controller.recommender.exceptions.InvalidInputException;
 import org.apache.pinot.controller.recommender.io.ConfigManager;
 import org.apache.pinot.controller.recommender.io.InputManager;
@@ -54,27 +56,44 @@ public class RecommenderDriver {
     inputManager.init();
     outputManager = inputManager.getOverWrittenConfigs();
 
-    for (RulesToExecute.Rule value : RulesToExecute.Rule.values()) {
+    // silent rules will run, but their output will only be used in other rules and it will not be present to user
+    List<AbstractRule> silentRules = new ArrayList<>();
+
+    for (RulesToExecute.Rule rule : RulesToExecute.Rule.values()) {
       try {
         Method ruleExecuteFlag =
-            inputManager.getRulesToExecute().getClass().getDeclaredMethod(RULE_EXECUTION_PREFIX + value.name().replace(RULE_EXECUTION_SUFFIX,""));
+            inputManager.getRulesToExecute().getClass().getDeclaredMethod(RULE_EXECUTION_PREFIX + rule.name().replace(RULE_EXECUTION_SUFFIX,""));
         LOGGER.info("{}:{}", ruleExecuteFlag.getName(), ruleExecuteFlag.invoke(inputManager.getRulesToExecute()));
-        if (!(boolean) ruleExecuteFlag.invoke(inputManager.getRulesToExecute())) {
-          continue;
+        boolean shouldRun = (boolean) ruleExecuteFlag.invoke(inputManager.getRulesToExecute());
+        boolean shouldSilentlyRun = false;
+        if (!shouldRun) {
+          shouldSilentlyRun = shouldSilentlyRun(rule, inputManager);
+          if (!shouldSilentlyRun) {
+            continue;
+          }
         }
-        AbstractRule abstractRule = RulesToExecute.RuleFactory.getRule(value, inputManager, outputManager);
+        AbstractRule abstractRule = RulesToExecute.RuleFactory.getRule(rule, inputManager, outputManager);
         if (abstractRule != null) {
           abstractRule.run();
+          if (shouldSilentlyRun) {
+            silentRules.add(abstractRule);
+          }
         }
       } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
-        LOGGER.error("Error while executing strategy:{}", value, e);
+        LOGGER.error("Error while executing strategy:{}", rule, e);
       }
     }
     try {
+      silentRules.forEach(AbstractRule::hideOutput);
       return objectMapper.writeValueAsString(outputManager);
     } catch (JsonProcessingException e) {
       LOGGER.error("Error while writing the output json string! Stack trace:", e);
     }
     return "";
+  }
+
+  private static boolean shouldSilentlyRun(RulesToExecute.Rule rule, InputManager input) {
+    return rule == RulesToExecute.Rule.SegmentSizeRule &&
+        (input.getTableType().equalsIgnoreCase("OFFLINE") || input.getTableType().equalsIgnoreCase("HYBRID"));
   }
 }

@@ -31,9 +31,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.creator.impl.V1Constants;
-import org.apache.pinot.segment.local.utils.CleanerUtil;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
+import org.apache.pinot.segment.spi.memory.CleanerUtil;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.roaringbitmap.Container;
 import org.roaringbitmap.RoaringBitmap;
@@ -52,7 +52,9 @@ import org.roaringbitmap.RoaringBitmapWriter;
  * </ul>
  */
 public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
-  public static final int VERSION = 1;
+  // NOTE: V1 is deprecated because it does not support top-level value, top-level array and nested array
+  public static final int VERSION_1 = 1;
+  public static final int VERSION_2 = 2;
   public static final int HEADER_LENGTH = 32;
 
   static final String TEMP_DIR_SUFFIX = ".json.idx.tmp";
@@ -97,7 +99,7 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
       throws IOException {
     int numRecords = records.size();
     Preconditions
-        .checkState(_nextFlattenedDocId + numRecords > 0, "Got more than %s flattened records", Integer.MAX_VALUE);
+        .checkState(_nextFlattenedDocId + numRecords >= 0, "Got more than %s flattened records", Integer.MAX_VALUE);
     _numFlattenedRecordsList.add(numRecords);
     for (Map<String, String> record : records) {
       for (Map.Entry<String, String> entry : record.entrySet()) {
@@ -130,7 +132,7 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   void generateIndexFile()
       throws IOException {
     ByteBuffer headerBuffer = ByteBuffer.allocate(HEADER_LENGTH);
-    headerBuffer.putInt(VERSION);
+    headerBuffer.putInt(VERSION_2);
     headerBuffer.putInt(_maxValueLength);
     long dictionaryFileLength = _dictionaryFile.length();
     long invertedIndexFileLength = _invertedIndexFile.length();

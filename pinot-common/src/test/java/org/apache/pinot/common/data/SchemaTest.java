@@ -20,6 +20,7 @@ package org.apache.pinot.common.data;
 
 import java.io.File;
 import java.net.URL;
+import java.sql.Timestamp;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -46,10 +47,17 @@ public class SchemaTest {
       throws Exception {
     Schema schemaToValidate;
 
-    schemaToValidate = Schema.fromString(makeSchema(FieldSpec.DataType.LONG, FieldSpec.DataType.STRING, true));
+    schemaToValidate = new Schema();
+    schemaToValidate.addField(new DimensionFieldSpec("d", FieldSpec.DataType.LONG, true));
+    schemaToValidate.addField(new MetricFieldSpec("m", FieldSpec.DataType.LONG));
     schemaToValidate.validate();
 
-    schemaToValidate = Schema.fromString(makeSchema(FieldSpec.DataType.BOOLEAN, FieldSpec.DataType.STRING, true));
+    schemaToValidate = new Schema();
+    schemaToValidate.addField(new DimensionFieldSpec("d", FieldSpec.DataType.STRING, true));
+    schemaToValidate.validate();
+
+    schemaToValidate = new Schema();
+    schemaToValidate.addField(new MetricFieldSpec("m", FieldSpec.DataType.STRING, "null"));
     try {
       schemaToValidate.validate();
       Assert.fail("Should have failed validation for invalid schema.");
@@ -57,7 +65,12 @@ public class SchemaTest {
       // expected
     }
 
-    schemaToValidate = Schema.fromString(makeSchema(FieldSpec.DataType.STRING, FieldSpec.DataType.STRING, false));
+    schemaToValidate = new Schema();
+    schemaToValidate.addField(new DimensionFieldSpec("d", FieldSpec.DataType.BOOLEAN, true));
+    schemaToValidate.validate();
+
+    schemaToValidate = new Schema();
+    schemaToValidate.addField(new MetricFieldSpec("m", FieldSpec.DataType.BOOLEAN, false));
     try {
       schemaToValidate.validate();
       Assert.fail("Should have failed validation for invalid schema.");
@@ -65,18 +78,18 @@ public class SchemaTest {
       // expected
     }
 
-    schemaToValidate = Schema.fromString(makeSchema(FieldSpec.DataType.LONG, FieldSpec.DataType.BOOLEAN, false));
+    schemaToValidate = new Schema();
+    schemaToValidate.addField(new DimensionFieldSpec("d", FieldSpec.DataType.TIMESTAMP, true));
     schemaToValidate.validate();
-  }
 
-  private String makeSchema(FieldSpec.DataType metricType, FieldSpec.DataType dimensionType, boolean isSingleValue) {
-    return "{" + "  \"schemaName\":\"SchemaTest\"," + "  \"metricFieldSpecs\":[" + "    {\"name\":\"m\",\"dataType\":\""
-        + metricType + "\"}" + "  ]," + "  \"dimensionFieldSpecs\":[" + "    {\"name\":\"d\",\"dataType\":\""
-        + dimensionType + "\",\"singleValueField\":" + isSingleValue + "}" + "  ]," + "  \"timeFieldSpec\":{"
-        + "    \"incomingGranularitySpec\":{\"dataType\":\"LONG\",\"timeType\":\"MILLISECONDS\",\"name\":\"time\"},"
-        + "    \"defaultNullValue\":12345" + "  }," + "  \"dateTimeFieldSpecs\":["
-        + "    {\"name\":\"Date\", \"dataType\":\"LONG\", \"format\":\"1:MILLISECONDS:EPOCH\", \"granularity\":\"5:MINUTES\", \"dateTimeType\":\"PRIMARY\"}"
-        + "  ], \"primaryKeyColumns\": [\"d\"]" + "}";
+    schemaToValidate = new Schema();
+    schemaToValidate.addField(new MetricFieldSpec("m", FieldSpec.DataType.BOOLEAN, new Timestamp(0)));
+    try {
+      schemaToValidate.validate();
+      Assert.fail("Should have failed validation for invalid schema.");
+    } catch (IllegalStateException e) {
+      // expected
+    }
   }
 
   @Test

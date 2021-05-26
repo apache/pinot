@@ -68,7 +68,7 @@ public class SanitizationTransformer implements RecordTransformer {
         Object[] values = (Object[]) value;
         int numValues = values.length;
         for (int i = 0; i < numValues; i++) {
-          values[i] = StringUtil.sanitizeStringValue((String) values[i], maxLength);
+          values[i] = StringUtil.sanitizeStringValue(values[i].toString(), maxLength);
         }
       }
     }

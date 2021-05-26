@@ -21,7 +21,7 @@ package org.apache.pinot.segment.local.segment.index.readers.forward;
 import java.nio.ByteBuffer;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkSVForwardIndexWriter;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 

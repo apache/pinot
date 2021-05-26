@@ -73,7 +73,7 @@ public class AsyncQueryResponse {
    */
   public String getStats() {
     StringBuilder stringBuilder =
-        new StringBuilder("(Server=SubmitDelayMs,ResponseDelayMs,ResponseSize,DeserializationTimeMs)");
+        new StringBuilder("(Server=SubmitDelayMs,ResponseDelayMs,ResponseSize,DeserializationTimeMs,RequestSentDelayMs)");
     for (Map.Entry<ServerRoutingInstance, ServerResponse> entry : _responseMap.entrySet()) {
       stringBuilder.append(';').append(entry.getKey().getShortName()).append('=').append(entry.getValue().toString());
     }
@@ -82,6 +82,10 @@ public class AsyncQueryResponse {
 
   void markRequestSubmitted(ServerRoutingInstance serverRoutingInstance) {
     _responseMap.get(serverRoutingInstance).markRequestSubmitted();
+  }
+
+  void markRequestSent(ServerRoutingInstance serverRoutingInstance, long requestSentLatencyMs) {
+    _responseMap.get(serverRoutingInstance).markRequestSent(requestSentLatencyMs);
   }
 
   void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, int responseSize,

@@ -32,8 +32,10 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.segment.local.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.segment.local.io.util.VarLengthValueWriter;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,7 +45,8 @@ public class SegmentDictionaryCreator implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentDictionaryCreator.class);
 
   private final Object _sortedValues;
-  private final FieldSpec _fieldSpec;
+  private final String _columnName;
+  private final DataType _storedType;
   private final File _dictionaryFile;
   private final boolean _useVarLengthDictionary;
 
@@ -59,8 +62,9 @@ public class SegmentDictionaryCreator implements Closeable {
       boolean useVarLengthDictionary)
       throws IOException {
     _sortedValues = sortedValues;
-    _fieldSpec = fieldSpec;
-    _dictionaryFile = new File(indexDir, fieldSpec.getName() + V1Constants.Dict.FILE_EXTENSION);
+    _columnName = fieldSpec.getName();
+    _storedType = fieldSpec.getDataType().getStoredType();
+    _dictionaryFile = new File(indexDir, _columnName + V1Constants.Dict.FILE_EXTENSION);
     FileUtils.touch(_dictionaryFile);
     _useVarLengthDictionary = useVarLengthDictionary;
   }
@@ -72,7 +76,7 @@ public class SegmentDictionaryCreator implements Closeable {
 
   public void build()
       throws IOException {
-    switch (_fieldSpec.getDataType()) {
+    switch (_storedType) {
       case INT:
         int[] sortedInts = (int[]) _sortedValues;
         int numValues = sortedInts.length;
@@ -90,9 +94,11 @@ public class SegmentDictionaryCreator implements Closeable {
             writer.writeInt(i, value);
           }
         }
-        LOGGER.info("Created dictionary for INT column: {} with cardinality: {}, range: {} to {}", _fieldSpec.getName(),
-            numValues, sortedInts[0], sortedInts[numValues - 1]);
+        LOGGER
+            .info("Created dictionary for INT column: {} with cardinality: {}, range: {} to {}", _columnName, numValues,
+                sortedInts[0], sortedInts[numValues - 1]);
         return;
+
       case LONG:
         long[] sortedLongs = (long[]) _sortedValues;
         numValues = sortedLongs.length;
@@ -110,10 +116,10 @@ public class SegmentDictionaryCreator implements Closeable {
             writer.writeLong(i, value);
           }
         }
-        LOGGER
-            .info("Created dictionary for LONG column: {} with cardinality: {}, range: {} to {}", _fieldSpec.getName(),
-                numValues, sortedLongs[0], sortedLongs[numValues - 1]);
+        LOGGER.info("Created dictionary for LONG column: {} with cardinality: {}, range: {} to {}", _columnName,
+            numValues, sortedLongs[0], sortedLongs[numValues - 1]);
         return;
+
       case FLOAT:
         float[] sortedFloats = (float[]) _sortedValues;
         numValues = sortedFloats.length;
@@ -131,10 +137,10 @@ public class SegmentDictionaryCreator implements Closeable {
             writer.writeFloat(i, value);
           }
         }
-        LOGGER
-            .info("Created dictionary for FLOAT column: {} with cardinality: {}, range: {} to {}", _fieldSpec.getName(),
-                numValues, sortedFloats[0], sortedFloats[numValues - 1]);
+        LOGGER.info("Created dictionary for FLOAT column: {} with cardinality: {}, range: {} to {}", _columnName,
+            numValues, sortedFloats[0], sortedFloats[numValues - 1]);
         return;
+
       case DOUBLE:
         double[] sortedDoubles = (double[]) _sortedValues;
         numValues = sortedDoubles.length;
@@ -152,9 +158,10 @@ public class SegmentDictionaryCreator implements Closeable {
             writer.writeDouble(i, value);
           }
         }
-        LOGGER.info("Created dictionary for DOUBLE column: {} with cardinality: {}, range: {} to {}",
-            _fieldSpec.getName(), numValues, sortedDoubles[0], sortedDoubles[numValues - 1]);
+        LOGGER.info("Created dictionary for DOUBLE column: {} with cardinality: {}, range: {} to {}", _columnName,
+            numValues, sortedDoubles[0], sortedDoubles[numValues - 1]);
         return;
+
       case STRING:
         String[] sortedStrings = (String[]) _sortedValues;
         numValues = sortedStrings.length;
@@ -174,7 +181,7 @@ public class SegmentDictionaryCreator implements Closeable {
         writeBytesValueDictionary(sortedStringBytes);
         LOGGER.info(
             "Created dictionary for STRING column: {} with cardinality: {}, max length in bytes: {}, range: {} to {}",
-            _fieldSpec.getName(), numValues, _numBytesPerEntry, sortedStrings[0], sortedStrings[numValues - 1]);
+            _columnName, numValues, _numBytesPerEntry, sortedStrings[0], sortedStrings[numValues - 1]);
         return;
 
       case BYTES:
@@ -195,11 +202,11 @@ public class SegmentDictionaryCreator implements Closeable {
         writeBytesValueDictionary(sortedByteArrays);
         LOGGER.info(
             "Created dictionary for BYTES column: {} with cardinality: {}, max length in bytes: {}, range: {} to {}",
-            _fieldSpec.getName(), numValues, _numBytesPerEntry, sortedBytes[0], sortedBytes[numValues - 1]);
+            _columnName, numValues, _numBytesPerEntry, sortedBytes[0], sortedBytes[numValues - 1]);
         return;
 
       default:
-        throw new UnsupportedOperationException("Unsupported data type: " + _fieldSpec.getDataType());
+        throw new UnsupportedOperationException("Unsupported data type: " + _storedType);
     }
   }
 
@@ -217,8 +224,7 @@ public class SegmentDictionaryCreator implements Closeable {
           writer.add(value);
         }
       }
-      LOGGER.info("Using variable length dictionary for column: {}, size: {}", _fieldSpec.getName(),
-          _dictionaryFile.length());
+      LOGGER.info("Using variable length dictionary for column: {}, size: {}", _columnName, _dictionaryFile.length());
     } else {
       // Backward-compatible: index file is always big-endian
       int numValues = bytesValues.length;
@@ -230,7 +236,7 @@ public class SegmentDictionaryCreator implements Closeable {
           writer.writeBytes(i, _numBytesPerEntry, bytesValues[i]);
         }
       }
-      LOGGER.info("Using fixed length dictionary for column: {}, size: {}", _fieldSpec.getName(),
+      LOGGER.info("Using fixed length dictionary for column: {}, size: {}", _columnName,
           (long) numValues * _numBytesPerEntry);
     }
   }
@@ -240,7 +246,7 @@ public class SegmentDictionaryCreator implements Closeable {
   }
 
   public int indexOfSV(Object value) {
-    switch (_fieldSpec.getDataType()) {
+    switch (_storedType) {
       case INT:
         return _intValueToIndexMap.get((int) value);
       case LONG:
@@ -254,7 +260,7 @@ public class SegmentDictionaryCreator implements Closeable {
       case BYTES:
         return _bytesValueToIndexMap.get(new ByteArray((byte[]) value));
       default:
-        throw new UnsupportedOperationException("Unsupported data type : " + _fieldSpec.getDataType());
+        throw new UnsupportedOperationException("Unsupported data type : " + _storedType);
     }
   }
 
@@ -262,7 +268,7 @@ public class SegmentDictionaryCreator implements Closeable {
     Object[] multiValues = (Object[]) value;
     int[] indexes = new int[multiValues.length];
 
-    switch (_fieldSpec.getDataType()) {
+    switch (_storedType) {
       case INT:
         for (int i = 0; i < multiValues.length; i++) {
           indexes[i] = _intValueToIndexMap.get((int) multiValues[i]);
@@ -289,7 +295,7 @@ public class SegmentDictionaryCreator implements Closeable {
         }
         break;
       default:
-        throw new UnsupportedOperationException("Unsupported data type : " + _fieldSpec.getDataType());
+        throw new UnsupportedOperationException("Unsupported data type : " + _storedType);
     }
     return indexes;
   }

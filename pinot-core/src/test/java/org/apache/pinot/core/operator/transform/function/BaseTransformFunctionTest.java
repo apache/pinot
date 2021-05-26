@@ -211,6 +211,36 @@ public abstract class BaseTransformFunctionTest {
     }
   }
 
+  protected void testTransformFunction(TransformFunction transformFunction, long[] expectedValues) {
+    int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
+    long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
+    float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
+    double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(intValues[i], (int) expectedValues[i]);
+      Assert.assertEquals(longValues[i], expectedValues[i]);
+      Assert.assertEquals(floatValues[i], (float) expectedValues[i]);
+      Assert.assertEquals(doubleValues[i], (double) expectedValues[i]);
+      Assert.assertEquals(stringValues[i], Long.toString(expectedValues[i]));
+    }
+  }
+
+  protected void testTransformFunction(TransformFunction transformFunction, float[] expectedValues) {
+    int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
+    long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
+    float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
+    double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(intValues[i], (int) expectedValues[i]);
+      Assert.assertEquals(longValues[i], (long) expectedValues[i]);
+      Assert.assertEquals(floatValues[i], expectedValues[i]);
+      Assert.assertEquals(doubleValues[i], (double) expectedValues[i]);
+      Assert.assertEquals(stringValues[i], Float.toString(expectedValues[i]));
+    }
+  }
+
   protected void testTransformFunction(TransformFunction transformFunction, double[] expectedValues) {
     int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);

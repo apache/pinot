@@ -30,12 +30,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.Request;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -74,6 +74,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected static final long DEFAULT_COUNT_STAR_RESULT = 115545L;
   protected static final int DEFAULT_LLC_SEGMENT_FLUSH_SIZE = 5000;
   protected static final int DEFAULT_HLC_SEGMENT_FLUSH_SIZE = 20000;
+  protected static final int DEFAULT_TRANSACTION_NUM_KAFKA_BROKERS = 3;
   protected static final int DEFAULT_LLC_NUM_KAFKA_BROKERS = 2;
   protected static final int DEFAULT_HLC_NUM_KAFKA_BROKERS = 1;
   protected static final int DEFAULT_LLC_NUM_KAFKA_PARTITIONS = 2;
@@ -147,6 +148,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected int getNumKafkaBrokers() {
+    if (useKafkaTransaction()) {
+      return DEFAULT_TRANSACTION_NUM_KAFKA_BROKERS;
+    }
     if (useLlc()) {
       return DEFAULT_LLC_NUM_KAFKA_BROKERS;
     } else {
@@ -154,12 +158,13 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     }
   }
 
-  protected int getBaseKafkaPort() {
-    return KafkaStarterUtils.DEFAULT_KAFKA_PORT;
+  protected int getKafkaPort() {
+    int idx = RANDOM.nextInt(_kafkaStarters.size());
+    return _kafkaStarters.get(idx).getPort();
   }
 
   protected String getKafkaZKAddress() {
-    return KafkaStarterUtils.DEFAULT_ZK_STR;
+    return getZkUrl() + "/kafka";
   }
 
   protected int getNumKafkaPartitions() {
@@ -315,7 +320,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
               StreamConfig.ConsumerType.LOWLEVEL.toString());
       streamConfigMap.put(KafkaStreamConfigProperties
               .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST),
-          KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
+          "localhost:" + _kafkaStarters.get(0).getPort());
       if (useKafkaTransaction()) {
         streamConfigMap.put(KafkaStreamConfigProperties
                 .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL),
@@ -328,10 +333,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
               StreamConfig.ConsumerType.HIGHLEVEL.toString());
       streamConfigMap.put(KafkaStreamConfigProperties
               .constructStreamProperty(KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_ZK_CONNECTION_STRING),
-          KafkaStarterUtils.DEFAULT_ZK_STR);
+          getKafkaZKAddress());
       streamConfigMap.put(KafkaStreamConfigProperties
               .constructStreamProperty(KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_BOOTSTRAP_SERVER),
-          KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
+          "localhost:" + _kafkaStarters.get(0).getPort());
     }
     streamConfigMap.put(StreamConfigProperties
             .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
@@ -398,7 +403,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected org.apache.pinot.client.Connection getPinotConnection() {
     if (_pinotConnection == null) {
-      _pinotConnection = ConnectionFactory.fromZookeeper(ZkStarter.DEFAULT_ZK_STR + "/" + getHelixClusterName());
+      _pinotConnection = ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName());
     }
     return _pinotConnection;
   }
@@ -464,7 +469,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected void pushAvroIntoKafka(List<File> avroFiles)
       throws Exception {
-    ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles, "localhost:" + getBaseKafkaPort(), getKafkaTopic(),
+
+    ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles, "localhost:" + getKafkaPort(), getKafkaTopic(),
         getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
   }
 
@@ -500,8 +506,13 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected void startKafka() {
-    _kafkaStarters = KafkaStarterUtils.startServers(getNumKafkaBrokers(), getBaseKafkaPort(), getKafkaZKAddress(),
-        KafkaStarterUtils.getDefaultKafkaConfiguration());
+    startKafka(KafkaStarterUtils.DEFAULT_KAFKA_PORT);
+  }
+
+  protected void startKafka(int port) {
+    Properties kafkaConfig = KafkaStarterUtils.getDefaultKafkaConfiguration();
+    _kafkaStarters = KafkaStarterUtils.startServers(getNumKafkaBrokers(), port, getKafkaZKAddress(),
+        kafkaConfig);
     _kafkaStarters.get(0)
         .createTopic(getKafkaTopic(), KafkaStarterUtils.getTopicCreationProps(getNumKafkaPartitions()));
   }
@@ -520,7 +531,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected long getCurrentCountStarResult()
       throws Exception {
-    return getPinotConnection().execute(new Request("pql", "SELECT COUNT(*) FROM " + getTableName())).getResultSet(0)
+    return getPinotConnection().execute(new Request("sql", "SELECT COUNT(*) FROM " + getTableName())).getResultSet(0)
         .getLong(0);
   }
 

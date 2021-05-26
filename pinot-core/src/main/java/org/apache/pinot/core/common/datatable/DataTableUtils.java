@@ -59,10 +59,11 @@ public class DataTableUtils {
     int numColumns = columnOffsets.length;
     assert numColumns == dataSchema.size();
 
+    ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     int rowSizeInBytes = 0;
     for (int i = 0; i < numColumns; i++) {
       columnOffsets[i] = rowSizeInBytes;
-      switch (dataSchema.getColumnDataType(i)) {
+      switch (storedColumnDataTypes[i]) {
         case INT:
           rowSizeInBytes += 4;
           break;

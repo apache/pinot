@@ -25,9 +25,7 @@ import java.util.concurrent.TimeUnit;
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.core.requesthandler.OptimizationFlags;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.tools.perf.PerfBenchmarkDriver;
 import org.apache.pinot.tools.perf.PerfBenchmarkDriverConf;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -51,12 +49,6 @@ import org.openjdk.jmh.runner.options.TimeValue;
 public class BenchmarkQueryEngine {
   /** List of query patterns used in the benchmark */
   private static final String[] QUERY_PATTERNS = new String[]{"SELECT count(*) from myTable"};
-
-  /** List of optimization flags to test,
-   * see {@link OptimizationFlags#getOptimizationFlags(BrokerRequest)} for the syntax
-   * used here. */
-  @Param({"", "-multipleOrEqualitiesToInClause"})
-  public String optimizationFlags;
 
   /** List of query patterns indices to run */
   @Param({"0"})
@@ -135,7 +127,7 @@ public class BenchmarkQueryEngine {
 
     ranOnce = false;
 
-    System.out.println(_perfBenchmarkDriver.postQuery(QUERY_PATTERNS[queryPattern], optimizationFlags).toString());
+    System.out.println(_perfBenchmarkDriver.postQuery(QUERY_PATTERNS[queryPattern]).toString());
   }
 
   @Benchmark
@@ -143,7 +135,7 @@ public class BenchmarkQueryEngine {
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public int sendQueryToPinot()
       throws Exception {
-    return _perfBenchmarkDriver.postQuery(QUERY_PATTERNS[queryPattern], optimizationFlags).get("totalDocs").asInt();
+    return _perfBenchmarkDriver.postQuery(QUERY_PATTERNS[queryPattern]).get("totalDocs").asInt();
   }
 
   public static void main(String[] args)

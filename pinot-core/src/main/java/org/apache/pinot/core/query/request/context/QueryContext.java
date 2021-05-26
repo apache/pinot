@@ -65,7 +65,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFacto
 public class QueryContext {
   private final String _tableName;
   private final List<ExpressionContext> _selectExpressions;
-  private final Map<ExpressionContext, String> _aliasMap;
+  private final List<String> _aliasList;
   private final FilterContext _filter;
   private final List<ExpressionContext> _groupByExpressions;
   private final FilterContext _havingFilter;
@@ -85,14 +85,14 @@ public class QueryContext {
   private Set<String> _columns;
 
   private QueryContext(String tableName, List<ExpressionContext> selectExpressions,
-      Map<ExpressionContext, String> aliasMap, @Nullable FilterContext filter,
+      List<String> aliasList, @Nullable FilterContext filter,
       @Nullable List<ExpressionContext> groupByExpressions, @Nullable FilterContext havingFilter,
       @Nullable List<OrderByExpressionContext> orderByExpressions, int limit, int offset,
       @Nullable Map<String, String> queryOptions, @Nullable Map<String, String> debugOptions,
       BrokerRequest brokerRequest) {
     _tableName = tableName;
     _selectExpressions = selectExpressions;
-    _aliasMap = Collections.unmodifiableMap(aliasMap);
+    _aliasList = Collections.unmodifiableList(aliasList);
     _filter = filter;
     _groupByExpressions = groupByExpressions;
     _havingFilter = havingFilter;
@@ -119,10 +119,10 @@ public class QueryContext {
   }
 
   /**
-   * Returns an unmodifiable map from the expression to its alias.
+   * Returns an unmodifiable list from the expression to its alias.
    */
-  public Map<ExpressionContext, String> getAliasMap() {
-    return _aliasMap;
+  public List<String> getAliasList() {
+    return _aliasList;
   }
 
   /**
@@ -224,7 +224,7 @@ public class QueryContext {
   @Override
   public String toString() {
     return "QueryContext{" + "_tableName='" + _tableName + '\'' + ", _selectExpressions=" + _selectExpressions
-        + ", _aliasMap=" + _aliasMap + ", _filter=" + _filter + ", _groupByExpressions=" + _groupByExpressions
+        + ", _aliasList=" + _aliasList + ", _filter=" + _filter + ", _groupByExpressions=" + _groupByExpressions
         + ", _havingFilter=" + _havingFilter + ", _orderByExpressions=" + _orderByExpressions + ", _limit=" + _limit
         + ", _offset=" + _offset + ", _queryOptions=" + _queryOptions + ", _debugOptions=" + _debugOptions
         + ", _brokerRequest=" + _brokerRequest + '}';
@@ -233,7 +233,7 @@ public class QueryContext {
   public static class Builder {
     private String _tableName;
     private List<ExpressionContext> _selectExpressions;
-    private Map<ExpressionContext, String> _aliasMap;
+    private List<String> _aliasList;
     private FilterContext _filter;
     private List<ExpressionContext> _groupByExpressions;
     private FilterContext _havingFilter;
@@ -254,8 +254,8 @@ public class QueryContext {
       return this;
     }
 
-    public Builder setAliasMap(Map<ExpressionContext, String> aliasMap) {
-      _aliasMap = aliasMap;
+    public Builder setAliasList(List<String> aliasList) {
+      _aliasList = aliasList;
       return this;
     }
 
@@ -308,7 +308,7 @@ public class QueryContext {
       // TODO: Add validation logic here
 
       QueryContext queryContext =
-          new QueryContext(_tableName, _selectExpressions, _aliasMap, _filter, _groupByExpressions, _havingFilter,
+          new QueryContext(_tableName, _selectExpressions, _aliasList, _filter, _groupByExpressions, _havingFilter,
               _orderByExpressions, _limit, _offset, _queryOptions, _debugOptions, _brokerRequest);
 
       // Pre-calculate the aggregation functions and columns for the query

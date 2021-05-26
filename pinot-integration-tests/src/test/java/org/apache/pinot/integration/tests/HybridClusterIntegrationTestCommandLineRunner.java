@@ -36,7 +36,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.core.requesthandler.PinotQueryRequest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -259,7 +258,7 @@ public class HybridClusterIntegrationTestCommandLineRunner {
     }
 
     @Override
-    protected int getBaseKafkaPort() {
+    protected int getKafkaPort() {
       return KAFKA_PORT;
     }
 
@@ -328,7 +327,7 @@ public class HybridClusterIntegrationTestCommandLineRunner {
 
       // Start Zk and Kafka
       startZk(ZK_PORT);
-      startKafka();
+      startKafka(getKafkaPort());
 
       // Start the Pinot cluster
       Map<String, Object> properties = getDefaultControllerConfiguration();
@@ -393,8 +392,7 @@ public class HybridClusterIntegrationTestCommandLineRunner {
                 @Override
                 public void run() {
                   try {
-                    JsonNode actualResponse =
-                        postQuery(new PinotQueryRequest("pql", currentQuery), "http://localhost:" + BROKER_PORT);
+                    JsonNode actualResponse = postQuery(currentQuery, "http://localhost:" + BROKER_PORT);
                     if (QueryComparison.compareWithEmpty(actualResponse, expectedResponse)
                         == QueryComparison.ComparisonStatus.FAILED) {
                       numFailedQueries.getAndIncrement();

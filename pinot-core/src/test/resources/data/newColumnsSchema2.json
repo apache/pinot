@@ -21,8 +21,7 @@
   "dimensionFieldSpecs": [
     {
       "dataType": "BOOLEAN",
-      "name": "newBooleanSVDimension",
-      "defaultNullValue": "false"
+      "name": "newBooleanSVDimension"
     },
     {
       "dataType": "INT",

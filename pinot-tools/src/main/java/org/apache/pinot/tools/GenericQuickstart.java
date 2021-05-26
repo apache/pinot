@@ -72,7 +72,7 @@ public class GenericQuickstart {
     _zookeeperInstance = ZkStarter.startLocalZkServer();
     try {
       _kafkaStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME,
-          KafkaStarterUtils.getDefaultKafkaConfiguration());
+          KafkaStarterUtils.getDefaultKafkaConfiguration(_zookeeperInstance));
     } catch (Exception e) {
       throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
     }

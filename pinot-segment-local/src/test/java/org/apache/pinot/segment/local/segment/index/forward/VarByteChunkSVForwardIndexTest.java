@@ -30,10 +30,10 @@ import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexW
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.forward.BaseChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
-import org.apache.pinot.segment.local.segment.memory.PinotNativeOrderLBuffer;
-import org.apache.pinot.segment.local.segment.memory.PinotNonNativeOrderLBuffer;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotNativeOrderLBuffer;
+import org.apache.pinot.segment.spi.memory.PinotNonNativeOrderLBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -59,6 +59,13 @@ public class VarByteChunkSVForwardIndexTest {
       throws Exception {
     test(ChunkCompressionType.PASS_THROUGH);
   }
+
+  @Test
+  public void testWithZstandardCompression()
+      throws Exception {
+    test(ChunkCompressionType.ZSTANDARD);
+  }
+
 
   /**
    * This test writes {@link #NUM_ENTRIES} using {@link VarByteChunkSVForwardIndexWriter}. It then reads
@@ -161,24 +168,31 @@ public class VarByteChunkSVForwardIndexTest {
       throws Exception {
     testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 10, 1000);
     testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 10, 1000);
+    testLargeVarcharHelper(ChunkCompressionType.ZSTANDARD, 10, 1000);
 
     testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 100, 1000);
     testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 100, 1000);
+    testLargeVarcharHelper(ChunkCompressionType.ZSTANDARD, 100, 1000);
 
     testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 1000, 1000);
     testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 1000, 1000);
+    testLargeVarcharHelper(ChunkCompressionType.ZSTANDARD, 1000, 1000);
 
     testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 10000, 100);
     testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 10000, 100);
+    testLargeVarcharHelper(ChunkCompressionType.ZSTANDARD, 10000, 100);
 
     testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 100000, 10);
     testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 100000, 10);
+    testLargeVarcharHelper(ChunkCompressionType.ZSTANDARD, 100000, 10);
 
     testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 1000000, 10);
     testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 1000000, 10);
+    testLargeVarcharHelper(ChunkCompressionType.ZSTANDARD, 1000000, 10);
 
     testLargeVarcharHelper(ChunkCompressionType.SNAPPY, 2000000, 10);
     testLargeVarcharHelper(ChunkCompressionType.PASS_THROUGH, 2000000, 10);
+    testLargeVarcharHelper(ChunkCompressionType.ZSTANDARD, 2000000, 10);
   }
 
   private void testLargeVarcharHelper(ChunkCompressionType compressionType, int numChars, int numDocs)

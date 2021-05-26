@@ -29,10 +29,8 @@ import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
-
-import java.util.*;
-import java.util.stream.Collectors;
-
+import java.util.Iterator;
+import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
@@ -49,8 +47,8 @@ import org.apache.pinot.spi.utils.ByteArray;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenerator {
   private final ExpressionContext _groupByExpression;
-  private final DataType _dataType;
-  private Map _groupKeyMap;
+  private final DataType _storedType;
+  private final Map _groupKeyMap;
   private final int _globalGroupIdUpperBound;
 
   private int _numGroups = 0;
@@ -58,8 +56,8 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   public NoDictionarySingleColumnGroupKeyGenerator(TransformOperator transformOperator,
       ExpressionContext groupByExpression, int numGroupsLimit) {
     _groupByExpression = groupByExpression;
-    _dataType = transformOperator.getResultMetadata(_groupByExpression).getDataType();
-    _groupKeyMap = createGroupKeyMap(_dataType);
+    _storedType = transformOperator.getResultMetadata(_groupByExpression).getDataType().getStoredType();
+    _groupKeyMap = createGroupKeyMap(_storedType);
     _globalGroupIdUpperBound = numGroupsLimit;
   }
 
@@ -73,7 +71,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     BlockValSet blockValSet = transformBlock.getBlockValueSet(_groupByExpression);
     int numDocs = transformBlock.getNumDocs();
 
-    switch (_dataType) {
+    switch (_storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < numDocs; i++) {
@@ -111,7 +109,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
         }
         break;
       default:
-        throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _dataType);
+        throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _storedType);
     }
   }
 
@@ -166,7 +164,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
 
   @Override
   public Iterator<GroupKey> getGroupKeys() {
-    switch (_dataType) {
+    switch (_storedType) {
       case INT:
         return new IntGroupKeyIterator((Int2IntOpenHashMap) _groupKeyMap);
       case LONG:
@@ -185,7 +183,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
 
   @Override
   public Iterator<StringGroupKey> getStringGroupKeys() {
-    switch (_dataType) {
+    switch (_storedType) {
       case INT:
         return new IntStringGroupKeyIterator((Int2IntOpenHashMap) _groupKeyMap);
       case LONG:
@@ -541,5 +539,4 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
       throw new UnsupportedOperationException();
     }
   }
-
 }

@@ -41,6 +41,7 @@ public class QueryException {
   public static final int SEGMENT_PLAN_EXECUTION_ERROR_CODE = 160;
   public static final int COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR_CODE = 170;
   public static final int ACCESS_DENIED_ERROR_CODE = 180;
+  public static final int TABLE_DOES_NOT_EXIST_ERROR_CODE = 190;
   public static final int QUERY_EXECUTION_ERROR_CODE = 200;
   // TODO: Handle these errors in broker
   public static final int SERVER_SHUTTING_DOWN_ERROR_CODE = 210;
@@ -72,6 +73,8 @@ public class QueryException {
       new ProcessingException(SEGMENT_PLAN_EXECUTION_ERROR_CODE);
   public static final ProcessingException COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR =
       new ProcessingException(COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR_CODE);
+  public static final ProcessingException TABLE_DOES_NOT_EXIST_ERROR =
+      new ProcessingException(TABLE_DOES_NOT_EXIST_ERROR_CODE);
   public static final ProcessingException QUERY_EXECUTION_ERROR = new ProcessingException(QUERY_EXECUTION_ERROR_CODE);
   public static final ProcessingException SERVER_SCHEDULER_DOWN_ERROR =
       new ProcessingException(SERVER_SHUTTING_DOWN_ERROR_CODE);
@@ -108,6 +111,7 @@ public class QueryException {
     PQL_PARSING_ERROR.setMessage("PQLParsingError");
     SEGMENT_PLAN_EXECUTION_ERROR.setMessage("SegmentPlanExecutionError");
     COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR.setMessage("CombineSegmentPlanTimeoutError");
+    TABLE_DOES_NOT_EXIST_ERROR.setMessage("TableDoesNotExistError");
     QUERY_EXECUTION_ERROR.setMessage("QueryExecutionError");
     SERVER_SCHEDULER_DOWN_ERROR.setMessage("ServerShuttingDown");
     SERVER_OUT_OF_CAPACITY_ERROR.setMessage("ServerOutOfCapacity");
@@ -160,16 +164,17 @@ public class QueryException {
    */
   public static boolean isClientError(int errorCode) {
     switch (errorCode) {
-      // NOTE: QueryException.BROKER_RESOURCE_MISSING_ERROR can be triggered either due to
-      // client error (incorrect table name) or due to issues with EV updates. For cases where
-      // access to tables is controlled via ACLs, for an incorrect table name we expect ACCESS_DENIED_ERROR to be
-      // thrown. Hence, we currently don't treat BROKER_RESOURCE_MISSING_ERROR as client error.
+      // NOTE: QueryException.BROKER_RESOURCE_MISSING_ERROR can be triggered due to issues
+      // with EV updates. For cases where access to tables is controlled via ACLs, for an
+      // incorrect table name we expect ACCESS_DENIED_ERROR to be thrown. Hence, we currently
+      // don't treat BROKER_RESOURCE_MISSING_ERROR as client error.
       case QueryException.ACCESS_DENIED_ERROR_CODE:
       case QueryException.JSON_COMPILATION_ERROR_CODE:
       case QueryException.JSON_PARSING_ERROR_CODE:
       case QueryException.QUERY_VALIDATION_ERROR_CODE:
       case QueryException.PQL_PARSING_ERROR_CODE:
       case QueryException.TOO_MANY_REQUESTS_ERROR_CODE:
+      case QueryException.TABLE_DOES_NOT_EXIST_ERROR_CODE:
         return true;
       default:
         return false;
