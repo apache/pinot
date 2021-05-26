@@ -34,8 +34,8 @@ import org.apache.pinot.core.operator.transform.function.TransformFunction;
  * <p>In absence of transforms, it servers as a pass-through to projection block.
  */
 public class TransformBlock implements Block {
-  private final ProjectionBlock _projectionBlock;
-  private final Map<ExpressionContext, TransformFunction> _transformFunctionMap;
+  protected final ProjectionBlock _projectionBlock;
+  protected final Map<ExpressionContext, TransformFunction> _transformFunctionMap;
 
   public TransformBlock(ProjectionBlock projectionBlock,
       Map<ExpressionContext, TransformFunction> transformFunctionMap) {
