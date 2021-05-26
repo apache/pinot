@@ -98,14 +98,13 @@ controller:
     port: 9000
     nodePort: ""
     protocol: TCP
-    gcpInternalLB: false
     name: controller
 
   external:
     enabled: true
     type: LoadBalancer
     port: 9000
-    gcpInternalLB: false
+    annotations: {}
 
   resources: {}
 
@@ -173,7 +172,6 @@ broker:
     loadBalancerSourceRanges: []
     type: ClusterIP
     protocol: TCP
-    gcpInternalLB: false
     port: 8099
     name: broker
     nodePort: ""
@@ -181,8 +179,9 @@ broker:
   external:
     enabled: true
     type: LoadBalancer
-    gcpInternalLB: false
     port: 8099
+    # For example, in private GKE cluster, you might add cloud.google.com/load-balancer-type: Internal
+    annotations: {}
 
   resources: {}
 
@@ -263,7 +262,6 @@ server:
     adminPortName: admin
     nodePort: ""
     protocol: TCP
-    gcpInternalLB: false
 
   resources: {}
 
@@ -340,7 +338,6 @@ minion:
     port: 9514
     nodePort: ""
     protocol: TCP
-    gcpInternalLB: false
     name: minion
 
   resources: {}
