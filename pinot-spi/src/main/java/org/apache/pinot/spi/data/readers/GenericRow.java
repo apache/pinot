@@ -198,6 +198,13 @@ public class GenericRow implements Serializable {
   }
 
   /**
+   * Marks a field as {@code null}.
+   */
+  public void addNullValueField(String fieldName) {
+    _nullValueFields.add(fieldName);
+  }
+
+  /**
    * Removes all the fields from the row.
    */
   public void clear() {
