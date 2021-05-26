@@ -20,7 +20,11 @@ package org.apache.pinot.core.operator.blocks;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;

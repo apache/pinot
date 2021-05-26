@@ -22,8 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.OrderByExpressionContext;
-import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
