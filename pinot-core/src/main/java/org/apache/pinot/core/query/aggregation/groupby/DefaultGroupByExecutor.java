@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby;
 
-import java.util.Map;
-import java.util.Iterator;
 import java.util.Collection;
+import java.util.Iterator;
+import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.data.table.TableResizer;
@@ -159,11 +159,11 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       keyNum = _svGroupKeys.length;
     }
     Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = _groupKeyGenerator.getGroupKeys();
-    if (keyNum > threshold) {
+    if (keyNum > threshold && threshold != -1) {
       return tableResizer.trimInSegmentResults(groupKeyIterator, _groupByResultHolders, threshold);
     }
     // Generate a list of intermediateResults if we don't need to trim
-    return tableResizer.buildInSegmentResults(groupKeyIterator, _groupByResultHolders, threshold);
+    return tableResizer.buildInSegmentResults(groupKeyIterator, _groupByResultHolders, keyNum);
   }
 
 }

@@ -19,13 +19,13 @@
 package org.apache.pinot.core.data.table;
 
 import com.google.common.base.Preconditions;
-import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,9 +36,9 @@ import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.postaggregation.PostAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
+import org.apache.pinot.core.query.postaggregation.PostAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.utils.ByteArray;
 
@@ -53,6 +53,7 @@ public class TableResizer {
   private final Map<ExpressionContext, Integer> _groupByExpressionIndexMap;
   private final AggregationFunction[] _aggregationFunctions;
   private final Map<FunctionContext, Integer> _aggregationFunctionIndexMap;
+  private final boolean _hasOrderBy;
   private final int _numOrderByExpressions;
   private final OrderByValueExtractor[] _orderByValueExtractors;
   private final Comparator<IntermediateRecord> _intermediateRecordComparator;
@@ -77,24 +78,30 @@ public class TableResizer {
     assert _aggregationFunctionIndexMap != null;
 
     List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
-    assert orderByExpressions != null;
-    _numOrderByExpressions = orderByExpressions.size();
-    _orderByValueExtractors = new OrderByValueExtractor[_numOrderByExpressions];
-    Comparator[] comparators = new Comparator[_numOrderByExpressions];
-    for (int i = 0; i < _numOrderByExpressions; i++) {
-      OrderByExpressionContext orderByExpression = orderByExpressions.get(i);
-      _orderByValueExtractors[i] = getOrderByValueExtractor(orderByExpression.getExpression());
-      comparators[i] = orderByExpression.isAsc() ? Comparator.naturalOrder() : Comparator.reverseOrder();
-    }
-    _intermediateRecordComparator = (o1, o2) -> {
+    _hasOrderBy = orderByExpressions != null;
+    if (_hasOrderBy) {
+      _numOrderByExpressions = orderByExpressions.size();
+      _orderByValueExtractors = new OrderByValueExtractor[_numOrderByExpressions];
+      Comparator[] comparators = new Comparator[_numOrderByExpressions];
       for (int i = 0; i < _numOrderByExpressions; i++) {
-        int result = comparators[i].compare(o1._values[i], o2._values[i]);
-        if (result != 0) {
-          return result;
-        }
+        OrderByExpressionContext orderByExpression = orderByExpressions.get(i);
+        _orderByValueExtractors[i] = getOrderByValueExtractor(orderByExpression.getExpression());
+        comparators[i] = orderByExpression.isAsc() ? Comparator.naturalOrder() : Comparator.reverseOrder();
       }
-      return 0;
-    };
+      _intermediateRecordComparator = (o1, o2) -> {
+        for (int i = 0; i < _numOrderByExpressions; i++) {
+          int result = comparators[i].compare(o1._values[i], o2._values[i]);
+          if (result != 0) {
+            return result;
+          }
+        }
+        return 0;
+      };
+    } else {
+      _numOrderByExpressions = -1;
+      _orderByValueExtractors = new OrderByValueExtractor[0];
+      _intermediateRecordComparator = (o1, o2) -> 0;
+    }
   }
 
   /**
@@ -119,6 +126,10 @@ public class TableResizer {
       // Post-aggregation function
       return new PostAggregationFunctionExtractor(function);
     }
+  }
+
+  public boolean getOrderByStatus() {
+    return _hasOrderBy;
   }
 
   /**
