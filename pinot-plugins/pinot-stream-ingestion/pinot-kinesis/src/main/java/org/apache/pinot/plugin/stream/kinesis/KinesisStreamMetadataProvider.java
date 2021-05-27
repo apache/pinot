@@ -45,7 +45,7 @@ import software.amazon.awssdk.services.kinesis.model.Shard;
 /**
  * A {@link StreamMetadataProvider} implementation for the Kinesis stream
  */
-public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
+public class  KinesisStreamMetadataProvider implements StreamMetadataProvider {
   private static final String SHARD_ID_PREFIX = "shardId-";
   private final KinesisConnectionHandler _kinesisConnectionHandler;
   private final StreamConsumerFactory _kinesisStreamConsumerFactory;
@@ -146,7 +146,8 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
       // 1. Root shards - Parent shardId will be null. Will find this case when creating new table.
       // 2. Parent expired - Parent shardId will not be part of shardIdToShard map
       // 3. Parent reached EOL and completely consumed.
-      if (parentShardId == null || !shardIdToShardMap.containsKey(parentShardId) || shardsEnded.contains(parentShardId)) {
+      if (parentShardId == null || !shardIdToShardMap.containsKey(parentShardId) || shardsEnded
+          .contains(parentShardId)) {
         Map<String, String> shardToSequenceNumberMap = new HashMap<>();
         shardToSequenceNumberMap.put(newShardId, newShard.sequenceNumberRange().startingSequenceNumber());
         newStartOffset = new KinesisPartitionGroupOffset(shardToSequenceNumberMap);
@@ -168,7 +169,8 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
     return shardIdNum.isEmpty() ? 0 : Integer.parseInt(shardIdNum);
   }
 
-  private boolean consumedEndOfShard(StreamPartitionMsgOffset startCheckpoint, PartitionGroupConsumptionStatus partitionGroupConsumptionStatus)
+  private boolean consumedEndOfShard(StreamPartitionMsgOffset startCheckpoint,
+      PartitionGroupConsumptionStatus partitionGroupConsumptionStatus)
       throws IOException, TimeoutException {
     PartitionGroupConsumer partitionGroupConsumer =
         _kinesisStreamConsumerFactory.createPartitionGroupConsumer(_clientId, partitionGroupConsumptionStatus);

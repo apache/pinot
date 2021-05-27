@@ -90,29 +90,32 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     }
   }
 
-  private KinesisRecordsBatch getResult(StreamPartitionMsgOffset start, StreamPartitionMsgOffset end,
+  private KinesisRecordsBatch getResult(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset,
       List<Record> recordList) {
-    KinesisPartitionGroupOffset kinesisStartCheckpoint = (KinesisPartitionGroupOffset) start;
+    KinesisPartitionGroupOffset kinesisStartCheckpoint = (KinesisPartitionGroupOffset) startOffset;
 
     try {
-
       if (_kinesisClient == null) {
         createConnection();
       }
 
       // TODO: iterate upon all the shardIds in the map
       //  Okay for now, since we have assumed that every partition group contains a single shard
-      Map<String, String> shardToStartSequenceMap = kinesisStartCheckpoint.getShardToStartSequenceMap();
-      Preconditions.checkState(shardToStartSequenceMap.size() == 1, "Only 1 shard per consumer supported. Found: %s",
-          shardToStartSequenceMap.keySet());
-      Map.Entry<String, String> shardToSequenceNum = shardToStartSequenceMap.entrySet().iterator().next();
-      String shardIterator = getShardIterator(shardToSequenceNum.getKey(), shardToSequenceNum.getValue());
+      Map<String, String> startShardToSequenceMap = kinesisStartCheckpoint.getShardToStartSequenceMap();
+      Preconditions.checkState(startShardToSequenceMap.size() == 1,
+          "Only 1 shard per consumer supported. Found: %s, in startShardToSequenceMap",
+          startShardToSequenceMap.keySet());
+      Map.Entry<String, String> startShardToSequenceNum = startShardToSequenceMap.entrySet().iterator().next();
+      String shardIterator = getShardIterator(startShardToSequenceNum.getKey(), startShardToSequenceNum.getValue());
 
       String kinesisEndSequenceNumber = null;
 
-      if (end != null) {
-        KinesisPartitionGroupOffset kinesisEndCheckpoint = (KinesisPartitionGroupOffset) end;
-        kinesisEndSequenceNumber = kinesisEndCheckpoint.getShardToStartSequenceMap().values().iterator().next();
+      if (endOffset != null) {
+        KinesisPartitionGroupOffset kinesisEndCheckpoint = (KinesisPartitionGroupOffset) endOffset;
+        Map<String, String> endShardToSequenceMap = kinesisEndCheckpoint.getShardToStartSequenceMap();
+        Preconditions.checkState(endShardToSequenceMap.size() == 1,
+            "Only 1 shard per consumer supported. Found: %s, in endShardToSequenceMap", endShardToSequenceMap.keySet());
+        kinesisEndSequenceNumber = endShardToSequenceMap.values().iterator().next();
       }
 
       String nextStartSequenceNumber;
@@ -144,7 +147,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
         shardIterator = getRecordsResponse.nextShardIterator();
       }
 
-      return new KinesisRecordsBatch(recordList, shardToSequenceNum.getKey(), isEndOfShard);
+      return new KinesisRecordsBatch(recordList, startShardToSequenceNum.getKey(), isEndOfShard);
     } catch (IllegalStateException e) {
       LOGGER.warn("Illegal state exception, connection is broken", e);
       return handleException(kinesisStartCheckpoint, recordList);
