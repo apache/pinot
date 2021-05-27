@@ -147,6 +147,7 @@
     <zstd-jni.version>1.4.9-5</zstd-jni.version>
     <log4j.version>2.11.2</log4j.version>
     <netty.version>4.1.54.Final</netty.version>
+    <reactivestreams.version>1.0.3</reactivestreams.version>
     <jts.version>1.16.1</jts.version>
     <h3.version>3.0.3</h3.version>
     <jmh.version>1.26</jmh.version>
@@ -439,6 +440,19 @@
         <groupId>io.netty</groupId>
         <artifactId>netty-all</artifactId>
         <version>${netty.version}</version>
+      </dependency>
+
+      <!-- this part is for resolving dependency convergence error for pinot-kinesis -->
+      <dependency>
+        <groupId>io.netty</groupId>
+        <artifactId>netty-codec</artifactId>
+        <version>${netty.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.reactivestreams</groupId>
+        <artifactId>reactive-streams</artifactId>
+        <version>${reactivestreams.version}</version>
       </dependency>
 
       <!-- this part is for resolving dependency convergence error for pinot-adls -->

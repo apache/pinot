@@ -90,6 +90,10 @@
         </exclusion>
         <exclusion>
           <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-s3</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.pinot</groupId>
           <artifactId>pinot-batch-ingestion-standalone</artifactId>
         </exclusion>
         <exclusion>

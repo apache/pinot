@@ -37,8 +37,6 @@
     <pinot.root>${basedir}/../../..</pinot.root>
     <phase.prop>package</phase.prop>
     <aws.version>2.14.28</aws.version>
-    <jackson.version>2.10.4</jackson.version>
-    <netty.version>4.1.42.Final</netty.version>
     <easymock.version>4.2</easymock.version>
     <reactive.version>1.0.2</reactive.version>
   </properties>
@@ -61,14 +59,6 @@
       <artifactId>sdk-core</artifactId>
       <version>${aws.version}</version>
       <exclusions>
-        <exclusion>
-          <groupId>com.fasterxml.jackson.core</groupId>
-          <artifactId>jackson-core</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.reactivestreams</groupId>
-          <artifactId>reactive-streams</artifactId>
-        </exclusion>
         <exclusion>
           <groupId>io.netty</groupId>
           <artifactId>netty-codec</artifactId>
@@ -93,14 +83,6 @@
       <version>${aws.version}</version>
       <exclusions>
         <exclusion>
-          <groupId>com.fasterxml.jackson.core</groupId>
-          <artifactId>jackson-core</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.reactivestreams</groupId>
-          <artifactId>reactive-streams</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>io.netty</groupId>
           <artifactId>netty-codec</artifactId>
         </exclusion>
@@ -118,41 +100,58 @@
         </exclusion>
       </exclusions>
     </dependency>
+
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>apache-client</artifactId>
+      <version>${aws.version}</version>
+    </dependency>
     <!-- https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-core -->
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-core</artifactId>
-      <version>${jackson.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
     </dependency>
 
     <dependency>
       <groupId>org.reactivestreams</groupId>
       <artifactId>reactive-streams</artifactId>
-      <version>${reactive.version}</version>
     </dependency>
 
     <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty-codec</artifactId>
-      <version>${netty.version}</version>
     </dependency>
 
     <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty-buffer</artifactId>
-      <version>${netty.version}</version>
     </dependency>
 
     <dependency>
       <groupId>io.netty</groupId>
+      <artifactId>netty-codec-http</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-codec-http2</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.netty</groupId>
       <artifactId>netty-transport</artifactId>
-      <version>${netty.version}</version>
     </dependency>
 
     <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty-common</artifactId>
-      <version>${netty.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
     </dependency>
 
     <dependency>
@@ -163,12 +162,14 @@
     </dependency>
 
   </dependencies>
-
   <profiles>
     <profile>
       <id>build-shaded-jar</id>
       <activation>
-        <activeByDefault>true</activeByDefault>
+        <property>
+          <name>skipShade</name>
+          <value>!true</value>
+        </property>
       </activation>
       <build>
         <plugins>
@@ -177,25 +178,35 @@
             <version>3.2.1</version>
             <executions>
               <execution>
-                <phase>package</phase>
+                <phase>${phase.prop}</phase>
                 <goals>
                   <goal>shade</goal>
                 </goals>
                 <configuration>
+                  <transformers>
+                    <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
+                  </transformers>
+                  <!--
+                  Usually in hadoop environment, there are multiple jars with different versions.
+                  Most of the NoSuchMethodExceptions are caused by class loading conflicts.
+                  Class relocation ensures the reference of certain packages/classes in Pinot code to
+                  shaded libs, e.g. jackson or guava.
+                  Ref: https://maven.apache.org/plugins/maven-shade-plugin/examples/class-relocation.html
+                  -->
                   <relocations>
                     <relocation>
+                      <pattern>com.google.common</pattern>
+                      <shadedPattern>shaded.com.google.common</shadedPattern>
+                    </relocation>
+                    <relocation>
                       <pattern>com.fasterxml.jackson</pattern>
-                      <shadedPattern>shaded.kinesis.com.fasterxml.jackson</shadedPattern>
+                      <shadedPattern>shaded.com.fasterxml.jackson</shadedPattern>
                     </relocation>
                     <relocation>
                       <pattern>software.amazon</pattern>
-                      <shadedPattern>shaded.kinesis.software.amazon</shadedPattern>
+                      <shadedPattern>shaded.software.amazon</shadedPattern>
                     </relocation>
                   </relocations>
-                  <transformers>
-                    <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
-                    <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer"/>
-                  </transformers>
                 </configuration>
               </execution>
             </executions>
@@ -204,5 +215,4 @@
       </build>
     </profile>
   </profiles>
-
 </project>

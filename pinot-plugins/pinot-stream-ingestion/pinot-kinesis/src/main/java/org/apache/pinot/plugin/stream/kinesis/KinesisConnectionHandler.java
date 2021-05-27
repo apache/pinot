@@ -24,6 +24,7 @@ import org.apache.commons.lang3.StringUtils;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.http.apache.ApacheSdkHttpService;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.kinesis.KinesisClient;
 import software.amazon.awssdk.services.kinesis.model.ListShardsRequest;
@@ -75,7 +76,9 @@ public class KinesisConnectionHandler {
       if (StringUtils.isNotBlank(_accessKey) && StringUtils.isNotBlank(_secretKey)) {
         AwsBasicCredentials awsBasicCredentials = AwsBasicCredentials.create(_accessKey, _secretKey);
         _kinesisClient = KinesisClient.builder().region(Region.of(_region))
-            .credentialsProvider(StaticCredentialsProvider.create(awsBasicCredentials)).build();
+            .credentialsProvider(StaticCredentialsProvider.create(awsBasicCredentials))
+            .httpClientBuilder(new ApacheSdkHttpService().createHttpClientBuilder())
+            .build();
       } else {
         _kinesisClient =
             KinesisClient.builder().region(Region.of(_region)).credentialsProvider(DefaultCredentialsProvider.create())
