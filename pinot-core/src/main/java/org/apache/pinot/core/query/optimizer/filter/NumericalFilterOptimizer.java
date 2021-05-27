@@ -59,6 +59,8 @@ import org.apache.pinot.spi.data.Schema;
  * When entire predicate gets rewritten to false (Example 3 above), the query will not return any data. Hence, it is
  * better for the Broker itself to return an empty response rather than sending the query to servers for further
  * evaluation.
+ *
+ * TODO: Add support for BETWEEN, IN, and NOT IN operators.
  */
 public class NumericalFilterOptimizer implements FilterOptimizer {
 
@@ -270,7 +272,8 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
             if (comparison > 0) {
               // Literal value is greater than the bounds of INT. > and >= expressions will always be false because an
               // INT column can never have a value greater than Integer.MAX_VALUE. < and <= expressions will always be
-              // true, because an INT column will always have values less than Integer.MIN_VALUE.
+              // true, because an INT column will always have values greater than or equal to Integer.MIN_VALUE and less
+              // than or equal to Integer.MAX_VALUE.
               setExpressionToBoolean(range, kind == FilterKind.LESS_THAN || kind == FilterKind.LESS_THAN_OR_EQUAL);
             } else if (comparison < 0) {
               // Literal value is less than the bounds of INT. > and >= expressions will always be true because an
@@ -298,6 +301,12 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
           }
           case DOUBLE: {
             // long to double conversion is always within bounds of double datatype, but the conversion can be lossy.
+            // Example:
+            //   Original long value   : 9223372036854775807 (Long.MAX_VALUE)
+            //   Converted double value: 9.223372036854776E18
+            //   This conversion is lossy because the last four digits of the long value (5807) had to be rounded off
+            //   to 6. After conversion we lost all information about the existence of last four digits. Converting the
+            //   double value back to long will not result in original long value.
             double converted = (double) actual;
             int comparison = BigDecimal.valueOf(actual).compareTo(BigDecimal.valueOf(converted));
 
