@@ -240,7 +240,7 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
 
   /**
    * For IN predicate, segment will not be pruned if the size of values is greater than threshold
-   * Prune the segment based on: Column min/max value
+   * Prune the segment based on: Column min/max value and Bloom Filter
    * @return true if the segment can be pruned
    * otherwise false if size of values > threshold or any of the value is greater than min value or smaller than max value of segment
    */
@@ -262,6 +262,16 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
         return false;
       }
     }
+
+    BloomFilterReader bloomFilter = dataSource.getBloomFilter();
+    if (bloomFilter != null) {
+      for (String value : values) {
+        if (bloomFilter.mightContain(value)) {
+          return false;
+        }
+      }
+    }
+
     return true;
   }
 
