@@ -115,7 +115,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     Preconditions.checkState(_maxInitialResultHolderCapacity <= _numGroupsLimit,
         "Invalid configuration: maxInitialResultHolderCapacity: %d must be smaller or equal to numGroupsLimit: %d",
         _maxInitialResultHolderCapacity, _numGroupsLimit);
-    //TODO: Get from server config file
+    //TODO: Figure out the correct trim limit. max(5*limit, 5000). What is the limit here?
     _inSegmentResultLimit = queryExecutorConfig.getConfig().getProperty(SEGMENT_TRIM_SIZE, DEFAULT_SEGMENT_TRIM_SIZE);
     _inSegmentTrimOpt = queryExecutorConfig.getConfig().getProperty(SEGMENT_TRIM_OPT, DEFAULT_SEGMENT_TRIM_OPT);
     LOGGER.info("Initializing plan maker with maxInitialResultHolderCapacity: {}, numGroupsLimit: {}, inSegmentTrim is on? {}, inSegmentResultLimit: {}",
