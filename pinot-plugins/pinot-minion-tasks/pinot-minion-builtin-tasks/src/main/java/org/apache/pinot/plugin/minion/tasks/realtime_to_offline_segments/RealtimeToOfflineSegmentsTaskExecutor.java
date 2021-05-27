@@ -197,7 +197,7 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     Preconditions.checkState(inputSegmentsDir.mkdirs(), "Failed to create input directory: %s for task: %s",
         inputSegmentsDir.getAbsolutePath(), taskType);
     for (File indexDir : originalIndexDirs) {
-      FileUtils.copyDirectoryToDirectory(indexDir, inputSegmentsDir);
+      FileUtils.moveDirectoryToDirectory(indexDir, inputSegmentsDir, false);
     }
     File outputSegmentsDir = new File(workingDir, OUTPUT_SEGMENTS_DIR);
     Preconditions.checkState(outputSegmentsDir.mkdirs(), "Failed to create output directory: %s for task: %s",
