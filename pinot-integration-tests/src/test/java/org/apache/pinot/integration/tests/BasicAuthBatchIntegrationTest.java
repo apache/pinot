@@ -24,7 +24,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -63,7 +62,7 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
     startController();
     startBroker();
     startServer();
-    startMinion(Collections.emptyList(), Collections.emptyList());
+    startMinion();
   }
 
   @AfterClass(alwaysRun = true)
@@ -99,8 +98,8 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
   @Test
   public void testBrokerNoAuth()
       throws Exception {
-    JsonNode response =
-        JsonUtils.stringToJsonNode(sendPostRequest("http://localhost:" + getRandomBrokerPort() + "/query/sql", "{\"sql\":\"SELECT now()\"}"));
+    JsonNode response = JsonUtils.stringToJsonNode(
+        sendPostRequest("http://localhost:" + getRandomBrokerPort() + "/query/sql", "{\"sql\":\"SELECT now()\"}"));
     Assert.assertFalse(response.has("resultTable"), "must not return result table");
     Assert.assertTrue(response.get("exceptions").get(0).get("errorCode").asInt() != 0, "must return error code");
   }
@@ -109,7 +108,8 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
   public void testBroker()
       throws Exception {
     JsonNode response = JsonUtils.stringToJsonNode(
-        sendPostRequest("http://localhost:" + getRandomBrokerPort() + "/query/sql", "{\"sql\":\"SELECT now()\"}", AUTH_HEADER));
+        sendPostRequest("http://localhost:" + getRandomBrokerPort() + "/query/sql", "{\"sql\":\"SELECT now()\"}",
+            AUTH_HEADER));
     Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "LONG",
         "must return result with LONG value");
     Assert.assertTrue(response.get("exceptions").isEmpty(), "must not return exception");
@@ -118,7 +118,8 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
   @Test
   public void testControllerGetTables()
       throws Exception {
-    JsonNode response = JsonUtils.stringToJsonNode(sendGetRequest("http://localhost:" + getControllerPort() + "/tables", AUTH_HEADER));
+    JsonNode response =
+        JsonUtils.stringToJsonNode(sendGetRequest("http://localhost:" + getControllerPort() + "/tables", AUTH_HEADER));
     Assert.assertTrue(response.get("tables").isArray(), "must return table array");
   }
 
@@ -155,18 +156,17 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
 
     // patch ingestion job file
     String jobFileContents = IOUtils.toString(new FileInputStream(jobFile));
-    IOUtils.write(jobFileContents.replaceAll("9000", String.valueOf(getControllerPort())),
-        new FileOutputStream(jobFile));
+    IOUtils
+        .write(jobFileContents.replaceAll("9000", String.valueOf(getControllerPort())), new FileOutputStream(jobFile));
 
-    new BootstrapTableTool("http", "localhost", getControllerPort(), baseDir.getAbsolutePath(), AUTH_TOKEN)
-        .execute();
+    new BootstrapTableTool("http", "localhost", getControllerPort(), baseDir.getAbsolutePath(), AUTH_TOKEN).execute();
 
     Thread.sleep(5000);
 
     // admin with full access
     JsonNode response = JsonUtils.stringToJsonNode(
-        sendPostRequest("http://localhost:" + getRandomBrokerPort() + "/query/sql", "{\"sql\":\"SELECT count(*) FROM baseballStats\"}",
-            AUTH_HEADER));
+        sendPostRequest("http://localhost:" + getRandomBrokerPort() + "/query/sql",
+            "{\"sql\":\"SELECT count(*) FROM baseballStats\"}", AUTH_HEADER));
     Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "LONG",
         "must return result with LONG value");
     Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "count(*)",
@@ -177,8 +177,8 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
 
     // user with valid auth but no table access
     JsonNode responseUser = JsonUtils.stringToJsonNode(
-        sendPostRequest("http://localhost:" + getRandomBrokerPort() + "/query/sql", "{\"sql\":\"SELECT count(*) FROM baseballStats\"}",
-            AUTH_HEADER_USER));
+        sendPostRequest("http://localhost:" + getRandomBrokerPort() + "/query/sql",
+            "{\"sql\":\"SELECT count(*) FROM baseballStats\"}", AUTH_HEADER_USER));
     Assert.assertFalse(responseUser.has("resultTable"), "must not return result table");
     Assert.assertTrue(responseUser.get("exceptions").get(0).get("errorCode").asInt() != 0, "must return error code");
   }
