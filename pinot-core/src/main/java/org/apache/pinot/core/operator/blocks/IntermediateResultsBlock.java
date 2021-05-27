@@ -114,6 +114,17 @@ public class IntermediateResultsBlock implements Block {
    */
   public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions,
                                   @Nullable AggregationGroupByResult aggregationGroupByResults,
+                                  DataSchema dataSchema) {
+    _aggregationFunctions = aggregationFunctions;
+    _aggregationGroupByResult = aggregationGroupByResults;
+    _dataSchema = dataSchema;
+  }
+
+  /**
+   * Constructor for aggregation group-by order-by result with {@link AggregationGroupByResult}.
+   */
+  public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions,
+                                  @Nullable AggregationGroupByResult aggregationGroupByResults,
                                   @Nullable Collection<TableResizer.fullIntermediateResult> intermediateCollection,
                                   DataSchema dataSchema) {
     _aggregationFunctions = aggregationFunctions;
@@ -287,6 +298,9 @@ public class IntermediateResultsBlock implements Block {
   }
 
   public Iterator<TableResizer.fullIntermediateResult> getIntermediateResultIterator() {
+    if (_intermediateCollection == null) {
+      return null;
+    }
     return _intermediateCollection.iterator();
   }
 

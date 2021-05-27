@@ -43,6 +43,7 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
   private final int _maxInitialResultHolderCapacity;
   private final int _numGroupsLimit;
+  private final int _inSegmentResultLimit;
   private final AggregationFunction[] _aggregationFunctions;
   private final ExpressionContext[] _groupByExpressions;
   private final TransformPlanNode _transformPlanNode;
@@ -50,10 +51,11 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
   private QueryContext _queryContext;
 
   public AggregationGroupByOrderByPlanNode(IndexSegment indexSegment, QueryContext queryContext,
-      int maxInitialResultHolderCapacity, int numGroupsLimit) {
+      int maxInitialResultHolderCapacity, int numGroupsLimit, int inSegmentResultLimit) {
     _indexSegment = indexSegment;
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
+    _inSegmentResultLimit = inSegmentResultLimit;
     _aggregationFunctions = queryContext.getAggregationFunctions();
     assert _aggregationFunctions != null;
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
@@ -97,11 +99,11 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
     if (_transformPlanNode != null) {
       // Do not use star-tree
       return new AggregationGroupByOrderByOperator(_aggregationFunctions, _groupByExpressions,
-          _maxInitialResultHolderCapacity, _numGroupsLimit, _transformPlanNode.run(), numTotalDocs, _queryContext, false);
+          _maxInitialResultHolderCapacity, _numGroupsLimit, _inSegmentResultLimit, _transformPlanNode.run(), numTotalDocs, _queryContext, false);
     } else {
       // Use star-tree
       return new AggregationGroupByOrderByOperator(_aggregationFunctions, _groupByExpressions,
-          _maxInitialResultHolderCapacity, _numGroupsLimit, _starTreeTransformPlanNode.run(), numTotalDocs, _queryContext, true);
+          _maxInitialResultHolderCapacity, _numGroupsLimit, _inSegmentResultLimit, _starTreeTransformPlanNode.run(), numTotalDocs, _queryContext, true);
     }
   }
 }

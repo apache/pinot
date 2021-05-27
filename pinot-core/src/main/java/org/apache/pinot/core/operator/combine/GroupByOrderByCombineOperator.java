@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.combine;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -33,8 +34,11 @@ import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.*;
+import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
+import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
@@ -124,11 +128,30 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
       // Merge aggregation group-by result.
         // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
         //TODO: change upsert api so that it accepts intermediateRecord directly
-        Iterator<TableResizer.fullIntermediateResult> groupKeyIterator = intermediateResultsBlock.getIntermediateResultIterator();
+      Iterator<TableResizer.fullIntermediateResult> groupKeyIterator = intermediateResultsBlock.getIntermediateResultIterator();
+      if (groupKeyIterator == null) {
+        // Merge aggregation group-by result.
+        AggregationGroupByResult aggregationGroupByResult = intermediateResultsBlock.getAggregationGroupByResult();
+        if (aggregationGroupByResult != null) {
+          // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
+          Iterator<GroupKeyGenerator.GroupKey> dicGroupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+          while (dicGroupKeyIterator.hasNext()) {
+            GroupKeyGenerator.GroupKey groupKey = dicGroupKeyIterator.next();
+            Object[] keys = groupKey._keys;
+            Object[] values = Arrays.copyOf(keys, _numColumns);
+            int groupId = groupKey._groupId;
+            for (int i = 0; i < _numAggregationFunctions; i++) {
+              values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
+            }
+            _indexedTable.upsert(new Key(keys), new Record(values));
+          }
+        }
+      } else {
         while (groupKeyIterator.hasNext()) {
           TableResizer.fullIntermediateResult intermediateResult = groupKeyIterator.next();
           _indexedTable.upsert(intermediateResult.getKey(), intermediateResult.getRecord());
         }
+      }
 
     } catch (EarlyTerminationException e) {
       // Early-terminated because query times out or is already satisfied
