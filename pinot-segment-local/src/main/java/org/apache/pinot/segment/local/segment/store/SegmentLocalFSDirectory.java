@@ -56,11 +56,11 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
 
   private final File _indexDir;
   private final File _segmentDirectory;
-  SegmentLock segmentLock;
-  private SegmentMetadataImpl segmentMetadata;
+  SegmentLock _segmentLock;
+  private SegmentMetadataImpl _segmentMetadata;
   private final ReadMode _readMode;
 
-  private ColumnIndexDirectory columnIndexDirectory;
+  private ColumnIndexDirectory _columnIndexDirectory;
 
   public SegmentLocalFSDirectory(File directory, ReadMode readMode)
       throws IOException {
@@ -77,8 +77,8 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     _segmentDirectory = getSegmentPath(directoryFile, metadata.getSegmentVersion());
     Preconditions.checkState(_segmentDirectory.exists(), "Segment directory: " + directoryFile + " must exist");
 
-    segmentLock = new SegmentLock();
-    segmentMetadata = metadata;
+    _segmentLock = new SegmentLock();
+    _segmentMetadata = metadata;
     _readMode = readMode;
     try {
       load();
@@ -95,14 +95,14 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
 
   @Override
   public SegmentMetadataImpl getSegmentMetadata() {
-    return segmentMetadata;
+    return _segmentMetadata;
   }
 
   @Override
   public void reloadMetadata()
       throws Exception {
-    segmentMetadata = new SegmentMetadataImpl(_indexDir);
-    columnIndexDirectory.setMetadata(segmentMetadata);
+    _segmentMetadata = new SegmentMetadataImpl(_indexDir);
+    _columnIndexDirectory.setSegmentMetadata(_segmentMetadata);
   }
 
   private File getSegmentPath(File segmentDirectory, SegmentVersion segmentVersion) {
@@ -142,7 +142,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
       try {
         return FileUtils.sizeOfDirectory(_segmentDirectory.toPath().toFile());
       } catch (IllegalArgumentException e) {
-        LOGGER.error("Failed to read disk size for directory: ", _segmentDirectory.getAbsolutePath());
+        LOGGER.error("Failed to read disk size for directory: {}", _segmentDirectory.getAbsolutePath());
         return -1;
       }
     } else {
@@ -171,7 +171,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   public Reader createReader()
       throws IOException {
 
-    if (segmentLock.tryReadLock()) {
+    if (_segmentLock.tryReadLock()) {
       loadData();
       return new Reader();
     }
@@ -181,7 +181,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   public Writer createWriter()
       throws IOException {
 
-    if (segmentLock.tryWriteLock()) {
+    if (_segmentLock.tryWriteLock()) {
       loadData();
       return new Writer();
     }
@@ -202,21 +202,21 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
 
   private synchronized void loadData()
       throws IOException {
-    if (columnIndexDirectory != null) {
+    if (_columnIndexDirectory != null) {
       return;
     }
 
-    String version = segmentMetadata.getVersion();
+    String version = _segmentMetadata.getVersion();
     SegmentVersion segmentVersion = valueOf(version);
 
     switch (segmentVersion) {
       case v1:
       case v2:
-        columnIndexDirectory = new FilePerIndexDirectory(_segmentDirectory, segmentMetadata, _readMode);
+        _columnIndexDirectory = new FilePerIndexDirectory(_segmentDirectory, _segmentMetadata, _readMode);
         break;
       case v3:
         try {
-          columnIndexDirectory = new SingleFileIndexDirectory(_segmentDirectory, segmentMetadata, _readMode);
+          _columnIndexDirectory = new SingleFileIndexDirectory(_segmentDirectory, _segmentMetadata, _readMode);
         } catch (ConfigurationException e) {
           LOGGER.error("Failed to create columnar index directory", e);
           throw new RuntimeException(e);
@@ -228,11 +228,11 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   @Override
   public void close()
       throws IOException {
-    segmentLock.close();
+    _segmentLock.close();
     synchronized (this) {
-      if (columnIndexDirectory != null) {
-        columnIndexDirectory.close();
-        columnIndexDirectory = null;
+      if (_columnIndexDirectory != null) {
+        _columnIndexDirectory.close();
+        _columnIndexDirectory = null;
       }
     }
   }
@@ -241,7 +241,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
       throws IOException {
     PinotDataBuffer buffer;
 
-    buffer = columnIndexDirectory.getBuffer(column, type);
+    buffer = _columnIndexDirectory.getBuffer(column, type);
 
     if (_readMode == ReadMode.mmap) {
       prefetchMmapData(buffer);
@@ -290,10 +290,6 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     }
   }
 
-  private boolean hasIndexFor(String column, ColumnIndexType type) {
-    return columnIndexDirectory.hasIndexFor(column, type);
-  }
-
   /***************************  SegmentDirectory Reader *********************/
   public class Reader extends SegmentDirectory.Reader {
 
@@ -305,13 +301,13 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
 
     @Override
     public boolean hasIndexFor(String column, ColumnIndexType type) {
-      return columnIndexDirectory.hasIndexFor(column, type);
+      return _columnIndexDirectory.hasIndexFor(column, type);
     }
 
     @Override
     public void close() {
       // do nothing here
-      segmentLock.unlock();
+      _segmentLock.unlock();
     }
 
     @Override
@@ -337,17 +333,17 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
 
     @Override
     public boolean isIndexRemovalSupported() {
-      return columnIndexDirectory.isIndexRemovalSupported();
+      return _columnIndexDirectory.isIndexRemovalSupported();
     }
 
     @Override
     public void removeIndex(String columnName, ColumnIndexType indexType) {
-      columnIndexDirectory.removeIndex(columnName, indexType);
+      _columnIndexDirectory.removeIndex(columnName, indexType);
     }
 
     private PinotDataBuffer getNewIndexBuffer(IndexKey key, long sizeBytes)
         throws IOException {
-      return columnIndexDirectory.newBuffer(key.name, key.type, sizeBytes);
+      return _columnIndexDirectory.newBuffer(key.name, key.type, sizeBytes);
     }
 
     @Override
@@ -362,11 +358,11 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     @Override
     public void close()
         throws IOException {
-      segmentLock.unlock();
-      if (columnIndexDirectory != null) {
-        columnIndexDirectory.close();
+      _segmentLock.unlock();
+      if (_columnIndexDirectory != null) {
+        _columnIndexDirectory.close();
       }
-      columnIndexDirectory = null;
+      _columnIndexDirectory = null;
     }
 
     @Override
@@ -377,7 +373,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
 
     @Override
     public boolean hasIndexFor(String column, ColumnIndexType type) {
-      return columnIndexDirectory.hasIndexFor(column, type);
+      return _columnIndexDirectory.hasIndexFor(column, type);
     }
   }
 
