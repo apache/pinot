@@ -97,6 +97,15 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     _inSegmentTrimOpt = DEFAULT_SEGMENT_TRIM_OPT;
   }
 
+  @VisibleForTesting
+  public InstancePlanMakerImplV2(int segmentTrimSize, boolean segmentTrimOpt) {
+    _maxInitialResultHolderCapacity = DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY;
+    _numGroupsLimit = DEFAULT_NUM_GROUPS_LIMIT;
+    _groupByTrimThreshold = DEFAULT_GROUPBY_TRIM_THRESHOLD;
+    _inSegmentResultLimit = segmentTrimSize;
+    _inSegmentTrimOpt = segmentTrimOpt;
+  }
+
   /**
    * Constructor for usage when client requires to pass {@link QueryExecutorConfig} to this class.
    * <ul>

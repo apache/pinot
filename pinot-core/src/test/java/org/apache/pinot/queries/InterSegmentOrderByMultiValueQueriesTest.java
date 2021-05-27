@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -36,6 +37,27 @@ public class InterSegmentOrderByMultiValueQueriesTest extends BaseMultiValueQuer
   public void testGroupByOrderByMVSQLResults(String query, List<Object[]> expectedResults,
       long expectedNumEntriesScannedPostFilter, DataSchema expectedDataSchema) {
     BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+    QueriesTestUtils
+        .testInterSegmentResultTable(brokerResponse, 400000L, 0, expectedNumEntriesScannedPostFilter, 400000L,
+            expectedResults, expectedResults.size(), expectedDataSchema);
+  }
+
+  @Test(dataProvider = "orderByDataProvider")
+  public void testGroupByOrderByMVTrimOptLowLimitSQLResults(String query, List<Object[]> expectedResults,
+      long expectedNumEntriesScannedPostFilter, DataSchema expectedDataSchema) {
+    expectedResults = expectedResults.subList(0, expectedResults.size()/2);
+    InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2(expectedResults.size(), true);
+    BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query, planMaker);
+    QueriesTestUtils
+        .testInterSegmentResultTable(brokerResponse, 400000L, 0, expectedNumEntriesScannedPostFilter, 400000L,
+            expectedResults, expectedResults.size(), expectedDataSchema);
+  }
+
+  @Test(dataProvider = "orderByDataProvider")
+  public void testGroupByOrderByMVTrimOptHighLimitSQLResults(String query, List<Object[]> expectedResults,
+      long expectedNumEntriesScannedPostFilter, DataSchema expectedDataSchema) {
+    InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2(expectedResults.size() + 1, true);
+    BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query, planMaker);
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0, expectedNumEntriesScannedPostFilter, 400000L,
             expectedResults, expectedResults.size(), expectedDataSchema);

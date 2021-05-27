@@ -400,6 +400,9 @@ public class TableResizer {
 
   public PriorityQueue<fullIntermediateResult> trimInSegmentResults(Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator,
                                                                     GroupByResultHolder[] _groupByResultHolders, int size) {
+    if (!groupKeyIterator.hasNext() || _groupByResultHolders.length == 0 || size == 0) {
+      return new PriorityQueue<>();
+    }
     int numAggregationFunctions = _aggregationFunctions.length;
     int numColumns = numAggregationFunctions + _numGroupByExpressions;
 
@@ -432,6 +435,9 @@ public class TableResizer {
 
   public List<fullIntermediateResult> buildInSegmentResults(Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator,
                                                             GroupByResultHolder[] _groupByResultHolders, int size) {
+    if (!groupKeyIterator.hasNext() || _groupByResultHolders.length == 0 || size == 0) {
+      return new ArrayList<>();
+    }
     int numAggregationFunctions = _aggregationFunctions.length;
     int numColumns = numAggregationFunctions + _numGroupByExpressions;
     List<fullIntermediateResult> list = new ArrayList<>(size);
