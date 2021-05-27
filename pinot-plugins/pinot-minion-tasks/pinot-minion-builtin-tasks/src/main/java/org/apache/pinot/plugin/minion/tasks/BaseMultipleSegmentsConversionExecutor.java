@@ -108,6 +108,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         // Un-tar the segment file
         File segmentDir = new File(tempDataDir, "segmentDir_" + i);
         File indexDir = TarGzCompressionUtils.untar(tarredSegmentFile, segmentDir).get(0);
+        FileUtils.deleteQuietly(tarredSegmentFile);
         inputSegmentFiles.add(indexDir);
       }
 
