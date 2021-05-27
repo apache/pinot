@@ -35,7 +35,6 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import javax.annotation.Nullable;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
@@ -53,8 +52,6 @@ import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.minion.MinionStarter;
-import org.apache.pinot.minion.event.MinionEventObserverFactory;
-import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
@@ -117,6 +114,8 @@ public abstract class ClusterTest extends ControllerTest {
     _brokerPorts = new ArrayList<>();
     for (int i = 0; i < numBrokers; i++) {
       Map<String, Object> properties = getDefaultBrokerConfiguration().toMap();
+      properties.put(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
+      properties.put(Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkStr);
       properties.put(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
       int port = NetUtils.findOpenPort(basePort + i);
       _brokerPorts.add(port);
@@ -125,8 +124,7 @@ public abstract class ClusterTest extends ControllerTest {
       PinotConfiguration configuration = new PinotConfiguration(properties);
       overrideBrokerConf(configuration);
 
-      HelixBrokerStarter brokerStarter =
-          new HelixBrokerStarter(configuration, getHelixClusterName(), zkStr, LOCAL_HOST);
+      HelixBrokerStarter brokerStarter = new HelixBrokerStarter(configuration);
       brokerStarter.start();
       _brokerStarters.add(brokerStarter);
     }
@@ -160,8 +158,7 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   protected void startServer(PinotConfiguration configuration) {
-    startServers(1, configuration, Server.DEFAULT_ADMIN_API_PORT, Helix.DEFAULT_SERVER_NETTY_PORT,
-        getZkUrl());
+    startServers(1, configuration, Server.DEFAULT_ADMIN_API_PORT, Helix.DEFAULT_SERVER_NETTY_PORT, getZkUrl());
   }
 
   protected void startServers(int numServers) {
@@ -180,6 +177,8 @@ public abstract class ClusterTest extends ControllerTest {
     overrideServerConf(configuration);
     try {
       for (int i = 0; i < numServers; i++) {
+        configuration.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
+        configuration.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkStr);
         configuration.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, Server.DEFAULT_INSTANCE_DATA_DIR + "-" + i);
         configuration
             .setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
@@ -188,9 +187,9 @@ public abstract class ClusterTest extends ControllerTest {
         // Thread time measurement is disabled by default, enable it in integration tests.
         // TODO: this can be removed when we eventually enable thread time measurement by default.
         configuration.setProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
-        HelixServerStarter helixServerStarter = new HelixServerStarter(getHelixClusterName(), zkStr, configuration);
-        _serverStarters.add(helixServerStarter);
+        HelixServerStarter helixServerStarter = new HelixServerStarter(configuration);
         helixServerStarter.start();
+        _serverStarters.add(helixServerStarter);
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -203,23 +202,13 @@ public abstract class ClusterTest extends ControllerTest {
 
   // NOTE: We don't allow multiple Minion instances in the same JVM because Minion uses singleton class MinionContext
   //       to manage the instance level configs
-  protected void startMinion(@Nullable List<PinotTaskExecutorFactory> taskExecutorFactories,
-      @Nullable List<MinionEventObserverFactory> eventObserverFactories) {
+  protected void startMinion() {
     FileUtils.deleteQuietly(new File(Minion.DEFAULT_INSTANCE_BASE_DIR));
     try {
-      _minionStarter = new MinionStarter(getHelixClusterName(), getZkUrl(), getDefaultMinionConfiguration());
-      // Register task executor factories
-      if (taskExecutorFactories != null) {
-        for (PinotTaskExecutorFactory taskExecutorFactory : taskExecutorFactories) {
-          _minionStarter.registerTaskExecutorFactory(taskExecutorFactory);
-        }
-      }
-      // Register event observer factories
-      if (eventObserverFactories != null) {
-        for (MinionEventObserverFactory eventObserverFactory : eventObserverFactories) {
-          _minionStarter.registerEventObserverFactory(eventObserverFactory);
-        }
-      }
+      PinotConfiguration minionConf = getDefaultMinionConfiguration();
+      minionConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
+      minionConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
+      _minionStarter = new MinionStarter(minionConf);
       _minionStarter.start();
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -414,7 +403,8 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Queries the broker's pql query endpoint (/query)
    */
-  public static JsonNode postQuery(String query, String brokerBaseApiUrl, boolean enableTrace, String queryType, Map<String, String> headers)
+  public static JsonNode postQuery(String query, String brokerBaseApiUrl, boolean enableTrace, String queryType,
+      Map<String, String> headers)
       throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put(queryType, query);

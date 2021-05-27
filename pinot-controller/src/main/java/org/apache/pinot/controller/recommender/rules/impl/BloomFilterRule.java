@@ -48,8 +48,8 @@ public class  BloomFilterRule extends AbstractRule {
 
   @Override
   public void run() {
-    int numDims = _input.getNumDims();
-    double[] weights = new double[numDims];
+    int numCols = _input.getNumCols();
+    double[] weights = new double[numCols];
     AtomicDouble totalWeight = new AtomicDouble(0);
 
     // For each query, find out the dimensions used in 'EQ'
@@ -65,7 +65,7 @@ public class  BloomFilterRule extends AbstractRule {
     });
     LOGGER.debug("Weight: {}, Total {}", weights, totalWeight);
 
-    for (int i = 0; i < numDims; i++) {
+    for (int i = 0; i < numCols; i++) {
       String dimName = _input.intToColName(i);
       if (((weights[i] / totalWeight.get()) > _params.THRESHOLD_MIN_PERCENT_EQ_BLOOMFILTER)
           //The partitioned dimension should be frequently > P used
@@ -108,10 +108,6 @@ public class  BloomFilterRule extends AbstractRule {
       String colName = lhs.toString();
       if (lhs.getType() == ExpressionContext.Type.FUNCTION) {
         LOGGER.trace("Skipping the function {}", colName);
-      } else if (_input.isPrimaryDateTime(colName)) {
-        LOGGER.trace("Skipping the DateTime column {}", colName);
-      } else if (!_input.isDim(colName)) {
-        LOGGER.error("Error: Column {} should not appear in filter", colName);
       } else if (filterContext.getPredicate().getType() == Predicate.Type.EQ) {
         ret.add(_input.colNameToInt(colName));
       }
@@ -120,6 +116,6 @@ public class  BloomFilterRule extends AbstractRule {
   }
 
   private FixedLenBitset MUTABLE_EMPTY_SET() {
-    return new FixedLenBitset(_input.getNumDims());
+    return new FixedLenBitset(_input.getNumCols());
   }
 }

@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
@@ -50,10 +49,6 @@ public class ReducerRecordReader implements RecordReader {
     _pinotSegmentRecordReader = new PinotSegmentRecordReader(indexDir, null, groupByColumns);
     _recordAggregator = recordAggregator;
     _groupByColumns = groupByColumns;
-  }
-
-  public Schema getSchema() {
-    return _pinotSegmentRecordReader.getSchema();
   }
 
   @Override

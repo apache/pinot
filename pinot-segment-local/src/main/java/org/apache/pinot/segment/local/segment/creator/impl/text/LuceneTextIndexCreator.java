@@ -33,6 +33,7 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexReader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 
@@ -47,7 +48,6 @@ public class LuceneTextIndexCreator implements TextIndexCreator {
   private static final int LUCENE_INDEX_MAX_BUFFER_SIZE_MB = 500;
 
   public static final String LUCENE_INDEX_DOC_ID_COLUMN_NAME = "DocID";
-  public static final String LUCENE_TEXT_INDEX_FILE_EXTENSION = ".lucene.index";
 
   private final String _textColumn;
   private final Directory _indexDirectory;
@@ -157,7 +157,7 @@ public class LuceneTextIndexCreator implements TextIndexCreator {
   }
 
   private File getV1TextIndexFile(File indexDir) {
-    String luceneIndexDirectory = _textColumn + LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION;
+    String luceneIndexDirectory = _textColumn + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION;
     return new File(indexDir, luceneIndexDirectory);
   }
 }

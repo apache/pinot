@@ -26,23 +26,13 @@
       ]
     },
     "transformConfigs": [
-      {
-        "columnName": "group_json",
-        "transformFunction": "jsonFormat(\"group\")"
-      }
     ],
     "complexTypeConfig": {
-      "unnestFields": ["group.group_topics"]
+      "fieldsToUnnest": ["group.group_topics"]
     }
   },
   "tableIndexConfig": {
-    "loadMode": "MMAP",
-    "noDictionaryColumns": [
-      "group_json"
-    ],
-    "jsonIndexColumns": [
-      "group_json"
-    ]
+    "loadMode": "MMAP"
   },
   "metadata": {
     "customConfigs": {}

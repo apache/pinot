@@ -27,10 +27,9 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
-import org.apache.pinot.segment.local.segment.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -87,7 +86,7 @@ public class SegmentGenerationWithTimeColumnTest {
       throws Exception {
     Schema schema = createSchema(true);
     File segmentDir = buildSegment(_tableConfig, schema, true, false);
-    SegmentMetadataImpl metadata = SegmentDirectory.loadSegmentMetadata(segmentDir);
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(segmentDir);
     Assert.assertEquals(metadata.getStartTime(), sdfToMillis(minTime));
     Assert.assertEquals(metadata.getEndTime(), sdfToMillis(maxTime));
   }
@@ -100,7 +99,7 @@ public class SegmentGenerationWithTimeColumnTest {
       throws Exception {
     Schema schema = createDateTimeFieldSpecSchema(true);
     File segmentDir = buildSegment(_tableConfig, schema, true, false);
-    SegmentMetadataImpl metadata = SegmentDirectory.loadSegmentMetadata(segmentDir);
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(segmentDir);
     Assert.assertEquals(metadata.getStartTime(), sdfToMillis(minTime));
     Assert.assertEquals(metadata.getEndTime(), sdfToMillis(maxTime));
   }
@@ -110,7 +109,7 @@ public class SegmentGenerationWithTimeColumnTest {
       throws Exception {
     Schema schema = createSchema(false);
     File segmentDir = buildSegment(_tableConfig, schema, false, false);
-    SegmentMetadataImpl metadata = SegmentDirectory.loadSegmentMetadata(segmentDir);
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(segmentDir);
     Assert.assertEquals(metadata.getStartTime(), minTime);
     Assert.assertEquals(metadata.getEndTime(), maxTime);
   }
@@ -123,7 +122,7 @@ public class SegmentGenerationWithTimeColumnTest {
       throws Exception {
     Schema schema = createDateTimeFieldSpecSchema(false);
     File segmentDir = buildSegment(_tableConfig, schema, false, false);
-    SegmentMetadataImpl metadata = SegmentDirectory.loadSegmentMetadata(segmentDir);
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(segmentDir);
     Assert.assertEquals(metadata.getStartTime(), minTime);
     Assert.assertEquals(metadata.getEndTime(), maxTime);
   }

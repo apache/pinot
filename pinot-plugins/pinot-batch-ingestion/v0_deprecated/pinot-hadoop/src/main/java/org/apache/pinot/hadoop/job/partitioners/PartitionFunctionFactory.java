@@ -20,10 +20,10 @@ package org.apache.pinot.hadoop.job.partitioners;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.segment.local.partition.ByteArrayPartitionFunction;
-import org.apache.pinot.segment.local.partition.HashCodePartitionFunction;
-import org.apache.pinot.segment.local.partition.ModuloPartitionFunction;
-import org.apache.pinot.segment.local.partition.MurmurPartitionFunction;
+import org.apache.pinot.segment.spi.partition.ByteArrayPartitionFunction;
+import org.apache.pinot.segment.spi.partition.HashCodePartitionFunction;
+import org.apache.pinot.segment.spi.partition.ModuloPartitionFunction;
+import org.apache.pinot.segment.spi.partition.MurmurPartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 
 

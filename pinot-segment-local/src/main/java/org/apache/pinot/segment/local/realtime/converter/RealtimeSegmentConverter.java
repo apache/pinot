@@ -30,6 +30,7 @@ import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -79,8 +80,6 @@ public class RealtimeSegmentConverter {
 
   public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics)
       throws Exception {
-    // lets create a record reader
-    RealtimeSegmentRecordReader reader = new RealtimeSegmentRecordReader(_realtimeSegmentImpl, _sortedColumn);
     SegmentGeneratorConfig genConfig = new SegmentGeneratorConfig(_tableConfig, _dataSchema);
     // The segment generation code in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable
@@ -120,11 +119,17 @@ public class RealtimeSegmentConverter {
     SegmentPartitionConfig segmentPartitionConfig = _realtimeSegmentImpl.getSegmentPartitionConfig();
     genConfig.setSegmentPartitionConfig(segmentPartitionConfig);
     genConfig.setNullHandlingEnabled(_nullHandlingEnabled);
-    final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    RealtimeSegmentSegmentCreationDataSource dataSource =
-        new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, reader, _dataSchema);
-    driver.init(genConfig, dataSource, CompositeTransformer.getPassThroughTransformer(), null);
-    driver.build();
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
+      int[] sortedDocIds =
+          _sortedColumn != null ? _realtimeSegmentImpl.getSortedDocIdIterationOrderWithSortedColumn(_sortedColumn)
+              : null;
+      recordReader.init(_realtimeSegmentImpl, sortedDocIds);
+      RealtimeSegmentSegmentCreationDataSource dataSource =
+          new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, recordReader);
+      driver.init(genConfig, dataSource, CompositeTransformer.getPassThroughTransformer(), null);
+      driver.build();
+    }
 
     if (segmentPartitionConfig != null) {
       Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();

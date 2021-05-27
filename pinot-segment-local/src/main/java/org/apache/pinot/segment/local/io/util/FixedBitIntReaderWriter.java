@@ -20,7 +20,7 @@ package org.apache.pinot.segment.local.io.util;
 
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
 public final class FixedBitIntReaderWriter implements Closeable {

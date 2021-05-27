@@ -32,6 +32,7 @@ import org.apache.avro.SchemaBuilder;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DateTimeGranularitySpec;
@@ -67,38 +68,33 @@ public class AvroUtils {
       String fieldName = field.name();
       DataType dataType = extractFieldDataType(field);
       boolean isSingleValueField = isSingleValueField(field);
-      if (fieldTypeMap == null) {
-        pinotSchema.addField(new DimensionFieldSpec(fieldName, dataType, isSingleValueField));
-      } else {
-        FieldSpec.FieldType fieldType = fieldTypeMap.get(fieldName);
-        Preconditions.checkNotNull(fieldType, "Field type not specified for field: %s", fieldName);
-        switch (fieldType) {
-          case DIMENSION:
-            pinotSchema.addField(new DimensionFieldSpec(fieldName, dataType, isSingleValueField));
-            break;
-          case METRIC:
-            Preconditions.checkState(isSingleValueField, "Metric field: %s cannot be multi-valued", fieldName);
-            pinotSchema.addField(new MetricFieldSpec(fieldName, dataType));
-            break;
-          case TIME:
-            Preconditions.checkState(isSingleValueField, "Time field: %s cannot be multi-valued", fieldName);
-            Preconditions.checkNotNull(timeUnit, "Time unit cannot be null");
-            pinotSchema.addField(new TimeFieldSpec(new TimeGranularitySpec(dataType, timeUnit, field.name())));
-            break;
-          case DATE_TIME:
-            Preconditions.checkState(isSingleValueField, "Time field: %s cannot be multi-valued", fieldName);
-            Preconditions.checkNotNull(timeUnit, "Time unit cannot be null");
-            pinotSchema.addField(new DateTimeFieldSpec(field.name(), dataType,
-                new DateTimeFormatSpec(1, timeUnit.toString(), DateTimeFieldSpec.TimeFormat.EPOCH.toString())
-                    .getFormat(), new DateTimeGranularitySpec(1, timeUnit).getGranularity()));
-            break;
-          default:
-            throw new UnsupportedOperationException(
-                "Unsupported field type: " + fieldType + " for field: " + fieldName);
-        }
-      }
+      addFieldToPinotSchema(pinotSchema, dataType, fieldName, isSingleValueField, fieldTypeMap, timeUnit);
     }
+    return pinotSchema;
+  }
 
+  /**
+   * Given an Avro schema, flatten/unnest the complex types based on the config, and then map from column to field type
+   * and time unit, return the equivalent Pinot schema.
+   *
+   * @param avroSchema Avro schema
+   * @param fieldTypeMap Map from column to field type
+   * @param timeUnit Time unit
+   * @param fieldsToUnnest the fields to unnest
+   * @param delimiter the delimiter to separate components in nested structure
+   * @param collectionNotUnnestedToJson the mode of converting collection to JSON
+   *
+   * @return Pinot schema
+   */
+  public static Schema getPinotSchemaFromAvroSchemaWithComplexTypeHandling(org.apache.avro.Schema avroSchema,
+      @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit, List<String> fieldsToUnnest,
+      String delimiter, ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson) {
+    Schema pinotSchema = new Schema();
+
+    for (Field field : avroSchema.getFields()) {
+      extractSchemaWithComplexTypeHandling(field.schema(), fieldsToUnnest, delimiter, field.name(), pinotSchema,
+          fieldTypeMap, timeUnit, collectionNotUnnestedToJson);
+    }
     return pinotSchema;
   }
 
@@ -137,13 +133,23 @@ public class AvroUtils {
    * @param avroSchemaFile Avro schema file
    * @param fieldTypeMap Map from column to field type
    * @param timeUnit Time unit
+   * @param complexType if allows complex-type handling
+   * @param fieldsToUnnest the fields to unnest
+   * @param delimiter the delimiter separating components in nested structure
+   * @param collectionNotUnnestedToJson to mode of converting collection to JSON string
    * @return Pinot schema
    */
   public static Schema getPinotSchemaFromAvroSchemaFile(File avroSchemaFile,
-      @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit)
+      @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit, boolean complexType,
+      List<String> fieldsToUnnest, String delimiter, ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson)
       throws IOException {
     org.apache.avro.Schema avroSchema = new org.apache.avro.Schema.Parser().parse(avroSchemaFile);
-    return getPinotSchemaFromAvroSchema(avroSchema, fieldTypeMap, timeUnit);
+    if (!complexType) {
+      return getPinotSchemaFromAvroSchema(avroSchema, fieldTypeMap, timeUnit);
+    } else {
+      return getPinotSchemaFromAvroSchemaWithComplexTypeHandling(avroSchema, fieldTypeMap, timeUnit, fieldsToUnnest,
+          delimiter, collectionNotUnnestedToJson);
+    }
   }
 
   /**
@@ -275,6 +281,106 @@ public class AvroUtils {
       return extractSupportedSchema(recordFields.get(0).schema());
     } else {
       return fieldSchema;
+    }
+  }
+
+  private static void extractSchemaWithComplexTypeHandling(org.apache.avro.Schema fieldSchema,
+      List<String> fieldsToUnnest, String delimiter, String path, Schema pinotSchema,
+      @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit,
+      ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson) {
+    org.apache.avro.Schema.Type fieldType = fieldSchema.getType();
+    switch (fieldType) {
+      case UNION:
+        org.apache.avro.Schema nonNullSchema = null;
+        for (org.apache.avro.Schema childFieldSchema : fieldSchema.getTypes()) {
+          if (childFieldSchema.getType() != org.apache.avro.Schema.Type.NULL) {
+            if (nonNullSchema == null) {
+              nonNullSchema = childFieldSchema;
+            } else {
+              throw new IllegalStateException("More than one non-null schema in UNION schema");
+            }
+          }
+        }
+        if (nonNullSchema != null) {
+          extractSchemaWithComplexTypeHandling(nonNullSchema, fieldsToUnnest, delimiter, path, pinotSchema, fieldTypeMap,
+              timeUnit, collectionNotUnnestedToJson);
+        } else {
+          throw new IllegalStateException("Cannot find non-null schema in UNION schema");
+        }
+        break;
+      case RECORD:
+        for (Field innerField : fieldSchema.getFields()) {
+          extractSchemaWithComplexTypeHandling(innerField.schema(), fieldsToUnnest, delimiter,
+              String.join(delimiter, path, innerField.name()), pinotSchema, fieldTypeMap, timeUnit,
+              collectionNotUnnestedToJson);
+        }
+        break;
+      case ARRAY:
+        org.apache.avro.Schema elementType = fieldSchema.getElementType();
+        if (fieldsToUnnest.contains(path)) {
+          extractSchemaWithComplexTypeHandling(elementType, fieldsToUnnest, delimiter, path, pinotSchema, fieldTypeMap,
+              timeUnit, collectionNotUnnestedToJson);
+        } else if (collectionNotUnnestedToJson == ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE && AvroSchemaUtil
+            .isPrimitiveType(elementType.getType())) {
+          addFieldToPinotSchema(pinotSchema, AvroSchemaUtil.valueOf(elementType.getType()), path, false, fieldTypeMap,
+              timeUnit);
+        } else if (shallConvertToJson(collectionNotUnnestedToJson, elementType)) {
+          addFieldToPinotSchema(pinotSchema, DataType.STRING, path, true, fieldTypeMap, timeUnit);
+        }
+        // do not include the node for other cases
+        break;
+      default:
+        DataType dataType = AvroSchemaUtil.valueOf(fieldType);
+        addFieldToPinotSchema(pinotSchema, dataType, path, true, fieldTypeMap, timeUnit);
+    }
+  }
+
+  private static boolean shallConvertToJson(ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson,
+      org.apache.avro.Schema elementType) {
+    switch (collectionNotUnnestedToJson) {
+      case ALL:
+        return true;
+      case NONE:
+        return false;
+      case NON_PRIMITIVE:
+        return !AvroSchemaUtil.isPrimitiveType(elementType.getType());
+      default:
+        throw new IllegalArgumentException(String.format("Unsupported collectionNotUnnestedToJson %s", collectionNotUnnestedToJson));
+    }
+  }
+
+  private static void addFieldToPinotSchema(Schema pinotSchema, DataType dataType, String name,
+      boolean isSingleValueField, @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap,
+      @Nullable TimeUnit timeUnit) {
+    if (fieldTypeMap == null) {
+      pinotSchema.addField(new DimensionFieldSpec(name, dataType, isSingleValueField));
+    } else {
+      FieldSpec.FieldType fieldType =
+          fieldTypeMap.containsKey(name) ? fieldTypeMap.get(name) : FieldSpec.FieldType.DIMENSION;
+      Preconditions.checkNotNull(fieldType, "Field type not specified for field: %s", name);
+      switch (fieldType) {
+        case DIMENSION:
+          pinotSchema.addField(new DimensionFieldSpec(name, dataType, isSingleValueField));
+          break;
+        case METRIC:
+          Preconditions.checkState(isSingleValueField, "Metric field: %s cannot be multi-valued", name);
+          pinotSchema.addField(new MetricFieldSpec(name, dataType));
+          break;
+        case TIME:
+          Preconditions.checkState(isSingleValueField, "Time field: %s cannot be multi-valued", name);
+          Preconditions.checkNotNull(timeUnit, "Time unit cannot be null");
+          pinotSchema.addField(new TimeFieldSpec(new TimeGranularitySpec(dataType, timeUnit, name)));
+          break;
+        case DATE_TIME:
+          Preconditions.checkState(isSingleValueField, "Time field: %s cannot be multi-valued", name);
+          Preconditions.checkNotNull(timeUnit, "Time unit cannot be null");
+          pinotSchema.addField(new DateTimeFieldSpec(name, dataType,
+              new DateTimeFormatSpec(1, timeUnit.toString(), DateTimeFieldSpec.TimeFormat.EPOCH.toString()).getFormat(),
+              new DateTimeGranularitySpec(1, timeUnit).getGranularity()));
+          break;
+        default:
+          throw new UnsupportedOperationException("Unsupported field type: " + fieldType + " for field: " + name);
+      }
     }
   }
 }

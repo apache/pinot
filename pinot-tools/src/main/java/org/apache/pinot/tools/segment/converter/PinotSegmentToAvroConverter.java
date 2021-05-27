@@ -28,6 +28,7 @@ import org.apache.avro.generic.GenericData.Record;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -46,9 +47,9 @@ public class PinotSegmentToAvroConverter implements PinotSegmentConverter {
   @Override
   public void convert()
       throws Exception {
+    File indexDir = new File(_segmentDir);
+    Schema avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(new SegmentMetadataImpl(indexDir).getSchema());
     try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(new File(_segmentDir))) {
-      Schema avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(pinotSegmentRecordReader.getSchema());
-
       try (DataFileWriter<Record> recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
         recordWriter.create(avroSchema, new File(_outputFile));
 
@@ -69,6 +70,7 @@ public class PinotSegmentToAvroConverter implements PinotSegmentConverter {
           }
 
           recordWriter.append(record);
+          row.clear();
         }
       }
     }

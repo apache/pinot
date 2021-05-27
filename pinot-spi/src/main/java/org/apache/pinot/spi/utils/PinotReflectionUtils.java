@@ -29,12 +29,24 @@ import org.reflections.util.FilterBuilder;
 
 public class PinotReflectionUtils {
   private static final String PINOT_PACKAGE_PREFIX = "org.apache.pinot";
+  private static final Object REFLECTION_LOCK = new Object();
 
   public static Set<Class<?>> getClassesThroughReflection(final String regexPattern,
       final Class<? extends Annotation> annotation) {
-    Reflections reflections = new Reflections(
-        new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage(PINOT_PACKAGE_PREFIX))
-            .filterInputsBy(new FilterBuilder.Include(regexPattern)).setScanners(new TypeAnnotationsScanner()));
-    return reflections.getTypesAnnotatedWith(annotation, true);
+    synchronized (getReflectionLock()) {
+      Reflections reflections = new Reflections(
+          new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage(PINOT_PACKAGE_PREFIX)).filterInputsBy(new FilterBuilder.Include(regexPattern)).setScanners(new TypeAnnotationsScanner()));
+      return reflections.getTypesAnnotatedWith(annotation, true);
+    }
+  }
+
+  /**
+   * Due to the multi-threading issue in org.reflections.vfs.ZipDir, we need to put a lock before calling the
+   * reflection related methods.
+   *
+   * @return
+   */
+  public static Object getReflectionLock() {
+    return REFLECTION_LOCK;
   }
 }

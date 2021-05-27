@@ -52,6 +52,24 @@ public class AvroSchemaUtil {
     }
   }
 
+  /**
+   * @return if the given avro type is a primitive type.
+   */
+  public static boolean isPrimitiveType(Schema.Type avroType) {
+    switch (avroType) {
+      case INT:
+      case LONG:
+      case FLOAT:
+      case DOUBLE:
+      case BOOLEAN:
+      case STRING:
+      case ENUM:
+        return true;
+      default:
+        return false;
+    }
+  }
+
   public static ObjectNode toAvroSchemaJsonObject(FieldSpec fieldSpec) {
     ObjectNode jsonSchema = JsonUtils.newObjectNode();
     jsonSchema.put("name", fieldSpec.getName());

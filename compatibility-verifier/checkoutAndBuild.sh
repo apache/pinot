@@ -37,8 +37,8 @@ function checkoutAndBuild() {
   pushd "$targetDir" || exit 1
   git init
   git remote add origin https://github.com/apache/incubator-pinot
-  git fetch --depth 1 origin "$commitHash"
-  git checkout FETCH_HEAD
+  git pull origin master
+  git checkout $commitHash
   mvn install package -DskipTests -Pbin-dist
   popd || exit 1
 }

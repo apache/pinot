@@ -37,9 +37,10 @@ import org.apache.lucene.store.FSDirectory;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
-import org.apache.pinot.segment.local.segment.store.SegmentDirectoryPaths;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -61,8 +62,6 @@ public class LuceneTextIndexReader implements TextIndexReader {
   private final DocIdTranslator _docIdTranslator;
   private final StandardAnalyzer _standardAnalyzer;
   private boolean _useANDForMultiTermQueries = false;
-
-  public static final String LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION = ".lucene.mapping";
 
   /**
    * As part of loading the segment in ImmutableSegmentLoader,
@@ -180,7 +179,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
         throws Exception {
       int length = Integer.BYTES * numDocs;
       File docIdMappingFile = new File(SegmentDirectoryPaths.findSegmentDirectory(segmentIndexDir),
-          column + LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
+          column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
       // The mapping is local to a segment. It is created on the server during segment load.
       // Unless we are running Pinot on Solaris/SPARC, the underlying architecture is
       // LITTLE_ENDIAN (Linux/x86). So use that as byte order.

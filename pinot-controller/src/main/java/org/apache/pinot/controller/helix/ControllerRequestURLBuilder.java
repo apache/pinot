@@ -255,8 +255,8 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tableConfigs", "validate");
   }
 
-  public String forSegmentDownload(String tableNameWithType, String segmentName) {
-    return URIUtils.constructDownloadUrl(_baseUrl, tableNameWithType, segmentName);
+  public String forSegmentDownload(String tableName, String segmentName) {
+    return URIUtils.constructDownloadUrl(_baseUrl, tableName, segmentName);
   }
 
   public String forSegmentDelete(String tableName, String segmentName) {

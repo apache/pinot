@@ -61,7 +61,7 @@ public class BasicAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest
     startController();
     startBroker();
     startServer();
-    startMinion(null, null);
+    startMinion();
 
     // Unpack the Avro files
     List<File> avroFiles = unpackAvroData(_tempDir);
@@ -141,8 +141,7 @@ public class BasicAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest
   @Override
   protected Connection getPinotConnection() {
     if (_pinotConnection == null) {
-      _pinotConnection =
-          ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(), AUTH_HEADER);
+      _pinotConnection = ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(), AUTH_HEADER);
     }
     return _pinotConnection;
   }
@@ -184,7 +183,7 @@ public class BasicAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest
     for (int i = 0; i < offlineSegments.size(); i++) {
       String segment = offlineSegments.get(i).asText();
       Assert.assertTrue(sendGetRequest(_controllerRequestURLBuilder
-          .forSegmentDownload(TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), segment), AUTH_HEADER)
+          .forSegmentDownload(getTableName(), segment), AUTH_HEADER)
           .length() > 200000); // download segment
     }
   }

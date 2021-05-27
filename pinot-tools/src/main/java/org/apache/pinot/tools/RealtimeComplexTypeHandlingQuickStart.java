@@ -22,12 +22,15 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.tools.Quickstart.Color;
+import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import org.apache.pinot.tools.streams.MeetupRsvpJsonStream;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
@@ -36,18 +39,20 @@ import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
 import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
-public class RealtimeComplexTypeHandlingQuickStart {
+public class RealtimeComplexTypeHandlingQuickStart extends QuickStartBase {
   private StreamDataServerStartable _kafkaStarter;
 
   public static void main(String[] args)
       throws Exception {
-    PluginManager.get().init();
-    new RealtimeComplexTypeHandlingQuickStart().execute();
+    List<String> arguments = new ArrayList<>();
+    arguments.addAll(Arrays.asList("QuickStart", "-type", "REALTIME-COMPLEX-TYPE"));
+    arguments.addAll(Arrays.asList(args));
+    PinotAdministrator.main(arguments.toArray(new String[arguments.size()]));
   }
 
   public void execute()
       throws Exception {
-    File quickstartTmpDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
+    File quickstartTmpDir = new File(_tmpDir, String.valueOf(System.currentTimeMillis()));
     File baseDir = new File(quickstartTmpDir, "meetupRsvp");
     File dataDir = new File(baseDir, "data");
     Preconditions.checkState(dataDir.mkdirs());

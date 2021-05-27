@@ -21,7 +21,7 @@ package org.apache.pinot.segment.local.utils.fst;
 
 import java.io.IOException;
 import org.apache.lucene.store.IndexInput;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
 /**

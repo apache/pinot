@@ -71,7 +71,7 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
     // Setup realtime table, and blank offline table
     super.setUp();
     addTableConfig(createOfflineTableConfig());
-    startMinion(null, null);
+    startMinion();
 
     _helixTaskResourceManager = _controllerStarter.getHelixTaskResourceManager();
     _taskManager = _controllerStarter.getTaskManager();

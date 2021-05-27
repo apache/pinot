@@ -20,6 +20,7 @@ package org.apache.pinot.core.minion;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -33,6 +34,7 @@ import org.apache.pinot.core.segment.processing.transformer.RecordTransformer;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -72,6 +74,8 @@ public class SegmentConverter {
   private List<String> _groupByColumns;
   private boolean _skipTimeValueCheck;
 
+  private Schema _schema;
+
   public SegmentConverter(List<File> inputIndexDirs, File workingDir, String tableName, String segmentName,
       int totalNumPartition, RecordTransformer recordTransformer, @Nullable RecordPartitioner recordPartitioner,
       @Nullable RecordAggregator recordAggregator, @Nullable List<String> groupByColumns, TableConfig tableConfig,
@@ -89,6 +93,21 @@ public class SegmentConverter {
     _recordAggregator = recordAggregator;
     _groupByColumns = groupByColumns;
     _skipTimeValueCheck = skipTimeValueCheck;
+
+    // Validate that segment schemas from all segments are the same
+    for (File indexDir : inputIndexDirs) {
+      Schema schema;
+      try {
+        schema = new SegmentMetadataImpl(indexDir).getSchema();
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while reading schema from: " + indexDir);
+      }
+      if (_schema == null) {
+        _schema = schema;
+      } else {
+        Preconditions.checkState(_schema.equals(schema), "Schemas from input segments are not the same");
+      }
+    }
   }
 
   public List<File> convertSegment()
@@ -102,8 +121,7 @@ public class SegmentConverter {
 
       try (MapperRecordReader mapperRecordReader = new MapperRecordReader(_inputIndexDirs, _recordTransformer,
           _recordPartitioner, _totalNumPartition, currentPartition)) {
-        buildSegment(mapperOutputPath, outputSegmentName, mapperRecordReader,
-            mapperRecordReader.getSchema(), _tableConfig);
+        buildSegment(mapperOutputPath, outputSegmentName, mapperRecordReader);
       }
       File outputSegment = new File(mapperOutputPath + File.separator + outputSegmentName);
 
@@ -112,8 +130,7 @@ public class SegmentConverter {
         String reducerOutputPath = _workingDir.getPath() + File.separator + REDUCER_PREFIX + currentPartition;
         try (ReducerRecordReader reducerRecordReader = new ReducerRecordReader(outputSegment, _recordAggregator,
             _groupByColumns)) {
-          buildSegment(reducerOutputPath, outputSegmentName, reducerRecordReader,
-              reducerRecordReader.getSchema(), _tableConfig);
+          buildSegment(reducerOutputPath, outputSegmentName, reducerRecordReader);
         }
         outputSegment = new File(reducerOutputPath + File.separator + outputSegmentName);
       }
@@ -128,8 +145,7 @@ public class SegmentConverter {
         String indexGenerationOutputPath = _workingDir.getPath() + File.separator + INDEX_PREFIX + currentPartition;
         try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(outputSegment, null,
             sortedColumn)) {
-          buildSegment(indexGenerationOutputPath, outputSegmentName, pinotSegmentRecordReader,
-              pinotSegmentRecordReader.getSchema(), _tableConfig);
+          buildSegment(indexGenerationOutputPath, outputSegmentName, pinotSegmentRecordReader);
         }
         outputSegment = new File(indexGenerationOutputPath + File.separator + outputSegmentName);
       }
@@ -144,10 +160,9 @@ public class SegmentConverter {
    *
    * TODO: Support all kinds of indexing (no dictionary)
    */
-  private void buildSegment(String outputPath, String segmentName, RecordReader recordReader,
-      Schema schema, TableConfig tableConfig)
+  private void buildSegment(String outputPath, String segmentName, RecordReader recordReader)
       throws Exception {
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, _schema);
     segmentGeneratorConfig.setOutDir(outputPath);
     segmentGeneratorConfig.setSegmentName(segmentName);
     segmentGeneratorConfig.setSkipTimeValueCheck(_skipTimeValueCheck);
