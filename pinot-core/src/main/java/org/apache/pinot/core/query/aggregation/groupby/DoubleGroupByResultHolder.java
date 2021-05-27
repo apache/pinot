@@ -96,5 +96,4 @@ public class DoubleGroupByResultHolder implements GroupByResultHolder {
   public void setValueForKey(int groupKey, Object newValue) {
     throw new UnsupportedOperationException();
   }
-
 }

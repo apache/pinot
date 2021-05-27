@@ -56,8 +56,9 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
   private int _numDocsScanned = 0;
 
   public AggregationGroupByOrderByOperator(AggregationFunction[] aggregationFunctions,
-                                           ExpressionContext[] groupByExpressions, int maxInitialResultHolderCapacity, int numGroupsLimit, int inSegmentResultLimit,
-                                           TransformOperator transformOperator, long numTotalDocs, QueryContext queryContext, boolean useStarTree) {
+       ExpressionContext[] groupByExpressions, int maxInitialResultHolderCapacity, int numGroupsLimit,
+       int inSegmentResultLimit, TransformOperator transformOperator, long numTotalDocs, QueryContext queryContext,
+       boolean useStarTree) {
     _aggregationFunctions = aggregationFunctions;
     _groupByExpressions = groupByExpressions;
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;

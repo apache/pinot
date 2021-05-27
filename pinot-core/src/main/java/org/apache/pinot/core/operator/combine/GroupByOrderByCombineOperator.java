@@ -33,7 +33,10 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.data.table.*;
+import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
+import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.data.table.TableResizer;
+import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -152,7 +155,6 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
           _indexedTable.upsert(intermediateResult.getKey(), intermediateResult.getRecord());
         }
       }
-
     } catch (EarlyTerminationException e) {
       // Early-terminated because query times out or is already satisfied
     } catch (Exception e) {
