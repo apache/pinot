@@ -30,6 +30,7 @@ import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.testng.Assert;
@@ -70,6 +71,34 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     QueriesTestUtils.testInterSegmentGroupByOrderByResultPQL(brokerResponse, expectedNumDocsScanned,
         expectedNumEntriesScannedInFilter, expectedNumEntriesScannedPostFilter, expectedNumTotalDocs, expectedGroups,
         expectedValues, true);
+  }
+
+  /**
+   * Tests the in-segment trim option for GroupBy OrderBy query
+   */
+  @Test(dataProvider = "orderBySQLResultTableProvider")
+  public void testGroupByOrderByTrimOptSQLLowLimitResponse(String query, List<Object[]> expectedResults, long expectedNumDocsScanned,
+      long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs,
+      DataSchema expectedDataSchema) {
+    expectedResults = expectedResults.subList(0, expectedResults.size()/2);
+    InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2(expectedResults.size(), true);
+    BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query, planMaker);
+    QueriesTestUtils
+        .testInterSegmentResultTable(brokerResponse, expectedNumDocsScanned, expectedNumEntriesScannedInFilter,
+            expectedNumEntriesScannedPostFilter, expectedNumTotalDocs, expectedResults, expectedResults.size(),
+            expectedDataSchema);
+  }
+
+  @Test(dataProvider = "orderBySQLResultTableProvider")
+  public void testGroupByOrderByTrimOptHighLimitSQLResponse(String query, List<Object[]> expectedResults, long expectedNumDocsScanned,
+      long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs,
+      DataSchema expectedDataSchema) {
+    InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2(expectedResults.size() + 1, true);
+    BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query, planMaker);
+    QueriesTestUtils
+        .testInterSegmentResultTable(brokerResponse, expectedNumDocsScanned, expectedNumEntriesScannedInFilter,
+            expectedNumEntriesScannedPostFilter, expectedNumTotalDocs, expectedResults, expectedResults.size(),
+            expectedDataSchema);
   }
 
   /**
