@@ -94,7 +94,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   }
 
   /**
-   * @deprecated Use {@code segmentPushFrequency} from {@link IngestionConfig#getBatchIngestionConfig()}
+   * @deprecated Use {@code segmentIngestionFrequency} from {@link IngestionConfig#getBatchIngestionConfig()}
    */
   public String getSegmentPushFrequency() {
     return _segmentPushFrequency;
@@ -105,7 +105,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   }
 
   /**
-   * @deprecated Use {@code segmentPushType} from {@link IngestionConfig#getBatchIngestionConfig()}
+   * @deprecated Use {@code segmentIngestionType} from {@link IngestionConfig#getBatchIngestionConfig()}
    */
   public String getSegmentPushType() {
     return _segmentPushType;
