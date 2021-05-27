@@ -118,7 +118,7 @@ public class TableResizer {
     }
     FunctionContext function = expression.getFunction();
     Preconditions
-            .checkState(function != null, "Failed to find ORDER-BY expression: %s in the GROUP-BY clause", expression);
+        .checkState(function != null, "Failed to find ORDER-BY expression: %s in the GROUP-BY clause", expression);
     if (function.getType() == FunctionContext.Type.AGGREGATION) {
       // Aggregation function
       return new AggregationFunctionExtractor(_aggregationFunctionIndexMap.get(function));
@@ -159,7 +159,7 @@ public class TableResizer {
         // num records to evict is smaller than num records to retain
         // make PQ of records to evict
         PriorityQueue<IntermediateRecord> priorityQueue =
-                convertToIntermediateRecordsPQ(recordsMap, numRecordsToEvict, _intermediateRecordComparator);
+            convertToIntermediateRecordsPQ(recordsMap, numRecordsToEvict, _intermediateRecordComparator);
         for (IntermediateRecord evictRecord : priorityQueue) {
           recordsMap.remove(evictRecord._key);
         }
@@ -179,7 +179,7 @@ public class TableResizer {
         }
         Comparator<IntermediateRecord> comparator = _intermediateRecordComparator.reversed();
         PriorityQueue<IntermediateRecord> priorityQueue =
-                convertToIntermediateRecordsPQ(recordsMap, trimToSize, comparator);
+            convertToIntermediateRecordsPQ(recordsMap, trimToSize, comparator);
         for (IntermediateRecord recordToRetain : priorityQueue) {
           trimmedRecordsMap.put(recordToRetain._key, recordsMap.get(recordToRetain._key));
         }
@@ -190,7 +190,7 @@ public class TableResizer {
   }
 
   private PriorityQueue<IntermediateRecord> convertToIntermediateRecordsPQ(Map<Key, Record> recordsMap, int size,
-                                                                           Comparator<IntermediateRecord> comparator) {
+      Comparator<IntermediateRecord> comparator) {
     PriorityQueue<IntermediateRecord> priorityQueue = new PriorityQueue<>(size, comparator);
     for (Map.Entry<Key, Record> entry : recordsMap.entrySet()) {
       IntermediateRecord intermediateRecord = getIntermediateRecord(entry.getKey(), entry.getValue());

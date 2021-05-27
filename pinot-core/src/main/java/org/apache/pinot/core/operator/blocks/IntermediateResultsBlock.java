@@ -113,8 +113,7 @@ public class IntermediateResultsBlock implements Block {
    * Constructor for aggregation group-by order-by result with {@link AggregationGroupByResult}.
    */
   public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions,
-                                  @Nullable AggregationGroupByResult aggregationGroupByResults,
-                                  DataSchema dataSchema) {
+                                  @Nullable AggregationGroupByResult aggregationGroupByResults, DataSchema dataSchema) {
     _aggregationFunctions = aggregationFunctions;
     _aggregationGroupByResult = aggregationGroupByResults;
     _dataSchema = dataSchema;

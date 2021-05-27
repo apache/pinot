@@ -23,7 +23,6 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.util.Map;
-import java.util.Random;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -45,7 +44,6 @@ public class PinotSegmentToJsonConverter implements PinotSegmentConverter {
   @Override
   public void convert()
       throws Exception {
-    String dateString = "1970-01-"+Integer.toString(10+Integer.parseInt(String.valueOf(_segmentDir.charAt(_segmentDir.length()-1))))+ "T00:00:00.000Z";
     try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader(new File(_segmentDir));
         BufferedWriter recordWriter = new BufferedWriter(new FileWriter(_outputFile))) {
       GenericRow row = new GenericRow();
@@ -61,9 +59,6 @@ public class PinotSegmentToJsonConverter implements PinotSegmentConverter {
             record.set(field, JsonUtils.objectToJsonNode(value));
           }
         }
-        record.put("_time", dateString);
-        Random num = new Random();
-        record.put("text", Integer.toString(10000000+num.nextInt(90000000))+Integer.toString(10000000+num.nextInt(90000000)));
         recordWriter.write(record.toString());
         recordWriter.newLine();
         row.clear();

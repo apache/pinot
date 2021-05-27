@@ -128,7 +128,6 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       groupByResultHolder.ensureCapacity(capacityNeeded);
       aggregate(transformBlock, length, i);
     }
-
   }
 
   protected void aggregate(TransformBlock transformBlock, int length, int functionIndex) {
