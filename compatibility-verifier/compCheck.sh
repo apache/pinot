@@ -47,7 +47,7 @@ margs=2
 # get usage of the script
 function usage() {
   command=$1
-  echo "Usage: $command -w <workingDir> -t <testSuiteDir> -k true/false"
+  echo "Usage: $command -w <workingDir> -t <testSuiteDir> [-k]"
 }
 
 function help() {
@@ -56,7 +56,7 @@ function help() {
   echo -e "  -w, --working-dir                      Working directory where olderCommit and newCommit target files reside."
   echo -e "  -t, --test-suite-dir                   Test suite directory\n"
   echo -e "OPTIONAL:"
-  echo -e "  -k, --keep-cluster-on-failure          Whether keep cluster on test failure (default: false)"
+  echo -e "  -k, --keep-cluster-on-failure          Keep cluster on test failure"
   echo -e "  -h, --help                             Prints this help\n"
 }
 

@@ -135,7 +135,7 @@ public class SqlResultComparator {
        * - selection without order by
        * - selection with order by (by sorting the segments on min-max value)
        * - DISTINCT queries.
-       * numDocsScanned is no-deterministic for those queries so numDocsScanned comparison should be skipped.
+       * numDocsScanned is non-deterministic for those queries so numDocsScanned comparison should be skipped.
        *
        * NOTE: DISTINCT queries are modeled as non-selection queries during query processing, but all DISTINCT
        * queries are selection queries during Calcite parsing (DISTINCT queries are selection queries with
@@ -256,6 +256,10 @@ public class SqlResultComparator {
     return true;
   }
 
+  /*
+   * For non-order-by queries, the result file should specify the isSuperset flag. If that is done, we will never hit
+   * this case. If you see any failures, please update the result file.
+   */
   private static boolean areNonOrderByQueryElementsEqual(List<String> actualElementsSerialized,
       List<String> expectedElementsSerialized) {
     // sort elements

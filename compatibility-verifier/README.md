@@ -33,12 +33,12 @@ dir and output the path, which can be used in step 2.
 ### Step 2: run compatibility regression test against the two targets build in step1
 ```shell
 ./compCheck.sh -h
-Usage:  -w <workingDir> -t <testSuiteDir> -k true/false
+Usage:  -w <workingDir> -t <testSuiteDir> [-k]
 MANDATORY:
   -w, --working-dir                      Working directory where olderCommit and newCommit target files reside.
   -t, --test-suite-dir                   Test suite directory
 
 OPTIONAL:
-  -k, --keep-cluster-on-failure          Whether keep cluster on test failure (default: false)
+  -k, --keep-cluster-on-failure          Keep cluster on test failure
   -h, --help                             Prints this help
 ```
