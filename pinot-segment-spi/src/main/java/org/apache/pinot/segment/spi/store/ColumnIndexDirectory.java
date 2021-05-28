@@ -18,51 +18,20 @@
  */
 package org.apache.pinot.segment.spi.store;
 
-import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.spi.utils.ReadMode;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
- * Abstract class to map the columnar indices to their location on disk.
+ * Abstract class to map the columnar indices to their buffers
  *
  */
 public abstract class ColumnIndexDirectory implements Closeable {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ColumnIndexDirectory.class);
 
-  protected File segmentDirectory;
-  protected SegmentMetadataImpl metadata;
-  protected ReadMode readMode;
-
-  /**
-   * @param segmentDirectory File pointing to segment directory
-   * @param metadata segment metadata. Metadata must be fully initialized
-   * @param readMode mmap vs heap map mode
-   */
-  protected ColumnIndexDirectory(File segmentDirectory, SegmentMetadataImpl metadata, ReadMode readMode) {
-    Preconditions.checkNotNull(segmentDirectory);
-    Preconditions.checkNotNull(readMode);
-    Preconditions.checkNotNull(metadata);
-
-    Preconditions.checkArgument(segmentDirectory.exists(),
-        "SegmentDirectory: " + segmentDirectory.toString() + " does not exist");
-    Preconditions.checkArgument(segmentDirectory.isDirectory(),
-        "SegmentDirectory: " + segmentDirectory.toString() + " is not a directory");
-
-    this.segmentDirectory = segmentDirectory;
-    this.metadata = metadata;
-    this.readMode = readMode;
-  }
-
-  public void setMetadata(SegmentMetadataImpl metadata) {
-    this.metadata = metadata;
-  }
+  public abstract void setSegmentMetadata(SegmentMetadataImpl segmentMetadata);
 
   /**
    * Allocation context for tracking memory

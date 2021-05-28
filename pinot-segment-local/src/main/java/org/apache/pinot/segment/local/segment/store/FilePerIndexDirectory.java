@@ -34,10 +34,34 @@ import org.apache.pinot.spi.utils.ReadMode;
 
 
 class FilePerIndexDirectory extends ColumnIndexDirectory {
+  private final File _segmentDirectory;
+  private SegmentMetadataImpl _segmentMetadata;
+  private final ReadMode _readMode;
   private final Map<IndexKey, PinotDataBuffer> indexBuffers = new HashMap<>();
 
-  protected FilePerIndexDirectory(File segmentDirectory, SegmentMetadataImpl metadata, ReadMode readMode) {
-    super(segmentDirectory, metadata, readMode);
+  /**
+   * @param segmentDirectory File pointing to segment directory
+   * @param segmentMetadata segment metadata. Metadata must be fully initialized
+   * @param readMode mmap vs heap mode
+   */
+  protected FilePerIndexDirectory(File segmentDirectory, SegmentMetadataImpl segmentMetadata, ReadMode readMode) {
+    Preconditions.checkNotNull(segmentDirectory);
+    Preconditions.checkNotNull(readMode);
+    Preconditions.checkNotNull(segmentMetadata);
+
+    Preconditions.checkArgument(segmentDirectory.exists(),
+        "SegmentDirectory: " + segmentDirectory.toString() + " does not exist");
+    Preconditions.checkArgument(segmentDirectory.isDirectory(),
+        "SegmentDirectory: " + segmentDirectory.toString() + " is not a directory");
+
+    _segmentDirectory = segmentDirectory;
+    _segmentMetadata = segmentMetadata;
+    _readMode = readMode;
+  }
+
+  @Override
+  public void setSegmentMetadata(SegmentMetadataImpl segmentMetadata) {
+    _segmentMetadata = segmentMetadata;
   }
 
   @Override
@@ -88,7 +112,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     File file = getFileFor(key.name, key.type);
     if (!file.exists()) {
       throw new RuntimeException(
-          "Could not find index for column: " + key.name + ", type: " + key.type + ", segment: " + segmentDirectory
+          "Could not find index for column: " + key.name + ", type: " + key.type + ", segment: " + _segmentDirectory
               .toString());
     }
     PinotDataBuffer buffer = mapForReads(file, key.type.toString() + ".reader");
@@ -113,22 +137,22 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     String filename;
     switch (indexType) {
       case DICTIONARY:
-        filename = metadata.getDictionaryFileName(column);
+        filename = _segmentMetadata.getDictionaryFileName(column);
         break;
       case FORWARD_INDEX:
-        filename = metadata.getForwardIndexFileName(column);
+        filename = _segmentMetadata.getForwardIndexFileName(column);
         break;
       case INVERTED_INDEX:
-        filename = metadata.getBitmapInvertedIndexFileName(column);
+        filename = _segmentMetadata.getBitmapInvertedIndexFileName(column);
         break;
       case RANGE_INDEX:
-        filename = metadata.getBitmapRangeIndexFileName(column);
+        filename = _segmentMetadata.getBitmapRangeIndexFileName(column);
         break;
       case BLOOM_FILTER:
-        filename = metadata.getBloomFilterFileName(column);
+        filename = _segmentMetadata.getBloomFilterFileName(column);
         break;
       case NULLVALUE_VECTOR:
-        filename = metadata.getNullValueVectorFileName(column);
+        filename = _segmentMetadata.getNullValueVectorFileName(column);
         break;
       case TEXT_INDEX:
         filename = column + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION;
@@ -142,7 +166,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
       default:
         throw new UnsupportedOperationException("Unknown index type: " + indexType.toString());
     }
-    return new File(segmentDirectory, filename);
+    return new File(_segmentDirectory, filename);
   }
 
   private PinotDataBuffer mapForWrites(File file, long sizeBytes, String context)
@@ -166,7 +190,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     String allocationContext = allocationContext(file, context);
 
     // Backward-compatible: index file is always big-endian
-    if (readMode == ReadMode.heap) {
+    if (_readMode == ReadMode.heap) {
       return PinotDataBuffer.loadFile(file, 0, file.length(), ByteOrder.BIG_ENDIAN, allocationContext);
     } else {
       return PinotDataBuffer.mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, allocationContext);
