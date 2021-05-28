@@ -120,7 +120,8 @@ public class IntermediateResultsBlock implements Block {
   }
 
   /**
-   * Constructor for aggregation group-by order-by result with {@link AggregationGroupByResult}.
+   * Constructor for aggregation group-by order-by result with {@link AggregationGroupByResult} and
+   * with a collection of intermediate records.
    */
   public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions,
       @Nullable AggregationGroupByResult aggregationGroupByResults,
@@ -295,6 +296,9 @@ public class IntermediateResultsBlock implements Block {
     _numGroupsLimitReached = numGroupsLimitReached;
   }
 
+  /**
+   * Get an iterator for the intermediate record collection. Should only be called if _intermediateCollection is present
+   */
   public Iterator<TableResizer.IntermediateRecord> getIntermediateResultIterator() {
     if (_intermediateCollection == null) {
       return null;

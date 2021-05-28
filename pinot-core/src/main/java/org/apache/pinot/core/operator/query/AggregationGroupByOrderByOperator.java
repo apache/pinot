@@ -119,7 +119,6 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     if (!_tableResizer.getOrderByStatus()) {
       return new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
     }
-    //TODO: get trim_threshold from plan node
     Collection<TableResizer.IntermediateRecord> intermediate =
         groupByExecutor.trimGroupByResult(_enableSegmentGroupTrim, _inSegmentResultLimit, _tableResizer);
     // Build intermediate result block based on aggregation group-by result from the executor

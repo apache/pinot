@@ -77,6 +77,7 @@ public class TableResizerTest {
         new Key(new Object[]{"c", 300, 5.0})
     );
 
+    // GroupKeys: d1: a0 ~ a14, d2: 10.0 ~ 24.0, d3: 1.0 ~ 15.0
     _groupKeys = new LinkedList<>();
     for (int i = 0; i < 15; ++i) {
       GroupKeyGenerator.GroupKey groupKey = new GroupKeyGenerator.GroupKey();
@@ -86,6 +87,8 @@ public class TableResizerTest {
       _groupKeys.add(groupKey);
     }
 
+    // Aggregation results: sum(m1) = 10 % d3, max(m2) = 100 % d3,
+    //                      distinctcount(m3) = set(new int[]{j}), avg(m4) = 10 / (j + 1)
     _groupByResultHolders = new GroupByResultHolder[NUM_RESULT_HOLDER];
     _groupByResultHolders[0] = new DoubleGroupByResultHolder(_groupKeys.size(), _groupKeys.size(), 0.0);
     _groupByResultHolders[1] = new DoubleGroupByResultHolder(_groupKeys.size(), _groupKeys.size(), 0.0);
@@ -97,7 +100,7 @@ public class TableResizerTest {
       _groupByResultHolders[1]
           .setValueForKey(_groupKeys.get(j)._groupId, 100 % ((Double) _groupKeys.get(j)._keys[2]));
       _groupByResultHolders[2].setValueForKey(_groupKeys.get(j)._groupId, new IntOpenHashSet(new int[]{j}));
-      _groupByResultHolders[3].setValueForKey(_groupKeys.get(j)._groupId, new AvgPair(10, j));
+      _groupByResultHolders[3].setValueForKey(_groupKeys.get(j)._groupId, new AvgPair(10, j + 1));
     }
 
     //@formatter:on
@@ -355,6 +358,20 @@ public class TableResizerTest {
       TableResizer.IntermediateRecord top = result.poll();
       assert top._record != null;
       assertEquals((String) top._record.getValues()[0], expect[expect.length - i - 1]);
+      ++i;
+    }
+
+    tableResizer = new TableResizer(DATA_SCHEMA,
+        QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "DISTINCTCOUNT(m3) DESC, AVG(m4) ASC"));
+    result = tableResizer.trimInSegmentResults(_groupKeys.listIterator(), _groupByResultHolders, GROUPBY_TRIM_SIZE);
+    assertEquals(result.size(), GROUPBY_TRIM_SIZE);
+
+    // Sum = 10 and count = j + 1. AVG(a14) = 10 / (14 + 1) = 10/15 which is the smallest
+    i = 5;
+    while (!result.isEmpty()) {
+      TableResizer.IntermediateRecord top = result.poll();
+      assert top._record != null;
+      assertEquals((String) top._record.getValues()[0], "a" + i);
       ++i;
     }
   }
