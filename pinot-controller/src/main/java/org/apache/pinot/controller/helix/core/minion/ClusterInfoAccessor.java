@@ -29,6 +29,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.minion.MergeRollupTaskMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.controller.ControllerConf;
@@ -108,6 +109,24 @@ public class ClusterInfoAccessor {
   public List<LLCRealtimeSegmentZKMetadata> getLLCRealtimeSegmentsMetadata(String tableName) {
     return ZKMetadataProvider
         .getLLCRealtimeSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(), tableName);
+  }
+
+  /**
+   * Fetches the {@link MergeRollupTaskMetadata} from MINION_TASK_METADATA for given table
+   * @param tableNameWithType table name with type
+   */
+  public MergeRollupTaskMetadata getMinionMergeRollupTaskMetadata(String tableNameWithType) {
+    return MinionTaskMetadataUtils.getMergeRollupTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
+            MinionConstants.MergeRollupTask.TASK_TYPE, tableNameWithType);
+  }
+
+  /**
+   * Sets the {@link MergeRollupTaskMetadata} into MINION_TASK_METADATA
+   * This call will override any previous metadata node
+   */
+  public void setMergeRollupTaskMetadata(MergeRollupTaskMetadata mergeRollupTaskMetadata) {
+    MinionTaskMetadataUtils.persistMergeRollupTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
+        MinionConstants.MergeRollupTask.TASK_TYPE, mergeRollupTaskMetadata, -1);
   }
 
   /**
