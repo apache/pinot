@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.processing.serde;
+package org.apache.pinot.core.segment.processing.genericrow;
 
 import java.util.Arrays;
 import java.util.Collections;
