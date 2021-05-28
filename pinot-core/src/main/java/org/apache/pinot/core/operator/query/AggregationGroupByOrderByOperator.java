@@ -50,15 +50,16 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
   private final TransformOperator _transformOperator;
   private final long _numTotalDocs;
   private final boolean _useStarTree;
+  private final boolean _enableSegmentGroupTrim;
   private final DataSchema _dataSchema;
   private final TableResizer _tableResizer;
 
   private int _numDocsScanned = 0;
 
   public AggregationGroupByOrderByOperator(AggregationFunction[] aggregationFunctions,
-       ExpressionContext[] groupByExpressions, int maxInitialResultHolderCapacity, int numGroupsLimit,
-       int inSegmentResultLimit, TransformOperator transformOperator, long numTotalDocs, QueryContext queryContext,
-       boolean useStarTree) {
+      ExpressionContext[] groupByExpressions, int maxInitialResultHolderCapacity, int numGroupsLimit,
+      int inSegmentResultLimit, TransformOperator transformOperator, long numTotalDocs, QueryContext queryContext,
+      boolean useStarTree, boolean enableSegmentGroupTrim) {
     _aggregationFunctions = aggregationFunctions;
     _groupByExpressions = groupByExpressions;
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
@@ -67,6 +68,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     _transformOperator = transformOperator;
     _numTotalDocs = numTotalDocs;
     _useStarTree = useStarTree;
+    _enableSegmentGroupTrim = enableSegmentGroupTrim;
 
     // NOTE: The indexedTable expects that the the data schema will have group by columns before aggregation columns
     int numGroupByExpressions = groupByExpressions.length;
@@ -118,8 +120,8 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
       return new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
     }
     //TODO: get trim_threshold from plan node
-    Collection<TableResizer.fullIntermediateResult> intermediate =
-            groupByExecutor.trimGroupByResult(_inSegmentResultLimit, _tableResizer);
+    Collection<TableResizer.IntermediateRecord> intermediate =
+        groupByExecutor.trimGroupByResult(_enableSegmentGroupTrim, _inSegmentResultLimit, _tableResizer);
     // Build intermediate result block based on aggregation group-by result from the executor
     return new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), intermediate, _dataSchema);
   }
