@@ -206,9 +206,10 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         QueryOptions queryOptions = new QueryOptions(queryContext.getQueryOptions());
         // new Combine operator only when GROUP_BY_MODE explicitly set to SQL
         if (queryOptions.isGroupByModeSQL()) {
+          // Calculate trim limit = max(limit * 5, 5000)
           int inSegmentTrimLimit = getTableCapacity(queryContext);
-
-          // For testing purpose
+          // TODO: Remove this check from the critical path and set the limit in a proper way
+          // Set the limit for test only.
           if (_inSegmentTrimLimit != 0) {
             inSegmentTrimLimit = _inSegmentTrimLimit;
           }

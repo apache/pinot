@@ -42,6 +42,9 @@ public class InterSegmentOrderByMultiValueQueriesTest extends BaseMultiValueQuer
             expectedResults, expectedResults.size(), expectedDataSchema);
   }
 
+  /**
+   * Tests the in-segment trim option for GroupBy OrderBy query
+   */
   @Test(dataProvider = "orderByDataProvider")
   public void testGroupByOrderByMVTrimOptLowLimitSQLResults(String query, List<Object[]> expectedResults,
       long expectedNumEntriesScannedPostFilter, DataSchema expectedDataSchema) {
@@ -53,6 +56,9 @@ public class InterSegmentOrderByMultiValueQueriesTest extends BaseMultiValueQuer
             expectedResults, expectedResults.size(), expectedDataSchema);
   }
 
+  /**
+   * Tests the in-segment build option for GroupBy OrderBy query. (No trim)
+   */
   @Test(dataProvider = "orderByDataProvider")
   public void testGroupByOrderByMVTrimOptHighLimitSQLResults(String query, List<Object[]> expectedResults,
       long expectedNumEntriesScannedPostFilter, DataSchema expectedDataSchema) {

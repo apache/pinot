@@ -229,6 +229,9 @@ public class TableResizer {
     return Arrays.asList(sortedArray);
   }
 
+  /**
+   * Helper class to make an IntermediateRecord with the record.
+   */
   private IntermediateRecord getInSegmentIntermediateRecord(Key key, Record record) {
     Comparable[] intermediateRecordValues = new Comparable[_numOrderByExpressions];
     for (int i = 0; i < _numOrderByExpressions; i++) {
@@ -237,6 +240,11 @@ public class TableResizer {
     return new IntermediateRecord(key, intermediateRecordValues, record);
   }
 
+  /**
+   * Trim the aggregation results using a priority queue and returns a the priority queue.
+   * This method is to be called from individual segment if the intermediate results need to be trimmed.
+   * The use case now is Multi-Segment GroupBy OrderBy query.
+   */
   public PriorityQueue<IntermediateRecord> trimInSegmentResults(Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator,
       GroupByResultHolder[] _groupByResultHolders, int size) {
     if (!groupKeyIterator.hasNext() || _groupByResultHolders.length == 0 || size == 0) {
@@ -273,6 +281,11 @@ public class TableResizer {
     return priorityQueue;
   }
 
+  /**
+   * Build a list of intermediate record and return the list.
+   * This method is to be called from individual segment if the intermediate results doesn't need to be trimmed.
+   * The use case now is Multi-Segment GroupBy OrderBy query.
+   */
   public List<IntermediateRecord> buildInSegmentResults(Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator,
       GroupByResultHolder[] _groupByResultHolders, int size) {
     if (!groupKeyIterator.hasNext() || _groupByResultHolders.length == 0 || size == 0) {
@@ -323,6 +336,8 @@ public class TableResizer {
    * 2. For values, IntermediateRecord should only have the columns needed for order by
    * 3. Inside the values, the columns should be ordered by the order by sequence
    * 4. For order by on aggregations, final results should extracted if the intermediate result is non-comparable
+   * 5. There is an optional field to store the original record. Each segment can keep the intermediate result in this
+   * form to prevent constructing IntermediateRecord again in the server.
    */
   public static class IntermediateRecord {
     final Key _key;

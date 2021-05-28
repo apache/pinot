@@ -77,10 +77,10 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
    * Tests the in-segment trim option for GroupBy OrderBy query
    */
   @Test(dataProvider = "orderBySQLResultTableProvider")
-  public void testGroupByOrderByTrimOptSQLLowLimitResponse(String query, List<Object[]> expectedResults, long expectedNumDocsScanned,
-      long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs,
-      DataSchema expectedDataSchema) {
-    expectedResults = expectedResults.subList(0, expectedResults.size()/2);
+  public void testGroupByOrderByTrimOptSQLLowLimitResponse(String query, List<Object[]> expectedResults,
+      long expectedNumDocsScanned, long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter,
+      long expectedNumTotalDocs, DataSchema expectedDataSchema) {
+    expectedResults = expectedResults.subList(0, expectedResults.size() / 2);
     InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2(expectedResults.size(), true);
     BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query, planMaker);
     QueriesTestUtils
@@ -89,10 +89,13 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
             expectedDataSchema);
   }
 
+  /**
+   * Tests the in-segment build option for GroupBy OrderBy query. (No trim)
+   */
   @Test(dataProvider = "orderBySQLResultTableProvider")
-  public void testGroupByOrderByTrimOptHighLimitSQLResponse(String query, List<Object[]> expectedResults, long expectedNumDocsScanned,
-      long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs,
-      DataSchema expectedDataSchema) {
+  public void testGroupByOrderByTrimOptHighLimitSQLResponse(String query, List<Object[]> expectedResults,
+      long expectedNumDocsScanned, long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter,
+      long expectedNumTotalDocs, DataSchema expectedDataSchema) {
     InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2(expectedResults.size() + 1, true);
     BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query, planMaker);
     QueriesTestUtils
