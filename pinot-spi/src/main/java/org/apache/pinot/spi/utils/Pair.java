@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.utils;
 
 import java.io.Serializable;
+import java.util.Objects;
 
 
 public class Pair<T1 extends Serializable, T2 extends Serializable> implements Serializable {
@@ -51,5 +52,22 @@ public class Pair<T1 extends Serializable, T2 extends Serializable> implements S
   @Override
   public String toString() {
     return "first=" + _first + ", second=" + _second;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    Pair<?, ?> pair = (Pair<?, ?>) o;
+    return Objects.equals(_first, pair._first) && Objects.equals(_second, pair._second);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(_first, _second);
   }
 }

@@ -775,7 +775,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
     TableDataManager tableDataManager = TableDataManagerProvider
         .getTableDataManager(tableDataManagerConfig, "testInstance", propertyStore, mock(ServerMetrics.class),
-            mock(HelixManager.class));
+            mock(HelixManager.class), null);
     tableDataManager.start();
     tableDataManager.shutDown();
     Assert.assertFalse(SegmentBuildTimeLeaseExtender.isExecutorShutdown());
