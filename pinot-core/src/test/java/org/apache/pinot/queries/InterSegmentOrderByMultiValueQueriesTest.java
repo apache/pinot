@@ -45,7 +45,7 @@ public class InterSegmentOrderByMultiValueQueriesTest extends BaseMultiValueQuer
   @Test(dataProvider = "orderByDataProvider")
   public void testGroupByOrderByMVTrimOptLowLimitSQLResults(String query, List<Object[]> expectedResults,
       long expectedNumEntriesScannedPostFilter, DataSchema expectedDataSchema) {
-    expectedResults = expectedResults.subList(0, expectedResults.size()/2);
+    expectedResults = expectedResults.subList(0, expectedResults.size() / 2);
     InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2(expectedResults.size(), true);
     BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query, planMaker);
     QueriesTestUtils

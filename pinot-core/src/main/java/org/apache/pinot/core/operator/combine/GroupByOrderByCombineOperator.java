@@ -131,7 +131,7 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
       // Merge aggregation group-by result.
         // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
         //TODO: change upsert api so that it accepts intermediateRecord directly
-      Iterator<TableResizer.fullIntermediateResult> groupKeyIterator = intermediateResultsBlock.getIntermediateResultIterator();
+      Iterator<TableResizer.IntermediateRecord> groupKeyIterator = intermediateResultsBlock.getIntermediateResultIterator();
       if (groupKeyIterator == null) {
         // Merge aggregation group-by result.
         AggregationGroupByResult aggregationGroupByResult = intermediateResultsBlock.getAggregationGroupByResult();
@@ -151,7 +151,7 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
         }
       } else {
         while (groupKeyIterator.hasNext()) {
-          TableResizer.fullIntermediateResult intermediateResult = groupKeyIterator.next();
+          TableResizer.IntermediateRecord intermediateResult = groupKeyIterator.next();
           _indexedTable.upsert(intermediateResult.getKey(), intermediateResult.getRecord());
         }
       }

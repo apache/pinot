@@ -149,7 +149,8 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   }
 
   @Override
-  public Collection<TableResizer.fullIntermediateResult> trimGroupByResult(int threshold, TableResizer tableResizer) {
+  public Collection<TableResizer.IntermediateRecord> trimGroupByResult(boolean enableSegmentGroupTrim,
+      int threshold, TableResizer tableResizer) {
     // Check if a trim is necessary
     int keyNum = 0;
     if (_hasMVGroupByExpression) {
@@ -158,11 +159,10 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       keyNum = _svGroupKeys.length;
     }
     Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = _groupKeyGenerator.getGroupKeys();
-    if (keyNum > threshold && threshold != -1) {
+    if (keyNum > threshold && enableSegmentGroupTrim) {
       return tableResizer.trimInSegmentResults(groupKeyIterator, _groupByResultHolders, threshold);
     }
     // Generate a list of intermediateResults if we don't need to trim
     return tableResizer.buildInSegmentResults(groupKeyIterator, _groupByResultHolders, keyNum);
   }
-
 }

@@ -49,5 +49,6 @@ public interface GroupByExecutor {
    * <p>Should be called after all transform blocks has been processed.
    *
    */
-  Collection<TableResizer.fullIntermediateResult> trimGroupByResult(int threshold, TableResizer tableResizer);
+  Collection<TableResizer.IntermediateRecord> trimGroupByResult(boolean enableSegmentGroupTrim, int threshold,
+      TableResizer tableResizer);
 }

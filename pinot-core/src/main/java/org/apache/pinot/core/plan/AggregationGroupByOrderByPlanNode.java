@@ -43,19 +43,21 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
   private final int _maxInitialResultHolderCapacity;
   private final int _numGroupsLimit;
-  private final int _inSegmentResultLimit;
+  private final boolean _enableSegmentGroupTrim;
+  private final int _inSegmentTrimLimit;
   private final AggregationFunction[] _aggregationFunctions;
   private final ExpressionContext[] _groupByExpressions;
   private final TransformPlanNode _transformPlanNode;
   private final StarTreeTransformPlanNode _starTreeTransformPlanNode;
-  private QueryContext _queryContext;
+  private final QueryContext _queryContext;
 
   public AggregationGroupByOrderByPlanNode(IndexSegment indexSegment, QueryContext queryContext,
-      int maxInitialResultHolderCapacity, int numGroupsLimit, int inSegmentResultLimit) {
+      int maxInitialResultHolderCapacity, int numGroupsLimit, boolean enableSegmentGroupTrim, int inSegmentTrimLimit) {
     _indexSegment = indexSegment;
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
-    _inSegmentResultLimit = inSegmentResultLimit;
+    _enableSegmentGroupTrim = enableSegmentGroupTrim;
+    _inSegmentTrimLimit = inSegmentTrimLimit;
     _aggregationFunctions = queryContext.getAggregationFunctions();
     assert _aggregationFunctions != null;
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
@@ -99,11 +101,13 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
     if (_transformPlanNode != null) {
       // Do not use star-tree
       return new AggregationGroupByOrderByOperator(_aggregationFunctions, _groupByExpressions,
-          _maxInitialResultHolderCapacity, _numGroupsLimit, _inSegmentResultLimit, _transformPlanNode.run(), numTotalDocs, _queryContext, false);
+          _maxInitialResultHolderCapacity, _numGroupsLimit, _inSegmentTrimLimit, _transformPlanNode.run(), numTotalDocs,
+          _queryContext, false, _enableSegmentGroupTrim);
     } else {
       // Use star-tree
       return new AggregationGroupByOrderByOperator(_aggregationFunctions, _groupByExpressions,
-          _maxInitialResultHolderCapacity, _numGroupsLimit, _inSegmentResultLimit, _starTreeTransformPlanNode.run(), numTotalDocs, _queryContext, true);
+          _maxInitialResultHolderCapacity, _numGroupsLimit, _inSegmentTrimLimit, _starTreeTransformPlanNode.run(),
+          numTotalDocs, _queryContext, true, _enableSegmentGroupTrim);
     }
   }
 }

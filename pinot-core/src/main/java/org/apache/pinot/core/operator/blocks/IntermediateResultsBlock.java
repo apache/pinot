@@ -58,7 +58,7 @@ public class IntermediateResultsBlock implements Block {
   private AggregationGroupByResult _aggregationGroupByResult;
   private List<Map<String, Object>> _combinedAggregationGroupByResult;
   private List<ProcessingException> _processingExceptions;
-  private Collection<TableResizer.fullIntermediateResult> _intermediateCollection;
+  private Collection<TableResizer.IntermediateRecord> _intermediateCollection;
   private long _numDocsScanned;
   private long _numEntriesScannedInFilter;
   private long _numEntriesScannedPostFilter;
@@ -123,9 +123,8 @@ public class IntermediateResultsBlock implements Block {
    * Constructor for aggregation group-by order-by result with {@link AggregationGroupByResult}.
    */
   public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions,
-                                  @Nullable AggregationGroupByResult aggregationGroupByResults,
-                                  @Nullable Collection<TableResizer.fullIntermediateResult> intermediateCollection,
-                                  DataSchema dataSchema) {
+      @Nullable AggregationGroupByResult aggregationGroupByResults,
+      @Nullable Collection<TableResizer.IntermediateRecord> intermediateCollection, DataSchema dataSchema) {
     _aggregationFunctions = aggregationFunctions;
     _aggregationGroupByResult = aggregationGroupByResults;
     _dataSchema = dataSchema;
@@ -225,12 +224,12 @@ public class IntermediateResultsBlock implements Block {
     _executionThreadCpuTimeNs = executionThreadCpuTimeNs;
   }
 
-  public void setNumServerThreads(int numServerThreads) {
-    _numServerThreads = numServerThreads;
-  }
-
   public int getNumServerThreads() {
     return _numServerThreads;
+  }
+
+  public void setNumServerThreads(int numServerThreads) {
+    _numServerThreads = numServerThreads;
   }
 
   @VisibleForTesting
@@ -296,7 +295,7 @@ public class IntermediateResultsBlock implements Block {
     _numGroupsLimitReached = numGroupsLimitReached;
   }
 
-  public Iterator<TableResizer.fullIntermediateResult> getIntermediateResultIterator() {
+  public Iterator<TableResizer.IntermediateRecord> getIntermediateResultIterator() {
     if (_intermediateCollection == null) {
       return null;
     }
