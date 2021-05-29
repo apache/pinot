@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.query.optimizer.statement;
 
-import java.util.Iterator;
-import java.util.Set;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
@@ -107,10 +105,7 @@ public class JsonStatementOptimizerTest {
         "Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.name.last>), Expression(type:LITERAL, literal:<Literal stringValue:STRING>), Expression(type:LITERAL, literal:<Literal stringValue:null>)]))");
   }
 
-  /**
-   * Test an aggregation function over json path expression in select clause.
-   * TODO: Note that alias is not applied in this case because json path expression is wrapped within another function.
-   */
+  /** Test an aggregation function over json path expression in select clause. */
   @Test
   public void testStringFunctionOverJsonPathSelectExpression() {
     BrokerRequest sqlBrokerRequest =
@@ -119,32 +114,38 @@ public class JsonStatementOptimizerTest {
     OPTIMIZER.optimize(pinotQuery, SCHEMA);
 
     Assert.assertEquals(pinotQuery.getSelectList().get(0).toString(),
-        "Expression(type:FUNCTION, functionCall:Function(operator:UPPER, operands:[Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.name.first>), Expression(type:LITERAL, literal:<Literal stringValue:STRING>), Expression(type:LITERAL, literal:<Literal stringValue:null>)]))]))");
+        "Expression(type:FUNCTION, functionCall:Function(operator:AS, operands:[Expression(type:FUNCTION, functionCall:Function(operator:UPPER, operands:[Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.name.first>), Expression(type:LITERAL, literal:<Literal stringValue:STRING>), Expression(type:LITERAL, literal:<Literal stringValue:null>)]))])), Expression(type:IDENTIFIER, identifier:Identifier(name:upper(jsonColumn.name.first)))]))");
   }
 
-  /**
-   * Test a numerical aggregation function over json path expression in select clause. TODO: Note that the query will fail
-   * because the return type of JSON_EXTRACT_SCALAR is always set to 'STRING'. This will be fixed in future when we move
-   * to having better storage mechanism for JSON documents instead of storing JSON documents as STRING as we do now.
-   */
+  /** Test a numerical function over json path expression in select clause. */
   @Test
   public void testNumericalFunctionOverJsonPathSelectExpression() {
-    BrokerRequest sqlBrokerRequest =
+
+    // Test without user-specified alias.
+    BrokerRequest sqlBrokerRequest1 =
         SQL_COMPILER.compileToBrokerRequest("SELECT MAX(jsonColumn.id) FROM jsontypetable");
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
+    PinotQuery pinotQuery1 = sqlBrokerRequest1.getPinotQuery();
+    OPTIMIZER.optimize(pinotQuery1, SCHEMA);
 
-    Assert.assertEquals(pinotQuery.getSelectList().get(0).toString(),
-        "");
-  }
+    Assert.assertEquals(pinotQuery1.getSelectList().get(0).toString(),
+        "Expression(type:FUNCTION, functionCall:Function(operator:AS, operands:[Expression(type:FUNCTION, functionCall:Function(operator:MAX, operands:[Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.id>), Expression(type:LITERAL, literal:<Literal stringValue:DOUBLE>), Expression(type:LITERAL, literal:<Literal doubleValue:-Infinity>)]))])), Expression(type:IDENTIFIER, identifier:Identifier(name:max(jsonColumn.id)))]))");
 
+    // Test with user-specified alias.
+    BrokerRequest sqlBrokerRequest2 =
+        SQL_COMPILER.compileToBrokerRequest("SELECT MAX(jsonColumn.id) AS x FROM jsontypetable");
+    PinotQuery pinotQuery2 = sqlBrokerRequest2.getPinotQuery();
+    OPTIMIZER.optimize(pinotQuery2, SCHEMA);
 
-  @Test
-  public void test() {
-    Set<String> functions = JsonStatementOptimizer.getNumericalFunctionList();
-    Iterator<String> iterator = functions.iterator();
-    while (iterator.hasNext()) {
-      System.out.println(iterator.next());
-    }
+    Assert.assertEquals(pinotQuery2.getSelectList().get(0).toString(),
+        "Expression(type:FUNCTION, functionCall:Function(operator:AS, operands:[Expression(type:FUNCTION, functionCall:Function(operator:MAX, operands:[Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.id>), Expression(type:LITERAL, literal:<Literal stringValue:DOUBLE>), Expression(type:LITERAL, literal:<Literal doubleValue:-Infinity>)]))])), Expression(type:IDENTIFIER, identifier:Identifier(name:x))]))");
+
+    // Test with nested function calls.
+    BrokerRequest sqlBrokerRequest3 =
+        SQL_COMPILER.compileToBrokerRequest("SELECT MAX(jsonColumn.id - 5) FROM jsontypetable");
+    PinotQuery pinotQuery3 = sqlBrokerRequest3.getPinotQuery();
+    OPTIMIZER.optimize(pinotQuery3, SCHEMA);
+
+    Assert.assertEquals(pinotQuery3.getSelectList().get(0).toString(),
+        "Expression(type:FUNCTION, functionCall:Function(operator:AS, operands:[Expression(type:FUNCTION, functionCall:Function(operator:MAX, operands:[Expression(type:FUNCTION, functionCall:Function(operator:MINUS, operands:[Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.id>), Expression(type:LITERAL, literal:<Literal stringValue:DOUBLE>), Expression(type:LITERAL, literal:<Literal doubleValue:-Infinity>)])), Expression(type:LITERAL, literal:<Literal longValue:5>)]))])), Expression(type:IDENTIFIER, identifier:Identifier(name:max(minus(jsonColumn.id,'5'))))]))");
   }
 }

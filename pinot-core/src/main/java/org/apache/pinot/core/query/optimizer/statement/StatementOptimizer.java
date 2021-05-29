@@ -24,7 +24,8 @@ import org.apache.pinot.spi.data.Schema;
 
 
 /**
- * This interface allows for writing optimizer classes that will optimize and entire SQL statement.
+ * Interface for optimizing a particular class of SQL statement. Optimizers that implement this interface may modify
+ * several or all parts of the SQL statement.
  */
 public interface StatementOptimizer {
 

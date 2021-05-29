@@ -59,10 +59,10 @@ import org.apache.pinot.spi.data.Schema;
  * below.
  *
  * Example 2:
- *   From : SELECT MIN(jsonColumn.id)
+ *   From : SELECT MIN(jsonColumn.id - 5)
  *             FROM testTable
  *            WHERE jsonColumn.id IS NOT NULL
- *   TO   : SELECT MIN(JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'DOUBLE', '-Infinity')) AS min(jsonColum.id)
+ *   TO   : SELECT MIN(MINUS(JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'DOUBLE', '-Infinity'),5)) AS min(minus(jsonColum.id, '5'))
  *             FROM testTable
  *            WHERE JSON_MATCH('"$.id" IS NOT NULL')
  *
@@ -98,7 +98,12 @@ public class JsonStatementOptimizer implements StatementOptimizer {
     // In SELECT clause, replace JSON path expressions with JSON_EXTRACT_SCALAR function with an alias.
     List<Expression> expressions = query.getSelectList();
     for (Expression expression : expressions) {
-      optimizeJsonIdentifier(expression, schema, false, true);
+      OptimizeResult result = optimizeJsonIdentifier(expression, schema, false, true);
+      if (expression.getType() == ExpressionType.FUNCTION && !expression.getFunctionCall().getOperator().equals("AS")
+          && result.hasJsonPathExpression) {
+        Function aliasFunction = getAliasFunction(result.alias, expression.getFunctionCall());
+        expression.setFunctionCall(aliasFunction);
+      }
     }
 
     // In WHERE clause, replace JSON path expressions with JSON_MATCH function.
@@ -122,34 +127,60 @@ public class JsonStatementOptimizer implements StatementOptimizer {
     }
   }
 
+  private static class OptimizeResult {
+    String alias;
+    boolean hasJsonPathExpression = false;
+
+    public OptimizeResult(String alias, boolean hasJsonPathExpression) {
+      this.alias = alias;
+      this.hasJsonPathExpression = hasJsonPathExpression;
+    }
+  }
+
   /** Replace an json path expression with an aliased JSON_EXTRACT_SCALAR function. */
-  private static void optimizeJsonIdentifier(Expression expression, Schema schema, boolean hasNumericalOutput,
+  private static OptimizeResult optimizeJsonIdentifier(Expression expression, Schema schema, boolean hasNumericalOutput,
       boolean hasColumnAlias) {
     switch (expression.getType()) {
-      case IDENTIFIER:
+      case LITERAL:
+        return new OptimizeResult(getLiteralSQL(expression.getLiteral(), true), false);
+      case IDENTIFIER: {
         String[] parts = getIdentifierParts(expression.getIdentifier());
+        boolean hasJsonPathExpression = false;
+        String alias = expression.getIdentifier().getName();
         if (parts.length > 1 && isValidJSONColumn(parts[0], schema)) {
           // replace <column-name>.<json-path> with json_extract_scalar(<column-name>, '<json-path>', 'STRING', <JSON-null-value>)
           Function jsonExtractScalarFunction = getJsonExtractFunction(parts, hasNumericalOutput);
-          Function aliasFunction =
-              hasColumnAlias ? getAliasFunction(expression.getIdentifier().getName(), jsonExtractScalarFunction)
-                  : jsonExtractScalarFunction;
           expression.setIdentifier(null);
           expression.setType(ExpressionType.FUNCTION);
-          expression.setFunctionCall(aliasFunction);
+          expression.setFunctionCall(jsonExtractScalarFunction);
+          hasJsonPathExpression = true;
         }
-        break;
-      case FUNCTION:
+        return new OptimizeResult(alias, hasJsonPathExpression);
+      }
+      case FUNCTION: {
         Function function = expression.getFunctionCall();
         List<Expression> operands = function.getOperands();
 
-        //hasColumnAlias &= isRelationalOperator(function.getOperator());
+        boolean hasJsonPathExpression = false;
+        StringBuffer alias = new StringBuffer();
+        alias.append(function.getOperator().toLowerCase(Locale.ROOT)).append("(");
         hasNumericalOutput = numericalFunctions.contains(function.getOperator().toLowerCase(Locale.ROOT));
-        for (Expression operand : operands) {
+        for (int i = 0; i < operands.size(); ++i) {
           // recursively check to see if there is a <json-column>.<json-path> identifier in this expression.
-          optimizeJsonIdentifier(operand, schema, hasNumericalOutput, false);
+          OptimizeResult operandResult = optimizeJsonIdentifier(operands.get(i), schema, hasNumericalOutput, false);
+          hasJsonPathExpression |= operandResult.hasJsonPathExpression;
+          if (i > 0) {
+            alias.append(",");
+          }
+          alias.append(operandResult.alias);
         }
+        alias.append(")");
+
+        return new OptimizeResult(alias.toString(), hasJsonPathExpression);
+      }
     }
+
+    return new OptimizeResult("", false);
   }
 
   /**
@@ -236,7 +267,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
               List<Expression> jsonMatchFunctionOperands = new ArrayList<>();
               jsonMatchFunctionOperands.add(RequestUtils.createIdentifierExpression(parts[0]));
               jsonMatchFunctionOperands.add(RequestUtils.createLiteralExpression(new StringLiteralAstNode(
-                  getJsonPath(parts, true) + getOperatorSymbol(kind) + getLiteralValue(right.getLiteral()))));
+                  getJsonPath(parts, true) + getOperatorSQL(kind) + getLiteralSQL(right.getLiteral(), false))));
               jsonMatchFunction.setOperands(jsonMatchFunctionOperands);
 
               expression.setFunctionCall(jsonMatchFunction);
@@ -255,7 +286,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
               List<Expression> jsonMatchFunctionOperands = new ArrayList<>();
               jsonMatchFunctionOperands.add(RequestUtils.createIdentifierExpression(parts[0]));
               jsonMatchFunctionOperands.add(RequestUtils.createLiteralExpression(
-                  new StringLiteralAstNode(getJsonPath(parts, true) + getOperatorSymbol(kind))));
+                  new StringLiteralAstNode(getJsonPath(parts, true) + getOperatorSQL(kind))));
               jsonMatchFunction.setOperands(jsonMatchFunctionOperands);
 
               expression.setFunctionCall(jsonMatchFunction);
@@ -311,7 +342,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
   }
 
   /** @return symbolic representation of function operator delimited by spaces. */
-  private static String getOperatorSymbol(FilterKind kind) {
+  private static String getOperatorSQL(FilterKind kind) {
     switch (kind) {
       case EQUALS:
         return " = ";
@@ -337,28 +368,45 @@ public class JsonStatementOptimizer implements StatementOptimizer {
     return " ";
   }
 
-  /** @return Literal value converted into an SQL string. Note that BYTE, STRING, and BINARY values are delimited by quotes. */
-  private static String getLiteralValue(Literal literal) {
+  /**
+   * @param literal {@link Literal} to convert to a {@link String}.
+   * @param aliasing When true, generate string for use in an alias; otherwise, generate SQL string representation.
+   * @return Literal value converted into either an alias name or an SQL string. BYTE, STRING, and BINARY values are
+   * delimited by quotes in SQL and everything is delimited by quotes for use in alias.
+   * */
+  private static String getLiteralSQL(Literal literal, boolean aliasing) {
+    String result = aliasing ? "'" : "";
     switch (literal.getSetField()) {
       case BOOL_VALUE:
-        return String.valueOf(literal.getBinaryValue());
+        result += String.valueOf(literal.getBinaryValue());
       case BYTE_VALUE:
-        return "'" + String.valueOf(literal.getByteValue()) + "'";
+        result +=
+            aliasing ? String.valueOf(literal.getByteValue()) : "'" + String.valueOf(literal.getByteValue()) + "'";
+        break;
       case SHORT_VALUE:
-        return String.valueOf(literal.getShortValue());
+        result +=
+            aliasing ? String.valueOf(literal.getShortValue()) : "'" + String.valueOf(literal.getShortValue()) + "'";
+        break;
       case INT_VALUE:
-        return String.valueOf(literal.getIntValue());
+        result += String.valueOf(literal.getIntValue());
+        break;
       case LONG_VALUE:
-        return String.valueOf(literal.getLongValue());
+        result += String.valueOf(literal.getLongValue());
+        break;
       case DOUBLE_VALUE:
-        return String.valueOf(literal.getDoubleValue());
+        result += String.valueOf(literal.getDoubleValue());
+        break;
       case STRING_VALUE:
-        return "'" + literal.getStringValue() + "'";
+        result += "'" + literal.getStringValue() + "'";
+        break;
       case BINARY_VALUE:
-        return "'" + String.valueOf(literal.getBinaryValue()) + "'";
+        result +=
+            aliasing ? String.valueOf(literal.getBinaryValue()) : "'" + String.valueOf(literal.getBinaryValue()) + "'";
+        break;
     }
 
-    return "";
+    result += aliasing ? "'" : "";
+    return result;
   }
 
   /** List of function that require input to be in a number. */
