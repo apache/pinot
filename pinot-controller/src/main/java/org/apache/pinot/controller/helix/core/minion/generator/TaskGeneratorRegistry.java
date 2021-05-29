@@ -40,7 +40,7 @@ public class TaskGeneratorRegistry {
   private final Map<String, PinotTaskGenerator> _taskGeneratorRegistry = new HashMap<>();
 
   /**
-   * The package regex pattern for auto-registered {@link TaskGenerator}.
+   * The package regex pattern for auto-registered {@link PinotTaskGenerator}.
    */
   public static final String TASK_GENERATOR_PACKAGE_REGEX_PATTERN = ".*\\.plugin\\.minion\\.tasks\\..*";
 

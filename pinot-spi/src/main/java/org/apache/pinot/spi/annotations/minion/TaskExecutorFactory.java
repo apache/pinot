@@ -29,7 +29,7 @@ import java.lang.annotation.Target;
  *
  * NOTE:
  *   - The annotated class must implement the PinotTaskExecutorFactory interface
- *   - The annotated class must be under the package of name 'org.apache.pinot.*.executor.*' to be auto-registered.
+ *   - The annotated class must be under the package of name 'org.apache.pinot.*.plugin.minion.tasks.*' to be auto-registered.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)

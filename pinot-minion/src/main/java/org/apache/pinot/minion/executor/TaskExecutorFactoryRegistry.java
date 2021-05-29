@@ -34,9 +34,9 @@ public class TaskExecutorFactoryRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(TaskExecutorFactoryRegistry.class);
 
   /**
-   * The package regex pattern for auto-registered {@link TaskExecutorFactory}.
+   * The package regex pattern for auto-registered {@link PinotTaskExecutorFactory}.
    */
-  private static final String TASK_EXECUTOR_PACKAGE_REGEX_PATTERN = ".*\\.plugin\\.minion\\.tasks\\..*";
+  private static final String TASK_EXECUTOR_FACTORY_PACKAGE_REGEX_PATTERN = ".*\\.plugin\\.minion\\.tasks\\..*";
 
   private final Map<String, PinotTaskExecutorFactory> _taskExecutorFactoryRegistry = new HashMap<>();
 
@@ -68,7 +68,7 @@ public class TaskExecutorFactoryRegistry {
 
   public static Set<Class<?>> getTaskExecutorFactoryClasses() {
     return PinotReflectionUtils
-        .getClassesThroughReflection(TASK_EXECUTOR_PACKAGE_REGEX_PATTERN, TaskExecutorFactory.class);
+        .getClassesThroughReflection(TASK_EXECUTOR_FACTORY_PACKAGE_REGEX_PATTERN, TaskExecutorFactory.class);
   }
 
   /**

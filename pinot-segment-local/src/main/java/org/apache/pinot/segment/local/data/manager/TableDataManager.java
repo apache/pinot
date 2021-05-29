@@ -18,17 +18,21 @@
  */
 package org.apache.pinot.segment.local.data.manager;
 
+import com.google.common.cache.LoadingCache;
 import java.io.File;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.utils.Pair;
 
 
 /**
@@ -41,7 +45,8 @@ public interface TableDataManager {
    * Initializes the table data manager. Should be called only once and before calling any other method.
    */
   void init(TableDataManagerConfig tableDataManagerConfig, String instanceId,
-      ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixManager helixManager);
+      ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixManager helixManager,
+      LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache);
 
   /**
    * Starts the table data manager. Should be called only once after table data manager gets initialized but before
@@ -126,4 +131,19 @@ public interface TableDataManager {
    * Returns the dir which contains the data segments.
    */
   File getTableDataDir();
+
+  /**
+   * Add error related to segment, if any. The implementation
+   * is expected to cache last 'N' errors for the table, related to
+   * segment transitions.
+   */
+  void addSegmentError(String segmentName, SegmentErrorInfo segmentErrorInfo);
+
+  /**
+   * Returns a list of segment errors that were encountered
+   * and cached.
+   *
+   * @return List of {@link SegmentErrorInfo}
+   */
+  Map<String, SegmentErrorInfo> getSegmentErrors();
 }

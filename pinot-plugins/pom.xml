@@ -108,6 +108,18 @@
                       <pattern>org.apache.http</pattern>
                       <shadedPattern>shaded.org.apache.http</shadedPattern>
                     </relocation>
+                    <relocation>
+                      <pattern>software.amazon</pattern>
+                      <shadedPattern>shaded.software.amazon</shadedPattern>
+                    </relocation>
+                    <relocation>
+                      <pattern>org.reflections</pattern>
+                      <shadedPattern>shaded.org.reflections</shadedPattern>
+                    </relocation>
+                    <relocation>
+                      <pattern>io.netty</pattern>
+                      <shadedPattern>shaded.io.netty</shadedPattern>
+                    </relocation>
                   </relocations>
                 </configuration>
               </execution>

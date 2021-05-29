@@ -292,7 +292,7 @@ public class PinotSegmentUploadDownloadRestletResource {
                 tableNameWithType);
         zkDownloadUri = downloadUri;
       } else {
-        zkDownloadUri = getZkDownloadURIForSegmentUpload(tableNameWithType, segmentName);
+        zkDownloadUri = getZkDownloadURIForSegmentUpload(rawTableName, segmentName);
       }
 
       // Zk operations
@@ -389,9 +389,9 @@ public class PinotSegmentUploadDownloadRestletResource {
       String tableNameWithType, SegmentMetadata segmentMetadata, String segmentName, String zkDownloadURI,
       boolean moveSegmentToFinalLocation, String crypter)
       throws Exception {
-    URI finalSegmentLocationURI = URIUtils
-        .getUri(ControllerFilePathProvider.getInstance().getDataDirURI().toString(), tableNameWithType,
-            URIUtils.encode(segmentName));
+    String basePath = ControllerFilePathProvider.getInstance().getDataDirURI().toString();
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    URI finalSegmentLocationURI = URIUtils.getUri(basePath, rawTableName, URIUtils.encode(segmentName));
     ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
     zkOperator.completeSegmentOperations(tableNameWithType, segmentMetadata, finalSegmentLocationURI, uploadedSegmentFile,
         enableParallelPushProtection, headers, zkDownloadURI, moveSegmentToFinalLocation, crypter);

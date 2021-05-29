@@ -58,4 +58,6 @@ public interface InstanceDataManagerConfig {
   String getTierBackend();
 
   PinotConfiguration getTierConfigs();
+
+  long getErrorCacheSize();
 }

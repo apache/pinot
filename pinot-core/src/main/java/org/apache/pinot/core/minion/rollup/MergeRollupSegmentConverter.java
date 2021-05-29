@@ -35,6 +35,10 @@ import org.apache.pinot.spi.data.Schema;
 
 
 /**
+ * This class is deprecated.
+ *
+ * TODO: Update current MergeRollupExecutor to use SegmentProcessorFramework instead
+ *
  * Rollup segment converter takes a list of segments and concatenates/rolls up segments based on the configuration.
  *
  * TODO: Add support for roll-up with time granularity change
