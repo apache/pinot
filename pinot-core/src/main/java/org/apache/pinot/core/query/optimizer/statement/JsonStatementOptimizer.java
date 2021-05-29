@@ -33,7 +33,6 @@ import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.core.query.optimizer.filter.StatementOptimizer;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.pql.parsers.pql2.ast.FloatingPointLiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.LiteralAstNode;
