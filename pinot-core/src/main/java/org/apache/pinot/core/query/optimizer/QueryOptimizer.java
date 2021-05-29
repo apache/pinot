@@ -32,12 +32,17 @@ import org.apache.pinot.core.query.optimizer.filter.FlattenAndOrFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.MergeEqInFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.MergeRangeFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.NumericalFilterOptimizer;
+import org.apache.pinot.core.query.optimizer.statement.StatementOptimizer;
+import org.apache.pinot.core.query.optimizer.statement.JsonStatementOptimizer;
 import org.apache.pinot.spi.data.Schema;
 
 
 public class QueryOptimizer {
   private static final List<FilterOptimizer> FILTER_OPTIMIZERS = Arrays
       .asList(new FlattenAndOrFilterOptimizer(), new NumericalFilterOptimizer(), new MergeEqInFilterOptimizer(), new MergeRangeFilterOptimizer());
+
+  private static final List<StatementOptimizer> STATEMENT_OPTIMIZERS = Arrays
+      .asList(new JsonStatementOptimizer());
 
   /**
    * Optimizes the given PQL query.
@@ -64,6 +69,11 @@ public class QueryOptimizer {
         filterExpression = filterOptimizer.optimize(filterExpression, schema);
       }
       pinotQuery.setFilterExpression(filterExpression);
+    }
+
+    // Run statement optimizer after filter has already been optimized.
+    for (StatementOptimizer statementOptimizer : STATEMENT_OPTIMIZERS) {
+      statementOptimizer.optimize(pinotQuery, schema);
     }
   }
 }
