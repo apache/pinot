@@ -41,12 +41,46 @@
 
 RM="/bin/rm"
 logCount=1
+#Declare the number of mandatory args
+margs=2
 
 # get usage of the script
 function usage() {
   command=$1
-  echo "Usage: $command workingDir testSuiteDir"
-  exit 1
+  echo "Usage: $command -w <workingDir> -t <testSuiteDir> [-k]"
+}
+
+function help() {
+  usage
+  echo -e "MANDATORY:"
+  echo -e "  -w, --working-dir                      Working directory where olderCommit and newCommit target files reside."
+  echo -e "  -t, --test-suite-dir                   Test suite directory\n"
+  echo -e "OPTIONAL:"
+  echo -e "  -k, --keep-cluster-on-failure          Keep cluster on test failure"
+  echo -e "  -h, --help                             Prints this help\n"
+}
+
+# Ensures that the number of passed args are at least equals
+# to the declared number of mandatory args.
+# It also handles the special case of the -h or --help arg.
+function margs_precheck() {
+  if [ $2 ] && [ $1 -lt $margs ]; then
+    if [ $2 == "--help" ] || [ $2 == "-h" ]; then
+      help
+      exit
+    else
+      usage compCheck
+      exit 1 # error
+    fi
+  fi
+}
+
+# Ensures that all the mandatory args are not empty
+function margs_check() {
+  if [ $# -lt $margs ]; then
+    usage
+    exit 1 # error
+  fi
 }
 
 function waitForZkReady() {
@@ -54,7 +88,7 @@ function waitForZkReady() {
   while [ $status -ne 0 ]; do
     sleep 1
     echo Checking port 2181 for zk ready
-    echo x |nc localhost 2181 1>/dev/null 2>&1
+    echo x | nc localhost 2181 1>/dev/null 2>&1
     status=$(echo $?)
   done
 }
@@ -75,13 +109,13 @@ function waitForKafkaReady() {
   while [ $status -ne 0 ]; do
     sleep 1
     echo Checking port 19092 for kafka ready
-    echo x |nc localhost 19092 1>/dev/null 2>&1
+    echo x | nc localhost 19092 1>/dev/null 2>&1
     status=$(echo $?)
   done
 }
 
 function waitForBrokerReady() {
-# TODO We are checking for port 8099. Check for real broker port from config if needed.
+  # TODO: We are checking for port 8099. Check for real broker port from config if needed.
   local status=1
   while [ $status -ne 0 ]; do
     sleep 1
@@ -92,7 +126,7 @@ function waitForBrokerReady() {
 }
 
 function waitForServerReady() {
-  # TODO We are checjing for port 8097. Check for real server port from config if needed,
+  # TODO: We are checking for port 8097. Check for real server port from config if needed,
   local status=1
   while [ $status -ne 0 ]; do
     sleep 1
@@ -132,22 +166,22 @@ function startService() {
     # Remove all previous zk data
     ${RM} -rf ${dirName}/zkdir
     ./pinot-admin.sh StartZookeeper -dataDir ${LOG_DIR}/zkdir 1>${LOG_DIR}/zookeeper.${logCount}.log 2>&1 &
-    echo $! > ${PID_DIR}/zookeeper.pid
+    echo $! >${PID_DIR}/zookeeper.pid
   elif [ "$serviceName" = "controller" ]; then
     ./pinot-admin.sh StartController ${configFileArg} 1>${LOG_DIR}/controller.${logCount}.log 2>&1 &
-    echo $! > ${PID_DIR}/controller.pid
+    echo $! >${PID_DIR}/controller.pid
   elif [ "$serviceName" = "broker" ]; then
     ./pinot-admin.sh StartBroker ${configFileArg} 1>${LOG_DIR}/broker.${logCount}.log 2>&1 &
-    echo $! > ${PID_DIR}/broker.pid
+    echo $! >${PID_DIR}/broker.pid
   elif [ "$serviceName" = "server" ]; then
     ./pinot-admin.sh StartServer ${configFileArg} 1>${LOG_DIR}/server.${logCount}.log 2>&1 &
-    echo $! > ${PID_DIR}/server.pid
+    echo $! >${PID_DIR}/server.pid
   elif [ "$serviceName" = "kafka" ]; then
     ./pinot-admin.sh StartKafka -zkAddress localhost:2181/kafka 1>${LOG_DIR}/kafka.${logCount}.log 2>&1 &
-    echo $! > ${PID_DIR}/kafka.pid
+    echo $! >${PID_DIR}/kafka.pid
   fi
   # Keep log files distinct so we can debug
-  logCount=$((logCount+1))
+  logCount=$((logCount + 1))
 
   echo "${serviceName} started"
   popd 1>/dev/null || exit 1
@@ -204,7 +238,10 @@ function stopServices() {
 function setupCompatTester() {
   COMPAT_TESTER="$(dirname $0)/../${COMPAT_TESTER_PATH}"
   local pinotIntegTestsRelDir="$(dirname $0)/../pinot-integration-tests/target"
-  local pinotIntegTestsAbsDir=`(cd ${pinotIntegTestsRelDir};pwd)`
+  local pinotIntegTestsAbsDir=$( (
+    cd ${pinotIntegTestsRelDir}
+    pwd
+  ))
   CLASSPATH_PREFIX=$(ls ${pinotIntegTestsAbsDir}/pinot-integration-tests-*-tests.jar)
   export CLASSPATH_PREFIX
 }
@@ -212,9 +249,12 @@ function setupCompatTester() {
 #compute absolute path for testSuiteDir if given relative
 function absPath() {
   local testSuiteDirPath=$1
-  if [[ ! "$testSuiteDirPath" = /* ]]; then
+  if [[ ! "$testSuiteDirPath" == /* ]]; then
     #relative path
-    testSuiteDirPath=$(cd "$testSuiteDirPath"; pwd)
+    testSuiteDirPath=$(
+      cd "$testSuiteDirPath"
+      pwd
+    )
   fi
   echo "$testSuiteDirPath"
 }
@@ -223,15 +263,44 @@ function absPath() {
 # Main
 #
 
-if [ $# -ne 2 ] ; then
-  usage compCheck
-fi
-
-COMPAT_TESTER_PATH="pinot-integration-tests/target/pinot-integration-tests-pkg/bin/pinot-compat-test-runner.sh"
+margs_precheck $# $1
 
 # create subdirectories for given commits
-workingDir=$(absPath $1)
-testSuiteDir=$(absPath $2)
+workingDir=
+testSuiteDir=
+keepClusterOnFailure="false"
+
+# Args while-loop
+while [ "$1" != "" ]; do
+  case $1 in
+  -w | --working-dir)
+    shift
+    workingDir=$(absPath $1)
+    ;;
+  -t | --test-suite-dir)
+    shift
+    testSuiteDir=$(absPath $1)
+    ;;
+  -k | keep-cluster-on-failure)
+    keepClusterOnFailure="true"
+    ;;
+  -h | --help)
+    help
+    exit
+    ;;
+  *)
+    echo "illegal option $1"
+    usage
+    exit 1 # error
+    ;;
+  esac
+  shift
+done
+
+# Pass mandatory args for check
+margs_check $workingDir $testSuiteDir
+
+COMPAT_TESTER_PATH="pinot-integration-tests/target/pinot-integration-tests-pkg/bin/pinot-compat-test-runner.sh"
 
 BROKER_CONF=${testSuiteDir}/config/BrokerConfig.conf
 CONTROLLER_CONF=${testSuiteDir}/config/ControllerConfig.conf
@@ -251,7 +320,7 @@ setupCompatTester
 
 # check that the default ports are open
 if [ "$(lsof -t -i:8097 -s TCP:LISTEN)" ] || [ "$(lsof -t -i:8098 -sTCP:LISTEN)" ] || [ "$(lsof -t -i:8099 -sTCP:LISTEN)" ] ||
-     [ "$(lsof -t -i:9000 -sTCP:LISTEN)" ] || [ "$(lsof -t -i:2181 -sTCP:LISTEN)" ]; then
+  [ "$(lsof -t -i:9000 -sTCP:LISTEN)" ] || [ "$(lsof -t -i:2181 -sTCP:LISTEN)" ]; then
   echo "Cannot start the components since the default ports are not open. Check any existing process that may be using the default ports."
   exit 1
 fi
@@ -261,40 +330,48 @@ fi
 startServices "$oldTargetDir"
 
 echo "Setting up cluster before upgrade"
-$COMPAT_TESTER $testSuiteDir/pre-controller-upgrade.yaml 1;
+$COMPAT_TESTER $testSuiteDir/pre-controller-upgrade.yaml 1
 if [ $? -ne 0 ]; then
-  stopServices
-  exit 1;
+  if [ $keepClusterOnFailure == "false" ]; then
+    stopServices
+  fi
+  exit 1
 fi
 echo "Upgrading controller"
 stopService controller
 startService controller "$newTargetDir" "$CONTROLLER_CONF"
 waitForControllerReady
 echo "Running tests after controller upgrade"
-$COMPAT_TESTER $testSuiteDir/pre-broker-upgrade.yaml 2;
+$COMPAT_TESTER $testSuiteDir/pre-broker-upgrade.yaml 2
 if [ $? -ne 0 ]; then
-  stopServices
-  exit 1;
+  if [ $keepClusterOnFailure == "false" ]; then
+    stopServices
+  fi
+  exit 1
 fi
 echo "Upgrading broker"
 stopService broker
 startService broker "$newTargetDir" "$BROKER_CONF"
 waitForBrokerReady
 echo "Running tests after broker upgrade"
-$COMPAT_TESTER $testSuiteDir/pre-server-upgrade.yaml 3;
+$COMPAT_TESTER $testSuiteDir/pre-server-upgrade.yaml 3
 if [ $? -ne 0 ]; then
-  stopServices
-  exit 1;
+  if [ $keepClusterOnFailure == "false" ]; then
+    stopServices
+  fi
+  exit 1
 fi
 echo "Upgrading server"
 stopService server
 startService server "$newTargetDir" "$SERVER_CONF"
 waitForServerReady
 echo "Running tests after server upgrade"
-$COMPAT_TESTER $testSuiteDir/post-server-upgrade.yaml 4;
+$COMPAT_TESTER $testSuiteDir/post-server-upgrade.yaml 4
 if [ $? -ne 0 ]; then
-  stopServices
-  exit 1;
+  if [ $keepClusterOnFailure == "false" ]; then
+    stopServices
+  fi
+  exit 1
 fi
 
 echo "Downgrading server"
@@ -303,20 +380,24 @@ stopService server
 startService server "$oldTargetDir" "$SERVER_CONF"
 waitForServerReady
 echo "Running tests after server downgrade"
-$COMPAT_TESTER $testSuiteDir/post-server-rollback.yaml 5;
+$COMPAT_TESTER $testSuiteDir/post-server-rollback.yaml 5
 if [ $? -ne 0 ]; then
-  stopServices
-  exit 1;
+  if [ $keepClusterOnFailure == "false" ]; then
+    stopServices
+  fi
+  exit 1
 fi
 echo "Downgrading broker"
 stopService broker
 startService broker "$oldTargetDir" "$BROKER_CONF"
 waitForBrokerReady
 echo "Running tests after broker downgrade"
-$COMPAT_TESTER $testSuiteDir/post-broker-rollback.yaml 6;
+$COMPAT_TESTER $testSuiteDir/post-broker-rollback.yaml 6
 if [ $? -ne 0 ]; then
-  stopServices
-  exit 1;
+  if [ $keepClusterOnFailure == "false" ]; then
+    stopServices
+  fi
+  exit 1
 fi
 echo "Downgrading controller"
 stopService controller
@@ -324,10 +405,12 @@ startService controller "$oldTargetDir" "$CONTROLLER_CONF"
 waitForControllerReady
 waitForControllerReady
 echo "Running tests after controller downgrade"
-$COMPAT_TESTER $testSuiteDir/post-controller-rollback.yaml 7;
+$COMPAT_TESTER $testSuiteDir/post-controller-rollback.yaml 7
 if [ $? -ne 0 ]; then
-  stopServices
-  exit 1;
+  if [ $keepClusterOnFailure == "false" ]; then
+    stopServices
+  fi
+  exit 1
 fi
 stopServices
 

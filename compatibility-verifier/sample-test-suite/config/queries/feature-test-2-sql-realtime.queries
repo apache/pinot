@@ -19,7 +19,11 @@
 
 # Selection
 SELECT longDimSV1, intDimMV1 FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ AND (stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72))) ORDER BY longDimSV1, intDimMV1
+# This is a subset comparison query: there are 10 qualified records in total, the query limit the number of returned records as 5, the test compares the returned results to be a subset of total qualified results.
+# To generate the result file, use this query instead:
+# SELECT longDimSV1, intDimMV1 FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ AND (stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72)))
 SELECT longDimSV1, intDimMV1 FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ AND (stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72))) LIMIT 5
+# This is a query exhausting all records: there are 10 qualified records in total, the query limit the number of returned records as 200
 SELECT longDimSV1, intDimMV1 FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ AND (stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72))) LIMIT 200
 
 # Aggregation
