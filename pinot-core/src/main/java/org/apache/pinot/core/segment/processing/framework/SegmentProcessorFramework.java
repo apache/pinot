@@ -21,6 +21,7 @@ package org.apache.pinot.core.segment.processing.framework;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.Arrays;
+import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -46,7 +47,7 @@ public class SegmentProcessorFramework {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentProcessorFramework.class);
 
-  private final File _inputSegmentsDir;
+  private final List<File> _inputSegments;
   private final File _outputSegmentsDir;
   private final SegmentProcessorConfig _segmentProcessorConfig;
 
@@ -60,20 +61,19 @@ public class SegmentProcessorFramework {
 
   /**
    * Initializes the Segment Processor framework with input segments, output path and processing config
-   * @param inputSegmentsDir directory containing the input segments. These can be tarred or untarred.
+   * @param inputSegments list of input segments. These can be tarred or untarred.
    * @param segmentProcessorConfig config for segment processing
    * @param outputSegmentsDir directory for placing the resulting segments. This should already exist.
    */
-  public SegmentProcessorFramework(File inputSegmentsDir, SegmentProcessorConfig segmentProcessorConfig,
-      File outputSegmentsDir) {
+  public SegmentProcessorFramework(List<File> inputSegments, SegmentProcessorConfig segmentProcessorConfig,
+                                   File outputSegmentsDir) {
 
     LOGGER.info(
-        "Initializing SegmentProcessorFramework with input segments dir: {}, output segments dir: {} and segment processor config: {}",
-        inputSegmentsDir.getAbsolutePath(), outputSegmentsDir.getAbsolutePath(), segmentProcessorConfig.toString());
+        "Initializing SegmentProcessorFramework with input segments: {}, output segments dir: {} and segment processor config: {}",
+        inputSegments, outputSegmentsDir.getAbsolutePath(), segmentProcessorConfig.toString());
 
-    _inputSegmentsDir = inputSegmentsDir;
-    Preconditions.checkState(_inputSegmentsDir.exists() && _inputSegmentsDir.isDirectory(),
-        "Input path: %s must be a directory with Pinot segments", _inputSegmentsDir.getAbsolutePath());
+    _inputSegments = inputSegments;
+    inputSegments.forEach(file -> Preconditions.checkState(file.exists(), "Input path: %s must exist", file.getAbsolutePath()));
     _outputSegmentsDir = outputSegmentsDir;
     Preconditions.checkState(
         _outputSegmentsDir.exists() && _outputSegmentsDir.isDirectory() && (_outputSegmentsDir.list().length == 0),
@@ -107,15 +107,14 @@ public class SegmentProcessorFramework {
       throws Exception {
 
     // Check for input segments
-    File[] segmentFiles = _inputSegmentsDir.listFiles();
-    if (segmentFiles.length == 0) {
-      throw new IllegalStateException("No segments found in input dir: " + _inputSegmentsDir.getAbsolutePath()
+    if (_inputSegments.size() == 0) {
+      throw new IllegalStateException("No segments found in input dir: " + _inputSegments
           + ". Exiting SegmentProcessorFramework.");
     }
 
     // Mapper phase.
-    LOGGER.info("Beginning mapper phase. Processing segments: {}", Arrays.toString(_inputSegmentsDir.list()));
-    for (File segment : segmentFiles) {
+    LOGGER.info("Beginning mapper phase. Processing segments: {}", _inputSegments);
+    for (File segment : _inputSegments) {
 
       String fileName = segment.getName();
       File mapperInput = segment;
@@ -183,7 +182,7 @@ public class SegmentProcessorFramework {
       driver.build();
     }
 
-    LOGGER.info("Successfully converted segments from: {} to {}", _inputSegmentsDir,
+    LOGGER.info("Successfully converted segments from: {} to {}", _inputSegments,
         Arrays.toString(_outputSegmentsDir.list()));
   }
 
