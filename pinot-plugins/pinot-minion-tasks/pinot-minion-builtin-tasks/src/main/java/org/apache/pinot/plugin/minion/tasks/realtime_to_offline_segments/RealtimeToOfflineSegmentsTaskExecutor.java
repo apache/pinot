@@ -193,18 +193,12 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
 
     SegmentProcessorConfig segmentProcessorConfig = segmentProcessorConfigBuilder.build();
 
-    File inputSegmentsDir = new File(workingDir, INPUT_SEGMENTS_DIR);
-    Preconditions.checkState(inputSegmentsDir.mkdirs(), "Failed to create input directory: %s for task: %s",
-        inputSegmentsDir.getAbsolutePath(), taskType);
-    for (File indexDir : originalIndexDirs) {
-      FileUtils.moveDirectoryToDirectory(indexDir, inputSegmentsDir, false);
-    }
     File outputSegmentsDir = new File(workingDir, OUTPUT_SEGMENTS_DIR);
     Preconditions.checkState(outputSegmentsDir.mkdirs(), "Failed to create output directory: %s for task: %s",
         outputSegmentsDir.getAbsolutePath(), taskType);
 
     SegmentProcessorFramework segmentProcessorFramework =
-        new SegmentProcessorFramework(inputSegmentsDir, segmentProcessorConfig, outputSegmentsDir);
+        new SegmentProcessorFramework(originalIndexDirs, segmentProcessorConfig, outputSegmentsDir);
     try {
       segmentProcessorFramework.processSegments();
     } finally {
