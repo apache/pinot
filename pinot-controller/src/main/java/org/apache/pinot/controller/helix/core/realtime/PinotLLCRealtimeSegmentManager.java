@@ -653,7 +653,7 @@ public class PinotLLCRealtimeSegmentManager {
 
     persistSegmentZKMetadata(realtimeTableName, committingSegmentZKMetadata, stat.getVersion());
 
-    // cache peer download segment for fix
+    // Add segments not successfully uploaded to deep store to a queue managed by Pinot controller for upload retry later.
     if (isUploadingRealtimeMissingSegmentStoreCopyEnabled() && isPeerURL(committingSegmentDescriptor.getSegmentLocation())) {
       cacheLLCSegmentNameForUpload(realtimeTableName, segmentName);
     }
@@ -1306,7 +1306,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
-  // Pre-fetch the LLC segment without deep store copy.
+  // Pre-fetch the LLC segments without deep store copy.
   public void prefetchLLCSegmentsWithoutDeepStoreCopy(String tableNameWithType) {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
       if (tableType != TableType.REALTIME) {
