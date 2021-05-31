@@ -83,30 +83,35 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
 
     Function function = expression.getFunctionCall();
     List<Expression> operands = function.getOperands();
-    String operator = function.getOperator();
-    if (operator.equals(FilterKind.AND.name()) || operator.equals(FilterKind.OR.name())) {
-      // Recursively traverse the expression tree to find an operator node that can be rewritten.
-      operands.forEach(operand -> optimize(operand, schema));
+    FilterKind kind = FilterKind.valueOf(function.getOperator());
+    switch (kind) {
+      case AND:
+      case OR:
+        // Recursively traverse the expression tree to find an operator node that can be rewritten.
+        operands.forEach(operand -> optimize(operand, schema));
 
-      // We have rewritten the child operands, so rewrite the parent if needed.
-      return optimizeCurrent(expression);
-    } else {
-      // Verify that LHS is a numeric column and RHS is a numeric literal before rewriting.
-      Expression lhs = operands.get(0);
-      Expression rhs = operands.get(1);
-      if (isNumericColumn(lhs, schema) && isNumericLiteral(rhs)) {
-        FilterKind kind = FilterKind.valueOf(operator);
-        switch (kind) {
-          case EQUALS:
-          case NOT_EQUALS:
-            return rewriteEqualsExpression(expression, kind, lhs, rhs, schema);
-          case GREATER_THAN:
-          case GREATER_THAN_OR_EQUAL:
-          case LESS_THAN:
-          case LESS_THAN_OR_EQUAL:
-            return rewriteRangeExpression(expression, kind, lhs, rhs, schema);
+        // We have rewritten the child operands, so rewrite the parent if needed.
+        return optimizeCurrent(expression);
+      case IS_NULL:
+      case IS_NOT_NULL:
+        // No need to try to optimize IS_NULL and IS_NOT_NULL operations on numerical columns.
+        break;
+      default:
+        // Verify that LHS is a numeric column and RHS is a numeric literal before rewriting.
+        Expression lhs = operands.get(0);
+        Expression rhs = operands.get(1);
+        if (isNumericColumn(lhs, schema) && isNumericLiteral(rhs)) {
+          switch (kind) {
+            case EQUALS:
+            case NOT_EQUALS:
+              return rewriteEqualsExpression(expression, kind, lhs, rhs, schema);
+            case GREATER_THAN:
+            case GREATER_THAN_OR_EQUAL:
+            case LESS_THAN:
+            case LESS_THAN_OR_EQUAL:
+              return rewriteRangeExpression(expression, kind, lhs, rhs, schema);
+          }
         }
-      }
     }
     return expression;
   }
