@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.upsert;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.segment.local.upsert.merger.CustomMerger;
 import org.apache.pinot.segment.local.upsert.merger.IgnoreMerger;
 import org.apache.pinot.segment.local.upsert.merger.IncrementMerger;
 import org.apache.pinot.segment.local.upsert.merger.OverwriteMerger;
@@ -32,6 +31,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 
 public class PartialUpsertHandler {
   private HashMap<String, PartialUpsertMerger> _mergers;
+  private UpsertConfig.STRATEGY _defaultStrategy;
 
   /**
    * Initializes the partial upsert merger with upsert config. Different fields can have different merge strategies.
@@ -44,31 +44,7 @@ public class PartialUpsertHandler {
   public void init(Schema schema, UpsertConfig.STRATEGY globalUpsertStrategy,
       Map<String, UpsertConfig.STRATEGY> partialUpsertStrategy, Map<String, String> customMergeStrategy) {
     _mergers = new HashMap<>();
-
-    // init globalUpsertStrategy
-    if (globalUpsertStrategy == UpsertConfig.STRATEGY.IGNORE) {
-      for (String dimColumn : schema.getDimensionNames()) {
-        if (!schema.getPrimaryKeyColumns().contains(dimColumn)) {
-          _mergers.put(dimColumn, new IgnoreMerger(dimColumn));
-        }
-      }
-      for (String metricColumn : schema.getMetricNames()) {
-        if (!schema.getPrimaryKeyColumns().contains(metricColumn)) {
-          _mergers.put(metricColumn, new IgnoreMerger(metricColumn));
-        }
-      }
-    } else {
-      for (String dimColumn : schema.getDimensionNames()) {
-        if (!schema.getPrimaryKeyColumns().contains(dimColumn)) {
-          _mergers.put(dimColumn, new OverwriteMerger(dimColumn));
-        }
-      }
-      for (String metricColumn : schema.getMetricNames()) {
-        if (!schema.getPrimaryKeyColumns().contains(metricColumn)) {
-          _mergers.put(metricColumn, new OverwriteMerger(metricColumn));
-        }
-      }
-    }
+    _defaultStrategy = globalUpsertStrategy;
 
     for (Map.Entry<String, UpsertConfig.STRATEGY> entry : partialUpsertStrategy.entrySet()) {
       if (entry.getValue() == UpsertConfig.STRATEGY.IGNORE) {
@@ -78,10 +54,6 @@ public class PartialUpsertHandler {
       } else if (entry.getValue() == UpsertConfig.STRATEGY.OVERWRITE) {
         _mergers.put(entry.getKey(), new OverwriteMerger(entry.getKey()));
       }
-    }
-
-    for (Map.Entry<String, String> entry : customMergeStrategy.entrySet()) {
-      _mergers.put(entry.getKey(), new CustomMerger(entry.getKey(), entry.getValue()));
     }
   }
 
@@ -95,8 +67,15 @@ public class PartialUpsertHandler {
   public GenericRow merge(GenericRow previousRecord, GenericRow newRecord) {
 
     // init new row to avoid mergers conflict.
-    GenericRow row = new GenericRow();
+    GenericRow row;
+    if (_defaultStrategy == UpsertConfig.STRATEGY.IGNORE) {
+      row = previousRecord.copy();
+    } else {
+      row = newRecord.copy();
+    }
+
     for (Map.Entry<String, PartialUpsertMerger> entry : _mergers.entrySet()) {
+      // object can be null, handle null values in mergers
       Object newValue = entry.getValue().merge(previousRecord, newRecord);
       row.putValue(entry.getKey(), newValue);
     }

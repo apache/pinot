@@ -52,7 +52,7 @@ public class UpsertConfig extends BaseJsonConfig {
 
   @JsonCreator
   public UpsertConfig(@JsonProperty(value = "mode", required = true) Mode mode,
-      @JsonProperty(value = "globalUpsertStategy") STRATEGY globalUpsertStrategy,
+      @JsonProperty(value = "globalUpsertStrategy") STRATEGY globalUpsertStrategy,
       @JsonProperty(value = "partialUpsertStrategy") Map<String, STRATEGY> partialUpsertStrategy,
       @JsonProperty(value = "customUpsertStrategy") Map<String, String> customUpsertStrategy) {
     Preconditions.checkArgument(mode != null, "Upsert mode must be configured");

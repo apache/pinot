@@ -33,9 +33,15 @@ public class IncrementMerger implements PartialUpsertMerger {
    * Increment the new value from incoming row to the given field of previous record.
    */
   public Object merge(GenericRow previousRecord, GenericRow currentRecord) {
-
-    assert previousRecord.getValue(_fieldName) instanceof Number;
-    assert currentRecord.getValue(_fieldName) instanceof Number;
+    if (previousRecord.getValue(_fieldName) == null && currentRecord.getValue(_fieldName) == null) {
+      return 0;
+    }
+    if (previousRecord.getValue(_fieldName) == null) {
+      return currentRecord.getValue(_fieldName);
+    }
+    if (currentRecord.getValue(_fieldName) == null) {
+      return previousRecord.getValue(_fieldName);
+    }
     return addNumbers((Number) previousRecord.getValue(_fieldName), (Number) currentRecord.getValue(_fieldName));
   }
 
