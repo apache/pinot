@@ -58,22 +58,32 @@ import org.apache.pinot.spi.data.Schema;
  * a numerical function, then output of json path expression is set to 'DOUBLE' as shown in the example below.
  *
  * Example 2:
- *   From : SELECT MIN(jsonColumn.id - 5)
+ *   From:   SELECT MIN(jsonColumn.id - 5)
  *             FROM testTable
  *            WHERE jsonColumn.id IS NOT NULL
- *   TO   : SELECT MIN(MINUS(JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'DOUBLE', '-Infinity'),5)) AS min(minus(jsonColum.id, '5'))
+ *   To:     SELECT MIN(MINUS(JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'DOUBLE', '-Infinity'),5)) AS min(minus(jsonColum.id, '5'))
  *             FROM testTable
  *            WHERE JSON_MATCH('"$.id" IS NOT NULL')
  *
  * Example 3:
- *   From : SELECT jsonColumn.id, count(*)
+ *   From:  SELECT jsonColumn.id, count(*)
  *             FROM testTable
  *            WHERE jsonColumn.name.first = 'Daffy' OR jsonColumn.id > 10
  *         GROUP BY jsonColumn.id
- *   TO   : SELECT MIN(JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'DOUBLE', '-Infinity')) AS min(jsonColumn.id)
+ *   To:    SELECT MIN(JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'DOUBLE', '-Infinity')) AS min(jsonColumn.id)
  *             FROM testTable
  *            WHERE JSON_MATCH('"$.name.first" = ''Daffy''') OR JSON_MATCH('"$.id" = 10')
  *         GROUP BY JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'STRING', 'null');
+ *
+ * Example 4:
+ *   From: SELECT jsonColumn.name.last, count(*)
+ *            FROM testTable
+ *        GROUP BY jsonColumn.name.last
+ *          HAVING jsonColumn.name.last = 'mouse'
+ *     To: SELECT JSON_EXTRACT_SCALAR(jsonColumn, '$.name.last', 'STRING', 'null') AS jsonColumn.name.last, count(*)
+ *               FROM testTable
+ *           GROUP BY JSON_EXTRACT_SCALAR(jsonColumn, '$.name.last', 'STRING', 'null')
+ *             HAVING JSON_EXTRACT_SCALAR(jsonColumn, '$.name.last', 'STRING', 'null') = 'mouse'
  *
  * Notes:
  * 1) In a filter expression, if json path appears on the left-hand side, the right-hand side must be a literal. In
@@ -83,7 +93,6 @@ import org.apache.pinot.spi.data.Schema;
  * 2) In WHERE clause each json path expression will be replaced with a JSON_MATCH function. If there are multiple
  *    json path expressions, they will be replaced by multiple JSON_MATCH functions. We currently don't fold multiple
  *    JSON_MATCH functions into a single JSON_MATCH_FUNCTION.
- * 3) Use of json path expressions in HAVING clause is not supported.
  */
 public class JsonStatementOptimizer implements StatementOptimizer {
 
@@ -120,6 +129,13 @@ public class JsonStatementOptimizer implements StatementOptimizer {
       for (Expression expression : expressions) {
         optimizeJsonIdentifier(expression, schema, false, false);
       }
+    }
+
+    // In HAVING clause, replace JSON path expressions with JSON_EXTRACT_SCALAR. This expression must match the
+    // corresponding SELECT list expression except for the alias.
+    Expression expression = query.getHavingExpression();
+    if (expression != null) {
+      optimizeJsonIdentifier(expression, schema, false, false);
     }
   }
 
