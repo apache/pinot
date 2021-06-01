@@ -78,10 +78,13 @@ import org.apache.pinot.spi.data.Schema;
  *
  * Note that in a filter expression, if json path appears in on the left-hand side, the right-hand side must be a
  * literal. In future this can be changed to have any expression on the right-hand side provided that we add support
- * for generating SQL fragements for a given expression.
+ * for generating SQL fragments for a given expression.
  *
  * TODO:
- *  - Alias cannot currently be applied if another function wraps json path expression
+ * In WHERE clause, if the LHS is a json path expression, then the RHS must be a literal. This is because we have added
+ * support for converting a literal node to an SQL fragment for use in JSON_MATCH (see {@link #getLiteralSQL}. Similar
+ * support for converting any {@link Expression} into SQL fragment can also be added and that will allow supporting any
+ * RHS expression where LHS is a json path expression.
  */
 public class JsonStatementOptimizer implements StatementOptimizer {
 

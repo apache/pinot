@@ -139,7 +139,7 @@ public class JsonStatementOptimizerTest {
     Assert.assertEquals(pinotQuery2.getSelectList().get(0).toString(),
         "Expression(type:FUNCTION, functionCall:Function(operator:AS, operands:[Expression(type:FUNCTION, functionCall:Function(operator:MAX, operands:[Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.id>), Expression(type:LITERAL, literal:<Literal stringValue:DOUBLE>), Expression(type:LITERAL, literal:<Literal doubleValue:-Infinity>)]))])), Expression(type:IDENTIFIER, identifier:Identifier(name:x))]))");
 
-    // Test with nested function calls.
+    // Test with nested function calls (minus function being used within max function).
     BrokerRequest sqlBrokerRequest3 =
         SQL_COMPILER.compileToBrokerRequest("SELECT MAX(jsonColumn.id - 5) FROM jsontypetable");
     PinotQuery pinotQuery3 = sqlBrokerRequest3.getPinotQuery();
