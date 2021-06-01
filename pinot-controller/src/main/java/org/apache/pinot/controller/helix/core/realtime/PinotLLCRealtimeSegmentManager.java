@@ -1334,7 +1334,7 @@ public class PinotLLCRealtimeSegmentManager {
           }
 
           LLCRealtimeSegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(tableNameWithType, segmentName, new Stat());
-          // Cache the committed llc segments without segment store download url
+          // Cache the committed LLC segments without segment store download url
           if (segmentZKMetadata.getStatus() == Status.DONE && CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(segmentZKMetadata.getDownloadUrl())) {
             cacheLLCSegmentNameForUpload(tableNameWithType, segmentName);
           }
@@ -1371,9 +1371,9 @@ public class PinotLLCRealtimeSegmentManager {
     // Store the segments to be fixed again in the case of fix failure, or skip in this round
     Queue<String> segmentsNotFixed = new LinkedList<>();
 
-    // Iterate through llc segments and upload missing segment store copy by following steps:
+    // Iterate through LLC segments and upload missing segment store copy by following steps:
     //  1. Ask servers which have online segment replica to upload to segment store. Servers return segment store download url after successful uploading.
-    //  2. Update the llc segment ZK metadata by adding segment store download url.
+    //  2. Update the LLC segment ZK metadata by adding segment store download url.
     while (!segmentQueue.isEmpty()) {
       String segmentName = segmentQueue.poll();
       // Check if it's null in case of the while condition doesn't stand true anymore in the step of dequeue. Dequeue returns null if queue is empty.
@@ -1393,7 +1393,7 @@ public class PinotLLCRealtimeSegmentManager {
           segmentsNotFixed.offer(segmentName);
           continue;
         }
-        LOGGER.info("Fixing llc segment {} whose segment store copy is unavailable", segmentName);
+        LOGGER.info("Fixing LLC segment {} whose segment store copy is unavailable", segmentName);
 
         // Find servers which have online replica
         List<URI> peerSegmentURIs = PeerServerSegmentFinder
@@ -1405,13 +1405,13 @@ public class PinotLLCRealtimeSegmentManager {
         // Randomly ask one server to upload
         URI uri = peerSegmentURIs.get(RANDOM.nextInt(peerSegmentURIs.size()));
         String serverUploadRequestUrl = StringUtil.join("/", uri.toString(), "upload");
-        LOGGER.info("Ask server to upload llc segment {} to segment store by this path: {}", segmentName, serverUploadRequestUrl);
+        LOGGER.info("Ask server to upload LLC segment {} to segment store by this path: {}", segmentName, serverUploadRequestUrl);
         String segmentDownloadUrl = _fileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl);
         LOGGER.info("Updating segment {} download url in ZK to be {}", segmentName, segmentDownloadUrl);
         // Update segment ZK metadata by adding the download URL
         segmentZKMetadata.setDownloadUrl(segmentDownloadUrl);
         persistSegmentZKMetadata(realtimeTableName, segmentZKMetadata, stat.getVersion());
-        LOGGER.info("Successfully uploaded llc segment {} to segment store with download url: {}", segmentName, segmentDownloadUrl);
+        LOGGER.info("Successfully uploaded LLC segment {} to segment store with download url: {}", segmentName, segmentDownloadUrl);
       } catch (Exception e) {
         segmentsNotFixed.offer(segmentName);
         _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.NUMBER_LLC_SEGMENTS_DEEP_STORE_UPLOAD_FIX_ERROR, 1L);
