@@ -32,9 +32,9 @@ import org.apache.pinot.core.query.optimizer.filter.FlattenAndOrFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.MergeEqInFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.MergeRangeFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.NumericalFilterOptimizer;
-import org.apache.pinot.core.query.optimizer.statement.StatementOptimizer;
-import org.apache.pinot.core.query.optimizer.statement.JsonStatementOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.TimePredicateFilterOptimizer;
+import org.apache.pinot.core.query.optimizer.statement.JsonStatementOptimizer;
+import org.apache.pinot.core.query.optimizer.statement.StatementOptimizer;
 import org.apache.pinot.spi.data.Schema;
 
 
