@@ -54,9 +54,8 @@ import org.apache.pinot.spi.data.Schema;
  *             FROM testTable
  *            WHERE JSON_MATCH('"$.name.first" IS NOT NULL')
  *
- * Note that the output datatype of any json path expression is 'STRING'. However, if json path expression appears as
- * an argument to a numerical function, then output of json path expression is set to 'DOUBLE' as shown in the example
- * below.
+ * Output datatype of any json path expression is 'STRING'. However, if json path expression appears as an argument to
+ * a numerical function, then output of json path expression is set to 'DOUBLE' as shown in the example below.
  *
  * Example 2:
  *   From : SELECT MIN(jsonColumn.id - 5)
@@ -76,23 +75,23 @@ import org.apache.pinot.spi.data.Schema;
  *            WHERE JSON_MATCH('"$.name.first" = ''Daffy''') OR JSON_MATCH('"$.id" = 10')
  *         GROUP BY JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'STRING', 'null');
  *
- * Note that in a filter expression, if json path appears in on the left-hand side, the right-hand side must be a
- * literal. In future this can be changed to have any expression on the right-hand side provided that we add support
- * for generating SQL fragments for a given expression.
- *
- * TODO:
- * In WHERE clause, if the LHS is a json path expression, then the RHS must be a literal. This is because we have added
- * support for converting a literal node to an SQL fragment for use in JSON_MATCH (see {@link #getLiteralSQL}. Similar
- * support for converting any {@link Expression} into SQL fragment can also be added and that will allow supporting any
- * RHS expression where LHS is a json path expression.
+ * Notes:
+ * 1) In a filter expression, if json path appears on the left-hand side, the right-hand side must be a literal. In
+ *    future this can be changed to have any expression on the right-hand side by implementing a function that would
+ *    convert any {@link Expression} into SQL fragment that can be used in JSON_MATCH. Currently only literals are
+ *    converted into SQL fragments {see @link #getLiteralSQL} function.
+ * 2) In WHERE clause each json path expression will be replaced with a JSON_MATCH function. If there are multiple
+ *    json path expressions, they will be replaced by multiple JSON_MATCH functions. We currently don't fold multiple
+ *    JSON_MATCH functions into a single JSON_MATCH_FUNCTION.
+ * 3) Use of json path expressions in HAVING clause is not supported.
  */
 public class JsonStatementOptimizer implements StatementOptimizer {
 
   /**
    * Maintain a list of numerical functions that requiring json path expression to output numerical values. This allows
-   * us to implicitly convert the output of json path expression to DOUBLE. TODO: There are much better ways of doing
-   * this by changing the storage format (currently STRING) of JSON document and/or by pre-declaring the data types of
-   * function operands.
+   * us to implicitly convert the output of json path expression to DOUBLE. TODO: There are better ways of doing this
+   * if we were to move to a new storage (currently STRING) for JSON or functions were to pre-declare their input
+   * data types.
    */
   private static Set<String> numericalFunctions = getNumericalFunctionList();
 
@@ -121,12 +120,6 @@ public class JsonStatementOptimizer implements StatementOptimizer {
       for (Expression expression : expressions) {
         optimizeJsonIdentifier(expression, schema, false, false);
       }
-    }
-
-    // In HAVING clause, replace JSON path expressions with JSON_MATCH function.
-    Expression expression = query.getHavingExpression();
-    if (expression != null) {
-      optimizeJsonPredicate(expression, schema);
     }
   }
 
