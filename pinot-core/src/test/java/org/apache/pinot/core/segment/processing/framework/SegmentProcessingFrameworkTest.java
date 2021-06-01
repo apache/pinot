@@ -242,12 +242,11 @@ public class SegmentProcessingFrameworkTest {
     }
 
     // empty input dir
-    SegmentProcessorFramework framework = new SegmentProcessorFramework(Arrays.asList(_emptyInputDir.listFiles()), config, outputSegmentDir);
     try {
-      framework.processSegments();
+       new SegmentProcessorFramework(Arrays.asList(_emptyInputDir.listFiles()), config, outputSegmentDir);
       fail("Should fail for empty input");
     } catch (Exception e) {
-      framework.cleanup();
+      // expected
     }
   }
 
