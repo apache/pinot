@@ -66,14 +66,15 @@ public class SegmentProcessorFramework {
    * @param outputSegmentsDir directory for placing the resulting segments. This should already exist.
    */
   public SegmentProcessorFramework(List<File> inputSegments, SegmentProcessorConfig segmentProcessorConfig,
-                                   File outputSegmentsDir) {
+      File outputSegmentsDir) {
 
     LOGGER.info(
         "Initializing SegmentProcessorFramework with input segments: {}, output segments dir: {} and segment processor config: {}",
         inputSegments, outputSegmentsDir.getAbsolutePath(), segmentProcessorConfig.toString());
 
     _inputSegments = inputSegments;
-    inputSegments.forEach(file -> Preconditions.checkState(file.exists(), "Input path: %s must exist", file.getAbsolutePath()));
+    inputSegments
+        .forEach(file -> Preconditions.checkState(file.exists(), "Input path: %s must exist", file.getAbsolutePath()));
     _outputSegmentsDir = outputSegmentsDir;
     Preconditions.checkState(
         _outputSegmentsDir.exists() && _outputSegmentsDir.isDirectory() && (_outputSegmentsDir.list().length == 0),
