@@ -73,8 +73,13 @@ public class SegmentProcessorFramework {
         inputSegments, outputSegmentsDir.getAbsolutePath(), segmentProcessorConfig.toString());
 
     _inputSegments = inputSegments;
-    inputSegments
+    _inputSegments
         .forEach(file -> Preconditions.checkState(file.exists(), "Input path: %s must exist", file.getAbsolutePath()));
+    if (_inputSegments.size() == 0) {
+      throw new IllegalStateException("No segments found in input dir: " + _inputSegments
+          + ". Exiting SegmentProcessorFramework.");
+    }
+
     _outputSegmentsDir = outputSegmentsDir;
     Preconditions.checkState(
         _outputSegmentsDir.exists() && _outputSegmentsDir.isDirectory() && (_outputSegmentsDir.list().length == 0),
@@ -106,12 +111,6 @@ public class SegmentProcessorFramework {
    */
   public void processSegments()
       throws Exception {
-
-    // Check for input segments
-    if (_inputSegments.size() == 0) {
-      throw new IllegalStateException("No segments found in input dir: " + _inputSegments
-          + ". Exiting SegmentProcessorFramework.");
-    }
 
     // Mapper phase.
     LOGGER.info("Beginning mapper phase. Processing segments: {}", _inputSegments);
