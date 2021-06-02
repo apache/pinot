@@ -30,6 +30,7 @@ import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ConnectionFactory;
+import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.client.Request;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.core.common.MinionConstants;
@@ -141,7 +142,11 @@ public class BasicAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest
   @Override
   protected Connection getPinotConnection() {
     if (_pinotConnection == null) {
-      _pinotConnection = ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(), AUTH_HEADER);
+      JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
+      factory.setHeaders(AUTH_HEADER);
+
+      _pinotConnection =
+          ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(), factory.buildTransport());
     }
     return _pinotConnection;
   }
@@ -182,9 +187,9 @@ public class BasicAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest
     // download and sanity-check size of offline segment(s)
     for (int i = 0; i < offlineSegments.size(); i++) {
       String segment = offlineSegments.get(i).asText();
-      Assert.assertTrue(sendGetRequest(_controllerRequestURLBuilder
-          .forSegmentDownload(getTableName(), segment), AUTH_HEADER)
-          .length() > 200000); // download segment
+      Assert.assertTrue(
+          sendGetRequest(_controllerRequestURLBuilder.forSegmentDownload(getTableName(), segment), AUTH_HEADER).length()
+              > 200000); // download segment
     }
   }
 }

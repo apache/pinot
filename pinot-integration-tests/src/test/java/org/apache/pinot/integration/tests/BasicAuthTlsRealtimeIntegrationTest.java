@@ -74,7 +74,7 @@ public class BasicAuthTlsRealtimeIntegrationTest extends BaseClusterIntegrationT
     startController();
     startBrokerHttps();
     startServerHttps();
-    startMinion(null, null);
+    startMinion();
 
     // Unpack the Avro files
     List<File> avroFiles = unpackAvroData(_tempDir);
