@@ -69,9 +69,9 @@ public class PartialUpsertHandler {
     // init new row to avoid mergers conflict.
     GenericRow row;
     if (_defaultStrategy == UpsertConfig.STRATEGY.IGNORE) {
-      row = previousRecord.copy();
+      row = previousRecord;
     } else {
-      row = newRecord.copy();
+      row = newRecord;
     }
 
     for (Map.Entry<String, PartialUpsertMerger> entry : _mergers.entrySet()) {
