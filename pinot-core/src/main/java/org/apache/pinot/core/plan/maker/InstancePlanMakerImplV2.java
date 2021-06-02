@@ -61,9 +61,11 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY_KEY = "max.init.group.holder.capacity";
   public static final int DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY = 10_000;
   public static final String NUM_GROUPS_LIMIT = "num.groups.limit";
-  public static final String ENABLE_SEGMENT_GROUP_TRIM = "enable.segment.group.trim";
   public static final int DEFAULT_NUM_GROUPS_LIMIT = 100_000;
+  public static final String ENABLE_SEGMENT_GROUP_TRIM = "enable.segment.group.trim";
   public static final boolean DEFAULT_ENABLE_SEGMENT_GROUP_TRIM = false;
+  public static final String SIZE_SEGMENT_GROUP_TRIM = "size.segment.group.trim";
+  public static final int DEFAULT_SEGMENT_TRIM_SIZE = 5000;
   // set as pinot.server.query.executor.groupby.trim.threshold
   public static final String GROUPBY_TRIM_THRESHOLD = "groupby.trim.threshold";
   public static final int DEFAULT_GROUPBY_TRIM_THRESHOLD = 1_000_000;
@@ -74,9 +76,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   // Used for SQL GROUP BY (server combine)
   private final int _groupByTrimThreshold;
   private final boolean _enableSegmentGroupTrim;
-
-  @VisibleForTesting
-  private int _inSegmentTrimLimit = -1;
+  private int _minSegmentTrimSize;
 
   @VisibleForTesting
   public InstancePlanMakerImplV2() {
@@ -84,6 +84,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     _numGroupsLimit = DEFAULT_NUM_GROUPS_LIMIT;
     _groupByTrimThreshold = DEFAULT_GROUPBY_TRIM_THRESHOLD;
     _enableSegmentGroupTrim = DEFAULT_ENABLE_SEGMENT_GROUP_TRIM;
+    _minSegmentTrimSize = DEFAULT_SEGMENT_TRIM_SIZE;
   }
 
   @VisibleForTesting
@@ -92,14 +93,15 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     _numGroupsLimit = numGroupsLimit;
     _groupByTrimThreshold = DEFAULT_GROUPBY_TRIM_THRESHOLD;
     _enableSegmentGroupTrim = DEFAULT_ENABLE_SEGMENT_GROUP_TRIM;
+    _minSegmentTrimSize = DEFAULT_SEGMENT_TRIM_SIZE;
   }
 
   @VisibleForTesting
-  public InstancePlanMakerImplV2(int inSegmentTrimLimit, boolean enableSegmentGroupTrim) {
+  public InstancePlanMakerImplV2(int minSegmentTrimSize, boolean enableSegmentGroupTrim) {
     _maxInitialResultHolderCapacity = DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY;
     _numGroupsLimit = DEFAULT_NUM_GROUPS_LIMIT;
     _groupByTrimThreshold = DEFAULT_GROUPBY_TRIM_THRESHOLD;
-    _inSegmentTrimLimit = inSegmentTrimLimit;
+    _minSegmentTrimSize = minSegmentTrimSize;
     _enableSegmentGroupTrim = enableSegmentGroupTrim;
   }
 
@@ -123,9 +125,14 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         _maxInitialResultHolderCapacity, _numGroupsLimit);
     _enableSegmentGroupTrim =
         queryExecutorConfig.getConfig().getProperty(ENABLE_SEGMENT_GROUP_TRIM, DEFAULT_ENABLE_SEGMENT_GROUP_TRIM);
+    _minSegmentTrimSize =
+        queryExecutorConfig.getConfig().getProperty(SIZE_SEGMENT_GROUP_TRIM, DEFAULT_SEGMENT_TRIM_SIZE);
+    Preconditions.checkState(0 <= _minSegmentTrimSize,
+        "Invalid configuration: minSegmentTrimSize: %d must be greater or equal to 0: %d",
+        0, _minSegmentTrimSize);
     LOGGER.info(
-        "Initializing plan maker with maxInitialResultHolderCapacity: {}, numGroupsLimit: {}, enableSegmentTrim: {}",
-        _maxInitialResultHolderCapacity, _numGroupsLimit, _enableSegmentGroupTrim);
+        "Initializing plan maker with maxInitialResultHolderCapacity: {}, numGroupsLimit: {}, enableSegmentTrim: {}, minSegmentTrimSize: {}",
+        _maxInitialResultHolderCapacity, _numGroupsLimit, _enableSegmentGroupTrim, _minSegmentTrimSize);
   }
 
   /**
@@ -206,15 +213,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         QueryOptions queryOptions = new QueryOptions(queryContext.getQueryOptions());
         // new Combine operator only when GROUP_BY_MODE explicitly set to SQL
         if (queryOptions.isGroupByModeSQL()) {
-          // Calculate trim limit = max(limit * 5, 5000)
-          int inSegmentTrimLimit = getTableCapacity(queryContext);
-          // TODO: Remove this check from the critical path and set the limit in a proper way
-          // Set the limit for test only.
-          if (_inSegmentTrimLimit != 0) {
-            inSegmentTrimLimit = _inSegmentTrimLimit;
-          }
           return new AggregationGroupByOrderByPlanNode(indexSegment, queryContext, _maxInitialResultHolderCapacity,
-              _numGroupsLimit, _enableSegmentGroupTrim, inSegmentTrimLimit);
+              _numGroupsLimit, _enableSegmentGroupTrim, _minSegmentTrimSize);
         }
         return new AggregationGroupByPlanNode(indexSegment, queryContext, _maxInitialResultHolderCapacity,
             _numGroupsLimit);

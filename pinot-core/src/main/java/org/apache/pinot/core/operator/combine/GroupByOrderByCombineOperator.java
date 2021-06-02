@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.combine;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -34,9 +35,9 @@ import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
+import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
-import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -130,10 +131,9 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
 
       // Merge aggregation group-by result.
       // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
-      Iterator<TableResizer.IntermediateRecord> groupKeyIterator =
-          intermediateResultsBlock.getIntermediateResultIterator();
+      Collection<IntermediateRecord> intermediateRecords = intermediateResultsBlock.getIntermediateResult();
       // For now, only GroupBy OrderBy query has pre-constructed intermediate records
-      if (groupKeyIterator == null) {
+      if (intermediateRecords == null) {
         // Merge aggregation group-by result.
         AggregationGroupByResult aggregationGroupByResult = intermediateResultsBlock.getAggregationGroupByResult();
         if (aggregationGroupByResult != null) {
@@ -151,10 +151,9 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
           }
         }
       } else {
-        while (groupKeyIterator.hasNext()) {
-          TableResizer.IntermediateRecord intermediateResult = groupKeyIterator.next();
+        for (IntermediateRecord intermediateResult : intermediateRecords) {
           //TODO: change upsert api so that it accepts intermediateRecord directly
-          _indexedTable.upsert(intermediateResult.getKey(), intermediateResult.getRecord());
+          _indexedTable.upsert(intermediateResult._key, intermediateResult._record);
         }
       }
     } catch (EarlyTerminationException e) {
