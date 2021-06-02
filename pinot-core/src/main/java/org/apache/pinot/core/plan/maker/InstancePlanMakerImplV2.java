@@ -75,7 +75,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   // Used for SQL GROUP BY (server combine)
   private final int _groupByTrimThreshold;
   private final boolean _enableSegmentGroupTrim;
-  private int _minSegmentTrimSize;
+  private final int _minSegmentTrimSize;
 
   @VisibleForTesting
   public InstancePlanMakerImplV2() {

@@ -201,7 +201,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   }
 
   @Override
-  public int getKeyNum() {
+  public int getNumKeys() {
     return _groupKeyMap.size();
   }
 

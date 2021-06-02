@@ -80,7 +80,7 @@ public interface GroupKeyGenerator {
   /**
    * Return current number of unique keys
    */
-  int getKeyNum();
+  int getNumKeys();
 
   /**
    * This class encapsulates the integer group id and the group keys.

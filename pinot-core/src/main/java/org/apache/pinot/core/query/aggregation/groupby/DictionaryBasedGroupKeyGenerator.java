@@ -209,7 +209,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   @Override
-  public int getKeyNum() { return _rawKeyHolder.getKeyNum(); }
+  public int getNumKeys() { return _rawKeyHolder.getNumKeys(); }
 
   private interface RawKeyHolder {
 
@@ -249,14 +249,14 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     /**
      * Returns current number of unique keys
      */
-    int getKeyNum();
+    int getNumKeys();
 
   }
 
   private class ArrayBasedHolder implements RawKeyHolder {
     // TODO: using bitmap might better
     private final boolean[] _flags = new boolean[_globalGroupIdUpperBound];
-    private int _keyNum = 0;
+    private int _numKeys = 0;
 
     @Override
     public void processSingleValue(int numDocs, int[] outGroupIds) {
@@ -267,7 +267,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         }
         outGroupIds[i] = groupId;
         // if the flag is false, then increase the key num
-        _keyNum += _flags[groupId] ? 0:1;
+        if (!_flags[groupId]) {
+          _numKeys++;
+        }
         _flags[groupId] = true;
       }
     }
@@ -276,9 +278,10 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     public void processMultiValue(int numDocs, int[][] outGroupIds) {
       for (int i = 0; i < numDocs; i++) {
         int[] groupIds = getIntRawKeys(i);
-        //TODO: Verify correctness of the following code
-        _keyNum += _flags[groupIds[0]] ? 0:1;
         for (int groupId : groupIds) {
+          if (!_flags[groupId]) {
+            _numKeys++;
+          }
           _flags[groupId] = true;
         }
         outGroupIds[i] = groupIds;
@@ -349,8 +352,8 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     @Override
-    public int getKeyNum() {
-      return _keyNum;
+    public int getNumKeys() {
+      return _numKeys;
     }
   }
 
@@ -442,7 +445,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     @Override
-    public int getKeyNum() {
+    public int getNumKeys() {
       return _groupIdMap.size();
     }
   }
@@ -661,7 +664,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       };
     }
     @Override
-    public int getKeyNum() {
+    public int getNumKeys() {
       return _groupIdMap.size();
     }
   }
@@ -868,7 +871,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     @Override
-    public int getKeyNum() {
+    public int getNumKeys() {
       return _groupIdMap.size();
     }
   }

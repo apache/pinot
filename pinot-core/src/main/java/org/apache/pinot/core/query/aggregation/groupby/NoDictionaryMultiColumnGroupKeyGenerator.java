@@ -338,7 +338,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   }
 
   @Override
-  public int getKeyNum() {
+  public int getNumKeys() {
     return _groupKeyMap.size();
   }
 
