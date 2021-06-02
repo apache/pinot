@@ -19,7 +19,6 @@
 package org.apache.pinot.common.utils;
 
 import java.util.*;
-
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
