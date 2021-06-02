@@ -150,7 +150,7 @@ public abstract class BasePinotLBuffer extends PinotDataBuffer {
   }
 
   @Override
-  protected void release()
+  public void release()
       throws IOException {
     if (_buffer instanceof LBuffer) {
       _buffer.release();

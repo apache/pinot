@@ -388,6 +388,6 @@ public abstract class PinotDataBuffer implements Closeable {
 
   public abstract void flush();
 
-  protected abstract void release()
+  public abstract void release()
       throws IOException;
 }

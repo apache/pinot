@@ -63,8 +63,6 @@ import org.slf4j.LoggerFactory;
 class SingleFileIndexDirectory extends ColumnIndexDirectory {
   private static final Logger LOGGER = LoggerFactory.getLogger(SingleFileIndexDirectory.class);
 
-  private static final String DEFAULT_INDEX_FILE_NAME = "columns.psf";
-  private static final String INDEX_MAP_FILE = "index_map";
   private static final long MAGIC_MARKER = 0xdeadbeefdeafbeadL;
   private static final int MAGIC_MARKER_SIZE_BYTES = 8;
   private static final String MAP_KEY_SEPARATOR = ".";
@@ -104,7 +102,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     _segmentMetadata = segmentMetadata;
     _readMode = readMode;
 
-    _indexFile = new File(segmentDirectory, DEFAULT_INDEX_FILE_NAME);
+    _indexFile = new File(segmentDirectory, V1Constants.INDEX_FILE_NAME);
     if (!_indexFile.exists()) {
       _indexFile.createNewFile();
     }
@@ -220,7 +218,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
 
   private void loadMap()
       throws ConfigurationException {
-    File mapFile = new File(_segmentDirectory, INDEX_MAP_FILE);
+    File mapFile = new File(_segmentDirectory, V1Constants.INDEX_MAP_FILE_NAME);
 
     PropertiesConfiguration mapConfig = CommonsConfigurationUtils.fromFile(mapFile);
 
@@ -327,7 +325,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
 
   private void persistIndexMap(IndexEntry entry)
       throws IOException {
-    File mapFile = new File(_segmentDirectory, INDEX_MAP_FILE);
+    File mapFile = new File(_segmentDirectory, V1Constants.INDEX_MAP_FILE_NAME);
     try (PrintWriter writer = new PrintWriter(new BufferedWriter(new FileWriter(mapFile, true)))) {
       String startKey = getKey(entry.key.name, entry.key.type.getIndexName(), true);
 

@@ -45,6 +45,7 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -103,9 +104,12 @@ public class ImmutableSegmentLoader {
       return new EmptyIndexSegment(localSegmentMetadata);
     }
 
+    PinotConfiguration tierConfigs = indexLoadingConfig.getTierConfigs();
+    PinotConfiguration segmentDirectoryLoaderConfigs = new PinotConfiguration(tierConfigs.toMap());
+
     // Pre-process the segment on local using local SegmentDirectory
     SegmentDirectory localSegmentDirectory = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
-        .load(indexDir.toURI(), indexLoadingConfig.getTierConfigs());
+        .load(indexDir.toURI(), segmentDirectoryLoaderConfigs);
 
     // NOTE: this step may modify the segment metadata
     try (
@@ -117,7 +121,7 @@ public class ImmutableSegmentLoader {
     SegmentDirectoryLoader segmentLoaderDirectory =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getTierBackend());
     SegmentDirectory actualSegmentDirectory =
-        segmentLoaderDirectory.load(indexDir.toURI(), indexLoadingConfig.getTierConfigs());
+        segmentLoaderDirectory.load(indexDir.toURI(), segmentDirectoryLoaderConfigs);
     SegmentDirectory.Reader segmentReader = actualSegmentDirectory.createReader();
     SegmentMetadataImpl segmentMetadata = actualSegmentDirectory.getSegmentMetadata();
 
@@ -165,7 +169,7 @@ public class ImmutableSegmentLoader {
 
     ImmutableSegmentImpl segment =
         new ImmutableSegmentImpl(actualSegmentDirectory, segmentMetadata, indexContainerMap, starTreeIndexContainer);
-    LOGGER.info("Successfully loaded segment {} with config: {}", segmentName, indexLoadingConfig.getTierConfigs());
+    LOGGER.info("Successfully loaded segment {} with config: {}", segmentName, segmentDirectoryLoaderConfigs);
     return segment;
   }
 }

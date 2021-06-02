@@ -326,7 +326,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
   }
 
   @Override
-  protected void release()
+  public void release()
       throws IOException {
     if (CleanerUtil.UNMAP_SUPPORTED) {
       CleanerUtil.getCleaner().freeBuffer(_buffer);
