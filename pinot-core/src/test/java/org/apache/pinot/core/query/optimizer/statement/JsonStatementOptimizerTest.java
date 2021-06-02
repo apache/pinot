@@ -40,35 +40,50 @@ public class JsonStatementOptimizerTest {
   /** Test that a json path expression in SELECT list is properly converted to a JSON_EXTRACT_SCALAR function within an AS function. */
   @Test
   public void testJsonSelect() {
-    BrokerRequest sqlBrokerRequest = SQL_COMPILER.compileToBrokerRequest("SELECT jsonColumn.x FROM testTable");
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
+    // SELECT using a simple json path expression.
+    BrokerRequest sqlBrokerRequest1 = SQL_COMPILER.compileToBrokerRequest("SELECT jsonColumn.x FROM testTable");
+    PinotQuery pinotQuery1 = sqlBrokerRequest1.getPinotQuery();
+    OPTIMIZER.optimize(pinotQuery1, SCHEMA);
 
-    Assert.assertEquals(pinotQuery.getSelectList().get(0).toString(),
+    Assert.assertEquals(pinotQuery1.getSelectList().get(0).toString(),
         "Expression(type:FUNCTION, functionCall:Function(operator:AS, operands:[Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.x>), Expression(type:LITERAL, literal:<Literal stringValue:STRING>), Expression(type:LITERAL, literal:<Literal stringValue:null>)])), Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn.x))]))");
+
+    // SELECT using json path expressions with array addressing.
+    BrokerRequest sqlBrokerRequest2 = SQL_COMPILER.compileToBrokerRequest("SELECT jsonColumn.data[0][1].a.b[0] FROM testTable");
+    PinotQuery pinotQuery2 = sqlBrokerRequest2.getPinotQuery();
+    OPTIMIZER.optimize(pinotQuery2, SCHEMA);
+
+    Assert.assertEquals(pinotQuery2.getSelectList().get(0).toString(),
+        "Expression(type:FUNCTION, functionCall:Function(operator:AS, operands:[Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.data[0][1].a.b[0]>), Expression(type:LITERAL, literal:<Literal stringValue:STRING>), Expression(type:LITERAL, literal:<Literal stringValue:null>)])), Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn.data[0][1].a.b[0]))]))");
+
+    // SELECT using json path expressions within double quotes.
+    BrokerRequest sqlBrokerRequest3 = SQL_COMPILER.compileToBrokerRequest("SELECT \"jsonColumn.a.b.c[0][1][2][3].d.e.f[0].g\" FROM testTable");
+    PinotQuery pinotQuery3 = sqlBrokerRequest3.getPinotQuery();
+    OPTIMIZER.optimize(pinotQuery2, SCHEMA);
+
+    Assert.assertEquals(pinotQuery2.getSelectList().get(0).toString(),
+        "Expression(type:FUNCTION, functionCall:Function(operator:AS, operands:[Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.data[0][1].a.b[0]>), Expression(type:LITERAL, literal:<Literal stringValue:STRING>), Expression(type:LITERAL, literal:<Literal stringValue:null>)])), Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.data[0][1].a.b[0]>), Expression(type:LITERAL, literal:<Literal stringValue:STRING>), Expression(type:LITERAL, literal:<Literal stringValue:null>)]))]))");
   }
 
-  /** Test that a predicate comparing a json path expression with STRING literal is properly converted into a JSON_MATCH function. */
+  /** Test that a predicate comparing a json path expression with literal is properly converted into a JSON_MATCH function. */
   @Test
-  public void testJsonStringFilter() {
-    BrokerRequest sqlBrokerRequest =
+  public void testJsonFilter() {
+    // String literal
+    BrokerRequest sqlBrokerRequest1 =
         SQL_COMPILER.compileToBrokerRequest("SELECT * FROM testTable WHERE jsonColumn.name.first = 'daffy'");
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
+    PinotQuery pinotQuery1 = sqlBrokerRequest1.getPinotQuery();
+    OPTIMIZER.optimize(pinotQuery1, SCHEMA);
 
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
+    Assert.assertEquals(pinotQuery1.getFilterExpression().toString(),
         "Expression(type:FUNCTION, functionCall:Function(operator:JSON_MATCH, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:\"$.name.first\" = 'daffy'>)]))");
-  }
 
-  /** Test that a predicate comparing a json path expression with number literal is properly converted into a JSON_MATCH function. */
-  @Test
-  public void testJsonNumericalFilter() {
-    BrokerRequest sqlBrokerRequest =
+    // Numerical literal
+    BrokerRequest sqlBrokerRequest2 =
         SQL_COMPILER.compileToBrokerRequest("SELECT * FROM testTable WHERE jsonColumn.id = 101");
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
+    PinotQuery pinotQuery2 = sqlBrokerRequest2.getPinotQuery();
+    OPTIMIZER.optimize(pinotQuery2, SCHEMA);
 
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
+    Assert.assertEquals(pinotQuery2.getFilterExpression().toString(),
         "Expression(type:FUNCTION, functionCall:Function(operator:JSON_MATCH, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:\"$.id\" = 101>)]))");
   }
 
