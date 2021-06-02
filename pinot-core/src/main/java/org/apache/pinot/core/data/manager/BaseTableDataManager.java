@@ -19,10 +19,14 @@
 package org.apache.pinot.core.data.manager;
 
 import com.google.common.base.Preconditions;
+import com.google.common.cache.LoadingCache;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.HelixManager;
@@ -31,11 +35,15 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
+import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.utils.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,10 +63,16 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected File _indexDir;
   protected Logger _logger;
   protected HelixManager _helixManager;
+  protected String _authToken;
+
+  // Fixed size LRU cache with TableName - SegmentName pair as key, and segment related
+  // errors as the value.
+  protected LoadingCache<Pair<String, String>, SegmentErrorInfo> _errorCache;
 
   @Override
   public void init(TableDataManagerConfig tableDataManagerConfig, String instanceId,
-      ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixManager helixManager) {
+      ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixManager helixManager,
+      @Nullable LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache) {
     LOGGER.info("Initializing table data manager for table: {}", tableDataManagerConfig.getTableName());
 
     _tableDataManagerConfig = tableDataManagerConfig;
@@ -66,6 +80,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _propertyStore = propertyStore;
     _serverMetrics = serverMetrics;
     _helixManager = helixManager;
+    _authToken = tableDataManagerConfig.getAuthToken();
 
     _tableNameWithType = tableDataManagerConfig.getTableName();
     _tableDataDir = tableDataManagerConfig.getDataDir();
@@ -73,6 +88,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     if (!_indexDir.exists()) {
       Preconditions.checkState(_indexDir.mkdirs());
     }
+    _errorCache = errorCache;
     _logger = LoggerFactory.getLogger(_tableNameWithType + "-" + getClass().getSimpleName());
 
     doInit();
@@ -223,5 +239,21 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public File getTableDataDir() {
     return _indexDir;
+  }
+
+  @Override
+  public void addSegmentError(String segmentName, SegmentErrorInfo segmentErrorInfo) {
+    _errorCache.put(new Pair<>(_tableNameWithType, segmentName), segmentErrorInfo);
+  }
+
+  @Override
+  public Map<String, SegmentErrorInfo> getSegmentErrors() {
+    if (_errorCache == null) {
+      return Collections.emptyMap();
+    } else {
+      // Filter out entries that match the table name.
+      return _errorCache.asMap().entrySet().stream().filter(map -> map.getKey().getFirst().equals(_tableNameWithType))
+          .collect(Collectors.toMap(map -> map.getKey().getSecond(), Map.Entry::getValue));
+    }
   }
 }

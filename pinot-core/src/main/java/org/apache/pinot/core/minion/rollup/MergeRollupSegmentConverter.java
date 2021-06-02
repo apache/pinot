@@ -26,8 +26,8 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.core.minion.SegmentConverter;
 import org.apache.pinot.core.minion.segment.RecordAggregator;
-import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.processing.transformer.RecordTransformer;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -35,6 +35,10 @@ import org.apache.pinot.spi.data.Schema;
 
 
 /**
+ * This class is deprecated.
+ *
+ * TODO: Update current MergeRollupExecutor to use SegmentProcessorFramework instead
+ *
  * Rollup segment converter takes a list of segments and concatenates/rolls up segments based on the configuration.
  *
  * TODO: Add support for roll-up with time granularity change

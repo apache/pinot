@@ -23,15 +23,14 @@ import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctTable;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -40,14 +39,16 @@ import org.apache.pinot.spi.utils.ByteArray;
 abstract class BaseDictionaryBasedMultiColumnDistinctExecutor implements DistinctExecutor {
   final List<ExpressionContext> _expressions;
   final List<Dictionary> _dictionaries;
+  final List<DataType> _dataTypes;
   final int _limit;
 
   final ObjectSet<DictIds> _dictIdsSet;
 
   BaseDictionaryBasedMultiColumnDistinctExecutor(List<ExpressionContext> expressions, List<Dictionary> dictionaries,
-      int limit) {
+      List<DataType> dataTypes, int limit) {
     _expressions = expressions;
     _dictionaries = dictionaries;
+    _dataTypes = dataTypes;
     _limit = limit;
 
     _dictIdsSet = new ObjectOpenHashSet<>(Math.min(limit, MAX_INITIAL_CAPACITY));
@@ -60,7 +61,7 @@ abstract class BaseDictionaryBasedMultiColumnDistinctExecutor implements Distinc
     ColumnDataType[] columnDataTypes = new ColumnDataType[numExpressions];
     for (int i = 0; i < numExpressions; i++) {
       columnNames[i] = _expressions.get(i).toString();
-      columnDataTypes[i] = ColumnDataType.fromDataTypeSV(_dictionaries.get(i).getValueType());
+      columnDataTypes[i] = ColumnDataType.fromDataTypeSV(_dataTypes.get(i));
     }
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
     List<Record> records = new ArrayList<>(_dictIdsSet.size());
@@ -68,9 +69,7 @@ abstract class BaseDictionaryBasedMultiColumnDistinctExecutor implements Distinc
       Object[] values = new Object[numExpressions];
       for (int i = 0; i < numExpressions; i++) {
         int dictId = dictIds._dictIds[i];
-        Dictionary dictionary = _dictionaries.get(i);
-        values[i] = dictionary.getValueType() == DataType.BYTES ? new ByteArray(dictionary.getBytesValue(dictId))
-            : dictionary.get(dictId);
+        values[i] = _dictionaries.get(i).getInternal(dictId);
       }
       records.add(new Record(values));
     }

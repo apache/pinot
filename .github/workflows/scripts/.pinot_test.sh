@@ -21,6 +21,10 @@
 # Java version
 java -version
 
+# Check network
+ifconfig
+netstat -i
+
 # Only run integration tests if needed
 if [ "$RUN_INTEGRATION_TESTS" != false ]; then
   mvn test -B -P github-actions,integration-tests-only && exit 0 || exit 1

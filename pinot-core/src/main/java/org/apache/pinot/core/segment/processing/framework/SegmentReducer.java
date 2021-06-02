@@ -26,7 +26,7 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.core.segment.processing.collector.Collector;
 import org.apache.pinot.core.segment.processing.collector.CollectorFactory;
-import org.apache.pinot.core.segment.processing.utils.SegmentProcessorUtils;
+import org.apache.pinot.core.util.SegmentProcessorAvroUtils;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
@@ -64,7 +64,7 @@ public class SegmentReducer {
 
     _reducerId = reducerId;
     _pinotSchema = reducerConfig.getPinotSchema();
-    _avroSchema = SegmentProcessorUtils.convertPinotSchemaToAvroSchema(_pinotSchema);
+    _avroSchema = SegmentProcessorAvroUtils.convertPinotSchemaToAvroSchema(_pinotSchema);
     _collector = CollectorFactory.getCollector(reducerConfig.getCollectorConfig(), _pinotSchema);
     _numRecordsPerPart = reducerConfig.getNumRecordsPerPart();
     LOGGER.info("Initialized reducer with id: {}, input dir: {}, output dir: {}, collector: {}, numRecordsPerPart: {}",
@@ -89,7 +89,6 @@ public class SegmentReducer {
         GenericRow next = avroRecordReader.next();
 
         // Aggregations
-        // TODO: Off-heap based implementation for aggregation/sorting
         _collector.collect(next);
 
         // Reached max records per part file. Flush
@@ -115,7 +114,7 @@ public class SegmentReducer {
     DataFileWriter<GenericData.Record> recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema));
     recordWriter.create(_avroSchema, new File(_reducerOutputDir, fileName));
     while (collectionIt.hasNext()) {
-      SegmentProcessorUtils.convertGenericRowToAvroRecord(collectionIt.next(), reusableRecord);
+      SegmentProcessorAvroUtils.convertGenericRowToAvroRecord(collectionIt.next(), reusableRecord);
       recordWriter.append(reusableRecord);
     }
     recordWriter.close();
@@ -128,6 +127,8 @@ public class SegmentReducer {
   /**
    * Cleans up reducer state
    */
-  public void cleanup() {
+  public void cleanup()
+      throws IOException {
+    _collector.close();
   }
 }

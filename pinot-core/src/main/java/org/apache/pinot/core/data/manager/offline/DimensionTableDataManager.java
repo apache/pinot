@@ -20,7 +20,6 @@ package org.apache.pinot.core.data.manager.offline;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,10 +30,10 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.core.data.manager.SegmentDataManager;
-import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
-import org.apache.pinot.core.indexsegment.IndexSegment;
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -67,7 +66,8 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
   }
 
   @VisibleForTesting
-  public static DimensionTableDataManager registerDimensionTable(String tableNameWithType, DimensionTableDataManager instance) {
+  public static DimensionTableDataManager registerDimensionTable(String tableNameWithType,
+      DimensionTableDataManager instance) {
     return _instances.computeIfAbsent(tableNameWithType, k -> instance);
   }
 
@@ -117,8 +117,8 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
       _logger.info("Successfully removed segment {} and reloaded lookup table: {}", segmentName, getTableName());
     } catch (Exception e) {
       throw new RuntimeException(String
-          .format("Error reloading lookup table after segment remove ({}) for table: {}", segmentName, getTableName()),
-          e);
+          .format("Error reloading lookup table after segment remove '%s' for table: '%s'", segmentName,
+              getTableName()), e);
     }
   }
 

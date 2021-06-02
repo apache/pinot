@@ -21,7 +21,7 @@ package org.apache.pinot.core.util;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.Collections;
 import javax.annotation.concurrent.NotThreadSafe;
-import org.apache.pinot.common.utils.Pairs.IntObjectPair;
+import org.apache.pinot.spi.utils.Pairs.IntObjectPair;
 
 
 /**

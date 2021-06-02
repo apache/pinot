@@ -928,4 +928,3 @@ public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQ
     return (org.apache.thrift.scheme.StandardScheme.class.equals(proto.getScheme()) ? STANDARD_SCHEME_FACTORY : TUPLE_SCHEME_FACTORY).getScheme();
   }
 }
-

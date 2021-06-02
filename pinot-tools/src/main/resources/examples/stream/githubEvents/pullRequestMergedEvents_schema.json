@@ -143,8 +143,8 @@
   "dateTimeFieldSpecs": [
     {
       "name": "mergedTimeMillis",
-      "dataType": "LONG",
-      "format": "1:MILLISECONDS:EPOCH",
+      "dataType": "TIMESTAMP",
+      "format": "1:MILLISECONDS:TIMESTAMP",
       "granularity": "1:MILLISECONDS"
     }
   ]

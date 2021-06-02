@@ -28,7 +28,7 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
-public interface PartitionLevelConsumer extends Closeable {
+public interface PartitionLevelConsumer extends Closeable, PartitionGroupConsumer {
 
   /**
    * Is here for backward compatibility for a short time.

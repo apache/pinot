@@ -21,12 +21,13 @@ package org.apache.pinot.tools.admin.command;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
-import org.apache.pinot.common.utils.CommonConstants;
+import java.util.Collections;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -43,7 +44,7 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
   @Option(name = "-tableConfigFile", required = true, metaVar = "<string>", aliases = {"-tableConf", "-tableConfig", "-filePath"}, usage = "Path to table config file.")
   private String _tableConfigFile;
 
-  @Option(name = "-schemaFile", required = false, metaVar = "<string>", aliases = {"-schema"}, usage = "Path to table schema file.")
+  @Option(name = "-schemaFile", required = false, metaVar = "<string>", aliases = {"-schemaFileName","-schema"}, usage = "Path to table schema file.")
   private String _schemaFile = null;
 
   @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
@@ -57,6 +58,15 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
 
   @Option(name = "-exec", required = false, metaVar = "<boolean>", usage = "Execute the command.")
   private boolean _exec;
+
+  @Option(name = "-user", required = false, metaVar = "<String>", usage = "Username for basic auth.")
+  private String _user;
+
+  @Option(name = "-password", required = false, metaVar = "<String>", usage = "Password for basic auth.")
+  private String _password;
+
+  @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
+  private String _authToken;
 
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
@@ -82,7 +92,8 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
   public String toString() {
     String retString =
         ("AddTable -tableConfigFile " + _tableConfigFile + " -schemaFile " + _schemaFile + " -controllerProtocol "
-            + _controllerProtocol + " -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort);
+            + _controllerProtocol + " -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort
+            + " -user " + _user + " -password " + "[hidden]");
     return ((_exec) ? (retString + " -exec") : retString);
   }
 
@@ -115,6 +126,21 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
     return this;
   }
 
+  public AddTableCommand setUser(String user) {
+    _user = user;
+    return this;
+  }
+
+  public AddTableCommand setPassword(String password) {
+    _password = password;
+    return this;
+  }
+
+  public AddTableCommand setAuthToken(String authToken) {
+    _authToken = authToken;
+    return this;
+  }
+
   public AddTableCommand setExecute(boolean exec) {
     _exec = exec;
     return this;
@@ -132,9 +158,10 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
       throw e;
     }
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      fileUploadDownloadClient.addSchema(
-          FileUploadDownloadClient.getUploadSchemaURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort)),
-          schema.getSchemaName(), schemaFile);
+      fileUploadDownloadClient.addSchema(FileUploadDownloadClient
+              .getUploadSchemaURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort)),
+          schema.getSchemaName(), schemaFile, makeAuthHeader(makeAuthToken(_authToken, _user, _password)),
+          Collections.emptyList());
     } catch (Exception e) {
       LOGGER.error("Got Exception to upload Pinot Schema: " + schema.getSchemaName(), e);
       throw e;
@@ -144,7 +171,8 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
   public boolean sendTableCreationRequest(JsonNode node)
       throws IOException {
     String res = AbstractBaseAdminCommand
-        .sendPostRequest(ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableCreate(), node.toString());
+        .sendRequest("POST", ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableCreate(), node.toString(),
+            makeAuthHeader(makeAuthToken(_authToken, _user, _password)));
     LOGGER.info(res);
     return res.contains("succesfully added");
   }
@@ -159,7 +187,7 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
     }
 
     if (_controllerHost == null) {
-      _controllerHost = NetUtil.getHostAddress();
+      _controllerHost = NetUtils.getHostAddress();
     }
     _controllerAddress = _controllerProtocol + "://" + _controllerHost + ":" + _controllerPort;
 

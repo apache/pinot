@@ -27,15 +27,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.StringUtils;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,7 +59,7 @@ public class PinotConfigUtils {
     Map<String, Object> properties = new HashMap<>();
     properties.put(ControllerConf.ZK_STR, zkAddress);
     properties.put(ControllerConf.HELIX_CLUSTER_NAME, clusterName);
-    properties.put(ControllerConf.CONTROLLER_HOST, !StringUtils.isEmpty(controllerHost) ? controllerHost : NetUtil.getHostAddress());
+    properties.put(ControllerConf.CONTROLLER_HOST, !StringUtils.isEmpty(controllerHost) ? controllerHost : NetUtils.getHostAddress());
     properties.put(ControllerConf.CONTROLLER_PORT, !StringUtils.isEmpty(controllerPort) ? controllerPort:getAvailablePort());
     properties.put(ControllerConf.DATA_DIR, !StringUtils.isEmpty(dataDir) ? dataDir : TMP_DIR + String.format("Controller_%s_%s/controller/data", controllerHost, controllerPort));
     properties.put(ControllerConf.CONTROLLER_VIP_HOST, controllerHost);
@@ -140,17 +139,22 @@ public class PinotConfigUtils {
     return null;
   }
 
-  public static Map<String, Object> generateBrokerConf(int brokerPort) {
+  public static Map<String, Object> generateBrokerConf(String clusterName, String zkAddress, String brokerHost,
+      int brokerPort)
+      throws SocketException, UnknownHostException {
     Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
+    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkAddress);
+    properties.put(CommonConstants.Broker.CONFIG_OF_BROKER_HOSTNAME, !StringUtils.isEmpty(brokerHost) ? brokerHost : NetUtils.getHostAddress());
     properties.put(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, brokerPort != 0 ? brokerPort : getAvailablePort());
-
     return properties;
   }
 
-  public static Map<String, Object> generateServerConf(String serverHost, int serverPort, int serverAdminPort,
-      String serverDataDir, String serverSegmentDir) throws SocketException, UnknownHostException {
+  public static Map<String, Object> generateServerConf(String clusterName, String zkAddress, String serverHost,
+      int serverPort, int serverAdminPort, String serverDataDir, String serverSegmentDir)
+      throws SocketException, UnknownHostException {
     if (serverHost == null) {
-      serverHost = NetUtil.getHostAddress();
+      serverHost = NetUtils.getHostAddress();
     }
     if (serverPort == 0) {
       serverPort = getAvailablePort();
@@ -165,6 +169,8 @@ public class PinotConfigUtils {
       serverSegmentDir = TMP_DIR + String.format("Server_%s_%d/server/segment", serverHost, serverPort);
     }
     Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
+    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkAddress);
     properties.put(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, serverHost);
     properties.put(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, serverPort);
     properties.put(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT, serverAdminPort);
@@ -174,12 +180,14 @@ public class PinotConfigUtils {
     return properties;
   }
 
-  public static Map<String, Object> generateMinionConf(String minionHost, int minionPort)
+  public static Map<String, Object> generateMinionConf(String clusterName, String zkAddress, String minionHost, int minionPort)
       throws SocketException, UnknownHostException {
     if (minionHost == null) {
-      minionHost = NetUtil.getHostAddress();
+      minionHost = NetUtils.getHostAddress();
     }
     Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
+    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkAddress);
     properties.put(CommonConstants.Helix.KEY_OF_MINION_HOST, minionHost);
     properties.put(CommonConstants.Helix.KEY_OF_MINION_PORT, minionPort != 0 ? minionPort : getAvailablePort());
 

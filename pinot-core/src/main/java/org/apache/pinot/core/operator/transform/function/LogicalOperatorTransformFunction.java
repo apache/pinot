@@ -22,40 +22,39 @@ import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
-import org.apache.pinot.core.util.ArrayCopyUtils;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.spi.utils.ArrayCopyUtils;
 
 
 /**
  * <code>LogicalOperatorTransformFunction</code> abstracts common functions for logical operators (AND, OR).
- * The results are in boolean format and stored as an integer array with 1 represents true and 0 represents false.
+ * The results are BOOLEAN type.
  */
 public abstract class LogicalOperatorTransformFunction extends BaseTransformFunction {
-
   protected List<TransformFunction> _arguments;
   protected int[] _results;
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     _arguments = arguments;
-    Preconditions.checkState(arguments.size() > 1, String
+    int numArguments = arguments.size();
+    Preconditions.checkState(numArguments > 1, String
         .format("Expect more than 1 argument for logical operator [%s], args [%s].", getName(),
             Arrays.toString(arguments.toArray())));
-    for (TransformFunction argument : arguments) {
-      Preconditions.checkState(
-          argument.getResultMetadata().getDataType().isNumeric() && argument.getResultMetadata().isSingleValue(), String
-              .format(
-                  "Unsupported data type for logical operator [%s] arguments, only supports single-valued number. Invalid argument: expression [%s], result type [%s]",
-                  getName(), argument.getName(), argument.getResultMetadata()));
+    for (int i = 0; i < numArguments; i++) {
+      TransformResultMetadata argumentMetadata = arguments.get(i).getResultMetadata();
+      Preconditions
+          .checkState(argumentMetadata.isSingleValue() && argumentMetadata.getDataType().getStoredType().isNumeric(),
+              String.format("Unsupported argument of index: %d, expecting single-valued boolean/number", i));
     }
   }
 
   @Override
   public TransformResultMetadata getResultMetadata() {
-    return INT_SV_NO_DICTIONARY_METADATA;
+    return BOOLEAN_SV_NO_DICTIONARY_METADATA;
   }
 
   @Override
@@ -63,12 +62,13 @@ public abstract class LogicalOperatorTransformFunction extends BaseTransformFunc
     if (_results == null) {
       _results = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
-    int length = projectionBlock.getNumDocs();
-    ArrayCopyUtils.copy(_arguments.get(0).transformToIntValuesSV(projectionBlock), _results, length);
-    for (int i = 1; i < _arguments.size(); i++) {
-      final TransformFunction transformFunction = _arguments.get(i);
+    int numDocs = projectionBlock.getNumDocs();
+    ArrayCopyUtils.copy(_arguments.get(0).transformToIntValuesSV(projectionBlock), _results, numDocs);
+    int numArguments = _arguments.size();
+    for (int i = 1; i < numArguments; i++) {
+      TransformFunction transformFunction = _arguments.get(i);
       int[] results = transformFunction.transformToIntValuesSV(projectionBlock);
-      for (int j = 0; j < length; j++) {
+      for (int j = 0; j < numDocs; j++) {
         _results[j] = getLogicalFuncResult(_results[j], results[j]);
       }
     }

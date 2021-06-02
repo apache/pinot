@@ -43,15 +43,27 @@ public class RequestStatistics {
   private long _numSegmentsQueried;
   private long _numSegmentsProcessed;
   private long _numSegmentsMatched;
+  private long _offlineThreadCpuTimeNs;
+  private long _realtimeThreadCpuTimeNs;
   private int _numServersQueried;
   private int _numServersResponded;
   private boolean _isNumGroupsLimitReached;
   private int _numExceptions;
   private String _brokerId;
+  private String _offlineServerTenant;
+  private String _realtimeServerTenant;
   private long _requestId;
 
   public String getBrokerId() {
     return _brokerId;
+  }
+
+  public String getOfflineServerTenant() {
+    return _offlineServerTenant;
+  }
+
+  public String getRealtimeServerTenant() {
+    return _realtimeServerTenant;
   }
 
   public long getRequestId() {
@@ -108,10 +120,20 @@ public class RequestStatistics {
     _numServersResponded = brokerResponse.getNumServersResponded();
     _isNumGroupsLimitReached = brokerResponse.isNumGroupsLimitReached();
     _numExceptions = brokerResponse.getExceptionsSize();
+    _offlineThreadCpuTimeNs = brokerResponse.getOfflineThreadCpuTimeNs();
+    _realtimeThreadCpuTimeNs = brokerResponse.getRealtimeThreadCpuTimeNs();
   }
 
   public void setBrokerId(String brokerId) {
     _brokerId = brokerId;
+  }
+
+  public void setOfflineServerTenant(String offlineServerTenant) {
+    _offlineServerTenant = offlineServerTenant;
+  }
+
+  public void setRealtimeServerTenant(String realtimeServerTenant) {
+    _realtimeServerTenant = realtimeServerTenant;
   }
 
   public void setRequestId(long requestId) {
@@ -192,6 +214,14 @@ public class RequestStatistics {
 
   public int getNumServersResponded() {
     return _numServersResponded;
+  }
+
+  public long getOfflineThreadCpuTimeNs() {
+    return _offlineThreadCpuTimeNs;
+  }
+
+  public long getRealtimeThreadCpuTimeNs() {
+    return _realtimeThreadCpuTimeNs;
   }
 
   public boolean isNumGroupsLimitReached() {

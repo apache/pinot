@@ -28,21 +28,21 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.controller.helix.ControllerTest;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
-import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.integration.tests.ClusterTest;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,8 +65,8 @@ import org.slf4j.LoggerFactory;
 public class SegmentOp extends BaseOp {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentOp.class);
   private static final FileFormat DEFAULT_FILE_FORMAT = FileFormat.CSV;
-  private static final int DEFAULT_MAX_SLEEP_TIME_MS = 30000;
-  private static final int DEFAULT_SLEEP_INTERVAL_MS = 200;
+  private static final int DEFAULT_MAX_SLEEP_TIME_MS = 60000;
+  private static final int DEFAULT_SLEEP_INTERVAL_MS = 1000;
 
   public enum Op {
     UPLOAD,
@@ -158,7 +158,7 @@ public class SegmentOp extends BaseOp {
       FileUtils.forceMkdir(localOutputTempDir);
       // replace the placeholder in the data file.
       File localReplacedInputDataFile = new File(localTempDir, "replaced");
-      Utils.replaceContent(new File(_inputDataFileName), localReplacedInputDataFile, GENERATION_NUMBER_PLACEHOLDER,
+      Utils.replaceContent(new File(getAbsoluteFileName(_inputDataFileName)), localReplacedInputDataFile, GENERATION_NUMBER_PLACEHOLDER,
           String.valueOf(_generationNumber));
 
       File segmentTarFile = generateSegment(localOutputTempDir, localReplacedInputDataFile.getAbsolutePath());
@@ -182,16 +182,16 @@ public class SegmentOp extends BaseOp {
    */
   private File generateSegment(File outputDir, String localReplacedInputDataFilePath)
       throws Exception {
-    TableConfig tableConfig = JsonUtils.fileToObject(new File(_tableConfigFileName), TableConfig.class);
+    TableConfig tableConfig = JsonUtils.fileToObject(new File(getAbsoluteFileName(_tableConfigFileName)), TableConfig.class);
     _tableName = tableConfig.getTableName();
-    // if user does not specify segmentName, use tableName + generationNumber
+    // if user does not specify segmentName, use tableName_generationNumber
     if (_segmentName == null || _segmentName.isEmpty()) {
-      _segmentName = _tableName + _generationNumber;
+      _segmentName = _tableName + "_" + _generationNumber;
     }
 
-    Schema schema = JsonUtils.fileToObject(new File(_schemaFileName), Schema.class);
+    Schema schema = JsonUtils.fileToObject(new File(getAbsoluteFileName(_schemaFileName)), Schema.class);
     RecordReaderConfig recordReaderConfig =
-        RecordReaderFactory.getRecordReaderConfig(DEFAULT_FILE_FORMAT, _recordReaderConfigFileName);
+        RecordReaderFactory.getRecordReaderConfig(DEFAULT_FILE_FORMAT,getAbsoluteFileName(_recordReaderConfigFileName));
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setInputFilePath(localReplacedInputDataFilePath);
@@ -283,11 +283,11 @@ public class SegmentOp extends BaseOp {
    */
   private boolean deleteSegment() {
     try {
-      TableConfig tableConfig = JsonUtils.fileToObject(new File(_tableConfigFileName), TableConfig.class);
+      TableConfig tableConfig = JsonUtils.fileToObject(new File(getAbsoluteFileName(_tableConfigFileName)), TableConfig.class);
       _tableName = tableConfig.getTableName();
-      // if user does not specify segmentName, use tableName + generationNumber
+      // if user does not specify segmentName, use tableName_generationNumber
       if (_segmentName == null || _segmentName.isEmpty()) {
-        _segmentName = _tableName + _generationNumber;
+        _segmentName = _tableName + "_" + _generationNumber;
       }
 
       ControllerTest.sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL)

@@ -21,7 +21,7 @@ package org.apache.pinot.core.operator.transform;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.ProjectionOperator;
@@ -29,8 +29,8 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
 
 /**
@@ -39,9 +39,9 @@ import org.apache.pinot.core.segment.index.readers.Dictionary;
 public class TransformOperator extends BaseOperator<TransformBlock> {
   private static final String OPERATOR_NAME = "TransformOperator";
 
-  private final ProjectionOperator _projectionOperator;
-  private final Map<String, DataSource> _dataSourceMap;
-  private final Map<ExpressionContext, TransformFunction> _transformFunctionMap = new HashMap<>();
+  protected final ProjectionOperator _projectionOperator;
+  protected final Map<String, DataSource> _dataSourceMap;
+  protected final Map<ExpressionContext, TransformFunction> _transformFunctionMap = new HashMap<>();
 
   /**
    * Constructor for the class

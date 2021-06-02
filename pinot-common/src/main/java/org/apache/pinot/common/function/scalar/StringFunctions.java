@@ -124,6 +124,44 @@ public class StringFunctions {
   }
 
   /**
+   * Standard SQL trim function.
+   *
+   * @param end BOTH|LEADING|TRAILING
+   * @param characters characters to be trimmed off
+   * @param value value to trim
+   * @return trim the characters from both/leading/trailing end of the string
+   */
+  @ScalarFunction
+  public static String trim(String end, String characters, String value) {
+    int length = value.length();
+    int startIndex = 0;
+    int endIndex = length;
+    if (end.equals("BOTH") || end.equals("LEADING")) {
+      while (startIndex < endIndex) {
+        if (characters.indexOf(value.charAt(startIndex)) >= 0) {
+          startIndex++;
+        } else {
+          break;
+        }
+      }
+    }
+    if (end.equals("BOTH") || end.equals("TRAILING")) {
+      while (startIndex < endIndex) {
+        if (characters.indexOf(value.charAt(endIndex - 1)) >= 0) {
+          endIndex--;
+        } else {
+          break;
+        }
+      }
+    }
+    if (startIndex > 0 || endIndex < length) {
+      return value.substring(startIndex, endIndex);
+    } else {
+      return value;
+    }
+  }
+
+  /**
    * @param input
    * @return trim spaces from left side of the string
    */
@@ -348,7 +386,7 @@ public class StringFunctions {
    * @return returns true if substring present in main string else false.
    */
   @ScalarFunction
-  public static Boolean contains(String input, String substring) {
+  public static boolean contains(String input, String substring) {
     return input.contains(substring);
   }
 }

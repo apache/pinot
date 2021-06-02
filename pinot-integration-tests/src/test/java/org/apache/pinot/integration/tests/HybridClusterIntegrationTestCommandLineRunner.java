@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.integration.tests;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.base.Preconditions;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -31,16 +33,13 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-
 import javax.annotation.Nullable;
-
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.requesthandler.PinotQueryRequest;
-import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.tools.query.comparison.QueryComparison;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -50,9 +49,6 @@ import org.testng.TestNG;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Preconditions;
 
 
 /**
@@ -262,7 +258,7 @@ public class HybridClusterIntegrationTestCommandLineRunner {
     }
 
     @Override
-    protected int getBaseKafkaPort() {
+    protected int getKafkaPort() {
       return KAFKA_PORT;
     }
 
@@ -331,7 +327,7 @@ public class HybridClusterIntegrationTestCommandLineRunner {
 
       // Start Zk and Kafka
       startZk(ZK_PORT);
-      startKafka();
+      startKafka(getKafkaPort());
 
       // Start the Pinot cluster
       Map<String, Object> properties = getDefaultControllerConfiguration();
@@ -396,8 +392,7 @@ public class HybridClusterIntegrationTestCommandLineRunner {
                 @Override
                 public void run() {
                   try {
-                    JsonNode actualResponse =
-                        postQuery(new PinotQueryRequest("pql", currentQuery), "http://localhost:" + BROKER_PORT);
+                    JsonNode actualResponse = postQuery(currentQuery, "http://localhost:" + BROKER_PORT);
                     if (QueryComparison.compareWithEmpty(actualResponse, expectedResponse)
                         == QueryComparison.ComparisonStatus.FAILED) {
                       numFailedQueries.getAndIncrement();

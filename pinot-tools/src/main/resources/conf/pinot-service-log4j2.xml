@@ -84,9 +84,12 @@
     <AsyncLogger name="org.apache.pinot.core.query" level="info" additivity="false">
       <AppenderRef ref="serverLog"/>
     </AsyncLogger>
+
+    <!-- Direct minion package log to the broker log file -->
     <AsyncLogger name="org.apache.pinot.minion" level="info" additivity="false">
       <AppenderRef ref="minionLog"/>
     </AsyncLogger>
+
     <AsyncLogger name="org.reflections" level="error" additivity="false"/>
     <AsyncLogger name="org.apache.pinot.spi.plugin" level="error" additivity="false">
       <AppenderRef ref="console"/>

@@ -18,44 +18,25 @@
  */
 package org.apache.pinot.integration.tests;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
-import javax.annotation.Nullable;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metrics.ControllerGauge;
-import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
-import org.apache.pinot.core.minion.PinotTaskConfig;
-import org.apache.pinot.minion.event.MinionEventObserver;
-import org.apache.pinot.minion.event.MinionEventObserverFactory;
-import org.apache.pinot.minion.exception.TaskCancelledException;
-import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
-import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
-import org.apache.pinot.plugin.minion.tasks.BaseTaskExecutor;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 /**
@@ -63,18 +44,21 @@ import static org.testng.Assert.assertTrue;
  * minion functionality.
  */
 public class SimpleMinionClusterIntegrationTest extends ClusterTest {
-  private static final String TASK_TYPE = "TestTask";
-  private static final String TABLE_NAME_1 = "testTable1";
-  private static final String TABLE_NAME_2 = "testTable2";
-  private static final String TABLE_NAME_3 = "testTable3";
-  private static final long STATE_TRANSITION_TIMEOUT_MS = 60_000L;  // 1 minute
-  private static final int NUM_TASKS = 2;
+  // Accessed by the plug-in classes
+  public static final String TASK_TYPE = "TestTask";
+  public static final String TABLE_NAME_1 = "testTable1";
+  public static final String TABLE_NAME_2 = "testTable2";
+  public static final String TABLE_NAME_3 = "testTable3";
+  public static final int NUM_TASKS = 2;
+  public static final int NUM_CONFIGS = 3;
+  public static final AtomicBoolean HOLD = new AtomicBoolean();
+  public static final AtomicBoolean TASK_START_NOTIFIED = new AtomicBoolean();
+  public static final AtomicBoolean TASK_SUCCESS_NOTIFIED = new AtomicBoolean();
+  public static final AtomicBoolean TASK_CANCELLED_NOTIFIED = new AtomicBoolean();
+  public static final AtomicBoolean TASK_ERROR_NOTIFIED = new AtomicBoolean();
 
-  private static final AtomicBoolean HOLD = new AtomicBoolean();
-  private static final AtomicBoolean TASK_START_NOTIFIED = new AtomicBoolean();
-  private static final AtomicBoolean TASK_SUCCESS_NOTIFIED = new AtomicBoolean();
-  private static final AtomicBoolean TASK_CANCELLED_NOTIFIED = new AtomicBoolean();
-  private static final AtomicBoolean TASK_ERROR_NOTIFIED = new AtomicBoolean();
+  private static final long STATE_TRANSITION_TIMEOUT_MS = 60_000L;  // 1 minute
+  private static final long ZK_CALLBACK_TIMEOUT_MS = 30_000L;       // 30 seconds
 
   private PinotHelixTaskResourceManager _helixTaskResourceManager;
   private PinotTaskManager _taskManager;
@@ -98,13 +82,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     _helixTaskResourceManager = _controllerStarter.getHelixTaskResourceManager();
     _taskManager = _controllerStarter.getTaskManager();
 
-    // Register the test task generator into task manager
-    PinotTaskGenerator taskGenerator = new TestTaskGenerator();
-    taskGenerator.init(_taskManager.getClusterInfoAccessor());
-    _taskManager.registerTaskGenerator(taskGenerator);
-
-    startMinion(Collections.singletonList(new TestTaskExecutorFactory()),
-        Collections.singletonList(new TestEventObserverFactory()));
+    startMinion();
   }
 
   @Test
@@ -140,12 +118,16 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
       return true;
     }, STATE_TRANSITION_TIMEOUT_MS, "Failed to get all tasks IN_PROGRESS");
 
-    Assert.assertEquals(_controllerStarter.getControllerMetrics()
-        .getValueOfTableGauge(TASK_TYPE + "." + TaskState.IN_PROGRESS, ControllerGauge.TASK_STATUS), NUM_TASKS);
-    Assert.assertEquals(_controllerStarter.getControllerMetrics()
-        .getValueOfTableGauge(TASK_TYPE + "." + TaskState.COMPLETED, ControllerGauge.TASK_STATUS), 0);
-    Assert.assertEquals(_controllerStarter.getControllerMetrics()
-        .getValueOfTableGauge(TASK_TYPE + "." + TaskState.STOPPED, ControllerGauge.TASK_STATUS), 0);
+    // Wait at most 30 seconds for ZK callback to update the controller gauges
+    ControllerMetrics controllerMetrics = _controllerStarter.getControllerMetrics();
+    String inProgressGauge = TASK_TYPE + "." + TaskState.IN_PROGRESS;
+    String stoppedGauge = TASK_TYPE + "." + TaskState.STOPPED;
+    String completedGauge = TASK_TYPE + "." + TaskState.COMPLETED;
+    TestUtils.waitForCondition(
+        input -> controllerMetrics.getValueOfTableGauge(inProgressGauge, ControllerGauge.TASK_STATUS) == NUM_TASKS
+            && controllerMetrics.getValueOfTableGauge(stoppedGauge, ControllerGauge.TASK_STATUS) == 0
+            && controllerMetrics.getValueOfTableGauge(completedGauge, ControllerGauge.TASK_STATUS) == 0,
+        ZK_CALLBACK_TIMEOUT_MS, "Failed to update the controller gauges");
 
     // Stop the task queue
     _helixTaskResourceManager.stopTaskQueue(TASK_TYPE);
@@ -166,12 +148,12 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
       return true;
     }, STATE_TRANSITION_TIMEOUT_MS, "Failed to get all tasks STOPPED");
 
-    Assert.assertEquals(_controllerStarter.getControllerMetrics()
-        .getValueOfTableGauge(TASK_TYPE + "." + TaskState.IN_PROGRESS, ControllerGauge.TASK_STATUS), 0);
-    Assert.assertEquals(_controllerStarter.getControllerMetrics()
-        .getValueOfTableGauge(TASK_TYPE + "." + TaskState.COMPLETED, ControllerGauge.TASK_STATUS), 0);
-    Assert.assertEquals(_controllerStarter.getControllerMetrics()
-        .getValueOfTableGauge(TASK_TYPE + "." + TaskState.STOPPED, ControllerGauge.TASK_STATUS), NUM_TASKS);
+    // Wait at most 30 seconds for ZK callback to update the controller gauges
+    TestUtils.waitForCondition(
+        input -> controllerMetrics.getValueOfTableGauge(inProgressGauge, ControllerGauge.TASK_STATUS) == 0
+            && controllerMetrics.getValueOfTableGauge(stoppedGauge, ControllerGauge.TASK_STATUS) == NUM_TASKS
+            && controllerMetrics.getValueOfTableGauge(completedGauge, ControllerGauge.TASK_STATUS) == 0,
+        ZK_CALLBACK_TIMEOUT_MS, "Failed to update the controller gauges");
 
     // Resume the task queue, and let the task complete
     _helixTaskResourceManager.resumeTaskQueue(TASK_TYPE);
@@ -193,12 +175,12 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
       return true;
     }, STATE_TRANSITION_TIMEOUT_MS, "Failed to get all tasks COMPLETED");
 
-    Assert.assertEquals(_controllerStarter.getControllerMetrics()
-        .getValueOfTableGauge(TASK_TYPE + "." + TaskState.IN_PROGRESS, ControllerGauge.TASK_STATUS), 0);
-    Assert.assertEquals(_controllerStarter.getControllerMetrics()
-        .getValueOfTableGauge(TASK_TYPE + "." + TaskState.COMPLETED, ControllerGauge.TASK_STATUS), NUM_TASKS);
-    Assert.assertEquals(_controllerStarter.getControllerMetrics()
-        .getValueOfTableGauge(TASK_TYPE + "." + TaskState.STOPPED, ControllerGauge.TASK_STATUS), 0);
+    // Wait at most 30 seconds for ZK callback to update the controller gauges
+    TestUtils.waitForCondition(
+        input -> controllerMetrics.getValueOfTableGauge(inProgressGauge, ControllerGauge.TASK_STATUS) == 0
+            && controllerMetrics.getValueOfTableGauge(stoppedGauge, ControllerGauge.TASK_STATUS) == 0
+            && controllerMetrics.getValueOfTableGauge(completedGauge, ControllerGauge.TASK_STATUS) == NUM_TASKS,
+        ZK_CALLBACK_TIMEOUT_MS, "Failed to update the controller gauges");
 
     // Delete the task queue
     _helixTaskResourceManager.deleteTaskQueue(TASK_TYPE, false);
@@ -207,12 +189,12 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     TestUtils.waitForCondition(input -> !_helixTaskResourceManager.getTaskTypes().contains(TASK_TYPE),
         STATE_TRANSITION_TIMEOUT_MS, "Failed to delete the task queue");
 
-    Assert.assertEquals(_controllerStarter.getControllerMetrics()
-        .getValueOfTableGauge(TASK_TYPE + "." + TaskState.IN_PROGRESS, ControllerGauge.TASK_STATUS), 0);
-    Assert.assertEquals(_controllerStarter.getControllerMetrics()
-        .getValueOfTableGauge(TASK_TYPE + "." + TaskState.COMPLETED, ControllerGauge.TASK_STATUS), NUM_TASKS);
-    Assert.assertEquals(_controllerStarter.getControllerMetrics()
-        .getValueOfTableGauge(TASK_TYPE + "." + TaskState.STOPPED, ControllerGauge.TASK_STATUS), 0);
+    // Wait at most 30 seconds for ZK callback to update the controller gauges
+    TestUtils.waitForCondition(
+        input -> controllerMetrics.getValueOfTableGauge(inProgressGauge, ControllerGauge.TASK_STATUS) == 0
+            && controllerMetrics.getValueOfTableGauge(stoppedGauge, ControllerGauge.TASK_STATUS) == 0
+            && controllerMetrics.getValueOfTableGauge(completedGauge, ControllerGauge.TASK_STATUS) == 0,
+        ZK_CALLBACK_TIMEOUT_MS, "Failed to update the controller gauges");
   }
 
   @AfterClass
@@ -226,118 +208,5 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     stopBroker();
     stopController();
     stopZk();
-  }
-
-  private static class TestTaskGenerator implements PinotTaskGenerator {
-
-    private ClusterInfoAccessor _clusterInfoAccessor;
-
-    @Override
-    public void init(ClusterInfoAccessor clusterInfoAccessor) {
-      _clusterInfoAccessor = clusterInfoAccessor;
-    }
-
-    @Override
-    public String getTaskType() {
-      return TASK_TYPE;
-    }
-
-    @Override
-    public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
-      assertEquals(tableConfigs.size(), NUM_TASKS);
-
-      // Generate at most 2 tasks
-      if (_clusterInfoAccessor.getTaskStates(TASK_TYPE).size() >= NUM_TASKS) {
-        return Collections.emptyList();
-      }
-
-      List<PinotTaskConfig> taskConfigs = new ArrayList<>();
-      for (TableConfig tableConfig : tableConfigs) {
-        Map<String, String> configs = new HashMap<>();
-        configs.put("tableName", tableConfig.getTableName());
-        configs.put("tableType", tableConfig.getTableType().toString());
-        taskConfigs.add(new PinotTaskConfig(TASK_TYPE, configs));
-      }
-      return taskConfigs;
-    }
-  }
-
-  public static class TestTaskExecutorFactory implements PinotTaskExecutorFactory {
-
-    @Override
-    public void init(MinionTaskZkMetadataManager zkMetadataManager) {
-    }
-
-    @Override
-    public String getTaskType() {
-      return TASK_TYPE;
-    }
-
-    @Override
-    public PinotTaskExecutor create() {
-      return new BaseTaskExecutor() {
-        @Override
-        public Boolean executeTask(PinotTaskConfig pinotTaskConfig) {
-          assertTrue(MINION_CONTEXT.getDataDir().exists());
-          assertNotNull(MINION_CONTEXT.getMinionMetrics());
-          assertNotNull(MINION_CONTEXT.getHelixPropertyStore());
-
-          assertEquals(pinotTaskConfig.getTaskType(), TASK_TYPE);
-          Map<String, String> configs = pinotTaskConfig.getConfigs();
-          assertEquals(configs.size(), NUM_TASKS);
-          String offlineTableName = configs.get("tableName");
-          assertEquals(TableNameBuilder.getTableTypeFromTableName(offlineTableName), TableType.OFFLINE);
-          String rawTableName = TableNameBuilder.extractRawTableName(offlineTableName);
-          assertTrue(rawTableName.equals(TABLE_NAME_1) || rawTableName.equals(TABLE_NAME_2));
-          assertEquals(configs.get("tableType"), TableType.OFFLINE.toString());
-
-          do {
-            if (_cancelled) {
-              throw new TaskCancelledException("Task has been cancelled");
-            }
-          } while (HOLD.get());
-          return true;
-        }
-      };
-    }
-  }
-
-  public static class TestEventObserverFactory implements MinionEventObserverFactory {
-
-    @Override
-    public void init(MinionTaskZkMetadataManager zkMetadataManager) {
-    }
-
-    @Override
-    public String getTaskType() {
-      return TASK_TYPE;
-    }
-
-    @Override
-    public MinionEventObserver create() {
-      return new MinionEventObserver() {
-        @Override
-        public void notifyTaskStart(PinotTaskConfig pinotTaskConfig) {
-          TASK_START_NOTIFIED.set(true);
-        }
-
-        @Override
-        public void notifyTaskSuccess(PinotTaskConfig pinotTaskConfig, @Nullable Object executionResult) {
-          assertTrue(executionResult instanceof Boolean);
-          assertTrue((Boolean) executionResult);
-          TASK_SUCCESS_NOTIFIED.set(true);
-        }
-
-        @Override
-        public void notifyTaskCancelled(PinotTaskConfig pinotTaskConfig) {
-          TASK_CANCELLED_NOTIFIED.set(true);
-        }
-
-        @Override
-        public void notifyTaskError(PinotTaskConfig pinotTaskConfig, Exception exception) {
-          TASK_ERROR_NOTIFIED.set(true);
-        }
-      };
-    }
   }
 }

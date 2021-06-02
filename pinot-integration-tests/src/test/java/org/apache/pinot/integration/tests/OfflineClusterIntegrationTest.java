@@ -33,22 +33,21 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import javax.validation.constraints.AssertTrue;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
 import org.apache.pinot.common.utils.grpc.GrpcRequestBuilder;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
-import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -58,6 +57,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -111,8 +111,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       "On_Time_On_Time_Performance_2014_100k_subset_nonulls_default_column_test_extra_columns.schema";
   private static final String SCHEMA_FILE_NAME_WITH_MISSING_COLUMNS =
       "On_Time_On_Time_Performance_2014_100k_subset_nonulls_default_column_test_missing_columns.schema";
-  private static final String TEST_DEFAULT_COLUMNS_QUERY =
-      "SELECT COUNT(*) FROM mytable WHERE NewAddedIntDimension < 0";
+  private static final String TEST_EXTRA_COLUMNS_QUERY = "SELECT COUNT(*) FROM mytable WHERE NewAddedIntDimension < 0";
+  private static final String TEST_MISSING_COLUMNS_QUERY = "SELECT COUNT(*) FROM mytable WHERE AirlineID > 0";
   private static final String SELECT_STAR_QUERY = "SELECT * FROM mytable";
 
   private final List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbacks =
@@ -442,24 +442,24 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   /** Check if server returns error response quickly without timing out Broker. */
   @Test
   public void testServerErrorWithBrokerTimeout()
-    throws Exception {
-      // Set query timeout
-      long queryTimeout = 5000;
-      TableConfig tableConfig = getOfflineTableConfig();
-      tableConfig.setQueryConfig(new QueryConfig(queryTimeout));
-      updateTableConfig(tableConfig);
+      throws Exception {
+    // Set query timeout
+    long queryTimeout = 5000;
+    TableConfig tableConfig = getOfflineTableConfig();
+    tableConfig.setQueryConfig(new QueryConfig(queryTimeout));
+    updateTableConfig(tableConfig);
 
-      long startTime = System.currentTimeMillis();
-      // The query below will fail execution due to use of double quotes around value in IN clause.
-      JsonNode queryResponse = postSqlQuery("SELECT count(*) FROM mytable WHERE Dest IN (\"DFW\")");
-      String result = queryResponse.toPrettyString();
+    long startTime = System.currentTimeMillis();
+    // The query below will fail execution due to use of double quotes around value in IN clause.
+    JsonNode queryResponse = postSqlQuery("SELECT count(*) FROM mytable WHERE Dest IN (\"DFW\")");
+    String result = queryResponse.toPrettyString();
 
-      assertTrue(System.currentTimeMillis() - startTime < queryTimeout);
-      assertTrue(queryResponse.get("exceptions").get(0).get("message").toString().startsWith("\"QueryExecutionError"));
+    assertTrue(System.currentTimeMillis() - startTime < queryTimeout);
+    assertTrue(queryResponse.get("exceptions").get(0).get("message").toString().startsWith("\"QueryExecutionError"));
 
-      // Remove timeout
-      tableConfig.setQueryConfig(null);
-      updateTableConfig(tableConfig);
+    // Remove timeout
+    tableConfig.setQueryConfig(null);
+    updateTableConfig(tableConfig);
   }
 
   @Test
@@ -615,66 +615,101 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     long numTotalDocs = getCountStarResult();
 
-    reloadDefaultColumns(true);
+    reloadWithExtraColumns();
     JsonNode queryResponse = postQuery(SELECT_STAR_QUERY);
     assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
     assertEquals(queryResponse.get("selectionResults").get("columns").size(), 91);
 
     testNewAddedColumns();
 
-    reloadDefaultColumns(false);
+    reloadWithMissingColumns();
+    queryResponse = postQuery(SELECT_STAR_QUERY);
+    assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+    assertEquals(queryResponse.get("selectionResults").get("columns").size(), 75);
+
+    reloadWithRegularColumns();
     queryResponse = postQuery(SELECT_STAR_QUERY);
     assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
     assertEquals(queryResponse.get("selectionResults").get("columns").size(), 79);
   }
 
-  private void reloadDefaultColumns(boolean withExtraColumns)
+  private void reloadWithExtraColumns()
       throws Exception {
     long numTotalDocs = getCountStarResult();
 
-    if (withExtraColumns) {
-      // Add columns to the schema first to pass the validation of the table config
-      _schemaFileName = SCHEMA_FILE_NAME_WITH_EXTRA_COLUMNS;
-      addSchema(createSchema());
-      TableConfig tableConfig = getOfflineTableConfig();
-      tableConfig.setIngestionConfig(new IngestionConfig(null, null, null, Arrays
-          .asList(new TransformConfig("NewAddedDerivedHoursSinceEpoch", "times(DaysSinceEpoch, 24)"),
-              new TransformConfig("NewAddedDerivedSecondsSinceEpoch", "times(times(DaysSinceEpoch, 24), 3600)"))));
-      updateTableConfig(tableConfig);
-    } else {
-      // Remove columns from the table config first to pass the validation of the table config
-      TableConfig tableConfig = getOfflineTableConfig();
-      tableConfig.setIngestionConfig(null);
-      updateTableConfig(tableConfig);
-      _schemaFileName = SCHEMA_FILE_NAME_WITH_MISSING_COLUMNS;
-      addSchema(createSchema());
-    }
+    // Add columns to the schema first to pass the validation of the table config
+    _schemaFileName = SCHEMA_FILE_NAME_WITH_EXTRA_COLUMNS;
+    addSchema(createSchema());
+    TableConfig tableConfig = getOfflineTableConfig();
+    tableConfig.setIngestionConfig(new IngestionConfig(null, null, null, Arrays
+        .asList(new TransformConfig("NewAddedDerivedHoursSinceEpoch", "times(DaysSinceEpoch, 24)"),
+            new TransformConfig("NewAddedDerivedSecondsSinceEpoch", "times(times(DaysSinceEpoch, 24), 3600)")), null));
+    updateTableConfig(tableConfig);
 
     // Trigger reload
     reloadOfflineTable(getTableName());
 
-    String errorMessage;
-    if (withExtraColumns) {
-      errorMessage = "Failed to add default columns";
-    } else {
-      errorMessage = "Failed to remove default columns";
-    }
-
     TestUtils.waitForCondition(aVoid -> {
       try {
-        JsonNode queryResponse = postQuery(TEST_DEFAULT_COLUMNS_QUERY);
+        JsonNode queryResponse = postQuery(TEST_EXTRA_COLUMNS_QUERY);
         // Total docs should not change during reload
         assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
         long count = queryResponse.get("aggregationResults").get(0).get("value").asLong();
-        if (withExtraColumns) {
-          return count == numTotalDocs;
-        } else {
-          return count == 0;
-        }
+        return count == numTotalDocs;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
-    }, 600_000L, errorMessage);
+    }, 600_000L, "Failed to add default columns");
+  }
+
+  private void reloadWithMissingColumns()
+      throws Exception {
+    long numTotalDocs = getCountStarResult();
+
+    // Remove columns from the table config first to pass the validation of the table config
+    TableConfig tableConfig = getOfflineTableConfig();
+    tableConfig.setIngestionConfig(null);
+    updateTableConfig(tableConfig);
+    _schemaFileName = SCHEMA_FILE_NAME_WITH_MISSING_COLUMNS;
+    addSchema(createSchema());
+
+    // Trigger reload
+    reloadOfflineTable(getTableName());
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse = postQuery(TEST_MISSING_COLUMNS_QUERY);
+        // Total docs should not change during reload
+        assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+        long count = queryResponse.get("aggregationResults").get(0).get("value").asLong();
+        return count == 0;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to skip missing columns");
+  }
+
+  private void reloadWithRegularColumns()
+      throws Exception {
+    long numTotalDocs = getCountStarResult();
+
+    _schemaFileName = DEFAULT_SCHEMA_FILE_NAME;
+    addSchema(createSchema());
+
+    // Trigger reload
+    reloadOfflineTable(getTableName());
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse = postQuery(TEST_MISSING_COLUMNS_QUERY);
+        // Total docs should not change during reload
+        assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+        long count = queryResponse.get("aggregationResults").get(0).get("value").asLong();
+        return count == numTotalDocs;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to reload regular columns");
   }
 
   private void testNewAddedColumns()
@@ -1150,22 +1185,46 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testQueryWithSameAlias()
+  public void testQueryWithAlias()
       throws Exception {
-    //test repeated columns in selection query
-    String query =
-        "SELECT ArrTime AS ArrTime, Carrier AS Carrier, DaysSinceEpoch AS DaysSinceEpoch FROM mytable ORDER BY DaysSinceEpoch DESC";
-    testQuery(query, Collections.singletonList(query));
+    {
+      //test same alias name with column name
+      String query =
+          "SELECT ArrTime AS ArrTime, Carrier AS Carrier, DaysSinceEpoch AS DaysSinceEpoch FROM mytable ORDER BY DaysSinceEpoch DESC";
+      testSqlQuery(query, Collections.singletonList(query));
 
-    //test repeated columns in selection query
-    query =
-        "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY Carrier DESC";
-    testQuery(query, Collections.singletonList(query));
+      query =
+          "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY Carrier DESC";
+      testSqlQuery(query, Collections.singletonList(query));
 
-    //test repeated columns in selection query
-    query =
-        "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY Carrier DESC, ArrTime DESC";
-    testQuery(query, Collections.singletonList(query));
+      query =
+          "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY Carrier DESC, ArrTime DESC";
+      testSqlQuery(query, Collections.singletonList(query));
+    }
+    {
+      //test single alias
+      String query = "SELECT ArrTime, Carrier AS CarrierName, DaysSinceEpoch FROM mytable ORDER BY DaysSinceEpoch DESC";
+      testSqlQuery(query, Collections.singletonList(query));
+
+      query = "SELECT count(*) AS cnt, max(ArrTime) as maxArrTime FROM mytable";
+      testSqlQuery(query, Collections.singletonList(query));
+
+      query = "SELECT count(*) AS cnt, Carrier AS CarrierName FROM mytable GROUP BY CarrierName ORDER BY cnt";
+      testSqlQuery(query, Collections.singletonList(query));
+    }
+    {
+      //test multiple alias
+      String query =
+          "SELECT ArrTime, Carrier, Carrier AS CarrierName1, Carrier AS CarrierName2, DaysSinceEpoch FROM mytable ORDER BY DaysSinceEpoch DESC";
+      testSqlQuery(query, Collections.singletonList(query));
+
+      query = "SELECT count(*) AS cnt, max(ArrTime) as maxArrTime1, max(ArrTime) as maxArrTime2 FROM mytable";
+      testSqlQuery(query, Collections.singletonList(query));
+
+      query =
+          "SELECT count(*), count(*) AS cnt1, count(*) AS cnt2, Carrier AS CarrierName FROM mytable GROUP BY CarrierName ORDER BY cnt2";
+      testSqlQuery(query, Collections.singletonList(query));
+    }
   }
 
   @AfterClass
@@ -1333,14 +1392,15 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testCaseInsensitivity() {
     int daysSinceEpoch = 16138;
-    long secondsSinceEpoch = 16138 * 24 * 60 * 60;
+    int hoursSinceEpoch = 16138 * 24;
+    int secondsSinceEpoch = 16138 * 24 * 60 * 60;
     List<String> baseQueries = Arrays.asList("SELECT * FROM mytable",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch limit 10000",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000",
         "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch,
+        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','HOURS') = " + hoursSinceEpoch,
         "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch,
-        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + daysSinceEpoch,
         "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable",
         "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
     List<String> queries = new ArrayList<>();
@@ -1365,14 +1425,15 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testColumnNameContainsTableName() {
     int daysSinceEpoch = 16138;
-    long secondsSinceEpoch = 16138 * 24 * 60 * 60;
+    int hoursSinceEpoch = 16138 * 24;
+    int secondsSinceEpoch = 16138 * 24 * 60 * 60;
     List<String> baseQueries = Arrays.asList("SELECT * FROM mytable",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch limit 10000",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000",
         "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch,
+        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','HOURS') = " + hoursSinceEpoch,
         "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch,
-        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + daysSinceEpoch,
         "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable",
         "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
     List<String> queries = new ArrayList<>();
@@ -1396,14 +1457,15 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testCaseInsensitivityWithColumnNameContainsTableName() {
     int daysSinceEpoch = 16138;
-    long secondsSinceEpoch = 16138 * 24 * 60 * 60;
+    int hoursSinceEpoch = 16138 * 24;
+    int secondsSinceEpoch = 16138 * 24 * 60 * 60;
     List<String> baseQueries = Arrays.asList("SELECT * FROM mytable",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch limit 10000",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000",
         "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch,
+        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','HOURS') = " + hoursSinceEpoch,
         "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch,
-        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + daysSinceEpoch,
         "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable",
         "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
     List<String> queries = new ArrayList<>();
@@ -1509,7 +1571,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertNotNull(dataTable.getDataSchema());
     assertEquals(dataTable.getNumberOfRows(), expectedNumDocs);
     Map<String, String> metadata = dataTable.getMetadata();
-    assertEquals(metadata.get(DataTable.NUM_DOCS_SCANNED_METADATA_KEY), Integer.toString(expectedNumDocs));
+    assertEquals(metadata.get(MetadataKey.NUM_DOCS_SCANNED.getName()), Integer.toString(expectedNumDocs));
   }
 
   private void testStreamingRequest(Iterator<Server.ServerResponse> streamingResponses)
@@ -1522,7 +1584,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       String responseType =
           streamingResponse.getMetadataMap().get(CommonConstants.Query.Response.MetadataKeys.RESPONSE_TYPE);
       if (responseType.equals(CommonConstants.Query.Response.ResponseType.DATA)) {
-        assertTrue(dataTable.getMetadata().isEmpty());
+        // verify the returned data table metadata only contains "threadCpuTimeNs".
+        Map<String, String> metadata = dataTable.getMetadata();
+        assertTrue(metadata.size() == 1 && metadata.containsKey(MetadataKey.THREAD_CPU_TIME_NS.getName()));
         assertNotNull(dataTable.getDataSchema());
         numTotalDocs += dataTable.getNumberOfRows();
       } else {
@@ -1532,7 +1596,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         assertNull(dataTable.getDataSchema());
         assertEquals(dataTable.getNumberOfRows(), 0);
         Map<String, String> metadata = dataTable.getMetadata();
-        assertEquals(metadata.get(DataTable.NUM_DOCS_SCANNED_METADATA_KEY), Integer.toString(expectedNumDocs));
+        assertEquals(metadata.get(MetadataKey.NUM_DOCS_SCANNED.getName()), Integer.toString(expectedNumDocs));
       }
     }
   }

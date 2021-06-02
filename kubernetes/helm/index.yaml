@@ -3,7 +3,7 @@ entries:
   pinot:
   - apiVersion: v1
     appVersion: 0.2.3
-    created: "2021-01-18T22:39:32.381431-08:00"
+    created: "2021-04-22T16:13:57.610533-07:00"
     dependencies:
     - condition: pinot.zookeeper.enabled,zookeeper.enabled
       name: zookeeper
@@ -31,7 +31,7 @@ entries:
     version: 0.2.3
   - apiVersion: v1
     appVersion: 0.2.2
-    created: "2021-01-18T22:39:32.377486-08:00"
+    created: "2021-04-22T16:13:57.604713-07:00"
     dependencies:
     - condition: pinot.zookeeper.enabled,zookeeper.enabled
       name: zookeeper
@@ -59,7 +59,7 @@ entries:
     version: 0.2.2
   - apiVersion: v1
     appVersion: 0.2.1
-    created: "2021-01-18T22:39:32.371665-08:00"
+    created: "2021-04-22T16:13:57.600004-07:00"
     dependencies:
     - condition: pinot.zookeeper.enabled,zookeeper.enabled
       name: zookeeper
@@ -87,7 +87,7 @@ entries:
     version: 0.2.1
   - apiVersion: v1
     appVersion: 0.2.0
-    created: "2021-01-18T22:39:32.367121-08:00"
+    created: "2021-04-22T16:13:57.592641-07:00"
     dependencies:
     - condition: pinot.zookeeper.enabled,zookeeper.enabled
       name: zookeeper
@@ -115,8 +115,29 @@ entries:
     version: 0.2.0
   presto:
   - apiVersion: v1
+    appVersion: 0.2.1
+    created: "2021-04-22T16:13:57.616017-07:00"
+    description: Presto is an open source distributed SQL query engine for running
+      interactive analytic queries against data sources of all sizes ranging from
+      gigabytes to petabytes.
+    digest: 370757c5a5c4fdb2e9e2e0e219400719b572e76c1c800e9c3abb29b6e2e5743a
+    home: https://github.com/prestodb/presto
+    keywords:
+    - analytics
+    - database
+    - presto
+    maintainers:
+    - email: dev@pinot.apache.org
+      name: pinot-dev
+    name: presto
+    sources:
+    - https://github.com/apache/incubator-pinot/tree/master/kubernetes/helm
+    urls:
+    - presto-0.2.1.tgz
+    version: 0.2.1
+  - apiVersion: v1
     appVersion: 0.2.0
-    created: "2021-01-18T22:39:32.383325-08:00"
+    created: "2021-04-22T16:13:57.612839-07:00"
     description: Presto is an open source distributed SQL query engine for running
       interactive analytic queries against data sources of all sizes ranging from
       gigabytes to petabytes.
@@ -135,4 +156,4 @@ entries:
     urls:
     - presto-0.2.0.tgz
     version: 0.2.0
-generated: "2021-01-18T22:39:32.361666-08:00"
+generated: "2021-04-22T16:13:57.586041-07:00"

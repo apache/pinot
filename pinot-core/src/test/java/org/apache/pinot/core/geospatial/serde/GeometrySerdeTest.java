@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.geospatial.serde;
 
+import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.PrecisionModel;
@@ -25,7 +26,7 @@ import org.locationtech.jts.io.WKTReader;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.core.geospatial.GeometryUtils.GEOGRAPHY_SRID;
+import static org.apache.pinot.segment.local.utils.GeometryUtils.GEOGRAPHY_SRID;
 
 
 public class GeometrySerdeTest {

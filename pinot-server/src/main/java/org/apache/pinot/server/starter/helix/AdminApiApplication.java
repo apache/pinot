@@ -28,11 +28,13 @@ import java.util.List;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.server.api.access.AccessControlFactory;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -44,6 +46,7 @@ import org.slf4j.LoggerFactory;
 
 public class AdminApiApplication extends ResourceConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(AdminApiApplication.class);
+  public static final String PINOT_CONFIGURATION = "pinotConfiguration";
 
   private final ServerInstance serverInstance;
   private final AccessControlFactory accessControlFactory;
@@ -51,10 +54,13 @@ public class AdminApiApplication extends ResourceConfig {
   private HttpServer httpServer;
   public static final String RESOURCE_PACKAGE = "org.apache.pinot.server.api.resources";
 
-  public AdminApiApplication(ServerInstance instance, AccessControlFactory accessControlFactory) {
+  public AdminApiApplication(ServerInstance instance, AccessControlFactory accessControlFactory,
+      PinotConfiguration serverConf) {
     this.serverInstance = instance;
     this.accessControlFactory = accessControlFactory;
     packages(RESOURCE_PACKAGE);
+    property(PINOT_CONFIGURATION, serverConf);
+
     register(new AbstractBinder() {
       @Override
       protected void configure() {
@@ -86,7 +92,9 @@ public class AdminApiApplication extends ResourceConfig {
       throw new RuntimeException("Failed to start http server", e);
     }
 
-    setupSwagger(httpServer);
+    synchronized (PinotReflectionUtils.getReflectionLock()) {
+      setupSwagger(httpServer);
+    }
     started = true;
     return true;
   }

@@ -32,13 +32,14 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.client.ResultSetGroup;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
@@ -60,9 +61,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
   // Default settings
   private static final String DEFAULT_PQL_QUERY_FILE_NAME =
-      "On_Time_On_Time_Performance_2014_100k_subset.test_queries_500";
+      "On_Time_On_Time_Performance_2014_100k_subset.test_queries_200.pql";
   private static final String DEFAULT_SQL_QUERY_FILE_NAME =
-      "On_Time_On_Time_Performance_2014_100k_subset.test_queries_500.sql";
+      "On_Time_On_Time_Performance_2014_100k_subset.test_queries_200.sql";
   private static final int DEFAULT_NUM_QUERIES_TO_GENERATE = 100;
   private static final int DEFAULT_MAX_NUM_QUERIES_TO_SKIP_IN_QUERY_FILE = 200;
 
@@ -463,16 +464,16 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    */
   public void testQueryExceptions()
       throws Exception {
-    testQueryException("POTATO");
-    testQueryException("SELECT COUNT(*) FROM potato");
-    testQueryException("SELECT POTATO(ArrTime) FROM mytable");
-    testQueryException("SELECT COUNT(*) FROM mytable where ArrTime = 'potato'");
+    testQueryException("POTATO", QueryException.PQL_PARSING_ERROR_CODE);
+    testQueryException("SELECT COUNT(*) FROM potato", QueryException.TABLE_DOES_NOT_EXIST_ERROR_CODE);
+    testQueryException("SELECT POTATO(ArrTime) FROM mytable", QueryException.QUERY_EXECUTION_ERROR_CODE);
+    testQueryException("SELECT COUNT(*) FROM mytable where ArrTime = 'potato'", QueryException.QUERY_EXECUTION_ERROR_CODE);
   }
 
-  private void testQueryException(String query)
+  private void testQueryException(String query, int errorCode)
       throws Exception {
     JsonNode jsonObject = postQuery(query);
-    assertTrue(jsonObject.get("exceptions").size() > 0);
+    assertEquals(jsonObject.get("exceptions").get(0).get("errorCode").asInt(), errorCode);
   }
 
   /**

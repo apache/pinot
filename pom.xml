@@ -31,7 +31,7 @@
 
   <groupId>org.apache.pinot</groupId>
   <artifactId>pinot</artifactId>
-  <version>0.7.0-SNAPSHOT</version>
+  <version>0.8.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Pinot</name>
   <description>A realtime distributed OLAP datastore</description>
@@ -39,6 +39,7 @@
 
   <modules>
     <module>pinot-spi</module>
+    <module>pinot-segment-spi</module>
     <module>pinot-broker</module>
     <module>pinot-common</module>
     <module>pinot-clients</module>
@@ -52,6 +53,7 @@
     <module>pinot-integration-tests</module>
     <module>pinot-distribution</module>
     <module>pinot-connectors</module>
+    <module>pinot-segment-local</module>
   </modules>
 
   <licenses>
@@ -113,8 +115,8 @@
       See also: the surefire plugin section and the profiles section.-->
     <SKIP_INTEGRATION_TESTS>true</SKIP_INTEGRATION_TESTS>
     <!-- Configuration for unit/integration tests section 1 of 3 (properties) ENDS HERE.-->
-    <avro.version>1.7.6</avro.version>
-    <parquet.version>1.8.0</parquet.version>
+    <avro.version>1.9.2</avro.version>
+    <parquet.version>1.11.1</parquet.version>
     <helix.version>0.9.8</helix.version>
     <zkclient.version>0.7</zkclient.version>
     <jackson.version>2.10.0</jackson.version>
@@ -142,11 +144,14 @@
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.1.2</dropwizard-metrics.version>
     <snappy-java.version>1.1.1.7</snappy-java.version>
+    <zstd-jni.version>1.4.9-5</zstd-jni.version>
     <log4j.version>2.11.2</log4j.version>
     <netty.version>4.1.54.Final</netty.version>
+    <reactivestreams.version>1.0.3</reactivestreams.version>
     <jts.version>1.16.1</jts.version>
     <h3.version>3.0.3</h3.version>
     <jmh.version>1.26</jmh.version>
+    <audienceannotations.version>0.11.0</audienceannotations.version>
 
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g</argLine>
@@ -183,17 +188,6 @@
       </activation>
       <properties>
         <kafka.version>2.0</kafka.version>
-      </properties>
-    </profile>
-    <profile>
-      <id>travis</id>
-      <activation>
-        <activeByDefault>false</activeByDefault>
-      </activation>
-      <properties>
-        <argLine>-Xms4g -Xmx4g -XX:MaxPermSize=512m -XX:MaxDirectMemorySize=10g
-          -Dlog4j2.configurationFile=log4j2-fatal-only.xml
-        </argLine>
       </properties>
     </profile>
     <profile>
@@ -271,6 +265,16 @@
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-spi</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-segment-spi</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-segment-local</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -438,6 +442,19 @@
         <version>${netty.version}</version>
       </dependency>
 
+      <!-- this part is for resolving dependency convergence error for pinot-kinesis -->
+      <dependency>
+        <groupId>io.netty</groupId>
+        <artifactId>netty-codec</artifactId>
+        <version>${netty.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.reactivestreams</groupId>
+        <artifactId>reactive-streams</artifactId>
+        <version>${reactivestreams.version}</version>
+      </dependency>
+
       <!-- this part is for resolving dependency convergence error for pinot-adls -->
       <dependency>
         <groupId>io.netty</groupId>
@@ -487,6 +504,11 @@
         <artifactId>netty-transport-native-epoll</artifactId>
         <version>${netty.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.apache.yetus</groupId>
+        <artifactId>audience-annotations</artifactId>
+        <version>${audienceannotations.version}</version>
+      </dependency>
 
       <dependency>
         <groupId>it.unimi.dsi</groupId>
@@ -512,6 +534,11 @@
         <groupId>org.xerial.snappy</groupId>
         <artifactId>snappy-java</artifactId>
         <version>${snappy-java.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.github.luben</groupId>
+        <artifactId>zstd-jni</artifactId>
+        <version>${zstd-jni.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.commons</groupId>
@@ -648,6 +675,10 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>org.apache.yetus</groupId>
+            <artifactId>audience-annotations</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -744,6 +775,10 @@
             <groupId>com.google.protobuf</groupId>
             <artifactId>protobuf-java</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>org.apache.yetus</groupId>
+            <artifactId>audience-annotations</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -805,6 +840,12 @@
             <artifactId>protobuf-java</artifactId>
           </exclusion>
         </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-mapreduce-client-core</artifactId>
+        <version>${hadoop.version}</version>
+        <scope>provided</scope>
       </dependency>
 
       <!-- Spark -->
@@ -1393,7 +1434,7 @@
         <plugin>
           <groupId>com.mycila</groupId>
           <artifactId>license-maven-plugin</artifactId>
-          <version>2.8</version>
+          <version>4.0</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -1534,54 +1575,82 @@
         <version>2.5</version>
       </plugin>
       <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <version>2.9.0</version>
+        <executions>
+          <execution>
+            <phase>verify</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <java>
+            <includes>
+              <include>src/main/java/**/*.java</include>
+              <include>src/test/java/**/*.java</include>
+            </includes>
+            <importOrder>
+              <order>,\#</order>
+            </importOrder>
+            <removeUnusedImports />
+          </java>
+        </configuration>
+      </plugin>
+      <plugin>
         <groupId>com.mycila</groupId>
         <artifactId>license-maven-plugin</artifactId>
-        <version>2.8</version>
+        <version>4.0</version>
         <configuration>
           <header>${pinot.root}/HEADER</header>
           <headerDefinitions>
-            <headerDefinition>${pinot.root}/rstheaderdefinition.xml</headerDefinition>
+            <headerDefinition>${pinot.root}/headerdefinition.xml</headerDefinition>
           </headerDefinitions>
           <excludes>
-            <!-- Exclude build files for docs -->
-            <exclude>docs/_build/**</exclude>
-            <exlude>docs/Makefile</exlude>
-
             <!-- Text and log files -->
             <exclude>**/*.txt</exclude>
             <exclude>**/*.log</exclude>
+            <exclude>**/*.list</exclude>
+            <exclude>**/*.out</exclude>
+            <exclude>**/*.generated</exclude>
+            <exclude>**/*.json</exclude>
+            <exclude>**/*.schema</exclude>
 
-            <exclude>**/*.pql</exclude>
-            <exclude>**/*.config</exclude>
-            <exclude>**/*.csv</exclude>
+            <!-- JDBC Drivers -->
+            <exclude>**/java.sql.*</exclude>
+
+            <!-- Spark datasource register -->
+            <exclude>**/org.apache.spark.sql.sources.DataSourceRegister</exclude>
+
+            <!-- Binary files -->
             <exclude>**/*.avro</exclude>
-            <exclude>**/*.conf</exclude>
-            <exclude>**/appAssemblerScriptTemplate</exclude>
-
-            <exclude>**/zone-index.properties</exclude>
-
-            <!-- Resource directories under test -->
-            <exclude>**/src/test/resources/**</exclude>
+            <exclude>**/*.avsc</exclude>
+            <exclude>**/*.csv</exclude>
+            <exclude>**/*.desc</exclude>
+            <exclude>**/*.parquet</exclude>
+            <exclude>**/*.gz</exclude>
+            <exclude>**/*.orc</exclude>
+            <exclude>**/*.dict</exclude>
+            <exclude>**/*.raw</exclude>
+            <exclude>**/*.mapping</exclude>
+            <exclude>**/*.ser</exclude>
+            <exclude>**/*.v1</exclude>
+            <exclude>**/*.v2</exclude>
 
             <!-- Auto-generated target directories -->
             <exclude>target/**</exclude>
             <exclude>pinot-*/target/**</exclude>
 
-            <!-- Top level directories -->
-            <exclude>thirdeye/**</exclude>
-            <exclude>website/**</exclude>
-            <exclude>docker/**</exclude>
+            <!-- Docker and Kubernetes (not part of the distribution) -->
             <exclude>kubernetes/**</exclude>
+            <exclude>docker/**</exclude>
 
-            <!-- Docker image configs -->
-            <exclude>docker/images/pinot-thirdeye/**</exclude>
-
-            <!-- Note: this will exclude all single character directories under the root directory.
-            We use this to exclude the temporary files generated during build -->
-            <exclude>?/**</exclude>
+            <!-- Pinot-Druid Benchmark (not part of the distribution) -->
+            <exclude>contrib/**</exclude>
 
             <!-- Top level files -->
-            <exclude>.codecov*</exclude>
             <exclude>HEADER</exclude>
             <exclude>LICENSE*</exclude>
             <exclude>NOTICE*</exclude>
@@ -1590,26 +1659,29 @@
             <!-- js, css files that are exact copies of the third-party works. In this case, the original header has to
             be kept. Please refer to 'Treatment of Third-party works' in https://www.apache.org/legal/src-headers.html
             -->
-            <exclude>**/codemirror/**</exclude>
-            <exclude>**/codemirror*</exclude>
-            <exclude>**/foundation*</exclude>
-            <exclude>**/angular*</exclude>
-            <exclude>**/underscore*</exclude>
-            <exclude>**/jquery*</exclude>
-            <exclude>**/normalize*</exclude>
-            <exclude>**/handlebars*</exclude>
-            <exclude>**/beautify*</exclude>
             <exclude>**/node_modules/**</exclude>
             <exclude>**/dist/**</exclude>
-            <exclude>**/.factorypath</exclude>
-            <exclude>**/app/**</exclude>
-            <exclude>**/src/main/resources/dist/**</exclude>
-            <exclude>**/src/main/resources/.*</exclude>
+            <exclude>**/src/main/resources/*.*rc</exclude>
           </excludes>
           <mapping>
+            <java>JAVADOC_STYLE</java>
+            <scala>JAVADOC_STYLE</scala>
             <thrift>JAVADOC_STYLE</thrift>
             <g4>JAVADOC_STYLE</g4>
+            <ts>JAVADOC_STYLE</ts>
+            <tsx>JAVADOC_STYLE</tsx>
+            <config>SCRIPT_STYLE</config>
+            <queries>SCRIPT_STYLE</queries>
+            <results>SCRIPT_STYLE</results>
+            <MockMaker>SCRIPT_STYLE</MockMaker>
+            <appAssemblerScriptTemplate>SCRIPT_STYLE</appAssemblerScriptTemplate>
+            <pql>SCRIPT_STYLE</pql>
+            <sql>SCRIPT_STYLE</sql>
+            <conf>DOUBLESLASH_STYLE</conf>
+            <cfg>DOUBLESLASH_STYLE</cfg>
+            <proto>DOUBLESLASH_STYLE</proto>
             <rst>RST_STYLE</rst>
+            <readme>RST_STYLE</readme>
           </mapping>
         </configuration>
         <executions>
@@ -1634,12 +1706,6 @@
         </executions>
         <configuration>
           <excludes>
-            <!-- Sphynx auto generated makefile -->
-            <exclude>docs/Makefile</exclude>
-
-            <!-- Exclude build files for docs -->
-            <exclude>docs/_build/**</exclude>
-
             <!-- Exclude license copies -->
             <exclude>licenses/**</exclude>
             <exclude>licenses-binary/**</exclude>
@@ -1647,52 +1713,47 @@
             <!-- Exclude build targets -->
             <exclude>**/target/**</exclude>
 
+            <!-- Text and log files -->
+            <exclude>**/*.txt</exclude>
+            <exclude>**/*.log</exclude>
+            <exclude>**/*.list</exclude>
+            <exclude>**/*.out</exclude>
+            <exclude>**/*.generated</exclude>
+            <exclude>**/*.json</exclude>
+            <exclude>**/*.schema</exclude>
+
+            <!-- JDBC Drivers -->
+            <exclude>**/java.sql.*</exclude>
+
+            <!-- Spark datasource register -->
+            <exclude>**/org.apache.spark.sql.sources.DataSourceRegister</exclude>
+
+            <!-- Binary files -->
+            <exclude>**/*.avro</exclude>
+            <exclude>**/*.avsc</exclude>
+            <exclude>**/*.csv</exclude>
+            <exclude>**/*.desc</exclude>
+            <exclude>**/*.parquet</exclude>
+            <exclude>**/*.gz</exclude>
+            <exclude>**/*.orc</exclude>
+            <exclude>**/*.dict</exclude>
+            <exclude>**/*.raw</exclude>
+            <exclude>**/*.mapping</exclude>
+            <exclude>**/*.ser</exclude>
+            <exclude>**/*.v1</exclude>
+            <exclude>**/*.v2</exclude>
+            <exclude>**/appAssemblerScriptTemplate</exclude>
 
             <!-- js, css files that are exact copies of the third-party works. In this case, the original header has to
             be kept. Please refer to 'Treatment of Third-party works' in https://www.apache.org/legal/src-headers.html
             -->
-            <exclude>**/codemirror/**</exclude>
-            <exclude>**/codemirror*</exclude>
-            <exclude>**/foundation*</exclude>
-            <exclude>**/angular*</exclude>
-            <exclude>**/underscore*</exclude>
-            <exclude>**/jquery*</exclude>
-            <exclude>**/normalize*</exclude>
-            <exclude>**/handlebars*</exclude>
-            <exclude>**/beautify*</exclude>
-            <exclude>**/src/main/resources/.*</exclude>
-            <exclude>**/src/main/resources/dist/**</exclude>
-            <exclude>**/src/main/resources/node_modules/**</exclude>
-
-            <!-- Binary files -->
-            <exclude>**/*.json</exclude>
-            <exclude>**/*.pql</exclude>
-            <exclude>**/*.log</exclude>
-            <exclude>**/*.csv</exclude>
-            <exclude>**/*.avro</exclude>
-            <exclude>**/*.conf</exclude>
-            <exclude>**/*.config</exclude>
-            <exclude>**/*.yml</exclude>
-            <exclude>**/*.yaml</exclude>
-            <exclude>**/*.properties</exclude>
+            <exclude>**/node_modules/**</exclude>
+            <exclude>**/dist/**</exclude>
+            <exclude>**/*.*rc</exclude>
+            <exclude>**/src/main/resources/*.*rc</exclude>
 
             <!-- IDE files -->
             <exclude>**/*.iml</exclude>
-
-            <!-- Top level -->
-            <exclude>.codecov*</exclude>
-
-            <!-- Test Resources -->
-            <exclude>**/test/resources/**</exclude>
-
-            <!-- JDBC Drivers -->
-            <exclude>**/main/resources/java.sql.*</exclude>
-
-            <!-- Spark datasource register -->
-            <exclude>**/src/main/resources/META-INF/services/org.apache.spark.sql.sources.DataSourceRegister</exclude>
-
-            <!-- Pinot Website (not part of the distribution) -->
-            <exclude>website/**</exclude>
 
             <!-- Docker and Kubernetes (not part of the distribution) -->
             <exclude>kubernetes/**</exclude>
@@ -1700,10 +1761,6 @@
 
             <!-- Pinot-Druid Benchmark (not part of the distribution) -->
             <exclude>contrib/**</exclude>
-
-            <!-- Third eye (not part of the distribution) -->
-            <exclude>thirdeye/**</exclude>
-            <exclude>docker/images/pinot-thirdeye/**</exclude>
 
             <!-- Github template files -->
             <exclude>.github/*.md</exclude>

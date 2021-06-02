@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.tools.anonymizer;
 
-import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
 
 
 public interface GlobalDictionaries {

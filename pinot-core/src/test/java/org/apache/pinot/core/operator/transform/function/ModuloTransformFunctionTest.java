@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import org.apache.pinot.core.query.exception.BadQueryRequestException;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -31,7 +31,7 @@ public class ModuloTransformFunctionTest extends BaseTransformFunctionTest {
   @Test
   public void testModuloTransformFunction() {
     ExpressionContext expression =
-        QueryContextConverterUtils.getExpression(String.format("mod(%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN));
+        RequestContextUtils.getExpressionFromSQL(String.format("mod(%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ModuloTransformFunction);
     Assert.assertEquals(transformFunction.getName(), ModuloTransformFunction.FUNCTION_NAME);
@@ -41,7 +41,7 @@ public class ModuloTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = QueryContextConverterUtils.getExpression(String.format("mod(%s,%s)", LONG_SV_COLUMN, FLOAT_SV_COLUMN));
+    expression = RequestContextUtils.getExpressionFromSQL(String.format("mod(%s,%s)", LONG_SV_COLUMN, FLOAT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ModuloTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -50,7 +50,7 @@ public class ModuloTransformFunctionTest extends BaseTransformFunctionTest {
     testTransformFunction(transformFunction, expectedValues);
 
     expression =
-        QueryContextConverterUtils.getExpression(String.format("mod(%s,%s)", FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN));
+        RequestContextUtils.getExpressionFromSQL(String.format("mod(%s,%s)", FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ModuloTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -59,7 +59,7 @@ public class ModuloTransformFunctionTest extends BaseTransformFunctionTest {
     testTransformFunction(transformFunction, expectedValues);
 
     expression =
-        QueryContextConverterUtils.getExpression(String.format("mod(%s,%s)", DOUBLE_SV_COLUMN, STRING_SV_COLUMN));
+        RequestContextUtils.getExpressionFromSQL(String.format("mod(%s,%s)", DOUBLE_SV_COLUMN, STRING_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ModuloTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -67,7 +67,7 @@ public class ModuloTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = QueryContextConverterUtils.getExpression(String.format("mod(%s,%s)", STRING_SV_COLUMN, INT_SV_COLUMN));
+    expression = RequestContextUtils.getExpressionFromSQL(String.format("mod(%s,%s)", STRING_SV_COLUMN, INT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ModuloTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -75,7 +75,7 @@ public class ModuloTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = QueryContextConverterUtils.getExpression(String
+    expression = RequestContextUtils.getExpressionFromSQL(String
         .format("mod(mod(mod(mod(mod(12,%s),%s),mod(mod(%s,%s),0.34)),%s),%s)", STRING_SV_COLUMN, DOUBLE_SV_COLUMN,
             FLOAT_SV_COLUMN, LONG_SV_COLUMN, INT_SV_COLUMN, DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
@@ -90,7 +90,7 @@ public class ModuloTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    ExpressionContext expression = QueryContextConverterUtils.getExpression(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 

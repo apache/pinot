@@ -19,12 +19,10 @@
 
 package org.apache.pinot.controller.api.access;
 
-import java.lang.reflect.Method;
 import java.util.Optional;
 import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
-import org.apache.pinot.controller.api.resources.ControllerApplicationException;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,25 +72,25 @@ public class AccessControlUtils {
    */
   public void validatePermission(Optional<String> tableNameOpt, AccessType accessType, HttpHeaders httpHeaders,
       String endpointUrl, AccessControl accessControl) {
-      boolean hasPermission;
-      String accessTypeToEndpointMsg =
-          String.format("access type '%s' to the endpoint '%s'", accessType, endpointUrl) + tableNameOpt
-              .map(name -> String.format(" for table '%s'", name)).orElse("");
-      try {
-        if (tableNameOpt.isPresent()) {
-          String rawTableName = TableNameBuilder.extractRawTableName(tableNameOpt.get());
-          hasPermission = accessControl.hasAccess(rawTableName, accessType, httpHeaders, endpointUrl);
-        } else {
-          hasPermission = accessControl.hasAccess(accessType, httpHeaders, endpointUrl);
-        }
-      } catch (Exception e) {
-        throw new ControllerApplicationException(LOGGER,
-            "Caught exception while validating permission for " + accessTypeToEndpointMsg,
-            Response.Status.INTERNAL_SERVER_ERROR, e);
+    boolean hasPermission;
+    String accessTypeToEndpointMsg =
+        String.format("access type '%s' to the endpoint '%s'", accessType, endpointUrl) + tableNameOpt
+            .map(name -> String.format(" for table '%s'", name)).orElse("");
+    try {
+      if (tableNameOpt.isPresent()) {
+        String rawTableName = TableNameBuilder.extractRawTableName(tableNameOpt.get());
+        hasPermission = accessControl.hasAccess(rawTableName, accessType, httpHeaders, endpointUrl);
+      } else {
+        hasPermission = accessControl.hasAccess(accessType, httpHeaders, endpointUrl);
       }
-      if (!hasPermission) {
-        throw new ControllerApplicationException(LOGGER, "Permission is denied for " + accessTypeToEndpointMsg,
-            Response.Status.FORBIDDEN);
-      }
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          "Caught exception while validating permission for " + accessTypeToEndpointMsg,
+          Response.Status.INTERNAL_SERVER_ERROR, e);
     }
+    if (!hasPermission) {
+      throw new ControllerApplicationException(LOGGER, "Permission is denied for " + accessTypeToEndpointMsg,
+          Response.Status.FORBIDDEN);
+    }
+  }
 }

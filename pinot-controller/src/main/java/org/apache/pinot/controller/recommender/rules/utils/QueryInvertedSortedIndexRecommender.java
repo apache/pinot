@@ -18,26 +18,34 @@
  */
 package org.apache.pinot.controller.recommender.rules.utils;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.predicate.InPredicate;
+import org.apache.pinot.common.request.context.predicate.NotInPredicate;
+import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.controller.recommender.io.InputManager;
 import org.apache.pinot.controller.recommender.rules.io.configs.IndexConfig;
 import org.apache.pinot.controller.recommender.rules.io.params.InvertedSortedIndexJointRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.predicate.InPredicate;
-import org.apache.pinot.core.query.request.context.predicate.NotInPredicate;
-import org.apache.pinot.core.query.request.context.predicate.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
-import java.util.stream.Collectors;
-
-import static org.apache.pinot.controller.recommender.rules.utils.PredicateParseResult.*;
+import static org.apache.pinot.controller.recommender.rules.utils.PredicateParseResult.NESI_ZERO;
+import static org.apache.pinot.controller.recommender.rules.utils.PredicateParseResult.PERCENT_SELECT_ALL;
+import static org.apache.pinot.controller.recommender.rules.utils.PredicateParseResult.PERCENT_SELECT_ZERO;
 
 
 /**
@@ -522,10 +530,6 @@ public class QueryInvertedSortedIndexRecommender {
           .setIteratorEvalPriorityEnum(IteratorEvalPriorityEnum.SCAN)
           .setRecommendationPriorityEnum(RecommendationPriorityEnum.NON_CANDIDATE_SCAN) // won't recommend index
           .setnESI(nESI).setPercentSelected(_params.PERCENT_SELECT_FOR_FUNCTION).setnESIWithIdx(nESI).build();
-    }
-    // Skip time columns
-    else if (_inputManager.isPrimaryDateTime(colName)) {
-      return null;
     }
     // Not a valid dimension name
     else if (!_inputManager.isDim(colName)) {

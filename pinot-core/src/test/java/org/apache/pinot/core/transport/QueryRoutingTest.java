@@ -26,7 +26,8 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.common.datatable.DataTableImplV2;
+import org.apache.pinot.common.utils.DataTable.MetadataKey;
+import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.TableType;
@@ -79,8 +80,8 @@ public class QueryRoutingTest {
   public void testValidResponse()
       throws Exception {
     long requestId = 123;
-    DataTable dataTable = new DataTableImplV2();
-    dataTable.getMetadata().put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(requestId));
+    DataTable dataTable = DataTableBuilder.getEmptyDataTable();
+    dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     byte[] responseBytes = dataTable.toBytes();
 
     // Start the server
@@ -156,8 +157,8 @@ public class QueryRoutingTest {
   public void testNonMatchingRequestId()
       throws Exception {
     long requestId = 123;
-    DataTable dataTable = new DataTableImplV2();
-    dataTable.getMetadata().put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(requestId));
+    DataTable dataTable = DataTableBuilder.getEmptyDataTable();
+    dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     byte[] responseBytes = dataTable.toBytes();
 
     // Start the server
@@ -186,8 +187,11 @@ public class QueryRoutingTest {
   public void testServerDown()
       throws Exception {
     long requestId = 123;
-    DataTable dataTable = new DataTableImplV2();
-    dataTable.getMetadata().put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(requestId));
+    // To avoid flakyness, set timeoutMs to 2000 msec. For some test runs, it can take up to
+    // 1400 msec to mark request as failed.
+    long timeoutMs = 2000L;
+    DataTable dataTable = DataTableBuilder.getEmptyDataTable();
+    dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     byte[] responseBytes = dataTable.toBytes();
 
     // Start the server
@@ -196,7 +200,7 @@ public class QueryRoutingTest {
 
     long startTimeMs = System.currentTimeMillis();
     AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId + 1, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+        _queryRouter.submitQuery(requestId + 1, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, timeoutMs);
 
     // Shut down the server before getting the response
     queryServer.shutDown();
@@ -210,12 +214,12 @@ public class QueryRoutingTest {
     assertEquals(serverResponse.getResponseSize(), 0);
     assertEquals(serverResponse.getDeserializationTimeMs(), 0);
     // Query should early terminate
-    assertTrue(System.currentTimeMillis() - startTimeMs < 1000);
+    assertTrue(System.currentTimeMillis() - startTimeMs < timeoutMs);
 
     // Submit query after server is down
     startTimeMs = System.currentTimeMillis();
     asyncQueryResponse =
-        _queryRouter.submitQuery(requestId + 1, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+        _queryRouter.submitQuery(requestId + 1, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, timeoutMs);
     response = asyncQueryResponse.getResponse();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
@@ -226,7 +230,7 @@ public class QueryRoutingTest {
     assertEquals(serverResponse.getResponseSize(), 0);
     assertEquals(serverResponse.getDeserializationTimeMs(), 0);
     // Query should early terminate
-    assertTrue(System.currentTimeMillis() - startTimeMs < 1000);
+    assertTrue(System.currentTimeMillis() - startTimeMs < timeoutMs);
   }
 
   @AfterClass

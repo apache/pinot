@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.client;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import java.net.URI;
 import java.sql.Connection;

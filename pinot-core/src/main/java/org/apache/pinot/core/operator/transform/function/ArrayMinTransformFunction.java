@@ -21,11 +21,11 @@ package org.apache.pinot.core.operator.transform.function;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
@@ -76,7 +76,7 @@ public class ArrayMinTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    if (_argument.getResultMetadata().getDataType() != FieldSpec.DataType.INT) {
+    if (_argument.getResultMetadata().getDataType().getStoredType() != DataType.INT) {
       return super.transformToIntValuesSV(projectionBlock);
     }
     if (_intValuesSV == null) {
@@ -96,7 +96,7 @@ public class ArrayMinTransformFunction extends BaseTransformFunction {
 
   @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
-    if (_argument.getResultMetadata().getDataType() != FieldSpec.DataType.LONG) {
+    if (_argument.getResultMetadata().getDataType().getStoredType() != DataType.LONG) {
       return super.transformToLongValuesSV(projectionBlock);
     }
     if (_longValuesSV == null) {
@@ -116,7 +116,7 @@ public class ArrayMinTransformFunction extends BaseTransformFunction {
 
   @Override
   public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
-    if (_argument.getResultMetadata().getDataType() != FieldSpec.DataType.FLOAT) {
+    if (_argument.getResultMetadata().getDataType().getStoredType() != DataType.FLOAT) {
       return super.transformToFloatValuesSV(projectionBlock);
     }
     if (_floatValuesSV == null) {
@@ -136,7 +136,7 @@ public class ArrayMinTransformFunction extends BaseTransformFunction {
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_argument.getResultMetadata().getDataType() != FieldSpec.DataType.DOUBLE) {
+    if (_argument.getResultMetadata().getDataType().getStoredType() != DataType.DOUBLE) {
       return super.transformToDoubleValuesSV(projectionBlock);
     }
     if (_doubleValuesSV == null) {
@@ -156,7 +156,7 @@ public class ArrayMinTransformFunction extends BaseTransformFunction {
 
   @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-    if (_argument.getResultMetadata().getDataType() != FieldSpec.DataType.STRING) {
+    if (_argument.getResultMetadata().getDataType().getStoredType() != DataType.STRING) {
       return super.transformToStringValuesSV(projectionBlock);
     }
     if (_stringValuesSV == null) {

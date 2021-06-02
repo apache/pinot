@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.minion.tasks;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -72,6 +73,7 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
     String downloadURL = configs.get(MinionConstants.DOWNLOAD_URL_KEY);
     String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
     String originalSegmentCrc = configs.get(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY);
+    String authToken = configs.get(MinionConstants.AUTH_TOKEN);
 
     LOGGER.info("Start executing {} on table: {}, segment: {} with downloadURL: {}, uploadURL: {}", taskType,
         tableNameWithType, segmentName, downloadURL, uploadURL);
@@ -121,7 +123,10 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
           new BasicHeader(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER,
               segmentZKMetadataCustomMapModifier.toJsonString());
 
-      List<Header> httpHeaders = Arrays.asList(ifMatchHeader, segmentZKMetadataCustomMapModifierHeader);
+      List<Header> httpHeaders = new ArrayList<>();
+      httpHeaders.add(ifMatchHeader);
+      httpHeaders.add(segmentZKMetadataCustomMapModifierHeader);
+      httpHeaders.addAll(FileUploadDownloadClient.makeAuthHeader(authToken));
 
       // Set parameters for upload request.
       NameValuePair enableParallelPushProtectionParameter =

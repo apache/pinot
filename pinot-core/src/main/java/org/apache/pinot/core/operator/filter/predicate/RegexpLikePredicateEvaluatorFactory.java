@@ -22,9 +22,9 @@ import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import java.util.regex.Pattern;
-import org.apache.pinot.core.query.request.context.predicate.Predicate;
-import org.apache.pinot.core.query.request.context.predicate.RegexpLikePredicate;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -40,10 +40,12 @@ public class RegexpLikePredicateEvaluatorFactory {
    *
    * @param regexpLikePredicate REGEXP_LIKE predicate to evaluate
    * @param dictionary Dictionary for the column
+   * @param dataType Data type for the column
    * @return Dictionary based REGEXP_LIKE predicate evaluator
    */
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(
-      RegexpLikePredicate regexpLikePredicate, Dictionary dictionary) {
+      RegexpLikePredicate regexpLikePredicate, Dictionary dictionary, DataType dataType) {
+    Preconditions.checkArgument(dataType == DataType.STRING, "Unsupported data type: " + dataType);
     return new DictionaryBasedRegexpLikePredicateEvaluator(regexpLikePredicate, dictionary);
   }
 

@@ -25,11 +25,12 @@ import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.PriorityQueue;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
@@ -73,7 +74,7 @@ public class SelectionOperatorService {
    * @param dataSchema data schema.
    */
   public SelectionOperatorService(QueryContext queryContext, DataSchema dataSchema) {
-    _selectionColumns = SelectionOperatorUtils.getSelectionColumns(queryContext.getSelectExpressions(), dataSchema);
+    _selectionColumns = SelectionOperatorUtils.getSelectionColumns(queryContext, dataSchema);
     _dataSchema = dataSchema;
     // Select rows from offset to offset + limit.
     _offset = queryContext.getOffset();
@@ -90,11 +91,13 @@ public class SelectionOperatorService {
    * @return flexible {@link Comparator} for selection rows.
    */
   private Comparator<Object[]> getTypeCompatibleComparator(List<OrderByExpressionContext> orderByExpressions) {
+    ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
+
     // Compare all single-value columns
     int numOrderByExpressions = orderByExpressions.size();
     List<Integer> valueIndexList = new ArrayList<>(numOrderByExpressions);
     for (int i = 0; i < numOrderByExpressions; i++) {
-      if (!_dataSchema.getColumnDataType(i).isArray()) {
+      if (!columnDataTypes[i].isArray()) {
         valueIndexList.add(i);
       }
     }
@@ -107,7 +110,7 @@ public class SelectionOperatorService {
     for (int i = 0; i < numValuesToCompare; i++) {
       int valueIndex = valueIndexList.get(i);
       valueIndices[i] = valueIndex;
-      isNumber[i] = _dataSchema.getColumnDataType(valueIndex).isNumber();
+      isNumber[i] = columnDataTypes[valueIndex].isNumber();
       multipliers[i] = orderByExpressions.get(valueIndex).isAsc() ? -1 : 1;
     }
 
@@ -166,7 +169,7 @@ public class SelectionOperatorService {
     LinkedList<Serializable[]> rowsInSelectionResults = new LinkedList<>();
     int[] columnIndices = SelectionOperatorUtils.getColumnIndices(_selectionColumns, _dataSchema);
     int numColumns = columnIndices.length;
-    DataSchema.ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
+    ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
 
     if (preserveType) {
       while (_rows.size() > _offset) {
@@ -175,7 +178,7 @@ public class SelectionOperatorService {
         Serializable[] extractedRow = new Serializable[numColumns];
         for (int i = 0; i < numColumns; i++) {
           int columnIndex = columnIndices[i];
-          extractedRow[i] = SelectionOperatorUtils.convertValueToType(row[columnIndex], columnDataTypes[columnIndex]);
+          extractedRow[i] = columnDataTypes[columnIndex].convertAndFormat(row[columnIndex]);
         }
         rowsInSelectionResults.addFirst(extractedRow);
       }
@@ -204,32 +207,33 @@ public class SelectionOperatorService {
    * @return {@link SelectionResults} object results.
    */
   public ResultTable renderResultTableWithOrdering() {
-    LinkedList<Object[]> rowsInSelectionResults = new LinkedList<>();
     int[] columnIndices = SelectionOperatorUtils.getColumnIndices(_selectionColumns, _dataSchema);
     int numColumns = columnIndices.length;
-    DataSchema.ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
-
-    while (_rows.size() > _offset) {
-      Object[] row = _rows.poll();
-      assert row != null;
-      Object[] extractedRow = new Object[numColumns];
-      for (int i = 0; i < numColumns; i++) {
-        int columnIndex = columnIndices[i];
-        extractedRow[i] = SelectionOperatorUtils.convertValueToType(row[columnIndex], columnDataTypes[columnIndex]);
-      }
-      rowsInSelectionResults.addFirst(extractedRow);
-    }
 
     // Construct the result data schema
     String[] columnNames = _dataSchema.getColumnNames();
+    ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
     String[] resultColumnNames = new String[numColumns];
-    DataSchema.ColumnDataType[] resultColumnDataTypes = new DataSchema.ColumnDataType[numColumns];
+    ColumnDataType[] resultColumnDataTypes = new ColumnDataType[numColumns];
     for (int i = 0; i < numColumns; i++) {
       int columnIndex = columnIndices[i];
       resultColumnNames[i] = columnNames[columnIndex];
       resultColumnDataTypes[i] = columnDataTypes[columnIndex];
     }
     DataSchema resultDataSchema = new DataSchema(resultColumnNames, resultColumnDataTypes);
+
+    // Extract the result rows
+    LinkedList<Object[]> rowsInSelectionResults = new LinkedList<>();
+    while (_rows.size() > _offset) {
+      Object[] row = _rows.poll();
+      assert row != null;
+      Object[] extractedRow = new Object[numColumns];
+      for (int i = 0; i < numColumns; i++) {
+        extractedRow[i] = resultColumnDataTypes[i].convertAndFormat(row[columnIndices[i]]);
+      }
+      rowsInSelectionResults.addFirst(extractedRow);
+    }
+
     return new ResultTable(resultDataSchema, rowsInSelectionResults);
   }
 }

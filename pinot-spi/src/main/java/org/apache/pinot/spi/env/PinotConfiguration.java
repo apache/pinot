@@ -26,15 +26,12 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
 import org.apache.commons.configuration.CompositeConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.MapConfiguration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -383,14 +380,24 @@ public class PinotConfiguration {
 
   /**
    * Overwrites a property value in memory.
-   * 
+   *
    * @param name of the property to overwrite in memory. Applies relaxed binding on the property name.
    * @param value to overwrite in memory
-   * 
+   *
    * @deprecated Configurations should be immutable. Prefer creating a new {@link #PinotConfiguration} with base properties to overwrite properties.
    */
   public void setProperty(String name, Object value) {
     configuration.setProperty(relaxPropertyName(name), value);
+  }
+
+
+  /**
+   * Delete a property value in memory.
+   *
+   * @param name of the property to remove in memory. Applies relaxed binding on the property name.
+   */
+  public void clearProperty(String name) {
+    configuration.clearProperty(relaxPropertyName(name));
   }
 
   /**

@@ -19,6 +19,7 @@
 package org.apache.pinot.core.segment.processing.framework;
 
 import com.google.common.collect.Lists;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -62,7 +63,8 @@ public class CollectorTest {
   }
 
   @Test
-  public void testConcatCollector() {
+  public void testConcatCollector()
+      throws IOException {
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName("testSchema").addSingleValueDimension("d", FieldSpec.DataType.STRING)
             .build();
@@ -83,10 +85,12 @@ public class CollectorTest {
     }
     collector.reset();
     assertEquals(collector.size(), 0);
+    collector.close();
   }
 
   @Test
-  public void testRollupCollectorWithNoMetrics() {
+  public void testRollupCollectorWithNoMetrics()
+      throws IOException {
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName("testSchema").addSingleValueDimension("d", FieldSpec.DataType.STRING)
             .build();
@@ -111,10 +115,12 @@ public class CollectorTest {
     }
     collector.reset();
     assertEquals(collector.size(), 0);
+    collector.close();
   }
 
   @Test
-  public void testRollupCollectorWithDefaultAggregations() {
+  public void testRollupCollectorWithDefaultAggregations()
+      throws IOException {
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName("testSchema").addSingleValueDimension("d", FieldSpec.DataType.STRING)
             .addMetric("m1", FieldSpec.DataType.INT).addMetric("m2", FieldSpec.DataType.LONG).build();
@@ -153,10 +159,12 @@ public class CollectorTest {
     }
     collector.reset();
     assertEquals(collector.size(), 0);
+    collector.close();
   }
 
   @Test
-  public void testRollupCollectorWithMVDimensions() {
+  public void testRollupCollectorWithMVDimensions()
+      throws IOException {
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName("testSchema").addMultiValueDimension("dMv", FieldSpec.DataType.STRING)
             .addMetric("m1", FieldSpec.DataType.INT).build();
@@ -181,10 +189,12 @@ public class CollectorTest {
     collector.collect(r3);
     collector.collect(r4);
     assertEquals(collector.size(), 3);
+    collector.close();
   }
 
   @Test
-  public void testRollupCollectorWithMinMaxAggregations() {
+  public void testRollupCollectorWithMinMaxAggregations()
+      throws IOException {
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName("testSchema").addSingleValueDimension("d", FieldSpec.DataType.STRING)
             .addMetric("m1", FieldSpec.DataType.INT).addMetric("m2", FieldSpec.DataType.LONG).build();
@@ -227,10 +237,12 @@ public class CollectorTest {
     }
     collector.reset();
     assertEquals(collector.size(), 0);
+    collector.close();
   }
 
   @Test
-  public void testConcatCollectorWithSort() {
+  public void testConcatCollectorWithSort()
+      throws IOException {
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName("testSchema").addSingleValueDimension("d", FieldSpec.DataType.STRING)
             .build();
@@ -256,10 +268,12 @@ public class CollectorTest {
     }
     collector.reset();
     assertEquals(collector.size(), 0);
+    collector.close();
   }
 
   @Test
-  public void testRollupCollectorWithSort() {
+  public void testRollupCollectorWithSort()
+      throws IOException {
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName("testSchema").addSingleValueDimension("d", FieldSpec.DataType.STRING)
             .addMetric("m1", FieldSpec.DataType.INT).build();
@@ -287,5 +301,6 @@ public class CollectorTest {
     }
     collector.reset();
     assertEquals(collector.size(), 0);
+    collector.close();
   }
 }

@@ -18,44 +18,52 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.math.MathContext;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.function.scalar.DataTypeConversionFunctions;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
 /**
- * This function is used for BigDecimal calculcations. It supports the sum aggregation using both precision and scale.
- * The function can be used as SUMPRECISION(column, 10, 2)
- * Following arguments are supported
- * bytes column - this is a column which contains big decimal value as bytes
- * precision - precision to be set to the final result
- * scale - scale to be set to the final result
+ * This function is used for BigDecimal calculations. It supports the sum aggregation using both precision and scale.
+ * <p>The function can be used as SUMPRECISION(expression, precision, scale)
+ * <p>Following arguments are supported:
+ * <ul>
+ *   <li>Expression: expression that contains the values to be summed up, can be serialized BigDecimal objects</li>
+ *   <li>Precision (optional): precision to be set to the final result</li>
+ *   <li>Scale (optional): scale to be set to the final result</li>
+ * </ul>
  */
 public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationFunction<BigDecimal, BigDecimal> {
-  MathContext _mathContext = new MathContext(0);
-  Integer _scale = null;
+  private final Integer _precision;
+  private final Integer _scale;
 
   public SumPrecisionAggregationFunction(List<ExpressionContext> arguments) {
     super(arguments.get(0));
-    int numArguments = arguments.size();
 
-    if (numArguments == 3) {
-      Integer precision = Integer.parseInt(arguments.get(1).getLiteral());
-      _scale = Integer.parseInt(arguments.get(2).getLiteral());
-      _mathContext = new MathContext(precision);
-    } else if (numArguments == 2) {
-      Integer precision = Integer.parseInt(arguments.get(1).getLiteral());
-      _mathContext = new MathContext(precision);
+    int numArguments = arguments.size();
+    Preconditions.checkArgument(numArguments <= 3, "SumPrecision expects at most 3 arguments, got: %s", numArguments);
+    if (numArguments > 1) {
+      _precision = Integer.valueOf(arguments.get(1).getLiteral());
+      if (numArguments > 2) {
+        _scale = Integer.valueOf(arguments.get(2).getLiteral());
+      } else {
+        _scale = null;
+      }
+    } else {
+      _precision = null;
+      _scale = null;
     }
   }
 
@@ -77,40 +85,142 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    byte[][] valueArray = blockValSetMap.get(_expression).getBytesValuesSV();
-    BigDecimal sumValue = getDefaultResult(aggregationResultHolder);
-    for (int i = 0; i < length; i++) {
-      BigDecimal value = DataTypeConversionFunctions.bytesToBigDecimalObject(valueArray[i]);
-      sumValue = sumValue.add(value);
+    BigDecimal sum = getDefaultResult(aggregationResultHolder);
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    switch (blockValSet.getValueType().getStoredType()) {
+      case INT:
+        int[] intValues = blockValSet.getIntValuesSV();
+        for (int i = 0; i < length; i++) {
+          sum = sum.add(BigDecimal.valueOf(intValues[i]));
+        }
+        break;
+      case LONG:
+        long[] longValues = blockValSet.getLongValuesSV();
+        for (int i = 0; i < length; i++) {
+          sum = sum.add(BigDecimal.valueOf(longValues[i]));
+        }
+        break;
+      case FLOAT:
+      case DOUBLE:
+      case STRING:
+        String[] stringValues = blockValSet.getStringValuesSV();
+        for (int i = 0; i < length; i++) {
+          sum = sum.add(new BigDecimal(stringValues[i]));
+        }
+        break;
+      case BYTES:
+        byte[][] bytesValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          sum = sum.add(BigDecimalUtils.deserialize(bytesValues[i]));
+        }
+        break;
+      default:
+        throw new IllegalStateException();
     }
-    aggregationResultHolder.setValue(sumValue);
+    aggregationResultHolder.setValue(sum);
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    byte[][] valueArray = blockValSetMap.get(_expression).getBytesValuesSV();
-    for (int i = 0; i < length; i++) {
-      int groupKey = groupKeyArray[i];
-      BigDecimal groupByResultValue = getDefaultResult(groupByResultHolder, groupKey);
-      BigDecimal value =  DataTypeConversionFunctions.bytesToBigDecimalObject(valueArray[i]);
-      groupByResultValue = groupByResultValue.add(value);
-      groupByResultHolder.setValueForKey(groupKey, groupByResultValue);
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    switch (blockValSet.getValueType().getStoredType()) {
+      case INT:
+        int[] intValues = blockValSet.getIntValuesSV();
+        for (int i = 0; i < length; i++) {
+          int groupKey = groupKeyArray[i];
+          BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
+          sum = sum.add(BigDecimal.valueOf(intValues[i]));
+          groupByResultHolder.setValueForKey(groupKey, sum);
+        }
+        break;
+      case LONG:
+        long[] longValues = blockValSet.getLongValuesSV();
+        for (int i = 0; i < length; i++) {
+          int groupKey = groupKeyArray[i];
+          BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
+          sum = sum.add(BigDecimal.valueOf(longValues[i]));
+          groupByResultHolder.setValueForKey(groupKey, sum);
+        }
+        break;
+      case FLOAT:
+      case DOUBLE:
+      case STRING:
+        String[] stringValues = blockValSet.getStringValuesSV();
+        for (int i = 0; i < length; i++) {
+          int groupKey = groupKeyArray[i];
+          BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
+          sum = sum.add(new BigDecimal(stringValues[i]));
+          groupByResultHolder.setValueForKey(groupKey, sum);
+        }
+        break;
+      case BYTES:
+        byte[][] bytesValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          int groupKey = groupKeyArray[i];
+          BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
+          sum = sum.add(BigDecimalUtils.deserialize(bytesValues[i]));
+          groupByResultHolder.setValueForKey(groupKey, sum);
+        }
+        break;
+      default:
+        throw new IllegalStateException();
     }
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    byte[][] valueArray = blockValSetMap.get(_expression).getBytesValuesSV();
-    for (int i = 0; i < length; i++) {
-      byte[] value = valueArray[i];
-      for (int groupKey : groupKeysArray[i]) {
-        BigDecimal groupByResultValue = getDefaultResult(groupByResultHolder, groupKey);
-        BigDecimal valueBigDecimal = DataTypeConversionFunctions.bytesToBigDecimalObject(value);
-        groupByResultValue = groupByResultValue.add(valueBigDecimal);
-        groupByResultHolder.setValueForKey(groupKey, groupByResultValue);
-      }
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    switch (blockValSet.getValueType().getStoredType()) {
+      case INT:
+        int[] intValues = blockValSet.getIntValuesSV();
+        for (int i = 0; i < length; i++) {
+          int value = intValues[i];
+          for (int groupKey : groupKeysArray[i]) {
+            BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
+            sum = sum.add(BigDecimal.valueOf(value));
+            groupByResultHolder.setValueForKey(groupKey, sum);
+          }
+        }
+        break;
+      case LONG:
+        long[] longValues = blockValSet.getLongValuesSV();
+        for (int i = 0; i < length; i++) {
+          long value = longValues[i];
+          for (int groupKey : groupKeysArray[i]) {
+            BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
+            sum = sum.add(BigDecimal.valueOf(value));
+            groupByResultHolder.setValueForKey(groupKey, sum);
+          }
+        }
+        break;
+      case FLOAT:
+      case DOUBLE:
+      case STRING:
+        String[] stringValues = blockValSet.getStringValuesSV();
+        for (int i = 0; i < length; i++) {
+          String value = stringValues[i];
+          for (int groupKey : groupKeysArray[i]) {
+            BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
+            sum = sum.add(new BigDecimal(value));
+            groupByResultHolder.setValueForKey(groupKey, sum);
+          }
+        }
+        break;
+      case BYTES:
+        byte[][] bytesValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          byte[] value = bytesValues[i];
+          for (int groupKey : groupKeysArray[i]) {
+            BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
+            sum = sum.add(BigDecimalUtils.deserialize(value));
+            groupByResultHolder.setValueForKey(groupKey, sum);
+          }
+        }
+        break;
+      default:
+        throw new IllegalStateException();
     }
   }
 
@@ -126,11 +236,7 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
 
   @Override
   public BigDecimal merge(BigDecimal intermediateResult1, BigDecimal intermediateResult2) {
-    try {
-      return intermediateResult1.add(intermediateResult2);
-    } catch (Exception e) {
-      throw new RuntimeException("Caught Exception while merging results in sum with precision function", e);
-    }
+    return intermediateResult1.add(intermediateResult2);
   }
 
   @Override
@@ -139,42 +245,31 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
   }
 
   @Override
-  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.OBJECT;
+  public ColumnDataType getIntermediateResultColumnType() {
+    return ColumnDataType.OBJECT;
   }
 
   @Override
-  public DataSchema.ColumnDataType getFinalResultColumnType() {
-    return DataSchema.ColumnDataType.STRING;
+  public ColumnDataType getFinalResultColumnType() {
+    return ColumnDataType.STRING;
   }
 
   @Override
   public BigDecimal extractFinalResult(BigDecimal intermediateResult) {
-    return setScale(new BigDecimal(intermediateResult.toString(), _mathContext));
+    if (_precision == null) {
+      return intermediateResult;
+    }
+    BigDecimal result = intermediateResult.round(new MathContext(_precision, RoundingMode.HALF_EVEN));
+    return _scale == null ? result : result.setScale(_scale, RoundingMode.HALF_EVEN);
   }
 
   public BigDecimal getDefaultResult(AggregationResultHolder aggregationResultHolder) {
     BigDecimal result = aggregationResultHolder.getResult();
-    if (result == null) {
-      result = new BigDecimal(0);
-      aggregationResultHolder.setValue(result);
-    }
-    return result;
+    return result != null ? result : BigDecimal.ZERO;
   }
 
   public BigDecimal getDefaultResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     BigDecimal result = groupByResultHolder.getResult(groupKey);
-    if (result == null) {
-      result = new BigDecimal(0);
-      groupByResultHolder.setValueForKey(groupKey, result);
-    }
-    return result;
-  }
-
-  private BigDecimal setScale(BigDecimal value) {
-    if (_scale != null) {
-      value = value.setScale(_scale, BigDecimal.ROUND_HALF_EVEN);
-    }
-    return value;
+    return result != null ? result : BigDecimal.ZERO;
   }
 }

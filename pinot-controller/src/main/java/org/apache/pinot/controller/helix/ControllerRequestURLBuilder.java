@@ -231,6 +231,30 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "schemas", schemaName);
   }
 
+  public String forTableConfigsCreate() {
+    return StringUtil.join("/", _baseUrl, "tableConfigs");
+  }
+
+  public String forTableConfigsGet(String configName) {
+    return StringUtil.join("/", _baseUrl, "tableConfigs", configName);
+  }
+
+  public String forTableConfigsList() {
+    return StringUtil.join("/", _baseUrl, "tableConfigs");
+  }
+
+  public String forTableConfigsUpdate(String configName) {
+    return StringUtil.join("/", _baseUrl, "tableConfigs", configName);
+  }
+
+  public String forTableConfigsDelete(String configName) {
+    return StringUtil.join("/", _baseUrl, "tableConfigs", configName);
+  }
+
+  public String forTableConfigsValidate() {
+    return StringUtil.join("/", _baseUrl, "tableConfigs", "validate");
+  }
+
   public String forSegmentDownload(String tableName, String segmentName) {
     return URIUtils.constructDownloadUrl(_baseUrl, tableName, segmentName);
   }
@@ -249,6 +273,10 @@ public class ControllerRequestURLBuilder {
 
   public String forListAllSegments(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "segments");
+  }
+
+  public String forSegmentMetadata(String tableName, String segmentName) {
+    return StringUtil.join("/", _baseUrl, "segments", tableName, segmentName, "metadata");
   }
 
   public String forListAllCrcInformationForTable(String tableName) {
@@ -335,5 +363,9 @@ public class ControllerRequestURLBuilder {
 
   public String forClusterConfigs() {
     return StringUtil.join("/", _baseUrl, "cluster/configs");
+  }
+
+  public String forAppConfigs() {
+    return StringUtil.join("/", _baseUrl, "appconfigs");
   }
 }

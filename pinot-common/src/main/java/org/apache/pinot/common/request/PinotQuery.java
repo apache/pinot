@@ -1709,4 +1709,3 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
     return (org.apache.thrift.scheme.StandardScheme.class.equals(proto.getScheme()) ? STANDARD_SCHEME_FACTORY : TUPLE_SCHEME_FACTORY).getScheme();
   }
 }
-

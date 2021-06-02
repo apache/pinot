@@ -31,12 +31,13 @@ import org.apache.helix.participant.statemachine.Transition;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.data.manager.SegmentDataManager;
-import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -117,7 +118,10 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
                 segmentNameStr);
         segmentDataManager.goOnlineFromConsuming(metadata);
       } catch (InterruptedException e) {
-        _logger.warn("State transition interrupted", e);
+        String errorMessage = String.format("State transition interrupted for segment %s.", segmentNameStr);
+        _logger.warn(errorMessage, e);
+        tableDataManager
+            .addSegmentError(segmentNameStr, new SegmentErrorInfo(System.currentTimeMillis(), errorMessage, e));
         throw new RuntimeException(e);
       } finally {
         tableDataManager.releaseSegment(acquiredSegment);
@@ -164,8 +168,15 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
           _instanceDataManager.addRealtimeSegment(tableNameWithType, segmentName);
         }
       } catch (Exception e) {
-        _logger.error("Caught exception in state transition from OFFLINE -> ONLINE for resource: {}, partition: {}",
-            tableNameWithType, segmentName, e);
+        String errorMessage = String
+            .format("Caught exception in state transition from OFFLINE -> ONLINE for resource: %s, partition: %s",
+                tableNameWithType, segmentName);
+        _logger.error(errorMessage, e);
+        TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableNameWithType);
+        if (tableDataManager != null) {
+          tableDataManager
+              .addSegmentError(segmentName, new SegmentErrorInfo(System.currentTimeMillis(), errorMessage, e));
+        }
         Utils.rethrowException(e);
       }
     }

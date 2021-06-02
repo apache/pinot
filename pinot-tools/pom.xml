@@ -25,7 +25,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.7.0-SNAPSHOT</version>
+    <version>0.8.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-tools</artifactId>
@@ -33,6 +33,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
+    <aws.version>2.14.28</aws.version>
   </properties>
   <dependencies>
     <dependency>
@@ -101,6 +102,76 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-kinesis</artifactId>
+      <version>${project.version}</version>
+      <scope>runtime</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>http-client-spi</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>protocol-core</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>annotations</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>utils</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>profiles</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>regions</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>auth</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>aws-core</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>apache-client</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>sdk-core</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>netty-nio-client</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>netty-codec</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>sdk-core</artifactId>
+      <version>${aws.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>s3</artifactId>
+      <version>${aws.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.reactivestreams</groupId>
+      <artifactId>reactive-streams</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-kafka-${kafka.version}</artifactId>
       <version>${project.version}</version>
       <scope>runtime</scope>
@@ -116,10 +187,21 @@
       <artifactId>pinot-s3</artifactId>
       <version>${project.version}</version>
       <scope>runtime</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>s3</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-minion-builtin-tasks</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-yammer</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
@@ -189,7 +271,7 @@
               <jvmSettings>
                 <initialMemorySize>4G</initialMemorySize>
                 <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-admin-log4j2.xml</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -255,7 +337,7 @@
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-controller-log4j2.xml</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -266,7 +348,7 @@
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-broker-log4j2.xml</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -277,7 +359,7 @@
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-server-log4j2.xml</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -288,7 +370,7 @@
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-minion-log4j2.xml</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -299,7 +381,7 @@
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-service-log4j2.xml</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -307,8 +389,7 @@
               <mainClass>org.apache.pinot.tools.Quickstart</mainClass>
               <name>quick-start-batch</name>
               <jvmSettings>
-                <initialMemorySize>1G</initialMemorySize>
-                <maxMemorySize>1G</maxMemorySize>
+                <initialMemorySize>4G</initialMemorySize>
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
                 </extraArguments>
@@ -318,8 +399,7 @@
               <mainClass>org.apache.pinot.tools.HybridQuickstart</mainClass>
               <name>quick-start-hybrid</name>
               <jvmSettings>
-                <initialMemorySize>1G</initialMemorySize>
-                <maxMemorySize>1G</maxMemorySize>
+                <initialMemorySize>4G</initialMemorySize>
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
                 </extraArguments>
@@ -329,8 +409,7 @@
               <mainClass>org.apache.pinot.tools.RealtimeQuickStart</mainClass>
               <name>quick-start-streaming</name>
               <jvmSettings>
-                <initialMemorySize>1G</initialMemorySize>
-                <maxMemorySize>1G</maxMemorySize>
+                <initialMemorySize>4G</initialMemorySize>
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
                 </extraArguments>
@@ -340,8 +419,7 @@
               <mainClass>org.apache.pinot.tools.BatchQuickstartWithMinion</mainClass>
               <name>quick-start-batch-with-minion</name>
               <jvmSettings>
-                <initialMemorySize>1G</initialMemorySize>
-                <maxMemorySize>1G</maxMemorySize>
+                <initialMemorySize>4G</initialMemorySize>
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
                 </extraArguments>
@@ -351,8 +429,7 @@
               <mainClass>org.apache.pinot.tools.UpsertQuickStart</mainClass>
               <name>quick-start-upsert-streaming</name>
               <jvmSettings>
-                <initialMemorySize>1G</initialMemorySize>
-                <maxMemorySize>1G</maxMemorySize>
+                <initialMemorySize>4G</initialMemorySize>
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
                 </extraArguments>
@@ -362,8 +439,7 @@
               <mainClass>org.apache.pinot.tools.JsonIndexQuickStart</mainClass>
               <name>quick-start-json-index-batch</name>
               <jvmSettings>
-                <initialMemorySize>1G</initialMemorySize>
-                <maxMemorySize>1G</maxMemorySize>
+                <initialMemorySize>4G</initialMemorySize>
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
                 </extraArguments>
@@ -373,8 +449,27 @@
               <mainClass>org.apache.pinot.tools.RealtimeJsonIndexQuickStart</mainClass>
               <name>quick-start-json-index-streaming</name>
               <jvmSettings>
-                <initialMemorySize>1G</initialMemorySize>
-                <maxMemorySize>1G</maxMemorySize>
+                <initialMemorySize>4G</initialMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.tools.RealtimeComplexTypeHandlingQuickStart</mainClass>
+              <name>quick-start-complex-type-handling-streaming</name>
+              <jvmSettings>
+                <initialMemorySize>4G</initialMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.tools.OfflineComplexTypeHandlingQuickStart</mainClass>
+              <name>quick-start-complex-type-handling-offline</name>
+              <jvmSettings>
+                <initialMemorySize>4G</initialMemorySize>
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
                 </extraArguments>
@@ -387,7 +482,17 @@
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-ingestion-job-log4j2.xml</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/log4j2.xml</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.tools.AuthQuickstart</mainClass>
+              <name>quick-start-auth</name>
+              <jvmSettings>
+                <initialMemorySize>4G</initialMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>

@@ -83,6 +83,18 @@ public class PartitionConfig {
     this._numKafkaPartitions = numKafkaPartitions;
   }
 
+  public void setNumPartitionsOfflineOverwritten(boolean numPartitionsOfflineOverwritten) {
+    _isNumPartitionsOfflineOverwritten = numPartitionsOfflineOverwritten;
+  }
+
+  public void setNumPartitionsRealtimeOverwritten(boolean numPartitionsRealtimeOverwritten) {
+    _isNumPartitionsRealtimeOverwritten = numPartitionsRealtimeOverwritten;
+  }
+
+  public void setPartitionDimensionOverwritten(boolean partitionDimensionOverwritten) {
+    _isPartitionDimensionOverwritten = partitionDimensionOverwritten;
+  }
+
   public boolean isNumPartitionsOfflineOverwritten() {
     return _isNumPartitionsOfflineOverwritten;
   }

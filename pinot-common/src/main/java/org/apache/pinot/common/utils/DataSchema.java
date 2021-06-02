@@ -18,24 +18,36 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.Serializable;
+import java.sql.Timestamp;
 import java.util.Arrays;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
 
 
 /**
  * The <code>DataSchema</code> class describes the schema of {@link DataTable}.
  */
+@JsonPropertyOrder({"columnNames", "columnDataTypes"})
 public class DataSchema {
   private final String[] _columnNames;
   private final ColumnDataType[] _columnDataTypes;
+  private ColumnDataType[] _storedColumnDataTypes;
 
-  public DataSchema(String[] columnNames, ColumnDataType[] columnDataTypes) {
+  @JsonCreator
+  public DataSchema(@JsonProperty("columnNames") String[] columnNames,
+      @JsonProperty("columnDataTypes") ColumnDataType[] columnDataTypes) {
     _columnNames = columnNames;
     _columnDataTypes = columnDataTypes;
   }
@@ -58,6 +70,18 @@ public class DataSchema {
 
   public ColumnDataType[] getColumnDataTypes() {
     return _columnDataTypes;
+  }
+
+  @JsonIgnore
+  public ColumnDataType[] getStoredColumnDataTypes() {
+    if (_storedColumnDataTypes == null) {
+      int numColumns = _columnDataTypes.length;
+      _storedColumnDataTypes = new ColumnDataType[numColumns];
+      for (int i = 0; i < numColumns; i++) {
+        _storedColumnDataTypes[i] = _columnDataTypes[i].getStoredType();
+      }
+    }
+    return _storedColumnDataTypes;
   }
 
   /**
@@ -175,7 +199,7 @@ public class DataSchema {
     return new DataSchema(columnNames, columnDataTypes);
   }
 
-  @SuppressWarnings("CloneDoesntCallSuperClone")
+  @SuppressWarnings("MethodDoesntCallSuperMethod")
   @Override
   public DataSchema clone() {
     return new DataSchema(_columnNames.clone(), _columnDataTypes.clone());
@@ -212,7 +236,37 @@ public class DataSchema {
   }
 
   public enum ColumnDataType {
-    INT, LONG, FLOAT, DOUBLE, STRING, BYTES, OBJECT, INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY;
+    INT,
+    LONG,
+    FLOAT,
+    DOUBLE,
+    BOOLEAN /* Stored as INT */,
+    TIMESTAMP /* Stored as LONG */,
+    STRING,
+    JSON /* Stored as STRING */,
+    BYTES,
+    OBJECT,
+    INT_ARRAY,
+    LONG_ARRAY,
+    FLOAT_ARRAY,
+    DOUBLE_ARRAY,
+    STRING_ARRAY;
+
+    /**
+     * Returns the data type stored in Pinot.
+     */
+    public ColumnDataType getStoredType() {
+      switch (this) {
+        case BOOLEAN:
+          return INT;
+        case TIMESTAMP:
+          return LONG;
+        case JSON:
+          return STRING;
+        default:
+          return this;
+      }
+    }
 
     public boolean isNumber() {
       return this == INT || this == LONG || this == FLOAT || this == DOUBLE;
@@ -241,11 +295,198 @@ public class DataSchema {
           this.isNumberArray() && anotherColumnDataType.isNumberArray());
     }
 
-    public static ColumnDataType fromDataType(FieldSpec.DataType dataType, boolean isSingleValue) {
+    public DataType toDataType() {
+      switch (this) {
+        case INT:
+          return DataType.INT;
+        case LONG:
+          return DataType.LONG;
+        case FLOAT:
+          return DataType.FLOAT;
+        case DOUBLE:
+          return DataType.DOUBLE;
+        case BOOLEAN:
+          return DataType.BOOLEAN;
+        case TIMESTAMP:
+          return DataType.TIMESTAMP;
+        case STRING:
+          return DataType.STRING;
+        case JSON:
+          return DataType.JSON;
+        case BYTES:
+          return DataType.BYTES;
+        default:
+          throw new IllegalStateException(String.format("Cannot convert ColumnDataType: %s to DataType", this));
+      }
+    }
+
+    /**
+     * Converts the given internal value to the type for external use (e.g. as UDF argument). The given value should be
+     * compatible with the type.
+     */
+    public Serializable convert(Object value) {
+      switch (this) {
+        case INT:
+          return ((Number) value).intValue();
+        case LONG:
+          return ((Number) value).longValue();
+        case FLOAT:
+          return ((Number) value).floatValue();
+        case DOUBLE:
+          return ((Number) value).doubleValue();
+        case BOOLEAN:
+          return (Integer) value == 1;
+        case TIMESTAMP:
+          return new Timestamp((Long) value);
+        case STRING:
+        case JSON:
+          return value.toString();
+        case BYTES:
+          return ((ByteArray) value).getBytes();
+        case INT_ARRAY:
+          return (int[]) value;
+        case LONG_ARRAY:
+          if (value instanceof long[]) {
+            return (long[]) value;
+          } else {
+            int[] intValues = (int[]) value;
+            int length = intValues.length;
+            long[] longValues = new long[length];
+            for (int i = 0; i < length; i++) {
+              longValues[i] = intValues[i];
+            }
+            return longValues;
+          }
+        case FLOAT_ARRAY:
+          return (float[]) value;
+        case DOUBLE_ARRAY:
+          if (value instanceof double[]) {
+            return (double[]) value;
+          } else if (value instanceof int[]) {
+            int[] intValues = (int[]) value;
+            int length = intValues.length;
+            double[] doubleValues = new double[length];
+            for (int i = 0; i < length; i++) {
+              doubleValues[i] = intValues[i];
+            }
+            return doubleValues;
+          } else if (value instanceof long[]) {
+            long[] longValues = (long[]) value;
+            int length = longValues.length;
+            double[] doubleValues = new double[length];
+            for (int i = 0; i < length; i++) {
+              doubleValues[i] = longValues[i];
+            }
+            return doubleValues;
+          } else {
+            float[] floatValues = (float[]) value;
+            int length = floatValues.length;
+            double[] doubleValues = new double[length];
+            for (int i = 0; i < length; i++) {
+              doubleValues[i] = floatValues[i];
+            }
+            return doubleValues;
+          }
+        case STRING_ARRAY:
+          return (String[]) value;
+        default:
+          throw new IllegalStateException(String.format("Cannot convert: '%s' to type: %s", value, this));
+      }
+    }
+
+    /**
+     * Formats the value to human-readable format based on the type to be used in the query response.
+     */
+    public Serializable format(Object value) {
+      switch (this) {
+        case TIMESTAMP:
+          assert value instanceof Timestamp;
+          return value.toString();
+        case BYTES:
+          return BytesUtils.toHexString((byte[]) value);
+        default:
+          return (Serializable) value;
+      }
+    }
+
+    /**
+     * Equivalent to {@link #convert(Object)} and {@link #format(Object)} with a single switch statement.
+     */
+    public Serializable convertAndFormat(Object value) {
+      switch (this) {
+        case INT:
+          return ((Number) value).intValue();
+        case LONG:
+          return ((Number) value).longValue();
+        case FLOAT:
+          return ((Number) value).floatValue();
+        case DOUBLE:
+          return ((Number) value).doubleValue();
+        case BOOLEAN:
+          return (Integer) value == 1;
+        case TIMESTAMP:
+          return new Timestamp((Long) value).toString();
+        case STRING:
+        case JSON:
+          return value.toString();
+        case BYTES:
+          return ((ByteArray) value).toHexString();
+        case INT_ARRAY:
+          return (int[]) value;
+        case LONG_ARRAY:
+          if (value instanceof long[]) {
+            return (long[]) value;
+          } else {
+            int[] intValues = (int[]) value;
+            int length = intValues.length;
+            long[] longValues = new long[length];
+            for (int i = 0; i < length; i++) {
+              longValues[i] = intValues[i];
+            }
+            return longValues;
+          }
+        case FLOAT_ARRAY:
+          return (float[]) value;
+        case DOUBLE_ARRAY:
+          if (value instanceof double[]) {
+            return (double[]) value;
+          } else if (value instanceof int[]) {
+            int[] intValues = (int[]) value;
+            int length = intValues.length;
+            double[] doubleValues = new double[length];
+            for (int i = 0; i < length; i++) {
+              doubleValues[i] = intValues[i];
+            }
+            return doubleValues;
+          } else if (value instanceof long[]) {
+            long[] longValues = (long[]) value;
+            int length = longValues.length;
+            double[] doubleValues = new double[length];
+            for (int i = 0; i < length; i++) {
+              doubleValues[i] = longValues[i];
+            }
+            return doubleValues;
+          } else {
+            float[] floatValues = (float[]) value;
+            int length = floatValues.length;
+            double[] doubleValues = new double[length];
+            for (int i = 0; i < length; i++) {
+              doubleValues[i] = floatValues[i];
+            }
+            return doubleValues;
+          }
+        case STRING_ARRAY:
+          return (String[]) value;
+        default:
+          throw new IllegalStateException(String.format("Cannot convert and format: '%s' to type: %s", value, this));
+      }
+    }
+
+    public static ColumnDataType fromDataType(DataType dataType, boolean isSingleValue) {
       return isSingleValue ? fromDataTypeSV(dataType) : fromDataTypeMV(dataType);
     }
 
-    public static ColumnDataType fromDataTypeSV(FieldSpec.DataType dataType) {
+    public static ColumnDataType fromDataTypeSV(DataType dataType) {
       switch (dataType) {
         case INT:
           return INT;
@@ -255,8 +496,14 @@ public class DataSchema {
           return FLOAT;
         case DOUBLE:
           return DOUBLE;
+        case BOOLEAN:
+          return BOOLEAN;
+        case TIMESTAMP:
+          return TIMESTAMP;
         case STRING:
           return STRING;
+        case JSON:
+          return JSON;
         case BYTES:
           return BYTES;
         default:
@@ -264,7 +511,7 @@ public class DataSchema {
       }
     }
 
-    public static ColumnDataType fromDataTypeMV(FieldSpec.DataType dataType) {
+    public static ColumnDataType fromDataTypeMV(DataType dataType) {
       switch (dataType) {
         case INT:
           return INT_ARRAY;

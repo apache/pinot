@@ -21,13 +21,13 @@ package org.apache.pinot.broker.pruner;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
-import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.core.data.partition.PartitionFunction;
-import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
+import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 
 
 /**

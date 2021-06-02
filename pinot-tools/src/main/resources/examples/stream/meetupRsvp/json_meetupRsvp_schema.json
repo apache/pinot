@@ -2,36 +2,36 @@
   "schemaName": "meetupRsvp",
   "dimensionFieldSpecs": [
     {
-      "name": "venue",
+      "name": "event_json",
       "dataType": "STRING",
       "maxLength": 2147483647
     },
     {
-      "name": "visibility",
-      "dataType": "STRING"
+      "name": "group_json",
+      "dataType": "STRING",
+      "maxLength": 2147483647
+    },
+    {
+      "name": "member_json",
+      "dataType": "STRING",
+      "maxLength": 2147483647
+    },
+    {
+      "name": "venue_json",
+      "dataType": "STRING",
+      "maxLength": 2147483647
     },
     {
       "name": "response",
       "dataType": "STRING"
     },
     {
-      "name": "member",
-      "dataType": "STRING",
-      "maxLength": 2147483647
-    },
-    {
       "name": "rsvp_id",
       "dataType": "LONG"
     },
     {
-      "name": "event",
-      "dataType": "STRING",
-      "maxLength": 2147483647
-    },
-    {
-      "name": "group",
-      "dataType": "STRING",
-      "maxLength": 2147483647
+      "name": "visibility",
+      "dataType": "STRING"
     }
   ],
   "metricFieldSpecs": [
@@ -43,8 +43,8 @@
   "dateTimeFieldSpecs": [
     {
       "name": "mtime",
-      "dataType": "LONG",
-      "format": "1:MILLISECONDS:EPOCH",
+      "dataType": "TIMESTAMP",
+      "format": "1:MILLISECONDS:TIMESTAMP",
       "granularity": "1:MILLISECONDS"
     }
   ]

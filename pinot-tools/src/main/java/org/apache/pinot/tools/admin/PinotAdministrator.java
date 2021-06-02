@@ -28,6 +28,7 @@ import org.apache.pinot.tools.admin.command.AddTableCommand;
 import org.apache.pinot.tools.admin.command.AddTenantCommand;
 import org.apache.pinot.tools.admin.command.AnonymizeDataCommand;
 import org.apache.pinot.tools.admin.command.AvroSchemaToPinotSchema;
+import org.apache.pinot.tools.admin.command.BootstrapTableCommand;
 import org.apache.pinot.tools.admin.command.ChangeNumReplicasCommand;
 import org.apache.pinot.tools.admin.command.ChangeTableState;
 import org.apache.pinot.tools.admin.command.CreateSegmentCommand;
@@ -35,6 +36,7 @@ import org.apache.pinot.tools.admin.command.DeleteClusterCommand;
 import org.apache.pinot.tools.admin.command.GenerateDataCommand;
 import org.apache.pinot.tools.admin.command.GitHubEventsQuickStartCommand;
 import org.apache.pinot.tools.admin.command.ImportDataCommand;
+import org.apache.pinot.tools.admin.command.JsonToPinotSchema;
 import org.apache.pinot.tools.admin.command.LaunchDataIngestionJobCommand;
 import org.apache.pinot.tools.admin.command.MoveReplicaGroup;
 import org.apache.pinot.tools.admin.command.OfflineSegmentIntervalCheckerCommand;
@@ -44,18 +46,17 @@ import org.apache.pinot.tools.admin.command.QuickStartCommand;
 import org.apache.pinot.tools.admin.command.RealtimeProvisioningHelperCommand;
 import org.apache.pinot.tools.admin.command.RebalanceTableCommand;
 import org.apache.pinot.tools.admin.command.SegmentProcessorFrameworkCommand;
-import org.apache.pinot.tools.admin.command.BootstrapTableCommand;
 import org.apache.pinot.tools.admin.command.ShowClusterInfoCommand;
 import org.apache.pinot.tools.admin.command.StartBrokerCommand;
 import org.apache.pinot.tools.admin.command.StartControllerCommand;
-import org.apache.pinot.tools.admin.command.StartMinionCommand;
-import org.apache.pinot.tools.admin.command.StartServiceManagerCommand;
-import org.apache.pinot.tools.admin.command.StreamGitHubEventsCommand;
 import org.apache.pinot.tools.admin.command.StartKafkaCommand;
+import org.apache.pinot.tools.admin.command.StartMinionCommand;
 import org.apache.pinot.tools.admin.command.StartServerCommand;
+import org.apache.pinot.tools.admin.command.StartServiceManagerCommand;
 import org.apache.pinot.tools.admin.command.StartZookeeperCommand;
 import org.apache.pinot.tools.admin.command.StopProcessCommand;
 import org.apache.pinot.tools.admin.command.StreamAvroIntoKafkaCommand;
+import org.apache.pinot.tools.admin.command.StreamGitHubEventsCommand;
 import org.apache.pinot.tools.admin.command.UploadSegmentCommand;
 import org.apache.pinot.tools.admin.command.ValidateConfigCommand;
 import org.apache.pinot.tools.admin.command.VerifyClusterStateCommand;
@@ -119,6 +120,7 @@ public class PinotAdministrator {
       @SubCommand(name = "DeleteCluster", impl = DeleteClusterCommand.class),
       @SubCommand(name = "ShowClusterInfo", impl = ShowClusterInfoCommand.class),
       @SubCommand(name = "AvroSchemaToPinotSchema", impl = AvroSchemaToPinotSchema.class),
+      @SubCommand(name = "JsonToPinotSchema", impl = JsonToPinotSchema.class),
       @SubCommand(name = "RebalanceTable", impl = RebalanceTableCommand.class),
       @SubCommand(name = "ChangeNumReplicas", impl = ChangeNumReplicasCommand.class),
       @SubCommand(name = "ValidateConfig", impl = ValidateConfigCommand.class),

@@ -20,10 +20,10 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
 /**
@@ -58,7 +58,7 @@ public class ArrayAverageTransformFunction extends BaseTransformFunction {
       throw new IllegalArgumentException(
           "The argument of ArrayAverage transform function must be a multi-valued column or a transform function");
     }
-    if (!firstArgument.getResultMetadata().getDataType().isNumeric()) {
+    if (!firstArgument.getResultMetadata().getDataType().getStoredType().isNumeric()) {
       throw new IllegalArgumentException("The argument of ArrayAverage transform function must be numeric");
     }
     _argument = firstArgument;
@@ -76,7 +76,7 @@ public class ArrayAverageTransformFunction extends BaseTransformFunction {
     }
 
     int numDocs = projectionBlock.getNumDocs();
-    switch (_argument.getResultMetadata().getDataType()) {
+    switch (_argument.getResultMetadata().getDataType().getStoredType()) {
       case INT:
         int[][] intValuesMV = _argument.transformToIntValuesMV(projectionBlock);
         for (int i = 0; i < numDocs; i++) {

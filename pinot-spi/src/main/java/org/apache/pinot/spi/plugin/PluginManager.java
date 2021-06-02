@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -192,7 +193,7 @@ public class PluginManager {
     URL[] urls = new URL[urlList.size()];
     urlList.toArray(urls);
     //always sort to make the behavior predictable
-    Arrays.sort(urls);
+    Arrays.sort(urls, Comparator.comparing(URL::toString));
     return new PluginClassLoader(urls, this.getClass().getClassLoader());
   }
 
@@ -327,4 +328,3 @@ public class PluginManager {
     }
   }
 }
-

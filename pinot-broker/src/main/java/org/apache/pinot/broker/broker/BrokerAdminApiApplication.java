@@ -26,9 +26,11 @@ import java.util.List;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
@@ -39,12 +41,15 @@ import org.glassfish.jersey.server.ResourceConfig;
 
 public class BrokerAdminApiApplication extends ResourceConfig {
   private static final String RESOURCE_PACKAGE = "org.apache.pinot.broker.api.resources";
+  public static final String PINOT_CONFIGURATION = "pinotConfiguration";
 
   private HttpServer _httpServer;
 
   public BrokerAdminApiApplication(RoutingManager routingManager, BrokerRequestHandler brokerRequestHandler,
-      BrokerMetrics brokerMetrics) {
+      BrokerMetrics brokerMetrics, PinotConfiguration brokerConf) {
     packages(RESOURCE_PACKAGE);
+    property(PINOT_CONFIGURATION, brokerConf);
+
     register(new AbstractBinder() {
       @Override
       protected void configure() {
@@ -66,8 +71,9 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     } catch (IOException e) {
       throw new RuntimeException("Failed to start http server", e);
     }
-
-    setupSwagger();
+    synchronized (PinotReflectionUtils.getReflectionLock()) {
+      setupSwagger();
+    }
   }
 
   private void setupSwagger() {

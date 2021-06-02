@@ -21,9 +21,7 @@ package org.apache.pinot.client.controller.response;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
-import com.google.common.collect.Lists;
 import com.ning.http.client.Response;
-
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ExecutionException;

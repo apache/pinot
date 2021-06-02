@@ -82,7 +82,6 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
   public void init(SegmentGenerationJobSpec spec) {
     _spec = spec;
 
-    //Get pinotFS for input
     if (_spec.getInputDirURI() == null) {
       throw new RuntimeException("Missing property 'inputDirURI' in 'jobSpec' file");
     }
@@ -91,9 +90,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     } catch (URISyntaxException e) {
       throw new RuntimeException("Invalid property: 'inputDirURI'", e);
     }
-    _inputDirFS = PinotFSFactory.create(_inputDirURI.getScheme());
 
-    //Get outputFS for writing output pinot segments
     if (_spec.getOutputDirURI() == null) {
       throw new RuntimeException("Missing property 'outputDirURI' in 'jobSpec' file");
     }
@@ -101,16 +98,6 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
       _outputDirURI = SegmentGenerationUtils.getDirectoryURI(_spec.getOutputDirURI());
     } catch (URISyntaxException e) {
       throw new RuntimeException("Invalid property: 'outputDirURI'", e);
-    }
-    _outputDirFS = PinotFSFactory.create(_outputDirURI.getScheme());
-    try {
-      if (!_outputDirFS.exists(_outputDirURI)) {
-        _outputDirFS.mkdir(_outputDirURI);
-      } else if (!_outputDirFS.isDirectory(_outputDirURI)) {
-        throw new RuntimeException(String.format("Output Directory URI: %s is not a directory", _outputDirURI));
-      }
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to validate output 'outputDirURI': " + _outputDirURI, e);
     }
 
     if (_spec.getRecordReaderSpec() == null) {
@@ -123,6 +110,27 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
       throw new RuntimeException("Missing property 'tableName' in 'tableSpec'");
     }
 
+    //Register all file systems
+    List<PinotFSSpec> pinotFSSpecs = _spec.getPinotFSSpecs();
+    for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
+      PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
+    }
+
+    //Get pinotFS for input
+    _inputDirFS = PinotFSFactory.create(_inputDirURI.getScheme());
+
+    //Get outputFS for writing output pinot segments
+    _outputDirFS = PinotFSFactory.create(_outputDirURI.getScheme());
+    try {
+      if (!_outputDirFS.exists(_outputDirURI)) {
+        _outputDirFS.mkdir(_outputDirURI);
+      } else if (!_outputDirFS.isDirectory(_outputDirURI)) {
+        throw new RuntimeException(String.format("Output Directory URI: %s is not a directory", _outputDirURI));
+      }
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to validate output 'outputDirURI': " + _outputDirURI, e);
+    }
+
     //Read Schema
     if (_spec.getTableSpec().getSchemaURI() == null) {
       if (_spec.getPinotClusterSpecs() == null || _spec.getPinotClusterSpecs().length == 0) {
@@ -133,7 +141,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
           .generateSchemaURI(pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
       _spec.getTableSpec().setSchemaURI(schemaURI);
     }
-    _schema = SegmentGenerationUtils.getSchema(_spec.getTableSpec().getSchemaURI());
+    _schema = SegmentGenerationUtils.getSchema(_spec.getTableSpec().getSchemaURI(), _spec.getAuthToken());
 
     // Read Table config
     if (_spec.getTableSpec().getTableConfigURI() == null) {
@@ -145,7 +153,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
           .generateTableConfigURI(pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
       _spec.getTableSpec().setTableConfigURI(tableConfigURI);
     }
-    _tableConfig = SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI());
+    _tableConfig = SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), spec.getAuthToken());
 
     final int jobParallelism = _spec.getSegmentCreationJobParallelism();
     int numThreads = JobUtils.getNumThreads(jobParallelism);
@@ -157,12 +165,6 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
   @Override
   public void run()
       throws Exception {
-    //init all file systems
-    List<PinotFSSpec> pinotFSSpecs = _spec.getPinotFSSpecs();
-    for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
-      PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
-    }
-
     //Get list of files to process
     String[] files = _inputDirFS.listFiles(_inputDirURI, true);
 
@@ -248,6 +250,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     taskSpec.setSegmentNameGeneratorSpec(_spec.getSegmentNameGeneratorSpec());
     taskSpec.setInputFilePath(localInputDataFile.getAbsolutePath());
     taskSpec.setSequenceId(seqId);
+    taskSpec.setFailOnEmptySegment(_spec.isFailOnEmptySegment());
     taskSpec.setCustomProperty(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, inputFileURI.toString());
 
     LOGGER.info("Submitting one Segment Generation Task for {}", inputFileURI);

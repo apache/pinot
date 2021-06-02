@@ -29,11 +29,9 @@ import org.apache.pinot.broker.routing.RoutingTable;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.CommonConstants.Helix;
-import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.helix.ControllerTest;
-import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -44,6 +42,7 @@ import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -77,9 +76,10 @@ public class HelixBrokerStarterTest extends ControllerTest {
 
     Map<String, Object> properties = new HashMap<>();
     properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, 18099);
-    
-    _brokerStarter =
-        new HelixBrokerStarter(new PinotConfiguration(properties), getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR);
+    properties.put(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
+    properties.put(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
+
+    _brokerStarter = new HelixBrokerStarter(new PinotConfiguration(properties));
     _brokerStarter.start();
 
     addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKERS - 1, true);
@@ -168,7 +168,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
     try {
       _helixResourceManager.addTable(newTableConfig);
       Assert.fail("Table creation should fail as testBroker does not exist");
-    } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
+    } catch (InvalidTableConfigException e) {
       // expected
     }
 

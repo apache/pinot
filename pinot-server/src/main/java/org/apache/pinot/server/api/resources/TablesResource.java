@@ -24,6 +24,7 @@ import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import java.io.File;
+import java.net.URI;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -34,6 +35,7 @@ import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -45,16 +47,18 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
+import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.data.manager.SegmentDataManager;
-import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
-import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.server.api.access.AccessControl;
 import org.apache.pinot.server.api.access.AccessControlFactory;
 import org.apache.pinot.server.starter.ServerInstance;
@@ -69,6 +73,7 @@ import org.slf4j.LoggerFactory;
 public class TablesResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(TablesResource.class);
   private static final String PEER_SEGMENT_DOWNLOAD_DIR = "peerSegmentDownloadDir";
+  private static final String SEGMENT_UPLOAD_DIR = "segmentUploadDir";
 
   @Inject
   private ServerInstance _serverInstance;
@@ -83,30 +88,9 @@ public class TablesResource {
   @ApiOperation(value = "List tables", notes = "List all the tables on this server")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = TablesList.class), @ApiResponse(code = 500, message = "Server initialization error", response = ErrorInfo.class)})
   public String listTables() {
-    InstanceDataManager instanceDataManager = checkGetInstanceDataManager();
+    InstanceDataManager instanceDataManager = ServerResourceUtils.checkGetInstanceDataManager(_serverInstance);
     List<String> tables = new ArrayList<>(instanceDataManager.getAllTables());
     return ResourceUtils.convertToJsonString(new TablesList(tables));
-  }
-
-  private InstanceDataManager checkGetInstanceDataManager() {
-    if (_serverInstance == null) {
-      throw new WebApplicationException("Server initialization error. Missing server instance");
-    }
-    InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
-    if (instanceDataManager == null) {
-      throw new WebApplicationException("Server initialization error. Missing data manager",
-          Response.Status.INTERNAL_SERVER_ERROR);
-    }
-    return instanceDataManager;
-  }
-
-  private TableDataManager checkGetTableDataManager(String tableName) {
-    InstanceDataManager dataManager = checkGetInstanceDataManager();
-    TableDataManager tableDataManager = dataManager.getTableDataManager(tableName);
-    if (tableDataManager == null) {
-      throw new WebApplicationException("Table " + tableName + " does not exist", Response.Status.NOT_FOUND);
-    }
-    return tableDataManager;
   }
 
   @GET
@@ -116,7 +100,7 @@ public class TablesResource {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = TableSegments.class), @ApiResponse(code = 500, message = "Server initialization error", response = ErrorInfo.class)})
   public String listTableSegments(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE") @PathParam("tableName") String tableName) {
-    TableDataManager tableDataManager = checkGetTableDataManager(tableName);
+    TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
     try {
       List<String> segments = new ArrayList<>(segmentDataManagers.size());
@@ -140,7 +124,7 @@ public class TablesResource {
       @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE") @PathParam("tableName") String tableName,
       @ApiParam(value = "Segment name", required = true) @PathParam("segmentName") String segmentName,
       @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") @DefaultValue("") List<String> columns) {
-    TableDataManager tableDataManager = checkGetTableDataManager(tableName);
+    TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
     SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
     if (segmentDataManager == null) {
       throw new WebApplicationException(String.format("Table %s segments %s does not exist", tableName, segmentName),
@@ -165,7 +149,7 @@ public class TablesResource {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class), @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)})
   public String getCrcMetadataForTable(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE") @PathParam("tableName") String tableName) {
-    TableDataManager tableDataManager = checkGetTableDataManager(tableName);
+    TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
     try {
       Map<String, String> segmentCrcForTable = new HashMap<>();
@@ -209,7 +193,8 @@ public class TablesResource {
       throw new WebApplicationException("No data access to table: " + tableNameWithType, Response.Status.FORBIDDEN);
     }
 
-    TableDataManager tableDataManager = checkGetTableDataManager(tableNameWithType);
+    TableDataManager tableDataManager =
+        ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
     SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
     if (segmentDataManager == null) {
       throw new WebApplicationException(
@@ -244,6 +229,73 @@ public class TablesResource {
     }
   }
 
+  /**
+   * Upload a low level consumer segment to segment store and return the segment download url. This endpoint is used when segment store copy is unavailable for committed low level consumer segments.
+   * Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment to upload it.
+   * @see <a href="https://cwiki.apache.org/confluence/display/PINOT/By-passing+deep-store+requirement+for+Realtime+segment+completion#BypassingdeepstorerequirementforRealtimesegmentcompletion-Failurecasesandhandling">By-passing deep-store requirement for Realtime segment completion:Failure cases and handling</a>
+   */
+  @POST
+  @Path("/segments/{realtimeTableName}/{segmentName}/upload")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Upload a low level consumer segment to segment store and return the segment download url", notes = "Upload a low level consumer segment to segment store and return the segment download url")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class), @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class), @ApiResponse(code = 400, message = "Bad request", response = ErrorInfo.class)})
+  public String uploadLLCSegment(
+      @ApiParam(value = "Name of the REALTIME table", required = true) @PathParam("realtimeTableName") String realtimeTableName,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName)
+      throws Exception {
+    LOGGER.info("Received a request to upload low level consumer segment {} for table {}", segmentName,
+        realtimeTableName);
+
+    // Check it's realtime table
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(realtimeTableName);
+    if (TableType.OFFLINE == tableType) {
+      throw new WebApplicationException(
+          String.format("Cannot upload low level consumer segment for OFFLINE table: %s", realtimeTableName),
+          Response.Status.BAD_REQUEST);
+    }
+
+    // Check the segment is low level consumer segment
+    if (!LLCSegmentName.isLowLevelConsumerSegmentName(segmentName)) {
+      throw new WebApplicationException(String.format("Segment %s is not a low level consumer segment", segmentName),
+          Response.Status.BAD_REQUEST);
+    }
+
+    String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(realtimeTableName);
+    TableDataManager tableDataManager =
+        ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
+    SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
+    if (segmentDataManager == null) {
+      throw new WebApplicationException(
+          String.format("Table %s segment %s does not exist", realtimeTableName, segmentName),
+          Response.Status.NOT_FOUND);
+    }
+
+    File segmentTarFile = null;
+    try {
+      // Create the tar.gz segment file in the server's segmentTarUploadDir folder with a unique file name.
+      File segmentTarUploadDir =
+          new File(_serverInstance.getInstanceDataManager().getSegmentFileDirectory(), SEGMENT_UPLOAD_DIR);
+      segmentTarUploadDir.mkdir();
+
+      segmentTarFile = new File(segmentTarUploadDir, tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID()
+          + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+      TarGzCompressionUtils.createTarGzFile(new File(tableDataManager.getTableDataDir(), segmentName), segmentTarFile);
+
+      // Use segment uploader to upload the segment tar file to segment store and return the segment download url.
+      SegmentUploader segmentUploader = _serverInstance.getInstanceDataManager().getSegmentUploader();
+      URI segmentDownloadUrl = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName));
+      if (segmentDownloadUrl == null) {
+        throw new WebApplicationException(
+            String.format("Failed to upload table %s segment %s to segment store", realtimeTableName, segmentName),
+            Response.Status.INTERNAL_SERVER_ERROR);
+      }
+      return segmentDownloadUrl.getPath();
+    } finally {
+      FileUtils.deleteQuietly(segmentTarFile);
+      tableDataManager.releaseSegment(segmentDataManager);
+    }
+  }
+
   @GET
   @Path("tables/{realtimeTableName}/consumingSegmentsInfo")
   @Produces(MediaType.APPLICATION_JSON)
@@ -258,7 +310,8 @@ public class TablesResource {
     String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(realtimeTableName);
 
     List<SegmentConsumerInfo> segmentConsumerInfoList = new ArrayList<>();
-    TableDataManager tableDataManager = checkGetTableDataManager(tableNameWithType);
+    TableDataManager tableDataManager =
+        ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {

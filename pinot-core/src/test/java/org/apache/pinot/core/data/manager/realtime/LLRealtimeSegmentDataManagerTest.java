@@ -29,6 +29,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.HelixManager;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
@@ -36,13 +38,17 @@ import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
-import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
-import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
+import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
+import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -51,6 +57,7 @@ import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -58,6 +65,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -68,18 +77,18 @@ public class LLRealtimeSegmentDataManagerTest {
   private static final String _segmentDir = "/tmp/" + LLRealtimeSegmentDataManagerTest.class.getSimpleName();
   private static final File _segmentDirFile = new File(_segmentDir);
   private static final String _tableName = "Coffee";
-  private static final int _partitionId = 13;
+  private static final int _partitionGroupId = 13;
   private static final int _sequenceId = 945;
   private static final long _segTimeMs = 98347869999L;
   private static final LLCSegmentName _segmentName =
-      new LLCSegmentName(_tableName, _partitionId, _sequenceId, _segTimeMs);
+      new LLCSegmentName(_tableName, _partitionGroupId, _sequenceId, _segTimeMs);
   private static final String _segmentNameStr = _segmentName.getSegmentName();
   private static final long _startOffsetValue = 19885L;
   private static final LongMsgOffset _startOffset = new LongMsgOffset(_startOffsetValue);
   private static final String _topicName = "someTopic";
   private static final int maxRowsInSegment = 250000;
   private static final long maxTimeForSegmentCloseMs = 64368000L;
-  private final Map<Integer, Semaphore> _partitionIdToSemaphoreMap = new ConcurrentHashMap<>();
+  private final Map<Integer, Semaphore> _partitionGroupIdToSemaphoreMap = new ConcurrentHashMap<>();
 
   private static long _timeNow = System.currentTimeMillis();
 
@@ -94,9 +103,9 @@ public class LLRealtimeSegmentDataManagerTest {
           + "  \"tableIndexConfig\": {\n" + "    \"invertedIndexColumns\": [" + "    ], \n"
           + "    \"lazyLoad\": \"false\", \n" + "    \"loadMode\": \"HEAP\", \n"
           + "    \"segmentFormatVersion\": null, \n" + "    \"sortedColumn\": [], \n" + "    \"streamConfigs\": {\n"
-          + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS + "\": \"" + maxRowsInSegment + "\", \n" + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME
-          + "\": \"" + maxTimeForSegmentCloseMs + "\", \n"
-          + "      \"stream.fakeStream.broker.list\": \"broker:7777\", \n"
+          + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS + "\": \"" + maxRowsInSegment + "\", \n"
+          + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME + "\": \"" + maxTimeForSegmentCloseMs
+          + "\", \n" + "      \"stream.fakeStream.broker.list\": \"broker:7777\", \n"
           + "      \"stream.fakeStream.consumer.prop.auto.offset.reset\": \"smallest\", \n"
           + "      \"stream.fakeStream.consumer.type\": \"simple\", \n"
           + "      \"stream.fakeStream.consumer.factory.class.name\": \"" + FakeStreamConsumerFactory.class.getName()
@@ -110,17 +119,14 @@ public class LLRealtimeSegmentDataManagerTest {
           + "      \"streamType\": \"fakeStream\"\n" + "    }\n" + "  }, \n"
           + "  \"tableName\": \"Coffee_REALTIME\", \n" + "  \"tableType\": \"realtime\", \n" + "  \"tenants\": {\n"
           + "    \"broker\": \"shared\", \n" + "    \"server\": \"server-1\"\n" + "  },\n"
-          + " \"upsertConfig\": {\"mode\": \"FULL\" } \n"
-          + "}";
+          + " \"upsertConfig\": {\"mode\": \"FULL\" } \n" + "}";
 
   private String makeSchema() {
     return "{" + "  \"schemaName\":\"SchemaTest\"," + "  \"metricFieldSpecs\":[" + "    {\"name\":\"m\",\"dataType\":\""
         + "LONG" + "\"}" + "  ]," + "  \"dimensionFieldSpecs\":[" + "    {\"name\":\"d\",\"dataType\":\"" + "STRING"
         + "\",\"singleValueField\":" + "true" + "}" + "  ]," + "  \"timeFieldSpec\":{"
         + "    \"incomingGranularitySpec\":{\"dataType\":\"LONG\",\"timeType\":\"MILLISECONDS\",\"name\":\"time\"},"
-        + "    \"defaultNullValue\":12345" + "  },\n"
-        + "\"primaryKeyColumns\": [\"event_id\"] \n"
-        + "}";
+        + "    \"defaultNullValue\":12345" + "  },\n" + "\"primaryKeyColumns\": [\"event_id\"] \n" + "}";
   }
 
   private TableConfig createTableConfig()
@@ -128,9 +134,10 @@ public class LLRealtimeSegmentDataManagerTest {
     return JsonUtils.stringToObject(_tableConfigJson, TableConfig.class);
   }
 
-  private RealtimeTableDataManager createTableDataManager() {
+  private RealtimeTableDataManager createTableDataManager(TableConfig tableConfig) {
     final String instanceId = "server-1";
-    SegmentBuildTimeLeaseExtender.create(instanceId, new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), _tableName);
+    SegmentBuildTimeLeaseExtender.getOrCreate(instanceId, new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()),
+        tableConfig.getTableName());
     RealtimeTableDataManager tableDataManager = mock(RealtimeTableDataManager.class);
     when(tableDataManager.getServerInstance()).thenReturn(instanceId);
     RealtimeSegmentStatsHistory statsHistory = mock(RealtimeSegmentStatsHistory.class);
@@ -146,6 +153,7 @@ public class LLRealtimeSegmentDataManagerTest {
     segmentZKMetadata.setSegmentName(_segmentNameStr);
     segmentZKMetadata.setStartOffset(_startOffset.toString());
     segmentZKMetadata.setCreationTime(System.currentTimeMillis());
+    segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
     return segmentZKMetadata;
   }
 
@@ -154,26 +162,28 @@ public class LLRealtimeSegmentDataManagerTest {
     LLCRealtimeSegmentZKMetadata segmentZKMetadata = createZkMetadata();
     TableConfig tableConfig = createTableConfig();
     InstanceZKMetadata instanceZKMetadata = new InstanceZKMetadata();
-    RealtimeTableDataManager tableDataManager = createTableDataManager();
+    RealtimeTableDataManager tableDataManager = createTableDataManager(tableConfig);
     String resourceDir = _segmentDir;
     LLCSegmentName llcSegmentName = new LLCSegmentName(_segmentNameStr);
-    _partitionIdToSemaphoreMap.putIfAbsent(_partitionId, new Semaphore(1));
+    _partitionGroupIdToSemaphoreMap.putIfAbsent(_partitionGroupId, new Semaphore(1));
     Schema schema = Schema.fromString(makeSchema());
     ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     FakeLLRealtimeSegmentDataManager segmentDataManager =
         new FakeLLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, tableDataManager, resourceDir, schema,
-            llcSegmentName, _partitionIdToSemaphoreMap, serverMetrics);
+            llcSegmentName, _partitionGroupIdToSemaphoreMap, serverMetrics);
     return segmentDataManager;
   }
 
   @BeforeClass
   public void setUp() {
     _segmentDirFile.deleteOnExit();
+    SegmentBuildTimeLeaseExtender.initExecutor();
   }
 
   @AfterClass
   public void tearDown() {
     FileUtils.deleteQuietly(_segmentDirFile);
+    SegmentBuildTimeLeaseExtender.shutdownExecutor();
   }
 
   @Test
@@ -184,14 +194,9 @@ public class LLRealtimeSegmentDataManagerTest {
     {
       //  Controller sends catchup response with both offset as well as streamPartitionMsgOffset
       String responseStr =
-          "{"
-              + "  \"streamPartitionMsgOffset\" : \"" + offset + "\","
-              + "  \"offset\" : " + offset + ","
-              + "  \"buildTimeSec\" : -1,"
-              + "  \"isSplitCommitType\" : false,"
-              + "  \"segmentLocation\" : \"file:///a/b\","
-              + "  \"status\" : \"CATCH_UP\""
-              + "}";
+          "{" + "  \"streamPartitionMsgOffset\" : \"" + offset + "\"," + "  \"offset\" : " + offset + ","
+              + "  \"buildTimeSec\" : -1," + "  \"isSplitCommitType\" : false,"
+              + "  \"segmentLocation\" : \"file:///a/b\"," + "  \"status\" : \"CATCH_UP\"" + "}";
       SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       StreamPartitionMsgOffset extractedOffset = segmentDataManager.extractOffset(response);
       Assert.assertEquals(extractedOffset.compareTo(new LongMsgOffset(offset)), 0);
@@ -199,27 +204,17 @@ public class LLRealtimeSegmentDataManagerTest {
     {
       //  Controller sends catchup response with offset only
       String responseStr =
-          "{"
-              + "  \"offset\" : " + offset + ","
-              + "  \"buildTimeSec\" : -1,"
-              + "  \"isSplitCommitType\" : false,"
-              + "  \"segmentLocation\" : \"file:///a/b\","
-              + "  \"status\" : \"CATCH_UP\""
-              + "}";
+          "{" + "  \"offset\" : " + offset + "," + "  \"buildTimeSec\" : -1," + "  \"isSplitCommitType\" : false,"
+              + "  \"segmentLocation\" : \"file:///a/b\"," + "  \"status\" : \"CATCH_UP\"" + "}";
       SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       StreamPartitionMsgOffset extractedOffset = segmentDataManager.extractOffset(response);
       Assert.assertEquals(extractedOffset.compareTo(new LongMsgOffset(offset)), 0);
     }
     {
       //  Controller sends catchup response streamPartitionMsgOffset only
-      String responseStr =
-          "{"
-              + "  \"streamPartitionMsgOffset\" : \"" + offset + "\","
-              + "  \"buildTimeSec\" : -1,"
-              + "  \"isSplitCommitType\" : false,"
-              + "  \"segmentLocation\" : \"file:///a/b\","
-              + "  \"status\" : \"CATCH_UP\""
-              + "}";
+      String responseStr = "{" + "  \"streamPartitionMsgOffset\" : \"" + offset + "\"," + "  \"buildTimeSec\" : -1,"
+          + "  \"isSplitCommitType\" : false," + "  \"segmentLocation\" : \"file:///a/b\","
+          + "  \"status\" : \"CATCH_UP\"" + "}";
       SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       StreamPartitionMsgOffset extractedOffset = segmentDataManager.extractOffset(response);
       Assert.assertEquals(extractedOffset.compareTo(new LongMsgOffset(offset)), 0);
@@ -719,7 +714,7 @@ public class LLRealtimeSegmentDataManagerTest {
     long timeout = 10_000L;
     FakeLLRealtimeSegmentDataManager firstSegmentDataManager = createFakeSegmentManager();
     Assert.assertTrue(firstSegmentDataManager.getAcquiredConsumerSemaphore().get());
-    Semaphore firstSemaphore = firstSegmentDataManager.getPartitionConsumerSemaphore();
+    Semaphore firstSemaphore = firstSegmentDataManager.getPartitionGroupConsumerSemaphore();
     Assert.assertEquals(firstSemaphore.availablePermits(), 0);
     Assert.assertFalse(firstSemaphore.hasQueuedThreads());
 
@@ -751,18 +746,39 @@ public class LLRealtimeSegmentDataManagerTest {
         "Failed to acquire the semaphore for the second segment manager in " + timeout + "ms");
 
     Assert.assertTrue(secondSegmentDataManager.get().getAcquiredConsumerSemaphore().get());
-    Semaphore secondSemaphore = secondSegmentDataManager.get().getPartitionConsumerSemaphore();
+    Semaphore secondSemaphore = secondSegmentDataManager.get().getPartitionGroupConsumerSemaphore();
     Assert.assertEquals(firstSemaphore, secondSemaphore);
     Assert.assertEquals(secondSemaphore.availablePermits(), 0);
     Assert.assertFalse(secondSemaphore.hasQueuedThreads());
 
     // Call destroy method the 2nd time on the first segment manager, the permits in semaphore won't increase.
     firstSegmentDataManager.destroy();
-    Assert.assertEquals(firstSegmentDataManager.getPartitionConsumerSemaphore().availablePermits(), 0);
+    Assert.assertEquals(firstSegmentDataManager.getPartitionGroupConsumerSemaphore().availablePermits(), 0);
 
     // The permit finally gets released in the Semaphore.
     secondSegmentDataManager.get().destroy();
-    Assert.assertEquals(secondSegmentDataManager.get().getPartitionConsumerSemaphore().availablePermits(), 1);
+    Assert.assertEquals(secondSegmentDataManager.get().getPartitionGroupConsumerSemaphore().availablePermits(), 1);
+  }
+
+  @Test
+  public void testShutdownTableDataManagerWillNotShutdownLeaseExtenderExecutor()
+      throws Exception {
+    TableConfig tableConfig = createTableConfig();
+    tableConfig.setUpsertConfig(null);
+    ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
+    when(propertyStore.get(anyString(), any(), anyInt())).thenReturn(TableConfigUtils.toZNRecord(tableConfig));
+
+    TableDataManagerConfig tableDataManagerConfig = mock(TableDataManagerConfig.class);
+    when(tableDataManagerConfig.getTableDataManagerType()).thenReturn("REALTIME");
+    when(tableDataManagerConfig.getTableName()).thenReturn(tableConfig.getTableName());
+    when(tableDataManagerConfig.getDataDir()).thenReturn(FileUtils.getTempDirectoryPath());
+
+    TableDataManager tableDataManager = TableDataManagerProvider
+        .getTableDataManager(tableDataManagerConfig, "testInstance", propertyStore, mock(ServerMetrics.class),
+            mock(HelixManager.class), null);
+    tableDataManager.start();
+    tableDataManager.shutDown();
+    Assert.assertFalse(SegmentBuildTimeLeaseExtender.isExecutorShutdown());
   }
 
   public static class FakeLLRealtimeSegmentDataManager extends LLRealtimeSegmentDataManager {
@@ -800,7 +816,7 @@ public class LLRealtimeSegmentDataManagerTest {
         throws Exception {
       super(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir,
           new IndexLoadingConfig(makeInstanceDataManagerConfig(), tableConfig), schema, llcSegmentName,
-          semaphoreMap.get(llcSegmentName.getPartitionId()), serverMetrics,
+          semaphoreMap.get(llcSegmentName.getPartitionGroupId()), serverMetrics,
           new PartitionUpsertMetadataManager("testTable_REALTIME", 0, serverMetrics));
       _state = LLRealtimeSegmentDataManager.class.getDeclaredField("_state");
       _state.setAccessible(true);

@@ -19,31 +19,27 @@
 package org.apache.pinot.core.geospatial.transform.function;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.core.common.DataSource;
+import java.util.List;
+import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.LiteralTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.List;
-import java.util.Map;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.spi.utils.BooleanUtils;
 
 
 /**
  * Function that returns a geometry type point object with the given coordinate values.
  */
 public class StPointFunction extends BaseTransformFunction {
-  private static final Logger LOGGER = LoggerFactory.getLogger(StPointFunction.class);
-
   public static final String FUNCTION_NAME = "ST_Point";
   private TransformFunction _firstArgument;
   private TransformFunction _secondArgument;
   private byte[][] _results;
-  private int _isGeography = 0;
+  private boolean _isGeography;
 
   @Override
   public String getName() {
@@ -66,7 +62,7 @@ public class StPointFunction extends BaseTransformFunction {
       transformFunction = arguments.get(2);
       Preconditions.checkArgument(transformFunction instanceof LiteralTransformFunction,
           "Third argument must be a literal of integer: %s", getName());
-      _isGeography = Integer.parseInt(((LiteralTransformFunction) transformFunction).getLiteral());
+      _isGeography = BooleanUtils.toBoolean(((LiteralTransformFunction) transformFunction).getLiteral());
     }
   }
 
@@ -87,5 +83,4 @@ public class StPointFunction extends BaseTransformFunction {
     }
     return _results;
   }
-
 }

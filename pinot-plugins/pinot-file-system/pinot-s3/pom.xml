@@ -26,7 +26,7 @@
   <parent>
     <artifactId>pinot-file-system</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.7.0-SNAPSHOT</version>
+    <version>0.8.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
 
@@ -39,7 +39,6 @@
     <netty.version>4.1.54.Final</netty.version>
     <http.client.version>4.5.9</http.client.version>
     <http.core.version>4.4.9</http.core.version>
-    <reactivestream.version>1.0.3</reactivestream.version>
     <s3mock.version>2.1.19</s3mock.version>
     <javax.version>3.1.0</javax.version>
     <phase.prop>package</phase.prop>
@@ -75,10 +74,6 @@
         <exclusion>
           <groupId>org.apache.logging.log4j</groupId>
           <artifactId>log4j-to-slf4j</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.reactivestreams</groupId>
-          <artifactId>reactive-streams</artifactId>
         </exclusion>
         <exclusion>
           <groupId>io.netty</groupId>
@@ -129,7 +124,6 @@
     <dependency>
       <groupId>org.reactivestreams</groupId>
       <artifactId>reactive-streams</artifactId>
-      <version>${reactivestream.version}</version>
     </dependency>
     <dependency>
       <groupId>io.netty</groupId>
@@ -181,4 +175,53 @@
       <version>${javax.version}</version>
     </dependency>
   </dependencies>
+  <profiles>
+    <profile>
+      <id>build-shaded-jar</id>
+      <activation>
+        <property>
+          <name>skipShade</name>
+          <value>!true</value>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-shade-plugin</artifactId>
+            <version>3.2.1</version>
+            <executions>
+              <execution>
+                <phase>${phase.prop}</phase>
+                <goals>
+                  <goal>shade</goal>
+                </goals>
+                <configuration>
+                  <transformers>
+                    <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
+                  </transformers>
+                  <!--
+                  Usually in hadoop environment, there are multiple jars with different versions.
+                  Most of the NoSuchMethodExceptions are caused by class loading conflicts.
+                  Class relocation ensures the reference of certain packages/classes in Pinot code to
+                  shaded libs, e.g. jackson or guava.
+                  Ref: https://maven.apache.org/plugins/maven-shade-plugin/examples/class-relocation.html
+                  -->
+                  <relocations>
+                    <relocation>
+                      <pattern>com.google.common</pattern>
+                      <shadedPattern>shaded.com.google.common</shadedPattern>
+                    </relocation>
+                    <relocation>
+                      <pattern>com.fasterxml.jackson</pattern>
+                      <shadedPattern>shaded.com.fasterxml.jackson</shadedPattern>
+                    </relocation>
+                  </relocations>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>

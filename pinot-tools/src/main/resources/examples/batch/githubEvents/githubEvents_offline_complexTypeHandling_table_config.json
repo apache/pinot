@@ -1,0 +1,29 @@
+{
+  "tableName": "githubEvents",
+  "tableType": "OFFLINE",
+  "tenants": {
+  },
+  "segmentsConfig": {
+    "segmentPushType": "REFRESH",
+    "replication": "1",
+    "timeColumnName": "created_at_timestamp"
+  },
+  "tableIndexConfig": {
+    "loadMode": "MMAP"
+  },
+  "ingestionConfig": {
+    "transformConfigs": [
+      {
+        "columnName": "created_at_timestamp",
+        "transformFunction": "fromDateTime(created_at, 'yyyy-MM-dd''T''HH:mm:ss''Z''')"
+      }
+    ],
+    "complexTypeConfig": {
+      "fieldsToUnnest": ["payload.commits"]
+    }
+  },
+  "metadata": {
+    "customConfigs": {
+    }
+  }
+}

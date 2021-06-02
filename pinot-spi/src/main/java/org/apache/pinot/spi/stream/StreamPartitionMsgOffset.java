@@ -42,16 +42,12 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 public interface StreamPartitionMsgOffset extends Comparable {
 
   /**
-   * Compare this offset with another one.
-   *
-   * @param other
-   * @return
-   */
-  int compareTo(Object other);
-
-  /**
    *  A serialized representation of the offset object as a String.
-   * @return
    */
   String toString();
+
+  /**
+   * Converts the string to a {@link StreamPartitionMsgOffset}
+   */
+  StreamPartitionMsgOffset fromString(String streamPartitionMsgOffsetStr);
 }

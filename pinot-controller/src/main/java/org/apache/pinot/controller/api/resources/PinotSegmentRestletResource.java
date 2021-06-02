@@ -33,7 +33,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
-import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -62,6 +61,7 @@ import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
@@ -91,6 +91,9 @@ import org.slf4j.LoggerFactory;
  *     <ul>
  *       <li>"/segments/{tableName}/{segmentName}/reload": reload a segment</li>
  *       <li>"/segments/{tableName}/reload": reload all segments</li>
+ *       <li>"/segments/{tableNameWithType}/{segmentName}/reset": reset a segment</li>
+ *       <li>"/segments/{tableNameWithType}/reset": reset all segments</li>
+ *       <li>"/segments/{tableName}/delete": delete the segments in the payload</li>
  *     </ul>
  *   </li>
  *   <li>
@@ -586,13 +589,14 @@ public class PinotSegmentRestletResource {
   @Path("segments/{tableName}/metadata")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the server metadata for all table segments", notes = "Get the server metadata for all table segments")
-  public String getServerMetadata(@ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-                                               @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) {
+  public String getServerMetadata(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) {
     LOGGER.info("Received a request to fetch metadata for all segments for table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == TableType.REALTIME) {
-      throw new ControllerApplicationException(LOGGER,
-          "Table type : " + tableTypeStr + " not yet supported.", Status.NOT_IMPLEMENTED);
+      throw new ControllerApplicationException(LOGGER, "Table type : " + tableTypeStr + " not yet supported.",
+          Status.NOT_IMPLEMENTED);
     }
 
     String tableNameWithType = getExistingTableNamesWithType(tableName, tableType).get(0);
@@ -603,8 +607,8 @@ public class PinotSegmentRestletResource {
     } catch (InvalidConfigException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST);
     } catch (IOException ioe) {
-      throw new ControllerApplicationException(LOGGER,
-          "Error parsing Pinot server response: " + ioe.getMessage(), Status.INTERNAL_SERVER_ERROR, ioe);
+      throw new ControllerApplicationException(LOGGER, "Error parsing Pinot server response: " + ioe.getMessage(),
+          Status.INTERNAL_SERVER_ERROR, ioe);
     }
     return segmentsMetadata;
   }
@@ -618,10 +622,11 @@ public class PinotSegmentRestletResource {
       throws InvalidConfigException, IOException {
     TableMetadataReader tableMetadataReader =
         new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
-    return tableMetadataReader.getSegmentsMetadata(tableNameWithType,
-        _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+    return tableMetadataReader
+        .getSegmentsMetadata(tableNameWithType, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
   }
 
+  // TODO: Move this API into PinotTableRestletResource
   @GET
   @Path("/tables/{realtimeTableName}/consumingSegmentsInfo")
   @Produces(MediaType.APPLICATION_JSON)

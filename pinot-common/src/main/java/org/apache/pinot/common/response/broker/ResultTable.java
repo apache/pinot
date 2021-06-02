@@ -21,7 +21,6 @@ package org.apache.pinot.common.response.broker;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-import java.io.Serializable;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
 
@@ -35,8 +34,7 @@ public class ResultTable {
   private final List<Object[]> _rows;
 
   @JsonCreator
-  public ResultTable(@JsonProperty("dataSchema") DataSchema dataSchema,
-      @JsonProperty("rows") List<Object[]> rows) {
+  public ResultTable(@JsonProperty("dataSchema") DataSchema dataSchema, @JsonProperty("rows") List<Object[]> rows) {
     _dataSchema = dataSchema;
     _rows = rows;
   }

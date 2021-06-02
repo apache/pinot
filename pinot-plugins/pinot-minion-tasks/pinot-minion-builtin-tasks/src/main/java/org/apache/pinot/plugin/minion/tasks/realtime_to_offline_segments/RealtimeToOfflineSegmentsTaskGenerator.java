@@ -29,7 +29,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
-import org.apache.pinot.common.utils.CommonConstants.Segment;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
@@ -42,6 +41,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.utils.CommonConstants.Segment;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
@@ -254,14 +254,15 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
     Map<Integer, LLCSegmentName> latestLLCSegmentNameMap = new HashMap<>();
     for (LLCRealtimeSegmentZKMetadata metadata : realtimeSegmentsMetadataList) {
       LLCSegmentName llcSegmentName = new LLCSegmentName(metadata.getSegmentName());
-      allPartitions.add(llcSegmentName.getPartitionId());
+      allPartitions.add(llcSegmentName.getPartitionGroupId());
 
       if (metadata.getStatus().equals(Segment.Realtime.Status.DONE)) {
         completedSegmentsMetadataList.add(metadata);
-        latestLLCSegmentNameMap.compute(llcSegmentName.getPartitionId(), (partitionId, latestLLCSegmentName) -> {
-          if (latestLLCSegmentName == null) {
-            return llcSegmentName;
-          } else {
+        latestLLCSegmentNameMap
+            .compute(llcSegmentName.getPartitionGroupId(), (partitionGroupId, latestLLCSegmentName) -> {
+              if (latestLLCSegmentName == null) {
+                return llcSegmentName;
+              } else {
             if (llcSegmentName.getSequenceNumber() > latestLLCSegmentName.getSequenceNumber()) {
               return llcSegmentName;
             } else {

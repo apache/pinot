@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 
 
 /**
@@ -47,7 +46,7 @@ public class EqualsTransformFunction extends BinaryOperatorTransformFunction {
   }
 
   @Override
-  int getBinaryFuncResult(int result) {
-    return (result == 0) ? 1 : 0;
+  protected boolean getBinaryFuncResult(int comparisonResult) {
+    return comparisonResult == 0;
   }
 }

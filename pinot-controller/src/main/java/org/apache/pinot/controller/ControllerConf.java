@@ -28,13 +28,14 @@ import java.util.Random;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.TimeUtils;
 
-import static org.apache.pinot.common.utils.CommonConstants.Controller.CONFIG_OF_CONTROLLER_METRICS_PREFIX;
-import static org.apache.pinot.common.utils.CommonConstants.Controller.DEFAULT_METRICS_PREFIX;
+import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONFIG_OF_CONTROLLER_METRICS_PREFIX;
+import static org.apache.pinot.spi.utils.CommonConstants.Controller.DEFAULT_METRICS_PREFIX;
 
 
 public class ControllerConf extends PinotConfiguration {
@@ -80,6 +81,8 @@ public class ControllerConf extends PinotConfiguration {
         "controller.offline.segment.interval.checker.frequencyInSeconds";
     public static final String REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS =
         "controller.realtime.segment.validation.frequencyInSeconds";
+    public static final String REALTIME_SEGMENT_VALIDATION_INITIAL_DELAY_IN_SECONDS =
+        "controller.realtime.segment.validation.initialDelayInSeconds";
     public static final String BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS =
         "controller.broker.resource.validation.frequencyInSeconds";
     public static final String BROKER_RESOURCE_VALIDATION_INITIAL_DELAY_IN_SECONDS =
@@ -233,7 +236,7 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public void setHelixClusterName(String clusterName) {
-    setProperty(HELIX_CLUSTER_NAME, clusterName);
+    setProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
   }
 
   public void setControllerHost(String host) {
@@ -273,7 +276,7 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public void setZkStr(String zkStr) {
-    setProperty(ZK_STR, zkStr);
+    setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkStr);
   }
 
   public void setDimTableMaxSize(String size) {
@@ -291,7 +294,8 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public String getHelixClusterName() {
-    return getProperty(HELIX_CLUSTER_NAME);
+    return containsKey(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME) ? getProperty(
+        CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME) : getProperty(HELIX_CLUSTER_NAME);
   }
 
   public String getControllerHost() {
@@ -337,7 +341,21 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public String getZkStr() {
-    return getProperty(ZK_STR);
+    Object zkAddressObj = containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER) ? getProperty(
+        CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER) : getProperty(ZK_STR);
+
+    // The set method converted comma separated string into ArrayList, so need to convert back to String here.
+    if (zkAddressObj instanceof List) {
+      List<String> zkAddressList = (List<String>) zkAddressObj;
+      String[] zkAddress = zkAddressList.toArray(new String[0]);
+      return StringUtil.join(",", zkAddress);
+    } else if (zkAddressObj instanceof String) {
+      return (String) zkAddressObj;
+    } else {
+      throw new RuntimeException(
+          "Unexpected data type for zkAddress PropertiesConfiguration, expecting String but got " + zkAddressObj
+              .getClass().getName());
+    }
   }
 
   @Override
@@ -628,7 +646,8 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public long getRealtimeSegmentValidationManagerInitialDelaySeconds() {
-    return getPeriodicTaskInitialDelayInSeconds();
+    return getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_INITIAL_DELAY_IN_SECONDS,
+        getPeriodicTaskInitialDelayInSeconds());
   }
 
   public long getPinotTaskManagerInitialDelaySeconds() {

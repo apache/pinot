@@ -18,12 +18,11 @@
  */
 package org.apache.pinot.core.query.scheduler;
 
-import static org.testng.Assert.assertNull;
-
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-
 import org.apache.pinot.spi.env.PinotConfiguration;
+
+import static org.testng.Assert.assertNull;
 
 
 class TestSchedulerGroupFactory implements SchedulerGroupFactory {

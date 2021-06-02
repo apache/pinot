@@ -20,14 +20,15 @@ package org.apache.pinot.core.startree.v2;
 
 import com.tdunning.math.stats.TDigest;
 import java.util.Random;
+import org.apache.pinot.segment.local.aggregator.PercentileTDigestValueAggregator;
+import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.core.data.aggregator.PercentileTDigestValueAggregator;
-import org.apache.pinot.core.data.aggregator.ValueAggregator;
 
 import static org.testng.Assert.assertEquals;
 
 
 public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<Object, TDigest> {
+  private static final int MAX_VALUE = 10000;
 
   @Override
   ValueAggregator<Object, TDigest> getValueAggregator() {
@@ -41,13 +42,14 @@ public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<Object, 
 
   @Override
   Object getRandomRawValue(Random random) {
-    return random.nextLong();
+    return random.nextInt(MAX_VALUE);
   }
 
   @Override
   void assertAggregatedValue(TDigest starTreeResult, TDigest nonStarTreeResult) {
+    double delta = MAX_VALUE * 0.05;
     for (int i = 0; i <= 100; i++) {
-      assertEquals(starTreeResult.quantile(i / 100), nonStarTreeResult.quantile(i / 100));
+      assertEquals(starTreeResult.quantile(i / 100.0), nonStarTreeResult.quantile(i / 100.0), delta);
     }
   }
 }

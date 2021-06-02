@@ -20,22 +20,15 @@ package org.apache.pinot.core.data.manager.realtime;
 
 import java.util.Map;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.core.data.manager.SegmentDataManager;
-import org.apache.pinot.core.indexsegment.mutable.MutableSegment;
-import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
-import org.apache.pinot.core.io.writer.impl.MmapMemoryManager;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
+import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.segment.local.io.writer.impl.MmapMemoryManager;
+import org.apache.pinot.segment.spi.MutableSegment;
+import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
 
 
 public abstract class RealtimeSegmentDataManager extends SegmentDataManager {
-
-  /**
-   * The state of the consumer of this segment
-   */
-  public enum ConsumerState {
-    CONSUMING,
-    NOT_CONSUMING // In error state
-  }
 
   @Override
   public abstract MutableSegment getSegment();

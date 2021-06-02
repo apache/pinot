@@ -43,15 +43,20 @@ public class IngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Configs related to record transformation functions applied during ingestion")
   private final List<TransformConfig> _transformConfigs;
 
+  @JsonPropertyDescription("Config related to handling complex type")
+  private final ComplexTypeConfig _complexTypeConfig;
+
   @JsonCreator
   public IngestionConfig(@JsonProperty("batchIngestionConfig") @Nullable BatchIngestionConfig batchIngestionConfig,
       @JsonProperty("streamIngestionConfig") @Nullable StreamIngestionConfig streamIngestionConfig,
       @JsonProperty("filterConfig") @Nullable FilterConfig filterConfig,
-      @JsonProperty("transformConfigs") @Nullable List<TransformConfig> transformConfigs) {
+      @JsonProperty("transformConfigs") @Nullable List<TransformConfig> transformConfigs,
+      @JsonProperty("complexTypeConfig") @Nullable ComplexTypeConfig complexTypeConfig) {
     _batchIngestionConfig = batchIngestionConfig;
     _streamIngestionConfig = streamIngestionConfig;
     _filterConfig = filterConfig;
     _transformConfigs = transformConfigs;
+    _complexTypeConfig = complexTypeConfig;
   }
 
   @Nullable
@@ -72,5 +77,10 @@ public class IngestionConfig extends BaseJsonConfig {
   @Nullable
   public List<TransformConfig> getTransformConfigs() {
     return _transformConfigs;
+  }
+
+  @Nullable
+  public ComplexTypeConfig getComplexTypeConfig() {
+    return _complexTypeConfig;
   }
 }

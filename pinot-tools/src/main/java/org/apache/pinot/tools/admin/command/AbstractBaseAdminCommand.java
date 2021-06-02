@@ -20,7 +20,6 @@ package org.apache.pinot.tools.admin.command;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -29,9 +28,13 @@ import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
-
+import java.util.*;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.http.Header;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
 
@@ -44,8 +47,6 @@ import org.apache.pinot.tools.utils.PinotConfigUtils;
 public class AbstractBaseAdminCommand extends AbstractBaseCommand {
   static final String DEFAULT_CONTROLLER_PORT = "9000";
   static final String URI_TABLES_PATH = "/tables/";
-
-  static final String TMP_DIR = System.getProperty("java.io.tmpdir") + File.separator;
 
   public AbstractBaseAdminCommand(boolean addShutdownHook) {
     super(addShutdownHook);
@@ -72,16 +73,23 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
 
   public static String sendRequest(String requestMethod, String urlString, String payload)
       throws IOException {
+    return sendRequest(requestMethod, urlString, payload, Collections.emptyList());
+  }
+
+  public static String sendRequest(String requestMethod, String urlString, String payload, List<Header> headers)
+      throws IOException {
     final URL url = new URL(urlString);
     final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 
-    conn.setDoOutput(true);
+    headers.forEach(header -> conn.setRequestProperty(header.getName(), header.getValue()));
     conn.setRequestMethod(requestMethod);
+    conn.setDoOutput(true);
     if (payload != null) {
-      final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(),
-          StandardCharsets.UTF_8));
-      writer.write(payload, 0, payload.length());
-      writer.flush();
+      try (final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(),
+          StandardCharsets.UTF_8))) {
+        writer.write(payload, 0, payload.length());
+        writer.flush();
+      }
     }
 
     try {
@@ -111,5 +119,37 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
   Map<String, Object> readConfigFromFile(String configFileName)
       throws ConfigurationException {
     return PinotConfigUtils.readConfigFromFile(configFileName);
+  }
+
+  /**
+   * Generate an (optional) HTTP Authorization header given an auth token
+   * @see FileUploadDownloadClient#makeAuthHeader(String)
+   *
+   * @param authToken auth token
+   * @return list of 0 or 1 "Authorization" headers
+   */
+  static List<Header> makeAuthHeader(String authToken) {
+    return FileUploadDownloadClient.makeAuthHeader(authToken);
+  }
+
+  /**
+   * Generate auth token from pass-thru token or generate basic auth from user/password pair
+   *
+   * @param authToken optional pass-thru token
+   * @param user optional username
+   * @param password optional password
+   * @return auth token, or null if neither pass-thru token nor user info available
+   */
+  @Nullable
+  static String makeAuthToken(String authToken, String user, String password) {
+    if (StringUtils.isNotBlank(authToken)) {
+      return authToken;
+    }
+
+    if (StringUtils.isNotBlank(user)) {
+      return BasicAuthUtils.toBasicAuthToken(user, password);
+    }
+
+    return null;
   }
 }

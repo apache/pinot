@@ -19,12 +19,12 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
-import org.apache.pinot.core.util.ArrayCopyUtils;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ArrayCopyUtils;
 
 
 /**
@@ -35,26 +35,34 @@ public abstract class BaseTransformFunction implements TransformFunction {
       new TransformResultMetadata(DataType.INT, true, false);
   protected static final TransformResultMetadata LONG_SV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.LONG, true, false);
+  protected static final TransformResultMetadata FLOAT_SV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.FLOAT, true, false);
   protected static final TransformResultMetadata DOUBLE_SV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.DOUBLE, true, false);
+  protected static final TransformResultMetadata BOOLEAN_SV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.BOOLEAN, true, false);
+  protected static final TransformResultMetadata TIMESTAMP_SV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.TIMESTAMP, true, false);
   protected static final TransformResultMetadata STRING_SV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.STRING, true, false);
   protected static final TransformResultMetadata STRING_MV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.STRING, false, false);
+  protected static final TransformResultMetadata JSON_SV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.JSON, true, false);
   protected static final TransformResultMetadata BYTES_SV_NO_DICTIONARY_METADATA =
-          new TransformResultMetadata(DataType.BYTES, true, false);
+      new TransformResultMetadata(DataType.BYTES, true, false);
 
-  private int[] _intValuesSV;
-  private long[] _longValuesSV;
-  private float[] _floatValuesSV;
-  private double[] _doubleValuesSV;
-  private String[] _stringValuesSV;
-  private byte[][] _byteValuesSV;
-  private int[][] _intValuesMV;
-  private long[][] _longValuesMV;
-  private float[][] _floatValuesMV;
-  private double[][] _doubleValuesMV;
-  private String[][] _stringValuesMV;
+  protected int[] _intValuesSV;
+  protected long[] _longValuesSV;
+  protected float[] _floatValuesSV;
+  protected double[] _doubleValuesSV;
+  protected String[] _stringValuesSV;
+  protected byte[][] _byteValuesSV;
+  protected int[][] _intValuesMV;
+  protected long[][] _longValuesMV;
+  protected float[][] _floatValuesMV;
+  protected double[][] _doubleValuesMV;
+  protected String[][] _stringValuesMV;
 
   @Override
   public Dictionary getDictionary() {
@@ -83,7 +91,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
       dictionary.readIntValues(dictIds, length, _intValuesSV);
     } else {
-      switch (getResultMetadata().getDataType()) {
+      switch (getResultMetadata().getDataType().getStoredType()) {
         case LONG:
           long[] longValues = transformToLongValuesSV(projectionBlock);
           ArrayCopyUtils.copy(longValues, _intValuesSV, length);
@@ -119,7 +127,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
       dictionary.readLongValues(dictIds, length, _longValuesSV);
     } else {
-      switch (getResultMetadata().getDataType()) {
+      switch (getResultMetadata().getDataType().getStoredType()) {
         case INT:
           int[] intValues = transformToIntValuesSV(projectionBlock);
           ArrayCopyUtils.copy(intValues, _longValuesSV, length);
@@ -155,7 +163,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
       dictionary.readFloatValues(dictIds, length, _floatValuesSV);
     } else {
-      switch (getResultMetadata().getDataType()) {
+      switch (getResultMetadata().getDataType().getStoredType()) {
         case INT:
           int[] intValues = transformToIntValuesSV(projectionBlock);
           ArrayCopyUtils.copy(intValues, _floatValuesSV, length);
@@ -191,7 +199,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
       dictionary.readDoubleValues(dictIds, length, _doubleValuesSV);
     } else {
-      switch (getResultMetadata().getDataType()) {
+      switch (getResultMetadata().getDataType().getStoredType()) {
         case INT:
           int[] intValues = transformToIntValuesSV(projectionBlock);
           ArrayCopyUtils.copy(intValues, _doubleValuesSV, length);
@@ -227,7 +235,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
       dictionary.readStringValues(dictIds, length, _stringValuesSV);
     } else {
-      switch (getResultMetadata().getDataType()) {
+      switch (getResultMetadata().getDataType().getStoredType()) {
         case INT:
           int[] intValues = transformToIntValuesSV(projectionBlock);
           ArrayCopyUtils.copy(intValues, _stringValuesSV, length);
@@ -266,7 +274,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
       dictionary.readIntValues(dictIds, length, _intValuesSV);
     } else {
-      Preconditions.checkState(getResultMetadata().getDataType() == DataType.STRING);
+      Preconditions.checkState(getResultMetadata().getDataType().getStoredType() == DataType.STRING);
       String[] stringValues = transformToStringValuesSV(projectionBlock);
       ArrayCopyUtils.copy(stringValues, _byteValuesSV, length);
     }
@@ -291,7 +299,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
         _intValuesMV[i] = intValues;
       }
     } else {
-      switch (getResultMetadata().getDataType()) {
+      switch (getResultMetadata().getDataType().getStoredType()) {
         case LONG:
           long[][] longValuesMV = transformToLongValuesMV(projectionBlock);
           for (int i = 0; i < length; i++) {
@@ -357,7 +365,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
         _longValuesMV[i] = longValues;
       }
     } else {
-      switch (getResultMetadata().getDataType()) {
+      switch (getResultMetadata().getDataType().getStoredType()) {
         case INT:
           int[][] intValuesMV = transformToIntValuesMV(projectionBlock);
           for (int i = 0; i < length; i++) {
@@ -423,7 +431,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
         _floatValuesMV[i] = floatValues;
       }
     } else {
-      switch (getResultMetadata().getDataType()) {
+      switch (getResultMetadata().getDataType().getStoredType()) {
         case INT:
           int[][] intValuesMV = transformToIntValuesMV(projectionBlock);
           for (int i = 0; i < length; i++) {
@@ -489,7 +497,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
         _doubleValuesMV[i] = doubleValues;
       }
     } else {
-      switch (getResultMetadata().getDataType()) {
+      switch (getResultMetadata().getDataType().getStoredType()) {
         case INT:
           int[][] intValuesMV = transformToIntValuesMV(projectionBlock);
           for (int i = 0; i < length; i++) {
@@ -555,7 +563,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
         _stringValuesMV[i] = stringValues;
       }
     } else {
-      switch (getResultMetadata().getDataType()) {
+      switch (getResultMetadata().getDataType().getStoredType()) {
         case INT:
           int[][] intValuesMV = transformToIntValuesMV(projectionBlock);
           for (int i = 0; i < length; i++) {

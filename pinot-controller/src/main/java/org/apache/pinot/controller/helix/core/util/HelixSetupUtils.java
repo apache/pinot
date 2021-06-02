@@ -43,14 +43,14 @@ import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.builder.CustomModeISBuilder;
 import org.apache.helix.model.builder.FullAutoModeISBuilder;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixBrokerResourceOnlineOfflineStateModelGenerator;
 import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.common.utils.CommonConstants.Helix.*;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.*;
 
 
 public class HelixSetupUtils {
@@ -205,10 +205,10 @@ public class HelixSetupUtils {
     if (resourceConfig == null) {
       resourceConfig = new ResourceConfig(LEAD_CONTROLLER_RESOURCE_NAME);
     }
-    // Set RESOURCE_ENABLED to false if it's absent in resource config
-    if (resourceConfig.getSimpleConfig(LEAD_CONTROLLER_RESOURCE_ENABLED_KEY) == null) {
-      resourceConfig.putSimpleConfig(LEAD_CONTROLLER_RESOURCE_ENABLED_KEY, Boolean.FALSE.toString());
-    }
+    // Explicitly set RESOURCE_ENABLED to true, so that the lead controller resource is always enabled.
+    // This is to help keep the behavior consistent in all clusters for better maintenance.
+    // TODO: remove the logic of handling this config in both controller and server in the next official release.
+    resourceConfig.putSimpleConfig(LEAD_CONTROLLER_RESOURCE_ENABLED_KEY, Boolean.TRUE.toString());
     configAccessor.setResourceConfig(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME, resourceConfig);
   }
 }

@@ -70,8 +70,7 @@ public class SelectionDataTableReducer implements DataTableReducer {
       DataTableReducerContext reducerContext, BrokerMetrics brokerMetrics) {
     if (dataTableMap.isEmpty()) {
       // For empty data table map, construct empty result using the cached data schema for selection query
-      List<String> selectionColumns =
-          SelectionOperatorUtils.getSelectionColumns(_queryContext.getSelectExpressions(), dataSchema);
+      List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(_queryContext, dataSchema);
       if (_responseFormatSql) {
         DataSchema selectionDataSchema = SelectionOperatorUtils.getResultTableDataSchema(dataSchema, selectionColumns);
         brokerResponseNative.setResultTable(new ResultTable(selectionDataSchema, Collections.emptyList()));
@@ -107,12 +106,11 @@ public class SelectionDataTableReducer implements DataTableReducer {
         }
       } else {
         // Selection only
-        List<String> selectionColumns =
-            SelectionOperatorUtils.getSelectionColumns(_queryContext.getSelectExpressions(), dataSchema);
+        List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(_queryContext, dataSchema);
         List<Object[]> reducedRows = SelectionOperatorUtils.reduceWithoutOrdering(dataTableMap.values(), limit);
         if (_responseFormatSql) {
           brokerResponseNative
-              .setResultTable(SelectionOperatorUtils.renderResultTableWithoutOrdering(reducedRows, dataSchema));
+              .setResultTable(SelectionOperatorUtils.renderResultTableWithoutOrdering(reducedRows, dataSchema, selectionColumns));
         } else {
           brokerResponseNative.setSelectionResults(SelectionOperatorUtils
               .renderSelectionResultsWithoutOrdering(reducedRows, dataSchema, selectionColumns, _preserveType));

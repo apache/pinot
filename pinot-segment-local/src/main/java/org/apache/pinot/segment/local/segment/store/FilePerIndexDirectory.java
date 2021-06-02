@@ -1,0 +1,199 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.segment.local.segment.store;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import java.io.File;
+import java.io.IOException;
+import java.nio.ByteOrder;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
+import org.apache.pinot.segment.spi.store.ColumnIndexType;
+import org.apache.pinot.spi.utils.ReadMode;
+
+
+class FilePerIndexDirectory extends ColumnIndexDirectory {
+  private final File _segmentDirectory;
+  private SegmentMetadataImpl _segmentMetadata;
+  private final ReadMode _readMode;
+  private final Map<IndexKey, PinotDataBuffer> indexBuffers = new HashMap<>();
+
+  /**
+   * @param segmentDirectory File pointing to segment directory
+   * @param segmentMetadata segment metadata. Metadata must be fully initialized
+   * @param readMode mmap vs heap mode
+   */
+  protected FilePerIndexDirectory(File segmentDirectory, SegmentMetadataImpl segmentMetadata, ReadMode readMode) {
+    Preconditions.checkNotNull(segmentDirectory);
+    Preconditions.checkNotNull(readMode);
+    Preconditions.checkNotNull(segmentMetadata);
+
+    Preconditions.checkArgument(segmentDirectory.exists(),
+        "SegmentDirectory: " + segmentDirectory.toString() + " does not exist");
+    Preconditions.checkArgument(segmentDirectory.isDirectory(),
+        "SegmentDirectory: " + segmentDirectory.toString() + " is not a directory");
+
+    _segmentDirectory = segmentDirectory;
+    _segmentMetadata = segmentMetadata;
+    _readMode = readMode;
+  }
+
+  @Override
+  public void setSegmentMetadata(SegmentMetadataImpl segmentMetadata) {
+    _segmentMetadata = segmentMetadata;
+  }
+
+  @Override
+  public PinotDataBuffer getBuffer(String column, ColumnIndexType type)
+      throws IOException {
+    IndexKey key = new IndexKey(column, type);
+    return getReadBufferFor(key);
+  }
+
+  @Override
+  public PinotDataBuffer newBuffer(String column, ColumnIndexType type, long sizeBytes)
+      throws IOException {
+    IndexKey key = new IndexKey(column, type);
+    return getWriteBufferFor(key, sizeBytes);
+  }
+
+  @Override
+  public boolean hasIndexFor(String column, ColumnIndexType type) {
+    File indexFile = getFileFor(column, type);
+    return indexFile.exists();
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+    for (PinotDataBuffer dataBuffer : indexBuffers.values()) {
+      dataBuffer.close();
+    }
+  }
+
+  @Override
+  public void removeIndex(String columnName, ColumnIndexType indexType) {
+    File indexFile = getFileFor(columnName, indexType);
+    indexFile.delete();
+  }
+
+  @Override
+  public boolean isIndexRemovalSupported() {
+    return true;
+  }
+
+  private PinotDataBuffer getReadBufferFor(IndexKey key)
+      throws IOException {
+    if (indexBuffers.containsKey(key)) {
+      return indexBuffers.get(key);
+    }
+
+    File file = getFileFor(key.name, key.type);
+    if (!file.exists()) {
+      throw new RuntimeException(
+          "Could not find index for column: " + key.name + ", type: " + key.type + ", segment: " + _segmentDirectory
+              .toString());
+    }
+    PinotDataBuffer buffer = mapForReads(file, key.type.toString() + ".reader");
+    indexBuffers.put(key, buffer);
+    return buffer;
+  }
+
+  private PinotDataBuffer getWriteBufferFor(IndexKey key, long sizeBytes)
+      throws IOException {
+    if (indexBuffers.containsKey(key)) {
+      return indexBuffers.get(key);
+    }
+
+    File filename = getFileFor(key.name, key.type);
+    PinotDataBuffer buffer = mapForWrites(filename, sizeBytes, key.type.toString() + ".writer");
+    indexBuffers.put(key, buffer);
+    return buffer;
+  }
+
+  @VisibleForTesting
+  File getFileFor(String column, ColumnIndexType indexType) {
+    String filename;
+    switch (indexType) {
+      case DICTIONARY:
+        filename = _segmentMetadata.getDictionaryFileName(column);
+        break;
+      case FORWARD_INDEX:
+        filename = _segmentMetadata.getForwardIndexFileName(column);
+        break;
+      case INVERTED_INDEX:
+        filename = _segmentMetadata.getBitmapInvertedIndexFileName(column);
+        break;
+      case RANGE_INDEX:
+        filename = _segmentMetadata.getBitmapRangeIndexFileName(column);
+        break;
+      case BLOOM_FILTER:
+        filename = _segmentMetadata.getBloomFilterFileName(column);
+        break;
+      case NULLVALUE_VECTOR:
+        filename = _segmentMetadata.getNullValueVectorFileName(column);
+        break;
+      case TEXT_INDEX:
+        filename = column + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION;
+        break;
+      case FST_INDEX:
+        filename = column + V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
+        break;
+      case JSON_INDEX:
+        filename = column + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION;
+        break;
+      default:
+        throw new UnsupportedOperationException("Unknown index type: " + indexType.toString());
+    }
+    return new File(_segmentDirectory, filename);
+  }
+
+  private PinotDataBuffer mapForWrites(File file, long sizeBytes, String context)
+      throws IOException {
+    Preconditions.checkNotNull(file);
+    Preconditions.checkArgument(sizeBytes >= 0 && sizeBytes < Integer.MAX_VALUE,
+        "File size must be less than 2GB, file: " + file);
+    Preconditions.checkState(!file.exists(), "File: " + file + " already exists");
+    String allocationContext = allocationContext(file, context);
+
+    // Backward-compatible: index file is always big-endian
+    return PinotDataBuffer.mapFile(file, false, 0, sizeBytes, ByteOrder.BIG_ENDIAN, allocationContext);
+  }
+
+  private PinotDataBuffer mapForReads(File file, String context)
+      throws IOException {
+    Preconditions.checkNotNull(file);
+    Preconditions.checkNotNull(context);
+    Preconditions.checkArgument(file.exists(), "File: " + file + " must exist");
+    Preconditions.checkArgument(file.isFile(), "File: " + file + " must be a regular file");
+    String allocationContext = allocationContext(file, context);
+
+    // Backward-compatible: index file is always big-endian
+    if (_readMode == ReadMode.heap) {
+      return PinotDataBuffer.loadFile(file, 0, file.length(), ByteOrder.BIG_ENDIAN, allocationContext);
+    } else {
+      return PinotDataBuffer.mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, allocationContext);
+    }
+  }
+}

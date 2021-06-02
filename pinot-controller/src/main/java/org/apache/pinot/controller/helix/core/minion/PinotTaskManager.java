@@ -491,16 +491,16 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   }
 
   public synchronized void reportMetrics(String taskType) {
-    Map<String, TaskState> taskStates = _helixTaskResourceManager.getTaskStates(taskType);
-    Map<TaskState, Integer> taskStateToCountMap = new HashMap<>();
-    for (TaskState taskState : taskStates.values()) {
-      taskStateToCountMap.merge(taskState, 1, Integer::sum);
+    // Reset all counters to 0
+    for (Map.Entry<TaskState, Integer> entry : _taskStateToCountMap.entrySet()) {
+      entry.setValue(0);
     }
-    // Reset all the status to 0
-    for (TaskState taskState : _taskStateToCountMap.keySet()) {
-      _taskStateToCountMap.put(taskState, 0);
+    if (_helixTaskResourceManager.getTaskTypes().contains(taskType)) {
+      Map<String, TaskState> taskStates = _helixTaskResourceManager.getTaskStates(taskType);
+      for (TaskState taskState : taskStates.values()) {
+        _taskStateToCountMap.merge(taskState, 1, Integer::sum);
+      }
     }
-    _taskStateToCountMap.putAll(taskStateToCountMap);
     for (Map.Entry<TaskState, Integer> taskStateEntry : _taskStateToCountMap.entrySet()) {
       _controllerMetrics
           .setValueOfTableGauge(String.format("%s.%s", taskType, taskStateEntry.getKey()), ControllerGauge.TASK_STATUS,

@@ -21,10 +21,13 @@ package org.apache.pinot.spi.data;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.Serializable;
+import java.sql.Timestamp;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.TimestampUtils;
 
 
 /**
@@ -42,22 +45,22 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   private static final int DEFAULT_MAX_LENGTH = 512;
 
-  // TODO: revisit to see if we allow 0-length byte array
-  private static final byte[] NULL_BYTE_ARRAY_VALUE = new byte[0];
-
   public static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_INT = Integer.MIN_VALUE;
   public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_LONG = Long.MIN_VALUE;
   public static final Float DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT = Float.NEGATIVE_INFINITY;
   public static final Double DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE = Double.NEGATIVE_INFINITY;
+  public static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_BOOLEAN = 0;
+  public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP = 0L;
   public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_STRING = "null";
-  public static final byte[] DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES = NULL_BYTE_ARRAY_VALUE;
+  public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_JSON = "null";
+  public static final byte[] DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES = new byte[0];
 
   public static final Integer DEFAULT_METRIC_NULL_VALUE_OF_INT = 0;
   public static final Long DEFAULT_METRIC_NULL_VALUE_OF_LONG = 0L;
   public static final Float DEFAULT_METRIC_NULL_VALUE_OF_FLOAT = 0.0F;
   public static final Double DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE = 0.0D;
   public static final String DEFAULT_METRIC_NULL_VALUE_OF_STRING = "null";
-  public static final byte[] DEFAULT_METRIC_NULL_VALUE_OF_BYTES = NULL_BYTE_ARRAY_VALUE;
+  public static final byte[] DEFAULT_METRIC_NULL_VALUE_OF_BYTES = new byte[0];
 
   protected String _name;
   protected DataType _dataType;
@@ -90,7 +93,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public FieldSpec(String name, DataType dataType, boolean isSingleValueField, int maxLength,
       @Nullable Object defaultNullValue) {
     _name = name;
-    _dataType = dataType.getStoredType();
+    _dataType = dataType;
     _isSingleValueField = isSingleValueField;
     _maxLength = maxLength;
     setDefaultNullValue(defaultNullValue);
@@ -113,7 +116,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setDataType(DataType dataType) {
-    _dataType = dataType.getStoredType();
+    _dataType = dataType;
     _defaultNullValue = getDefaultNullValue(getFieldType(), _dataType, _stringDefaultNullValue);
   }
 
@@ -207,8 +210,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             case BYTES:
               return DEFAULT_METRIC_NULL_VALUE_OF_BYTES;
             default:
-              throw new UnsupportedOperationException(
-                  "Unknown default null value for metric field of data type: " + dataType);
+              throw new IllegalStateException("Unsupported metric data type: " + dataType);
           }
         case DIMENSION:
         case TIME:
@@ -222,16 +224,21 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
               return DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT;
             case DOUBLE:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE;
+            case BOOLEAN:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_BOOLEAN;
+            case TIMESTAMP:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP;
             case STRING:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_STRING;
+            case JSON:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_JSON;
             case BYTES:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES;
             default:
-              throw new UnsupportedOperationException(
-                  "Unknown default null value for dimension/time field of data type: " + dataType);
+              throw new IllegalStateException("Unsupported dimension/time data type: " + dataType);
           }
         default:
-          throw new UnsupportedOperationException("Unsupported field type: " + fieldType);
+          throw new IllegalStateException("Unsupported field type: " + fieldType);
       }
     }
   }
@@ -246,6 +253,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
+
   /**
    * Deprecated. Use TableConfig -> IngestionConfig -> TransformConfigs
    */
@@ -276,11 +284,36 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   protected void appendDefaultNullValue(ObjectNode jsonNode) {
     assert _defaultNullValue != null;
+    String key = "defaultNullValue";
     if (!_defaultNullValue.equals(getDefaultNullValue(getFieldType(), _dataType, null))) {
-      if (_defaultNullValue instanceof Number) {
-        jsonNode.set("defaultNullValue", JsonUtils.objectToJsonNode(_defaultNullValue));
-      } else {
-        jsonNode.put("defaultNullValue", getStringValue(_defaultNullValue));
+      switch (_dataType) {
+        case INT:
+          jsonNode.put(key, (Integer) _defaultNullValue);
+          break;
+        case LONG:
+          jsonNode.put(key, (Long) _defaultNullValue);
+          break;
+        case FLOAT:
+          jsonNode.put(key, (Float) _defaultNullValue);
+          break;
+        case DOUBLE:
+          jsonNode.put(key, (Double) _defaultNullValue);
+          break;
+        case BOOLEAN:
+          jsonNode.put(key, (Integer) _defaultNullValue == 1);
+          break;
+        case TIMESTAMP:
+          jsonNode.put(key, new Timestamp((Long) _defaultNullValue).toString());
+          break;
+        case STRING:
+        case JSON:
+          jsonNode.put(key, (String) _defaultNullValue);
+          break;
+        case BYTES:
+          jsonNode.put(key, BytesUtils.toHexString((byte[]) _defaultNullValue));
+          break;
+        default:
+          throw new IllegalStateException("Unsupported data type: " + this);
       }
     }
   }
@@ -306,7 +339,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     return EqualityUtils.isEqual(_name, that._name) && EqualityUtils.isEqual(_dataType, that._dataType) && EqualityUtils
         .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils
         .isEqual(getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils
-        .isEqual(_maxLength, that._maxLength) && EqualityUtils.isEqual(_transformFunction, that._transformFunction);
+        .isEqual(_maxLength, that._maxLength) && EqualityUtils.isEqual(_transformFunction, that._transformFunction)
+        && EqualityUtils.isEqual(_virtualColumnProvider, that._virtualColumnProvider);
   }
 
   @Override
@@ -317,6 +351,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     result = EqualityUtils.hashCodeOf(result, getStringValue(_defaultNullValue));
     result = EqualityUtils.hashCodeOf(result, _maxLength);
     result = EqualityUtils.hashCodeOf(result, _transformFunction);
+    result = EqualityUtils.hashCodeOf(result, _virtualColumnProvider);
     return result;
   }
 
@@ -335,16 +370,48 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   /**
    * The <code>DataType</code> enum is used to demonstrate the data type of a field.
    */
+  @SuppressWarnings("rawtypes")
   public enum DataType {
     // LIST is for complex lists which is different from multi-value column of primitives
     // STRUCT, MAP and LIST are composable to form a COMPLEX field
-    INT, LONG, FLOAT, DOUBLE, BOOLEAN/* Stored as STRING */, STRING, BYTES, STRUCT, MAP, LIST;
+    INT,
+    LONG,
+    FLOAT,
+    DOUBLE,
+    BOOLEAN /* Stored as INT */,
+    TIMESTAMP /* Stored as LONG */,
+    STRING,
+    JSON /* Stored as STRING */,
+    BYTES,
+    STRUCT,
+    MAP,
+    LIST;
 
     /**
      * Returns the data type stored in Pinot.
+     * <p>Pinot internally stores data (physical) in INT, LONG, FLOAT, DOUBLE, STRING, BYTES type, other data types
+     * (logical) will be stored as one of these types.
+     * <p>Stored type should be used when reading the physical stored values from Dictionary, Forward Index etc.
      */
     public DataType getStoredType() {
-      return this == BOOLEAN ? STRING : this;
+      switch (this) {
+        case BOOLEAN:
+          return INT;
+        case TIMESTAMP:
+          return LONG;
+        case JSON:
+          return STRING;
+        default:
+          return this;
+      }
+    }
+
+    /**
+     * Returns {@code true} if the data type is of fixed width (INT, LONG, FLOAT, DOUBLE, BOOLEAN, TIMESTAMP),
+     * {@code false} otherwise.
+     */
+    public boolean isFixedWidth() {
+      return this.ordinal() < STRING.ordinal();
     }
 
     /**
@@ -353,8 +420,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     public int size() {
       switch (this) {
         case INT:
+        case BOOLEAN:
           return Integer.BYTES;
         case LONG:
+        case TIMESTAMP:
           return Long.BYTES;
         case FLOAT:
           return Float.BYTES;
@@ -366,37 +435,72 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
 
     /**
-     * Converts the given string value to the data type.
+     * Returns {@code true} if the data type is numeric (INT, LONG, FLOAT, DOUBLE), {@code false} otherwise.
+     */
+    public boolean isNumeric() {
+      return this == INT || this == LONG || this == FLOAT || this == DOUBLE;
+    }
+
+    /**
+     * Converts the given string value to the data type. Returns byte[] for BYTES.
      */
     public Object convert(String value) {
-      switch (this) {
-        case INT:
-          return Integer.valueOf(value);
-        case LONG:
-          return Long.valueOf(value);
-        case FLOAT:
-          return Float.valueOf(value);
-        case DOUBLE:
-          return Double.valueOf(value);
-        case STRING:
-          return value;
-        case BYTES:
-          return BytesUtils.toBytes(value);
-        default:
-          throw new UnsupportedOperationException("Unsupported data type: " + this);
+      try {
+        switch (this) {
+          case INT:
+            return Integer.valueOf(value);
+          case LONG:
+            return Long.valueOf(value);
+          case FLOAT:
+            return Float.valueOf(value);
+          case DOUBLE:
+            return Double.valueOf(value);
+          case BOOLEAN:
+            return BooleanUtils.toInt(value);
+          case TIMESTAMP:
+            return TimestampUtils.toMillisSinceEpoch(value);
+          case STRING:
+          case JSON:
+            return value;
+          case BYTES:
+            return BytesUtils.toBytes(value);
+          default:
+            throw new IllegalStateException();
+        }
+      } catch (Exception e) {
+        throw new IllegalArgumentException(String.format("Cannot convert value: '%s' to type: %s", value, this));
       }
     }
 
     /**
-     * Check if the data type is for fixed width data (INT, LONG, FLOAT, DOUBLE)
-     * or variable width data (STRING, BYTES)
+     * Converts the given string value to the data type. Returns ByteArray for BYTES.
      */
-    public boolean isFixedWidth() {
-      return this != STRING && this != BYTES;
-    }
-
-    public boolean isNumeric() {
-      return this == INT || this == LONG || this == FLOAT || this == DOUBLE;
+    public Comparable convertInternal(String value) {
+      try {
+        switch (this) {
+          case INT:
+            return Integer.valueOf(value);
+          case LONG:
+            return Long.valueOf(value);
+          case FLOAT:
+            return Float.valueOf(value);
+          case DOUBLE:
+            return Double.valueOf(value);
+          case BOOLEAN:
+            return BooleanUtils.toInt(value);
+          case TIMESTAMP:
+            return TimestampUtils.toMillisSinceEpoch(value);
+          case STRING:
+          case JSON:
+            return value;
+          case BYTES:
+            return BytesUtils.toByteArray(value);
+          default:
+            throw new IllegalStateException();
+        }
+      } catch (Exception e) {
+        throw new IllegalArgumentException(String.format("Cannot convert value: '%s' to type: %s", value, this));
+      }
     }
   }
 

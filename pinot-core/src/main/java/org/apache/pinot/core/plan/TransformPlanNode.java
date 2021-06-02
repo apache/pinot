@@ -21,10 +21,11 @@ package org.apache.pinot.core.plan;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
-import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.core.operator.transform.PassThroughTransformOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.spi.IndexSegment;
 
 
 /**
@@ -33,6 +34,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 public class TransformPlanNode implements PlanNode {
   private final Collection<ExpressionContext> _expressions;
   private final ProjectionPlanNode _projectionPlanNode;
+  private boolean _areAllExpressionsIdentifiers = true;
 
   public TransformPlanNode(IndexSegment indexSegment, QueryContext queryContext,
       Collection<ExpressionContext> expressions, int maxDocsPerCall) {
@@ -40,6 +42,7 @@ public class TransformPlanNode implements PlanNode {
     Set<String> projectionColumns = new HashSet<>();
     for (ExpressionContext expression : expressions) {
       expression.getColumns(projectionColumns);
+      if(expression.getType() != ExpressionContext.Type.IDENTIFIER) _areAllExpressionsIdentifiers = false;
     }
     // NOTE: Skip creating DocIdSetPlanNode when maxDocsPerCall is 0 (for selection query with LIMIT 0).
     DocIdSetPlanNode docIdSetPlanNode =
@@ -49,6 +52,10 @@ public class TransformPlanNode implements PlanNode {
 
   @Override
   public TransformOperator run() {
-    return new TransformOperator(_projectionPlanNode.run(), _expressions);
+    if(!_areAllExpressionsIdentifiers) {
+      return new TransformOperator(_projectionPlanNode.run(), _expressions);
+    } else {
+      return new PassThroughTransformOperator(_projectionPlanNode.run(), _expressions);
+    }
   }
 }

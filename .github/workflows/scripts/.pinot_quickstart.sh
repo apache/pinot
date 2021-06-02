@@ -18,15 +18,32 @@
 # under the License.
 #
 
+
+cleanup () {
+  # Terminate the process and wait for the clean up to be done
+  kill "$1"
+  while true;
+  do
+    kill -0 "$1" && sleep 1 || break
+  done
+
+  # Delete ZK directory
+  rm -rf '/tmp/PinotAdmin/zkData'
+}
+
 # Print environment variables
 printenv
+
+# Check network
+ifconfig
+netstat -i
 
 # Java version
 java -version
 
 # Build
 PASS=0
-for i in $(seq 1 5)
+for i in $(seq 1 2)
 do
   mvn clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true
   if [ $? -eq 0 ]; then
@@ -42,14 +59,80 @@ fi
 DIST_BIN_DIR=`ls -d pinot-distribution/target/apache-pinot-*/apache-pinot-*`
 cd "${DIST_BIN_DIR}"
 
+# Test standalone pinot
+bin/pinot-admin.sh StartZookeeper &
+ZK_PID=$!
+sleep 10
+# Print the JVM settings
+jps -lvm
+
+bin/pinot-admin.sh StartServiceManager -bootstrapConfigPaths conf/pinot-controller.conf conf/pinot-broker.conf conf/pinot-server.conf conf/pinot-minion.conf&
+PINOT_PID=$!
+# Print the JVM settings
+jps -lvm
+
+# Wait for at most 6 minutes for all services up.
+sleep 60
+for i in $(seq 1 150)
+do
+  if [[ `curl localhost:9000/health` = "OK" ]]; then
+    if [[ `curl localhost:8099/health` = "OK" ]]; then
+      if [[ `curl localhost:8097/health` = "OK" ]]; then
+        break
+      fi
+    fi
+  fi
+  sleep 2
+done
+
+# Add Table
+bin/pinot-admin.sh AddTable -tableConfigFile examples/batch/baseballStats/baseballStats_offline_table_config.json -schemaFile examples/batch/baseballStats/baseballStats_schema.json -exec
+if [ $? -ne 0 ]; then
+  echo 'Failed to create table baseballStats.'
+  exit 1
+fi
+
+# Ingest Data
+bin/pinot-admin.sh LaunchDataIngestionJob -jobSpecFile examples/batch/baseballStats/ingestionJobSpec.yaml
+if [ $? -ne 0 ]; then
+  echo 'Failed to ingest data for table baseballStats.'
+  exit 1
+fi
+PASS=0
+
+# Wait for 10 Seconds for table to be set up, then query the total count.
+sleep 10
+for i in $(seq 1 150)
+do
+  QUERY_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from baseballStats limit 1","trace":false}' http://localhost:8099/query/sql`
+  if [ $? -eq 0 ]; then
+    COUNT_STAR_RES=`echo "${QUERY_RES}" | jq '.resultTable.rows[0][0]'`
+    if [[ "${COUNT_STAR_RES}" =~ ^[0-9]+$ ]] && [ "${COUNT_STAR_RES}" -eq 97889 ]; then
+      PASS=1
+      break
+    fi
+  fi
+  sleep 2
+done
+
+cleanup "${PINOT_PID}"
+cleanup "${ZK_PID}"
+if [ "${PASS}" -eq 0 ]; then
+  echo 'Standalone test failed: Cannot get correct result for count star query.'
+  exit 1
+fi
+
 # Test quick-start-batch
 bin/quick-start-batch.sh &
 PID=$!
 
+# Print the JVM settings
+jps -lvm
+
 PASS=0
 
-# Wait for 30 seconds for table to be set up, then at most 5 minutes to reach the desired state
-sleep 30
+# Wait for 1 minute for table to be set up, then at most 5 minutes to reach the desired state
+sleep 60
 for i in $(seq 1 150)
 do
   QUERY_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from baseballStats limit 1","trace":false}' http://localhost:8000/query/sql`
@@ -63,18 +146,6 @@ do
   sleep 2
 done
 
-cleanup () {
-  # Terminate the process and wait for the clean up to be done
-  kill "$1"
-  while true;
-  do
-    kill -0 "$1" && sleep 1 || break
-  done
-
-  # Delete ZK directory
-  rm -rf '/tmp/PinotAdmin/zkData'
-}
-
 cleanup "${PID}"
 if [ "${PASS}" -eq 0 ]; then
   echo 'Batch Quickstart failed: Cannot get correct result for count star query.'
@@ -85,10 +156,13 @@ fi
 bin/quick-start-batch-with-minion.sh &
 PID=$!
 
+# Print the JVM settings
+jps -lvm
+
 PASS=0
 
-# Wait for 30 seconds for table to be set up, then at most 5 minutes to reach the desired state
-sleep 30
+# Wait for 1 minute for table to be set up, then at most 5 minutes to reach the desired state
+sleep 60
 for i in $(seq 1 150)
 do
   QUERY_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from baseballStats limit 1","trace":false}' http://localhost:8000/query/sql`
@@ -115,8 +189,8 @@ PID=$!
 PASS=0
 RES_1=0
 
-# Wait for 30 seconds for table to be set up, then at most 5 minutes to reach the desired state
-sleep 30
+# Wait for 1 minute for table to be set up, then at most 5 minutes to reach the desired state
+sleep 60
 for i in $(seq 1 150)
 do
   QUERY_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from meetupRsvp limit 1","trace":false}' http://localhost:8000/query/sql`
@@ -146,15 +220,17 @@ if [ "${PASS}" -eq 0 ]; then
 fi
 
 # Test quick-start-hybrid
-cd bin
-./quick-start-hybrid.sh &
+bin/quick-start-hybrid.sh &
 PID=$!
+
+# Print the JVM settings
+jps -lvm
 
 PASS=0
 RES_1=0
 
-# Wait for 30 seconds for table to be set up, then at most 5 minutes to reach the desired state
-sleep 30
+# Wait for 1 minute for table to be set up, then at most 5 minutes to reach the desired state
+sleep 60
 for i in $(seq 1 150)
 do
   QUERY_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from airlineStats limit 1","trace":false}' http://localhost:8000/query/sql`

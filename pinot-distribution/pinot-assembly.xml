@@ -55,6 +55,10 @@
       <source>${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-kafka-${kafka.version}/target/pinot-kafka-${kafka.version}-${project.version}-shaded.jar</source>
       <destName>plugins/pinot-stream-ingestion/pinot-kafka-${kafka.version}/pinot-kafka-${kafka.version}-${project.version}-shaded.jar</destName>
     </file>
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-kinesis/target/pinot-kinesis-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-stream-ingestion/pinot-kinesis/pinot-kinesis-${project.version}-shaded.jar</destName>
+    </file>
     <!-- End Include Pinot Stream Ingestion Plugins-->
     <!-- Start Include Pinot Batch Ingestion Plugins-->
     <file>
@@ -88,6 +92,12 @@
       <destName>plugins/pinot-file-system/pinot-s3/pinot-s3-${project.version}-shaded.jar</destName>
     </file>
     <!-- End Include Pinot File System Plugins-->
+    <!-- Start Include Pinot Environment Plugins-->
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-environment/pinot-azure/target/pinot-azure-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-environment/pinot-azure/pinot-azure-${project.version}-shaded.jar</destName>
+    </file>
+    <!-- End Include Pinot Environment Plugins-->
     <!-- Start Include Pinot Input Format Plugins-->
     <file>
       <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-avro/target/pinot-avro-${project.version}-shaded.jar</source>
@@ -134,6 +144,18 @@
       <destName>plugins/pinot-metrics/pinot-yammer/pinot-yammer-${project.version}-shaded.jar</destName>
     </file>
     <!-- End Include Pinot Metrics Plugins-->
+    <!-- Start Include Pinot Segment Writer Plugins-->
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-segment-writer/pinot-segment-writer-file-based/target/pinot-segment-writer-file-based-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-segment-writer/pinot-segment-writer-file-based/pinot-segment-writer-file-based-${project.version}-shaded.jar</destName>
+    </file>
+    <!-- End Include Pinot Segment Writer Plugins-->
+    <!-- Start Include Pinot Segment Uploader Plugins-->
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-segment-uploader/pinot-segment-uploader-default/target/pinot-segment-uploader-default-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-segment-uploader/pinot-segment-uploader-default/pinot-segment-uploader-default-${project.version}-shaded.jar</destName>
+    </file>
+    <!-- End Include Pinot Segment Uploader Plugins-->
     <!-- End Include Pinot Plugins-->
   </files>
   <fileSets>

@@ -20,7 +20,6 @@ package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.pinot.spi.config.BaseJsonConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
@@ -95,7 +94,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   }
 
   /**
-   * @deprecated Use {@code segmentPushFrequency} from {@link IngestionConfig#getBatchIngestionConfig()}
+   * @deprecated Use {@code segmentIngestionFrequency} from {@link IngestionConfig#getBatchIngestionConfig()}
    */
   public String getSegmentPushFrequency() {
     return _segmentPushFrequency;
@@ -106,7 +105,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   }
 
   /**
-   * @deprecated Use {@code segmentPushType} from {@link IngestionConfig#getBatchIngestionConfig()}
+   * @deprecated Use {@code segmentIngestionType} from {@link IngestionConfig#getBatchIngestionConfig()}
    */
   public String getSegmentPushType() {
     return _segmentPushType;

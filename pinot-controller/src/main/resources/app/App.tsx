@@ -19,49 +19,127 @@
 
 import * as React from 'react';
 import * as ReactDOM from 'react-dom';
-import { MuiThemeProvider } from '@material-ui/core';
-import { Switch, Route, HashRouter as Router } from 'react-router-dom';
+import { CircularProgress, createStyles, makeStyles, MuiThemeProvider } from '@material-ui/core';
+import { Switch, Route, HashRouter as Router, Redirect } from 'react-router-dom';
 import theme from './theme';
 import Layout from './components/Layout';
 import RouterData from './router';
 import PinotMethodUtils from './utils/PinotMethodUtils';
 import CustomNotification from './components/CustomNotification';
 import { NotificationContextProvider } from './components/Notification/NotificationContextProvider';
+import app_state from './app_state';
+
+const useStyles = makeStyles(() =>
+  createStyles({
+    loader: {
+      position: 'fixed',
+      left: '50%',
+      top: '30%'
+    },
+  })
+);
 
 const App = () => {
   const [clusterName, setClusterName] = React.useState('');
+  const [loading, setLoading] = React.useState(true);
+  const [isAuthenticated, setIsAuthenticated] = React.useState(null);
+
   const fetchClusterName = async () => {
     const clusterNameResponse = await PinotMethodUtils.getClusterName();
     localStorage.setItem('pinot_ui:clusterName', clusterNameResponse);
     setClusterName(clusterNameResponse);
   };
+
+  const fetchClusterConfig = async () => {
+    const clusterConfig = await PinotMethodUtils.getClusterConfigJSON();
+    app_state.queryConsoleOnlyView = clusterConfig?.queryConsoleOnlyView === 'true';
+    setLoading(false);
+  };
+
+  const getRouterData = () => {
+    if(app_state.queryConsoleOnlyView){
+      return RouterData.filter((routeObj)=>{return routeObj.path === '/query'});
+    }
+    return RouterData;
+  };
+
+  const getAuthInfo = async () => {
+    const authInfoResponse = await PinotMethodUtils.getAuthInfo()
+    // If authInfoResponse has workflow set to anything but BASIC,
+    // it doesn't require authentication.
+    if(authInfoResponse?.workflow !== 'BASIC'){
+      setIsAuthenticated(true);
+    } else {
+      setLoading(false);
+    }
+  }
+
   React.useEffect(()=>{
-    fetchClusterName();
+    getAuthInfo();
   }, []);
+
+  React.useEffect(()=>{
+    if(isAuthenticated){
+      fetchClusterConfig();
+      fetchClusterName();
+    }
+  }, [isAuthenticated]);
+
+  const loginRender = (Component, props) => {
+    return (
+      <div className="p-8">
+        <Component {...props} setIsAuthenticated={setIsAuthenticated}/>
+      </div>
+    )
+  };
+
+  const componentRender = (Component, props) => {
+    return (
+      <div className="p-8">
+        <Layout clusterName={clusterName} {...props}>
+          <Component {...props} />
+        </Layout>
+      </div>
+    )
+  };
+
+  const classes = useStyles();
+
   return (
     <MuiThemeProvider theme={theme}>
       <NotificationContextProvider>
         <CustomNotification />
-        <Router>
-          <Switch>
-            {RouterData.map(({ path, Component }, key) => (
-              <Route
-                exact
-                path={path}
-                key={key}
-                render={props => {
-                  return (
-                    <div className="p-8">
-                      <Layout clusterName={clusterName} {...props}>
-                        <Component {...props} />
-                      </Layout>
-                    </div>
-                  );
-                }}
-              />
-            ))}
-          </Switch>
-        </Router>
+        {
+          loading ?
+            <CircularProgress className={classes.loader} size={80}/>
+          :
+          <Router>
+            <Switch>
+              {getRouterData().map(({ path, Component }, key) => (
+                <Route
+                  exact
+                  path={path}
+                  key={key}
+                  render={props => {
+                    if(path === '/login'){
+                      return loginRender(Component, props);
+                    } else if(isAuthenticated){
+                      // default render
+                      return componentRender(Component, props);
+                    } else {
+                      return (
+                        <Redirect to="/login"/>
+                      );
+                    }
+                  }}
+                />
+              ))}
+              <Route path="*">
+                <Redirect to={app_state.queryConsoleOnlyView ? "/query" : "/"} />
+              </Route>
+            </Switch>
+          </Router>
+        }
       </NotificationContextProvider>
     </MuiThemeProvider>
   );

@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.tools;
 
-import org.apache.pinot.spi.plugin.PluginManager;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import org.apache.pinot.tools.admin.PinotAdministrator;
 
 
 public class BatchQuickstartWithMinion extends Quickstart {
@@ -27,9 +30,16 @@ public class BatchQuickstartWithMinion extends Quickstart {
     return "examples/minions/batch/baseballStats";
   }
 
+  @Override
+  public int getNumMinions() {
+    return 1;
+  }
+
   public static void main(String[] args)
       throws Exception {
-    PluginManager.get().init();
-    new BatchQuickstartWithMinion().execute();
+    List<String> arguments = new ArrayList<>();
+    arguments.addAll(Arrays.asList("QuickStart", "-type", "BATCH-MINION"));
+    arguments.addAll(Arrays.asList(args));
+    PinotAdministrator.main(arguments.toArray(new String[arguments.size()]));
   }
 }

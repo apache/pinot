@@ -25,7 +25,7 @@ import java.io.FileReader;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.io.IOUtils;
-import org.apache.pinot.core.io.writer.impl.FixedBitMVForwardIndexWriter;
+import org.apache.pinot.segment.local.io.writer.impl.FixedBitMVForwardIndexWriter;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 

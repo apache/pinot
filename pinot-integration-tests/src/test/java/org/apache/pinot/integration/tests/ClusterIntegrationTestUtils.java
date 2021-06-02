@@ -63,18 +63,18 @@ import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.SelectionSort;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.requesthandler.PinotQueryParserFactory;
-import org.apache.pinot.core.requesthandler.PinotQueryRequest;
-import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
-import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
+import org.apache.pinot.pql.parsers.PinotQuery2BrokerRequestConverter;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
@@ -404,7 +404,6 @@ public class ClusterIntegrationTestUtils {
     }
   }
 
-
   /**
    * Push random generated
    *
@@ -536,9 +535,31 @@ public class ClusterIntegrationTestUtils {
       org.apache.pinot.client.Connection pinotConnection, @Nullable List<String> sqlQueries,
       @Nullable Connection h2Connection)
       throws Exception {
+    testPqlQuery(pinotQuery, brokerUrl, pinotConnection, sqlQueries, h2Connection, null);
+  }
+
+  /**
+   * Run equivalent Pinot and H2 query and compare the results.
+   * <p>LIMITATIONS:
+   * <ul>
+   *   <li>Skip comparison for selection and aggregation group-by when H2 results are too large to exhaust.</li>
+   *   <li>Do not examine the order of result records.</li>
+   * </ul>
+   *
+   * @param pinotQuery Pinot query
+   * @param brokerUrl Pinot broker URL
+   * @param pinotConnection Pinot connection
+   * @param sqlQueries H2 SQL queries
+   * @param h2Connection H2 connection
+   * @param headers headers
+   * @throws Exception
+   */
+  public static void testPqlQuery(String pinotQuery, String brokerUrl,
+      org.apache.pinot.client.Connection pinotConnection, @Nullable List<String> sqlQueries,
+      @Nullable Connection h2Connection, @Nullable Map<String, String> headers)
+      throws Exception {
     // Use broker response for metadata check, connection response for value check
-    PinotQueryRequest pinotBrokerQueryRequest = new PinotQueryRequest(CommonConstants.Broker.Request.PQL, pinotQuery);
-    JsonNode pinotResponse = ClusterTest.postQuery(pinotBrokerQueryRequest, brokerUrl);
+    JsonNode pinotResponse = ClusterTest.postQuery(pinotQuery, brokerUrl, headers);
     Request pinotClientRequest = new Request(CommonConstants.Broker.Request.PQL, pinotQuery);
     ResultSetGroup pinotResultSetGroup = pinotConnection.execute(pinotClientRequest);
 
@@ -757,12 +778,30 @@ public class ClusterIntegrationTestUtils {
   static void testSqlQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
       @Nullable List<String> sqlQueries, @Nullable Connection h2Connection)
       throws Exception {
+    testSqlQuery(pinotQuery, brokerUrl, pinotConnection, sqlQueries, h2Connection, null);
+  }
+
+  /**
+   * Run equivalent Pinot SQL and H2 query and compare the results.
+   *
+   * @param pinotQuery Pinot sql query
+   * @param brokerUrl Pinot broker URL
+   * @param pinotConnection Pinot connection
+   * @param sqlQueries H2 SQL query
+   * @param h2Connection H2 connection
+   * @param headers headers
+   * @throws Exception
+   */
+  static void testSqlQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
+      @Nullable List<String> sqlQueries, @Nullable Connection h2Connection, @Nullable Map<String, String> headers)
+      throws Exception {
     if (pinotQuery == null || sqlQueries == null) {
       return;
     }
 
+    // TODO: Use PinotQuery instead of BrokerRequest here
     BrokerRequest brokerRequest =
-        PinotQueryParserFactory.get(CommonConstants.Broker.Request.SQL).compileToBrokerRequest(pinotQuery);
+        new PinotQuery2BrokerRequestConverter().convert(CalciteSqlParser.compileToPinotQuery(pinotQuery));
 
     List<String> orderByColumns = new ArrayList<>();
     if (isSelectionQuery(brokerRequest) && brokerRequest.getOrderBy() != null
@@ -771,7 +810,7 @@ public class ClusterIntegrationTestUtils {
     }
 
     // broker response
-    JsonNode pinotResponse = ClusterTest.postSqlQuery(pinotQuery, brokerUrl);
+    JsonNode pinotResponse = ClusterTest.postSqlQuery(pinotQuery, brokerUrl, headers);
     if (pinotResponse.get("exceptions").size() > 0) {
       throw new RuntimeException("Got Exceptions from Query Response: " + pinotResponse);
     }

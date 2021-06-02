@@ -19,12 +19,12 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.Map;
-import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -63,8 +63,8 @@ public class DistinctCountBitmapMVAggregationFunction extends DistinctCountBitma
 
     // For non-dictionary-encoded expression, store hash code of the values into the bitmap
     RoaringBitmap valueBitmap = getValueBitmap(aggregationResultHolder);
-    DataType valueType = blockValSet.getValueType();
-    switch (valueType) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    switch (storedType) {
       case INT:
         int[][] intValues = blockValSet.getIntValuesMV();
         for (int i = 0; i < length; i++) {
@@ -104,7 +104,7 @@ public class DistinctCountBitmapMVAggregationFunction extends DistinctCountBitma
         break;
       default:
         throw new IllegalStateException(
-            "Illegal data type for DISTINCT_COUNT_BITMAP_MV aggregation function: " + valueType);
+            "Illegal data type for DISTINCT_COUNT_BITMAP_MV aggregation function: " + storedType);
     }
   }
 
@@ -124,8 +124,8 @@ public class DistinctCountBitmapMVAggregationFunction extends DistinctCountBitma
     }
 
     // For non-dictionary-encoded expression, store hash code of the values into the bitmap
-    DataType valueType = blockValSet.getValueType();
-    switch (valueType) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    switch (storedType) {
       case INT:
         int[][] intValues = blockValSet.getIntValuesMV();
         for (int i = 0; i < length; i++) {
@@ -170,7 +170,7 @@ public class DistinctCountBitmapMVAggregationFunction extends DistinctCountBitma
         break;
       default:
         throw new IllegalStateException(
-            "Illegal data type for DISTINCT_COUNT_BITMAP_MV aggregation function: " + valueType);
+            "Illegal data type for DISTINCT_COUNT_BITMAP_MV aggregation function: " + storedType);
     }
   }
 
@@ -192,8 +192,8 @@ public class DistinctCountBitmapMVAggregationFunction extends DistinctCountBitma
     }
 
     // For non-dictionary-encoded expression, store hash code of the values into the bitmap
-    DataType valueType = blockValSet.getValueType();
-    switch (valueType) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    switch (storedType) {
       case INT:
         int[][] intValues = blockValSet.getIntValuesMV();
         for (int i = 0; i < length; i++) {
@@ -248,7 +248,7 @@ public class DistinctCountBitmapMVAggregationFunction extends DistinctCountBitma
         break;
       default:
         throw new IllegalStateException(
-            "Illegal data type for DISTINCT_COUNT_BITMAP_MV aggregation function: " + valueType);
+            "Illegal data type for DISTINCT_COUNT_BITMAP_MV aggregation function: " + storedType);
     }
   }
 }

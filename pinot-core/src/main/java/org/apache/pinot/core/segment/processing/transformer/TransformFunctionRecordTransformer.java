@@ -20,8 +20,8 @@ package org.apache.pinot.core.segment.processing.transformer;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.core.data.function.FunctionEvaluator;
-import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
+import org.apache.pinot.segment.local.function.FunctionEvaluator;
+import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 

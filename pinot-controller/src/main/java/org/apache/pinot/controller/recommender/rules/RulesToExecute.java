@@ -22,12 +22,15 @@ import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 import org.apache.pinot.controller.recommender.io.ConfigManager;
 import org.apache.pinot.controller.recommender.io.InputManager;
+import org.apache.pinot.controller.recommender.rules.impl.AggregateMetricsRule;
 import org.apache.pinot.controller.recommender.rules.impl.BloomFilterRule;
 import org.apache.pinot.controller.recommender.rules.impl.FlagQueryRule;
 import org.apache.pinot.controller.recommender.rules.impl.InvertedSortedIndexJointRule;
 import org.apache.pinot.controller.recommender.rules.impl.KafkaPartitionRule;
 import org.apache.pinot.controller.recommender.rules.impl.NoDictionaryOnHeapDictionaryJointRule;
 import org.apache.pinot.controller.recommender.rules.impl.PinotTablePartitionRule;
+import org.apache.pinot.controller.recommender.rules.impl.RealtimeProvisioningRule;
+import org.apache.pinot.controller.recommender.rules.impl.SegmentSizeRule;
 import org.apache.pinot.controller.recommender.rules.impl.VariedLengthDictionaryRule;
 
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.RulesToExecute.*;
@@ -43,6 +46,8 @@ public class RulesToExecute {
   public static class RuleFactory {
     public static AbstractRule getRule(Rule rule, InputManager inputManager, ConfigManager outputManager) {
       switch (rule) {
+        case SegmentSizeRule:
+          return new SegmentSizeRule(inputManager, outputManager);
         case FlagQueryRule:
           return new FlagQueryRule(inputManager, outputManager);
         case InvertedSortedIndexJointRule:
@@ -57,12 +62,17 @@ public class RulesToExecute {
           return new NoDictionaryOnHeapDictionaryJointRule(inputManager, outputManager);
         case VariedLengthDictionaryRule:
           return new VariedLengthDictionaryRule(inputManager, outputManager);
+        case AggregateMetricsRule:
+          return new AggregateMetricsRule(inputManager, outputManager);
+        case RealtimeProvisioningRule:
+          return new RealtimeProvisioningRule(inputManager, outputManager);
         default:
           return null;
       }
     }
   }
   // All rules will execute by default unless explicitly specifying "recommendInvertedSortedIndexJoint" = "false"
+  boolean _recommendSegmentSize = DEFAULT_RECOMMEND_SEGMENT_SIZE;
   boolean _recommendKafkaPartition = DEFAULT_RECOMMEND_KAFKA_PARTITION;
   boolean _recommendPinotTablePartition = DEFAULT_RECOMMEND_PINOT_TABLE_PARTITION;
   boolean _recommendInvertedSortedIndexJoint = DEFAULT_RECOMMEND_INVERTED_SORTED_INDEX_JOINT;
@@ -70,6 +80,8 @@ public class RulesToExecute {
   boolean _recommendNoDictionaryOnHeapDictionaryJoint = DEFAULT_RECOMMEND_NO_DICTIONARY_ONHEAP_DICTIONARY_JOINT;
   boolean _recommendVariedLengthDictionary = DEFAULT_RECOMMEND_VARIED_LENGTH_DICTIONARY;
   boolean _recommendFlagQuery = DEFAULT_RECOMMEND_FLAG_QUERY;
+  boolean _recommendAggregateMetrics = DEFAULT_RECOMMEND_AGGREGATE_METRICS;
+  boolean _recommendRealtimeProvisioning = DEFAULT_RECOMMEND_REALTIME_PROVISIONING;
 
   @JsonSetter(nulls = Nulls.SKIP)
   public void setRecommendVariedLengthDictionary(boolean recommendVariedLengthDictionary) {
@@ -106,6 +118,21 @@ public class RulesToExecute {
     _recommendBloomFilter = recommendBloomFilter;
   }
 
+  @JsonSetter(nulls = Nulls.SKIP)
+  public void setRecommendAggregateMetrics(boolean aggregateMetrics) {
+    _recommendAggregateMetrics = aggregateMetrics;
+  }
+
+  @JsonSetter(nulls = Nulls.SKIP)
+  public void setRecommendRealtimeProvisioning(boolean recommendRealtimeProvisioning) {
+    _recommendRealtimeProvisioning = recommendRealtimeProvisioning;
+  }
+
+  @JsonSetter(nulls = Nulls.SKIP)
+  public void setRecommendSegmentSize(boolean recommendSegmentSize) {
+    _recommendSegmentSize = recommendSegmentSize;
+  }
+
   public boolean isRecommendVariedLengthDictionary() {
     return _recommendVariedLengthDictionary;
   }
@@ -134,15 +161,30 @@ public class RulesToExecute {
     return _recommendBloomFilter;
   }
 
+  public boolean isRecommendAggregateMetrics() {
+    return _recommendAggregateMetrics;
+  }
+
+  public boolean isRecommendRealtimeProvisioning() {
+    return _recommendRealtimeProvisioning;
+  }
+
+  public boolean isRecommendSegmentSize() {
+    return _recommendSegmentSize;
+  }
+
   // Be careful with the sequence, each rule can execute individually
   // but a rule may depend on its previous rule when they both fired
   public enum Rule {
-    FlagQueryRule, 
+    SegmentSizeRule, // This rule must be the first rule. It provides segment count, segment size, numRows in segments which are used in other rules. It also adjust cardinality per segment for different columns.
+    FlagQueryRule,
     KafkaPartitionRule,
     InvertedSortedIndexJointRule,
     NoDictionaryOnHeapDictionaryJointRule, // NoDictionaryOnHeapDictionaryJointRule must go after InvertedSortedIndexJointRule since we do not recommend NoDictionary on cols with indices
     VariedLengthDictionaryRule, // VariedLengthDictionaryRule must go after NoDictionaryOnHeapDictionaryJointRule  since we do not recommend dictionary on NoDictionary cols
     PinotTablePartitionRule, // PinotTablePartitionRule must go after KafkaPartitionRule to recommend realtime partitions, after NoDictionaryOnHeapDictionaryJointRule to correctly calculate record size
     BloomFilterRule,
+    AggregateMetricsRule,
+    RealtimeProvisioningRule // this rule must be the last one because it needs the output of other rules as its input
   }
 }

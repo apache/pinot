@@ -34,4 +34,3 @@ public class AllowAllAccessFactory implements AccessControlFactory {
     return ALLOW_ALL_ACCESS;
   }
 }
-

@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -64,70 +65,71 @@ public class DateTimeFunctionsTest {
     GenericRow row0_0 = new GenericRow();
     row0_0.putValue("timestamp", 1578685189000L);
     // round to 15 minutes, but keep in milliseconds: Fri Jan 10 2020 19:39:49 becomes Fri Jan 10 2020 19:30:00
-    inputs.add(new Object[]{"round(timestamp, 900000)", Lists.newArrayList("timestamp"), row0_0, 1578684600000L});
+    inputs.add(new Object[]{"round(\"timestamp\", 900000)", Lists.newArrayList("timestamp"), row0_0, 1578684600000L});
 
     // toEpochSeconds (with type conversion)
     GenericRow row1_0 = new GenericRow();
     row1_0.putValue("timestamp", 1578685189000.0);
-    inputs.add(new Object[]{"toEpochSeconds(timestamp)", Lists.newArrayList("timestamp"), row1_0, 1578685189L});
+    inputs.add(new Object[]{"toEpochSeconds(\"timestamp\")", Lists.newArrayList("timestamp"), row1_0, 1578685189L});
 
     // toEpochSeconds w/ rounding (with type conversion)
     GenericRow row1_1 = new GenericRow();
     row1_1.putValue("timestamp", "1578685189000");
     inputs.add(
-        new Object[]{"toEpochSecondsRounded(timestamp, 10)", Lists.newArrayList("timestamp"), row1_1, 1578685180L});
+        new Object[]{"toEpochSecondsRounded(\"timestamp\", 10)", Lists.newArrayList("timestamp"), row1_1, 1578685180L});
 
     // toEpochSeconds w/ bucketing (with underscore in function name)
     GenericRow row1_2 = new GenericRow();
     row1_2.putValue("timestamp", 1578685189000L);
-    inputs.add(
-        new Object[]{"to_epoch_seconds_bucket(timestamp, 10)", Lists.newArrayList("timestamp"), row1_2, 157868518L});
+    inputs.add(new Object[]{"to_epoch_seconds_bucket(\"timestamp\", 10)", Lists.newArrayList(
+        "timestamp"), row1_2, 157868518L});
 
     // toEpochMinutes
     GenericRow row2_0 = new GenericRow();
     row2_0.putValue("timestamp", 1578685189000L);
-    inputs.add(new Object[]{"toEpochMinutes(timestamp)", Lists.newArrayList("timestamp"), row2_0, 26311419L});
+    inputs.add(new Object[]{"toEpochMinutes(\"timestamp\")", Lists.newArrayList("timestamp"), row2_0, 26311419L});
 
     // toEpochMinutes w/ rounding
     GenericRow row2_1 = new GenericRow();
     row2_1.putValue("timestamp", 1578685189000L);
-    inputs
-        .add(new Object[]{"toEpochMinutesRounded(timestamp, 15)", Lists.newArrayList("timestamp"), row2_1, 26311410L});
+    inputs.add(
+        new Object[]{"toEpochMinutesRounded(\"timestamp\", 15)", Lists.newArrayList("timestamp"), row2_1, 26311410L});
 
     // toEpochMinutes w/ bucketing
     GenericRow row2_2 = new GenericRow();
     row2_2.putValue("timestamp", 1578685189000L);
-    inputs.add(new Object[]{"toEpochMinutesBucket(timestamp, 15)", Lists.newArrayList("timestamp"), row2_2, 1754094L});
+    inputs.add(
+        new Object[]{"toEpochMinutesBucket(\"timestamp\", 15)", Lists.newArrayList("timestamp"), row2_2, 1754094L});
 
     // toEpochHours
     GenericRow row3_0 = new GenericRow();
     row3_0.putValue("timestamp", 1578685189000L);
-    inputs.add(new Object[]{"toEpochHours(timestamp)", Lists.newArrayList("timestamp"), row3_0, 438523L});
+    inputs.add(new Object[]{"toEpochHours(\"timestamp\")", Lists.newArrayList("timestamp"), row3_0, 438523L});
 
     // toEpochHours w/ rounding
     GenericRow row3_1 = new GenericRow();
     row3_1.putValue("timestamp", 1578685189000L);
-    inputs.add(new Object[]{"toEpochHoursRounded(timestamp, 2)", Lists.newArrayList("timestamp"), row3_1, 438522L});
+    inputs.add(new Object[]{"toEpochHoursRounded(\"timestamp\", 2)", Lists.newArrayList("timestamp"), row3_1, 438522L});
 
     // toEpochHours w/ bucketing
     GenericRow row3_2 = new GenericRow();
     row3_2.putValue("timestamp", 1578685189000L);
-    inputs.add(new Object[]{"toEpochHoursBucket(timestamp, 2)", Lists.newArrayList("timestamp"), row3_2, 219261L});
+    inputs.add(new Object[]{"toEpochHoursBucket(\"timestamp\", 2)", Lists.newArrayList("timestamp"), row3_2, 219261L});
 
     // toEpochDays
     GenericRow row4_0 = new GenericRow();
     row4_0.putValue("timestamp", 1578685189000L);
-    inputs.add(new Object[]{"toEpochDays(timestamp)", Lists.newArrayList("timestamp"), row4_0, 18271L});
+    inputs.add(new Object[]{"toEpochDays(\"timestamp\")", Lists.newArrayList("timestamp"), row4_0, 18271L});
 
     // toEpochDays w/ rounding
     GenericRow row4_1 = new GenericRow();
     row4_1.putValue("timestamp", 1578685189000L);
-    inputs.add(new Object[]{"toEpochDaysRounded(timestamp, 7)", Lists.newArrayList("timestamp"), row4_1, 18270L});
+    inputs.add(new Object[]{"toEpochDaysRounded(\"timestamp\", 7)", Lists.newArrayList("timestamp"), row4_1, 18270L});
 
     // toEpochDays w/ bucketing
     GenericRow row4_2 = new GenericRow();
     row4_2.putValue("timestamp", 1578685189000L);
-    inputs.add(new Object[]{"toEpochDaysBucket(timestamp, 7)", Lists.newArrayList("timestamp"), row4_2, 2610L});
+    inputs.add(new Object[]{"toEpochDaysBucket(\"timestamp\", 7)", Lists.newArrayList("timestamp"), row4_2, 2610L});
 
     // fromEpochDays
     GenericRow row5_0 = new GenericRow();
@@ -221,7 +223,7 @@ public class DateTimeFunctionsTest {
     // fromDateTime with timezone
     GenericRow row11_2 = new GenericRow();
     row11_2.putValue("dateTime", "Mon Aug 24 12:36:46 America/Los_Angeles 2009");
-    inputs.add(new Object[]{"fromDateTime(dateTime, \"EEE MMM dd HH:mm:ss ZZZ yyyy\")", Lists.newArrayList(
+    inputs.add(new Object[]{"fromDateTime(dateTime, 'EEE MMM dd HH:mm:ss ZZZ yyyy')", Lists.newArrayList(
         "dateTime"), row11_2, 1251142606000L});
 
     // timezone_hour and timezone_minute

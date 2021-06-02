@@ -22,7 +22,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertFalse;
@@ -84,20 +83,13 @@ public class HavingFilterHandlerTest {
       PostAggregationHandler postAggregationHandler = new PostAggregationHandler(queryContext, dataSchema);
       HavingFilterHandler havingFilterHandler =
           new HavingFilterHandler(queryContext.getHavingFilter(), postAggregationHandler);
-      assertTrue(
-          havingFilterHandler.isMatch(new Object[]{11, 11L, 10.5f, 10.5, "11", new ByteArray(new byte[]{17}), 5}));
-      assertFalse(
-          havingFilterHandler.isMatch(new Object[]{10, 11L, 10.5f, 10.5, "11", new ByteArray(new byte[]{17}), 5}));
-      assertFalse(
-          havingFilterHandler.isMatch(new Object[]{11, 10L, 10.5f, 10.5, "11", new ByteArray(new byte[]{17}), 5}));
-      assertFalse(
-          havingFilterHandler.isMatch(new Object[]{11, 11L, 10.0f, 10.5, "11", new ByteArray(new byte[]{17}), 5}));
-      assertFalse(
-          havingFilterHandler.isMatch(new Object[]{11, 11L, 10.5f, 10.0, "11", new ByteArray(new byte[]{17}), 5}));
-      assertFalse(
-          havingFilterHandler.isMatch(new Object[]{11, 11L, 10.5f, 10.5, "10", new ByteArray(new byte[]{17}), 5}));
-      assertFalse(
-          havingFilterHandler.isMatch(new Object[]{11, 11L, 10.5f, 10.5, "11", new ByteArray(new byte[]{16}), 5}));
+      assertTrue(havingFilterHandler.isMatch(new Object[]{11, 11L, 10.5f, 10.5, "11", new byte[]{17}, 5}));
+      assertFalse(havingFilterHandler.isMatch(new Object[]{10, 11L, 10.5f, 10.5, "11", new byte[]{17}, 5}));
+      assertFalse(havingFilterHandler.isMatch(new Object[]{11, 10L, 10.5f, 10.5, "11", new byte[]{17}, 5}));
+      assertFalse(havingFilterHandler.isMatch(new Object[]{11, 11L, 10.0f, 10.5, "11", new byte[]{17}, 5}));
+      assertFalse(havingFilterHandler.isMatch(new Object[]{11, 11L, 10.5f, 10.0, "11", new byte[]{17}, 5}));
+      assertFalse(havingFilterHandler.isMatch(new Object[]{11, 11L, 10.5f, 10.5, "10", new byte[]{17}, 5}));
+      assertFalse(havingFilterHandler.isMatch(new Object[]{11, 11L, 10.5f, 10.5, "11", new byte[]{16}, 5}));
     }
   }
 }

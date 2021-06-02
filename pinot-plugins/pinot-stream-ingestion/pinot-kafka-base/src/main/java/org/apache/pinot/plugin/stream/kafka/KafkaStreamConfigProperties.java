@@ -66,4 +66,3 @@ public class KafkaStreamConfigProperties {
 
   public static final String KAFKA_CONSUMER_PROP_PREFIX = "kafka.consumer.prop";
 }
-

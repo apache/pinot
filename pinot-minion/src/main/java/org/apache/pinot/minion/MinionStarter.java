@@ -20,8 +20,10 @@ package org.apache.pinot.minion;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.InstanceType;
@@ -30,13 +32,14 @@ import org.apache.helix.manager.zk.ZKHelixManager;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.task.TaskStateModelFactory;
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
+import org.apache.pinot.core.transport.ListenerConfig;
+import org.apache.pinot.core.transport.TlsConfig;
+import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.core.util.TlsUtils;
 import org.apache.pinot.minion.event.EventObserverFactoryRegistry;
 import org.apache.pinot.minion.event.MinionEventObserverFactory;
 import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
@@ -48,8 +51,11 @@ import org.apache.pinot.minion.taskfactory.TaskFactoryRegistry;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,16 +74,34 @@ public class MinionStarter implements ServiceStartable {
   private final HelixManager _helixManager;
   private final TaskExecutorFactoryRegistry _taskExecutorFactoryRegistry;
   private final EventObserverFactoryRegistry _eventObserverFactoryRegistry;
+  private MinionAdminApiApplication _minionAdminApplication;
+  private final List<ListenerConfig> _listenerConfigs;
 
-  public MinionStarter(String helixClusterName, String zkAddress, PinotConfiguration config)
+  @Deprecated
+  public MinionStarter(String clusterName, String zkServers, PinotConfiguration minionConfig)
+      throws Exception {
+    this(applyMinionConfigs(minionConfig, clusterName, zkServers));
+  }
+
+  @Deprecated
+  private static PinotConfiguration applyMinionConfigs(PinotConfiguration minionConfig, String clusterName, String zkServers) {
+    minionConfig.setProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
+    minionConfig.setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkServers);
+    return minionConfig;
+  }
+
+  public MinionStarter(PinotConfiguration config)
       throws Exception {
     _config = config;
-    String host = _config.getProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST,
-        _config.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtil
-            .getHostnameOrAddress() : NetUtil.getHostAddress());
+    String helixClusterName = _config.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
+    String zkAddress = _config.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER);
+    String host = _config.getProperty(CommonConstants.Helix.KEY_OF_MINION_HOST,
+        _config.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils
+            .getHostnameOrAddress() : NetUtils.getHostAddress());
     int port = _config.getProperty(CommonConstants.Helix.KEY_OF_MINION_PORT, CommonConstants.Minion.DEFAULT_HELIX_PORT);
     _instanceId = _config.getProperty(CommonConstants.Helix.Instance.INSTANCE_ID_KEY,
         CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE + host + "_" + port);
+    _listenerConfigs = ListenerConfigUtil.buildMinionAdminConfigs(_config);
     setupHelixSystemProperties();
     _helixManager = new ZKHelixManager(helixClusterName, _instanceId, InstanceType.PARTICIPANT, zkAddress);
     MinionTaskZkMetadataManager minionTaskZkMetadataManager = new MinionTaskZkMetadataManager(_helixManager);
@@ -160,6 +184,17 @@ public class MinionStarter implements ServiceStartable {
     minionMetrics.initializeGlobalMeters();
     minionContext.setMinionMetrics(minionMetrics);
 
+    // Install default SSL context if necessary (even if not force-enabled everywhere)
+    TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_config, CommonConstants.Minion.MINION_TLS_PREFIX);
+    if (StringUtils.isNotBlank(tlsDefaults.getKeyStorePath()) || StringUtils
+        .isNotBlank(tlsDefaults.getTrustStorePath())) {
+      LOGGER.info("Installing default SSL context for any client requests");
+      TlsUtils.installDefaultSSLSocketFactory(tlsDefaults);
+    }
+
+    // initialize authentication
+    minionContext.setTaskAuthToken(_config.getProperty(CommonConstants.Minion.CONFIG_OF_TASK_AUTH_TOKEN));
+
     // Start all components
     LOGGER.info("Initializing PinotFSFactory");
     PinotConfiguration pinotFSConfig = _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
@@ -192,6 +227,10 @@ public class MinionStarter implements ServiceStartable {
     addInstanceTagIfNeeded();
     minionContext.setHelixPropertyStore(_helixManager.getHelixPropertyStore());
 
+    LOGGER.info("Starting minion admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
+    _minionAdminApplication = new MinionAdminApiApplication(_config);
+    _minionAdminApplication.start(_listenerConfigs);
+
     // Initialize health check callback
     LOGGER.info("Initializing health check callback");
     ServiceStatus.setServiceStatusCallback(_instanceId, new ServiceStatus.ServiceStatusCallback() {
@@ -222,6 +261,9 @@ public class MinionStarter implements ServiceStartable {
     } catch (IOException e) {
       LOGGER.warn("Caught exception closing PinotFS classes", e);
     }
+    LOGGER.info("Shutting down admin application");
+    _minionAdminApplication.stop();
+
     LOGGER.info("Stopping Pinot minion: " + _instanceId);
     _helixManager.disconnect();
     LOGGER.info("Deregistering service status handler");
