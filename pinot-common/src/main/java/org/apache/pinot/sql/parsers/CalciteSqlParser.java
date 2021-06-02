@@ -929,7 +929,7 @@ public class CalciteSqlParser {
       case DOT:
         functionName = functionNode.getOperator().getName().toUpperCase();
         if (functionName.equals("ITEM") || functionName.equals("DOT")) {
-          // Calcite parses path expression such as "data[0][1].a.b[0] into a chain of ITEM and/or DOT
+          // Calcite parses path expression such as "data[0][1].a.b[0]" into a chain of ITEM and/or DOT
           // functions. Collapse this chain into an identifier.
           StringBuffer path = new StringBuffer();
           compilePathExpression(functionName, functionNode, path);

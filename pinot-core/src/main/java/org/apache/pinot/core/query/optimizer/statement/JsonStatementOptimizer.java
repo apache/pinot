@@ -203,7 +203,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
    *   Output: AS(JSON_EXTRACT_SCALAR('jsoncolumn', 'x.y.z', 'STRING', 'null'), 'jsoncolumn.x.y.z')
    *
    * @return a Function with "AS" operator that wraps another function.
-   * */
+   */
   private static Function getAliasFunction(String alias, Function function) {
     Function aliasFunction = new Function("AS");
 
@@ -317,9 +317,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
    *  two parts when joined together (name.first) represent a JSON path expression.
    */
   private static String[] getIdentifierParts(Identifier identifier) {
-    String fullName = identifier.getName();
-    String[] parts = fullName.split("\\.");
-    return parts;
+    return identifier.getName().split("\\.");
   }
 
   /**
@@ -387,38 +385,37 @@ public class JsonStatementOptimizer implements StatementOptimizer {
    * delimited by quotes in SQL and everything is delimited by quotes for use in alias.
    * */
   private static String getLiteralSQL(Literal literal, boolean aliasing) {
-    String result = aliasing ? "'" : "";
+    StringBuffer result = new StringBuffer();
+    result.append(aliasing ? "'" : "");
     switch (literal.getSetField()) {
       case BOOL_VALUE:
-        result += String.valueOf(literal.getBinaryValue());
+        result.append(String.valueOf(literal.getBinaryValue()));
+        break;
       case BYTE_VALUE:
-        result +=
-            aliasing ? String.valueOf(literal.getByteValue()) : "'" + String.valueOf(literal.getByteValue()) + "'";
+        result.append(aliasing ? String.valueOf(literal.getByteValue()) : "'" + String.valueOf(literal.getByteValue()) + "'");
         break;
       case SHORT_VALUE:
-        result +=
-            aliasing ? String.valueOf(literal.getShortValue()) : "'" + String.valueOf(literal.getShortValue()) + "'";
+        result.append(aliasing ? String.valueOf(literal.getShortValue()) : "'" + String.valueOf(literal.getShortValue()) + "'");
         break;
       case INT_VALUE:
-        result += String.valueOf(literal.getIntValue());
+        result.append(String.valueOf(literal.getIntValue()));
         break;
       case LONG_VALUE:
-        result += String.valueOf(literal.getLongValue());
+        result.append(String.valueOf(literal.getLongValue()));
         break;
       case DOUBLE_VALUE:
-        result += String.valueOf(literal.getDoubleValue());
+        result.append(String.valueOf(literal.getDoubleValue()));
         break;
       case STRING_VALUE:
-        result += "'" + literal.getStringValue() + "'";
+        result.append("'" + literal.getStringValue() + "'");
         break;
       case BINARY_VALUE:
-        result +=
-            aliasing ? String.valueOf(literal.getBinaryValue()) : "'" + String.valueOf(literal.getBinaryValue()) + "'";
+        result.append(aliasing ? String.valueOf(literal.getBinaryValue()) : "'" + String.valueOf(literal.getBinaryValue()) + "'");
         break;
     }
 
-    result += aliasing ? "'" : "";
-    return result;
+    result.append(aliasing ? "'" : "");
+    return result.toString();
   }
 
   /** List of function that require input to be in a number. */
@@ -435,7 +432,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
     for (AggregationFunctionType agg : aggs) {
       set.add(agg.getName());
     }
-
+    
     return set;
   }
 }
