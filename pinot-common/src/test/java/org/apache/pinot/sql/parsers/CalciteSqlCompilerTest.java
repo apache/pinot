@@ -383,6 +383,10 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(tempBrokerRequest.getQuerySource().getTableName(), "mytable");
     Assert.assertEquals(tempBrokerRequest.getSelections().getSelectionColumns().get(0),
         String.format("'%s'", literal.getFieldValue().toString()));
+
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT count(*) from mytable where bar > ago('PT1H')");
+    literal = pinotQuery.getSelectList().get(0).getLiteral();
+    Assert.assertNull(literal);
   }
 
   @Test
