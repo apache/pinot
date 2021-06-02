@@ -37,6 +37,15 @@ public final class GroupByUtils {
   }
 
   /**
+   * Returns the capacity of the table required by the given query.
+   * NOTE: It returns {@code max(limit * 5, resultLowerLimit)} where resultLowerLimit is configured by the user
+   *      (Default: 5000)
+   */
+  public static int getTableCapacity(int limit, int resultLowerLimit) {
+    return Math.max(limit * 5, resultLowerLimit);
+  }
+
+  /**
    * (For SQL semantic) Returns the capacity of the table required by the given query.
    * <ul>
    *   <li>For GROUP-BY with ORDER-BY or HAVING, returns {@code max(limit * 5, 5000)} to ensure the result accuracy</li>

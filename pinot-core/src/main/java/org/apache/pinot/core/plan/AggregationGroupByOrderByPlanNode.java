@@ -33,6 +33,8 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
+import static org.apache.pinot.core.util.GroupByUtils.getTableCapacity;
+
 
 /**
  * The <code>AggregationGroupByOrderByPlanNode</code> class provides the execution plan for aggregation group-by order-by query on a
@@ -40,11 +42,11 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
  */
 @SuppressWarnings("rawtypes")
 public class AggregationGroupByOrderByPlanNode implements PlanNode {
+  private final int TRIM_OFF = -1;
   private final IndexSegment _indexSegment;
   private final int _maxInitialResultHolderCapacity;
   private final int _numGroupsLimit;
-  private final boolean _enableSegmentGroupTrim;
-  private final int _inSegmentTrimLimit;
+  private final int _trimSize;
   private final AggregationFunction[] _aggregationFunctions;
   private final ExpressionContext[] _groupByExpressions;
   private final TransformPlanNode _transformPlanNode;
@@ -52,18 +54,22 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
   private final QueryContext _queryContext;
 
   public AggregationGroupByOrderByPlanNode(IndexSegment indexSegment, QueryContext queryContext,
-      int maxInitialResultHolderCapacity, int numGroupsLimit, boolean enableSegmentGroupTrim, int inSegmentTrimLimit) {
+      int maxInitialResultHolderCapacity, int numGroupsLimit, boolean enableSegmentGroupTrim, int minSegmentTrimSize) {
     _indexSegment = indexSegment;
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
-    _enableSegmentGroupTrim = enableSegmentGroupTrim;
-    _inSegmentTrimLimit = inSegmentTrimLimit;
     _aggregationFunctions = queryContext.getAggregationFunctions();
     assert _aggregationFunctions != null;
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     assert groupByExpressions != null;
     _groupByExpressions = groupByExpressions.toArray(new ExpressionContext[0]);
     _queryContext = queryContext;
+
+    if (!enableSegmentGroupTrim  || queryContext.getOrderByExpressions() == null) {
+      _trimSize = TRIM_OFF;
+    } else {
+      _trimSize = getTableCapacity(queryContext.getLimit(), minSegmentTrimSize);
+    }
 
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();
     if (starTrees != null && !StarTreeUtils.isStarTreeDisabled(queryContext)) {
@@ -101,13 +107,13 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
     if (_transformPlanNode != null) {
       // Do not use star-tree
       return new AggregationGroupByOrderByOperator(_aggregationFunctions, _groupByExpressions,
-          _maxInitialResultHolderCapacity, _numGroupsLimit, _inSegmentTrimLimit, _transformPlanNode.run(), numTotalDocs,
-          _queryContext, false, _enableSegmentGroupTrim);
+          _maxInitialResultHolderCapacity, _numGroupsLimit, _trimSize, _transformPlanNode.run(), numTotalDocs,
+          _queryContext, false);
     } else {
       // Use star-tree
       return new AggregationGroupByOrderByOperator(_aggregationFunctions, _groupByExpressions,
-          _maxInitialResultHolderCapacity, _numGroupsLimit, _inSegmentTrimLimit, _starTreeTransformPlanNode.run(),
-          numTotalDocs, _queryContext, true, _enableSegmentGroupTrim);
+          _maxInitialResultHolderCapacity, _numGroupsLimit, _trimSize, _starTreeTransformPlanNode.run(),
+          numTotalDocs, _queryContext, true);
     }
   }
 }

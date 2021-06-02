@@ -81,6 +81,15 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
       long expectedNumDocsScanned, long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter,
       long expectedNumTotalDocs, DataSchema expectedDataSchema) {
     expectedResults = expectedResults.subList(0, expectedResults.size() / 2);
+
+    if (query.toUpperCase().contains("LIMIT")) {
+      String[] keyWords = query.split(" ");
+      keyWords[keyWords.length - 1] = String.valueOf(expectedResults.size());
+      query = String.join(" ", keyWords);
+    } else {
+      query += " LIMIT " + expectedResults.size();
+    }
+
     InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2(expectedResults.size(), true);
     BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query, planMaker);
     QueriesTestUtils

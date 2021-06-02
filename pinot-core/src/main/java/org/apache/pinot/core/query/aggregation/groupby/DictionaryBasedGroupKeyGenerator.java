@@ -93,6 +93,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
   private final int _globalGroupIdUpperBound;
   private final RawKeyHolder _rawKeyHolder;
+  private int _keyNum;
 
   public DictionaryBasedGroupKeyGenerator(TransformOperator transformOperator, ExpressionContext[] groupByExpressions,
       int numGroupsLimit, int arrayBasedThreshold) {
@@ -106,6 +107,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     _dictionaries = new Dictionary[_numGroupByExpressions];
     _singleValueDictIds = new int[_numGroupByExpressions][];
     _multiValueDictIds = new int[_numGroupByExpressions][][];
+    _keyNum = 0;
 
     long cardinalityProduct = 1L;
     boolean longOverflow = false;
@@ -206,6 +208,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     return _rawKeyHolder.getStringGroupKeys();
   }
 
+  @Override
+  public int getKeyNum() { return _rawKeyHolder.getKeyNum(); }
+
   private interface RawKeyHolder {
 
     /**
@@ -240,11 +245,18 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
      * Returns an iterator of {@link StringGroupKey}. Use this interface to iterate through all the group keys.
      */
     Iterator<StringGroupKey> getStringGroupKeys();
+
+    /**
+     * Returns current number of unique keys
+     */
+    int getKeyNum();
+
   }
 
   private class ArrayBasedHolder implements RawKeyHolder {
     // TODO: using bitmap might better
     private final boolean[] _flags = new boolean[_globalGroupIdUpperBound];
+    private int _keyNum = 0;
 
     @Override
     public void processSingleValue(int numDocs, int[] outGroupIds) {
@@ -254,6 +266,8 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
           groupId = groupId * _cardinalities[j] + _singleValueDictIds[j][i];
         }
         outGroupIds[i] = groupId;
+        // if the flag is false, then increase the key num
+        _keyNum += _flags[groupId] ? 0:1;
         _flags[groupId] = true;
       }
     }
@@ -262,6 +276,8 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     public void processMultiValue(int numDocs, int[][] outGroupIds) {
       for (int i = 0; i < numDocs; i++) {
         int[] groupIds = getIntRawKeys(i);
+        //TODO: Verify correctness of the following code
+        _keyNum += _flags[groupIds[0]] ? 0:1;
         for (int groupId : groupIds) {
           _flags[groupId] = true;
         }
@@ -330,6 +346,11 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
           throw new UnsupportedOperationException();
         }
       };
+    }
+
+    @Override
+    public int getKeyNum() {
+      return _keyNum;
     }
   }
 
@@ -418,6 +439,11 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
           throw new UnsupportedOperationException();
         }
       };
+    }
+
+    @Override
+    public int getKeyNum() {
+      return _groupIdMap.size();
     }
   }
 
@@ -634,6 +660,10 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         }
       };
     }
+    @Override
+    public int getKeyNum() {
+      return _groupIdMap.size();
+    }
   }
 
   /**
@@ -835,6 +865,11 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
           throw new UnsupportedOperationException();
         }
       };
+    }
+
+    @Override
+    public int getKeyNum() {
+      return _groupIdMap.size();
     }
   }
 

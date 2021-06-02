@@ -335,12 +335,12 @@ public class TableResizerTest {
   public void testInSegmentTrim() {
     TableResizer tableResizer =
         new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "d3 DESC"));
-    PriorityQueue<TableResizer.IntermediateRecord> result =
+    PriorityQueue<IntermediateRecord> result =
         tableResizer.trimInSegmentResults(_groupKeys.listIterator(), _groupByResultHolders, GROUPBY_TRIM_SIZE);
     assertEquals(result.size(), GROUPBY_TRIM_SIZE);
     int i = 5;
     while (!result.isEmpty()) {
-      TableResizer.IntermediateRecord top = result.poll();
+      IntermediateRecord top = result.poll();
       assert top._record != null;
       assertEquals((String) top._record.getValues()[0], "a" + i);
       ++i;
@@ -355,7 +355,7 @@ public class TableResizerTest {
     String[] expect = {"a14", "a12", "a11", "a13", "a10", "a5", "a6", "a7", "a3", "a2"};
     i = 0;
     while (!result.isEmpty()) {
-      TableResizer.IntermediateRecord top = result.poll();
+      IntermediateRecord top = result.poll();
       assert top._record != null;
       assertEquals((String) top._record.getValues()[0], expect[expect.length - i - 1]);
       ++i;
@@ -369,38 +369,10 @@ public class TableResizerTest {
     // Sum = 10 and count = j + 1. AVG(a14) = 10 / (14 + 1) = 10/15 which is the smallest
     i = 5;
     while (!result.isEmpty()) {
-      TableResizer.IntermediateRecord top = result.poll();
+      IntermediateRecord top = result.poll();
       assert top._record != null;
       assertEquals((String) top._record.getValues()[0], "a" + i);
       ++i;
-    }
-  }
-
-  /**
-   * Tests in-segment build result. Keep all results without comparison.
-   */
-  @Test
-  public void testInSegmentBuild() {
-    TableResizer tableResizer =
-        new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "d3 DESC"));
-    List<TableResizer.IntermediateRecord> result =
-        tableResizer.buildInSegmentResults(_groupKeys.listIterator(), _groupByResultHolders, RESULT_SIZE);
-    assertEquals(result.size(), RESULT_SIZE);
-    for (int i = 0; i < result.size(); ++i) {
-      TableResizer.IntermediateRecord top = result.get(i);
-      assert top._record != null;
-      assertEquals((String) top._record.getValues()[0], "a" + i);
-    }
-
-    tableResizer = new TableResizer(DATA_SCHEMA, QueryContextConverterUtils
-        .getQueryContextFromSQL(QUERY_PREFIX + "SUM(m1) DESC, max(m2) DESC, DISTINCTCOUNT(m3) DESC"));
-    result = tableResizer.buildInSegmentResults(_groupKeys.listIterator(), _groupByResultHolders, RESULT_SIZE);
-    assertEquals(result.size(), RESULT_SIZE);
-
-    for (int i = 0; i < result.size(); ++i) {
-      TableResizer.IntermediateRecord top = result.get(i);
-      assert top._record != null;
-      assertEquals((String) top._record.getValues()[0], "a" + i);
     }
   }
 }

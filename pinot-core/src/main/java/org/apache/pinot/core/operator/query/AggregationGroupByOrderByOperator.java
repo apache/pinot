@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.query;
 import java.util.Collection;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
@@ -41,34 +42,34 @@ import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 @SuppressWarnings("rawtypes")
 public class AggregationGroupByOrderByOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "AggregationGroupByOrderByOperator";
+  private static final int TRIM_OFF = -1;
 
   private final AggregationFunction[] _aggregationFunctions;
   private final ExpressionContext[] _groupByExpressions;
   private final int _maxInitialResultHolderCapacity;
   private final int _numGroupsLimit;
-  private final int _inSegmentResultLimit;
+  private final int _trimSize;
   private final TransformOperator _transformOperator;
   private final long _numTotalDocs;
   private final boolean _useStarTree;
-  private final boolean _enableSegmentGroupTrim;
   private final DataSchema _dataSchema;
-  private final TableResizer _tableResizer;
+  private final QueryContext _queryContext;
 
   private int _numDocsScanned = 0;
 
   public AggregationGroupByOrderByOperator(AggregationFunction[] aggregationFunctions,
       ExpressionContext[] groupByExpressions, int maxInitialResultHolderCapacity, int numGroupsLimit,
-      int inSegmentResultLimit, TransformOperator transformOperator, long numTotalDocs, QueryContext queryContext,
-      boolean useStarTree, boolean enableSegmentGroupTrim) {
+      int trimSize, TransformOperator transformOperator, long numTotalDocs, QueryContext queryContext,
+      boolean useStarTree) {
     _aggregationFunctions = aggregationFunctions;
     _groupByExpressions = groupByExpressions;
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
-    _inSegmentResultLimit = inSegmentResultLimit;
+    _trimSize = trimSize;
     _transformOperator = transformOperator;
     _numTotalDocs = numTotalDocs;
     _useStarTree = useStarTree;
-    _enableSegmentGroupTrim = enableSegmentGroupTrim;
+    _queryContext = queryContext;
 
     // NOTE: The indexedTable expects that the the data schema will have group by columns before aggregation columns
     int numGroupByExpressions = groupByExpressions.length;
@@ -94,7 +95,6 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     }
 
     _dataSchema = new DataSchema(columnNames, columnDataTypes);
-    _tableResizer = new TableResizer(_dataSchema, queryContext);
   }
 
   @Override
@@ -116,13 +116,14 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
       groupByExecutor.process(transformBlock);
     }
 
-    if (!_tableResizer.getOrderByStatus()) {
+    // Trim is off or no need to trim
+    if (_trimSize == TRIM_OFF || groupByExecutor.getResultNum() <= _trimSize) {
+      // Build intermediate result block based on aggregation group-by result from the executor
       return new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
     }
-    Collection<TableResizer.IntermediateRecord> intermediate =
-        groupByExecutor.trimGroupByResult(_enableSegmentGroupTrim, _inSegmentResultLimit, _tableResizer);
-    // Build intermediate result block based on aggregation group-by result from the executor
-    return new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), intermediate, _dataSchema);
+    TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
+    Collection<IntermediateRecord> intermediate = groupByExecutor.trimGroupByResult(_trimSize, tableResizer);
+    return new IntermediateResultsBlock(_aggregationFunctions, intermediate, _dataSchema);
   }
 
   @Override

@@ -38,9 +38,9 @@ import org.apache.pinot.core.common.BlockDocIdValueSet;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
+import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.Table;
-import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
@@ -58,7 +58,7 @@ public class IntermediateResultsBlock implements Block {
   private AggregationGroupByResult _aggregationGroupByResult;
   private List<Map<String, Object>> _combinedAggregationGroupByResult;
   private List<ProcessingException> _processingExceptions;
-  private Collection<TableResizer.IntermediateRecord> _intermediateCollection;
+  private Collection<IntermediateRecord> _intermediateRecords;
   private long _numDocsScanned;
   private long _numEntriesScannedInFilter;
   private long _numEntriesScannedPostFilter;
@@ -124,12 +124,10 @@ public class IntermediateResultsBlock implements Block {
    * with a collection of intermediate records.
    */
   public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions,
-      @Nullable AggregationGroupByResult aggregationGroupByResults,
-      @Nullable Collection<TableResizer.IntermediateRecord> intermediateCollection, DataSchema dataSchema) {
+      Collection<IntermediateRecord> intermediateRecords, DataSchema dataSchema) {
     _aggregationFunctions = aggregationFunctions;
-    _aggregationGroupByResult = aggregationGroupByResults;
     _dataSchema = dataSchema;
-    _intermediateCollection = intermediateCollection;
+    _intermediateRecords = intermediateRecords;
   }
 
   public IntermediateResultsBlock(Table table) {
@@ -297,13 +295,11 @@ public class IntermediateResultsBlock implements Block {
   }
 
   /**
-   * Get an iterator for the intermediate record collection. Should only be called if _intermediateCollection is present
+   * Get the collection of intermediate records
    */
-  public Iterator<TableResizer.IntermediateRecord> getIntermediateResultIterator() {
-    if (_intermediateCollection == null) {
-      return null;
-    }
-    return _intermediateCollection.iterator();
+  @Nullable
+  public Collection<IntermediateRecord> getIntermediateResult() {
+    return _intermediateRecords;
   }
 
   public DataTable getDataTable()
