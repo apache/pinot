@@ -20,7 +20,6 @@ package org.apache.pinot.client;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 
 
@@ -28,8 +27,6 @@ import java.util.Properties;
  * Creates connections to Pinot, given various initialization methods.
  */
 public class ConnectionFactory {
-  static PinotClientTransportFactory _transportFactory = new JsonAsyncHttpPinotClientTransportFactory();
-
   private ConnectionFactory() {
   }
 
@@ -40,20 +37,20 @@ public class ConnectionFactory {
    * @return A connection that connects to the brokers in the given Helix cluster
    */
   public static Connection fromZookeeper(String zkUrl) {
-    return fromZookeeper(zkUrl, null);
+    return fromZookeeper(zkUrl, new JsonAsyncHttpPinotClientTransportFactory().buildTransport());
   }
 
   /**
    * Creates a connection to a Pinot cluster, given its Zookeeper URL
    *
    * @param zkUrl The URL to the Zookeeper cluster, must include the cluster name e.g host:port/chroot/pinot-cluster
-   * @param headers Map of key and values of header which need to be used during http call
+   * @param transport pinot transport
    * @return A connection that connects to the brokers in the given Helix cluster
    */
-  public static Connection fromZookeeper(String zkUrl, Map<String, String> headers) {
+  public static Connection fromZookeeper(String zkUrl, PinotClientTransport transport) {
     try {
       DynamicBrokerSelector dynamicBrokerSelector = new DynamicBrokerSelector(zkUrl);
-      return new Connection(dynamicBrokerSelector, _transportFactory.buildTransport(headers));
+      return new Connection(dynamicBrokerSelector, transport);
     } catch (Exception e) {
       throw new PinotClientException(e);
     }
@@ -66,19 +63,18 @@ public class ConnectionFactory {
    * @return A connection that connects to the brokers specified in the properties
    */
   public static Connection fromProperties(Properties properties) {
-    return fromProperties(properties, null);
+    return fromProperties(properties, new JsonAsyncHttpPinotClientTransportFactory().buildTransport());
   }
 
   /**
    * Creates a connection from properties containing the connection parameters.
    *
    * @param properties The properties to use for the connection
-   * @param headers Map of key and values of header which need to be used during http call
+   * @param transport pinot transport
    * @return A connection that connects to the brokers specified in the properties
    */
-  public static Connection fromProperties(Properties properties, Map<String, String> headers) {
-    return new Connection(Arrays.asList(properties.getProperty("brokerList").split(",")),
-        _transportFactory.buildTransport(headers));
+  public static Connection fromProperties(Properties properties, PinotClientTransport transport) {
+    return new Connection(Arrays.asList(properties.getProperty("brokerList").split(",")), transport);
   }
 
   /**
@@ -88,17 +84,17 @@ public class ConnectionFactory {
    * @return A connection to the set of brokers specified
    */
   public static Connection fromHostList(String... brokers) {
-    return fromHostList(Arrays.asList(brokers), null);
+    return fromHostList(Arrays.asList(brokers), new JsonAsyncHttpPinotClientTransportFactory().buildTransport());
   }
 
   /**
    * Creates a connection which sends queries randomly between the specified brokers.
    *
    * @param brokers The list of brokers to send queries to
-   * @param headers Map of key and values of header which need to be used during http call
+   * @param transport pinot transport
    * @return A connection to the set of brokers specified
    */
-  public static Connection fromHostList(List<String> brokers, Map<String, String> headers) {
-    return new Connection(brokers, _transportFactory.buildTransport(headers));
+  public static Connection fromHostList(List<String> brokers, PinotClientTransport transport) {
+    return new Connection(brokers, transport);
   }
 }

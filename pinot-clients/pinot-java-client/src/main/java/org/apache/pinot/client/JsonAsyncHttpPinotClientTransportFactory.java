@@ -18,19 +18,46 @@
  */
 package org.apache.pinot.client;
 
+import java.util.HashMap;
 import java.util.Map;
+import javax.net.ssl.SSLContext;
+import org.apache.pinot.spi.utils.CommonConstants;
+
 
 /**
  * Pinot client transport factory for JSON encoded BrokerResults through HTTP.
  */
-class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTransportFactory {
-  @Override
-  public PinotClientTransport buildTransport() {
-    return new JsonAsyncHttpPinotClientTransport();
-  }
+public class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTransportFactory {
+  Map<String, String> _headers = new HashMap<>();
+  String _scheme = CommonConstants.HTTP_PROTOCOL;
+  SSLContext _sslContext = null;
 
   @Override
-  public PinotClientTransport buildTransport(Map<String, String> headers) {
-    return new JsonAsyncHttpPinotClientTransport(headers);
+  public PinotClientTransport buildTransport() {
+    return new JsonAsyncHttpPinotClientTransport(_sslContext, _headers, _scheme);
+  }
+
+  public Map<String, String> getHeaders() {
+    return _headers;
+  }
+
+  public void setHeaders(Map<String, String> headers) {
+    _headers = headers;
+  }
+
+  public String getScheme() {
+    return _scheme;
+  }
+
+  public void setScheme(String scheme) {
+    _scheme = scheme;
+  }
+
+  public SSLContext getSslContext() {
+    return _sslContext;
+  }
+
+  public void setSslContext(SSLContext sslContext) {
+    _sslContext = sslContext;
   }
 }

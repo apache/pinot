@@ -23,11 +23,15 @@ import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.ning.http.client.AsyncHttpClient;
+import com.ning.http.client.AsyncHttpClientConfig;
 import com.ning.http.client.Response;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import javax.net.ssl.SSLContext;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,18 +39,31 @@ import org.slf4j.LoggerFactory;
 /**
  * JSON encoded Pinot client transport over AsyncHttpClient.
  */
-class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
+public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   private static final Logger LOGGER = LoggerFactory.getLogger(JsonAsyncHttpPinotClientTransport.class);
   private static final ObjectReader OBJECT_READER = new ObjectMapper().reader();
 
-  AsyncHttpClient _httpClient = new AsyncHttpClient();
-  Map<String, String> _headers;
+  AsyncHttpClient _httpClient;
+
+  Map<String, String> _headers = new HashMap<>();
+  String _scheme = CommonConstants.HTTP_PROTOCOL;
+  SSLContext _sslContext = null;
 
   public JsonAsyncHttpPinotClientTransport() {
+    _httpClient = new AsyncHttpClient();
   }
 
-  public JsonAsyncHttpPinotClientTransport(Map<String, String> headers) {
+  public JsonAsyncHttpPinotClientTransport(SSLContext sslContext, Map<String, String> headers, String scheme) {
     _headers = headers;
+    _scheme = scheme;
+    _sslContext = sslContext;
+
+    AsyncHttpClientConfig.Builder builder = new AsyncHttpClientConfig.Builder();
+    if (_sslContext != null) {
+      builder.setSSLContext(_sslContext);
+    }
+
+    _httpClient = new AsyncHttpClient(builder.build());
   }
 
   @Override
@@ -72,10 +89,10 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
 
       final String url;
       if (queryFormat.equalsIgnoreCase("sql")) {
-        url = "http://" + brokerAddress + "/query/sql";
+        url = _scheme + "://" + brokerAddress + "/query/sql";
         json.put("queryOptions", "groupByMode=sql;responseFormat=sql");
       } else {
-        url = "http://" + brokerAddress + "/query";
+        url = _scheme + "://" + brokerAddress + "/query";
       }
 
       AsyncHttpClient.BoundRequestBuilder requestBuilder = _httpClient.preparePost(url);
