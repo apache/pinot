@@ -42,6 +42,7 @@ import org.apache.commons.httpclient.methods.multipart.Part;
 import org.apache.commons.httpclient.methods.multipart.StringPart;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
@@ -158,8 +159,17 @@ public abstract class ControllerTest {
 
     ControllerConf config = new ControllerConf(properties);
 
-    _controllerPort = Integer.valueOf(config.getControllerPort());
-    _controllerBaseApiUrl = "http://localhost:" + _controllerPort;
+    String controllerScheme = "http";
+    if (StringUtils.isNotBlank(config.getControllerVipProtocol())) {
+      controllerScheme = config.getControllerVipProtocol();
+    }
+
+    _controllerPort = DEFAULT_CONTROLLER_PORT;
+    if (StringUtils.isNotBlank(config.getControllerPort())) {
+      _controllerPort = Integer.parseInt(config.getControllerPort());
+    }
+
+    _controllerBaseApiUrl = controllerScheme + "://localhost:" + _controllerPort;
     _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl);
     _controllerDataDir = config.getDataDir();
 
