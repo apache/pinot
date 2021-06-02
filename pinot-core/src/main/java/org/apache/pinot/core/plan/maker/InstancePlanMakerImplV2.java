@@ -51,10 +51,6 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.core.util.GroupByUtils.getTableCapacity;
-
-
-
 /**
  * The <code>InstancePlanMakerImplV2</code> class is the default implementation of {@link PlanMaker}.
  */
@@ -77,7 +73,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   // Used for SQL GROUP BY (server combine)
   private final int _groupByTrimThreshold;
   private final boolean _enableSegmentGroupTrim;
-  private int _minSegmentTrimSize;
+  private final int _minSegmentTrimSize;
 
   @VisibleForTesting
   public InstancePlanMakerImplV2() {
