@@ -382,8 +382,7 @@ public class MutableSegmentImpl implements MutableSegment {
       if (isPartialUpsertEnabled()) {
         // init partial upsert handler with partial upsert config
         _partialUpsertHandler
-            .init(config.getSchema(), config.getGlobalUpsertStrategy(), config.getPartialUpsertStrategy(),
-                config.getCustomUpsertStrategy());
+            .init(config.getSchema(), config.getGlobalUpsertStrategy(), config.getPartialUpsertStrategy());
       }
     } else {
       _partitionUpsertMetadataManager = null;

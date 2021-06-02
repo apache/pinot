@@ -61,7 +61,6 @@ public class RealtimeSegmentConfig {
   private final String _consumerDir;
   private final UpsertConfig.STRATEGY _globalUpsertStrategy;
   private final Map<String, UpsertConfig.STRATEGY> _partialUpsertStrategy;
-  private final Map<String, String> _customUpsertStrategy;
 
   // TODO: Clean up this constructor. Most of these things can be extracted from tableConfig.
   private RealtimeSegmentConfig(String tableNameWithType, String segmentName, String streamName, Schema schema,
@@ -72,8 +71,7 @@ public class RealtimeSegmentConfig {
       RealtimeSegmentStatsHistory statsHistory, String partitionColumn, PartitionFunction partitionFunction,
       int partitionId, boolean aggregateMetrics, boolean nullHandlingEnabled, String consumerDir,
       UpsertConfig.Mode upsertMode, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
-      UpsertConfig.STRATEGY globalUpsertStrategy, Map<String, UpsertConfig.STRATEGY> partialUpsertStrategy,
-      Map<String, String> customUpsertStrategy) {
+      UpsertConfig.STRATEGY globalUpsertStrategy, Map<String, UpsertConfig.STRATEGY> partialUpsertStrategy) {
     _tableNameWithType = tableNameWithType;
     _segmentName = segmentName;
     _streamName = streamName;
@@ -103,7 +101,6 @@ public class RealtimeSegmentConfig {
     _globalUpsertStrategy =
         _upsertMode != UpsertConfig.Mode.PARTIAL ? UpsertConfig.STRATEGY.OVERWRITE : globalUpsertStrategy;
     _partialUpsertStrategy = _upsertMode != UpsertConfig.Mode.PARTIAL ? new HashMap<>() : partialUpsertStrategy;
-    _customUpsertStrategy = _upsertMode != UpsertConfig.Mode.PARTIAL ? new HashMap<>() : customUpsertStrategy;
   }
 
   public String getTableNameWithType() {
@@ -223,10 +220,6 @@ public class RealtimeSegmentConfig {
     return _partialUpsertStrategy;
   }
 
-  public Map<String, String> getCustomUpsertStrategy() {
-    return _customUpsertStrategy;
-  }
-
   public static class Builder {
     private String _tableNameWithType;
     private String _segmentName;
@@ -256,7 +249,6 @@ public class RealtimeSegmentConfig {
     private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
     private UpsertConfig.STRATEGY _globalUpsertStrategy;
     private Map<String, UpsertConfig.STRATEGY> _partialUpsertStrategy;
-    private Map<String, String> _customUpsertStrategy;
 
     public Builder() {
     }
@@ -409,18 +401,13 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
-    public Builder setCustomUpsertStrategy(Map<String, String> customUpsertStrategy) {
-      _customUpsertStrategy = customUpsertStrategy;
-      return this;
-    }
-
     public RealtimeSegmentConfig build() {
       return new RealtimeSegmentConfig(_tableNameWithType, _segmentName, _streamName, _schema, _timeColumnName,
           _capacity, _avgNumMultiValues, _noDictionaryColumns, _varLengthDictionaryColumns, _invertedIndexColumns,
           _textIndexColumns, _fstIndexColumns, _jsonIndexColumns, _h3IndexConfigs, _realtimeSegmentZKMetadata, _offHeap,
           _memoryManager, _statsHistory, _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics,
           _nullHandlingEnabled, _consumerDir, _upsertMode, _partitionUpsertMetadataManager, _globalUpsertStrategy,
-          _partialUpsertStrategy, _customUpsertStrategy);
+          _partialUpsertStrategy);
     }
   }
 }

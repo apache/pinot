@@ -359,11 +359,22 @@ public final class TableConfigUtils {
         "The partial upsert strategies is not correct");
   }
 
+  /**
+   * Validates the partial upsert-related configurations
+   *  - global strategies can only be OVERWRITE/IGNORE.
+   *  - INCREMENT merger should be numeric data types.
+   */
   private static boolean validatePartialUpsertStrategies(Schema schema, UpsertConfig upsertConfig) {
+    UpsertConfig.STRATEGY globalUpsertStrategy = upsertConfig.getGlobalUpsertStrategy();
+
+    if (!new HashSet<>(Arrays.asList(UpsertConfig.STRATEGY.OVERWRITE, UpsertConfig.STRATEGY.IGNORE))
+        .contains(globalUpsertStrategy)) {
+      return false;
+    }
+
     Map<String, UpsertConfig.STRATEGY> partialUpsertStrategies = upsertConfig.getPartialUpsertStrategy();
 
     for (Map.Entry<String, UpsertConfig.STRATEGY> entry : partialUpsertStrategies.entrySet()) {
-
       Set<FieldSpec.DataType> numericsDataType =
           new HashSet<FieldSpec.DataType>(Arrays.asList(INT, LONG, FLOAT, DOUBLE));
 

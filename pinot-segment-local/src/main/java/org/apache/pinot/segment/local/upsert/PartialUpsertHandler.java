@@ -39,10 +39,9 @@ public class PartialUpsertHandler {
    * @param schema of table
    * @param globalUpsertStrategy can be derived into fields to merger map.
    * @param partialUpsertStrategy can be derived into fields to merger map.
-   * @param customMergeStrategy can be derived into fields to merger map.
    */
   public void init(Schema schema, UpsertConfig.STRATEGY globalUpsertStrategy,
-      Map<String, UpsertConfig.STRATEGY> partialUpsertStrategy, Map<String, String> customMergeStrategy) {
+      Map<String, UpsertConfig.STRATEGY> partialUpsertStrategy) {
     _mergers = new HashMap<>();
     _defaultStrategy = globalUpsertStrategy;
 
