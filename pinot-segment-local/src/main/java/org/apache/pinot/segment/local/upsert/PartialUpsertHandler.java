@@ -25,7 +25,6 @@ import org.apache.pinot.segment.local.upsert.merger.IncrementMerger;
 import org.apache.pinot.segment.local.upsert.merger.OverwriteMerger;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMerger;
 import org.apache.pinot.spi.config.table.UpsertConfig;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -36,22 +35,24 @@ public class PartialUpsertHandler {
   /**
    * Initializes the partial upsert merger with upsert config. Different fields can have different merge strategies.
    *
-   * @param schema of table
    * @param globalUpsertStrategy can be derived into fields to merger map.
-   * @param partialUpsertStrategy can be derived into fields to merger map.
+   * @param partialUpsertStrategies can be derived into fields to merger map.
    */
-  public void init(Schema schema, UpsertConfig.STRATEGY globalUpsertStrategy,
-      Map<String, UpsertConfig.STRATEGY> partialUpsertStrategy) {
+  public void init(UpsertConfig.STRATEGY globalUpsertStrategy,
+      Map<String, UpsertConfig.STRATEGY> partialUpsertStrategies) {
     _mergers = new HashMap<>();
     _defaultStrategy = globalUpsertStrategy;
 
-    for (Map.Entry<String, UpsertConfig.STRATEGY> entry : partialUpsertStrategy.entrySet()) {
-      if (entry.getValue() == UpsertConfig.STRATEGY.IGNORE) {
-        _mergers.put(entry.getKey(), new IgnoreMerger(entry.getKey()));
-      } else if (entry.getValue() == UpsertConfig.STRATEGY.INCREMENT) {
-        _mergers.put(entry.getKey(), new IncrementMerger(entry.getKey()));
-      } else if (entry.getValue() == UpsertConfig.STRATEGY.OVERWRITE) {
-        _mergers.put(entry.getKey(), new OverwriteMerger(entry.getKey()));
+    for (String fieldName : partialUpsertStrategies.keySet()) {
+      UpsertConfig.STRATEGY strategy = partialUpsertStrategies.get(fieldName);
+      if (strategy != _defaultStrategy) {
+        if (strategy == UpsertConfig.STRATEGY.IGNORE) {
+          _mergers.put(fieldName, new IgnoreMerger(fieldName));
+        } else if (strategy == UpsertConfig.STRATEGY.INCREMENT) {
+          _mergers.put(fieldName, new IncrementMerger(fieldName));
+        } else if (strategy == UpsertConfig.STRATEGY.OVERWRITE) {
+          _mergers.put(fieldName, new OverwriteMerger(fieldName));
+        }
       }
     }
   }

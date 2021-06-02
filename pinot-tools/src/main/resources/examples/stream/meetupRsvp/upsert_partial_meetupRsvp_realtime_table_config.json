@@ -46,7 +46,7 @@
   "upsertConfig": {
     "mode": "PARTIAL",
     "globalUpsertStrategy": "IGNORE",
-    "partialUpsertStrategy":{
+    "partialUpsertStrategies":{
       "rsvp_count": "INCREMENT",
       "group_name": "OVERWRITE"
     }

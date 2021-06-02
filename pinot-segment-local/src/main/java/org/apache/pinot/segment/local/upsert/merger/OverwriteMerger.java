@@ -32,6 +32,9 @@ public class OverwriteMerger implements PartialUpsertMerger {
    * Keep the value from incoming row for the given field.
    */
   public Object merge(GenericRow previousRecord, GenericRow currentRecord) {
+    if (currentRecord.getValue(_fieldName) == null) {
+      return previousRecord.getValue(_fieldName);
+    }
     return currentRecord.getValue(_fieldName);
   }
 }

@@ -372,7 +372,7 @@ public final class TableConfigUtils {
       return false;
     }
 
-    Map<String, UpsertConfig.STRATEGY> partialUpsertStrategies = upsertConfig.getPartialUpsertStrategy();
+    Map<String, UpsertConfig.STRATEGY> partialUpsertStrategies = upsertConfig.getPartialUpsertStrategies();
 
     for (Map.Entry<String, UpsertConfig.STRATEGY> entry : partialUpsertStrategies.entrySet()) {
       Set<FieldSpec.DataType> numericsDataType =

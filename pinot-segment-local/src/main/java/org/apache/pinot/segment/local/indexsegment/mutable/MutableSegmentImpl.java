@@ -165,7 +165,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final ThreadSafeMutableRoaringBitmap _validDocIds;
   private final ValidDocIndexReader _validDocIndex;
 
-  private final PartialUpsertHandler _partialUpsertHandler = new PartialUpsertHandler();
+  private final PartialUpsertHandler _partialUpsertHandler;
 
   public MutableSegmentImpl(RealtimeSegmentConfig config, @Nullable ServerMetrics serverMetrics) {
     _serverMetrics = serverMetrics;
@@ -379,15 +379,17 @@ public class MutableSegmentImpl implements MutableSegment {
       _partitionUpsertMetadataManager = config.getPartitionUpsertMetadataManager();
       _validDocIds = new ThreadSafeMutableRoaringBitmap();
       _validDocIndex = new ValidDocIndexReaderImpl(_validDocIds);
+      _partialUpsertHandler = new PartialUpsertHandler();
       if (isPartialUpsertEnabled()) {
-        // init partial upsert handler with partial upsert config
+        // only init partial upsert handler for partial mode
         _partialUpsertHandler
-            .init(config.getSchema(), config.getGlobalUpsertStrategy(), config.getPartialUpsertStrategy());
+            .init(config.getGlobalUpsertStrategy(), config.getPartialUpsertStrategies());
       }
     } else {
       _partitionUpsertMetadataManager = null;
       _validDocIds = null;
       _validDocIndex = null;
+      _partialUpsertHandler = null;
     }
   }
 

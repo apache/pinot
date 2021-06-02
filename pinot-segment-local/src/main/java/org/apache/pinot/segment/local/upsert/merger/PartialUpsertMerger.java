@@ -23,7 +23,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 
 public interface PartialUpsertMerger {
   /**
-   * Handle partial upsert merge for given fieldName.
+   * Handle partial upsert merge.
    *
    * @param previousRecord the last derived full record during ingestion.
    * @param currentRecord the new consumed record.
