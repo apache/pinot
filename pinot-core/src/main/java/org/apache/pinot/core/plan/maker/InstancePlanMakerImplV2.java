@@ -51,6 +51,8 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.core.util.GroupByUtils.getTableCapacity;
+
 
 
 /**
