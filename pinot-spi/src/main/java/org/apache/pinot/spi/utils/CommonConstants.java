@@ -334,6 +334,11 @@ public class CommonConstants {
       public static final String CONFIG_OF_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = "upload.request.timeout.ms";
 
       /**
+       * Specify connection scheme to use for controller upload connections. Defaults to "http"
+       */
+      public static final String CONFIG_OF_PROTOCOL = "protocol";
+
+      /**
        * Service token for accessing protected controller APIs.
        * E.g. null (auth disabled), "Basic abcdef..." (basic auth), "Bearer 123def..." (oauth2)
        */
