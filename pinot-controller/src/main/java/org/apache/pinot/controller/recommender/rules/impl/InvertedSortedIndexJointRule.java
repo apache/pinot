@@ -98,8 +98,8 @@ public class InvertedSortedIndexJointRule extends AbstractRule {
 
     LOGGER.debug("perQuerySelectedCandidate: {}", perQuerySelectedCandidate);
 
-    int numDimsIndexApplicable = _input.getNumDimsInvertedSortedApplicable();
-    double[] weights = new double[numDimsIndexApplicable];
+    int numColumnsIndexApplicable = _input.getNumColumnsInvertedSortedApplicable();
+    double[] weights = new double[numColumnsIndexApplicable];
     for (int i = 0; i < perQueryNESI.size(); i++) {
       double savedNESI = perQueryNESI.get(i) - perQuerySelectedCandidate.get(i).getnESIWithIdx();
       // split per query nESI saved equally among the columns used in this query
@@ -111,18 +111,18 @@ public class InvertedSortedIndexJointRule extends AbstractRule {
       }
     }
 
-    List<Pair<String, Double>> dimNameWeightPairRank = new ArrayList<>(numDimsIndexApplicable);
+    List<Pair<String, Double>> colNameWeightPairRank = new ArrayList<>(numColumnsIndexApplicable);
 
-    for (int i = 0; i < numDimsIndexApplicable; i++) {
+    for (int i = 0; i < numColumnsIndexApplicable; i++) {
       if (weights[i] > 0) {
-        dimNameWeightPairRank.add(Pair.of(_input.intToColName(i), weights[i]));
+        colNameWeightPairRank.add(Pair.of(_input.intToColName(i), weights[i]));
       }
     }
 
-    if (!dimNameWeightPairRank.isEmpty()) {
+    if (!colNameWeightPairRank.isEmpty()) {
       if (_input.getOverWrittenConfigs().getIndexConfig().isSortedColumnOverwritten()) {
         // if an overwritten sorted index presents
-        dimNameWeightPairRank.forEach(pair -> {
+        colNameWeightPairRank.forEach(pair -> {
           _output.getIndexConfig().getInvertedIndexColumns()
               .add(pair.getLeft()); // Add recommendations to inverted index set
         });
@@ -135,21 +135,21 @@ public class InvertedSortedIndexJointRule extends AbstractRule {
         // Our study shows that: [Regardless of the situation, a inverted index can be
         // replaced with a sorted index (given no prior sorted index), and the performance
         // boost will be significant, the binary search cost of sorted index is minor]
-        dimNameWeightPairRank.sort((a, b) -> b.getRight().compareTo(a.getRight()));
-        LOGGER.debug("dimWeightsRank: {}", dimNameWeightPairRank);
+        colNameWeightPairRank.sort((a, b) -> b.getRight().compareTo(a.getRight()));
+        LOGGER.debug("colWeightsRank: {}", colNameWeightPairRank);
         Double weightThresholdForTopCandidates =
-            dimNameWeightPairRank.get(0).getRight() * _params.THRESHOLD_RATIO_MIN_NESI_FOR_TOP_CANDIDATES;
-        Optional<Pair<String, Double>> sortedColumn = dimNameWeightPairRank.stream()
+            colNameWeightPairRank.get(0).getRight() * _params.THRESHOLD_RATIO_MIN_NESI_FOR_TOP_CANDIDATES;
+        Optional<Pair<String, Double>> sortedColumn = colNameWeightPairRank.stream()
             .filter(pair -> pair.getRight() >= weightThresholdForTopCandidates) // nESI saved > threshold
             .filter(pair -> _input.isSingleValueColumn(pair.getLeft())) // sorted index on single valued column
             .max(Comparator.comparing(pair -> // pick dimension with highest Cardinality as sorted index
                 _input.getCardinality(pair.getLeft())));
         if (sortedColumn.isPresent()) {
           _output.getIndexConfig().setSortedColumn(sortedColumn.get().getLeft());
-          dimNameWeightPairRank.stream().filter(pair -> pair != sortedColumn.get())
+          colNameWeightPairRank.stream().filter(pair -> pair != sortedColumn.get())
               .forEach(pair -> _output.getIndexConfig().getInvertedIndexColumns().add(pair.getLeft()));
         } else {
-          dimNameWeightPairRank.forEach(pair -> _output.getIndexConfig().getInvertedIndexColumns().add(pair.getLeft()));
+          colNameWeightPairRank.forEach(pair -> _output.getIndexConfig().getInvertedIndexColumns().add(pair.getLeft()));
         }
       }
     }
@@ -161,7 +161,7 @@ public class InvertedSortedIndexJointRule extends AbstractRule {
    * @return the optimal combination of indices and the nESI with such combination
    */
   public PredicateParseResult findOptimalCombination(List<List<PredicateParseResult>> parsedQuery) {
-    int n = _input.getNumDimsInvertedSortedApplicable();
+    int n = _input.getNumColumnsInvertedSortedApplicable();
     int iterationsWithoutGain = 0;
     PredicateParseResult optimalCombinationResult = evaluateCombination(n, 1, parsedQuery);
     LOGGER.debug("findOptimalCombination: currentOptimalCombinationResult: {}", optimalCombinationResult);
