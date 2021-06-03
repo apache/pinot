@@ -88,7 +88,16 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
         + "ORDER BY daysSinceEpoch LIMIT 10";
     SelectionOrderByOperator selectionOrderByOperator = getOperatorForSqlQuery(query);
     IntermediateResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
+    verifySelectionOrderByAgoFunctionResult(resultsBlock);
 
+    query = "SELECT daysSinceEpoch from testTable WHERE fromEpochDays(daysSinceEpoch) > ago('P1D') "
+        + "ORDER BY daysSinceEpoch LIMIT 10";
+    selectionOrderByOperator = getOperatorForSqlQuery(query);
+    resultsBlock = selectionOrderByOperator.nextBlock();
+    verifySelectionOrderByAgoFunctionResult(resultsBlock);
+  }
+
+  private void verifySelectionOrderByAgoFunctionResult(IntermediateResultsBlock resultsBlock) {
     DataSchema selectionDataSchema = resultsBlock.getDataSchema();
     Map<String, Integer> columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
     Assert.assertEquals(selectionDataSchema.size(), 1);
@@ -98,25 +107,6 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
         DataSchema.ColumnDataType.INT);
 
     PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
-    Assert.assertEquals(selectionResult.size(), 10);
-    for (Object[] row : selectionResult) {
-      Assert.assertEquals(row.length, 1);
-      Assert.assertEquals(((Integer) row[columnIndexMap.get("daysSinceEpoch")]).intValue(), 126164076);
-    }
-
-    query = "SELECT daysSinceEpoch from testTable WHERE fromEpochDays(daysSinceEpoch) > ago('P1D') "
-        + "ORDER BY daysSinceEpoch LIMIT 10";
-    selectionOrderByOperator = getOperatorForSqlQuery(query);
-    resultsBlock = selectionOrderByOperator.nextBlock();
-    selectionDataSchema = resultsBlock.getDataSchema();
-    columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
-    Assert.assertEquals(selectionDataSchema.size(), 1);
-    Assert.assertEquals(getVirtualColumns(selectionDataSchema), 0);
-    Assert.assertTrue(columnIndexMap.containsKey("daysSinceEpoch"));
-    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("daysSinceEpoch")),
-        DataSchema.ColumnDataType.INT);
-
-    selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
     for (Object[] row : selectionResult) {
       Assert.assertEquals(row.length, 1);
