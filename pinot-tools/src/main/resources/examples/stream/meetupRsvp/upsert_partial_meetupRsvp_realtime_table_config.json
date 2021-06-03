@@ -14,6 +14,7 @@
   "tenants": {},
   "tableIndexConfig": {
     "loadMode": "MMAP",
+    "nullHandlingEnabled": true,
     "streamConfigs": {
       "streamType": "kafka",
       "stream.kafka.consumer.type": "lowLevel",

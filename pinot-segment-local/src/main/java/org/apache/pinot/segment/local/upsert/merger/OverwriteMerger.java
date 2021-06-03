@@ -18,23 +18,16 @@
  */
 package org.apache.pinot.segment.local.upsert.merger;
 
-import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 public class OverwriteMerger implements PartialUpsertMerger {
-  private final String _fieldName;
 
-  public OverwriteMerger(String fieldName) {
-    _fieldName = fieldName;
-  }
+  public OverwriteMerger() { }
 
   /**
    * Keep the value from incoming row for the given field.
    */
-  public Object merge(GenericRow previousRecord, GenericRow currentRecord) {
-    if (currentRecord.getValue(_fieldName) == null) {
-      return previousRecord.getValue(_fieldName);
-    }
-    return currentRecord.getValue(_fieldName);
+  public Object merge(Object previousValue, Object currentValue) {
+    return currentValue;
   }
 }

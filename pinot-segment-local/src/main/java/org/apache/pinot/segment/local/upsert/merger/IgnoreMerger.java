@@ -18,21 +18,17 @@
  */
 package org.apache.pinot.segment.local.upsert.merger;
 
-import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 public class IgnoreMerger implements PartialUpsertMerger {
 
-  private final String _fieldName;
-
-  public IgnoreMerger(String fieldName) {
-    _fieldName = fieldName;
+  public IgnoreMerger() {
   }
 
   /**
    * Ignore the value from incoming row for the given field.
    */
-  public Object merge(GenericRow previousRecord, GenericRow currentRecord) {
-    return previousRecord.getValue(_fieldName);
+  public Object merge(Object previousValue, Object currentValue) {
+    return previousValue;
   }
 }

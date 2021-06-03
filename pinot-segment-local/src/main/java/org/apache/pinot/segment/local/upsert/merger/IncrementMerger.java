@@ -18,31 +18,17 @@
  */
 package org.apache.pinot.segment.local.upsert.merger;
 
-import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 public class IncrementMerger implements PartialUpsertMerger {
 
-  private final String _fieldName;
-
-  public IncrementMerger(String fieldName) {
-    _fieldName = fieldName;
-  }
+  public IncrementMerger() { }
 
   /**
    * Increment the new value from incoming row to the given field of previous record.
    */
-  public Object merge(GenericRow previousRecord, GenericRow currentRecord) {
-    if (previousRecord.getValue(_fieldName) == null && currentRecord.getValue(_fieldName) == null) {
-      return 0;
-    }
-    if (previousRecord.getValue(_fieldName) == null) {
-      return currentRecord.getValue(_fieldName);
-    }
-    if (currentRecord.getValue(_fieldName) == null) {
-      return previousRecord.getValue(_fieldName);
-    }
-    return addNumbers((Number) previousRecord.getValue(_fieldName), (Number) currentRecord.getValue(_fieldName));
+  public Object merge(Object previousValue, Object currentValue) {
+    return addNumbers((Number) previousValue, (Number) currentValue);
   }
 
   private static Number addNumbers(Number a, Number b) {

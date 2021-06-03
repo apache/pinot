@@ -18,16 +18,15 @@
  */
 package org.apache.pinot.segment.local.upsert.merger;
 
-import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 public interface PartialUpsertMerger {
   /**
    * Handle partial upsert merge.
    *
-   * @param previousRecord the last derived full record during ingestion.
-   * @param currentRecord the new consumed record.
+   * @param previousValue the last derived full record during ingestion.
+   * @param currentValue the new consumed record.
    * @return a new row after merge
    */
-  Object merge(GenericRow previousRecord, GenericRow currentRecord);
+  Object merge(Object previousValue, Object currentValue);
 }

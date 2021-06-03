@@ -109,6 +109,7 @@ public final class TableConfigUtils {
     validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
     validateFieldConfigList(tableConfig.getFieldConfigList(), tableConfig.getIndexingConfig(), schema);
     validateUpsertConfig(tableConfig, schema);
+    validatePartialUpsertStrategies(schema, tableConfig);
     validateTaskConfigs(tableConfig);
   }
 
@@ -354,37 +355,42 @@ public final class TableConfigUtils {
     Preconditions.checkState(
         CollectionUtils.isEmpty(tableConfig.getIndexingConfig().getStarTreeIndexConfigs()) && !tableConfig
             .getIndexingConfig().isEnableDefaultStarTree(), "The upsert table cannot have star-tree index.");
-
-    Preconditions.checkState(validatePartialUpsertStrategies(schema, tableConfig.getUpsertConfig()),
-        "The partial upsert strategies is not correct");
   }
 
   /**
    * Validates the partial upsert-related configurations
    *  - global strategies can only be OVERWRITE/IGNORE.
    *  - INCREMENT merger should be numeric data types.
+   *  - enforce nullValueHandling for partial upsert tables.
    */
-  private static boolean validatePartialUpsertStrategies(Schema schema, UpsertConfig upsertConfig) {
-    UpsertConfig.STRATEGY globalUpsertStrategy = upsertConfig.getGlobalUpsertStrategy();
-
-    if (!new HashSet<>(Arrays.asList(UpsertConfig.STRATEGY.OVERWRITE, UpsertConfig.STRATEGY.IGNORE))
-        .contains(globalUpsertStrategy)) {
-      return false;
+  private static void validatePartialUpsertStrategies(Schema schema, TableConfig tableConfig) {
+    if (tableConfig.getUpsertMode() != UpsertConfig.Mode.PARTIAL) {
+      return;
     }
 
-    Map<String, UpsertConfig.STRATEGY> partialUpsertStrategies = upsertConfig.getPartialUpsertStrategies();
+    UpsertConfig.STRATEGY globalUpsertStrategy = tableConfig.getUpsertConfig().getGlobalUpsertStrategy();
+
+    Preconditions.checkState(
+        !new HashSet<>(Arrays.asList(UpsertConfig.STRATEGY.OVERWRITE, UpsertConfig.STRATEGY.IGNORE))
+            .contains(globalUpsertStrategy),
+        "Global strategies can only be OVERWRITE/IGNORE.");
+
+    Map<String, UpsertConfig.STRATEGY> partialUpsertStrategies = tableConfig.getUpsertConfig().getPartialUpsertStrategies();
 
     for (Map.Entry<String, UpsertConfig.STRATEGY> entry : partialUpsertStrategies.entrySet()) {
       Set<FieldSpec.DataType> numericsDataType =
           new HashSet<FieldSpec.DataType>(Arrays.asList(INT, LONG, FLOAT, DOUBLE));
 
       if (entry.getValue() == UpsertConfig.STRATEGY.INCREMENT) {
-        if (!numericsDataType.contains(schema.getFieldSpecFor(entry.getKey()).getDataType())) {
-          return false;
-        }
+        Preconditions.checkState(
+            !numericsDataType.contains(schema.getFieldSpecFor(entry.getKey()).getDataType()),
+            "INCREMENT merger should be numeric data types.");
       }
     }
-    return true;
+
+    Preconditions.checkState(
+        !tableConfig.getIndexingConfig().isNullHandlingEnabled(),
+        "NullValueHandling is required to be enabled for partial upsert tables.");
   }
 
   /**

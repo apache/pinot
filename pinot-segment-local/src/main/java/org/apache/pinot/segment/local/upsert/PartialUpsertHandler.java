@@ -47,11 +47,11 @@ public class PartialUpsertHandler {
       UpsertConfig.STRATEGY strategy = partialUpsertStrategies.get(fieldName);
       if (strategy != _defaultStrategy) {
         if (strategy == UpsertConfig.STRATEGY.IGNORE) {
-          _mergers.put(fieldName, new IgnoreMerger(fieldName));
+          _mergers.put(fieldName, new IgnoreMerger());
         } else if (strategy == UpsertConfig.STRATEGY.INCREMENT) {
-          _mergers.put(fieldName, new IncrementMerger(fieldName));
+          _mergers.put(fieldName, new IncrementMerger());
         } else if (strategy == UpsertConfig.STRATEGY.OVERWRITE) {
-          _mergers.put(fieldName, new OverwriteMerger(fieldName));
+          _mergers.put(fieldName, new OverwriteMerger());
         }
       }
     }
@@ -66,7 +66,7 @@ public class PartialUpsertHandler {
    */
   public GenericRow merge(GenericRow previousRecord, GenericRow newRecord) {
 
-    // init new row to avoid mergers conflict.
+    // init new row to avoid mergers conflict
     GenericRow row;
     if (_defaultStrategy == UpsertConfig.STRATEGY.IGNORE) {
       row = previousRecord;
@@ -74,10 +74,17 @@ public class PartialUpsertHandler {
       row = newRecord;
     }
 
-    for (Map.Entry<String, PartialUpsertMerger> entry : _mergers.entrySet()) {
-      // object can be null, handle null values in mergers
-      Object newValue = entry.getValue().merge(previousRecord, newRecord);
-      row.putValue(entry.getKey(), newValue);
+    // object can be null, handle null values in mergers
+    for (String fieldName : _mergers.keySet()) {
+      if (newRecord.isNullValue(fieldName)) {
+        row.putDefaultNullValue(fieldName, previousRecord.getValue(fieldName));
+      } else if (previousRecord.isNullValue(fieldName)) {
+        row.putDefaultNullValue(fieldName, newRecord.getValue(fieldName));
+      } else {
+        Object newValue =
+            _mergers.get(fieldName).merge(previousRecord.getValue(fieldName), newRecord.getValue(fieldName));
+        row.putValue(fieldName, newValue);
+      }
     }
     return row;
   }
