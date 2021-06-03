@@ -64,7 +64,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public static final String ENABLE_SEGMENT_GROUP_TRIM = "enable.segment.group.trim";
   public static final boolean DEFAULT_ENABLE_SEGMENT_GROUP_TRIM = false;
   public static final String SIZE_SEGMENT_GROUP_TRIM = "size.segment.group.trim";
-  public static final int DEFAULT_SEGMENT_TRIM_SIZE = 5000;
+  public static final int DEFAULT_SEGMENT_TRIM_SIZE = -1;
   // set as pinot.server.query.executor.groupby.trim.threshold
   public static final String GROUPBY_TRIM_THRESHOLD = "groupby.trim.threshold";
   public static final int DEFAULT_GROUPBY_TRIM_THRESHOLD = 1_000_000;
@@ -126,8 +126,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         queryExecutorConfig.getConfig().getProperty(ENABLE_SEGMENT_GROUP_TRIM, DEFAULT_ENABLE_SEGMENT_GROUP_TRIM);
     _minSegmentTrimSize =
         queryExecutorConfig.getConfig().getProperty(SIZE_SEGMENT_GROUP_TRIM, DEFAULT_SEGMENT_TRIM_SIZE);
-    Preconditions.checkState(0 <= _minSegmentTrimSize,
-        "Invalid configuration: minSegmentTrimSize: %d must be greater or equal to 0: %d",
+    Preconditions.checkState(0 < _minSegmentTrimSize,
+        "Invalid configuration: minSegmentTrimSize: %d must be greater than 0: %d",
         0, _minSegmentTrimSize);
     LOGGER.info(
         "Initializing plan maker with maxInitialResultHolderCapacity: {}, numGroupsLimit: {}, enableSegmentTrim: {}, minSegmentTrimSize: {}",

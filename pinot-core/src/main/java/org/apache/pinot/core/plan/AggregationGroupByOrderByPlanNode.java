@@ -65,10 +65,19 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
     _groupByExpressions = groupByExpressions.toArray(new ExpressionContext[0]);
     _queryContext = queryContext;
 
-    if (!enableSegmentGroupTrim  || queryContext.getOrderByExpressions() == null) {
-      _trimSize = TRIM_OFF;
+    // Only trim if there is OrderBy
+    if (queryContext.getOrderByExpressions() != null) {
+      if (minSegmentTrimSize > 0) {
+        // A positive trim size is given
+        _trimSize = getTableCapacity(queryContext.getLimit(), minSegmentTrimSize);
+      } else if (enableSegmentGroupTrim) {
+        // Enable without a specific trim size, use the default size of 5000.
+        _trimSize = getTableCapacity(queryContext.getLimit());
+      } else {
+        _trimSize = TRIM_OFF;
+      }
     } else {
-      _trimSize = getTableCapacity(queryContext.getLimit(), minSegmentTrimSize);
+      _trimSize = TRIM_OFF;
     }
 
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();
