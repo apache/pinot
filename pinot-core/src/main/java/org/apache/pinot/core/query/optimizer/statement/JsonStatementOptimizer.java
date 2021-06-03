@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.optimizer.statement;
 
+import com.sun.org.apache.xpath.internal.operations.Bool;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -40,6 +41,7 @@ import org.apache.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.Pair;
 
 
 /**
@@ -109,10 +111,13 @@ public class JsonStatementOptimizer implements StatementOptimizer {
     // In SELECT clause, replace JSON path expressions with JSON_EXTRACT_SCALAR function with an alias.
     List<Expression> expressions = query.getSelectList();
     for (Expression expression : expressions) {
-      OptimizeResult result = optimizeJsonIdentifier(expression, schema, false, true);
+      Pair<String, Boolean> result = optimizeJsonIdentifier(expression, schema, false, true);
       if (expression.getType() == ExpressionType.FUNCTION && !expression.getFunctionCall().getOperator().equals("AS")
-          && result.hasJsonPathExpression) {
-        Function aliasFunction = getAliasFunction(result.alias, expression.getFunctionCall());
+          && result.getSecond()) {
+        // Since this is not an AS function (user-specified alias) and the function or its arguments contain json path
+        // expression, set an alias for the expression after replacing json path expression with JSON_EXTRACT_SCALAR
+        // function.
+        Function aliasFunction = getAliasFunction(result.getFirst(), expression.getFunctionCall());
         expression.setFunctionCall(aliasFunction);
       }
     }
@@ -139,22 +144,16 @@ public class JsonStatementOptimizer implements StatementOptimizer {
     }
   }
 
-  private static class OptimizeResult {
-    String alias;
-    boolean hasJsonPathExpression = false;
-
-    public OptimizeResult(String alias, boolean hasJsonPathExpression) {
-      this.alias = alias;
-      this.hasJsonPathExpression = hasJsonPathExpression;
-    }
-  }
-
-  /** Replace an json path expression with an aliased JSON_EXTRACT_SCALAR function. */
-  private static OptimizeResult optimizeJsonIdentifier(Expression expression, Schema schema, boolean hasNumericalOutput,
+  /**
+   * Replace an json path expression with an aliased JSON_EXTRACT_SCALAR function.
+   * @return A {@link Pair} of values where the first value is alias for the input expression and second
+   * value indicates whether json path expression was found (true) or not (false) in the expression.
+   */
+  private static Pair<String, Boolean> optimizeJsonIdentifier(Expression expression, Schema schema, boolean hasNumericalOutput,
       boolean hasColumnAlias) {
     switch (expression.getType()) {
       case LITERAL:
-        return new OptimizeResult(getLiteralSQL(expression.getLiteral(), true), false);
+        return new Pair<>(getLiteralSQL(expression.getLiteral(), true), false);
       case IDENTIFIER: {
         String[] parts = getIdentifierParts(expression.getIdentifier());
         boolean hasJsonPathExpression = false;
@@ -167,7 +166,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
           expression.setFunctionCall(jsonExtractScalarFunction);
           hasJsonPathExpression = true;
         }
-        return new OptimizeResult(alias, hasJsonPathExpression);
+        return new Pair<>(alias, hasJsonPathExpression);
       }
       case FUNCTION: {
         Function function = expression.getFunctionCall();
@@ -179,20 +178,20 @@ public class JsonStatementOptimizer implements StatementOptimizer {
         hasNumericalOutput = numericalFunctions.contains(function.getOperator().toLowerCase(Locale.ROOT));
         for (int i = 0; i < operands.size(); ++i) {
           // recursively check to see if there is a <json-column>.<json-path> identifier in this expression.
-          OptimizeResult operandResult = optimizeJsonIdentifier(operands.get(i), schema, hasNumericalOutput, false);
-          hasJsonPathExpression |= operandResult.hasJsonPathExpression;
+          Pair<String, Boolean> operandResult = optimizeJsonIdentifier(operands.get(i), schema, hasNumericalOutput, false);
+          hasJsonPathExpression |= operandResult.getSecond();
           if (i > 0) {
             alias.append(",");
           }
-          alias.append(operandResult.alias);
+          alias.append(operandResult.getFirst());
         }
         alias.append(")");
 
-        return new OptimizeResult(alias.toString(), hasJsonPathExpression);
+        return new Pair<>(alias.toString(), hasJsonPathExpression);
       }
     }
 
-    return new OptimizeResult("", false);
+    return new Pair<>("", false);
   }
 
   /**
@@ -432,7 +431,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
     for (AggregationFunctionType agg : aggs) {
       set.add(agg.getName());
     }
-    
+
     return set;
   }
 }
