@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.optimizer.statement;
 
-import com.sun.org.apache.xpath.internal.operations.Bool;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashSet;
