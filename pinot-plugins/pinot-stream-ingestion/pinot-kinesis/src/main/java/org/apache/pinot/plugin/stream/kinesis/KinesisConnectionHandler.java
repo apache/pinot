@@ -19,14 +19,19 @@
 package org.apache.pinot.plugin.stream.kinesis;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.http.apache.ApacheSdkHttpService;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.kinesis.KinesisClient;
+import software.amazon.awssdk.services.kinesis.KinesisClientBuilder;
 import software.amazon.awssdk.services.kinesis.model.ListShardsRequest;
 import software.amazon.awssdk.services.kinesis.model.ListShardsResponse;
 import software.amazon.awssdk.services.kinesis.model.Shard;
@@ -41,12 +46,14 @@ public class KinesisConnectionHandler {
   private final String _region;
   private final String _accessKey;
   private final String _secretKey;
+  private final String _endpoint;
 
   public KinesisConnectionHandler(KinesisConfig kinesisConfig) {
     _stream = kinesisConfig.getStreamTopicName();
     _region = kinesisConfig.getAwsRegion();
     _accessKey = kinesisConfig.getAccessKey();
     _secretKey = kinesisConfig.getSecretKey();
+    _endpoint = kinesisConfig.getEndpoint();
     createConnection();
   }
 
@@ -56,6 +63,7 @@ public class KinesisConnectionHandler {
     _region = kinesisConfig.getAwsRegion();
     _accessKey = kinesisConfig.getAccessKey();
     _secretKey = kinesisConfig.getSecretKey();
+    _endpoint = kinesisConfig.getEndpoint();
     _kinesisClient = kinesisClient;
   }
 
@@ -73,17 +81,26 @@ public class KinesisConnectionHandler {
    */
   public void createConnection() {
     if (_kinesisClient == null) {
+      KinesisClientBuilder kinesisClientBuilder;
       if (StringUtils.isNotBlank(_accessKey) && StringUtils.isNotBlank(_secretKey)) {
         AwsBasicCredentials awsBasicCredentials = AwsBasicCredentials.create(_accessKey, _secretKey);
-        _kinesisClient = KinesisClient.builder().region(Region.of(_region))
+        kinesisClientBuilder = KinesisClient.builder().region(Region.of(_region))
             .credentialsProvider(StaticCredentialsProvider.create(awsBasicCredentials))
-            .httpClientBuilder(new ApacheSdkHttpService().createHttpClientBuilder())
-            .build();
+            .httpClientBuilder(new ApacheSdkHttpService().createHttpClientBuilder());
       } else {
-        _kinesisClient =
-            KinesisClient.builder().region(Region.of(_region)).credentialsProvider(DefaultCredentialsProvider.create())
-                .build();
+        kinesisClientBuilder =
+            KinesisClient.builder().region(Region.of(_region)).credentialsProvider(DefaultCredentialsProvider.create());
       }
+
+      if(StringUtils.isNotBlank(_endpoint)){
+        try {
+          kinesisClientBuilder = kinesisClientBuilder.endpointOverride(new URI(_endpoint));
+        } catch (URISyntaxException e){
+          throw new IllegalArgumentException("URI syntax is not correctly specified for endpoint: " + _endpoint, e);
+        }
+      }
+
+      _kinesisClient = kinesisClientBuilder.build();
     }
   }
 

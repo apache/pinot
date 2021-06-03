@@ -1,0 +1,27 @@
+{
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "INT",
+      "singleValueField": true,
+      "name": "Quarter"
+    },
+    {
+      "dataType": "STRING",
+      "singleValueField": true,
+      "name": "Origin"
+    },
+    {
+      "dataType": "INT",
+      "singleValueField": true,
+      "name": "FlightNum"
+    }
+  ],
+  "timeFieldSpec": {
+    "incomingGranularitySpec": {
+      "timeType": "DAYS",
+      "dataType": "INT",
+      "name": "DaysSinceEpoch"
+    }
+  },
+  "schemaName": "airlineStatsMinSchema"
+}
