@@ -470,32 +470,32 @@ public class MutableSegmentImpl implements MutableSegment {
   @Override
   public boolean index(GenericRow row, @Nullable RowMetadata rowMetadata)
       throws IOException {
-    // Update dictionary first
-    updateDictionary(row);
-
-    // If metrics aggregation is enabled and if the dimension values were already seen, this will return existing docId,
-    // else this will return a new docId.
-    int docId = getOrCreateDocId();
 
     boolean canTakeMore;
-    if (docId == _numDocsIndexed) {
-
+    if (!_aggregateMetrics) {
       if (isUpsertEnabled()) {
         PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
         Object timeValue = row.getValue(_timeColumnName);
         Preconditions.checkArgument(timeValue instanceof Comparable, "time column shall be comparable");
         long timestamp = IngestionUtils.extractTimeValue((Comparable) timeValue);
-        row = _partitionUpsertMetadataManager.handleUpsert(row, docId, primaryKey, timestamp, this);
-        updateDictionary(row);
+        row = _partitionUpsertMetadataManager.handleUpsert(row, _numDocsIndexed, primaryKey, timestamp, this);
       }
 
+      updateDictionary(row);
       // New row
       addNewRow(row);
       // Update number of documents indexed at last to make the latest row queryable
       canTakeMore = _numDocsIndexed++ < _capacity;
+
     } else {
       Preconditions.checkArgument(!isUpsertEnabled(), "metrics aggregation cannot be used with upsert");
-      assert _aggregateMetrics;
+      // Update dictionary first
+      updateDictionary(row);
+
+      // If metrics aggregation is enabled and if the dimension values were already seen, this will return existing docId,
+      // else this will return a new docId.
+      int docId = getOrCreateDocId();
+
       aggregateMetrics(row, docId);
       canTakeMore = true;
     }
