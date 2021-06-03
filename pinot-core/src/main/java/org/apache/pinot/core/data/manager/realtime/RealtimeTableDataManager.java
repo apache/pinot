@@ -242,7 +242,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   public boolean isPartialUpsertEnabled() {
-    return _upsertMode != UpsertConfig.Mode.PARTIAL;
+    return _upsertMode == UpsertConfig.Mode.PARTIAL;
   }
 
   /*
