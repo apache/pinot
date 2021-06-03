@@ -3,10 +3,10 @@ function absPath() {
   local relPath=$1
   if [[ ! "$relPath" == /* ]]; then
     #relative path
-    absolutePath=$(
+    relPath=$(
       cd "$relPath"
       pwd
     )
   fi
-  echo "$absolutePath"
+  echo "$relPath"
 }
