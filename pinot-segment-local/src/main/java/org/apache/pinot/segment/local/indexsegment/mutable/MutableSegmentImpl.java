@@ -474,11 +474,8 @@ public class MutableSegmentImpl implements MutableSegment {
     boolean canTakeMore;
     if (!_aggregateMetrics) {
       if (isUpsertEnabled()) {
-        PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
-        Object timeValue = row.getValue(_timeColumnName);
-        Preconditions.checkArgument(timeValue instanceof Comparable, "time column shall be comparable");
-        long timestamp = IngestionUtils.extractTimeValue((Comparable) timeValue);
-        row = _partitionUpsertMetadataManager.handleUpsert(row, _numDocsIndexed, primaryKey, timestamp, this);
+        row = handleUpsert(row, _numDocsIndexed);
+//        row = _partitionUpsertMetadataManager.handleUpsert(row, _numDocsIndexed, primaryKey, timestamp, this);
       }
 
       updateDictionary(row);
@@ -517,14 +514,18 @@ public class MutableSegmentImpl implements MutableSegment {
     return _upsertMode == UpsertConfig.Mode.PARTIAL;
   }
 
-  private void handleUpsert(GenericRow row, int docId) {
+  private GenericRow handleUpsert(GenericRow row, int docId) {
     PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
     Object timeValue = row.getValue(_timeColumnName);
     Preconditions.checkArgument(timeValue instanceof Comparable, "time column shall be comparable");
     long timestamp = IngestionUtils.extractTimeValue((Comparable) timeValue);
-    _partitionUpsertMetadataManager
+
+    // pass in a single value array
+    List<GenericRow> rows = new ArrayList<>();
+    rows.add(row);
+    return _partitionUpsertMetadataManager
         .updateRecord(_segmentName, new PartitionUpsertMetadataManager.RecordInfo(primaryKey, docId, timestamp),
-            _validDocIds);
+            _validDocIds, rows, this).get(0);
   }
 
   private void updateDictionary(GenericRow row) {
