@@ -42,45 +42,17 @@
 RM="/bin/rm"
 logCount=1
 #Declare the number of mandatory args
-margs=2
+cmdName=`baseName $0`
 
 # get usage of the script
 function usage() {
-  command=$1
-  echo "Usage: $command -w <workingDir> -t <testSuiteDir> [-k]"
-}
-
-function help() {
-  usage
+  echo "Usage: $cmdName -w <workingDir> -t <testSuiteDir> [-k]"
   echo -e "MANDATORY:"
   echo -e "  -w, --working-dir                      Working directory where olderCommit and newCommit target files reside."
   echo -e "  -t, --test-suite-dir                   Test suite directory\n"
   echo -e "OPTIONAL:"
   echo -e "  -k, --keep-cluster-on-failure          Keep cluster on test failure"
   echo -e "  -h, --help                             Prints this help\n"
-}
-
-# Ensures that the number of passed args are at least equals
-# to the declared number of mandatory args.
-# It also handles the special case of the -h or --help arg.
-function margs_precheck() {
-  if [ $2 ] && [ $1 -lt $margs ]; then
-    if [ $2 == "--help" ] || [ $2 == "-h" ]; then
-      help
-      exit
-    else
-      usage compCheck
-      exit 1 # error
-    fi
-  fi
-}
-
-# Ensures that all the mandatory args are not empty
-function margs_check() {
-  if [ $# -lt $margs ]; then
-    usage
-    exit 1 # error
-  fi
 }
 
 function waitForZkReady() {
@@ -192,7 +164,7 @@ function stopService() {
   serviceName=$1
   if [ -f "${PID_DIR}/${serviceName}".pid ]; then
     pid=$(cat "${PID_DIR}/${serviceName}".pid)
-    kill -9 $pid
+    kill -9 $pid 1>/dev/null 2>&1
     # TODO Kill without -9 and add a while loop waiting for process to die
     status=0
     while [ $status -ne 1 ]; do
@@ -263,8 +235,6 @@ function absPath() {
 # Main
 #
 
-margs_precheck $# $1
-
 # create subdirectories for given commits
 workingDir=
 testSuiteDir=
@@ -285,8 +255,8 @@ while [ "$1" != "" ]; do
     keepClusterOnFailure="true"
     ;;
   -h | --help)
-    help
-    exit
+    usage
+    exit 0
     ;;
   *)
     echo "illegal option $1"
@@ -297,8 +267,10 @@ while [ "$1" != "" ]; do
   shift
 done
 
-# Pass mandatory args for check
-margs_check $workingDir $testSuiteDir
+if [ -z "$workingDir" -o -z "$testSuiteDir" ]; then
+  usage
+  exit 1
+fi
 
 COMPAT_TESTER_PATH="pinot-integration-tests/target/pinot-integration-tests-pkg/bin/pinot-compat-test-runner.sh"
 

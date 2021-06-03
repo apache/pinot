@@ -21,12 +21,25 @@
 
 # get a temporary directory in case the workingDir is not provided by user
 TMP_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')
+cmdName=`baseName $0`
 
 # get usage of the script
 function usage() {
-  command=$1
-  echo "Usage: $command olderCommit newerCommit [workingDir]"
+  echo "Usage: $cmdName -o olderCommit -n newerCommit [-w workingDir]"
   exit 1
+}
+
+#compute absolute path from a relative path
+function absPath() {
+  local relPath=$1
+  if [[ ! "$relPath" == /* ]]; then
+    #relative path
+    absolutePath=$(
+      cd "$relPath"
+      pwd
+    )
+  fi
+  echo "$absolutePath"
 }
 
 # This function builds Pinot given a specific commit hash and target directory
@@ -44,19 +57,55 @@ function checkoutAndBuild() {
 }
 
 # get arguments
-olderCommit=$1
-newerCommit=$2
+# Args while-loop
+while [ "$1" != "" ]; do
+  case $1 in
+  -w | --working-dir)
+    shift
+    workingDir=$1
+    ;;
+  -o | --old-commit-hash)
+    shift
+    olderCommit=$1
+    ;;
+  -n | --new-commit-hash)
+    shift
+    newerCommit=$1
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    echo "illegal option $1"
+    usage
+    exit 1 # error
+    ;;
+  esac
+  shift
+done
 
-if [ -n "$3" ]; then
-  workingDir=$3
-  if [ -d "$workingDir" ]; then
-    echo "Directory ${workingDir} already exists. Use a new directory."
-    exit 1
-  fi
-else
-  # use the temp directory in case workingDir is not provided
+if [ -z "$olderCommit" -o -z "$newerCommit" ]; then
+  usage
+  exit 1
+fi
+
+if [ -z $workingDir ]; then
   workingDir=$TMP_DIR
-  echo "workingDir: ${workingDir}"
+  echo "Using working directory $TMP_DIR"
+else 
+  if [ -d $workingDir ]; then
+    echo "Directory ${workingDir} already exists. Use a new directory."
+    usage
+    exit 1
+  else
+    mkdir -p ${workingDir}
+    if [ $? -ne 0 ]; then
+      echo "Could not create ${workingDir}"
+      exit 1
+    fi
+    workingDir=$(absPath "$workingDir")
+  fi
 fi
 
 # create subdirectories for given commits
