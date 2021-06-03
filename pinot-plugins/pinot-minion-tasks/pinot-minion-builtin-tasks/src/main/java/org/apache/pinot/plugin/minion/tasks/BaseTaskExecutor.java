@@ -20,6 +20,8 @@ package org.apache.pinot.plugin.minion.tasks;
 
 import com.google.common.base.Preconditions;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
+import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -35,6 +37,12 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
   public void cancel() {
     _cancelled = true;
   }
+
+  /**
+   * Returns the segment ZK metadata custom map modifier.
+   */
+  protected abstract SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier(
+      PinotTaskConfig pinotTaskConfig, SegmentConversionResult segmentConversionResult);
 
   protected TableConfig getTableConfig(String tableNameWithType) {
     TableConfig tableConfig =
