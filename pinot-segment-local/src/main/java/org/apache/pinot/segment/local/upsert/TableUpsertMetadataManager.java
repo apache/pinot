@@ -46,6 +46,7 @@ public class TableUpsertMetadataManager {
 
   public PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
     return _partitionMetadataManagerMap.computeIfAbsent(partitionId,
-        k -> new PartitionUpsertMetadataManager(_tableNameWithType, k, _serverMetrics, _tableDataManager, _partialUpsertHandler));
+        k -> new PartitionUpsertMetadataManager(_tableNameWithType, k, _serverMetrics, _tableDataManager,
+            _partialUpsertHandler));
   }
 }

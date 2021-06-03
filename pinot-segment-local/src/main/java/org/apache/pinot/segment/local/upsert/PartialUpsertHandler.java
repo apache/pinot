@@ -76,10 +76,12 @@ public class PartialUpsertHandler {
 
     // object can be null, handle null values in mergers
     for (String fieldName : _mergers.keySet()) {
-      if (newRecord.isNullValue(fieldName)) {
+      if (newRecord.isNullValue(fieldName) && previousRecord.isNullValue(fieldName)) {
         row.putDefaultNullValue(fieldName, previousRecord.getValue(fieldName));
+      } else if (newRecord.isNullValue(fieldName)) {
+        row.putValue(fieldName, previousRecord.getValue(fieldName));
       } else if (previousRecord.isNullValue(fieldName)) {
-        row.putDefaultNullValue(fieldName, newRecord.getValue(fieldName));
+        row.putValue(fieldName, newRecord.getValue(fieldName));
       } else {
         Object newValue =
             _mergers.get(fieldName).merge(previousRecord.getValue(fieldName), newRecord.getValue(fieldName));
