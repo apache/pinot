@@ -1,8 +1,7 @@
-#compute absolute path from a relative path
+# Compute absolute dir path from a relative path. Requires that the path exist
 function absPath() {
   local relPath=$1
   if [[ ! "$relPath" == /* ]]; then
-    #relative path
     relPath=$(
       cd "$relPath"
       pwd
