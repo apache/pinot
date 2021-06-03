@@ -22,24 +22,15 @@
 # get a temporary directory in case the workingDir is not provided by user
 TMP_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')
 cmdName=`baseName $0`
+source `dirname $0`/utils.inc
 
 # get usage of the script
 function usage() {
   echo "Usage: $cmdName -o olderCommit -n newerCommit [-w workingDir]"
+  echo -e "  -w, --working-dir                      Working directory where olderCommit and newCommit target files reside\n"
+  echo -e "  -n, --new-commit-hash                  git hash for new commit\n"
+  echo -e "  -o, --old-commit-hash                  git hash for old commit\n"
   exit 1
-}
-
-#compute absolute path from a relative path
-function absPath() {
-  local relPath=$1
-  if [[ ! "$relPath" == /* ]]; then
-    #relative path
-    absolutePath=$(
-      cd "$relPath"
-      pwd
-    )
-  fi
-  echo "$absolutePath"
 }
 
 # This function builds Pinot given a specific commit hash and target directory

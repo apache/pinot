@@ -25,7 +25,7 @@
 
 ### Step 1: checkout source code and build targets for older commit and newer commit
 ```shell
-./compatibility-verifier/checkoutAndBuild.sh [olderCommit] [newerCommit] [workingDir]
+./compatibility-verifier/checkoutAndBuild.sh -o olderCommit -n newerCommit [-w workingDir]
 ```
 ***NOTE***: `[workingDir]` is optional, if user does not specify `[workingDir]`, the script will create a temporary working 
 dir and output the path, which can be used in step 2.

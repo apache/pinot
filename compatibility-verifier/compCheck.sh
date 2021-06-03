@@ -43,6 +43,7 @@ RM="/bin/rm"
 logCount=1
 #Declare the number of mandatory args
 cmdName=`baseName $0`
+source `dirname $0`/utils.inc
 
 # get usage of the script
 function usage() {
@@ -216,19 +217,6 @@ function setupCompatTester() {
   ))
   CLASSPATH_PREFIX=$(ls ${pinotIntegTestsAbsDir}/pinot-integration-tests-*-tests.jar)
   export CLASSPATH_PREFIX
-}
-
-#compute absolute path for testSuiteDir if given relative
-function absPath() {
-  local testSuiteDirPath=$1
-  if [[ ! "$testSuiteDirPath" == /* ]]; then
-    #relative path
-    testSuiteDirPath=$(
-      cd "$testSuiteDirPath"
-      pwd
-    )
-  fi
-  echo "$testSuiteDirPath"
 }
 
 #
