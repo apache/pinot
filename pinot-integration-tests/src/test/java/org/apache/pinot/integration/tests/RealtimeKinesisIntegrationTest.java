@@ -70,6 +70,10 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
 
   public static final String REGION = "us-east-1";
   public static final String LOCALSTACK_KINESIS_ENDPOINT = "http://localhost:4566";
+  public static final int NUM_SHARDS = 10;
+
+  public static final String SCHEMA_FILE_PATH = "kinesis/airlineStats_data_reduced.schema";
+  public static final String DATA_FILE_PATH = "kinesis/airlineStats_data_reduced.json";
 
   private final Localstack localstackDocker = Localstack.INSTANCE;
 
@@ -108,8 +112,7 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
 
   public Schema createKinesisSchema()
       throws Exception {
-    URL resourceUrl =
-        BaseClusterIntegrationTest.class.getClassLoader().getResource("kinesis/airlineStats_data_min.schema");
+    URL resourceUrl = BaseClusterIntegrationTest.class.getClassLoader().getResource(SCHEMA_FILE_PATH);
     Assert.assertNotNull(resourceUrl);
     return Schema.fromFile(new File(resourceUrl.getFile()));
   }
@@ -120,27 +123,26 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
   }
 
   protected void waitForAllDocsLoadedKinesis(long timeoutMs, boolean raiseError) {
-    final long countStarResult = 10;
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
       @Nullable
       @Override
       public Boolean apply(@Nullable Void aVoid) {
         try {
-          return getCurrentCountStarResult() >= countStarResult;
+          return getCurrentCountStarResult() >= totalRecordsPushedInStream;
         } catch (Exception e) {
           return null;
         }
       }
-    }, 100L, timeoutMs, "Failed to load " + countStarResult + " documents", raiseError);
+    }, 1000L, timeoutMs, "Failed to load " + totalRecordsPushedInStream + " documents", raiseError);
   }
 
   public TableConfig createKinesisTableConfig() {
-    return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName())
-        .setSchemaName("airlineStatsMinSchema").setTimeColumnName("DaysSinceEpoch")
-        .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
-        .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setLLC(true)
-        .setStreamConfigs(createKinesisStreamConfig()).setNullHandlingEnabled(getNullHandlingEnabled()).build();
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName()).setSchemaName(getTableName())
+        .setTimeColumnName("DaysSinceEpoch").setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
+        .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
+        .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
+        .setLLC(true).setStreamConfigs(createKinesisStreamConfig()).setNullHandlingEnabled(getNullHandlingEnabled())
+        .build();
   }
 
   public Map<String, String> createKinesisStreamConfig() {
@@ -151,6 +153,10 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
     streamConfigMap
         .put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_TOPIC_NAME),
             STREAM_NAME);
+
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_FETCH_TIMEOUT_MILLIS),
+        "30000");
     streamConfigMap
         .put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_CONSUMER_TYPES),
             StreamConfig.ConsumerType.LOWLEVEL.toString());
@@ -190,7 +196,7 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
         .credentialsProvider(getLocalAWSCredentials()).region(Region.of(REGION))
         .endpointOverride(new URI(LOCALSTACK_KINESIS_ENDPOINT)).build();
 
-    kinesisClient.createStream(CreateStreamRequest.builder().streamName(STREAM_NAME).shardCount(3).build());
+    kinesisClient.createStream(CreateStreamRequest.builder().streamName(STREAM_NAME).shardCount(NUM_SHARDS).build());
     await().until(() -> kinesisClient.describeStream(DescribeStreamRequest.builder().streamName(STREAM_NAME).build())
         .streamDescription().streamStatusAsString().equals("ACTIVE"));
   }
@@ -210,32 +216,37 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
       PreparedStatement h2Statement =
           _h2Connection.prepareStatement("INSERT INTO " + getTableName() + " VALUES (" + params.toString() + ")");
 
-      InputStream inputStream = RealtimeKinesisIntegrationTest.class.getClassLoader()
-          .getResourceAsStream("kinesis/airlineStats_data_min.json");
+      InputStream inputStream =
+          RealtimeKinesisIntegrationTest.class.getClassLoader().getResourceAsStream(DATA_FILE_PATH);
 
       try (BufferedReader br = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
         String line;
         while ((line = br.readLine()) != null) {
+          JsonNode data = JsonUtils.stringToJsonNode(line);
+
           PutRecordRequest putRecordRequest =
               PutRecordRequest.builder().streamName(STREAM_NAME).data(SdkBytes.fromUtf8String(line))
-                  .partitionKey(line.substring(10)).build();
+                  .partitionKey(data.get("Origin").textValue()).build();
           PutRecordResponse putRecordResponse = kinesisClient.putRecord(putRecordRequest);
           if (putRecordResponse.sdkHttpResponse().statusCode() == 200) {
-            totalRecordsPushedInStream++;
-            JsonNode data = JsonUtils.stringToJsonNode(line);
-            h2Statement.setObject(1, data.get("Quarter").intValue());
-            h2Statement.setObject(2, data.get("FlightNum").intValue());
-            h2Statement.setObject(3, data.get("Origin").textValue());
-            h2Statement.setObject(4, data.get("DaysSinceEpoch").intValue());
+            if (StringUtils.isNotBlank(putRecordResponse.sequenceNumber()) && StringUtils
+                .isNotBlank(putRecordResponse.shardId())) {
+              totalRecordsPushedInStream++;
+              h2Statement.setObject(1, data.get("Quarter").intValue());
+              h2Statement.setObject(2, data.get("FlightNum").intValue());
+              h2Statement.setObject(3, data.get("Origin").textValue());
+              h2Statement.setObject(4, data.get("Destination").textValue());
+              h2Statement.setObject(5, data.get("DaysSinceEpoch").intValue());
 
-            h2Statement.execute();
+              h2Statement.execute();
+            }
           }
         }
       }
 
       inputStream.close();
     } catch (Exception e) {
-      e.printStackTrace();
+      throw new RuntimeException("Could not publish records to Kinesis Stream", e);
     }
   }
 
@@ -265,7 +276,7 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
     h2ResultSet.beforeFirst();
     int row = 0;
     Map<String, Integer> columnToIndex = new HashMap<>();
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 5; i++) {
       columnToIndex.put(pinotResultSet.getColumnName(i), i);
     }
 
@@ -273,14 +284,18 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
       int expectedQuarter = h2ResultSet.getInt("Quarter");
       int expectedFlightNum = h2ResultSet.getInt("FlightNum");
       String expectedOrigin = h2ResultSet.getString("Origin");
+      String expectedDestination = h2ResultSet.getString("Destination");
 
       int actualQuarter = pinotResultSet.getInt(row, columnToIndex.get("Quarter"));
       int actualFlightNum = pinotResultSet.getInt(row, columnToIndex.get("FlightNum"));
       String actualOrigin = pinotResultSet.getString(row, columnToIndex.get("Origin"));
+      String actualDestination = pinotResultSet.getString(row, columnToIndex.get("Destination"));
 
       Assert.assertEquals(actualQuarter, expectedQuarter);
       Assert.assertEquals(actualFlightNum, expectedFlightNum);
       Assert.assertEquals(actualOrigin, expectedOrigin);
+      Assert.assertEquals(actualDestination, expectedDestination);
+
       row++;
 
       if (row >= pinotResultSet.getRowCount()) {
@@ -315,6 +330,7 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
     h2FieldNameAndTypes.add("Quarter bigint");
     h2FieldNameAndTypes.add("FlightNum bigint");
     h2FieldNameAndTypes.add("Origin varchar(128)");
+    h2FieldNameAndTypes.add("Destination varchar(128)");
     h2FieldNameAndTypes.add("DaysSinceEpoch bigint");
 
     _h2Connection.prepareCall("CREATE TABLE " + getTableName() + "(" + StringUtil

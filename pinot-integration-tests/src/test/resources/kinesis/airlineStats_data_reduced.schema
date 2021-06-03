@@ -11,6 +11,11 @@
       "name": "Origin"
     },
     {
+      "dataType": "STRING",
+      "singleValueField": true,
+      "name": "Destination"
+    },
+    {
       "dataType": "INT",
       "singleValueField": true,
       "name": "FlightNum"
@@ -23,5 +28,5 @@
       "name": "DaysSinceEpoch"
     }
   },
-  "schemaName": "airlineStatsMinSchema"
+  "schemaName": "mytable"
 }
