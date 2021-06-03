@@ -201,7 +201,8 @@ public class BasicAuthTlsRealtimeIntegrationTest extends BaseClusterIntegrationT
       factory.setScheme("https");
       factory.setSslContext(FileUploadDownloadClient._defaultSSLContext);
 
-      _pinotConnection = ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(), factory.buildTransport());
+      _pinotConnection =
+          ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(), factory.buildTransport());
     }
     return _pinotConnection;
   }
@@ -242,9 +243,9 @@ public class BasicAuthTlsRealtimeIntegrationTest extends BaseClusterIntegrationT
     // download and sanity-check size of offline segment(s)
     for (int i = 0; i < offlineSegments.size(); i++) {
       String segment = offlineSegments.get(i).asText();
-      Assert.assertTrue(sendGetRequest(_controllerRequestURLBuilder
-          .forSegmentDownload(TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), segment), AUTH_HEADER)
-          .length() > 200000); // download segment
+      Assert.assertTrue(
+          sendGetRequest(_controllerRequestURLBuilder.forSegmentDownload(getTableName(), segment), AUTH_HEADER).length()
+              > 200000); // download segment
     }
   }
 

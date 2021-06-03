@@ -53,7 +53,7 @@ public class ServerSegmentCompletionProtocolHandler {
   private static Integer _controllerHttpsPort;
   private static int _segmentUploadRequestTimeoutMs;
   private static String _authToken;
-  private static String _protocol;
+  private static String _protocol = HTTP_PROTOCOL;
 
   private final FileUploadDownloadClient _fileUploadDownloadClient;
   private final ServerMetrics _serverMetrics;
