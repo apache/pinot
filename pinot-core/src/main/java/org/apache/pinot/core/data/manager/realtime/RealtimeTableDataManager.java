@@ -60,6 +60,7 @@ import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.V3RemoveIndexException;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
+import org.apache.pinot.segment.local.upsert.PartialUpsertHandler;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
@@ -115,6 +116,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private TableUpsertMetadataManager _tableUpsertMetadataManager;
   private List<String> _primaryKeyColumns;
   private String _timeColumnName;
+  private PartialUpsertHandler _partialUpsertHandler;
 
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
     _segmentBuildSemaphore = segmentBuildSemaphore;
@@ -160,7 +162,14 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     if (isUpsertEnabled()) {
       Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
-      _tableUpsertMetadataManager = new TableUpsertMetadataManager(_tableNameWithType, _serverMetrics, this);
+
+      if (isPartialUpsertEnabled()) {
+        _partialUpsertHandler = new PartialUpsertHandler();
+        // only init partial upsert handler for partial mode
+        _partialUpsertHandler.init(tableConfig.getUpsertConfig().getGlobalUpsertStrategy(), tableConfig.getUpsertConfig().getPartialUpsertStrategies());
+      }
+
+      _tableUpsertMetadataManager = new TableUpsertMetadataManager(_tableNameWithType, _serverMetrics, this, _partialUpsertHandler);
       _primaryKeyColumns = schema.getPrimaryKeyColumns();
       Preconditions.checkState(!CollectionUtils.isEmpty(_primaryKeyColumns),
           "Primary key columns must be configured for upsert");
@@ -230,6 +239,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   public boolean isUpsertEnabled() {
     return _upsertMode != UpsertConfig.Mode.NONE;
+  }
+
+  public boolean isPartialUpsertEnabled() {
+    return _upsertMode != UpsertConfig.Mode.PARTIAL;
   }
 
   /*

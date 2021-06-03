@@ -47,6 +47,7 @@ import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.upsert.PartialUpsertHandler;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -819,7 +820,7 @@ public class LLRealtimeSegmentDataManagerTest {
           new IndexLoadingConfig(makeInstanceDataManagerConfig(), tableConfig), schema, llcSegmentName,
           semaphoreMap.get(llcSegmentName.getPartitionGroupId()), serverMetrics,
           new PartitionUpsertMetadataManager("testTable_REALTIME", 0, serverMetrics,
-              Mockito.mock(TableDataManager.class)));
+              Mockito.mock(TableDataManager.class), Mockito.mock(PartialUpsertHandler.class)));
       _state = LLRealtimeSegmentDataManager.class.getDeclaredField("_state");
       _state.setAccessible(true);
       _shouldStop = LLRealtimeSegmentDataManager.class.getDeclaredField("_shouldStop");

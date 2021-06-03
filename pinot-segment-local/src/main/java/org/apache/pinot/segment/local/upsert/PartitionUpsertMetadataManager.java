@@ -64,13 +64,15 @@ public class PartitionUpsertMetadataManager {
   private final int _partitionId;
   private final ServerMetrics _serverMetrics;
   private final TableDataManager _tableDataManager;
+  private final PartialUpsertHandler _partialUpsertHandler;
 
   public PartitionUpsertMetadataManager(String tableNameWithType, int partitionId, ServerMetrics serverMetrics,
-      TableDataManager tableDataManager) {
+      TableDataManager tableDataManager, PartialUpsertHandler partialUpsertHandler) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
     _serverMetrics = serverMetrics;
     _tableDataManager = tableDataManager;
+    _partialUpsertHandler = partialUpsertHandler;
   }
 
   public ConcurrentHashMap<PrimaryKey, RecordLocation> getPrimaryKeyToRecordLocationMap() {
@@ -162,7 +164,7 @@ public class PartitionUpsertMetadataManager {
           previousRow = _tableDataManager.acquireSegment(lastRecord.getSegmentName()).getSegment()
               .getRecord(lastRecord.getDocId(), previousRow);
         }
-        row = mutableSegmentImpl.getPartialUpsertHandler().merge(previousRow, row);
+        row = _partialUpsertHandler.merge(previousRow, row);
       }
     }
 

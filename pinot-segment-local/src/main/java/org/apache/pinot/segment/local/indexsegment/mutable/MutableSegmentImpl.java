@@ -58,7 +58,6 @@ import org.apache.pinot.segment.local.segment.index.readers.ValidDocIndexReaderI
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
-import org.apache.pinot.segment.local.upsert.PartialUpsertHandler;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.utils.FixedIntArrayOffHeapIdMap;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
@@ -164,8 +163,6 @@ public class MutableSegmentImpl implements MutableSegment {
   //        the valid doc ids won't be updated.
   private final ThreadSafeMutableRoaringBitmap _validDocIds;
   private final ValidDocIndexReader _validDocIndex;
-
-  private final PartialUpsertHandler _partialUpsertHandler;
 
   public MutableSegmentImpl(RealtimeSegmentConfig config, @Nullable ServerMetrics serverMetrics) {
     _serverMetrics = serverMetrics;
@@ -379,17 +376,10 @@ public class MutableSegmentImpl implements MutableSegment {
       _partitionUpsertMetadataManager = config.getPartitionUpsertMetadataManager();
       _validDocIds = new ThreadSafeMutableRoaringBitmap();
       _validDocIndex = new ValidDocIndexReaderImpl(_validDocIds);
-      _partialUpsertHandler = new PartialUpsertHandler();
-      if (isPartialUpsertEnabled()) {
-        // only init partial upsert handler for partial mode
-        _partialUpsertHandler
-            .init(config.getGlobalUpsertStrategy(), config.getPartialUpsertStrategies());
-      }
     } else {
       _partitionUpsertMetadataManager = null;
       _validDocIds = null;
       _validDocIndex = null;
-      _partialUpsertHandler = null;
     }
   }
 
@@ -737,10 +727,6 @@ public class MutableSegmentImpl implements MutableSegment {
   public Set<String> getColumnNames() {
     // Return all column names, virtual and physical.
     return Sets.union(_schema.getColumnNames(), _newlyAddedColumnsFieldMap.keySet());
-  }
-
-  public PartialUpsertHandler getPartialUpsertHandler() {
-    return _partialUpsertHandler;
   }
 
   public ThreadSafeMutableRoaringBitmap getValidDocIds() {

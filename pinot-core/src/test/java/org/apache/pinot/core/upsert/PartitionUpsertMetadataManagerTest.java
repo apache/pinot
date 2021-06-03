@@ -25,6 +25,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.realtime.impl.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.segment.local.upsert.PartialUpsertHandler;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.RecordLocation;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
@@ -46,7 +47,7 @@ public class PartitionUpsertMetadataManagerTest {
   public void testAddSegment() {
     PartitionUpsertMetadataManager upsertMetadataManager =
         new PartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Mockito.mock(ServerMetrics.class),
-            Mockito.mock(TableDataManager.class));
+            Mockito.mock(TableDataManager.class), Mockito.mock(PartialUpsertHandler.class));
     Map<PrimaryKey, RecordLocation> recordLocationMap = upsertMetadataManager.getPrimaryKeyToRecordLocationMap();
 
     // Add the first segment
@@ -134,7 +135,7 @@ public class PartitionUpsertMetadataManagerTest {
   public void testUpdateRecord() {
     PartitionUpsertMetadataManager upsertMetadataManager =
         new PartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Mockito.mock(ServerMetrics.class),
-            Mockito.mock(TableDataManager.class));
+            Mockito.mock(TableDataManager.class), Mockito.mock(PartialUpsertHandler.class));
     Map<PrimaryKey, RecordLocation> recordLocationMap = upsertMetadataManager.getPrimaryKeyToRecordLocationMap();
 
     // Add the first segment
@@ -200,7 +201,7 @@ public class PartitionUpsertMetadataManagerTest {
   public void testRemoveSegment() {
     PartitionUpsertMetadataManager upsertMetadataManager =
         new PartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Mockito.mock(ServerMetrics.class),
-            Mockito.mock(TableDataManager.class));
+            Mockito.mock(TableDataManager.class), Mockito.mock(PartialUpsertHandler.class));
     Map<PrimaryKey, RecordLocation> recordLocationMap = upsertMetadataManager.getPrimaryKeyToRecordLocationMap();
 
     // Add 2 segments

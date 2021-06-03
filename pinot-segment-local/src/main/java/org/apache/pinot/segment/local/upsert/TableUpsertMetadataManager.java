@@ -34,16 +34,18 @@ public class TableUpsertMetadataManager {
   private final String _tableNameWithType;
   private final ServerMetrics _serverMetrics;
   private final TableDataManager _tableDataManager;
+  private final PartialUpsertHandler _partialUpsertHandler;
 
   public TableUpsertMetadataManager(String tableNameWithType, ServerMetrics serverMetrics,
-      TableDataManager tableDataManager) {
+      TableDataManager tableDataManager, PartialUpsertHandler partialUpsertHandler) {
     _tableNameWithType = tableNameWithType;
     _serverMetrics = serverMetrics;
     _tableDataManager = tableDataManager;
+    _partialUpsertHandler = partialUpsertHandler;
   }
 
   public PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
     return _partitionMetadataManagerMap.computeIfAbsent(partitionId,
-        k -> new PartitionUpsertMetadataManager(_tableNameWithType, k, _serverMetrics, _tableDataManager));
+        k -> new PartitionUpsertMetadataManager(_tableNameWithType, k, _serverMetrics, _tableDataManager, _partialUpsertHandler));
   }
 }
