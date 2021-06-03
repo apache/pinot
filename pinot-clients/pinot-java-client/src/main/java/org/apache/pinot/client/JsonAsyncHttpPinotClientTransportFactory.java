@@ -28,9 +28,9 @@ import org.apache.pinot.spi.utils.CommonConstants;
  * Pinot client transport factory for JSON encoded BrokerResults through HTTP.
  */
 public class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTransportFactory {
-  Map<String, String> _headers = new HashMap<>();
-  String _scheme = CommonConstants.HTTP_PROTOCOL;
-  SSLContext _sslContext = null;
+  private Map<String, String> _headers = new HashMap<>();
+  private String _scheme = CommonConstants.HTTP_PROTOCOL;
+  private SSLContext _sslContext = null;
 
   @Override
   public PinotClientTransport buildTransport() {

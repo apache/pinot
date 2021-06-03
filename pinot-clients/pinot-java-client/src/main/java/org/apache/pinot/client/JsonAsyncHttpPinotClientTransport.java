@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -43,24 +44,25 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   private static final Logger LOGGER = LoggerFactory.getLogger(JsonAsyncHttpPinotClientTransport.class);
   private static final ObjectReader OBJECT_READER = new ObjectMapper().reader();
 
-  AsyncHttpClient _httpClient;
+  private final Map<String, String> _headers;
+  private final String _scheme;
 
-  Map<String, String> _headers = new HashMap<>();
-  String _scheme = CommonConstants.HTTP_PROTOCOL;
-  SSLContext _sslContext = null;
+  private final AsyncHttpClient _httpClient;
 
   public JsonAsyncHttpPinotClientTransport() {
+    _headers = new HashMap<>();
+    _scheme = CommonConstants.HTTP_PROTOCOL;
     _httpClient = new AsyncHttpClient();
   }
 
-  public JsonAsyncHttpPinotClientTransport(SSLContext sslContext, Map<String, String> headers, String scheme) {
+  public JsonAsyncHttpPinotClientTransport(@Nullable SSLContext sslContext, Map<String, String> headers,
+      String scheme) {
     _headers = headers;
     _scheme = scheme;
-    _sslContext = sslContext;
 
     AsyncHttpClientConfig.Builder builder = new AsyncHttpClientConfig.Builder();
-    if (_sslContext != null) {
-      builder.setSSLContext(_sslContext);
+    if (sslContext != null) {
+      builder.setSSLContext(sslContext);
     }
 
     _httpClient = new AsyncHttpClient(builder.build());
