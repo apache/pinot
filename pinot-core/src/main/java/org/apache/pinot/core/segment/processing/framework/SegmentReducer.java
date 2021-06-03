@@ -26,11 +26,11 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.core.segment.processing.collector.Collector;
 import org.apache.pinot.core.segment.processing.collector.CollectorFactory;
+import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
+import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileReader;
 import org.apache.pinot.core.util.SegmentProcessorAvroUtils;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,27 +48,27 @@ public class SegmentReducer {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentReducer.class);
 
-  private final File _reducerInputDir;
+  private final String _reducerId;
+  private final GenericRowFileManager _fileManager;
   private final File _reducerOutputDir;
 
-  private final String _reducerId;
   private final Schema _pinotSchema;
   private final org.apache.avro.Schema _avroSchema;
   private final Collector _collector;
   private final int _numRecordsPerPart;
 
-  public SegmentReducer(String reducerId, File reducerInputDir, SegmentReducerConfig reducerConfig,
+  public SegmentReducer(String reducerId, GenericRowFileManager fileManager, SegmentReducerConfig reducerConfig,
       File reducerOutputDir) {
-    _reducerInputDir = reducerInputDir;
+    _reducerId = reducerId;
+    _fileManager = fileManager;
     _reducerOutputDir = reducerOutputDir;
 
-    _reducerId = reducerId;
     _pinotSchema = reducerConfig.getPinotSchema();
     _avroSchema = SegmentProcessorAvroUtils.convertPinotSchemaToAvroSchema(_pinotSchema);
     _collector = CollectorFactory.getCollector(reducerConfig.getCollectorConfig(), _pinotSchema);
     _numRecordsPerPart = reducerConfig.getNumRecordsPerPart();
-    LOGGER.info("Initialized reducer with id: {}, input dir: {}, output dir: {}, collector: {}, numRecordsPerPart: {}",
-        _reducerId, _reducerInputDir, _reducerOutputDir, _collector.getClass(), _numRecordsPerPart);
+    LOGGER.info("Initialized reducer with id: {}, output dir: {}, collector: {}, numRecordsPerPart: {}", _reducerId,
+        _reducerOutputDir, _collector.getClass(), _numRecordsPerPart);
   }
 
   /**
@@ -77,27 +77,22 @@ public class SegmentReducer {
    */
   public void reduce()
       throws Exception {
-
     int part = 0;
-    for (File inputFile : _reducerInputDir.listFiles()) {
+    GenericRowFileReader fileReader = _fileManager.getFileReader();
+    int numRows = fileReader.getNumRows();
+    for (int i = 0; i < numRows; i++) {
+      GenericRow next = fileReader.read(i, new GenericRow());
 
-      RecordReader avroRecordReader = RecordReaderFactory
-          .getRecordReaderByClass("org.apache.pinot.plugin.inputformat.avro.AvroRecordReader", inputFile,
-              _pinotSchema.getColumnNames(), null);
+      // Aggregations
+      _collector.collect(next);
 
-      while (avroRecordReader.hasNext()) {
-        GenericRow next = avroRecordReader.next();
-
-        // Aggregations
-        _collector.collect(next);
-
-        // Reached max records per part file. Flush
-        if (_collector.size() == _numRecordsPerPart) {
-          flushRecords(_collector, createReducerOutputFileName(_reducerId, part++));
-          _collector.reset();
-        }
+      // Reached max records per part file. Flush
+      if (_collector.size() == _numRecordsPerPart) {
+        flushRecords(_collector, createReducerOutputFileName(_reducerId, part++));
+        _collector.reset();
       }
     }
+    _fileManager.closeFileReader();
     if (_collector.size() > 0) {
       flushRecords(_collector, createReducerOutputFileName(_reducerId, part));
       _collector.reset();

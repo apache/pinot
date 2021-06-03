@@ -60,8 +60,7 @@ public class GenericRowFileReader implements Closeable {
    */
   public GenericRow read(int rowId, GenericRow reuse) {
     long offset = _offsetBuffer.getLong((long) rowId << 3); // rowId * Long.BYTES
-    _deserializer.deserialize(offset, reuse);
-    return reuse;
+    return _deserializer.deserialize(offset, reuse);
   }
 
   /**
