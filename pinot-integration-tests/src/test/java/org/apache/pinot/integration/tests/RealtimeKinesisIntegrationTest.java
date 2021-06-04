@@ -7,6 +7,7 @@ import cloud.localstack.docker.annotation.LocalstackDockerProperties;
 import cloud.localstack.docker.command.Command;
 import cloud.localstack.docker.exception.LocalstackDockerException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeType;
 import com.google.common.base.Function;
 import java.io.BufferedReader;
 import java.io.File;
@@ -21,8 +22,10 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import javax.activation.UnsupportedDataTypeException;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -170,8 +173,7 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
     streamConfigMap.put(KinesisConfig.MAX_RECORDS_TO_FETCH, String.valueOf(MAX_RECORDS_TO_FETCH));
     streamConfigMap.put(KinesisConfig.SHARD_ITERATOR_TYPE, ShardIteratorType.AT_SEQUENCE_NUMBER.toString());
     streamConfigMap.put(KinesisConfig.ENDPOINT, LOCALSTACK_KINESIS_ENDPOINT);
-    streamConfigMap
-        .put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, Integer.toString(getRealtimeSegmentFlushSize()));
+    streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, Integer.toString(5000));
     streamConfigMap.put(StreamConfigProperties
         .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "smallest");
     return streamConfigMap;
@@ -232,12 +234,26 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
             if (StringUtils.isNotBlank(putRecordResponse.sequenceNumber()) && StringUtils
                 .isNotBlank(putRecordResponse.shardId())) {
               totalRecordsPushedInStream++;
-              h2Statement.setObject(1, data.get("Quarter").intValue());
-              h2Statement.setObject(2, data.get("FlightNum").intValue());
-              h2Statement.setObject(3, data.get("Origin").textValue());
-              h2Statement.setObject(4, data.get("Destination").textValue());
-              h2Statement.setObject(5, data.get("DaysSinceEpoch").intValue());
 
+              int fieldIndex = 1;
+              for (String fieldNameAndDatatype : h2FieldNameAndTypes) {
+                String[] fieldNameAndDatatypeList = fieldNameAndDatatype.split(" ");
+                String fieldName = fieldNameAndDatatypeList[0];
+                String h2DataType = fieldNameAndDatatypeList[1];
+                switch (h2DataType) {
+                  case "int": {
+                    h2Statement.setObject(fieldIndex++, data.get(fieldName).intValue());
+                    break;
+                  }
+                  case "varchar(128)": {
+                    h2Statement.setObject(fieldIndex++, data.get(fieldName).textValue());
+                    break;
+                  }
+                  default: {
+
+                  }
+                }
+              }
               h2Statement.execute();
             }
           }
@@ -276,25 +292,34 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
     h2ResultSet.beforeFirst();
     int row = 0;
     Map<String, Integer> columnToIndex = new HashMap<>();
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < h2FieldNameAndTypes.size(); i++) {
       columnToIndex.put(pinotResultSet.getColumnName(i), i);
     }
 
     while (h2ResultSet.next()) {
-      int expectedQuarter = h2ResultSet.getInt("Quarter");
-      int expectedFlightNum = h2ResultSet.getInt("FlightNum");
-      String expectedOrigin = h2ResultSet.getString("Origin");
-      String expectedDestination = h2ResultSet.getString("Destination");
 
-      int actualQuarter = pinotResultSet.getInt(row, columnToIndex.get("Quarter"));
-      int actualFlightNum = pinotResultSet.getInt(row, columnToIndex.get("FlightNum"));
-      String actualOrigin = pinotResultSet.getString(row, columnToIndex.get("Origin"));
-      String actualDestination = pinotResultSet.getString(row, columnToIndex.get("Destination"));
+      for (String fieldNameAndDatatype : h2FieldNameAndTypes) {
+        String[] fieldNameAndDatatypeList = fieldNameAndDatatype.split(" ");
+        String fieldName = fieldNameAndDatatypeList[0];
+        String h2DataType = fieldNameAndDatatypeList[1];
+        switch (h2DataType) {
+          case "int": {
+            int expectedValue = h2ResultSet.getInt(fieldName);
+            int actualValue = pinotResultSet.getInt(row, columnToIndex.get(fieldName));
+            Assert.assertEquals(expectedValue, actualValue);
+            break;
+          }
+          case "varchar(128)": {
+            String expectedValue = h2ResultSet.getString(fieldName);
+            String actualValue = pinotResultSet.getString(row, columnToIndex.get(fieldName));
+            Assert.assertEquals(expectedValue, actualValue);
+            break;
+          }
+          default: {
 
-      Assert.assertEquals(actualQuarter, expectedQuarter);
-      Assert.assertEquals(actualFlightNum, expectedFlightNum);
-      Assert.assertEquals(actualOrigin, expectedOrigin);
-      Assert.assertEquals(actualDestination, expectedDestination);
+          }
+        }
+      }
 
       row++;
 
@@ -324,14 +349,52 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
     Class.forName("org.h2.Driver");
     _h2Connection = DriverManager.getConnection("jdbc:h2:mem:");
     _h2Connection.prepareCall("DROP TABLE IF EXISTS " + getTableName()).execute();
-
     h2FieldNameAndTypes = new ArrayList<>();
 
-    h2FieldNameAndTypes.add("Quarter bigint");
-    h2FieldNameAndTypes.add("FlightNum bigint");
-    h2FieldNameAndTypes.add("Origin varchar(128)");
-    h2FieldNameAndTypes.add("Destination varchar(128)");
-    h2FieldNameAndTypes.add("DaysSinceEpoch bigint");
+    InputStream inputStream = RealtimeKinesisIntegrationTest.class.getClassLoader().getResourceAsStream(DATA_FILE_PATH);
+
+    String line;
+    try (BufferedReader br = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+      while ((line = br.readLine()) != null) {
+        break;
+      }
+    } finally {
+      inputStream.close();
+    }
+
+    if (StringUtils.isNotBlank(line)) {
+      JsonNode dataObject = JsonUtils.stringToJsonNode(line);
+
+      Iterator<Map.Entry<String, JsonNode>> fieldIterator = dataObject.fields();
+      while (fieldIterator.hasNext()) {
+        Map.Entry<String, JsonNode> field = fieldIterator.next();
+        String fieldName = field.getKey();
+        JsonNodeType fieldDataType = field.getValue().getNodeType();
+
+        String h2DataType;
+
+        switch (fieldDataType) {
+          case NUMBER: {
+            h2DataType = "int";
+            break;
+          }
+          case STRING: {
+            h2DataType = "varchar(128)";
+            break;
+          }
+          case BOOLEAN: {
+            h2DataType = "boolean";
+            break;
+          }
+          default: {
+            throw new UnsupportedDataTypeException(
+                "Kinesis Integration test doesn't support datatype: " + fieldDataType.name());
+          }
+        }
+
+        h2FieldNameAndTypes.add(fieldName + " " + h2DataType);
+      }
+    }
 
     _h2Connection.prepareCall("CREATE TABLE " + getTableName() + "(" + StringUtil
         .join(",", h2FieldNameAndTypes.toArray(new String[h2FieldNameAndTypes.size()])) + ")").execute();
