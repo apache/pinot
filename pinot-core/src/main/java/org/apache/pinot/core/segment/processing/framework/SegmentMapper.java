@@ -20,7 +20,7 @@ package org.apache.pinot.core.segment.processing.framework;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -52,7 +52,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Mapper phase of the SegmentProcessorFramework.
- * Reads the input segment and creates partitioned avro data files
+ * Reads the input records and creates partitioned generic row files.
  * Performs:
  * - record filtering
  * - column transformations
@@ -74,7 +74,8 @@ public class SegmentMapper {
   private final RecordTransformer _recordTransformer;
   private final DataTypeTransformer _dataTypeTransformer;
 
-  private final List<Partitioner> _partitioners = new ArrayList<>();
+  private final Partitioner[] _partitioners;
+  private final String[] _partitionsBuffer;
   private final Map<String, GenericRowFileManager> _partitionToFileManagerMap = new HashMap<>();
 
   public SegmentMapper(List<RecordReader> recordReaders, SegmentMapperConfig mapperConfig, File mapperOutputDir) {
@@ -94,18 +95,22 @@ public class SegmentMapper {
     _recordFilter = RecordFilterFactory.getRecordFilter(mapperConfig.getRecordFilterConfig());
     _recordTransformer = RecordTransformerFactory.getRecordTransformer(mapperConfig.getRecordTransformerConfig());
     _dataTypeTransformer = new DataTypeTransformer(schema);
-    for (PartitionerConfig partitionerConfig : mapperConfig.getPartitionerConfigs()) {
-      _partitioners.add(PartitionerFactory.getPartitioner(partitionerConfig));
+    List<PartitionerConfig> partitionerConfigs = mapperConfig.getPartitionerConfigs();
+    int numPartitioners = partitionerConfigs.size();
+    _partitioners = new Partitioner[numPartitioners];
+    _partitionsBuffer = new String[numPartitioners];
+    for (int i = 0; i < numPartitioners; i++) {
+      _partitioners[i] = PartitionerFactory.getPartitioner(partitionerConfigs.get(i));
     }
     LOGGER.info(
         "Initialized mapper with {} record readers, output dir: {}, recordTransformer: {}, recordFilter: {}, partitioners: {}",
         _recordReaders.size(), _mapperOutputDir, _recordTransformer.getClass(), _recordFilter.getClass(),
-        _partitioners.stream().map(p -> p.getClass().toString()).collect(Collectors.joining(",")));
+        Arrays.stream(_partitioners).map(p -> p.getClass().toString()).collect(Collectors.joining(",")));
   }
 
   /**
-   * Reads the input segment and generates partitioned avro data files into the mapper output directory
-   * Records for each partition are put into a directory of its own withing the mapper output directory, identified by the partition name
+   * Reads the input records and generates partitioned generic row files into the mapper output directory.
+   * Records for each partition are put into a directory of the partition name within the mapper output directory.
    */
   public Map<String, GenericRowFileManager> map()
       throws Exception {
@@ -150,12 +155,11 @@ public class SegmentMapper {
     row = _dataTypeTransformer.transform(_recordTransformer.transformRecord(row));
 
     // Partitioning
-    int numPartitioners = _partitioners.size();
-    String[] partitions = new String[numPartitioners];
+    int numPartitioners = _partitioners.length;
     for (int i = 0; i < numPartitioners; i++) {
-      partitions[i] = _partitioners.get(i).getPartition(row);
+      _partitionsBuffer[i] = _partitioners[i].getPartition(row);
     }
-    String partition = StringUtil.join("_", partitions);
+    String partition = StringUtil.join("_", _partitionsBuffer);
 
     // Create writer for the partition if not exists
     GenericRowFileManager fileManager = _partitionToFileManagerMap.get(partition);

@@ -27,12 +27,12 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 
 
-public class SegmentProcessingUtils {
+public final class SegmentProcessingUtils {
   private SegmentProcessingUtils() {
   }
 
   /**
-   * Returns the field specs with the names sorted in alphabetical order.
+   * Returns the field specs (physical only) with the names sorted in alphabetical order.
    */
   public static List<FieldSpec> getFieldSpecs(Schema schema) {
     List<FieldSpec> fieldSpecs = new ArrayList<>();
@@ -46,7 +46,8 @@ public class SegmentProcessingUtils {
   }
 
   /**
-   * Returns the field specs with sorted column in the front, followed by other columns sorted in alphabetical order.
+   * Returns the field specs (physical only) with sorted column in the front, followed by other columns sorted in
+   * alphabetical order.
    */
   public static List<FieldSpec> getFieldSpecs(Schema schema, List<String> sortOrder) {
     List<FieldSpec> fieldSpecs = new ArrayList<>();
@@ -54,6 +55,7 @@ public class SegmentProcessingUtils {
       FieldSpec fieldSpec = schema.getFieldSpecFor(sortColumn);
       Preconditions.checkArgument(fieldSpec != null, "Failed to find sort column: %s", sortColumn);
       Preconditions.checkArgument(fieldSpec.isSingleValueField(), "Cannot sort on MV column: %s", sortColumn);
+      Preconditions.checkArgument(!fieldSpec.isVirtualColumn(), "Cannot sort on virtual column: %s", sortColumn);
       fieldSpecs.add(fieldSpec);
     }
 
