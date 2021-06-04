@@ -44,6 +44,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -202,7 +203,7 @@ public class BasicAuthTlsRealtimeIntegrationTest extends BaseClusterIntegrationT
     if (_pinotConnection == null) {
       JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
       factory.setHeaders(AUTH_HEADER);
-      factory.setScheme("https");
+      factory.setScheme(CommonConstants.HTTPS_PROTOCOL);
       factory.setSslContext(FileUploadDownloadClient._defaultSSLContext);
 
       _pinotConnection =

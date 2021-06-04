@@ -34,7 +34,7 @@ public class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTran
 
   @Override
   public PinotClientTransport buildTransport() {
-    return new JsonAsyncHttpPinotClientTransport(_sslContext, _headers, _scheme);
+    return new JsonAsyncHttpPinotClientTransport(_headers, _scheme, _sslContext);
   }
 
   public Map<String, String> getHeaders() {
