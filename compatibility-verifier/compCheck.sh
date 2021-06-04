@@ -42,7 +42,7 @@
 RM="/bin/rm"
 logCount=1
 #Declare the number of mandatory args
-cmdName=`baseName $0`
+cmdName=`basename $0`
 source `dirname $0`/utils.inc
 
 # get usage of the script
@@ -287,51 +287,69 @@ fi
 
 # Setup initial cluster with olderCommit and do rolling upgrade
 # Provide abspath of filepath to $COMPAT_TESTER
+echo "Setting up cluster before upgrade"
 startServices "$oldTargetDir"
 
-echo "Setting up cluster before upgrade"
-$COMPAT_TESTER $testSuiteDir/pre-controller-upgrade.yaml 1
-if [ $? -ne 0 ]; then
-  if [ $keepClusterOnFailure == "false" ]; then
-    stopServices
+genNum=0
+if [ -f $testSuiteDir/pre-controller-upgrade.yaml ]; then
+  genNum=$((genNum+1))
+  $COMPAT_TESTER $testSuiteDir/pre-controller-upgrade.yaml $genNum
+  if [ $? -ne 0 ]; then
+    echo Failed before controller upgrade
+    if [ $keepClusterOnFailure == "false" ]; then
+      stopServices
+    fi
+    exit 1
   fi
-  exit 1
 fi
 echo "Upgrading controller"
 stopService controller
 startService controller "$newTargetDir" "$CONTROLLER_CONF"
 waitForControllerReady
-echo "Running tests after controller upgrade"
-$COMPAT_TESTER $testSuiteDir/pre-broker-upgrade.yaml 2
-if [ $? -ne 0 ]; then
-  if [ $keepClusterOnFailure == "false" ]; then
-    stopServices
+
+if [ -f $testSuiteDir/pre-broker-upgrade.yaml ]; then
+  genNum=$((genNum+1))
+  echo "Running tests after controller upgrade"
+  $COMPAT_TESTER $testSuiteDir/pre-broker-upgrade.yaml $genNum
+  if [ $? -ne 0 ]; then
+    echo Failed before broker upgrade
+    if [ $keepClusterOnFailure == "false" ]; then
+      stopServices
+    fi
+    exit 1
   fi
-  exit 1
 fi
 echo "Upgrading broker"
 stopService broker
 startService broker "$newTargetDir" "$BROKER_CONF"
 waitForBrokerReady
-echo "Running tests after broker upgrade"
-$COMPAT_TESTER $testSuiteDir/pre-server-upgrade.yaml 3
-if [ $? -ne 0 ]; then
-  if [ $keepClusterOnFailure == "false" ]; then
-    stopServices
+if [ -f $testSuiteDir/pre-server-upgrade.yaml ]; then
+  echo "Running tests after broker upgrade"
+  genNum=$((genNum+1))
+  $COMPAT_TESTER $testSuiteDir/pre-server-upgrade.yaml $genNum
+  if [ $? -ne 0 ]; then
+    echo Failed before server upgrade
+    if [ $keepClusterOnFailure == "false" ]; then
+      stopServices
+    fi
+    exit 1
   fi
-  exit 1
 fi
 echo "Upgrading server"
 stopService server
 startService server "$newTargetDir" "$SERVER_CONF"
 waitForServerReady
-echo "Running tests after server upgrade"
-$COMPAT_TESTER $testSuiteDir/post-server-upgrade.yaml 4
-if [ $? -ne 0 ]; then
-  if [ $keepClusterOnFailure == "false" ]; then
-    stopServices
+if [ -f $testSuiteDir/post-server-upgrade.yaml ]; then
+  echo "Running tests after server upgrade"
+  genNum=$((genNum+1))
+  $COMPAT_TESTER $testSuiteDir/post-server-upgrade.yaml $genNum
+  if [ $? -ne 0 ]; then
+    echo Failed after server upgrade
+    if [ $keepClusterOnFailure == "false" ]; then
+      stopServices
+    fi
+    exit 1
   fi
-  exit 1
 fi
 
 echo "Downgrading server"
@@ -339,38 +357,50 @@ echo "Downgrading server"
 stopService server
 startService server "$oldTargetDir" "$SERVER_CONF"
 waitForServerReady
-echo "Running tests after server downgrade"
-$COMPAT_TESTER $testSuiteDir/post-server-rollback.yaml 5
-if [ $? -ne 0 ]; then
-  if [ $keepClusterOnFailure == "false" ]; then
-    stopServices
+if [ -f $testSuiteDir/post-server-rollback.yaml ]; then
+  echo "Running tests after server downgrade"
+  genNum=$((genNum+1))
+  $COMPAT_TESTER $testSuiteDir/post-server-rollback.yaml $genNum
+  if [ $? -ne 0 ]; then
+    echo Failed after server downgrade
+    if [ $keepClusterOnFailure == "false" ]; then
+      stopServices
+    fi
+    exit 1
   fi
-  exit 1
 fi
 echo "Downgrading broker"
 stopService broker
 startService broker "$oldTargetDir" "$BROKER_CONF"
 waitForBrokerReady
-echo "Running tests after broker downgrade"
-$COMPAT_TESTER $testSuiteDir/post-broker-rollback.yaml 6
-if [ $? -ne 0 ]; then
-  if [ $keepClusterOnFailure == "false" ]; then
-    stopServices
+if [ -f $testSuiteDir/post-broker-rollback.yaml ]; then
+  echo "Running tests after broker downgrade"
+  genNum=$((genNum+1))
+  $COMPAT_TESTER $testSuiteDir/post-broker-rollback.yaml $genNum
+  if [ $? -ne 0 ]; then
+    echo Failed after broker downgrade
+    if [ $keepClusterOnFailure == "false" ]; then
+      stopServices
+    fi
+    exit 1
   fi
-  exit 1
 fi
 echo "Downgrading controller"
 stopService controller
 startService controller "$oldTargetDir" "$CONTROLLER_CONF"
 waitForControllerReady
 waitForControllerReady
-echo "Running tests after controller downgrade"
-$COMPAT_TESTER $testSuiteDir/post-controller-rollback.yaml 7
-if [ $? -ne 0 ]; then
-  if [ $keepClusterOnFailure == "false" ]; then
-    stopServices
+if [ -f $testSuiteDir/post-controller-rollback.yaml ]; then
+  echo "Running tests after controller downgrade"
+  genNum=$((genNum+1))
+  $COMPAT_TESTER $testSuiteDir/post-controller-rollback.yaml $genNum
+  if [ $? -ne 0 ]; then
+    echo Failed after controller downgrade
+    if [ $keepClusterOnFailure == "false" ]; then
+      stopServices
+    fi
+    exit 1
   fi
-  exit 1
 fi
 stopServices
 
