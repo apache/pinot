@@ -79,7 +79,7 @@ import static org.testng.Assert.assertTrue;
  */
 public abstract class ClusterTest extends ControllerTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(ClusterTest.class);
-  private static final int DEFAULT_BROKER_PORT = 18099;
+  protected static final int DEFAULT_BROKER_PORT = 18099;
   protected static final Random RANDOM = new Random(System.currentTimeMillis());
 
   protected String _brokerBaseApiUrl;
@@ -129,6 +129,28 @@ public abstract class ClusterTest extends ControllerTest {
       _brokerStarters.add(brokerStarter);
     }
     _brokerBaseApiUrl = "http://localhost:" + _brokerPorts.get(0);
+  }
+
+  protected void startBrokerHttps()
+      throws Exception {
+    _brokerStarters = new ArrayList<>();
+    _brokerPorts = new ArrayList<>();
+
+    Map<String, Object> properties = getDefaultBrokerConfiguration().toMap();
+    properties.put(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
+    properties.put(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
+
+    PinotConfiguration configuration = new PinotConfiguration(properties);
+    overrideBrokerConf(configuration);
+
+    HelixBrokerStarter brokerStarter =
+        new HelixBrokerStarter(configuration, getHelixClusterName(), getZkUrl(), LOCAL_HOST);
+    brokerStarter.start();
+    _brokerStarters.add(brokerStarter);
+
+    // TLS configs require hard-coding
+    _brokerPorts.add(DEFAULT_BROKER_PORT);
+    _brokerBaseApiUrl = "https://localhost:" + _brokerPorts.get(0);
   }
 
   protected int getRandomBrokerPort() {
@@ -191,6 +213,24 @@ public abstract class ClusterTest extends ControllerTest {
         helixServerStarter.start();
         _serverStarters.add(helixServerStarter);
       }
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  protected void startServerHttps() {
+    FileUtils.deleteQuietly(new File(Server.DEFAULT_INSTANCE_BASE_DIR));
+    _serverStarters = new ArrayList<>();
+
+    Map<String, Object> properties = getDefaultServerConfiguration().toMap();
+
+    PinotConfiguration configuration = new PinotConfiguration(properties);
+    overrideServerConf(configuration);
+
+    try {
+      HelixServerStarter helixServerStarter = new HelixServerStarter(getHelixClusterName(), getZkUrl(), configuration);
+      _serverStarters.add(helixServerStarter);
+      helixServerStarter.start();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

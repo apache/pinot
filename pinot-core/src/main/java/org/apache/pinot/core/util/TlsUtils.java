@@ -49,7 +49,6 @@ import org.apache.pinot.spi.utils.CommonConstants;
  * Utility class for shared TLS configuration logic
  */
 public final class TlsUtils {
-  private static final String ENABLED = "enabled";
   private static final String CLIENT_AUTH_ENABLED = "client.auth.enabled";
   private static final String KEYSTORE_PATH = "keystore.path";
   private static final String KEYSTORE_PASSWORD = "keystore.password";

@@ -329,9 +329,26 @@ public class CommonConstants {
     public static class SegmentCompletionProtocol {
       public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";
 
+      /**
+       * Deprecated. Enable legacy https configs for segment upload.
+       * Use server-wide TLS configs instead.
+       */
+      @Deprecated
       public static final String CONFIG_OF_CONTROLLER_HTTPS_ENABLED = "enabled";
+
+      /**
+       * Deprecated. Set the legacy https port for segment upload.
+       * Use server-wide TLS configs instead.
+       */
+      @Deprecated
       public static final String CONFIG_OF_CONTROLLER_HTTPS_PORT = "controller.port";
+
       public static final String CONFIG_OF_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = "upload.request.timeout.ms";
+
+      /**
+       * Specify connection scheme to use for controller upload connections. Defaults to "http"
+       */
+      public static final String CONFIG_OF_PROTOCOL = "protocol";
 
       /**
        * Service token for accessing protected controller APIs.

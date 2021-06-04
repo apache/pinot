@@ -53,6 +53,7 @@ public class ServerSegmentCompletionProtocolHandler {
   private static Integer _controllerHttpsPort;
   private static int _segmentUploadRequestTimeoutMs;
   private static String _authToken;
+  private static String _protocol = HTTP_PROTOCOL;
 
   private final FileUploadDownloadClient _fileUploadDownloadClient;
   private final ServerMetrics _serverMetrics;
@@ -60,10 +61,15 @@ public class ServerSegmentCompletionProtocolHandler {
 
   public static void init(PinotConfiguration uploaderConfig) {
     PinotConfiguration httpsConfig = uploaderConfig.subset(HTTPS_PROTOCOL);
+
+    // NOTE: legacy https config for segment upload is deprecated. If you're relying on these settings, please consider
+    // moving to server-wide TLS configs instead. Legacy support will be removed eventually.
     if (httpsConfig.getProperty(CONFIG_OF_CONTROLLER_HTTPS_ENABLED, false)) {
       _sslContext = new ClientSSLContextGenerator(httpsConfig.subset(CommonConstants.PREFIX_OF_SSL_SUBSET)).generate();
       _controllerHttpsPort = httpsConfig.getProperty(CONFIG_OF_CONTROLLER_HTTPS_PORT, Integer.class);
     }
+
+    _protocol = uploaderConfig.getProperty(CONFIG_OF_PROTOCOL, HTTP_PROTOCOL);
     _segmentUploadRequestTimeoutMs = uploaderConfig
         .getProperty(CONFIG_OF_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS, DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS);
     _authToken = uploaderConfig.getProperty(CONFIG_OF_SEGMENT_UPLOADER_AUTH_TOKEN);
@@ -192,7 +198,7 @@ public class ServerSegmentCompletionProtocolHandler {
       LOGGER.warn("No leader found while trying to send {}", request.toString());
       return null;
     }
-    String protocol = HTTP_PROTOCOL;
+    String protocol = _protocol;
     if (_controllerHttpsPort != null) {
       leaderHostPort.setSecond(_controllerHttpsPort);
       protocol = HTTPS_PROTOCOL;
