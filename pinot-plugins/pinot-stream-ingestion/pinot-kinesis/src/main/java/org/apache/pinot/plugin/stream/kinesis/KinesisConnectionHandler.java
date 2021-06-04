@@ -90,10 +90,10 @@ public class KinesisConnectionHandler {
             KinesisClient.builder().region(Region.of(_region)).credentialsProvider(DefaultCredentialsProvider.create());
       }
 
-      if(StringUtils.isNotBlank(_endpoint)){
+      if (StringUtils.isNotBlank(_endpoint)) {
         try {
           kinesisClientBuilder = kinesisClientBuilder.endpointOverride(new URI(_endpoint));
-        } catch (URISyntaxException e){
+        } catch (URISyntaxException e) {
           throw new IllegalArgumentException("URI syntax is not correctly specified for endpoint: " + _endpoint, e);
         }
       }

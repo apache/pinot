@@ -51,6 +51,7 @@ import org.apache.pinot.client.Request;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.plugin.stream.kinesis.KinesisConfig;
+import org.apache.pinot.plugin.stream.kinesis.KinesisConsumer;
 import org.apache.pinot.plugin.stream.kinesis.KinesisConsumerFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -60,6 +61,8 @@ import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -79,20 +82,22 @@ import software.amazon.awssdk.services.kinesis.model.PutRecordResponse;
 import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 import software.amazon.awssdk.utils.AttributeMap;
 
-import static org.awaitility.Awaitility.await;
 
-
-@LocalstackDockerProperties(services = {"kinesis", "dynamodb"})
+@LocalstackDockerProperties(services = {"kinesis"})
 public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSet {
+  private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeKinesisIntegrationTest.class);
+
   private static final LocalstackDockerAnnotationProcessor PROCESSOR = new LocalstackDockerAnnotationProcessor();
   private static final String STREAM_NAME = "kinesis-test";
   private static final String STREAM_TYPE = "kinesis";
-  public static final int MAX_RECORDS_TO_FETCH = 2000;
+  public static final int MAX_RECORDS_TO_FETCH = Integer.MAX_VALUE;
 
   public static final String REGION = "us-east-1";
   public static final String LOCALSTACK_KINESIS_ENDPOINT = "http://localhost:4566";
   public static final int NUM_SHARDS = 10;
 
+  //Localstack Kinesis doesn't support large rows.
+  //So, this airlineStats data file consists of only few fields and rows from the original data
   public static final String SCHEMA_FILE_PATH = "kinesis/airlineStats_data_reduced.schema";
   public static final String DATA_FILE_PATH = "kinesis/airlineStats_data_reduced.json";
 
@@ -151,6 +156,7 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
         try {
           return getCurrentCountStarResult() >= totalRecordsPushedInStream;
         } catch (Exception e) {
+          LOGGER.warn("Could not fetch current number of rows in pinot table " + getTableName(), e);
           return null;
         }
       }
@@ -209,6 +215,8 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
       stopAllLocalstackDockerCommand.execute();
 
       final LocalstackDockerConfiguration dockerConfig = PROCESSOR.process(this.getClass());
+      //Restart localstack docker after killing all the existing localstack docker containers.
+      //If it fails at this step, the test is terminated.
       localstackDocker.startup(dockerConfig);
     }
 
@@ -219,8 +227,23 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
         .endpointOverride(new URI(LOCALSTACK_KINESIS_ENDPOINT)).build();
 
     kinesisClient.createStream(CreateStreamRequest.builder().streamName(STREAM_NAME).shardCount(NUM_SHARDS).build());
-    await().until(() -> kinesisClient.describeStream(DescribeStreamRequest.builder().streamName(STREAM_NAME).build())
-        .streamDescription().streamStatusAsString().equals("ACTIVE"));
+
+    TestUtils.waitForCondition(new Function<Void, Boolean>() {
+      @Nullable
+      @Override
+      public Boolean apply(@Nullable Void aVoid) {
+        try {
+          String kinesisStreamStatus =
+              kinesisClient.describeStream(DescribeStreamRequest.builder().streamName(STREAM_NAME).build())
+                  .streamDescription().streamStatusAsString();
+
+          return kinesisStreamStatus.contentEquals("ACTIVE");
+        } catch (Exception e) {
+          LOGGER.warn("Could not fetch kinesis stream status", e);
+          return null;
+        }
+      }
+    }, 1000L, 30000, "Kinesis stream " + STREAM_NAME + " is not created or is not in active state", true);
   }
 
   public void stopKinesis() {
@@ -268,9 +291,6 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
                   case "varchar(128)": {
                     h2Statement.setObject(fieldIndex++, data.get(fieldName).textValue());
                     break;
-                  }
-                  default: {
-
                   }
                 }
               }
@@ -333,9 +353,6 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
             String actualValue = pinotResultSet.getString(row, columnToIndex.get(fieldName));
             Assert.assertEquals(expectedValue, actualValue);
             break;
-          }
-          default: {
-
           }
         }
       }
