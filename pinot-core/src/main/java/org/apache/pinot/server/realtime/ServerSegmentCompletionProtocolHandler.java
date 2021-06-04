@@ -61,10 +61,14 @@ public class ServerSegmentCompletionProtocolHandler {
 
   public static void init(PinotConfiguration uploaderConfig) {
     PinotConfiguration httpsConfig = uploaderConfig.subset(HTTPS_PROTOCOL);
+
+    // NOTE: legacy https config for segment upload is deprecated. If you're relying on these settings, please consider
+    // moving to server-wide TLS configs instead. Legacy support will be removed eventually.
     if (httpsConfig.getProperty(CONFIG_OF_CONTROLLER_HTTPS_ENABLED, false)) {
       _sslContext = new ClientSSLContextGenerator(httpsConfig.subset(CommonConstants.PREFIX_OF_SSL_SUBSET)).generate();
       _controllerHttpsPort = httpsConfig.getProperty(CONFIG_OF_CONTROLLER_HTTPS_PORT, Integer.class);
     }
+
     _protocol = uploaderConfig.getProperty(CONFIG_OF_PROTOCOL, HTTP_PROTOCOL);
     _segmentUploadRequestTimeoutMs = uploaderConfig
         .getProperty(CONFIG_OF_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS, DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS);
