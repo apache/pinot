@@ -50,8 +50,6 @@ public class TableResizerTest {
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.OBJECT, DataSchema.ColumnDataType.OBJECT});
   private static final int TRIM_TO_SIZE = 3;
   private static final int NUM_RESULT_HOLDER = 4;
-  private static final int RESULT_SIZE = 15;
-  private static final int GROUPBY_TRIM_SIZE = 10;
 
   private Map<Key, Record> _recordsMap;
   private List<Record> _records;
@@ -76,34 +74,36 @@ public class TableResizerTest {
         new Key(new Object[]{"c", 50, 4.0}),
         new Key(new Object[]{"c", 300, 5.0})
     );
+    //@formatter:on
+    List<Object[]> objectArray = Arrays.asList(
+        new Object[]{"a", 10, 1.0},
+        new Object[]{"b", 10, 2.0},
+        new Object[]{"c", 200, 3.0},
+        new Object[]{"c", 50, 4.0},
+        new Object[]{"c", 300, 5.0});
 
-    // GroupKeys: d1: a0 ~ a14, d2: 10.0 ~ 24.0, d3: 1.0 ~ 15.0
+    // Use _keys for _groupKeys
     _groupKeys = new LinkedList<>();
-    for (int i = 0; i < 15; ++i) {
+    for (int i = 0; i < _keys.size(); ++i) {
       GroupKeyGenerator.GroupKey groupKey = new GroupKeyGenerator.GroupKey();
-      groupKey._keys = new Object[]{"a" + i, 10.0 + i, 1.0 + i};
+      groupKey._keys = objectArray.get(i);
       groupKey._groupId = i;
-
       _groupKeys.add(groupKey);
     }
 
-    // Aggregation results: sum(m1) = 10 % d3, max(m2) = 100 % d3,
-    //                      distinctcount(m3) = set(new int[]{j}), avg(m4) = 10 / (j + 1)
+    // groupByResults are the same as _records
     _groupByResultHolders = new GroupByResultHolder[NUM_RESULT_HOLDER];
     _groupByResultHolders[0] = new DoubleGroupByResultHolder(_groupKeys.size(), _groupKeys.size(), 0.0);
     _groupByResultHolders[1] = new DoubleGroupByResultHolder(_groupKeys.size(), _groupKeys.size(), 0.0);
     _groupByResultHolders[2] = new ObjectGroupByResultHolder(_groupKeys.size(), _groupKeys.size());
     _groupByResultHolders[3] = new ObjectGroupByResultHolder(_groupKeys.size(), _groupKeys.size());
-    for (int j = 0; j < _groupKeys.size(); ++j) {
-      _groupByResultHolders[0]
-          .setValueForKey(_groupKeys.get(j)._groupId, 10 % ((Double) _groupKeys.get(j)._keys[2]));
-      _groupByResultHolders[1]
-          .setValueForKey(_groupKeys.get(j)._groupId, 100 % ((Double) _groupKeys.get(j)._keys[2]));
-      _groupByResultHolders[2].setValueForKey(_groupKeys.get(j)._groupId, new IntOpenHashSet(new int[]{j}));
-      _groupByResultHolders[3].setValueForKey(_groupKeys.get(j)._groupId, new AvgPair(10, j + 1));
+    for (int i = 0; i < _groupKeys.size(); ++i) {
+      _groupByResultHolders[0].setValueForKey(_groupKeys.get(i)._groupId, (double)_records.get(i).getValues()[3]);
+      _groupByResultHolders[1].setValueForKey(_groupKeys.get(i)._groupId, (double)_records.get(i).getValues()[4]);
+      _groupByResultHolders[2].setValueForKey(_groupKeys.get(i)._groupId, _records.get(i).getValues()[5]);
+      _groupByResultHolders[3].setValueForKey(_groupKeys.get(i)._groupId, _records.get(i).getValues()[6]);
     }
 
-    //@formatter:on
     _recordsMap = new HashMap<>();
     int numRecords = _records.size();
     for (int i = 0; i < numRecords; i++) {
@@ -335,44 +335,43 @@ public class TableResizerTest {
   public void testInSegmentTrim() {
     TableResizer tableResizer =
         new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "d3 DESC"));
-    PriorityQueue<IntermediateRecord> result =
-        tableResizer.trimInSegmentResults(_groupKeys.listIterator(), _groupByResultHolders, GROUPBY_TRIM_SIZE);
-    assertEquals(result.size(), GROUPBY_TRIM_SIZE);
-    int i = 5;
-    while (!result.isEmpty()) {
-      IntermediateRecord top = result.poll();
-      assert top._record != null;
-      assertEquals((String) top._record.getValues()[0], "a" + i);
-      ++i;
+    PriorityQueue<IntermediateRecord> results =
+        tableResizer.trimInSegmentResults(_groupKeys.listIterator(), _groupByResultHolders, TRIM_TO_SIZE);
+    assertEquals(results.size(), TRIM_TO_SIZE);
+    IntermediateRecord[] resultArray = new IntermediateRecord[results.size()];
+    for (int i = 0; i < TRIM_TO_SIZE; ++i) {
+      IntermediateRecord result = results.poll();
+      resultArray[i] = result;
     }
+    //  _records[4],  _records[3],  _records[2]
+    assertEquals(resultArray[0]._record, _records.get(2));
+    assertEquals(resultArray[1]._record, _records.get(3));
+    assertEquals(resultArray[2]._record, _records.get(4));
 
     tableResizer = new TableResizer(DATA_SCHEMA, QueryContextConverterUtils
         .getQueryContextFromSQL(QUERY_PREFIX + "SUM(m1) DESC, max(m2) DESC, DISTINCTCOUNT(m3) DESC"));
-    result = tableResizer.trimInSegmentResults(_groupKeys.listIterator(), _groupByResultHolders, GROUPBY_TRIM_SIZE);
-    assertEquals(result.size(), GROUPBY_TRIM_SIZE);
-    // a14 -> d3 = 15 -> SUM(m1) = 10%15 = 10, max(m2) = 100%15 = 10
-    // a12 -> d3 = 13 -> SUM(m1) = 10%13 = 10, max(m2) = 100%13 = 9
-    String[] expect = {"a14", "a12", "a11", "a13", "a10", "a5", "a6", "a7", "a3", "a2"};
-    i = 0;
-    while (!result.isEmpty()) {
-      IntermediateRecord top = result.poll();
-      assert top._record != null;
-      assertEquals((String) top._record.getValues()[0], expect[expect.length - i - 1]);
-      ++i;
+    results = tableResizer.trimInSegmentResults(_groupKeys.listIterator(), _groupByResultHolders, TRIM_TO_SIZE);
+    assertEquals(results.size(), TRIM_TO_SIZE);
+    for (int i = 0; i < TRIM_TO_SIZE; ++i) {
+      IntermediateRecord result = results.poll();
+      resultArray[i] = result;
     }
+    // _records[2],  _records[3],  _records[1]
+    assertEquals(resultArray[0]._record, _records.get(1));
+    assertEquals(resultArray[1]._record, _records.get(3));
+    assertEquals(resultArray[2]._record, _records.get(2));
 
     tableResizer = new TableResizer(DATA_SCHEMA,
         QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "DISTINCTCOUNT(m3) DESC, AVG(m4) ASC"));
-    result = tableResizer.trimInSegmentResults(_groupKeys.listIterator(), _groupByResultHolders, GROUPBY_TRIM_SIZE);
-    assertEquals(result.size(), GROUPBY_TRIM_SIZE);
-
-    // Sum = 10 and count = j + 1. AVG(a14) = 10 / (14 + 1) = 10/15 which is the smallest
-    i = 5;
-    while (!result.isEmpty()) {
-      IntermediateRecord top = result.poll();
-      assert top._record != null;
-      assertEquals((String) top._record.getValues()[0], "a" + i);
-      ++i;
+    results = tableResizer.trimInSegmentResults(_groupKeys.listIterator(), _groupByResultHolders, TRIM_TO_SIZE);
+    assertEquals(results.size(), TRIM_TO_SIZE);
+    for (int i = 0; i < TRIM_TO_SIZE; ++i) {
+      IntermediateRecord result = results.poll();
+      resultArray[i] = result;
     }
+    // _records[2],  _records[3],  _records[1]
+    assertEquals(resultArray[0]._record, _records.get(1));
+    assertEquals(resultArray[1]._record, _records.get(3));
+    assertEquals(resultArray[2]._record, _records.get(4));
   }
 }

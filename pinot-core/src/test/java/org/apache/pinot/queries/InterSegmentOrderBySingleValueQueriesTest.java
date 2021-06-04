@@ -90,7 +90,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
       query += " LIMIT " + expectedResults.size();
     }
 
-    InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2(expectedResults.size(), true);
+    InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2(expectedResults.size());
     BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query, planMaker);
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, expectedNumDocsScanned, expectedNumEntriesScannedInFilter,
@@ -102,10 +102,10 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
    * Tests the in-segment build option for GroupBy OrderBy query. (No trim)
    */
   @Test(dataProvider = "orderBySQLResultTableProvider")
-  public void testGroupByOrderByTrimOptHighLimitSQLResponse(String query, List<Object[]> expectedResults,
+  public void testGroupByOrderByMVSegmentTrimSQLResults(String query, List<Object[]> expectedResults,
       long expectedNumDocsScanned, long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter,
       long expectedNumTotalDocs, DataSchema expectedDataSchema) {
-    InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2(expectedResults.size() + 1, true);
+    InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2(1);
     BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query, planMaker);
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, expectedNumDocsScanned, expectedNumEntriesScannedInFilter,

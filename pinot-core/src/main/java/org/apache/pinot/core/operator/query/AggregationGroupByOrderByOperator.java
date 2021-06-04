@@ -117,7 +117,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     }
 
     // Trim is off or no need to trim
-    if (_trimSize == TRIM_OFF || groupByExecutor.getResultNum() <= _trimSize) {
+    if (_trimSize <= 0 || groupByExecutor.getNumGroups() <= _trimSize) {
       // Build intermediate result block based on aggregation group-by result from the executor
       return new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
     }

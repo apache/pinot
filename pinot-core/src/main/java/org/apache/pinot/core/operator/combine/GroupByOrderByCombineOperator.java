@@ -131,7 +131,7 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
 
       // Merge aggregation group-by result.
       // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
-      Collection<IntermediateRecord> intermediateRecords = intermediateResultsBlock.getIntermediateResult();
+      Collection<IntermediateRecord> intermediateRecords = intermediateResultsBlock.getIntermediateRecords();
       // For now, only GroupBy OrderBy query has pre-constructed intermediate records
       if (intermediateRecords == null) {
         // Merge aggregation group-by result.

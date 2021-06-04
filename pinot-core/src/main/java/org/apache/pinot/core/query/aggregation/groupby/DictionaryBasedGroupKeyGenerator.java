@@ -93,7 +93,6 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
   private final int _globalGroupIdUpperBound;
   private final RawKeyHolder _rawKeyHolder;
-  private int _keyNum;
 
   public DictionaryBasedGroupKeyGenerator(TransformOperator transformOperator, ExpressionContext[] groupByExpressions,
       int numGroupsLimit, int arrayBasedThreshold) {
@@ -107,7 +106,6 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     _dictionaries = new Dictionary[_numGroupByExpressions];
     _singleValueDictIds = new int[_numGroupByExpressions][];
     _multiValueDictIds = new int[_numGroupByExpressions][][];
-    _keyNum = 0;
 
     long cardinalityProduct = 1L;
     boolean longOverflow = false;

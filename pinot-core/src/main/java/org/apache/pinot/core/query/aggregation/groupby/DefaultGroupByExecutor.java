@@ -149,7 +149,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   }
 
   @Override
-  public int getResultNum() {
+  public int getNumGroups() {
     return _groupKeyGenerator.getNumKeys();
   }
 

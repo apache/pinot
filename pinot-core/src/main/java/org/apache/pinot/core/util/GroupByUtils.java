@@ -25,7 +25,7 @@ public final class GroupByUtils {
   private GroupByUtils() {
   }
 
-  private static final int NUM_RESULTS_LOWER_LIMIT = 5000;
+  public static final int DEFAULT_MIN_NUM_GROUPS = 5000;
 
   /**
    * (For PQL semantic) Returns the capacity of the table required by the given query.
@@ -33,16 +33,16 @@ public final class GroupByUtils {
    *       in PQL semantic.
    */
   public static int getTableCapacity(int limit) {
-    return Math.max(limit * 5, NUM_RESULTS_LOWER_LIMIT);
+    return Math.max(limit * 5, DEFAULT_MIN_NUM_GROUPS);
   }
 
   /**
    * Returns the capacity of the table required by the given query.
-   * NOTE: It returns {@code max(limit * 5, resultLowerLimit)} where resultLowerLimit is configured by the user
+   * NOTE: It returns {@code max(limit * 5, minNumGroups)} where minNumGroups is configured by the user
    *      (Default: 5000)
    */
-  public static int getTableCapacity(int limit, int resultLowerLimit) {
-    return Math.max(limit * 5, resultLowerLimit);
+  public static int getTableCapacity(int limit, int minNumGroups) {
+    return Math.max(limit * 5, minNumGroups);
   }
 
   /**
@@ -55,7 +55,7 @@ public final class GroupByUtils {
   public static int getTableCapacity(QueryContext queryContext) {
     int limit = queryContext.getLimit();
     if (queryContext.getOrderByExpressions() != null || queryContext.getHavingFilter() != null) {
-      return Math.max(limit * 5, NUM_RESULTS_LOWER_LIMIT);
+      return Math.max(limit * 5, DEFAULT_MIN_NUM_GROUPS);
     } else {
       return limit;
     }

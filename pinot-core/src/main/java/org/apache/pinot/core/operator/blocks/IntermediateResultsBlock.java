@@ -298,7 +298,7 @@ public class IntermediateResultsBlock implements Block {
    * Get the collection of intermediate records
    */
   @Nullable
-  public Collection<IntermediateRecord> getIntermediateResult() {
+  public Collection<IntermediateRecord> getIntermediateRecords() {
     return _intermediateRecords;
   }
 

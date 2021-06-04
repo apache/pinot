@@ -49,7 +49,7 @@ public interface GroupByExecutor {
    *
    * @return Number of results
    */
-  int getResultNum();
+  int getNumGroups();
 
   /**
    * Trim the GroupBy result up to the threshold max(configurable_threshold * 5, minTrimSize)

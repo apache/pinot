@@ -217,15 +217,11 @@ public class TableResizer {
   }
 
   /**
-   * Trim the aggregation results using a priority queue and returns a the priority queue.
+   * Trims the aggregation results using a priority queue and returns the priority queue.
    * This method is to be called from individual segment if the intermediate results need to be trimmed.
-   * The use case now is Multi-Segment GroupBy OrderBy query.
    */
   public PriorityQueue<IntermediateRecord> trimInSegmentResults(Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator,
       GroupByResultHolder[] _groupByResultHolders, int size) {
-    if (!groupKeyIterator.hasNext() || _groupByResultHolders.length == 0 || size == 0) {
-      return new PriorityQueue<>();
-    }
     int numAggregationFunctions = _aggregationFunctions.length;
     int numColumns = numAggregationFunctions + _numGroupByExpressions;
 
