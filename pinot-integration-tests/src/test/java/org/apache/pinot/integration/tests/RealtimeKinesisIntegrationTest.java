@@ -191,6 +191,8 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
     streamConfigMap.put(KinesisConfig.MAX_RECORDS_TO_FETCH, String.valueOf(MAX_RECORDS_TO_FETCH));
     streamConfigMap.put(KinesisConfig.SHARD_ITERATOR_TYPE, ShardIteratorType.AT_SEQUENCE_NUMBER.toString());
     streamConfigMap.put(KinesisConfig.ENDPOINT, LOCALSTACK_KINESIS_ENDPOINT);
+    streamConfigMap.put(KinesisConfig.ACCESS_KEY, getLocalAWSCredentials().resolveCredentials().accessKeyId());
+    streamConfigMap.put(KinesisConfig.SECRET_KEY, getLocalAWSCredentials().resolveCredentials().secretAccessKey());
     streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, Integer.toString(5000));
     streamConfigMap.put(StreamConfigProperties
         .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "smallest");
@@ -284,8 +286,7 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
     }
   }
 
-  private static AwsCredentialsProvider getLocalAWSCredentials()
-      throws Exception {
+  private static AwsCredentialsProvider getLocalAWSCredentials() {
     return StaticCredentialsProvider.create(AwsBasicCredentials.create("access", "secret"));
   }
 
