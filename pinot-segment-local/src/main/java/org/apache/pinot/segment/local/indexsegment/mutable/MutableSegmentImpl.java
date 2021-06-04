@@ -471,28 +471,28 @@ public class MutableSegmentImpl implements MutableSegment {
   public boolean index(GenericRow row, @Nullable RowMetadata rowMetadata)
       throws IOException {
 
-    boolean canTakeMore;
     if (!_aggregateMetrics) {
       if (isUpsertEnabled()) {
         row = handleUpsert(row, _numDocsIndexed);
-//        row = _partitionUpsertMetadataManager.handleUpsert(row, _numDocsIndexed, primaryKey, timestamp, this);
       }
+    }
 
-      updateDictionary(row);
+    // Update dictionary first
+    updateDictionary(row);
+
+    // If metrics aggregation is enabled and if the dimension values were already seen, this will return existing docId,
+    // else this will return a new docId.
+    int docId = getOrCreateDocId();
+
+    boolean canTakeMore;
+    if (docId == _numDocsIndexed) {
       // New row
       addNewRow(row);
       // Update number of documents indexed at last to make the latest row queryable
       canTakeMore = _numDocsIndexed++ < _capacity;
-
     } else {
       Preconditions.checkArgument(!isUpsertEnabled(), "metrics aggregation cannot be used with upsert");
-      // Update dictionary first
-      updateDictionary(row);
-
-      // If metrics aggregation is enabled and if the dimension values were already seen, this will return existing docId,
-      // else this will return a new docId.
-      int docId = getOrCreateDocId();
-
+      assert _aggregateMetrics;
       aggregateMetrics(row, docId);
       canTakeMore = true;
     }
