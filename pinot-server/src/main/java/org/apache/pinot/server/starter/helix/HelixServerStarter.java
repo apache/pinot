@@ -303,7 +303,7 @@ public class HelixServerStarter implements ServiceStartable {
       Map<String, String> existingEnvironmentConfigsMap = instanceConfig.getRecord().getMapField(
           CommonConstants.ENVIRONMENT_IDENTIFIER);
 
-      if (existingEnvironmentConfigsMap != null && !existingEnvironmentConfigsMap.equals(environmentProperties)) {
+      if (existingEnvironmentConfigsMap == null || !existingEnvironmentConfigsMap.equals(environmentProperties)) {
         instanceConfig.getRecord().setMapField(CommonConstants.ENVIRONMENT_IDENTIFIER, environmentProperties);
         LOGGER.info("Adding environment properties: {} for instance: {}", environmentProperties, _instanceId);
         needToUpdateInstanceConfig = true;
