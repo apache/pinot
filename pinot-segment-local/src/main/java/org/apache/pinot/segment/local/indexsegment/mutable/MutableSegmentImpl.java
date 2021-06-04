@@ -521,11 +521,10 @@ public class MutableSegmentImpl implements MutableSegment {
     long timestamp = IngestionUtils.extractTimeValue((Comparable) timeValue);
 
     // pass in a single value array
-    List<GenericRow> rows = new ArrayList<>();
-    rows.add(row);
+    GenericRow[] rows = new GenericRow[]{row};
     return _partitionUpsertMetadataManager
         .updateRecord(_segmentName, new PartitionUpsertMetadataManager.RecordInfo(primaryKey, docId, timestamp),
-            _validDocIds, rows, this).get(0);
+            _validDocIds, rows, this)[0];
   }
 
   private void updateDictionary(GenericRow row) {

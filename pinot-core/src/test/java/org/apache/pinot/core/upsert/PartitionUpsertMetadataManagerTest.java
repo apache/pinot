@@ -29,6 +29,7 @@ import org.apache.pinot.segment.local.realtime.impl.ThreadSafeMutableRoaringBitm
 import org.apache.pinot.segment.local.upsert.PartialUpsertHandler;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.RecordLocation;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.mockito.Mockito;
@@ -153,8 +154,9 @@ public class PartitionUpsertMetadataManagerTest {
     String segment2 = getSegmentName(2);
     ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
 
+    GenericRow row = Mockito.mock(GenericRow.class);
     upsertMetadataManager
-        .updateRecord(segment2, new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(3), 0, 100), validDocIds2, Mockito.anyList(), Mockito.mock(
+        .updateRecord(segment2, new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(3), 0, 100), validDocIds2, new GenericRow[]{row}, Mockito.mock(
             MutableSegmentImpl.class));
     // segment1: 0 -> {0, 100}, 1 -> {1, 120}, 2 -> {2, 100}
     // segment2: 3 -> {0, 100}
@@ -166,7 +168,7 @@ public class PartitionUpsertMetadataManagerTest {
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0});
 
     upsertMetadataManager
-        .updateRecord(segment2, new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(2), 1, 120), validDocIds2, Mockito.anyList(), Mockito.mock(
+        .updateRecord(segment2, new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(2), 1, 120), validDocIds2, new GenericRow[]{row}, Mockito.mock(
             MutableSegmentImpl.class));
     // segment1: 0 -> {0, 100}, 1 -> {1, 120}
     // segment2: 2 -> {1, 120}, 3 -> {0, 100}
@@ -178,7 +180,7 @@ public class PartitionUpsertMetadataManagerTest {
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
 
     upsertMetadataManager
-        .updateRecord(segment2, new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(1), 2, 100), validDocIds2, Mockito.anyList(), Mockito.mock(
+        .updateRecord(segment2, new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(1), 2, 100), validDocIds2, new GenericRow[]{row}, Mockito.mock(
             MutableSegmentImpl.class));
     // segment1: 0 -> {0, 100}, 1 -> {1, 120}
     // segment2: 2 -> {1, 120}, 3 -> {0, 100}
@@ -190,7 +192,7 @@ public class PartitionUpsertMetadataManagerTest {
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
 
     upsertMetadataManager
-        .updateRecord(segment2, new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(0), 3, 100), validDocIds2, Mockito.anyList(), Mockito.mock(
+        .updateRecord(segment2, new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(0), 3, 100), validDocIds2, new GenericRow[]{row}, Mockito.mock(
             MutableSegmentImpl.class));
     // segment1: 1 -> {1, 120}
     // segment2: 0 -> {3, 100}, 2 -> {1, 120}, 3 -> {0, 100}

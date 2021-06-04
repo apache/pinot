@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Iterator;
-import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -154,7 +153,7 @@ public class PartitionUpsertMetadataManager {
   /**
    * Updates the upsert metadata for a new consumed record in the given consuming segment.
    */
-  public List<GenericRow> updateRecord(String segmentName, RecordInfo recordInfo, ThreadSafeMutableRoaringBitmap validDocIds, List<GenericRow> rows, MutableSegmentImpl mutableSegmentImpl) {
+  public GenericRow[] updateRecord(String segmentName, RecordInfo recordInfo, ThreadSafeMutableRoaringBitmap validDocIds, GenericRow[] rows, MutableSegmentImpl mutableSegmentImpl) {
     _primaryKeyToRecordLocationMap.compute(recordInfo._primaryKey, (primaryKey, currentRecordLocation) -> {
       if (currentRecordLocation != null) {
         // Existing primary key
@@ -170,8 +169,7 @@ public class PartitionUpsertMetadataManager {
               previousRow = _tableDataManager.acquireSegment(currentRecordLocation.getSegmentName()).getSegment()
                   .getRecord(currentRecordLocation.getDocId(), previousRow);
             }
-            rows.add(_partialUpsertHandler.merge(previousRow, rows.get(0)));
-            rows.remove(0);
+            rows[0] = _partialUpsertHandler.merge(previousRow, rows[0]);
           }
 
           currentRecordLocation.getValidDocIds().remove(currentRecordLocation.getDocId());
