@@ -23,20 +23,20 @@ import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.avro.file.DataFileWriter;
-import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.segment.processing.collector.CollectorConfig;
 import org.apache.pinot.core.segment.processing.collector.CollectorFactory;
 import org.apache.pinot.core.segment.processing.collector.ValueAggregatorFactory;
-import org.apache.pinot.core.util.SegmentProcessorAvroUtils;
+import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
+import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileWriter;
+import org.apache.pinot.core.segment.processing.utils.SegmentProcessingUtils;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordReader;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -55,60 +55,47 @@ import static org.testng.Assert.assertTrue;
  * Tests for {@link SegmentReducer}
  */
 public class SegmentReducerTest {
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "SegmentReducerTest");
 
-  private File _baseDir;
-  private File _partDir;
-  private Schema _pinotSchema;
-  private final List<Object[]> _rawData1597795200000L = Lists
-      .newArrayList(new Object[]{"abc", 4000, 1597795200000L}, new Object[]{"abc", 3000, 1597795200000L},
+  private final File _mapperOutputDir = new File(TEMP_DIR, "mapper_output/1597795200000");
+  private final Schema _pinotSchema = new Schema.SchemaBuilder().setSchemaName("mySchema")
+      .addSingleValueDimension("campaign", FieldSpec.DataType.STRING).addMetric("clicks", FieldSpec.DataType.INT)
+      .addDateTime("timeValue", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+  private final List<Object[]> _rawData1597795200000L = Arrays
+      .asList(new Object[]{"abc", 4000, 1597795200000L}, new Object[]{"abc", 3000, 1597795200000L},
           new Object[]{"pqr", 1000, 1597795200000L}, new Object[]{"xyz", 4000, 1597795200000L},
           new Object[]{"pqr", 1000, 1597795200000L});
 
+  private GenericRowFileManager _fileManager;
+
   @BeforeClass
-  public void before()
+  public void setUp()
       throws IOException {
-    _baseDir = new File(FileUtils.getTempDirectory(), "segment_reducer_test_" + System.currentTimeMillis());
-    FileUtils.deleteQuietly(_baseDir);
-    assertTrue(_baseDir.mkdirs());
+    FileUtils.deleteQuietly(TEMP_DIR);
+    assertTrue(_mapperOutputDir.mkdirs());
 
-    // mapper output directory/partition directory
-    _partDir = new File(_baseDir, "mapper_output/1597795200000");
-    assertTrue(_partDir.mkdirs());
-
-    _pinotSchema = new Schema.SchemaBuilder().setSchemaName("mySchema")
-        .addSingleValueDimension("campaign", FieldSpec.DataType.STRING).addMetric("clicks", FieldSpec.DataType.INT)
-        .addDateTime("timeValue", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
-    org.apache.avro.Schema avroSchema = SegmentProcessorAvroUtils.convertPinotSchemaToAvroSchema(_pinotSchema);
-
-    // create 2 avro files
-    DataFileWriter<GenericData.Record> recordWriter1 = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema));
-    recordWriter1.create(avroSchema, new File(_partDir, "map1.avro"));
-    DataFileWriter<GenericData.Record> recordWriter2 = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema));
-    recordWriter2.create(avroSchema, new File(_partDir, "map2.avro"));
+    List<FieldSpec> fieldSpecs = SegmentProcessingUtils.getFieldSpecs(_pinotSchema);
+    _fileManager = new GenericRowFileManager(_mapperOutputDir, fieldSpecs, false);
+    GenericRowFileWriter fileWriter = _fileManager.getFileWriter();
+    GenericRow reuse = new GenericRow();
     for (int i = 0; i < 5; i++) {
-      GenericData.Record record = new GenericData.Record(avroSchema);
-      record.put("campaign", _rawData1597795200000L.get(i)[0]);
-      record.put("clicks", _rawData1597795200000L.get(i)[1]);
-      record.put("timeValue", _rawData1597795200000L.get(i)[2]);
-      if (i < 2) {
-        recordWriter1.append(record);
-      } else {
-        recordWriter2.append(record);
-      }
+      reuse.putValue("campaign", _rawData1597795200000L.get(i)[0]);
+      reuse.putValue("clicks", _rawData1597795200000L.get(i)[1]);
+      reuse.putValue("timeValue", _rawData1597795200000L.get(i)[2]);
+      fileWriter.write(reuse);
+      reuse.clear();
     }
-    recordWriter1.close();
-    recordWriter2.close();
+    _fileManager.closeFileWriter();
   }
 
   @Test(dataProvider = "segmentReducerDataProvider")
   public void segmentReducerTest(String reducerId, SegmentReducerConfig reducerConfig, Set<String> expectedFileNames,
       List<Object[]> expectedRecords, Comparator comparator)
       throws Exception {
-
-    File reducerOutputDir = new File(_baseDir, "reducer_output");
+    File reducerOutputDir = new File(TEMP_DIR, "reducer_output");
     FileUtils.deleteQuietly(reducerOutputDir);
     assertTrue(reducerOutputDir.mkdirs());
-    SegmentReducer segmentReducer = new SegmentReducer(reducerId, _partDir, reducerConfig, reducerOutputDir);
+    SegmentReducer segmentReducer = new SegmentReducer(reducerId, _fileManager, reducerConfig, reducerOutputDir);
     segmentReducer.reduce();
     segmentReducer.cleanup();
 
@@ -210,7 +197,9 @@ public class SegmentReducerTest {
   }
 
   @AfterClass
-  public void after() {
-    FileUtils.deleteQuietly(_baseDir);
+  public void tearDown()
+      throws IOException {
+    _fileManager.cleanUp();
+    FileUtils.deleteQuietly(TEMP_DIR);
   }
 }
