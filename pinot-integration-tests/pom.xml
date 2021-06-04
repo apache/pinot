@@ -96,6 +96,8 @@
                 <exclude>**/RealtimeClusterIntegrationTest.java</exclude>
                 <!-- Covered by ConvertToRawIndexMinionClusterIntegrationTest -->
                 <exclude>**/HybridClusterIntegrationTest.java</exclude>
+                <!-- Covered by BasicAuthTlsRealtimeClusterIntegrationTest -->
+                <exclude>**/BasicAuthRealtimeIntegrationTest.java</exclude>
               </excludes>
             </configuration>
           </plugin>

@@ -55,6 +55,10 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER;
 
 
+/**
+ * NOTE: if (only) this test fails it may be due to either (a) auth issues or (b) TLS/SSL issues. To determine which way
+ * to go, you can manually run BasicAuthRealtimeIntegrationTest which tests the auth aspect only.
+ */
 public class BasicAuthTlsRealtimeIntegrationTest extends BaseClusterIntegrationTest {
   private final File _tempDirTls = new File(FileUtils.getTempDirectory(), getClass().getSimpleName() + "-cert");
   private final File _tlsStore = _tempDirTls.toPath().resolve("tlsstore.jks").toFile();

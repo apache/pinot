@@ -148,6 +148,7 @@ public abstract class ClusterTest extends ControllerTest {
     brokerStarter.start();
     _brokerStarters.add(brokerStarter);
 
+    // TLS configs require hard-coding
     _brokerPorts.add(DEFAULT_BROKER_PORT);
     _brokerBaseApiUrl = "https://localhost:" + _brokerPorts.get(0);
   }
