@@ -178,20 +178,20 @@ public class MutableSegmentImpl implements MutableSegment {
             realtimeSegmentZKMetadata.getEndTime(), realtimeSegmentZKMetadata.getTimeUnit(),
             realtimeSegmentZKMetadata.getTotalDocs(), realtimeSegmentZKMetadata.getCrc(), _schema) {
           @Override
-      public int getTotalDocs() {
-        return _numDocsIndexed;
-      }
+          public int getTotalDocs() {
+            return _numDocsIndexed;
+          }
 
-      @Override
-      public long getLastIndexedTimestamp() {
-        return _lastIndexedTimeMs;
-      }
+          @Override
+          public long getLastIndexedTimestamp() {
+            return _lastIndexedTimeMs;
+          }
 
-      @Override
-      public long getLatestIngestionTimestamp() {
-        return _latestIngestionTimeMs;
-      }
-    };
+          @Override
+          public long getLatestIngestionTimestamp() {
+            return _latestIngestionTimeMs;
+          }
+        };
 
     _offHeap = config.isOffHeap();
     _memoryManager = config.getMemoryManager();
@@ -373,6 +373,7 @@ public class MutableSegmentImpl implements MutableSegment {
     // init upsert-related data structure
     _upsertMode = config.getUpsertMode();
     if (isUpsertEnabled()) {
+      Preconditions.checkState(!_aggregateMetrics, "Metrics aggregation and upsert cannot be enabled together");
       _partitionUpsertMetadataManager = config.getPartitionUpsertMetadataManager();
       _validDocIds = new ThreadSafeMutableRoaringBitmap();
       _validDocIndex = new ValidDocIndexReaderImpl(_validDocIds);
@@ -470,31 +471,32 @@ public class MutableSegmentImpl implements MutableSegment {
   @Override
   public boolean index(GenericRow row, @Nullable RowMetadata rowMetadata)
       throws IOException {
-
-    if (!_aggregateMetrics) {
-      if (isUpsertEnabled()) {
-        row = handleUpsert(row, _numDocsIndexed);
-      }
-    }
-
-    // Update dictionary first
-    updateDictionary(row);
-
-    // If metrics aggregation is enabled and if the dimension values were already seen, this will return existing docId,
-    // else this will return a new docId.
-    int docId = getOrCreateDocId();
-
     boolean canTakeMore;
-    if (docId == _numDocsIndexed) {
-      // New row
+    if (isUpsertEnabled()) {
+      row = handleUpsert(row, _numDocsIndexed);
+
+      updateDictionary(row);
       addNewRow(row);
       // Update number of documents indexed at last to make the latest row queryable
       canTakeMore = _numDocsIndexed++ < _capacity;
     } else {
-      Preconditions.checkArgument(!isUpsertEnabled(), "metrics aggregation cannot be used with upsert");
-      assert _aggregateMetrics;
-      aggregateMetrics(row, docId);
-      canTakeMore = true;
+      // Update dictionary first
+      updateDictionary(row);
+
+      // If metrics aggregation is enabled and if the dimension values were already seen, this will return existing
+      // docId, else this will return a new docId.
+      int docId = getOrCreateDocId();
+
+      if (docId == _numDocsIndexed) {
+        // New row
+        addNewRow(row);
+        // Update number of documents indexed at last to make the latest row queryable
+        canTakeMore = _numDocsIndexed++ < _capacity;
+      } else {
+        assert _aggregateMetrics;
+        aggregateMetrics(row, docId);
+        canTakeMore = true;
+      }
     }
 
     // Update last indexed time and latest ingestion time
@@ -510,21 +512,14 @@ public class MutableSegmentImpl implements MutableSegment {
     return _upsertMode != UpsertConfig.Mode.NONE;
   }
 
-  public boolean isPartialUpsertEnabled() {
-    return _upsertMode == UpsertConfig.Mode.PARTIAL;
-  }
-
   private GenericRow handleUpsert(GenericRow row, int docId) {
     PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
     Object timeValue = row.getValue(_timeColumnName);
     Preconditions.checkArgument(timeValue instanceof Comparable, "time column shall be comparable");
     long timestamp = IngestionUtils.extractTimeValue((Comparable) timeValue);
-
-    // pass in a single value array
-    GenericRow[] rows = new GenericRow[]{row};
     return _partitionUpsertMetadataManager
         .updateRecord(_segmentName, new PartitionUpsertMetadataManager.RecordInfo(primaryKey, docId, timestamp),
-            _validDocIds, rows, this)[0];
+            _validDocIds, row);
   }
 
   private void updateDictionary(GenericRow row) {
@@ -727,10 +722,6 @@ public class MutableSegmentImpl implements MutableSegment {
   public Set<String> getColumnNames() {
     // Return all column names, virtual and physical.
     return Sets.union(_schema.getColumnNames(), _newlyAddedColumnsFieldMap.keySet());
-  }
-
-  public ThreadSafeMutableRoaringBitmap getValidDocIds() {
-    return _validDocIds;
   }
 
   @Override

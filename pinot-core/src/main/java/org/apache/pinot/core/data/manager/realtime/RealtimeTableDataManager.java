@@ -116,7 +116,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private TableUpsertMetadataManager _tableUpsertMetadataManager;
   private List<String> _primaryKeyColumns;
   private String _timeColumnName;
-  private PartialUpsertHandler _partialUpsertHandler;
 
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
     _segmentBuildSemaphore = segmentBuildSemaphore;
@@ -160,16 +159,19 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", _tableNameWithType);
     _upsertMode = tableConfig.getUpsertMode();
     if (isUpsertEnabled()) {
+      UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+      assert upsertConfig != null;
       Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
 
+      PartialUpsertHandler partialUpsertHandler = null;
       if (isPartialUpsertEnabled()) {
-        _partialUpsertHandler = new PartialUpsertHandler();
-        // only init partial upsert handler for partial mode
-        _partialUpsertHandler.init(tableConfig.getUpsertConfig().getGlobalUpsertStrategy(), tableConfig.getUpsertConfig().getPartialUpsertStrategies());
+        partialUpsertHandler = new PartialUpsertHandler();
+        partialUpsertHandler.init(upsertConfig.getGlobalUpsertStrategy(), upsertConfig.getPartialUpsertStrategies());
       }
 
-      _tableUpsertMetadataManager = new TableUpsertMetadataManager(_tableNameWithType, _serverMetrics, this, _partialUpsertHandler);
+      _tableUpsertMetadataManager =
+          new TableUpsertMetadataManager(_tableNameWithType, _serverMetrics, this, partialUpsertHandler);
       _primaryKeyColumns = schema.getPrimaryKeyColumns();
       Preconditions.checkState(!CollectionUtils.isEmpty(_primaryKeyColumns),
           "Primary key columns must be configured for upsert");
@@ -313,12 +315,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       // The segment is uploaded to an upsert enabled realtime table. Download the segment and load.
       Preconditions.checkArgument(realtimeSegmentZKMetadata instanceof LLCRealtimeSegmentZKMetadata,
           "Upload segment is not LLC segment");
-      String downURL = ((LLCRealtimeSegmentZKMetadata) realtimeSegmentZKMetadata).getDownloadUrl();
-      Preconditions.checkNotNull(downURL, "Upload segment metadata has no download url");
-      downloadSegmentFromDeepStore(segmentName, indexLoadingConfig, downURL);
+      String downloadUrl = ((LLCRealtimeSegmentZKMetadata) realtimeSegmentZKMetadata).getDownloadUrl();
+      Preconditions.checkNotNull(downloadUrl, "Upload segment metadata has no download url");
+      downloadSegmentFromDeepStore(segmentName, indexLoadingConfig, downloadUrl);
       _logger
           .info("Downloaded, untarred and add segment {} of table {} from {}", segmentName, tableConfig.getTableName(),
-              downURL);
+              downloadUrl);
       return;
     }
 

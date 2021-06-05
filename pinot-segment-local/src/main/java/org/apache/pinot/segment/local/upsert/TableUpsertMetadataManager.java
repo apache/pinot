@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.upsert;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
@@ -37,7 +38,7 @@ public class TableUpsertMetadataManager {
   private final PartialUpsertHandler _partialUpsertHandler;
 
   public TableUpsertMetadataManager(String tableNameWithType, ServerMetrics serverMetrics,
-      TableDataManager tableDataManager, PartialUpsertHandler partialUpsertHandler) {
+      TableDataManager tableDataManager, @Nullable PartialUpsertHandler partialUpsertHandler) {
     _tableNameWithType = tableNameWithType;
     _serverMetrics = serverMetrics;
     _tableDataManager = tableDataManager;

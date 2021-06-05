@@ -21,12 +21,13 @@ package org.apache.pinot.segment.local.upsert;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.realtime.impl.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
@@ -65,9 +66,13 @@ public class PartitionUpsertMetadataManager {
   private final ServerMetrics _serverMetrics;
   private final TableDataManager _tableDataManager;
   private final PartialUpsertHandler _partialUpsertHandler;
+  // Reused for reading previous record during partial upsert
+  private final GenericRow _reuse = new GenericRow();
+  // Stores the result of updateRecord()
+  private GenericRow _result;
 
   public PartitionUpsertMetadataManager(String tableNameWithType, int partitionId, ServerMetrics serverMetrics,
-      TableDataManager tableDataManager, PartialUpsertHandler partialUpsertHandler) {
+      TableDataManager tableDataManager, @Nullable PartialUpsertHandler partialUpsertHandler) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
     _serverMetrics = serverMetrics;
@@ -151,9 +156,12 @@ public class PartitionUpsertMetadataManager {
   }
 
   /**
-   * Updates the upsert metadata for a new consumed record in the given consuming segment.
+   * Updates the upsert metadata for a new consumed record in the given consuming segment. Returns the merged record if
+   * partial-upsert is enabled.
    */
-  public GenericRow[] updateRecord(String segmentName, RecordInfo recordInfo, ThreadSafeMutableRoaringBitmap validDocIds, GenericRow[] rows, MutableSegmentImpl mutableSegmentImpl) {
+  public GenericRow updateRecord(String segmentName, RecordInfo recordInfo, ThreadSafeMutableRoaringBitmap validDocIds,
+      GenericRow record) {
+    _result = record;
     _primaryKeyToRecordLocationMap.compute(recordInfo._primaryKey, (primaryKey, currentRecordLocation) -> {
       if (currentRecordLocation != null) {
         // Existing primary key
@@ -161,21 +169,33 @@ public class PartitionUpsertMetadataManager {
         // Update the record location when the new timestamp is greater than or equal to the current timestamp. Update
         // the record location when there is a tie to keep the newer record.
         if (recordInfo._timestamp >= currentRecordLocation.getTimestamp()) {
-          if (mutableSegmentImpl.isPartialUpsertEnabled()) {
-            GenericRow previousRow = new GenericRow();
-            if (currentRecordLocation.getSegmentName() == mutableSegmentImpl.getSegmentName()) {
-              previousRow = mutableSegmentImpl.getRecord(currentRecordLocation.getDocId(), previousRow);
+          if (_partialUpsertHandler != null) {
+            // Partial upsert
+            String currentSegmentName = currentRecordLocation.getSegmentName();
+            SegmentDataManager segmentDataManager = _tableDataManager.acquireSegment(currentSegmentName);
+            if (segmentDataManager != null) {
+              try {
+                _reuse.clear();
+                GenericRow previousRecord =
+                    segmentDataManager.getSegment().getRecord(currentRecordLocation.getDocId(), _reuse);
+                _result = _partialUpsertHandler.merge(previousRecord, record);
+              } finally {
+                _tableDataManager.releaseSegment(segmentDataManager);
+              }
             } else {
-              previousRow = _tableDataManager.acquireSegment(currentRecordLocation.getSegmentName()).getSegment()
-                  .getRecord(currentRecordLocation.getDocId(), previousRow);
+              LOGGER.warn("Failed to find current segment for partial upsert: {}, skipping updating the record",
+                  currentSegmentName);
             }
-            rows[0] = _partialUpsertHandler.merge(previousRow, rows[0]);
           }
-
           currentRecordLocation.getValidDocIds().remove(currentRecordLocation.getDocId());
           validDocIds.add(recordInfo._docId);
           return new RecordLocation(segmentName, recordInfo._docId, recordInfo._timestamp, validDocIds);
         } else {
+          if (_partialUpsertHandler != null) {
+            LOGGER.warn(
+                "Got late record for partial upsert: {} (current timestamp: {}, record timestamp: {}), skipping updating the record",
+                record, currentRecordLocation.getTimestamp(), recordInfo._timestamp);
+          }
           return currentRecordLocation;
         }
       } else {
@@ -187,7 +207,7 @@ public class PartitionUpsertMetadataManager {
     // Update metrics
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
         _primaryKeyToRecordLocationMap.size());
-    return rows;
+    return _result;
   }
 
   /**
