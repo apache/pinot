@@ -66,14 +66,19 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
   }
 
   public PulsarMessageBatch fetchMessages(MessageId startMessageId, MessageId endMessageId,
-      List<Message<byte[]>> messagesList)
-      throws TimeoutException {
+      List<Message<byte[]>> messagesList) {
     //TODO: return n-1 records instead of n and use offset of nth record as next starting point
     try {
       _reader.seek(startMessageId);
 
       while (_reader.hasMessageAvailable()) {
         Message<byte[]> nextMessage = _reader.readNext();
+
+        if (endMessageId != null) {
+          if (nextMessage.getMessageId().compareTo(endMessageId) > 0) {
+            break;
+          }
+        }
         messagesList.add(nextMessage);
       }
 

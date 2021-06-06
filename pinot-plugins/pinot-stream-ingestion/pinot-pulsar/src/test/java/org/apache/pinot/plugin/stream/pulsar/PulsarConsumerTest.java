@@ -18,18 +18,25 @@
  */
 package org.apache.pinot.plugin.stream.pulsar;
 
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pulsar.client.admin.PulsarAdmin;
+import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageId;
+import org.apache.pulsar.client.api.MessageRouter;
 import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.Schema;
+import org.apache.pulsar.client.api.TopicMetadata;
+import org.apache.pulsar.client.impl.MessageIdImpl;
+import org.apache.pulsar.client.internal.DefaultImplementation;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -42,10 +49,11 @@ public class PulsarConsumerTest {
   public static final String TEST_TOPIC = "test-topic";
   public static final int NUM_PARTITION = 3;
   public static final String MESSAGE_PREFIX = "sample_msg";
-  public static final int NUM_RECORDS = 1000;
+  public static final int NUM_RECORDS_PER_PARTITION = 1000;
   public static final String CLIENT_ID = "clientId";
   private PulsarClient _pulsarClient;
   private PulsarStandaloneCluster _pulsarStandaloneCluster;
+  private HashMap<Integer, MessageId> _partitionToFirstMessageIdMap = new HashMap<>();
 
   @BeforeClass
   public void setUp()
@@ -74,9 +82,22 @@ public class PulsarConsumerTest {
 
   public void publishRecords()
       throws Exception {
-    Producer<String> producer = _pulsarClient.newProducer(Schema.STRING).topic(TEST_TOPIC).create();
-    for (int i = 0; i < NUM_RECORDS; i++) {
-      producer.send(MESSAGE_PREFIX + "-" + i);
+    for(int p = 0; p < NUM_PARTITION ; p++) {
+      final int partition = p;
+      Producer<String> producer = _pulsarClient.newProducer(Schema.STRING).topic(TEST_TOPIC).messageRouter(new MessageRouter() {
+        @Override
+        public int choosePartition(Message<?> msg, TopicMetadata metadata) {
+          return partition;
+        }
+      }).create();
+
+      for (int i = 0; i < NUM_RECORDS_PER_PARTITION; i++) {
+        MessageId messageId = producer.send(MESSAGE_PREFIX + "_" + i);
+        if(!_partitionToFirstMessageIdMap.containsKey(partition)){
+          _partitionToFirstMessageIdMap.put(partition, messageId);
+        }
+      }
+
     }
   }
 
@@ -110,19 +131,46 @@ public class PulsarConsumerTest {
     final StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(getStreamConfig());
     int numPartitions = new PulsarStreamMetadataProvider(CLIENT_ID, getStreamConfig()).fetchPartitionCount(10000);
 
-    int totalMessagesReceived = 0;
     for (int partition = 0; partition < numPartitions; partition++) {
-      final PartitionLevelConsumer consumer = streamConsumerFactory.createPartitionLevelConsumer(CLIENT_ID, partition);
-      final MessageBatch messageBatch =
-          consumer.fetchMessages(new MessageIdStreamOffset(MessageId.earliest), null, 10000);
+      int totalMessagesReceived = 0;
 
-      for (int i = 0; i < messageBatch.getMessageCount(); i++) {
-        final byte[] msg = (byte[]) messageBatch.getMessageAtIndex(i);
-        Assert.assertTrue(new String(msg).contains(MESSAGE_PREFIX));
+      final PartitionLevelConsumer consumer = streamConsumerFactory.createPartitionLevelConsumer(CLIENT_ID, partition);
+      final MessageBatch messageBatch1 =
+          consumer.fetchMessages(new MessageIdStreamOffset(MessageId.earliest), new MessageIdStreamOffset(getMessageIdForPartitionAndIndex(partition, 500)), 10000);
+      Assert.assertEquals(messageBatch1.getMessageCount(), 500);
+      for (int i = 0; i < messageBatch1.getMessageCount(); i++) {
+        final byte[] msg = (byte[]) messageBatch1.getMessageAtIndex(i);
+        Assert.assertEquals(new String(msg), "sample_msg_" + i);
         totalMessagesReceived++;
       }
+
+     final MessageBatch messageBatch2 = consumer.fetchMessages(new MessageIdStreamOffset(getMessageIdForPartitionAndIndex(partition, 500)), null, 10000);
+      Assert.assertEquals(messageBatch2.getMessageCount(), 500);
+      for (int i = 0; i < messageBatch2.getMessageCount(); i++) {
+        final byte[] msg = (byte[]) messageBatch2.getMessageAtIndex(i);
+        Assert.assertEquals(new String(msg), "sample_msg_" + (500 + i));
+        totalMessagesReceived++;
+      }
+
+
+      final MessageBatch messageBatch3 = consumer.fetchMessages(new MessageIdStreamOffset(getMessageIdForPartitionAndIndex(partition, 10)), new MessageIdStreamOffset(getMessageIdForPartitionAndIndex(partition, 35)), 10000);
+      Assert.assertEquals(messageBatch3.getMessageCount(), 25);
+      for (int i = 0; i < messageBatch3.getMessageCount(); i++) {
+        final byte[] msg = (byte[]) messageBatch3.getMessageAtIndex(i);
+        Assert.assertEquals(new String(msg), "sample_msg_" + (10 + i));
+      }
+
+      Assert.assertEquals(totalMessagesReceived, NUM_RECORDS_PER_PARTITION);
+
     }
 
-    Assert.assertEquals(totalMessagesReceived, NUM_RECORDS);
   }
+
+
+  public MessageId getMessageIdForPartitionAndIndex(int partitionNum, int index){
+   MessageId startMessageIdRaw =  _partitionToFirstMessageIdMap.get(partitionNum);
+   MessageIdImpl startMessageId = MessageIdImpl.convertToMessageIdImpl(startMessageIdRaw);
+   return DefaultImplementation.newMessageId(startMessageId.getLedgerId(), index, partitionNum);
+  }
+
 }
