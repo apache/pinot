@@ -31,10 +31,10 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
 
   @Override
   public MessageBatch fetchMessages(StreamPartitionMsgOffset startMsgOffset, StreamPartitionMsgOffset endMsgOffset,
-      int timeoutMillis)
-      throws TimeoutException {
+      int timeoutMillis) {
     final MessageId startMessageId = ((MessageIdStreamOffset) startMsgOffset).getMessageId();
-    final MessageId endMessageId = endMsgOffset == null ? MessageId.latest : ((MessageIdStreamOffset) endMsgOffset).getMessageId();
+    final MessageId endMessageId =
+        endMsgOffset == null ? MessageId.latest : ((MessageIdStreamOffset) endMsgOffset).getMessageId();
 
     List<Message<byte[]>> messagesList = new ArrayList<>();
     Future<PulsarMessageBatch> pulsarResultFuture =
@@ -45,11 +45,10 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
     } catch (Exception e) {
       return new PulsarMessageBatch(buildOffsetFilteringIterable(messagesList, startMessageId, endMessageId));
     }
-
-
   }
 
-  public PulsarMessageBatch fetchMessages(MessageId startMessageId, MessageId endMessageId, List<Message<byte[]>> messagesList)
+  public PulsarMessageBatch fetchMessages(MessageId startMessageId, MessageId endMessageId,
+      List<Message<byte[]>> messagesList)
       throws TimeoutException {
     //TODO: return n-1 records instead of n and use offset of nth record as next starting point
     try {
@@ -61,23 +60,23 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
       }
 
       return new PulsarMessageBatch(buildOffsetFilteringIterable(messagesList, startMessageId, endMessageId));
-    }catch (PulsarClientException e){
+    } catch (PulsarClientException e) {
       LOGGER.warn("Error consuming records from Pulsar topic", e);
       return new PulsarMessageBatch(buildOffsetFilteringIterable(messagesList, startMessageId, endMessageId));
     }
   }
 
-  private Iterable<Message<byte[]>> buildOffsetFilteringIterable(
-      final List<Message<byte[]>> messageAndOffsets, final MessageId startOffset, final MessageId endOffset) {
+  private Iterable<Message<byte[]>> buildOffsetFilteringIterable(final List<Message<byte[]>> messageAndOffsets,
+      final MessageId startOffset, final MessageId endOffset) {
     return Iterables.filter(messageAndOffsets, input -> {
       // Filter messages that are either null or have an offset ∉ [startOffset, endOffset]
-      return input != null && input.getData() != null && (input.getMessageId().compareTo(startOffset) >= 0) && ( (endOffset == null) || ( input.getMessageId().compareTo(endOffset) < 0));
+      return input != null && input.getData() != null && (input.getMessageId().compareTo(startOffset) >= 0) && (
+          (endOffset == null) || (input.getMessageId().compareTo(endOffset) < 0));
     });
   }
 
   @Override
-  public MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis)
-      throws TimeoutException {
+  public MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis) {
     throw new UnsupportedOperationException("Pulsar does not support long offsets");
   }
 

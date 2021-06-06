@@ -2,7 +2,6 @@ package org.apache.pinot.plugin.stream.pulsar;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.concurrent.TimeoutException;
 import javax.annotation.Nonnull;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -10,9 +9,12 @@ import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.PulsarClientException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnectionHandler implements StreamMetadataProvider {
+  private Logger LOGGER = LoggerFactory.getLogger(PulsarStreamMetadataProvider.class);
 
   private String _clientId;
   private StreamConfig _streamConfig;
@@ -35,7 +37,7 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
   public int fetchPartitionCount(long timeoutMillis) {
     try {
       return _pulsarClient.getPartitionsForTopic(_streamConfig.getTopicName()).get().size();
-    } catch (Exception e){
+    } catch (Exception e) {
       //TODO: Handle error
       return 0;
     }
@@ -47,8 +49,8 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
   }
 
   @Override
-  public StreamPartitionMsgOffset fetchStreamPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)
-      throws TimeoutException {
+  public StreamPartitionMsgOffset fetchStreamPartitionOffset(@Nonnull OffsetCriteria offsetCriteria,
+      long timeoutMillis) {
     Preconditions.checkNotNull(offsetCriteria);
     try {
       MessageId offset = null;
@@ -66,8 +68,9 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
         throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria.toString());
       }
       return new MessageIdStreamOffset(offset);
-    } catch (PulsarClientException e){
-      //TODO: handler exception
+    } catch (PulsarClientException e) {
+      LOGGER.error("Cannot fetch offsets for partition " + _partition + " and topic " + _topic + " and offsetCriteria "
+          + offsetCriteria.toString(), e);
       return null;
     }
   }
@@ -75,6 +78,6 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
   @Override
   public void close()
       throws IOException {
-    //super.close();
+    super.close();
   }
 }

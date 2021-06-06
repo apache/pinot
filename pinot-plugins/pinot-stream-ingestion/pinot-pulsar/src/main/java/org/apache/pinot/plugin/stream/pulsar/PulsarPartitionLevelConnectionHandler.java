@@ -27,14 +27,7 @@ public class PulsarPartitionLevelConnectionHandler {
     _clientId = clientId;
     _partition = partition;
     _topic = _config.getPulsarTopicName();
-//    Properties consumerProp = new Properties();
-//    consumerProp.putAll(streamConfig.getStreamConfigsMap());
-//    consumerProp.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, _config.getBootstrapHosts());
-//    consumerProp.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-//    consumerProp.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, BytesDeserializer.class.getName());
-//    if (_config.getKafkaIsolationLevel() != null) {
-//      consumerProp.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, _config.getKafkaIsolationLevel());
-//    }
+
     try {
       _pulsarClient = PulsarClient.builder().serviceUrl(_config.getBootstrapServers()).build();
 

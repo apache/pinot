@@ -4,9 +4,12 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pulsar.client.api.MessageId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class MessageIdStreamOffset implements StreamPartitionMsgOffset {
+  private Logger LOGGER = LoggerFactory.getLogger(MessageIdStreamOffset.class);
   private MessageId _messageId;
 
   public MessageIdStreamOffset(MessageId messageId){
@@ -17,7 +20,7 @@ public class MessageIdStreamOffset implements StreamPartitionMsgOffset {
     try {
       _messageId = MessageId.fromByteArray(messageId.getBytes(StandardCharsets.UTF_8));
     }catch (IOException e){
-      //TODO: handle invalid message id error
+      LOGGER.warn("Cannot parse message id "  + messageId, e);
     }
   }
 

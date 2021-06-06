@@ -50,9 +50,6 @@ public class PulsarStreamLevelConsumerManager {
 
       Properties consumerProp = new Properties();
       consumerProp.putAll(pulsarStreamLevelStreamConfig.getPulsarConsumerProperties());
-//      consumerProp.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaStreamLevelStreamConfig.getBootstrapServers());
-//      consumerProp.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-//      consumerProp.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, BytesDeserializer.class.getName());
 
       try {
         _pulsarClient = PulsarClient.builder().serviceUrl(pulsarStreamLevelStreamConfig.getBootstrapServers()).build();
@@ -76,7 +73,7 @@ public class PulsarStreamLevelConsumerManager {
     }
   }
 
-  public static void releaseKafkaConsumer(final Reader<byte[]> pulsarConsumer) {
+  public static void releasePulsarConsumer(final Reader<byte[]> pulsarConsumer) {
     synchronized (PulsarStreamLevelConsumerManager.class) {
       // Release the consumer, mark it for shutdown in the future
       final long releaseTime = System.currentTimeMillis() + CONSUMER_SHUTDOWN_DELAY_MILLIS;

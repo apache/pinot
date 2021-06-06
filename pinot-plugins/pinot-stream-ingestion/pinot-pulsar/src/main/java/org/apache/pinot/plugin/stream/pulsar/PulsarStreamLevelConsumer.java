@@ -82,7 +82,7 @@ public class PulsarStreamLevelConsumer implements StreamLevelConsumer {
   public void shutdown()
       throws Exception {
     if (_reader != null) {
-      PulsarStreamLevelConsumerManager.releaseKafkaConsumer(_reader);
+      PulsarStreamLevelConsumerManager.releasePulsarConsumer(_reader);
       _reader = null;
     }
   }
