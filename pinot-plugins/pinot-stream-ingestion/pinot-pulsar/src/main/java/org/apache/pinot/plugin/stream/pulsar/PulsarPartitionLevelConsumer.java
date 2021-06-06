@@ -61,6 +61,9 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
     try {
       return pulsarResultFuture.get(timeoutMillis, TimeUnit.MILLISECONDS);
     } catch (Exception e) {
+      //The fetchMessages has thrown an exception. Most common cause is the timeout.
+      //We return the records fetched till now along with the next start offset.
+      LOGGER.warn("Error while fetching records from Pulsar", e);
       return new PulsarMessageBatch(buildOffsetFilteringIterable(messagesList, startMessageId, endMessageId));
     }
   }

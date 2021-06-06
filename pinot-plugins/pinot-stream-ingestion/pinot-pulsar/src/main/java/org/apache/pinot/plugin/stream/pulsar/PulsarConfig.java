@@ -27,7 +27,6 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pulsar.client.api.MessageId;
 
-//TODO: Add properties for batch receive - maxNumMessages, maxNumBytes, timeout.
 public class PulsarConfig {
   public static final String STREAM_TYPE = "pulsar";
   public static final String PULSAR_PROP_PREFIX = "consumer.prop";
