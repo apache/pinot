@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.stream.pulsar;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.util.List;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
@@ -49,21 +50,19 @@ public class PulsarPartitionLevelConnectionHandler {
     try {
       _pulsarClient = PulsarClient.builder().serviceUrl(_config.getBootstrapServers()).build();
 
-      _reader =
-          _pulsarClient.newReader().topic(getPartitionedTopicName(partition))
-              .startMessageId(_config.getInitialMessageId()).create();
+      _reader = _pulsarClient.newReader().topic(getPartitionedTopicName(partition))
+          .startMessageId(_config.getInitialMessageId()).create();
 
-      LOGGER.info("Created consumer with id {} for topic {}", _reader,
-          _config.getPulsarTopicName());
-
-    } catch (PulsarClientException e) {
+      LOGGER.info("Created consumer with id {} for topic {}", _reader, _config.getPulsarTopicName());
+    } catch (Exception e) {
       LOGGER.error("Could not create pulsar consumer", e);
     }
-
   }
 
-  private String getPartitionedTopicName(int partition) {
-    return _config.getPulsarTopicName() + SEPERATOR + TOPIC_PARTITION_NAME_SUFFIX + SEPERATOR + partition;
+  private String getPartitionedTopicName(int partition)
+      throws Exception {
+    List<String> partitionTopicList = _pulsarClient.getPartitionsForTopic(_topic).get();
+    return partitionTopicList.get(partition);
   }
 
   public void close()

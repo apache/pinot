@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.stream.pulsar;
 
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
@@ -98,6 +99,12 @@ public class PulsarConsumerTest {
         }
       }
 
+    }
+
+    List<String> partitionedTopicList =  _pulsarClient.getPartitionsForTopic(TEST_TOPIC).get();
+
+    for(String p : partitionedTopicList) {
+      System.out.println("TOPIC: " + p);
     }
   }
 
