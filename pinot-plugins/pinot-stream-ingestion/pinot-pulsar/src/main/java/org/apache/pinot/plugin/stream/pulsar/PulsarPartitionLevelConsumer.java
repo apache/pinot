@@ -70,7 +70,6 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
 
   public PulsarMessageBatch fetchMessages(MessageId startMessageId, MessageId endMessageId,
       List<Message<byte[]>> messagesList) {
-    //TODO: return n-1 records instead of n and use offset of nth record as next starting point
     try {
       _reader.seek(startMessageId);
 
