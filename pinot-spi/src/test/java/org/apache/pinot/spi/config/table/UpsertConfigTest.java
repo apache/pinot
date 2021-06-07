@@ -28,15 +28,10 @@ public class UpsertConfigTest {
 
   @Test
   public void testUpsertConfig() {
-    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    assertEquals(upsertConfig.getMode(), UpsertConfig.Mode.FULL);
+    UpsertConfig upsertConfig1 = new UpsertConfig(UpsertConfig.Mode.FULL);
+    assertEquals(upsertConfig1.getMode(), UpsertConfig.Mode.FULL);
 
-    // Test illegal arguments
-    try {
-      new UpsertConfig(UpsertConfig.Mode.PARTIAL);
-      fail();
-    } catch (IllegalArgumentException e) {
-      // Expected
-    }
+    UpsertConfig upsertConfig2 = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    assertEquals(upsertConfig2.getMode(), UpsertConfig.Mode.PARTIAL);
   }
 }
