@@ -173,6 +173,7 @@ public class GenericRow implements Serializable {
    */
   public void putValue(String fieldName, @Nullable Object value) {
     _fieldToValueMap.put(fieldName, value);
+    _nullValueFields.remove(fieldName);
   }
 
   public PrimaryKey getPrimaryKey(List<String> primaryKeyColumns) {

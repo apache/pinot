@@ -368,13 +368,6 @@ public final class TableConfigUtils {
       return;
     }
 
-    UpsertConfig.STRATEGY globalUpsertStrategy = tableConfig.getUpsertConfig().getGlobalUpsertStrategy();
-
-    Preconditions.checkState(
-        new HashSet<>(Arrays.asList(UpsertConfig.STRATEGY.OVERWRITE, UpsertConfig.STRATEGY.IGNORE))
-            .contains(globalUpsertStrategy),
-        "Global strategies can only be OVERWRITE/IGNORE.");
-
     Map<String, UpsertConfig.STRATEGY> partialUpsertStrategies = tableConfig.getUpsertConfig().getPartialUpsertStrategies();
 
     for (Map.Entry<String, UpsertConfig.STRATEGY> entry : partialUpsertStrategies.entrySet()) {

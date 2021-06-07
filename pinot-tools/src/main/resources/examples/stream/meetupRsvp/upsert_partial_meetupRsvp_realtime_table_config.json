@@ -46,10 +46,8 @@
   },
   "upsertConfig": {
     "mode": "PARTIAL",
-    "globalUpsertStrategy": "IGNORE",
     "partialUpsertStrategies":{
-      "rsvp_count": "INCREMENT",
-      "group_name": "OVERWRITE"
+      "rsvp_count": "INCREMENT"
     }
   }
 }

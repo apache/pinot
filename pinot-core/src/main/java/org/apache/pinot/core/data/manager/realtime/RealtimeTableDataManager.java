@@ -167,7 +167,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       PartialUpsertHandler partialUpsertHandler = null;
       if (isPartialUpsertEnabled()) {
         partialUpsertHandler = new PartialUpsertHandler();
-        partialUpsertHandler.init(upsertConfig.getGlobalUpsertStrategy(), upsertConfig.getPartialUpsertStrategies());
+        partialUpsertHandler.init(upsertConfig.getPartialUpsertStrategies());
       }
 
       _tableUpsertMetadataManager =

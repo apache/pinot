@@ -37,39 +37,29 @@ public class UpsertConfig extends BaseJsonConfig {
   }
 
   private final Mode _mode;
-  private final STRATEGY _globalUpsertStrategy;
   private final Map<String, STRATEGY> _partialUpsertStrategies;
 
   public UpsertConfig(@JsonProperty(value = "mode", required = true) Mode mode) {
     Preconditions.checkArgument(mode != null, "Upsert mode must be configured");
-    Preconditions.checkArgument(mode != Mode.PARTIAL, "Partial upsert mode is not supported");
     _mode = mode;
-    _globalUpsertStrategy = null;
     _partialUpsertStrategies = null;
   }
 
   @JsonCreator
   public UpsertConfig(@JsonProperty(value = "mode", required = true) Mode mode,
-      @JsonProperty(value = "globalUpsertStrategy") STRATEGY globalUpsertStrategy,
       @JsonProperty(value = "partialUpsertStrategies") Map<String, STRATEGY> partialUpsertStrategies) {
     Preconditions.checkArgument(mode != null, "Upsert mode must be configured");
     _mode = mode;
 
     if (mode == Mode.PARTIAL) {
-      _globalUpsertStrategy = globalUpsertStrategy != null ? globalUpsertStrategy : STRATEGY.OVERWRITE;
       _partialUpsertStrategies = partialUpsertStrategies != null ? partialUpsertStrategies : new HashMap<>();
     } else {
-      _globalUpsertStrategy = null;
       _partialUpsertStrategies = null;
     }
   }
 
   public Mode getMode() {
     return _mode;
-  }
-
-  public STRATEGY getGlobalUpsertStrategy() {
-    return _globalUpsertStrategy;
   }
 
   public Map<String, STRATEGY> getPartialUpsertStrategies() {
