@@ -295,10 +295,10 @@ if [ -f $testSuiteDir/pre-controller-upgrade.yaml ]; then
   genNum=$((genNum+1))
   $COMPAT_TESTER $testSuiteDir/pre-controller-upgrade.yaml $genNum
   if [ $? -ne 0 ]; then
-    echo Failed before controller upgrade
     if [ $keepClusterOnFailure == "false" ]; then
       stopServices
     fi
+    echo Failed before controller upgrade
     exit 1
   fi
 fi
@@ -312,10 +312,10 @@ if [ -f $testSuiteDir/pre-broker-upgrade.yaml ]; then
   echo "Running tests after controller upgrade"
   $COMPAT_TESTER $testSuiteDir/pre-broker-upgrade.yaml $genNum
   if [ $? -ne 0 ]; then
-    echo Failed before broker upgrade
     if [ $keepClusterOnFailure == "false" ]; then
       stopServices
     fi
+    echo Failed before broker upgrade
     exit 1
   fi
 fi
@@ -328,10 +328,10 @@ if [ -f $testSuiteDir/pre-server-upgrade.yaml ]; then
   genNum=$((genNum+1))
   $COMPAT_TESTER $testSuiteDir/pre-server-upgrade.yaml $genNum
   if [ $? -ne 0 ]; then
-    echo Failed before server upgrade
     if [ $keepClusterOnFailure == "false" ]; then
       stopServices
     fi
+    echo Failed before server upgrade
     exit 1
   fi
 fi
@@ -344,10 +344,10 @@ if [ -f $testSuiteDir/post-server-upgrade.yaml ]; then
   genNum=$((genNum+1))
   $COMPAT_TESTER $testSuiteDir/post-server-upgrade.yaml $genNum
   if [ $? -ne 0 ]; then
-    echo Failed after server upgrade
     if [ $keepClusterOnFailure == "false" ]; then
       stopServices
     fi
+    echo Failed after server upgrade
     exit 1
   fi
 fi
@@ -362,10 +362,10 @@ if [ -f $testSuiteDir/post-server-rollback.yaml ]; then
   genNum=$((genNum+1))
   $COMPAT_TESTER $testSuiteDir/post-server-rollback.yaml $genNum
   if [ $? -ne 0 ]; then
-    echo Failed after server downgrade
     if [ $keepClusterOnFailure == "false" ]; then
       stopServices
     fi
+    echo Failed after server downgrade
     exit 1
   fi
 fi
@@ -378,10 +378,10 @@ if [ -f $testSuiteDir/post-broker-rollback.yaml ]; then
   genNum=$((genNum+1))
   $COMPAT_TESTER $testSuiteDir/post-broker-rollback.yaml $genNum
   if [ $? -ne 0 ]; then
-    echo Failed after broker downgrade
     if [ $keepClusterOnFailure == "false" ]; then
       stopServices
     fi
+    echo Failed after broker downgrade
     exit 1
   fi
 fi
@@ -395,10 +395,10 @@ if [ -f $testSuiteDir/post-controller-rollback.yaml ]; then
   genNum=$((genNum+1))
   $COMPAT_TESTER $testSuiteDir/post-controller-rollback.yaml $genNum
   if [ $? -ne 0 ]; then
-    echo Failed after controller downgrade
     if [ $keepClusterOnFailure == "false" ]; then
       stopServices
     fi
+    echo Failed after controller downgrade
     exit 1
   fi
 fi
