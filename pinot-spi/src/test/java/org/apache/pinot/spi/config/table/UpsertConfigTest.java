@@ -21,7 +21,6 @@ package org.apache.pinot.spi.config.table;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.fail;
 
 
 public class UpsertConfigTest {
