@@ -154,8 +154,6 @@ public class SegmentPushUtils implements Serializable {
         Arrays.toString(segmentUris.subList(0, Math.min(5, segmentUris.size())).toArray()),
         Arrays.toString(spec.getPinotClusterSpecs()));
     for (String segmentUri : segmentUris) {
-      URI segmentURI = URI.create(segmentUri);
-      PinotFS outputDirFS = PinotFSFactory.create(segmentURI.getScheme());
       for (PinotClusterSpec pinotClusterSpec : spec.getPinotClusterSpecs()) {
         URI controllerURI;
         try {
@@ -194,6 +192,8 @@ public class SegmentPushUtils implements Serializable {
             }
           } finally {
             if (spec.isCleanUpOutputDir()) {
+              URI segmentURI = URI.create(segmentUri);
+              PinotFS outputDirFS = PinotFSFactory.create(segmentURI.getScheme());
               outputDirFS.delete(segmentURI, true);
             }
           }
