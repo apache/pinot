@@ -74,31 +74,6 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
   }
 
   /**
-   * Tests the in-segment trim option for GroupBy OrderBy query
-   */
-  @Test(dataProvider = "orderBySQLResultTableProvider")
-  public void testGroupByOrderByTrimOptSQLLowLimitResponse(String query, List<Object[]> expectedResults,
-      long expectedNumDocsScanned, long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter,
-      long expectedNumTotalDocs, DataSchema expectedDataSchema) {
-    expectedResults = expectedResults.subList(0, expectedResults.size() / 2);
-
-    if (query.toUpperCase().contains("LIMIT")) {
-      String[] keyWords = query.split(" ");
-      keyWords[keyWords.length - 1] = String.valueOf(expectedResults.size());
-      query = String.join(" ", keyWords);
-    } else {
-      query += " LIMIT " + expectedResults.size();
-    }
-
-    InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2(expectedResults.size());
-    BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query, planMaker);
-    QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, expectedNumDocsScanned, expectedNumEntriesScannedInFilter,
-            expectedNumEntriesScannedPostFilter, expectedNumTotalDocs, expectedResults, expectedResults.size(),
-            expectedDataSchema);
-  }
-
-  /**
    * Tests the in-segment build option for GroupBy OrderBy query. (No trim)
    */
   @Test(dataProvider = "orderBySQLResultTableProvider")

@@ -216,7 +216,6 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     }
   }
 
-
   /**
    * Returns {@code true} if the given aggregation-only without filter QueryContext can be solved with segment metadata,
    * {@code false} otherwise.

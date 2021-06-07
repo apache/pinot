@@ -43,30 +43,6 @@ public class InterSegmentOrderByMultiValueQueriesTest extends BaseMultiValueQuer
   }
 
   /**
-   * Tests the in-segment trim option for GroupBy OrderBy query
-   */
-  @Test(dataProvider = "orderByDataProvider")
-  public void testGroupByOrderByMVTrimOptLowLimitSQLResults(String query, List<Object[]> expectedResults,
-      long expectedNumEntriesScannedPostFilter, DataSchema expectedDataSchema) {
-
-    expectedResults = expectedResults.subList(0, expectedResults.size() / 2);
-
-    if (query.toUpperCase().contains("LIMIT")) {
-      String[] keyWords = query.split(" ");
-      keyWords[keyWords.length - 1] = String.valueOf(expectedResults.size());
-      query = String.join(" ", keyWords);
-    } else {
-      query += " LIMIT " + expectedResults.size();
-    }
-
-    InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2(expectedResults.size());
-    BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query, planMaker);
-    QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 400000L, 0, expectedNumEntriesScannedPostFilter, 400000L,
-            expectedResults, expectedResults.size(), expectedDataSchema);
-  }
-
-  /**
    * Tests the in-segment build option for GroupBy OrderBy query. (No trim)
    */
   @Test(dataProvider = "orderByDataProvider")

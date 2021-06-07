@@ -33,20 +33,16 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
-import static org.apache.pinot.core.util.GroupByUtils.getTableCapacity;
-
-
 /**
  * The <code>AggregationGroupByOrderByPlanNode</code> class provides the execution plan for aggregation group-by order-by query on a
  * single segment.
  */
 @SuppressWarnings("rawtypes")
 public class AggregationGroupByOrderByPlanNode implements PlanNode {
-  private final int TRIM_OFF = -1;
   private final IndexSegment _indexSegment;
   private final int _maxInitialResultHolderCapacity;
   private final int _numGroupsLimit;
-  private final int _trimSize;
+  private final int _minSegmentTrimSize;
   private final AggregationFunction[] _aggregationFunctions;
   private final ExpressionContext[] _groupByExpressions;
   private final TransformPlanNode _transformPlanNode;
@@ -64,13 +60,7 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
     assert groupByExpressions != null;
     _groupByExpressions = groupByExpressions.toArray(new ExpressionContext[0]);
     _queryContext = queryContext;
-
-    // Only trim if there is OrderBy and has a positive trim size
-    if (queryContext.getOrderByExpressions() != null && minSegmentTrimSize > 0) {
-      _trimSize = getTableCapacity(queryContext.getLimit(), minSegmentTrimSize);
-    } else {
-      _trimSize = TRIM_OFF;
-    }
+    _minSegmentTrimSize = minSegmentTrimSize;
 
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();
     if (starTrees != null && !StarTreeUtils.isStarTreeDisabled(queryContext)) {
@@ -108,12 +98,12 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
     if (_transformPlanNode != null) {
       // Do not use star-tree
       return new AggregationGroupByOrderByOperator(_aggregationFunctions, _groupByExpressions,
-          _maxInitialResultHolderCapacity, _numGroupsLimit, _trimSize, _transformPlanNode.run(), numTotalDocs,
+          _maxInitialResultHolderCapacity, _numGroupsLimit, _minSegmentTrimSize, _transformPlanNode.run(), numTotalDocs,
           _queryContext, false);
     } else {
       // Use star-tree
       return new AggregationGroupByOrderByOperator(_aggregationFunctions, _groupByExpressions,
-          _maxInitialResultHolderCapacity, _numGroupsLimit, _trimSize, _starTreeTransformPlanNode.run(),
+          _maxInitialResultHolderCapacity, _numGroupsLimit, _minSegmentTrimSize, _starTreeTransformPlanNode.run(),
           numTotalDocs, _queryContext, true);
     }
   }

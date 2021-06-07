@@ -248,6 +248,7 @@ public class PerfBenchmarkDriver {
     if (_segmentFormatVersion != null) {
       properties.put(CommonConstants.Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, _segmentFormatVersion);
     }
+    properties.put("min.segment.group.trim.size", 100);
 
     LOGGER.info("Starting server instance: {}", _serverInstanceName);
 

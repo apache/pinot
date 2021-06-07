@@ -34,6 +34,8 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 
+import static org.apache.pinot.core.util.GroupByUtils.getTableCapacity;
+
 
 /**
  * The <code>AggregationGroupByOrderByOperator</code> class provides the operator for aggregation group-by query on a
@@ -59,17 +61,22 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
 
   public AggregationGroupByOrderByOperator(AggregationFunction[] aggregationFunctions,
       ExpressionContext[] groupByExpressions, int maxInitialResultHolderCapacity, int numGroupsLimit,
-      int trimSize, TransformOperator transformOperator, long numTotalDocs, QueryContext queryContext,
+      int minSegmentTrimSize, TransformOperator transformOperator, long numTotalDocs, QueryContext queryContext,
       boolean useStarTree) {
     _aggregationFunctions = aggregationFunctions;
     _groupByExpressions = groupByExpressions;
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
-    _trimSize = trimSize;
     _transformOperator = transformOperator;
     _numTotalDocs = numTotalDocs;
     _useStarTree = useStarTree;
     _queryContext = queryContext;
+
+    if (queryContext.getOrderByExpressions() != null && minSegmentTrimSize > 0) {
+      _trimSize = getTableCapacity(queryContext.getLimit(), minSegmentTrimSize);
+    } else {
+      _trimSize = TRIM_OFF;
+    }
 
     // NOTE: The indexedTable expects that the the data schema will have group by columns before aggregation columns
     int numGroupByExpressions = groupByExpressions.length;
@@ -122,8 +129,8 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
       return new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
     }
     TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
-    Collection<IntermediateRecord> intermediate = groupByExecutor.trimGroupByResult(_trimSize, tableResizer);
-    return new IntermediateResultsBlock(_aggregationFunctions, intermediate, _dataSchema);
+    Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(_trimSize, tableResizer);
+    return new IntermediateResultsBlock(_aggregationFunctions, intermediateRecords, _dataSchema);
   }
 
   @Override
