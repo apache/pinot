@@ -26,9 +26,9 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
-import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.local.realtime.impl.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.slf4j.Logger;
@@ -64,103 +64,107 @@ public class PartitionUpsertMetadataManager {
   private final String _tableNameWithType;
   private final int _partitionId;
   private final ServerMetrics _serverMetrics;
-  private final TableDataManager _tableDataManager;
   private final PartialUpsertHandler _partialUpsertHandler;
+
+  // TODO(upset): consider an off-heap KV store to persist this index to improve the recovery speed.
+  @VisibleForTesting
+  final ConcurrentHashMap<PrimaryKey, RecordLocation> _primaryKeyToRecordLocationMap = new ConcurrentHashMap<>();
+
   // Reused for reading previous record during partial upsert
   private final GenericRow _reuse = new GenericRow();
   // Stores the result of updateRecord()
   private GenericRow _result;
 
   public PartitionUpsertMetadataManager(String tableNameWithType, int partitionId, ServerMetrics serverMetrics,
-      TableDataManager tableDataManager, @Nullable PartialUpsertHandler partialUpsertHandler) {
+      @Nullable PartialUpsertHandler partialUpsertHandler) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
     _serverMetrics = serverMetrics;
-    _tableDataManager = tableDataManager;
     _partialUpsertHandler = partialUpsertHandler;
   }
 
-  public ConcurrentHashMap<PrimaryKey, RecordLocation> getPrimaryKeyToRecordLocationMap() {
-    return _primaryKeyToRecordLocationMap;
+  /**
+   * Initializes the upsert metadata for the given immutable segment.
+   */
+  public void addSegment(ImmutableSegmentImpl immutableSegment, Iterator<RecordInfo> recordInfoIterator) {
+    addSegment(immutableSegment, recordInfoIterator, new ThreadSafeMutableRoaringBitmap());
   }
 
-  // TODO(upset): consider an off-heap KV store to persist this index to improve the recovery speed.
   @VisibleForTesting
-  final ConcurrentHashMap<PrimaryKey, RecordLocation> _primaryKeyToRecordLocationMap = new ConcurrentHashMap<>();
-
-  /**
-   * Initializes the upsert metadata for the given immutable segment, returns the valid doc ids for the segment.
-   */
-  public ThreadSafeMutableRoaringBitmap addSegment(String segmentName, Iterator<RecordInfo> recordInfoIterator) {
+  void addSegment(ImmutableSegmentImpl immutableSegment, Iterator<RecordInfo> recordInfoIterator,
+      ThreadSafeMutableRoaringBitmap validDocIds) {
+    String segmentName = immutableSegment.getSegmentName();
     LOGGER.info("Adding upsert metadata for segment: {}", segmentName);
+    immutableSegment.enableUpsert(this, validDocIds);
 
-    ThreadSafeMutableRoaringBitmap validDocIds = new ThreadSafeMutableRoaringBitmap();
     while (recordInfoIterator.hasNext()) {
       RecordInfo recordInfo = recordInfoIterator.next();
       _primaryKeyToRecordLocationMap.compute(recordInfo._primaryKey, (primaryKey, currentRecordLocation) -> {
         if (currentRecordLocation != null) {
           // Existing primary key
 
-          if (segmentName.equals(currentRecordLocation.getSegmentName())) {
-            // The current record location has the same segment name
-
-            // Update the record location when the new timestamp is greater than or equal to the current timestamp.
-            // There are 2 scenarios:
-            //   1. The current record location is pointing to the same segment (the segment being added). In this case,
-            //      we want to update the record location when there is a tie to keep the newer record. Note that the
-            //      record info iterator will return records with incremental doc ids.
-            //   2. The current record location is pointing to the old segment being replaced. This could happen when
-            //      committing a consuming segment, or reloading a completed segment. In this case, we want to update
-            //      the record location when there is a tie because the record locations should point to the new added
-            //      segment instead of the old segment being replaced. Also, do not update the valid doc ids for the old
-            //      segment because it has not been replaced yet.
+          // The current record is in the same segment
+          // Update the record location when there is a tie to keep the newer record. Note that the record info iterator
+          // will return records with incremental doc ids.
+          IndexSegment currentSegment = currentRecordLocation.getSegment();
+          if (immutableSegment == currentSegment) {
             if (recordInfo._timestamp >= currentRecordLocation.getTimestamp()) {
-              // Only update the valid doc ids for the new segment
-              if (validDocIds == currentRecordLocation.getValidDocIds()) {
-                validDocIds.remove(currentRecordLocation.getDocId());
-              }
+              validDocIds.remove(currentRecordLocation.getDocId());
               validDocIds.add(recordInfo._docId);
-              return new RecordLocation(segmentName, recordInfo._docId, recordInfo._timestamp, validDocIds);
-            } else {
-              return currentRecordLocation;
-            }
-          } else {
-            // The current record location is pointing to a different segment
-
-            // Update the record location when getting a newer timestamp, or the timestamp is the same as the current
-            // timestamp, but the segment has a larger sequence number (the segment is newer than the current segment).
-            if (recordInfo._timestamp > currentRecordLocation.getTimestamp() || (
-                recordInfo._timestamp == currentRecordLocation.getTimestamp() && LLCSegmentName
-                    .isLowLevelConsumerSegmentName(segmentName) && LLCSegmentName
-                    .isLowLevelConsumerSegmentName(currentRecordLocation.getSegmentName())
-                    && LLCSegmentName.getSequenceNumber(segmentName) > LLCSegmentName
-                    .getSequenceNumber(currentRecordLocation.getSegmentName()))) {
-              currentRecordLocation.getValidDocIds().remove(currentRecordLocation.getDocId());
-              validDocIds.add(recordInfo._docId);
-              return new RecordLocation(segmentName, recordInfo._docId, recordInfo._timestamp, validDocIds);
+              return new RecordLocation(immutableSegment, recordInfo._docId, recordInfo._timestamp);
             } else {
               return currentRecordLocation;
             }
           }
+
+          // The current record is in an old segment being replaced
+          // This could happen when committing a consuming segment, or reloading a completed segment. In this case, we
+          // want to update the record location when there is a tie because the record locations should point to the new
+          // added segment instead of the old segment being replaced. Also, do not update the valid doc ids for the old
+          // segment because it has not been replaced yet.
+          String currentSegmentName = currentSegment.getSegmentName();
+          if (segmentName.equals(currentSegmentName)) {
+            if (recordInfo._timestamp >= currentRecordLocation.getTimestamp()) {
+              validDocIds.add(recordInfo._docId);
+              return new RecordLocation(immutableSegment, recordInfo._docId, recordInfo._timestamp);
+            } else {
+              return currentRecordLocation;
+            }
+          }
+
+          // The current record is in a different segment
+          // Update the record location when getting a newer timestamp, or the timestamp is the same as the current
+          // timestamp, but the segment has a larger sequence number (the segment is newer than the current segment).
+          if (recordInfo._timestamp > currentRecordLocation.getTimestamp() || (
+              recordInfo._timestamp == currentRecordLocation.getTimestamp() && LLCSegmentName
+                  .isLowLevelConsumerSegmentName(segmentName) && LLCSegmentName
+                  .isLowLevelConsumerSegmentName(currentSegmentName)
+                  && LLCSegmentName.getSequenceNumber(segmentName) > LLCSegmentName
+                  .getSequenceNumber(currentSegmentName))) {
+            assert currentSegment.getValidDocIds() != null;
+            currentSegment.getValidDocIds().remove(currentRecordLocation.getDocId());
+            validDocIds.add(recordInfo._docId);
+            return new RecordLocation(immutableSegment, recordInfo._docId, recordInfo._timestamp);
+          } else {
+            return currentRecordLocation;
+          }
         } else {
           // New primary key
           validDocIds.add(recordInfo._docId);
-          return new RecordLocation(segmentName, recordInfo._docId, recordInfo._timestamp, validDocIds);
+          return new RecordLocation(immutableSegment, recordInfo._docId, recordInfo._timestamp);
         }
       });
     }
     // Update metrics
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
         _primaryKeyToRecordLocationMap.size());
-    return validDocIds;
   }
 
   /**
    * Updates the upsert metadata for a new consumed record in the given consuming segment. Returns the merged record if
    * partial-upsert is enabled.
    */
-  public GenericRow updateRecord(String segmentName, RecordInfo recordInfo, ThreadSafeMutableRoaringBitmap validDocIds,
-      GenericRow record) {
+  public GenericRow updateRecord(IndexSegment segment, RecordInfo recordInfo, GenericRow record) {
     _result = record;
     _primaryKeyToRecordLocationMap.compute(recordInfo._primaryKey, (primaryKey, currentRecordLocation) -> {
       if (currentRecordLocation != null) {
@@ -169,39 +173,30 @@ public class PartitionUpsertMetadataManager {
         // Update the record location when the new timestamp is greater than or equal to the current timestamp. Update
         // the record location when there is a tie to keep the newer record.
         if (recordInfo._timestamp >= currentRecordLocation.getTimestamp()) {
+          IndexSegment currentSegment = currentRecordLocation.getSegment();
           if (_partialUpsertHandler != null) {
             // Partial upsert
-            String currentSegmentName = currentRecordLocation.getSegmentName();
-            SegmentDataManager segmentDataManager = _tableDataManager.acquireSegment(currentSegmentName);
-            if (segmentDataManager != null) {
-              try {
-                _reuse.clear();
-                GenericRow previousRecord =
-                    segmentDataManager.getSegment().getRecord(currentRecordLocation.getDocId(), _reuse);
-                _result = _partialUpsertHandler.merge(previousRecord, record);
-              } finally {
-                _tableDataManager.releaseSegment(segmentDataManager);
-              }
-            } else {
-              LOGGER.warn("Failed to find current segment for partial upsert: {}, skipping updating the record",
-                  currentSegmentName);
-            }
+            GenericRow previousRecord = currentSegment.getRecord(currentRecordLocation.getDocId(), _reuse);
+            _result = _partialUpsertHandler.merge(previousRecord, record);
           }
-          currentRecordLocation.getValidDocIds().remove(currentRecordLocation.getDocId());
-          validDocIds.add(recordInfo._docId);
-          return new RecordLocation(segmentName, recordInfo._docId, recordInfo._timestamp, validDocIds);
+          assert currentSegment.getValidDocIds() != null;
+          currentSegment.getValidDocIds().remove(currentRecordLocation.getDocId());
+          assert segment.getValidDocIds() != null;
+          segment.getValidDocIds().add(recordInfo._docId);
+          return new RecordLocation(segment, recordInfo._docId, recordInfo._timestamp);
         } else {
           if (_partialUpsertHandler != null) {
             LOGGER.warn(
-                "Got late record for partial upsert: {} (current timestamp: {}, record timestamp: {}), skipping updating the record",
+                "Got late event for partial upsert: {} (current timestamp: {}, record timestamp: {}), skipping updating the record",
                 record, currentRecordLocation.getTimestamp(), recordInfo._timestamp);
           }
           return currentRecordLocation;
         }
       } else {
         // New primary key
-        validDocIds.add(recordInfo._docId);
-        return new RecordLocation(segmentName, recordInfo._docId, recordInfo._timestamp, validDocIds);
+        assert segment.getValidDocIds() != null;
+        segment.getValidDocIds().add(recordInfo._docId);
+        return new RecordLocation(segment, recordInfo._docId, recordInfo._timestamp);
       }
     });
     // Update metrics
@@ -214,14 +209,16 @@ public class PartitionUpsertMetadataManager {
    * Removes the upsert metadata for the given immutable segment. No need to remove the upsert metadata for the
    * consuming segment because it should be replaced by the committed segment.
    */
-  public void removeSegment(String segmentName, ThreadSafeMutableRoaringBitmap validDocIds) {
+  public void removeSegment(IndexSegment segment) {
+    String segmentName = segment.getSegmentName();
     LOGGER.info("Removing upsert metadata for segment: {}", segmentName);
 
-    if (!validDocIds.getMutableRoaringBitmap().isEmpty()) {
-      // Remove all the record locations that point to the valid doc ids of the removed segment.
+    assert segment.getValidDocIds() != null;
+    if (!segment.getValidDocIds().getMutableRoaringBitmap().isEmpty()) {
+      // Remove all the record locations that point to the removed segment
       _primaryKeyToRecordLocationMap.forEach((primaryKey, recordLocation) -> {
-        if (recordLocation.getValidDocIds() == validDocIds) {
-          // Check and remove to prevent removing the key that is just updated.
+        if (recordLocation.getSegment() == segment) {
+          // Check and remove to prevent removing the key that is just updated
           _primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation);
         }
       });

@@ -49,9 +49,9 @@ import org.apache.pinot.core.util.QueryOptions;
 import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
-import org.apache.pinot.segment.spi.index.reader.ValidDocIndexReader;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
@@ -71,23 +71,23 @@ public class FilterPlanNode implements PlanNode {
   @Override
   public BaseFilterOperator run() {
     FilterContext filter = _queryContext.getFilter();
-    ValidDocIndexReader validDocIndexReader = _indexSegment.getValidDocIndex();
+    ThreadSafeMutableRoaringBitmap validDocIds = _indexSegment.getValidDocIds();
     boolean upsertSkipped = false;
     if (_queryContext.getQueryOptions() != null) {
       upsertSkipped = new QueryOptions(_queryContext.getQueryOptions()).isSkipUpsert();
     }
     if (filter != null) {
       BaseFilterOperator filterOperator = constructPhysicalOperator(filter, _queryContext.getDebugOptions());
-      if (validDocIndexReader != null && !upsertSkipped) {
+      if (validDocIds != null && !upsertSkipped) {
         BaseFilterOperator validDocFilter =
-            new BitmapBasedFilterOperator(validDocIndexReader.getValidDocBitmap(), false, _numDocs);
+            new BitmapBasedFilterOperator(validDocIds.getMutableRoaringBitmap(), false, _numDocs);
         return FilterOperatorUtils.getAndFilterOperator(Arrays.asList(filterOperator, validDocFilter), _numDocs,
             _queryContext.getDebugOptions());
       } else {
         return filterOperator;
       }
-    } else if (validDocIndexReader != null && !upsertSkipped) {
-      return new BitmapBasedFilterOperator(validDocIndexReader.getValidDocBitmap(), false, _numDocs);
+    } else if (validDocIds != null && !upsertSkipped) {
+      return new BitmapBasedFilterOperator(validDocIds.getMutableRoaringBitmap(), false, _numDocs);
     } else {
       return new MatchAllFilterOperator(_numDocs);
     }

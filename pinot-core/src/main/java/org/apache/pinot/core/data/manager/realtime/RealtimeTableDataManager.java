@@ -54,7 +54,6 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
-import org.apache.pinot.segment.local.realtime.impl.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.V3RemoveIndexException;
@@ -166,12 +165,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
       PartialUpsertHandler partialUpsertHandler = null;
       if (isPartialUpsertEnabled()) {
-        partialUpsertHandler = new PartialUpsertHandler();
-        partialUpsertHandler.init(upsertConfig.getPartialUpsertStrategies());
+        partialUpsertHandler = new PartialUpsertHandler(upsertConfig.getPartialUpsertStrategies());
       }
-
       _tableUpsertMetadataManager =
-          new TableUpsertMetadataManager(_tableNameWithType, _serverMetrics, this, partialUpsertHandler);
+          new TableUpsertMetadataManager(_tableNameWithType, _serverMetrics, partialUpsertHandler);
       _primaryKeyColumns = schema.getPrimaryKeyColumns();
       Preconditions.checkState(!CollectionUtils.isEmpty(_primaryKeyColumns),
           "Primary key columns must be configured for upsert");
@@ -408,9 +405,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
             return new PartitionUpsertMetadataManager.RecordInfo(primaryKey, _docId++, timestamp);
           }
         };
-    ThreadSafeMutableRoaringBitmap validDocIds =
-        partitionUpsertMetadataManager.addSegment(segmentName, recordInfoIterator);
-    immutableSegment.enableUpsert(partitionUpsertMetadataManager, validDocIds);
+    partitionUpsertMetadataManager.addSegment(immutableSegment, recordInfoIterator);
   }
 
   public void downloadAndReplaceSegment(String segmentName, LLCRealtimeSegmentZKMetadata llcSegmentMetadata,

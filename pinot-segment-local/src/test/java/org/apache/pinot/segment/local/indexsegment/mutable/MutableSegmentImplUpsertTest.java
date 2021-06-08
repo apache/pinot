@@ -22,9 +22,7 @@ import java.io.File;
 import java.net.URL;
 import java.util.Collections;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
-import org.apache.pinot.segment.local.upsert.PartialUpsertHandler;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -63,8 +61,8 @@ public class MutableSegmentImplUpsertTest {
     _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
     File jsonFile = new File(dataResourceUrl.getFile());
     _partitionUpsertMetadataManager =
-        new TableUpsertMetadataManager("testTable_REALTIME", Mockito.mock(ServerMetrics.class),
-            Mockito.mock(TableDataManager.class), Mockito.mock(PartialUpsertHandler.class)).getOrCreatePartitionManager(0);
+        new TableUpsertMetadataManager("testTable_REALTIME", Mockito.mock(ServerMetrics.class), null)
+            .getOrCreatePartitionManager(0);
     _mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
             false, true, new UpsertConfig(UpsertConfig.Mode.FULL), "secondsSinceEpoch",
@@ -83,7 +81,7 @@ public class MutableSegmentImplUpsertTest {
 
   @Test
   public void testUpsertIngestion() {
-    ImmutableRoaringBitmap bitmap = _mutableSegmentImpl.getValidDocIndex().getValidDocBitmap();
+    ImmutableRoaringBitmap bitmap = _mutableSegmentImpl.getValidDocIds().getMutableRoaringBitmap();
     Assert.assertFalse(bitmap.contains(0));
     Assert.assertTrue(bitmap.contains(1));
     Assert.assertTrue(bitmap.contains(2));

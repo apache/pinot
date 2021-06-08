@@ -18,28 +18,27 @@
  */
 package org.apache.pinot.segment.local.upsert.merger;
 
-
-
 public class IncrementMerger implements PartialUpsertMerger {
-
-  public IncrementMerger() { }
+  IncrementMerger() {
+  }
 
   /**
    * Increment the new value from incoming row to the given field of previous record.
    */
+  @Override
   public Object merge(Object previousValue, Object currentValue) {
     return addNumbers((Number) previousValue, (Number) currentValue);
   }
 
   private static Number addNumbers(Number a, Number b) {
-    if (a instanceof Double || b instanceof Double) {
-      return a.doubleValue() + b.doubleValue();
-    } else if (a instanceof Float || b instanceof Float) {
-      return a.floatValue() + b.floatValue();
-    } else if (a instanceof Long || b instanceof Long) {
-      return a.longValue() + b.longValue();
+    if (a instanceof Integer) {
+      return (Integer) a + (Integer) b;
+    } else if (a instanceof Long) {
+      return (Long) a + (Long) b;
+    } else if (a instanceof Float) {
+      return (Float) a + (Float) b;
+    } else {
+      return (Double) a + (Double) b;
     }
-
-    return a.intValue() + b.intValue();
   }
 }

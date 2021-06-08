@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.segment.local.upsert.merger;
 
-
-
 public interface PartialUpsertMerger {
   /**
    * Handle partial upsert merge.

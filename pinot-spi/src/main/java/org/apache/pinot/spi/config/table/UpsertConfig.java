@@ -32,12 +32,12 @@ public class UpsertConfig extends BaseJsonConfig {
     FULL, PARTIAL, NONE
   }
 
-  public enum STRATEGY {
-    OVERWRITE, IGNORE, INCREMENT
+  public enum Strategy {
+    OVERWRITE, INCREMENT
   }
 
   private final Mode _mode;
-  private final Map<String, STRATEGY> _partialUpsertStrategies;
+  private final Map<String, Strategy> _partialUpsertStrategies;
 
   public UpsertConfig(@JsonProperty(value = "mode", required = true) Mode mode) {
     Preconditions.checkArgument(mode != null, "Upsert mode must be configured");
@@ -47,7 +47,7 @@ public class UpsertConfig extends BaseJsonConfig {
 
   @JsonCreator
   public UpsertConfig(@JsonProperty(value = "mode", required = true) Mode mode,
-      @JsonProperty(value = "partialUpsertStrategies") Map<String, STRATEGY> partialUpsertStrategies) {
+      @JsonProperty(value = "partialUpsertStrategies") Map<String, Strategy> partialUpsertStrategies) {
     Preconditions.checkArgument(mode != null, "Upsert mode must be configured");
     _mode = mode;
 
@@ -62,7 +62,7 @@ public class UpsertConfig extends BaseJsonConfig {
     return _mode;
   }
 
-  public Map<String, STRATEGY> getPartialUpsertStrategies() {
+  public Map<String, Strategy> getPartialUpsertStrategies() {
     return _partialUpsertStrategies;
   }
 }

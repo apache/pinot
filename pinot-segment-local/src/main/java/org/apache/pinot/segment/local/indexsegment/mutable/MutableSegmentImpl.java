@@ -40,7 +40,6 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
-import org.apache.pinot.segment.local.realtime.impl.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.MutableDictionaryFactory;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
@@ -54,7 +53,6 @@ import org.apache.pinot.segment.local.realtime.impl.json.MutableJsonIndex;
 import org.apache.pinot.segment.local.realtime.impl.nullvalue.MutableNullValueVector;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
-import org.apache.pinot.segment.local.segment.index.readers.ValidDocIndexReaderImpl;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
@@ -67,13 +65,13 @@ import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.MutableDictionary;
 import org.apache.pinot.segment.spi.index.reader.MutableForwardIndex;
-import org.apache.pinot.segment.spi.index.reader.ValidDocIndexReader;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -162,7 +160,6 @@ public class MutableSegmentImpl implements MutableSegment {
   //        consumption with newer timestamp (late event in consuming segment), the record location will be updated, but
   //        the valid doc ids won't be updated.
   private final ThreadSafeMutableRoaringBitmap _validDocIds;
-  private final ValidDocIndexReader _validDocIndex;
 
   public MutableSegmentImpl(RealtimeSegmentConfig config, @Nullable ServerMetrics serverMetrics) {
     _serverMetrics = serverMetrics;
@@ -376,11 +373,9 @@ public class MutableSegmentImpl implements MutableSegment {
       Preconditions.checkState(!_aggregateMetrics, "Metrics aggregation and upsert cannot be enabled together");
       _partitionUpsertMetadataManager = config.getPartitionUpsertMetadataManager();
       _validDocIds = new ThreadSafeMutableRoaringBitmap();
-      _validDocIndex = new ValidDocIndexReaderImpl(_validDocIds);
     } else {
       _partitionUpsertMetadataManager = null;
       _validDocIds = null;
-      _validDocIndex = null;
     }
   }
 
@@ -518,8 +513,7 @@ public class MutableSegmentImpl implements MutableSegment {
     Preconditions.checkArgument(timeValue instanceof Comparable, "time column shall be comparable");
     long timestamp = IngestionUtils.extractTimeValue((Comparable) timeValue);
     return _partitionUpsertMetadataManager
-        .updateRecord(_segmentName, new PartitionUpsertMetadataManager.RecordInfo(primaryKey, docId, timestamp),
-            _validDocIds, row);
+        .updateRecord(this, new PartitionUpsertMetadataManager.RecordInfo(primaryKey, docId, timestamp), row);
   }
 
   private void updateDictionary(GenericRow row) {
@@ -763,8 +757,8 @@ public class MutableSegmentImpl implements MutableSegment {
 
   @Nullable
   @Override
-  public ValidDocIndexReader getValidDocIndex() {
-    return _validDocIndex;
+  public ThreadSafeMutableRoaringBitmap getValidDocIds() {
+    return _validDocIds;
   }
 
   @Override

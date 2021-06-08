@@ -368,21 +368,19 @@ public final class TableConfigUtils {
       return;
     }
 
-    Map<String, UpsertConfig.STRATEGY> partialUpsertStrategies = tableConfig.getUpsertConfig().getPartialUpsertStrategies();
+    Map<String, UpsertConfig.Strategy> partialUpsertStrategies =
+        tableConfig.getUpsertConfig().getPartialUpsertStrategies();
 
-    for (Map.Entry<String, UpsertConfig.STRATEGY> entry : partialUpsertStrategies.entrySet()) {
-      Set<FieldSpec.DataType> numericsDataType =
-          new HashSet<>(Arrays.asList(INT, LONG, FLOAT, DOUBLE));
+    for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
+      Set<FieldSpec.DataType> numericsDataType = new HashSet<>(Arrays.asList(INT, LONG, FLOAT, DOUBLE));
 
-      if (entry.getValue() == UpsertConfig.STRATEGY.INCREMENT) {
-        Preconditions.checkState(
-            numericsDataType.contains(schema.getFieldSpecFor(entry.getKey()).getDataType()),
+      if (entry.getValue() == UpsertConfig.Strategy.INCREMENT) {
+        Preconditions.checkState(numericsDataType.contains(schema.getFieldSpecFor(entry.getKey()).getDataType()),
             "INCREMENT merger should be numeric data types.");
       }
     }
 
-    Preconditions.checkState(
-        tableConfig.getIndexingConfig().isNullHandlingEnabled(),
+    Preconditions.checkState(tableConfig.getIndexingConfig().isNullHandlingEnabled(),
         "NullValueHandling is required to be enabled for partial upsert tables.");
   }
 
