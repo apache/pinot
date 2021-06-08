@@ -471,9 +471,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     updateTableConfig(tableConfig);
 
     long startTime = System.currentTimeMillis();
-    // The query below will fail execution due to use of double quotes around value in IN clause.
-    JsonNode queryResponse = postSqlQuery("SELECT count(*) FROM mytable WHERE Dest IN (\"DFW\")");
-    String result = queryResponse.toPrettyString();
+    // The query below will fail execution due to JSON_MATCH on column without json index
+    JsonNode queryResponse = postSqlQuery("SELECT count(*) FROM mytable WHERE JSON_MATCH(Dest, '$=123')");
 
     assertTrue(System.currentTimeMillis() - startTime < queryTimeout);
     assertTrue(queryResponse.get("exceptions").get(0).get("message").toString().startsWith("\"QueryExecutionError"));

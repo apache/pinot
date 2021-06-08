@@ -179,11 +179,6 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(func.getOperator(), "REGEXP_LIKE");
     Assert.assertEquals(func.getOperands().get(0).getIdentifier().getName(), "E");
     Assert.assertEquals(func.getOperands().get(1).getLiteral().getStringValue(), "^U.*");
-    pinotQuery = CalciteSqlParser.compileToPinotQuery("select * from vegetables where f LIKE '%potato%'");
-    func = pinotQuery.getFilterExpression().getFunctionCall();
-    Assert.assertEquals(func.getOperator(), SqlKind.LIKE.name());
-    Assert.assertEquals(func.getOperands().get(0).getIdentifier().getName(), "f");
-    Assert.assertEquals(func.getOperands().get(1).getLiteral().getStringValue(), "%potato%");
     pinotQuery = CalciteSqlParser.compileToPinotQuery("select * from vegetables where g IN (12, 13, 15.2, 17)");
     func = pinotQuery.getFilterExpression().getFunctionCall();
     Assert.assertEquals(func.getOperator(), SqlKind.IN.name());
@@ -339,6 +334,30 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(func.getOperator(), SqlKind.GREATER_THAN_OR_EQUAL.name());
     Assert.assertEquals(func.getOperands().get(0).getIdentifier().getName(), "c");
     Assert.assertEquals(func.getOperands().get(1).getLiteral().getLongValue(), 10L);
+  }
+
+  @Test
+  public void testInvalidFilterClauses() {
+    // Only support regexp_like
+    testInvalidFilterClause("a like b");
+    // Only support literals in IN/NOT_IN/REGEXP_LIKE/TEXT_MATCH/JSON_MATCH predicate
+    testInvalidFilterClause("a in (\"b\")");
+    testInvalidFilterClause("a not in ('b', c)");
+    testInvalidFilterClause("regexp_like(a, b)");
+    testInvalidFilterClause("text_match(a, \"b\")");
+    testInvalidFilterClause("json_match(a, b");
+    // Nested invalid filter
+    testInvalidFilterClause("a = 1 and c in (\"d\")");
+  }
+
+  private void testInvalidFilterClause(String filter) {
+    try {
+      CalciteSqlParser.compileToPinotQuery("select * from vegetables where " + filter);
+    } catch (SqlCompilationException e) {
+      // Expected
+      return;
+    }
+    Assert.fail("Should fail on invalid filter: " + filter);
   }
 
   @Test
