@@ -98,7 +98,7 @@ $ git clone https://github.com/apache/incubator-pinot.git
 $ cd incubator-pinot
 
 # Build Pinot
-$ mvn clean install -DskipTests -Pbin-dist
+$ ./mvnw clean install -DskipTests -Pbin-dist
 
 # Run the Quick Demo
 $ cd pinot-distribution/target/apache-pinot-incubating-<version>-SNAPSHOT-bin/apache-pinot-incubating-<version>-SNAPSHOT-bin

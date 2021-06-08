@@ -45,7 +45,7 @@ java -version
 PASS=0
 for i in $(seq 1 2)
 do
-  mvn clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true
+  ./mvnw clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true
   if [ $? -eq 0 ]; then
     PASS=1
     break;
@@ -261,6 +261,6 @@ fi
 
 cd ../../../../../
 pwd
-mvn clean > /dev/null
+./mvnw clean > /dev/null
 
 exit 0
