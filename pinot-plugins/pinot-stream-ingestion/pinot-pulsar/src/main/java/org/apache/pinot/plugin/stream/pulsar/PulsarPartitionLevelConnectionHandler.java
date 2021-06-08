@@ -59,7 +59,7 @@ public class PulsarPartitionLevelConnectionHandler {
     }
   }
 
-  private String getPartitionedTopicName(int partition)
+  protected String getPartitionedTopicName(int partition)
       throws Exception {
     List<String> partitionTopicList = _pulsarClient.getPartitionsForTopic(_topic).get();
     return partitionTopicList.get(partition);

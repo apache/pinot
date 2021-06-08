@@ -31,7 +31,7 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 public class PulsarConsumerFactory extends StreamConsumerFactory {
   @Override
   public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
-    return new PulsarPartitionLevelConsumer(clientId, _streamConfig, partition);
+    throw new UnsupportedOperationException("Partition Level consumer is deprecated!");
   }
 
   @Override
@@ -58,6 +58,6 @@ public class PulsarConsumerFactory extends StreamConsumerFactory {
   @Override
   public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
       PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
-    throw new UnsupportedOperationException();
+    return new PulsarPartitionLevelConsumer(clientId, _streamConfig, partitionGroupConsumptionStatus);
   }
 }

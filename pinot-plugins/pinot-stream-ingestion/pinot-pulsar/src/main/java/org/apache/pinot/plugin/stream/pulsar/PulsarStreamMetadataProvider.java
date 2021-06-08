@@ -20,13 +20,22 @@ package org.apache.pinot.plugin.stream.pulsar;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeoutException;
 import javax.annotation.Nonnull;
 import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pulsar.client.admin.PulsarAdmin;
+import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.PulsarClientException;
+import org.apache.pulsar.client.api.Reader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,6 +99,55 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
           + offsetCriteria.toString(), e);
       return null;
     }
+  }
+
+  /**
+   * We assume 1:1 mapping from partitionGroupId to partitionId in pulsar. This works because pulsar doesn't have
+   * the concept of child partitions as well as reducing the current number of partition.
+   * @param clientId
+   * @param streamConfig
+   * @param partitionGroupConsumptionStatuses list of {@link PartitionGroupConsumptionStatus} for current partition groups
+   * @param timeoutMillis
+   * @return
+   * @throws TimeoutException
+   * @throws IOException
+   */
+  @Override
+  public List<PartitionGroupMetadata> computePartitionGroupMetadata(String clientId, StreamConfig streamConfig,
+      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis)
+      throws TimeoutException, IOException {
+    List<PartitionGroupMetadata> newPartitionGroupMetadataList = new ArrayList<>();
+
+    for (PartitionGroupConsumptionStatus partitionGroupConsumptionStatus : partitionGroupConsumptionStatuses) {
+      newPartitionGroupMetadataList.add(
+          new PartitionGroupMetadata(partitionGroupConsumptionStatus.getPartitionGroupId(),
+              partitionGroupConsumptionStatus.getStartOffset()));
+    }
+
+    try {
+      List<String> partitionedTopicNameList = _pulsarClient.getPartitionsForTopic(_topic).get();
+
+      if (partitionedTopicNameList.size() > partitionGroupConsumptionStatuses.size()) {
+        int newPartitionStartIndex = partitionGroupConsumptionStatuses.size();
+
+        for (int p = newPartitionStartIndex; p < partitionedTopicNameList.size(); p++) {
+
+          Reader reader =
+              _pulsarClient.newReader().topic(getPartitionedTopicName(p)).startMessageId(_config.getInitialMessageId())
+                  .create();
+
+          if (reader.hasMessageAvailable()) {
+            Message message = reader.readNext();
+            newPartitionGroupMetadataList
+                .add(new PartitionGroupMetadata(p, new MessageIdStreamOffset(message.getMessageId())));
+          }
+        }
+      }
+    } catch (Exception e) {
+      //No partition found with id p
+    }
+
+    return newPartitionGroupMetadataList;
   }
 
   @Override

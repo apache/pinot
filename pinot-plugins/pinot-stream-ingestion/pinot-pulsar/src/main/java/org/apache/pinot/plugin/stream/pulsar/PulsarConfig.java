@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.stream.pulsar;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -44,9 +43,6 @@ public class PulsarConfig {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
     _pulsarTopicName = streamConfig.getTopicName();
     _bootstrapServers = streamConfigMap.getOrDefault(BOOTSTRAP_SERVERS, DEFAULT_BOOTSTRAP_BROKERS);
-
-    Preconditions.checkNotNull(_bootstrapServers,
-        "Must specify bootstrap broker connect string " + BOOTSTRAP_SERVERS + " in high level pulsar consumer");
     _subscriberId = subscriberId;
 
     String startPositionProperty = StreamConfigProperties.constructStreamProperty(STREAM_TYPE, START_POSITION);

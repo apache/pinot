@@ -6,12 +6,16 @@
     <artifactId>pinot-stream-ingestion</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>0.8.0-SNAPSHOT</version>
+    <relativePath>..</relativePath>
   </parent>
   <modelVersion>4.0.0</modelVersion>
 
+  <name>Pinot Pulsar</name>
+  <url>https://pinot.apache.org/</url>
   <artifactId>pinot-pulsar</artifactId>
 
   <properties>
+    <pinot.root>${basedir}/../../..</pinot.root>
     <pulsar.version>2.7.2</pulsar.version>
   </properties>
 

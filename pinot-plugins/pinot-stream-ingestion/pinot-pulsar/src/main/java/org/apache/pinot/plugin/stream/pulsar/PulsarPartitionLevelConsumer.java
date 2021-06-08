@@ -28,6 +28,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.spi.stream.MessageBatch;
+import org.apache.pinot.spi.stream.PartitionGroupConsumer;
+import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -38,12 +40,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnectionHandler implements PartitionLevelConsumer {
+public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnectionHandler implements PartitionGroupConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(PulsarPartitionLevelConsumer.class);
   private final ExecutorService _executorService;
+  private final PartitionGroupConsumptionStatus _partitionGroupConsumptionStatus;
 
-  public PulsarPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
-    super(clientId, streamConfig, partition);
+  public PulsarPartitionLevelConsumer(String clientId, StreamConfig streamConfig, PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
+    super(clientId, streamConfig, partitionGroupConsumptionStatus.getPartitionGroupId());
+    _partitionGroupConsumptionStatus = partitionGroupConsumptionStatus;
     _executorService = Executors.newSingleThreadExecutor();
   }
 
@@ -98,11 +102,6 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
       return input != null && input.getData() != null && (input.getMessageId().compareTo(startOffset) >= 0) && (
           (endOffset == null) || (input.getMessageId().compareTo(endOffset) < 0));
     });
-  }
-
-  @Override
-  public MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis) {
-    throw new UnsupportedOperationException("Pulsar does not support long offsets");
   }
 
   @Override

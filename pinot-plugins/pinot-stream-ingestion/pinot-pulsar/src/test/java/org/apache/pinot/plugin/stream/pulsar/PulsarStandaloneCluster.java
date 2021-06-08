@@ -18,11 +18,18 @@
  */
 package org.apache.pinot.plugin.stream.pulsar;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class PulsarStandaloneCluster {
+  private static Logger LOGGER = LoggerFactory.getLogger(PulsarStandaloneCluster.class);
+
   public static final Integer DEFAULT_BROKER_PORT = 6650;
   public static final Integer DEFAULT_ADMIN_PORT = 8080;
   public static final String DEFAULT_DATA_MOUNT_DIRECTORY = "pulsar-data";
@@ -37,7 +44,7 @@ public class PulsarStandaloneCluster {
   private Process _pulsarCluster;
 
   public static final String DOCKER_COMMAND =
-      "docker run --name " + DOCKER_CONTAINER_NAME + " -p %d:%d -p %d:%d " + "  --mount source=pulsardata,target=%s"
+      "docker run --name " + DOCKER_CONTAINER_NAME + " -p %d:6650 -p %d:8080 " + "  --mount source=pulsardata,target=%s"
           + "  --mount source=pulsarconf,target=%s " + "  apachepulsar/pulsar:2.7.2 bin/pulsar standalone";
 
   public static final String DOCKER_STOP_COMMAND = "docker stop " + DOCKER_CONTAINER_NAME;
@@ -86,13 +93,12 @@ public class PulsarStandaloneCluster {
     dataDir.mkdirs();
     confDir.mkdirs();
 
-    String formattedCommand = String
-        .format(DOCKER_COMMAND, brokerPort, brokerPort, adminPort, adminPort, dataDir.getAbsolutePath(),
-            confDir.getAbsolutePath());
+    String formattedCommand =
+        String.format(DOCKER_COMMAND, brokerPort, adminPort, dataDir.getAbsolutePath(), confDir.getAbsolutePath());
 
     _pulsarCluster = Runtime.getRuntime().exec(formattedCommand);
 
-    Thread.sleep(30000);
+    Thread.sleep(30000L);
   }
 
   public void stop()
@@ -108,7 +114,8 @@ public class PulsarStandaloneCluster {
       if (process.exitValue() != 0) {
         throw new RuntimeException("Could not stop running docker container " + DOCKER_CONTAINER_NAME);
       }
-    }catch (IllegalThreadStateException ignore){}
+    } catch (IllegalThreadStateException ignore) {
+    }
 
     process = Runtime.getRuntime().exec(DOCKER_REMOVE_COMMAND);
   }
