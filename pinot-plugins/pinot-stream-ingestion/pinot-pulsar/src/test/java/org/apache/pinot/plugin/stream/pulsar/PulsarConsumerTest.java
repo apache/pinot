@@ -61,26 +61,35 @@ public class PulsarConsumerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    _pulsarStandaloneCluster = new PulsarStandaloneCluster();
+    try {
+      _pulsarStandaloneCluster = new PulsarStandaloneCluster();
 
-    _pulsarStandaloneCluster.start();
+      _pulsarStandaloneCluster.start();
 
-    PulsarAdmin admin =
-        PulsarAdmin.builder().serviceHttpUrl("http://localhost:" + _pulsarStandaloneCluster.getAdminPort()).build();
+      PulsarAdmin admin =
+          PulsarAdmin.builder().serviceHttpUrl("http://localhost:" + _pulsarStandaloneCluster.getAdminPort()).build();
 
-    String bootstrapServer = "pulsar://localhost:" + _pulsarStandaloneCluster.getBrokerPort();
+      String bootstrapServer = "pulsar://localhost:" + _pulsarStandaloneCluster.getBrokerPort();
 
-    _pulsarClient = PulsarClient.builder().serviceUrl(bootstrapServer).build();
+      _pulsarClient = PulsarClient.builder().serviceUrl(bootstrapServer).build();
 
-    admin.topics().createPartitionedTopic(TEST_TOPIC, NUM_PARTITION);
+      admin.topics().createPartitionedTopic(TEST_TOPIC, NUM_PARTITION);
 
-    publishRecords();
+      publishRecords();
+    } catch (Exception e) {
+      if (_pulsarStandaloneCluster != null) {
+        _pulsarStandaloneCluster.stop();
+      }
+      throw new RuntimeException("Failed to setUp test environment", e);
+    }
   }
 
   @AfterClass
   public void tearDown()
       throws Exception {
-    _pulsarStandaloneCluster.stop();
+    if (_pulsarStandaloneCluster != null) {
+      _pulsarStandaloneCluster.stop();
+    }
   }
 
   public void publishRecords()

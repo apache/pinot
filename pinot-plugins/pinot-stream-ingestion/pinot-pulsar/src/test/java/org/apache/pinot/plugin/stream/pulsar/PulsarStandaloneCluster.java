@@ -18,16 +18,23 @@
  */
 package org.apache.pinot.plugin.stream.pulsar;
 
+import com.google.common.base.Function;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.util.TestUtils;
+import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class PulsarStandaloneCluster {
+  public static final long DEFAULT_WAIT_TIMEOUT = 3000L;
+  public static final long WAIT_TIME_FOR_NAMESPACES_LOAD = 20000L;
   private static Logger LOGGER = LoggerFactory.getLogger(PulsarStandaloneCluster.class);
 
   public static final Integer DEFAULT_BROKER_PORT = 6650;
@@ -42,16 +49,18 @@ public class PulsarStandaloneCluster {
   private String _confMountDirectory;
 
   private Process _pulsarCluster;
+  private DockerExecutor _dockerExecutor;
 
   public static final String DOCKER_COMMAND =
-      "docker run --name " + DOCKER_CONTAINER_NAME + " -p %d:6650 -p %d:8080 " + "  --mount source=pulsardata,target=%s"
-          + "  --mount source=pulsarconf,target=%s " + "  apachepulsar/pulsar:2.7.2 bin/pulsar standalone";
+      "docker run -d --rm --name " + DOCKER_CONTAINER_NAME + " -p %d:6650 -p %d:8080"
+          + " --mount source=pulsardata,target=%s" + " --mount source=pulsarconf,target=%s"
+          + " apachepulsar/pulsar:2.7.2 bin/pulsar standalone";
 
   public static final String DOCKER_STOP_COMMAND = "docker stop " + DOCKER_CONTAINER_NAME;
   public static final String DOCKER_REMOVE_COMMAND = "docker rm " + DOCKER_CONTAINER_NAME;
 
   public PulsarStandaloneCluster() {
-
+    _dockerExecutor = new DockerExecutor();
   }
 
   public void setBrokerPort(Integer brokerPort) {
@@ -93,30 +102,23 @@ public class PulsarStandaloneCluster {
     dataDir.mkdirs();
     confDir.mkdirs();
 
-    String formattedCommand =
+    String runCommand =
         String.format(DOCKER_COMMAND, brokerPort, adminPort, dataDir.getAbsolutePath(), confDir.getAbsolutePath());
 
-    _pulsarCluster = Runtime.getRuntime().exec(formattedCommand);
+    _dockerExecutor.execute(runCommand, DEFAULT_WAIT_TIMEOUT);
 
-    Thread.sleep(30000L);
+    Thread.sleep(WAIT_TIME_FOR_NAMESPACES_LOAD);
   }
 
   public void stop()
       throws Exception {
-    if (_pulsarCluster != null && _pulsarCluster.isAlive()) {
-      _pulsarCluster.destroy();
-      _pulsarCluster = null;
-    }
-    Process process = Runtime.getRuntime().exec(DOCKER_STOP_COMMAND);
+    _dockerExecutor.execute(DOCKER_STOP_COMMAND, DEFAULT_WAIT_TIMEOUT);
 
-    Thread.sleep(5000);
-    try {
-      if (process.exitValue() != 0) {
-        throw new RuntimeException("Could not stop running docker container " + DOCKER_CONTAINER_NAME);
-      }
-    } catch (IllegalThreadStateException ignore) {
+    if (_dataMountDirectory != null) {
+      FileUtils.deleteDirectory(new File(_dataMountDirectory));
     }
-
-    process = Runtime.getRuntime().exec(DOCKER_REMOVE_COMMAND);
+    if (_confMountDirectory != null) {
+      FileUtils.deleteDirectory(new File(_confMountDirectory));
+    }
   }
 }
