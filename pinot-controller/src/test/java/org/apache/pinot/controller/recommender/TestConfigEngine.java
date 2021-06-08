@@ -239,6 +239,20 @@ public class TestConfigEngine {
   }
 
   @Test
+  void testRangeIndexRule()
+      throws InvalidInputException, IOException {
+    loadInput("recommenderInput/RangeIndexInput.json");
+    ConfigManager output = new ConfigManager();
+    AbstractRule abstractRule =
+        RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.RangeIndexRule, _input, output);
+    abstractRule.run();
+    // Although column i has highest weight, it being string column, range index recommender will skip it and select next winner
+    assertNotEquals(output.getIndexConfig().getRangeIndexColumns().toString(), "[i]");
+    // index can be supported on dimension, date-time and metric columns
+    assertEquals(output.getIndexConfig().getRangeIndexColumns().toString(), "[t, j]");
+  }
+
+  @Test
   void testNoDictionaryOnHeapDictionaryJointRule()
       throws InvalidInputException, IOException {
     loadInput("recommenderInput/NoDictionaryOnHeapDictionaryJointRuleInput.json");
