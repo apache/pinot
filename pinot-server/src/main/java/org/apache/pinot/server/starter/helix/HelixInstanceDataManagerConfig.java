@@ -226,7 +226,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public PinotConfiguration getTierConfigs() {
     String tierBackend = getTierBackend();
-    String tierConfigsPrefix = String.format("%s.%s.", TIER_CONFIGS_PREFIX, tierBackend);
+    String tierConfigsPrefix = String.format("%s.%s", TIER_CONFIGS_PREFIX, tierBackend);
     Map<String, Object> tierConfigs =
         new HashMap<>(_instanceDataManagerConfiguration.subset(tierConfigsPrefix).toMap());
     if (!tierConfigs.containsKey(READ_MODE)) {
