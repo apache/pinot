@@ -45,7 +45,8 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
   private final ExecutorService _executorService;
   private final PartitionGroupConsumptionStatus _partitionGroupConsumptionStatus;
 
-  public PulsarPartitionLevelConsumer(String clientId, StreamConfig streamConfig, PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
+  public PulsarPartitionLevelConsumer(String clientId, StreamConfig streamConfig,
+      PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
     super(clientId, streamConfig, partitionGroupConsumptionStatus.getPartitionGroupId());
     _partitionGroupConsumptionStatus = partitionGroupConsumptionStatus;
     _executorService = Executors.newSingleThreadExecutor();
@@ -64,9 +65,11 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
 
     try {
       return pulsarResultFuture.get(timeoutMillis, TimeUnit.MILLISECONDS);
-    } catch (Exception e) {
+    } catch (TimeoutException e) {
       //The fetchMessages has thrown an exception. Most common cause is the timeout.
       //We return the records fetched till now along with the next start offset.
+      return new PulsarMessageBatch(buildOffsetFilteringIterable(messagesList, startMessageId, endMessageId));
+    } catch (Exception e) {
       LOGGER.warn("Error while fetching records from Pulsar", e);
       return new PulsarMessageBatch(buildOffsetFilteringIterable(messagesList, startMessageId, endMessageId));
     }
