@@ -284,7 +284,8 @@ public class MinionStarter implements ServiceStartable {
     HelixAdmin helixAdmin = _helixManager.getClusterManagmentTool();
     String clusterName = _helixManager.getClusterName();
     InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(clusterName, _instanceId);
-    if (instanceConfig.getTags().isEmpty()) {
+    List<String> instanceTags = instanceConfig.getTags();
+    if (instanceTags == null || instanceTags.isEmpty()) {
       LOGGER.info("Adding default Helix tag: {} to Pinot minion", CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
       helixAdmin.addInstanceTag(clusterName, _instanceId, CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
     }
