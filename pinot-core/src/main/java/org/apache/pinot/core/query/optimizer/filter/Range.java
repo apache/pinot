@@ -116,4 +116,28 @@ public class Range {
         stringUpperBound.equals(RangePredicate.UNBOUNDED) ? null : dataType.convertInternal(stringUpperBound);
     return new Range(lowerBound, lowerInclusive, upperBound, upperInclusive);
   }
+
+  public Comparable getLowerBound() {
+    return _lowerBound;
+  }
+
+  public boolean isLowerInclusive() {
+    return _lowerInclusive;
+  }
+
+  public void setLowerInclusive(boolean lowerInclusive) {
+    _lowerInclusive = lowerInclusive;
+  }
+
+  public Comparable getUpperBound() {
+    return _upperBound;
+  }
+
+  public boolean isUpperInclusive() {
+    return _upperInclusive;
+  }
+
+  public void setUpperInclusive(boolean upperInclusive) {
+    _upperInclusive = upperInclusive;
+  }
 }
