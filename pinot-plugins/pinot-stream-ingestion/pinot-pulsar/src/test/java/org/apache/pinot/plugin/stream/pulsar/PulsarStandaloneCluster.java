@@ -1,67 +1,32 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
- */
 package org.apache.pinot.plugin.stream.pulsar;
 
-import com.google.common.base.Function;
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.util.List;
-import javax.annotation.Nullable;
+import java.io.FileInputStream;
+import java.util.Optional;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.util.TestUtils;
-import org.apache.pulsar.client.admin.PulsarAdmin;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.pulsar.PulsarStandalone;
+import org.apache.pulsar.PulsarStandaloneBuilder;
+import org.apache.pulsar.broker.ServiceConfiguration;
+import org.apache.pulsar.common.configuration.PulsarConfigurationLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class PulsarStandaloneCluster {
-  public static final long DEFAULT_WAIT_TIMEOUT = 3000L;
-  public static final long WAIT_TIME_FOR_NAMESPACES_LOAD = 20000L;
   private static Logger LOGGER = LoggerFactory.getLogger(PulsarStandaloneCluster.class);
 
-  public static final Integer DEFAULT_BROKER_PORT = 6650;
-  public static final Integer DEFAULT_ADMIN_PORT = 8080;
-  public static final String DEFAULT_DATA_MOUNT_DIRECTORY = "pulsar-data";
-  public static final String DEFAULT_CONF_MOUNT_DIRECTORY = "pulsar-conf";
-  public static final String DOCKER_CONTAINER_NAME = "pulsar_standalone_pinot";
+  public static final String DEFAULT_STANDALONE_CONF = "standalone.conf";
+  public static final String DEFAULT_ZK_DIR = "pulsar-zk";
+  public static final String DEFAULT_BK_DIR = "pulsar-bookeeper";
 
   private Integer _brokerPort;
   private Integer _adminPort;
-  private String _dataMountDirectory;
-  private String _confMountDirectory;
+  private String _zkDir;
+  private String _bkDir;
 
-  private Process _pulsarCluster;
-  private DockerExecutor _dockerExecutor;
-
-  public static final String DOCKER_COMMAND =
-      "docker run -d --rm --name " + DOCKER_CONTAINER_NAME + " -p %d:6650 -p %d:8080"
-          + " --mount source=pulsardata,target=%s" + " --mount source=pulsarconf,target=%s"
-          + " apachepulsar/pulsar:2.7.2 bin/pulsar standalone";
-
-  public static final String DOCKER_STOP_COMMAND = "docker stop " + DOCKER_CONTAINER_NAME;
-  public static final String DOCKER_REMOVE_COMMAND = "docker rm " + DOCKER_CONTAINER_NAME;
-
-  public PulsarStandaloneCluster() {
-    _dockerExecutor = new DockerExecutor();
-  }
+  private PulsarStandalone _pulsarStandalone;
+  private File _tempDir;
 
   public void setBrokerPort(Integer brokerPort) {
     _brokerPort = brokerPort;
@@ -71,54 +36,79 @@ public class PulsarStandaloneCluster {
     _adminPort = adminPort;
   }
 
+  public void setZkDir(String zkDir) {
+    _zkDir = zkDir;
+  }
+
+  public void setBkDir(String bkDir) {
+    _bkDir = bkDir;
+  }
+
   public Integer getBrokerPort() {
-    Integer brokerPort = _brokerPort == null ? DEFAULT_BROKER_PORT : _brokerPort;
-    return brokerPort;
+    return _brokerPort;
   }
 
   public Integer getAdminPort() {
-    Integer adminPort = _adminPort == null ? DEFAULT_ADMIN_PORT : _adminPort;
-    return adminPort;
-  }
-
-  public void setDataMountDirectory(String dataMountDirectory) {
-    _dataMountDirectory = dataMountDirectory;
-  }
-
-  public void setConfMountDirectory(String confMountDirectory) {
-    _confMountDirectory = confMountDirectory;
+    return _adminPort;
   }
 
   public void start()
       throws Exception {
-    Integer brokerPort = _brokerPort == null ? DEFAULT_BROKER_PORT : _brokerPort;
-    Integer adminPort = _adminPort == null ? DEFAULT_ADMIN_PORT : _adminPort;
-    String dataMountDirectory = _dataMountDirectory == null ? DEFAULT_DATA_MOUNT_DIRECTORY : _dataMountDirectory;
-    String confMountDirectory = _confMountDirectory == null ? DEFAULT_CONF_MOUNT_DIRECTORY : _confMountDirectory;
+    final File clusterConfigFile = new File(getClass().getClassLoader().getResource(DEFAULT_STANDALONE_CONF).toURI());
 
-    File tempDir = FileUtils.getTempDirectory();
-    File dataDir = new File(tempDir, dataMountDirectory);
-    File confDir = new File(tempDir, confMountDirectory);
-    dataDir.mkdirs();
-    confDir.mkdirs();
+    String zkDir = StringUtils.isBlank(_zkDir) ? DEFAULT_ZK_DIR : _zkDir;
+    String bkDir = StringUtils.isBlank(_bkDir) ? DEFAULT_BK_DIR : _bkDir;
+    _tempDir = FileUtils.getTempDirectory();
+    File zkDirFile = new File(_tempDir, zkDir);
+    File bkDirFile = new File(_tempDir, bkDir);
+    zkDirFile.mkdirs();
+    bkDirFile.mkdirs();
 
-    String runCommand =
-        String.format(DOCKER_COMMAND, brokerPort, adminPort, dataDir.getAbsolutePath(), confDir.getAbsolutePath());
+    ServiceConfiguration config =
+        PulsarConfigurationLoader.create((new FileInputStream(clusterConfigFile)), ServiceConfiguration.class);
+    config.setManagedLedgerDefaultEnsembleSize(1);
+    config.setManagedLedgerDefaultWriteQuorum(1);
+    config.setManagedLedgerDefaultAckQuorum(1);
+    String zkServers = "127.0.0.1";
+    config.setAdvertisedAddress("localhost");
 
-    _dockerExecutor.execute(runCommand, DEFAULT_WAIT_TIMEOUT);
+    _pulsarStandalone = PulsarStandaloneBuilder.instance().withConfig(config).withNoStreamStorage(true).build();
+    _pulsarStandalone.setZkDir(zkDirFile.getAbsolutePath());
+    _pulsarStandalone.setBkDir(bkDirFile.getAbsolutePath());
 
-    Thread.sleep(WAIT_TIME_FOR_NAMESPACES_LOAD);
+    if (config.getZookeeperServers() != null) {
+      _pulsarStandalone.setZkPort(Integer.parseInt(config.getZookeeperServers().split(":")[1]));
+    }
+
+    config.setZookeeperServers(zkServers + ":" + _pulsarStandalone.getZkPort());
+    config.setConfigurationStoreServers(zkServers + ":" + _pulsarStandalone.getZkPort());
+
+    config.setRunningStandalone(true);
+
+    if (_brokerPort != null) {
+      config.setBrokerServicePort(Optional.of(_brokerPort));
+    } else {
+      _brokerPort = config.getBrokerServicePort().get();
+    }
+
+    if (_adminPort != null) {
+      config.setWebServicePort(Optional.of(_adminPort));
+    } else {
+      _adminPort = config.getWebServicePort().get();
+    }
+
+    _pulsarStandalone.setConfigFile(clusterConfigFile.getAbsolutePath());
+    _pulsarStandalone.setConfig(config);
+
+    _pulsarStandalone.start();
   }
 
-  public void stop()
-      throws Exception {
-    _dockerExecutor.execute(DOCKER_STOP_COMMAND, DEFAULT_WAIT_TIMEOUT);
-
-    if (_dataMountDirectory != null) {
-      FileUtils.deleteDirectory(new File(_dataMountDirectory));
-    }
-    if (_confMountDirectory != null) {
-      FileUtils.deleteDirectory(new File(_confMountDirectory));
+  public void stop() {
+    try {
+      _pulsarStandalone.close();
+      _tempDir.delete();
+    } catch (Exception e) {
+      LOGGER.warn("Failed to stop embedded pulsar and zookeeper", e);
     }
   }
 }

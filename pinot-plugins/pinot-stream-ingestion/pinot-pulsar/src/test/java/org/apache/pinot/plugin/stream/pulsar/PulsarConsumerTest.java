@@ -18,15 +18,11 @@
  */
 package org.apache.pinot.plugin.stream.pulsar;
 
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
-import org.apache.pinot.spi.stream.PartitionLevelConsumer;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
@@ -50,7 +46,7 @@ public class PulsarConsumerTest {
 
   public static final String TABLE_NAME_WITH_TYPE = "tableName_REALTIME";
   public static final String TEST_TOPIC = "test-topic";
-  public static final int NUM_PARTITION = 3;
+  public static final int NUM_PARTITION = 1;
   public static final String MESSAGE_PREFIX = "sample_msg";
   public static final int NUM_RECORDS_PER_PARTITION = 1000;
   public static final String CLIENT_ID = "clientId";
@@ -124,7 +120,7 @@ public class PulsarConsumerTest {
     streamConfigMap.put("stream.pulsar.consumer.type", streamPulsarConsumerType);
     streamConfigMap.put("stream.pulsar.topic.name", TEST_TOPIC);
     streamConfigMap.put("stream.pulsar.bootstrap.servers", streamPulsarBrokerList);
-    streamConfigMap.put("stream.pulsar.start_position", "earliest");
+    streamConfigMap.put("stream.pulsar.start.position", "earliest");
     streamConfigMap.put("stream.pulsar.consumer.factory.class.name", getPulsarConsumerFactoryName());
     streamConfigMap.put("stream.pulsar.decoder.class.name", "decoderClass");
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);

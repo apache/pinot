@@ -43,7 +43,7 @@ public class PulsarConfig {
   public PulsarConfig(StreamConfig streamConfig, String subscriberId) {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
     _pulsarTopicName = streamConfig.getTopicName();
-    _bootstrapServers = streamConfigMap.get(BOOTSTRAP_SERVERS);
+    _bootstrapServers = streamConfigMap.get(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, BOOTSTRAP_SERVERS));
     _subscriberId = subscriberId;
 
     Preconditions.checkNotNull(_bootstrapServers, "No brokers provided in the config");
