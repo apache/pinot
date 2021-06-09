@@ -51,19 +51,15 @@ public class MetadataEqualsHashCodeTest {
     EqualsVerifier.forClass(Schema.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).
         usingGetClass().verify();
     EqualsVerifier.forClass(DimensionFieldSpec.class)
-        .withIgnoredFields("_virtualColumnProvider")
         .suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS).
         usingGetClass().verify();
     EqualsVerifier.forClass(MetricFieldSpec.class)
-        .withIgnoredFields("_virtualColumnProvider")
         .suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS).
         usingGetClass().verify();
     EqualsVerifier.forClass(TimeFieldSpec.class)
-        .withIgnoredFields("_virtualColumnProvider")
         .suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS).
         usingGetClass().verify();
     EqualsVerifier.forClass(DateTimeFieldSpec.class)
-        .withIgnoredFields("_virtualColumnProvider")
         .suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS).
         usingGetClass().verify();
   }

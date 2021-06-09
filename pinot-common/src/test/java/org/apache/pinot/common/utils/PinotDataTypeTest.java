@@ -19,7 +19,6 @@
 package org.apache.pinot.common.utils;
 
 import java.sql.Timestamp;
-import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -104,8 +103,7 @@ public class PinotDataTypeTest {
 
   @Test
   public void testTimestamp() {
-    Timestamp timestamp = Timestamp.valueOf(LocalDateTime.now());
-    timestamp.setNanos(0);
+    Timestamp timestamp = new Timestamp(System.currentTimeMillis());
     assertEquals(TIMESTAMP.convert(timestamp.getTime(), LONG), timestamp);
     assertEquals(TIMESTAMP.convert(timestamp.toString(), STRING), timestamp);
     assertEquals(TIMESTAMP.convert(timestamp.getTime(), JSON), timestamp);

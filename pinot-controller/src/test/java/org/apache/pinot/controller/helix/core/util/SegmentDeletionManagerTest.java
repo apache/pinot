@@ -49,7 +49,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-@Test(singleThreaded = true)
+
 public class SegmentDeletionManagerTest {
   final static String tableName = "table";
   final static String clusterName = "mock";

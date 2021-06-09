@@ -169,7 +169,7 @@ public class BasicAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest
 
     // schedule offline segment generation
     Assert.assertNotNull(_controllerStarter.getTaskManager().scheduleTasks());
-    Thread.sleep(7000);
+    Thread.sleep(5000);
 
     ResultSetGroup resultAfterOffline = getPinotConnection().execute(query);
 

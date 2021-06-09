@@ -44,7 +44,7 @@ public class PluginClassLoader extends URLClassLoader {
          *
          * @see https://community.oracle.com/tech/developers/discussion/4011800/base-classloader-no-longer-from-urlclassloader
          */
-        super.addURL(url);
+        addURL(url);
       } catch (Exception e) {
         ExceptionUtils.rethrow(e);
       }
