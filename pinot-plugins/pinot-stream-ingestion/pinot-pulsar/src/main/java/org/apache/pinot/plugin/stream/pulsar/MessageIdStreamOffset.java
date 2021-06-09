@@ -30,15 +30,15 @@ public class MessageIdStreamOffset implements StreamPartitionMsgOffset {
   private Logger LOGGER = LoggerFactory.getLogger(MessageIdStreamOffset.class);
   private MessageId _messageId;
 
-  public MessageIdStreamOffset(MessageId messageId){
+  public MessageIdStreamOffset(MessageId messageId) {
     _messageId = messageId;
   }
 
-  public MessageIdStreamOffset(String messageId){
+  public MessageIdStreamOffset(String messageId) {
     try {
       _messageId = MessageId.fromByteArray(messageId.getBytes(StandardCharsets.UTF_8));
-    }catch (IOException e){
-      LOGGER.warn("Cannot parse message id "  + messageId, e);
+    } catch (IOException e) {
+      LOGGER.warn("Cannot parse message id " + messageId, e);
     }
   }
 
@@ -54,7 +54,7 @@ public class MessageIdStreamOffset implements StreamPartitionMsgOffset {
   @Override
   public int compareTo(Object other) {
     MessageIdStreamOffset messageIdStreamOffset = (MessageIdStreamOffset) other;
-   return _messageId.compareTo(messageIdStreamOffset.getMessageId());
+    return _messageId.compareTo(messageIdStreamOffset.getMessageId());
   }
 
   @Override

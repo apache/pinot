@@ -30,7 +30,6 @@ import java.util.concurrent.TimeoutException;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
-import org.apache.pinot.spi.stream.PartitionLevelConsumer;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pulsar.client.api.Message;
@@ -43,12 +42,10 @@ import org.slf4j.LoggerFactory;
 public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnectionHandler implements PartitionGroupConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(PulsarPartitionLevelConsumer.class);
   private final ExecutorService _executorService;
-  private final PartitionGroupConsumptionStatus _partitionGroupConsumptionStatus;
 
   public PulsarPartitionLevelConsumer(String clientId, StreamConfig streamConfig,
       PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
     super(clientId, streamConfig, partitionGroupConsumptionStatus.getPartitionGroupId());
-    _partitionGroupConsumptionStatus = partitionGroupConsumptionStatus;
     _executorService = Executors.newSingleThreadExecutor();
   }
 
@@ -66,8 +63,8 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
     try {
       return pulsarResultFuture.get(timeoutMillis, TimeUnit.MILLISECONDS);
     } catch (TimeoutException e) {
-      //The fetchMessages has thrown an exception. Most common cause is the timeout.
-      //We return the records fetched till now along with the next start offset.
+      // The fetchMessages has thrown an exception. Most common cause is the timeout.
+      // We return the records fetched till now along with the next start offset.
       return new PulsarMessageBatch(buildOffsetFilteringIterable(messagesList, startMessageId, endMessageId));
     } catch (Exception e) {
       LOGGER.warn("Error while fetching records from Pulsar", e);

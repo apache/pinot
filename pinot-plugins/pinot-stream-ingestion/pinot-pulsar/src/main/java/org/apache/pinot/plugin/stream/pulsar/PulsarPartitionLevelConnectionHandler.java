@@ -32,8 +32,6 @@ import org.slf4j.LoggerFactory;
 public class PulsarPartitionLevelConnectionHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(PulsarPartitionLevelConnectionHandler.class);
 
-  public static final String SEPERATOR = "-";
-  public static final String TOPIC_PARTITION_NAME_SUFFIX = "partition";
   protected final PulsarConfig _config;
   protected final String _clientId;
   protected final int _partition;
@@ -68,10 +66,5 @@ public class PulsarPartitionLevelConnectionHandler {
   public void close()
       throws IOException {
     _reader.close();
-  }
-
-  @VisibleForTesting
-  protected PulsarConfig getPulsarPartitionLevelStreamConfig() {
-    return _config;
   }
 }

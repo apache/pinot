@@ -65,16 +65,11 @@ public class PulsarStreamLevelConsumerManager {
           pulsarStreamLevelStreamConfig.getPulsarTopicName());
 
       // Create the consumer
-
-      Properties consumerProp = new Properties();
-      consumerProp.putAll(pulsarStreamLevelStreamConfig.getPulsarConsumerProperties());
-
       try {
         _pulsarClient = PulsarClient.builder().serviceUrl(pulsarStreamLevelStreamConfig.getBootstrapServers()).build();
 
-        _reader =
-            _pulsarClient.newReader().topic(pulsarStreamLevelStreamConfig.getPulsarTopicName())
-                .startMessageId(pulsarStreamLevelStreamConfig.getInitialMessageId()).create();
+        _reader = _pulsarClient.newReader().topic(pulsarStreamLevelStreamConfig.getPulsarTopicName())
+            .startMessageId(pulsarStreamLevelStreamConfig.getInitialMessageId()).create();
 
         // Mark both the consumer and iterator as acquired
         CONSUMER_FOR_CONFIG_KEY.put(configKey, _reader);

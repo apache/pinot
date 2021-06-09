@@ -43,19 +43,16 @@ import org.slf4j.LoggerFactory;
 public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnectionHandler implements StreamMetadataProvider {
   private Logger LOGGER = LoggerFactory.getLogger(PulsarStreamMetadataProvider.class);
 
-  private String _clientId;
   private StreamConfig _streamConfig;
   private int _partition;
 
   public PulsarStreamMetadataProvider(String clientId, StreamConfig streamConfig) {
     super(clientId, streamConfig, 0);
-    _clientId = clientId;
     _streamConfig = streamConfig;
   }
 
   public PulsarStreamMetadataProvider(String clientId, StreamConfig streamConfig, int partition) {
     super(clientId, streamConfig, partition);
-    _clientId = clientId;
     _streamConfig = streamConfig;
     _partition = partition;
   }
@@ -65,8 +62,7 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
     try {
       return _pulsarClient.getPartitionsForTopic(_streamConfig.getTopicName()).get().size();
     } catch (Exception e) {
-      //TODO: Handle error
-      return 0;
+      throw new RuntimeException("Cannot fetch partitions for topic: " + _streamConfig.getTopicName(), e);
     }
   }
 
@@ -144,7 +140,7 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
         }
       }
     } catch (Exception e) {
-      //No partition found with id p
+      // No partition found
     }
 
     return newPartitionGroupMetadataList;
