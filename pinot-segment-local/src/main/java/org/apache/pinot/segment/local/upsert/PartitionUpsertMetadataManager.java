@@ -165,6 +165,20 @@ public class PartitionUpsertMetadataManager {
    * partial-upsert is enabled.
    */
   public GenericRow updateRecord(IndexSegment segment, RecordInfo recordInfo, GenericRow record) {
+    // For partial-upsert, need to ensure all previous records are loaded before inserting new records.
+    if (_partialUpsertHandler != null) {
+      while (!_partialUpsertHandler.isAllSegmentsLoaded()) {
+        LOGGER
+            .info("Sleeping 1 second waiting for all segments loaded for partial-upsert table: {}", _tableNameWithType);
+        try {
+          //noinspection BusyWait
+          Thread.sleep(1000L);
+        } catch (InterruptedException e) {
+          throw new RuntimeException(e);
+        }
+      }
+    }
+
     _result = record;
     _primaryKeyToRecordLocationMap.compute(recordInfo._primaryKey, (primaryKey, currentRecordLocation) -> {
       if (currentRecordLocation != null) {
