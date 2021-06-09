@@ -73,7 +73,6 @@ public class GroupByInSegmentTrimTest {
   private static final String SEGMENT_NAME = "TestGroupByInSegment";
 
   private static final String METRIC_PREFIX = "metric_";
-  private static final double MAX_VALUE = Integer.MAX_VALUE;
   private static final int NUM_ROWS = 1000;
   private static final int NUM_COLUMN = 2;
   private static final int MAX_INITIAL_RESULT_HOLDER_CAPACITY = 10_000;
@@ -82,7 +81,6 @@ public class GroupByInSegmentTrimTest {
   private static String[] _columns;
   private static double[][] _inputData;
   private static Map<Double, Double> _resultMap;
-  private Random _random;
 
   /**
    * Initializations prior to the test:
@@ -94,7 +92,6 @@ public class GroupByInSegmentTrimTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    _random = new Random(System.currentTimeMillis());
     _resultMap = new HashMap<>();
     // Current Schema: Columns: metrics_0(double), metrics_1(double)
     _inputData = new double[NUM_COLUMN][NUM_ROWS];
@@ -119,11 +116,7 @@ public class GroupByInSegmentTrimTest {
     IntermediateResultsBlock resultsBlock = aggregationGroupByOrderByOperator.nextBlock();
     ArrayList<Pair<Double, Double>> extractedResult = extractTestResult(resultsBlock);
 
-    assertEquals(extractedResult.size(), expectedResult.size());
-
-    for (int j = 0; j < expectedResult.size(); ++j) {
-      assertEquals(extractedResult.get(j), expectedResult.get(j));
-    }
+    assertEquals(extractedResult, expectedResult);
   }
 
   /**
@@ -149,19 +142,18 @@ public class GroupByInSegmentTrimTest {
 
     // Fill the data table
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
+    int step = 10;
     for (int i = 0; i < NUM_ROWS; i++) {
-      Map<String, Object> map = new HashMap<>();
+      GenericRow genericRow = new GenericRow();
 
       for (int j = 0; j < _columns.length; j++) {
         String metricName = _columns[j];
-        double value = _random.nextDouble() * MAX_VALUE;
+        double value = step + i + j;
         _inputData[j][i] = value;
-        map.put(metricName, value);
+        genericRow.putValue(metricName, value);
       }
       // Compute the max result and insert into a grouped map
       computeMaxResult(_inputData[0][i], _inputData[1][i]);
-      GenericRow genericRow = new GenericRow();
-      genericRow.init(map);
       rows.add(genericRow);
     }
 
