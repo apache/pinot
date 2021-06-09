@@ -169,20 +169,21 @@ public class BasicAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest
 
     // schedule offline segment generation
     Assert.assertNotNull(_controllerStarter.getTaskManager().scheduleTasks());
-    Thread.sleep(5000);
 
-    ResultSetGroup resultAfterOffline = getPinotConnection().execute(query);
+    // wait for offline segments
+    JsonNode offlineSegments = TestUtils.waitForResult(() -> {
+      JsonNode segmentSets = JsonUtils.stringToJsonNode(
+          sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(getTableName()), AUTH_HEADER));
+      JsonNode currentOfflineSegments =
+          new IntRange(0, segmentSets.size()).stream().map(segmentSets::get).filter(s -> s.has("OFFLINE"))
+              .map(s -> s.get("OFFLINE")).findFirst().get();
+      Assert.assertFalse(currentOfflineSegments.isEmpty());
+      return currentOfflineSegments;
+    }, 30000);
 
     // Verify constant row count
+    ResultSetGroup resultAfterOffline = getPinotConnection().execute(query);
     Assert.assertEquals(resultBeforeOffline.getResultSet(0).getLong(0), resultAfterOffline.getResultSet(0).getLong(0));
-
-    // list offline segments
-    JsonNode segmentSets = JsonUtils
-        .stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(getTableName()), AUTH_HEADER));
-    JsonNode offlineSegments =
-        new IntRange(0, segmentSets.size()).stream().map(segmentSets::get).filter(s -> s.has("OFFLINE"))
-            .map(s -> s.get("OFFLINE")).findFirst().get();
-    Assert.assertFalse(offlineSegments.isEmpty());
 
     // download and sanity-check size of offline segment(s)
     for (int i = 0; i < offlineSegments.size(); i++) {
