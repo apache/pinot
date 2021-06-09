@@ -22,9 +22,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.ArrayList;
 import java.util.Map;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.Assert;
@@ -160,6 +160,3 @@ public class PinotFSTest {
     }
   }
 }
-
-
-
