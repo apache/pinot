@@ -27,7 +27,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
-import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
