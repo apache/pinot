@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.combine;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -34,6 +35,7 @@ import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
+import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
@@ -128,19 +130,30 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
       }
 
       // Merge aggregation group-by result.
-      AggregationGroupByResult aggregationGroupByResult = intermediateResultsBlock.getAggregationGroupByResult();
-      if (aggregationGroupByResult != null) {
-        // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
-        Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
-        while (groupKeyIterator.hasNext()) {
-          GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-          Object[] keys = groupKey._keys;
-          Object[] values = Arrays.copyOf(keys, _numColumns);
-          int groupId = groupKey._groupId;
-          for (int i = 0; i < _numAggregationFunctions; i++) {
-            values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
+      // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
+      Collection<IntermediateRecord> intermediateRecords = intermediateResultsBlock.getIntermediateRecords();
+      // For now, only GroupBy OrderBy query has pre-constructed intermediate records
+      if (intermediateRecords == null) {
+        // Merge aggregation group-by result.
+        AggregationGroupByResult aggregationGroupByResult = intermediateResultsBlock.getAggregationGroupByResult();
+        if (aggregationGroupByResult != null) {
+          // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
+          Iterator<GroupKeyGenerator.GroupKey> dicGroupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+          while (dicGroupKeyIterator.hasNext()) {
+            GroupKeyGenerator.GroupKey groupKey = dicGroupKeyIterator.next();
+            Object[] keys = groupKey._keys;
+            Object[] values = Arrays.copyOf(keys, _numColumns);
+            int groupId = groupKey._groupId;
+            for (int i = 0; i < _numAggregationFunctions; i++) {
+              values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
+            }
+            _indexedTable.upsert(new Key(keys), new Record(values));
           }
-          _indexedTable.upsert(new Key(keys), new Record(values));
+        }
+      } else {
+        for (IntermediateRecord intermediateResult : intermediateRecords) {
+          //TODO: change upsert api so that it accepts intermediateRecord directly
+          _indexedTable.upsert(intermediateResult._key, intermediateResult._record);
         }
       }
     } catch (EarlyTerminationException e) {

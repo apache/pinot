@@ -38,6 +38,7 @@ import org.apache.pinot.core.common.BlockDocIdValueSet;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
+import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.Table;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -57,6 +58,7 @@ public class IntermediateResultsBlock implements Block {
   private AggregationGroupByResult _aggregationGroupByResult;
   private List<Map<String, Object>> _combinedAggregationGroupByResult;
   private List<ProcessingException> _processingExceptions;
+  private Collection<IntermediateRecord> _intermediateRecords;
   private long _numDocsScanned;
   private long _numEntriesScannedInFilter;
   private long _numEntriesScannedPostFilter;
@@ -115,6 +117,17 @@ public class IntermediateResultsBlock implements Block {
     _aggregationFunctions = aggregationFunctions;
     _aggregationGroupByResult = aggregationGroupByResults;
     _dataSchema = dataSchema;
+  }
+
+  /**
+   * Constructor for aggregation group-by order-by result with {@link AggregationGroupByResult} and
+   * with a collection of intermediate records.
+   */
+  public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions,
+      Collection<IntermediateRecord> intermediateRecords, DataSchema dataSchema) {
+    _aggregationFunctions = aggregationFunctions;
+    _dataSchema = dataSchema;
+    _intermediateRecords = intermediateRecords;
   }
 
   public IntermediateResultsBlock(Table table) {
@@ -210,12 +223,12 @@ public class IntermediateResultsBlock implements Block {
     _executionThreadCpuTimeNs = executionThreadCpuTimeNs;
   }
 
-  public void setNumServerThreads(int numServerThreads) {
-    _numServerThreads = numServerThreads;
-  }
-
   public int getNumServerThreads() {
     return _numServerThreads;
+  }
+
+  public void setNumServerThreads(int numServerThreads) {
+    _numServerThreads = numServerThreads;
   }
 
   @VisibleForTesting
@@ -279,6 +292,14 @@ public class IntermediateResultsBlock implements Block {
 
   public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
     _numGroupsLimitReached = numGroupsLimitReached;
+  }
+
+  /**
+   * Get the collection of intermediate records
+   */
+  @Nullable
+  public Collection<IntermediateRecord> getIntermediateRecords() {
+    return _intermediateRecords;
   }
 
   public DataTable getDataTable()
