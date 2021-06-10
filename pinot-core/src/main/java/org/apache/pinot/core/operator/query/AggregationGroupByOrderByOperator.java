@@ -44,7 +44,6 @@ import static org.apache.pinot.core.util.GroupByUtils.getTableCapacity;
 @SuppressWarnings("rawtypes")
 public class AggregationGroupByOrderByOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "AggregationGroupByOrderByOperator";
-  private static final int TRIM_OFF = -1;
 
   private final AggregationFunction[] _aggregationFunctions;
   private final ExpressionContext[] _groupByExpressions;
@@ -118,6 +117,9 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
       groupByExecutor.process(transformBlock);
     }
 
+    if (_queryContext.getOrderByExpressions() == null) {
+
+    }
     // There is no OrderBy or minSegmentTrimSize is set to be negative or 0
     if (_queryContext.getOrderByExpressions() == null || _minSegmentTrimSize <= 0) {
       // Build intermediate result block based on aggregation group-by result from the executor

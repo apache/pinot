@@ -155,6 +155,7 @@ public class GroupByInSegmentTrimTest {
       // Compute the max result and insert into a grouped map
       computeMaxResult(_inputData[0][i], _inputData[1][i]);
       rows.add(genericRow);
+      step += 1;
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
