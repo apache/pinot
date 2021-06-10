@@ -20,8 +20,10 @@ package org.apache.pinot.core.data.table;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -132,6 +134,35 @@ public class IndexedTableTest {
     testNonConcurrent(indexedTable, mergeTable);
     indexedTable.finish(true);
     checkSurvivors(indexedTable, survivors);
+  }
+
+  @Test(invocationCount = 10)
+  public void testQuickSelect(){
+    Random random = new Random();
+    int[] array = random.ints(10000, 10,100000).toArray();
+    int numRecordsToRetain = 3000;
+    // Make intermediate record map
+    TableResizer.IntermediateRecord[] intermediateRecords = new TableResizer.IntermediateRecord[array.length];
+    for (int i = 0; i < array.length; ++i) {
+      Key key = new Key(new Integer[]{array[i]});
+      Comparable[] intermediateRecordValues = new Comparable[]{array[i]};
+      intermediateRecords[i] = new TableResizer.IntermediateRecord(key, intermediateRecordValues);
+    }
+    TableResizer.IntermediateRecord[] copies = Arrays.copyOf(intermediateRecords, intermediateRecords.length);
+
+    Comparator comparator = Comparator.naturalOrder();
+    Comparator<TableResizer.IntermediateRecord> keyComparator =
+        (o1, o2) -> comparator.compare(o1._values[0], o2._values[0]);
+
+    TableResizer.TopKSelect(intermediateRecords, 0, intermediateRecords.length-1, numRecordsToRetain, keyComparator);
+    TableResizer.IntermediateRecord[] trimmedArray = Arrays.copyOfRange(intermediateRecords, 0, numRecordsToRetain);
+    Arrays.sort(trimmedArray, 0, numRecordsToRetain - 1, keyComparator);
+    Arrays.sort(copies, keyComparator);
+    // Compare result
+    for (int i = 0; i < trimmedArray.length; ++i) {
+      Assert.assertEquals(trimmedArray[i]._key, copies[i]._key);
+    }
+
   }
 
   @DataProvider(name = "initDataProvider")
