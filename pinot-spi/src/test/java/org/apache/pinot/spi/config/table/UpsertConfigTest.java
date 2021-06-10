@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.spi.config.table;
 
+import java.util.HashMap;
+import java.util.Map;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -30,7 +32,9 @@ public class UpsertConfigTest {
     UpsertConfig upsertConfig1 = new UpsertConfig(UpsertConfig.Mode.FULL);
     assertEquals(upsertConfig1.getMode(), UpsertConfig.Mode.FULL);
 
-    UpsertConfig upsertConfig2 = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
-    assertEquals(upsertConfig2.getMode(), UpsertConfig.Mode.PARTIAL);
+    Map<String, UpsertConfig.Strategy> partialUpsertStratgies = new HashMap<>();
+    partialUpsertStratgies.put("myCol", UpsertConfig.Strategy.INCREMENT);
+    UpsertConfig upsertConfig2 = new UpsertConfig(UpsertConfig.Mode.PARTIAL, partialUpsertStratgies);
+    assertEquals(upsertConfig2.getPartialUpsertStrategies(), partialUpsertStratgies);
   }
 }
