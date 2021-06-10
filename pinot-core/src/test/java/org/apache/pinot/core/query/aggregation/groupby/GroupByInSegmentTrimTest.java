@@ -142,20 +142,20 @@ public class GroupByInSegmentTrimTest {
 
     // Fill the data table
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
-    int step = 10;
+    int baseValue = 10;
     for (int i = 0; i < NUM_ROWS; i++) {
       GenericRow genericRow = new GenericRow();
 
       for (int j = 0; j < _columns.length; j++) {
         String metricName = _columns[j];
-        double value = step + i + j;
+        double value = baseValue + i + j;
         _inputData[j][i] = value;
         genericRow.putValue(metricName, value);
       }
       // Compute the max result and insert into a grouped map
       computeMaxResult(_inputData[0][i], _inputData[1][i]);
       rows.add(genericRow);
-      step += 1;
+      baseValue += 10;
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();

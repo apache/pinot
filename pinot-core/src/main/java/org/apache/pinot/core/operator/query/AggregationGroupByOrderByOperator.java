@@ -117,9 +117,6 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
       groupByExecutor.process(transformBlock);
     }
 
-    if (_queryContext.getOrderByExpressions() == null) {
-
-    }
     // There is no OrderBy or minSegmentTrimSize is set to be negative or 0
     if (_queryContext.getOrderByExpressions() == null || _minSegmentTrimSize <= 0) {
       // Build intermediate result block based on aggregation group-by result from the executor
