@@ -51,7 +51,6 @@ import org.apache.pinot.client.Request;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.plugin.stream.kinesis.KinesisConfig;
-import org.apache.pinot.plugin.stream.kinesis.KinesisConsumer;
 import org.apache.pinot.plugin.stream.kinesis.KinesisConsumerFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -96,8 +95,8 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
   public static final String LOCALSTACK_KINESIS_ENDPOINT = "http://localhost:4566";
   public static final int NUM_SHARDS = 10;
 
-  //Localstack Kinesis doesn't support large rows.
-  //So, this airlineStats data file consists of only few fields and rows from the original data
+  // Localstack Kinesis doesn't support large rows.
+  // So, this airlineStats data file consists of only few fields and rows from the original data
   public static final String SCHEMA_FILE_PATH = "kinesis/airlineStats_data_reduced.schema";
   public static final String DATA_FILE_PATH = "kinesis/airlineStats_data_reduced.json";
 
