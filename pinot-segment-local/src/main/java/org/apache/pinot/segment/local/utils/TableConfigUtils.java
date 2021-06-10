@@ -359,7 +359,7 @@ public final class TableConfigUtils {
 
   /**
    * Validates the partial upsert-related configurations
-   *  - global strategies can only be OVERWRITE/IGNORE.
+   *  - INCREMENT merger cannot be applied to PK.
    *  - INCREMENT merger should be numeric data types.
    *  - enforce nullValueHandling for partial upsert tables.
    */
@@ -368,6 +368,9 @@ public final class TableConfigUtils {
       return;
     }
 
+    Preconditions.checkState(tableConfig.getIndexingConfig().isNullHandlingEnabled(),
+        "NullValueHandling is required to be enabled for partial upsert tables.");
+
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies =
         tableConfig.getUpsertConfig().getPartialUpsertStrategies();
 
@@ -375,13 +378,13 @@ public final class TableConfigUtils {
       Set<FieldSpec.DataType> numericsDataType = new HashSet<>(Arrays.asList(INT, LONG, FLOAT, DOUBLE));
 
       if (entry.getValue() == UpsertConfig.Strategy.INCREMENT) {
+        Preconditions.checkState(schema.getPrimaryKeyColumns().contains(entry.getKey()),
+            "INCREMENT merger cannot be applied to PK.");
+
         Preconditions.checkState(numericsDataType.contains(schema.getFieldSpecFor(entry.getKey()).getDataType()),
             "INCREMENT merger should be numeric data types.");
       }
     }
-
-    Preconditions.checkState(tableConfig.getIndexingConfig().isNullHandlingEnabled(),
-        "NullValueHandling is required to be enabled for partial upsert tables.");
   }
 
   /**
