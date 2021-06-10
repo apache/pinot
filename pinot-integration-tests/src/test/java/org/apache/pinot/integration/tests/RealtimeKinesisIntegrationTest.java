@@ -132,7 +132,7 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
     publishRecordsToKinesis();
 
     // Wait for all documents loaded
-    waitForAllDocsLoadedKinesis(60_000L);
+    waitForAllDocsLoadedKinesis(120_000L);
   }
 
   public Schema createKinesisSchema()
@@ -191,14 +191,14 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
         KinesisConsumerFactory.class.getName());
     streamConfigMap
         .put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_DECODER_CLASS),
-            "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder");
+            "org.apache.pinot.plugin.inputformat.json.StreamJSONMessageDecoder");
     streamConfigMap.put(KinesisConfig.REGION, REGION);
     streamConfigMap.put(KinesisConfig.MAX_RECORDS_TO_FETCH, String.valueOf(MAX_RECORDS_TO_FETCH));
-    streamConfigMap.put(KinesisConfig.SHARD_ITERATOR_TYPE, ShardIteratorType.AT_SEQUENCE_NUMBER.toString());
+    streamConfigMap.put(KinesisConfig.SHARD_ITERATOR_TYPE, ShardIteratorType.AFTER_SEQUENCE_NUMBER.toString());
     streamConfigMap.put(KinesisConfig.ENDPOINT, LOCALSTACK_KINESIS_ENDPOINT);
     streamConfigMap.put(KinesisConfig.ACCESS_KEY, getLocalAWSCredentials().resolveCredentials().accessKeyId());
     streamConfigMap.put(KinesisConfig.SECRET_KEY, getLocalAWSCredentials().resolveCredentials().secretAccessKey());
-    streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, Integer.toString(5000));
+    streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, Integer.toString(200));
     streamConfigMap.put(StreamConfigProperties
         .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "smallest");
     return streamConfigMap;
