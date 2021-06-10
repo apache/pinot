@@ -18,13 +18,14 @@
  */
 package org.apache.pinot.plugin.stream.kafka;
 
-
 import org.apache.pinot.plugin.inputformat.json.StreamJSONMessageDecoder;
 
 
 /**
  * This class has been kept for backward compatability. Use @see `org.apache.pinot.plugin.inputformat.json.StreamJSONMessageDecoder` for future use cases.
+ * This class will be removed in a later release.
  */
+@Deprecated
 public class KafkaJSONMessageDecoder extends StreamJSONMessageDecoder {
 
 }
