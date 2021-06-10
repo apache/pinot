@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.pinot.core.segment.processing.filter.RecordFilterConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.transformer.RecordTransformerConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -29,25 +30,30 @@ import org.apache.pinot.spi.data.Schema;
  * Config for the mapper phase of SegmentProcessorFramework
  */
 public class SegmentMapperConfig {
-
-  private final Schema _pinotSchema;
+  private final TableConfig _tableConfig;
+  private final Schema _schema;
   private final RecordTransformerConfig _recordTransformerConfig;
   private final RecordFilterConfig _recordFilterConfig;
   private final List<PartitionerConfig> _partitionerConfigs;
 
-  public SegmentMapperConfig(Schema pinotSchema, RecordTransformerConfig recordTransformerConfig,
+  public SegmentMapperConfig(TableConfig tableConfig, Schema schema, RecordTransformerConfig recordTransformerConfig,
       RecordFilterConfig recordFilterConfig, List<PartitionerConfig> partitionerConfigs) {
-    _pinotSchema = pinotSchema;
+    _tableConfig = tableConfig;
+    _schema = schema;
     _recordTransformerConfig = recordTransformerConfig;
     _recordFilterConfig = recordFilterConfig;
     _partitionerConfigs = partitionerConfigs;
   }
 
+  public TableConfig getTableConfig() {
+    return _tableConfig;
+  }
+
   /**
    * The Pinot schema
    */
-  public Schema getPinotSchema() {
-    return _pinotSchema;
+  public Schema getSchema() {
+    return _schema;
   }
 
   /**

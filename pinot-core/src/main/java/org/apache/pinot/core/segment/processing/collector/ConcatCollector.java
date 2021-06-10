@@ -22,16 +22,17 @@ import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.Arrays;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileReader;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileWriter;
+import org.apache.pinot.core.segment.processing.utils.SegmentProcessingUtils;
+import org.apache.pinot.core.segment.processing.utils.SortOrderComparator;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
@@ -40,15 +41,10 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  * A Collector implementation for collecting and concatenating all incoming rows.
  */
 public class ConcatCollector implements Collector {
-  private static final String RECORD_OFFSET_FILE_NAME = "record.offset";
-  private static final String RECORD_DATA_FILE_NAME = "record.data";
-
-  private final List<FieldSpec> _fieldSpecs = new ArrayList<>();
   private final int _numSortColumns;
   private final SortOrderComparator _sortOrderComparator;
   private final File _workingDir;
-  private final File _recordOffsetFile;
-  private final File _recordDataFile;
+  private final GenericRowFileManager _recordFileManager;
 
   private GenericRowFileWriter _recordFileWriter;
   private GenericRowFileReader _recordFileReader;
@@ -56,44 +52,28 @@ public class ConcatCollector implements Collector {
 
   public ConcatCollector(CollectorConfig collectorConfig, Schema schema) {
     List<String> sortOrder = collectorConfig.getSortOrder();
+    List<FieldSpec> fieldSpecs;
     if (CollectionUtils.isNotEmpty(sortOrder)) {
+      fieldSpecs = SegmentProcessingUtils.getFieldSpecs(schema, sortOrder);
       _numSortColumns = sortOrder.size();
-      DataType[] sortColumnStoredTypes = new DataType[_numSortColumns];
-      for (int i = 0; i < _numSortColumns; i++) {
-        String sortColumn = sortOrder.get(i);
-        FieldSpec fieldSpec = schema.getFieldSpecFor(sortColumn);
-        Preconditions.checkArgument(fieldSpec != null, "Failed to find sort column: %s", sortColumn);
-        Preconditions.checkArgument(fieldSpec.isSingleValueField(), "Cannot sort on MV column: %s", sortColumn);
-        sortColumnStoredTypes[i] = fieldSpec.getDataType().getStoredType();
-        _fieldSpecs.add(fieldSpec);
-      }
-      _sortOrderComparator = new SortOrderComparator(_numSortColumns, sortColumnStoredTypes);
-      for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-        if (!fieldSpec.isVirtualColumn() && !sortOrder.contains(fieldSpec.getName())) {
-          _fieldSpecs.add(fieldSpec);
-        }
-      }
+      _sortOrderComparator = SegmentProcessingUtils.getSortOrderComparator(fieldSpecs, _numSortColumns);
     } else {
+      fieldSpecs = SegmentProcessingUtils.getFieldSpecs(schema);
       _numSortColumns = 0;
       _sortOrderComparator = null;
-      for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-        if (!fieldSpec.isVirtualColumn()) {
-          _fieldSpecs.add(fieldSpec);
-        }
-      }
     }
 
     _workingDir =
         new File(FileUtils.getTempDirectory(), String.format("concat_collector_%d", System.currentTimeMillis()));
     Preconditions.checkState(_workingDir.mkdirs(), "Failed to create dir: %s for %s with config: %s",
         _workingDir.getAbsolutePath(), ConcatCollector.class.getSimpleName(), collectorConfig);
-    _recordOffsetFile = new File(_workingDir, RECORD_OFFSET_FILE_NAME);
-    _recordDataFile = new File(_workingDir, RECORD_DATA_FILE_NAME);
 
+    // TODO: Pass 'includeNullFields' from the config
+    _recordFileManager = new GenericRowFileManager(_workingDir, fieldSpecs, true);
     try {
-      reset();
+      _recordFileWriter = _recordFileManager.getFileWriter();
     } catch (IOException e) {
-      throw new RuntimeException("Caught exception while resetting the collector", e);
+      throw new RuntimeException("Caught exception while creating the file writer", e);
     }
   }
 
@@ -107,8 +87,8 @@ public class ConcatCollector implements Collector {
   @Override
   public Iterator<GenericRow> iterator()
       throws IOException {
-    _recordFileWriter.close();
-    _recordFileReader = new GenericRowFileReader(_recordOffsetFile, _recordDataFile, _fieldSpecs, true);
+    _recordFileManager.closeFileWriter();
+    _recordFileReader = _recordFileManager.getFileReader();
 
     // TODO: A lot of this code can be made common across Collectors, once {@link RollupCollector} is also converted to off heap implementation
     if (_numSortColumns != 0) {
@@ -156,15 +136,8 @@ public class ConcatCollector implements Collector {
   @Override
   public void reset()
       throws IOException {
-    if (_recordFileWriter != null) {
-      _recordFileWriter.close();
-    }
-    if (_recordFileReader != null) {
-      _recordFileReader.close();
-    }
-    FileUtils.cleanDirectory(_workingDir);
-    // TODO: Pass 'includeNullFields' from the config
-    _recordFileWriter = new GenericRowFileWriter(_recordOffsetFile, _recordDataFile, _fieldSpecs, true);
+    _recordFileManager.cleanUp();
+    _recordFileWriter = _recordFileManager.getFileWriter();
     _numDocs = 0;
   }
 
@@ -172,12 +145,7 @@ public class ConcatCollector implements Collector {
   public void close()
       throws IOException {
     try {
-      if (_recordFileWriter != null) {
-        _recordFileWriter.close();
-      }
-      if (_recordFileReader != null) {
-        _recordFileReader.close();
-      }
+      _recordFileManager.cleanUp();
     } finally {
       FileUtils.deleteQuietly(_workingDir);
     }

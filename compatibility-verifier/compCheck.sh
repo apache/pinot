@@ -42,45 +42,18 @@
 RM="/bin/rm"
 logCount=1
 #Declare the number of mandatory args
-margs=2
+cmdName=`basename $0`
+source `dirname $0`/utils.inc
 
 # get usage of the script
 function usage() {
-  command=$1
-  echo "Usage: $command -w <workingDir> -t <testSuiteDir> [-k]"
-}
-
-function help() {
-  usage
+  echo "Usage: $cmdName -w <workingDir> -t <testSuiteDir> [-k]"
   echo -e "MANDATORY:"
   echo -e "  -w, --working-dir                      Working directory where olderCommit and newCommit target files reside."
   echo -e "  -t, --test-suite-dir                   Test suite directory\n"
   echo -e "OPTIONAL:"
   echo -e "  -k, --keep-cluster-on-failure          Keep cluster on test failure"
   echo -e "  -h, --help                             Prints this help\n"
-}
-
-# Ensures that the number of passed args are at least equals
-# to the declared number of mandatory args.
-# It also handles the special case of the -h or --help arg.
-function margs_precheck() {
-  if [ $2 ] && [ $1 -lt $margs ]; then
-    if [ $2 == "--help" ] || [ $2 == "-h" ]; then
-      help
-      exit
-    else
-      usage compCheck
-      exit 1 # error
-    fi
-  fi
-}
-
-# Ensures that all the mandatory args are not empty
-function margs_check() {
-  if [ $# -lt $margs ]; then
-    usage
-    exit 1 # error
-  fi
 }
 
 function waitForZkReady() {
@@ -192,7 +165,7 @@ function stopService() {
   serviceName=$1
   if [ -f "${PID_DIR}/${serviceName}".pid ]; then
     pid=$(cat "${PID_DIR}/${serviceName}".pid)
-    kill -9 $pid
+    kill -9 $pid 1>/dev/null 2>&1
     # TODO Kill without -9 and add a while loop waiting for process to die
     status=0
     while [ $status -ne 1 ]; do
@@ -246,24 +219,9 @@ function setupCompatTester() {
   export CLASSPATH_PREFIX
 }
 
-#compute absolute path for testSuiteDir if given relative
-function absPath() {
-  local testSuiteDirPath=$1
-  if [[ ! "$testSuiteDirPath" == /* ]]; then
-    #relative path
-    testSuiteDirPath=$(
-      cd "$testSuiteDirPath"
-      pwd
-    )
-  fi
-  echo "$testSuiteDirPath"
-}
-
 #
 # Main
 #
-
-margs_precheck $# $1
 
 # create subdirectories for given commits
 workingDir=
@@ -285,8 +243,8 @@ while [ "$1" != "" ]; do
     keepClusterOnFailure="true"
     ;;
   -h | --help)
-    help
-    exit
+    usage
+    exit 0
     ;;
   *)
     echo "illegal option $1"
@@ -297,8 +255,10 @@ while [ "$1" != "" ]; do
   shift
 done
 
-# Pass mandatory args for check
-margs_check $workingDir $testSuiteDir
+if [ -z "$workingDir" -o -z "$testSuiteDir" ]; then
+  usage
+  exit 1
+fi
 
 COMPAT_TESTER_PATH="pinot-integration-tests/target/pinot-integration-tests-pkg/bin/pinot-compat-test-runner.sh"
 
@@ -327,51 +287,69 @@ fi
 
 # Setup initial cluster with olderCommit and do rolling upgrade
 # Provide abspath of filepath to $COMPAT_TESTER
+echo "Setting up cluster before upgrade"
 startServices "$oldTargetDir"
 
-echo "Setting up cluster before upgrade"
-$COMPAT_TESTER $testSuiteDir/pre-controller-upgrade.yaml 1
-if [ $? -ne 0 ]; then
-  if [ $keepClusterOnFailure == "false" ]; then
-    stopServices
+genNum=0
+if [ -f $testSuiteDir/pre-controller-upgrade.yaml ]; then
+  genNum=$((genNum+1))
+  $COMPAT_TESTER $testSuiteDir/pre-controller-upgrade.yaml $genNum
+  if [ $? -ne 0 ]; then
+    if [ $keepClusterOnFailure == "false" ]; then
+      stopServices
+    fi
+    echo Failed before controller upgrade
+    exit 1
   fi
-  exit 1
 fi
 echo "Upgrading controller"
 stopService controller
 startService controller "$newTargetDir" "$CONTROLLER_CONF"
 waitForControllerReady
-echo "Running tests after controller upgrade"
-$COMPAT_TESTER $testSuiteDir/pre-broker-upgrade.yaml 2
-if [ $? -ne 0 ]; then
-  if [ $keepClusterOnFailure == "false" ]; then
-    stopServices
+
+if [ -f $testSuiteDir/pre-broker-upgrade.yaml ]; then
+  genNum=$((genNum+1))
+  echo "Running tests after controller upgrade"
+  $COMPAT_TESTER $testSuiteDir/pre-broker-upgrade.yaml $genNum
+  if [ $? -ne 0 ]; then
+    if [ $keepClusterOnFailure == "false" ]; then
+      stopServices
+    fi
+    echo Failed before broker upgrade
+    exit 1
   fi
-  exit 1
 fi
 echo "Upgrading broker"
 stopService broker
 startService broker "$newTargetDir" "$BROKER_CONF"
 waitForBrokerReady
-echo "Running tests after broker upgrade"
-$COMPAT_TESTER $testSuiteDir/pre-server-upgrade.yaml 3
-if [ $? -ne 0 ]; then
-  if [ $keepClusterOnFailure == "false" ]; then
-    stopServices
+if [ -f $testSuiteDir/pre-server-upgrade.yaml ]; then
+  echo "Running tests after broker upgrade"
+  genNum=$((genNum+1))
+  $COMPAT_TESTER $testSuiteDir/pre-server-upgrade.yaml $genNum
+  if [ $? -ne 0 ]; then
+    if [ $keepClusterOnFailure == "false" ]; then
+      stopServices
+    fi
+    echo Failed before server upgrade
+    exit 1
   fi
-  exit 1
 fi
 echo "Upgrading server"
 stopService server
 startService server "$newTargetDir" "$SERVER_CONF"
 waitForServerReady
-echo "Running tests after server upgrade"
-$COMPAT_TESTER $testSuiteDir/post-server-upgrade.yaml 4
-if [ $? -ne 0 ]; then
-  if [ $keepClusterOnFailure == "false" ]; then
-    stopServices
+if [ -f $testSuiteDir/post-server-upgrade.yaml ]; then
+  echo "Running tests after server upgrade"
+  genNum=$((genNum+1))
+  $COMPAT_TESTER $testSuiteDir/post-server-upgrade.yaml $genNum
+  if [ $? -ne 0 ]; then
+    if [ $keepClusterOnFailure == "false" ]; then
+      stopServices
+    fi
+    echo Failed after server upgrade
+    exit 1
   fi
-  exit 1
 fi
 
 echo "Downgrading server"
@@ -379,38 +357,50 @@ echo "Downgrading server"
 stopService server
 startService server "$oldTargetDir" "$SERVER_CONF"
 waitForServerReady
-echo "Running tests after server downgrade"
-$COMPAT_TESTER $testSuiteDir/post-server-rollback.yaml 5
-if [ $? -ne 0 ]; then
-  if [ $keepClusterOnFailure == "false" ]; then
-    stopServices
+if [ -f $testSuiteDir/post-server-rollback.yaml ]; then
+  echo "Running tests after server downgrade"
+  genNum=$((genNum+1))
+  $COMPAT_TESTER $testSuiteDir/post-server-rollback.yaml $genNum
+  if [ $? -ne 0 ]; then
+    if [ $keepClusterOnFailure == "false" ]; then
+      stopServices
+    fi
+    echo Failed after server downgrade
+    exit 1
   fi
-  exit 1
 fi
 echo "Downgrading broker"
 stopService broker
 startService broker "$oldTargetDir" "$BROKER_CONF"
 waitForBrokerReady
-echo "Running tests after broker downgrade"
-$COMPAT_TESTER $testSuiteDir/post-broker-rollback.yaml 6
-if [ $? -ne 0 ]; then
-  if [ $keepClusterOnFailure == "false" ]; then
-    stopServices
+if [ -f $testSuiteDir/post-broker-rollback.yaml ]; then
+  echo "Running tests after broker downgrade"
+  genNum=$((genNum+1))
+  $COMPAT_TESTER $testSuiteDir/post-broker-rollback.yaml $genNum
+  if [ $? -ne 0 ]; then
+    if [ $keepClusterOnFailure == "false" ]; then
+      stopServices
+    fi
+    echo Failed after broker downgrade
+    exit 1
   fi
-  exit 1
 fi
 echo "Downgrading controller"
 stopService controller
 startService controller "$oldTargetDir" "$CONTROLLER_CONF"
 waitForControllerReady
 waitForControllerReady
-echo "Running tests after controller downgrade"
-$COMPAT_TESTER $testSuiteDir/post-controller-rollback.yaml 7
-if [ $? -ne 0 ]; then
-  if [ $keepClusterOnFailure == "false" ]; then
-    stopServices
+if [ -f $testSuiteDir/post-controller-rollback.yaml ]; then
+  echo "Running tests after controller downgrade"
+  genNum=$((genNum+1))
+  $COMPAT_TESTER $testSuiteDir/post-controller-rollback.yaml $genNum
+  if [ $? -ne 0 ]; then
+    if [ $keepClusterOnFailure == "false" ]; then
+      stopServices
+    fi
+    echo Failed after controller downgrade
+    exit 1
   fi
-  exit 1
 fi
 stopServices
 

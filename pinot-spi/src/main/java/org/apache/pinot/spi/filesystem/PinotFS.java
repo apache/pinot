@@ -90,7 +90,7 @@ public abstract class PinotFS implements Closeable, Serializable {
    * @return true if move is successful
    * @throws IOException on IO failure
    */
-  public final boolean move(URI srcUri, URI dstUri, boolean overwrite)
+  public boolean move(URI srcUri, URI dstUri, boolean overwrite)
       throws IOException {
     if (!exists(srcUri)) {
       LOGGER.warn("Source {} does not exist", srcUri);

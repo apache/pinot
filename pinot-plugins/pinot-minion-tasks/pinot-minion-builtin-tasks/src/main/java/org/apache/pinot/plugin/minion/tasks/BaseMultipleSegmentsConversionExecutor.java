@@ -27,8 +27,12 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.http.Header;
 import org.apache.http.NameValuePair;
+import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
+import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
@@ -47,6 +51,8 @@ import org.slf4j.LoggerFactory;
  * {@link BaseMultipleSegmentsConversionExecutor} assumes that output segments are new segments derived from input
  * segments. So, we do not check crc or modify zk metadata when uploading segments. In case of modifying the existing
  * segments, {@link BaseSingleSegmentConversionExecutor} has to be used.
+ *
+ * TODO: add test for SegmentZKMetadataCustomMapModifier
  */
 public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseMultipleSegmentsConversionExecutor.class);
@@ -89,6 +95,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     String[] downloadURLs = downloadURLString.split(MinionConstants.URL_SEPARATOR);
     String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
     String authToken = configs.get(MinionConstants.AUTH_TOKEN);
+    String replaceSegmentsString = configs.get(MinionConstants.ENABLE_REPLACE_SEGMENTS_KEY);
+    boolean replaceSegmentsEnabled = Boolean.parseBoolean(replaceSegmentsString);
 
     LOGGER.info("Start executing {} on table: {}, input segments: {} with downloadURLs: {}, uploadURL: {}", taskType,
         tableNameWithType, inputSegmentNames, downloadURLString, uploadURL);
@@ -138,10 +146,33 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
             taskType + " on table: " + tableNameWithType + ", segments: " + inputSegmentNames + " got cancelled");
       }
 
+      // Update the segment lineage to indicate that the segment replacement is in progress.
+      String lineageEntryId = null;
+      if (replaceSegmentsEnabled) {
+        List<String> segmentsFrom =
+            Arrays.stream(inputSegmentNames.split(",")).map(String::trim).collect(Collectors.toList());
+        List<String> segmentsTo =
+            segmentConversionResults.stream().map(SegmentConversionResult::getSegmentName).collect(Collectors.toList());
+        lineageEntryId = SegmentConversionUtils
+            .startSegmentReplace(tableNameWithType, uploadURL, new StartReplaceSegmentsRequest(segmentsFrom, segmentsTo));
+      }
+
       // Upload the tarred segments
       for (int i = 0; i < numOutputSegments; i++) {
         File convertedTarredSegmentFile = tarredSegmentFiles.get(i);
-        String resultSegmentName = segmentConversionResults.get(i).getSegmentName();
+        SegmentConversionResult segmentConversionResult = segmentConversionResults.get(i);
+        String resultSegmentName = segmentConversionResult.getSegmentName();
+
+        // Set segment ZK metadata custom map modifier into HTTP header to modify the segment ZK metadata
+        SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier =
+            getSegmentZKMetadataCustomMapModifier(pinotTaskConfig, segmentConversionResult);
+        Header segmentZKMetadataCustomMapModifierHeader =
+            new BasicHeader(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER,
+                segmentZKMetadataCustomMapModifier.toJsonString());
+
+        List<Header> httpHeaders = new ArrayList<>();
+        httpHeaders.add(segmentZKMetadataCustomMapModifierHeader);
+        httpHeaders.addAll(FileUploadDownloadClient.makeAuthHeader(authToken));
 
         // Set parameters for upload request
         NameValuePair enableParallelPushProtectionParameter =
@@ -153,6 +184,11 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         SegmentConversionUtils
             .uploadSegment(configs, FileUploadDownloadClient.makeAuthHeader(authToken), parameters, tableNameWithType,
                 resultSegmentName, uploadURL, convertedTarredSegmentFile);
+      }
+
+      // Update the segment lineage to indicate that the segment replacement is done.
+      if (replaceSegmentsEnabled) {
+        SegmentConversionUtils.endSegmentReplace(tableNameWithType, uploadURL, lineageEntryId);
       }
 
       String outputSegmentNames = segmentConversionResults.stream().map(SegmentConversionResult::getSegmentName)

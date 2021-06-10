@@ -20,6 +20,7 @@ package org.apache.pinot.minion;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.io.FileUtils;
@@ -284,7 +285,8 @@ public class MinionStarter implements ServiceStartable {
     HelixAdmin helixAdmin = _helixManager.getClusterManagmentTool();
     String clusterName = _helixManager.getClusterName();
     InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(clusterName, _instanceId);
-    if (instanceConfig.getTags().isEmpty()) {
+    List<String> instanceTags = instanceConfig == null ? new ArrayList<>(0) : instanceConfig.getTags();
+    if (instanceTags.isEmpty()) {
       LOGGER.info("Adding default Helix tag: {} to Pinot minion", CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
       helixAdmin.addInstanceTag(clusterName, _instanceId, CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
     }

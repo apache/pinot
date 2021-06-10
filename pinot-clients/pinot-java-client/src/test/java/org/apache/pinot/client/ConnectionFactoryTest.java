@@ -66,9 +66,14 @@ public class ConnectionFactoryTest {
     List<String> brokers = new ArrayList<>();
     brokers.add("127.0.0.1:1234");
     brokers.add("localhost:2345");
+
     Map<String, String> headers = new HashMap<>();
     headers.put("Caller", "curl");
-    Connection connection = ConnectionFactory.fromHostList(brokers, headers);
+
+    JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
+    factory.setHeaders(headers);
+
+    Connection connection = ConnectionFactory.fromHostList(brokers, factory.buildTransport());
 
     // Check that the broker list has the right length and has the same servers
     Assert.assertEquals(connection.getBrokerList(), brokers);
