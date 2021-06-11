@@ -52,7 +52,7 @@ public class TableConfigUtilsTest {
    * </ul>
    */
   @Test
-  public void testIndexToIngestionConfigConversion() {
+  public void testConvertFromLegacyTableConfig() {
     String expectedPushFrequency = "HOURLY";
     String expectedPushType = "APPEND";
 

@@ -224,6 +224,8 @@ public class TableConfigUtils {
    *   <li>The conversion happens in-place, the specified tableConfig is mutated in-place.</li>
    * </ul>
    *
+   * TODO: We should clear the values from deprecated configs after conversion.
+   *
    * @param tableConfig Input table config.
    */
   public static void convertFromLegacyTableConfig(TableConfig tableConfig) {
