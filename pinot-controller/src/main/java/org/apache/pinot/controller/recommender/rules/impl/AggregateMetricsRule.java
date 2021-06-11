@@ -19,15 +19,18 @@
 
 package org.apache.pinot.controller.recommender.rules.impl;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.controller.recommender.exceptions.InvalidInputException;
 import org.apache.pinot.controller.recommender.io.ConfigManager;
 import org.apache.pinot.controller.recommender.io.InputManager;
 import org.apache.pinot.controller.recommender.rules.AbstractRule;
+import org.apache.pinot.core.query.request.context.QueryContext;
 
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.HYBRID;
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.REALTIME;
@@ -37,6 +40,7 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
  * This rule checks the provided queries and suggests the value for 'AggregateMetrics' flag in table config.
  * It looks at selection columns and if all of them are SUM function, the flag should be true, otherwise it's false.
  * It also checks if all column names appearing in sum function are in fact metric columns.
+ * Keep in mind that the group-by columns that appear in selection are ok and don't need to be inside SUM functions.
  */
 public class AggregateMetricsRule extends AbstractRule {
 
@@ -56,9 +60,15 @@ public class AggregateMetricsRule extends AbstractRule {
   private boolean shouldAggregate(InputManager inputManager) {
     Set<String> metricNames = new HashSet<>(inputManager.getSchema().getMetricNames());
     for (String query : inputManager.getParsedQueries()) {
-      for (ExpressionContext selectExpr : inputManager.getQueryContext(query).getSelectExpressions()) {
+      QueryContext queryContext = inputManager.getQueryContext(query);
+      Set<String> groupByColumnNames = getGroupByColumnNames(queryContext);
+      for (ExpressionContext selectExpr : queryContext.getSelectExpressions()) {
         FunctionContext funcCtx = selectExpr.getFunction();
-        if (selectExpr.getType() != ExpressionContext.Type.FUNCTION
+        if (selectExpr.getType() == ExpressionContext.Type.IDENTIFIER) {
+          if (!groupByColumnNames.contains(selectExpr.getIdentifier())) {
+            return false;
+          }
+        } else if (selectExpr.getType() != ExpressionContext.Type.FUNCTION
             || !funcCtx.getFunctionName().equalsIgnoreCase("SUM")
             || hasNonMetricArguments(funcCtx.getArguments(), metricNames)) {
           return false;
@@ -66,6 +76,14 @@ public class AggregateMetricsRule extends AbstractRule {
       }
     }
     return true;
+  }
+
+  private Set<String> getGroupByColumnNames(QueryContext queryContext) {
+    List<ExpressionContext> groupByExprs = queryContext.getGroupByExpressions();
+    if (groupByExprs == null) {
+      return Collections.emptySet();
+    }
+    return groupByExprs.stream().map(ExpressionContext::getIdentifier).collect(Collectors.toSet());
   }
 
   private boolean hasNonMetricArguments(List<ExpressionContext> arguments, Set<String> metricNames) {

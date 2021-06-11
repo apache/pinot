@@ -101,6 +101,17 @@ public class AggregateMetricsRuleTest {
   }
 
   @Test
+  public void testRun_withGroupBy()
+      throws Exception {
+    Set<String> metrics = ImmutableSet.of("a", "b", "c");
+    InputManager input = createInput(metrics, "select d1, d2, sum(a), sum(b) from tableT group by d1, d2");
+    ConfigManager output = new ConfigManager();
+    AggregateMetricsRule rule = new AggregateMetricsRule(input, output);
+    rule.run();
+    assertTrue(output.isAggregateMetrics());
+  }
+
+  @Test
   public void testRun_offlineTable()
       throws Exception {
     Set<String> metrics = ImmutableSet.of("a", "b", "c");
