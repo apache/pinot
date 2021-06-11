@@ -54,6 +54,7 @@ public class partialUpsertHandlerTest {
     incomingRecord = new GenericRow();
     previousRecord.putValue("field1", 1);
     incomingRecord.putValue("field1", 2);
+    newRecord = handler.merge(previousRecord, incomingRecord);
     assertEquals(newRecord.isNullValue("field1"), false);
     assertEquals(newRecord.getValue("field1"), 3);
   }
