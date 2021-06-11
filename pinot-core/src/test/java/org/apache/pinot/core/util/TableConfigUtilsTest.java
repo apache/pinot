@@ -1111,6 +1111,7 @@ public class TableConfigUtilsTest {
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol1", FieldSpec.DataType.LONG)
             .addSingleValueDimension("myCol2", FieldSpec.DataType.STRING)
+            .addDateTime("myTimeCol", FieldSpec.DataType.LONG, "1:DAYS:EPOCH", "1:DAYS")
             .setPrimaryKeyColumns(Lists.newArrayList("myCol1")).build();
 
     Map<String, String> streamConfigs = new HashMap<>();
@@ -1145,6 +1146,14 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertConfig(tableConfig, schema);
     } catch (Exception e) {
       Assert.assertEquals(e.getMessage(), "INCREMENT merger should be numeric data types.");
+    }
+
+    partialUpsertStratgies = new HashMap<>();
+    partialUpsertStratgies.put("myTimeCol", UpsertConfig.Strategy.INCREMENT);
+    try {
+      TableConfigUtils.validateUpsertConfig(tableConfig, schema);
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(), "INCREMENT merger cannot be applied to Datetime columns.");
     }
   }
 }

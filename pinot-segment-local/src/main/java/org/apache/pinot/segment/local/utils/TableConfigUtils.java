@@ -381,6 +381,8 @@ public final class TableConfigUtils {
         Preconditions.checkState(schema.getPrimaryKeyColumns().contains(entry.getKey()),
             "INCREMENT merger cannot be applied to PK.");
 
+        Preconditions.checkState(schema.getDateTimeNames().contains(entry.getKey()), "INCREMENT merger cannot be applied to Datetime columns.");
+
         Preconditions.checkState(numericsDataType.contains(schema.getFieldSpecFor(entry.getKey()).getDataType()),
             "INCREMENT merger should be numeric data types.");
       }
