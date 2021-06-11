@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -76,7 +75,6 @@ public class QuickstartRunner {
   private final boolean _enableTenantIsolation;
   private final String _authToken;
   private final Map<String, Object> _configOverrides;
-  private final String _queryOptions;
 
   private final List<Integer> _controllerPorts = new ArrayList<>();
   private final List<Integer> _brokerPorts = new ArrayList<>();
@@ -84,7 +82,7 @@ public class QuickstartRunner {
 
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
       int numServers, int numMinions, File tempDir, boolean enableIsolation, String authToken,
-      Map<String, Object> configOverrides, String queryOptions)
+      Map<String, Object> configOverrides)
       throws Exception {
     _tableRequests = tableRequests;
     _numControllers = numControllers;
@@ -95,14 +93,13 @@ public class QuickstartRunner {
     _enableTenantIsolation = enableIsolation;
     _authToken = authToken;
     _configOverrides = configOverrides;
-    _queryOptions = queryOptions;
     clean();
   }
 
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
       int numServers, File tempDir)
       throws Exception {
-    this(tableRequests, numControllers, numBrokers, numServers, 0, tempDir, true, null, null, null);
+    this(tableRequests, numControllers, numBrokers, numServers, 0, tempDir, true, null, null);
   }
 
   private void startZookeeper()
@@ -251,9 +248,6 @@ public class QuickstartRunner {
   public JsonNode runQuery(String query)
       throws Exception {
     int brokerPort = _brokerPorts.get(RANDOM.nextInt(_brokerPorts.size()));
-    if (StringUtils.isNotBlank(_queryOptions)) {
-      query = query + " " + _queryOptions;
-    }
     return JsonUtils.stringToJsonNode(new PostQueryCommand().setBrokerPort(String.valueOf(brokerPort))
         .setQueryType(CommonConstants.Broker.Request.SQL).setAuthToken(_authToken).setQuery(query).run());
   }

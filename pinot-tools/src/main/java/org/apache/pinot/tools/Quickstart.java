@@ -63,13 +63,6 @@ public class Quickstart extends QuickStartBase {
     return null;
   }
 
-  /**
-   * Set query options which will be appended to end of the query e.g. option(timeoutMs=60000)
-   */
-  public String getQueryOptions() {
-    return null;
-  }
-
   public static void printStatus(Color color, String message) {
     System.out.println(color._code + message + Color.RESET._code);
   }
@@ -188,7 +181,7 @@ public class Quickstart extends QuickStartBase {
     QuickstartTableRequest request = new QuickstartTableRequest(baseDir.getAbsolutePath());
     QuickstartRunner runner =
         new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, getNumMinions(), dataDir, true, getAuthToken(),
-            getConfigOverrides(), getQueryOptions());
+            getConfigOverrides());
 
     printStatus(Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");
     runner.startAll();
