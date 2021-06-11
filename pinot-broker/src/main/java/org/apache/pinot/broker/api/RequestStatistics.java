@@ -53,6 +53,7 @@ public class RequestStatistics {
   private String _offlineServerTenant;
   private String _realtimeServerTenant;
   private long _requestId;
+  private int _numRowsResultSet;
 
   public String getBrokerId() {
     return _brokerId;
@@ -122,6 +123,7 @@ public class RequestStatistics {
     _numExceptions = brokerResponse.getExceptionsSize();
     _offlineThreadCpuTimeNs = brokerResponse.getOfflineThreadCpuTimeNs();
     _realtimeThreadCpuTimeNs = brokerResponse.getRealtimeThreadCpuTimeNs();
+    _numRowsResultSet = brokerResponse.getNumRowsResultSet();
   }
 
   public void setBrokerId(String brokerId) {
