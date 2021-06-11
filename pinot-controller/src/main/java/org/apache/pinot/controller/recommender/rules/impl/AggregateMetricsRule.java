@@ -61,14 +61,14 @@ public class AggregateMetricsRule extends AbstractRule {
     Set<String> metricNames = new HashSet<>(inputManager.getSchema().getMetricNames());
     for (String query : inputManager.getParsedQueries()) {
       QueryContext queryContext = inputManager.getQueryContext(query);
-      Set<String> groupByColumnNames = getGroupByColumnNames(queryContext);
+      Set<ExpressionContext> groupByExprs = getGroupByExpressions(queryContext);
       for (ExpressionContext selectExpr : queryContext.getSelectExpressions()) {
+        if (groupByExprs.contains(selectExpr)) {
+          // acceptable case; skip
+          continue;
+        }
         FunctionContext funcCtx = selectExpr.getFunction();
-        if (selectExpr.getType() == ExpressionContext.Type.IDENTIFIER) {
-          if (!groupByColumnNames.contains(selectExpr.getIdentifier())) {
-            return false;
-          }
-        } else if (selectExpr.getType() != ExpressionContext.Type.FUNCTION
+        if (selectExpr.getType() != ExpressionContext.Type.FUNCTION
             || !funcCtx.getFunctionName().equalsIgnoreCase("SUM")
             || hasNonMetricArguments(funcCtx.getArguments(), metricNames)) {
           return false;
@@ -78,12 +78,12 @@ public class AggregateMetricsRule extends AbstractRule {
     return true;
   }
 
-  private Set<String> getGroupByColumnNames(QueryContext queryContext) {
+  private Set<ExpressionContext> getGroupByExpressions(QueryContext queryContext) {
     List<ExpressionContext> groupByExprs = queryContext.getGroupByExpressions();
     if (groupByExprs == null) {
       return Collections.emptySet();
     }
-    return groupByExprs.stream().map(ExpressionContext::getIdentifier).collect(Collectors.toSet());
+    return new HashSet<>(groupByExprs);
   }
 
   private boolean hasNonMetricArguments(List<ExpressionContext> arguments, Set<String> metricNames) {

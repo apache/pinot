@@ -112,6 +112,20 @@ public class AggregateMetricsRuleTest {
   }
 
   @Test
+  public void testRun_withTransformationFunctionInGroupBy()
+      throws Exception {
+    Set<String> metrics = ImmutableSet.of("a", "b", "c");
+    InputManager input = createInput(metrics,
+        "select d, dateTimeConvert(t, '1:MILLISECONDS:EPOCH', '1:SECONDS:EPOCH', '15:MINUTES'), sum(a), sum(b)"
+            + " from tableT"
+            + " group by d, dateTimeConvert(t, '1:MILLISECONDS:EPOCH', '1:SECONDS:EPOCH', '15:MINUTES')");
+    ConfigManager output = new ConfigManager();
+    AggregateMetricsRule rule = new AggregateMetricsRule(input, output);
+    rule.run();
+    assertTrue(output.isAggregateMetrics());
+  }
+
+  @Test
   public void testRun_offlineTable()
       throws Exception {
     Set<String> metrics = ImmutableSet.of("a", "b", "c");
