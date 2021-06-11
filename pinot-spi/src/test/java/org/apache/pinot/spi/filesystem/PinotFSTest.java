@@ -32,8 +32,10 @@ import org.testng.annotations.Test;
 
 
 public class PinotFSTest {
-  public String srcForMoveFile = "myfs://myhost1:1234/root/file1";
-  public String dstForMoveFile = "myfs://myhost2:1234/someDir/file1";
+  public String srcForMoveFile = "myfs://root/file1";
+  public String dstForMoveFile = "myfs://root/someDir/file1";
+  public String srcForMoveFileWithPort = "myfs://myhost1:1234/root/file1";
+  public String dstForMoveFileWithPort = "myfs://myhost2:1234/someDir/file1";
 
   @Test
   public void testMoveFileUriGeneration() throws Exception {
@@ -42,12 +44,27 @@ public class PinotFSTest {
     fs.move(new URI(srcForMoveFile), new URI(dstForMoveFile), false);
 
     Assert.assertEquals(fs.mkdirCalls, 1,"should call mkdir once");
-    Assert.assertEquals(fs.mkdirArgs.get(0).toString(), "myfs://myhost2:1234/someDir", "should create correct parent");
+    Assert.assertEquals(fs.mkdirArgs.get(0).toString(), "myfs://root/someDir", "should create correct parent");
 
     Assert.assertEquals(fs.doMoveCalls, 1, "doMove should be called once");
     Map<String, URI> callArgs = fs.doMoveArgs.get(0);
     Assert.assertEquals(callArgs.get("srcUri").toString(), srcForMoveFile, "should keep correct src");
     Assert.assertEquals(callArgs.get("dstUri").toString(), dstForMoveFile, "should keep correct dst");
+  }
+
+  @Test
+  public void testMoveFileUriGenerationWithPort() throws Exception {
+    MockRemoteFS fs = new MockRemoteFS();
+    fs.init(null);
+    fs.move(new URI(srcForMoveFileWithPort), new URI(dstForMoveFileWithPort), false);
+
+    Assert.assertEquals(fs.mkdirCalls, 1,"should call mkdir once");
+    Assert.assertEquals(fs.mkdirArgs.get(0).toString(), "myfs://myhost2:1234/someDir", "should create correct parent");
+
+    Assert.assertEquals(fs.doMoveCalls, 1, "doMove should be called once");
+    Map<String, URI> callArgs = fs.doMoveArgs.get(0);
+    Assert.assertEquals(callArgs.get("srcUri").toString(), srcForMoveFileWithPort, "should keep correct src");
+    Assert.assertEquals(callArgs.get("dstUri").toString(), dstForMoveFileWithPort, "should keep correct dst");
   }
 
   /**
@@ -104,7 +121,8 @@ public class PinotFSTest {
     public boolean exists(URI fileUri)
         throws IOException {
 
-      if (fileUri.toString() == srcForMoveFile) {
+      if (fileUri.toString() == srcForMoveFile ||
+          fileUri.toString() == srcForMoveFileWithPort) {
         return true;
       }
 
