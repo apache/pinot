@@ -213,6 +213,8 @@ public class CommonConstants {
         public static final String RESPONSE_FORMAT = "responseFormat";
         public static final String GROUP_BY_MODE = "groupByMode";
         public static final String SKIP_UPSERT = "skipUpsert";
+        public static final String SEGMENT_ENABLE_TRIM = "segmentEnableTrim";
+        public static final String SEGMENT_MIN_TRIM_SIZE = "segmentMinTrimSize";
       }
     }
   }

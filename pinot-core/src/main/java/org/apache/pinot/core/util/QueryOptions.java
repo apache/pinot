@@ -33,6 +33,8 @@ public class QueryOptions {
   private final boolean _responseFormatSQL;
   private final boolean _preserveType;
   private final boolean _skipUpsert;
+  private final Boolean _enableSegmentTrim;
+  private final Integer _segmentTrimSize;
 
   public QueryOptions(@Nullable Map<String, String> queryOptions) {
     if (queryOptions != null) {
@@ -41,12 +43,16 @@ public class QueryOptions {
       _responseFormatSQL = Request.SQL.equalsIgnoreCase(queryOptions.get(Request.QueryOptionKey.RESPONSE_FORMAT));
       _preserveType = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.PRESERVE_TYPE));
       _skipUpsert = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.SKIP_UPSERT));
+      _enableSegmentTrim = getEnableSegmentTrim(queryOptions);
+      _segmentTrimSize = getSegmentTrimSize(queryOptions);
     } else {
       _timeoutMs = null;
       _groupByModeSQL = false;
       _responseFormatSQL = false;
       _preserveType = false;
       _skipUpsert = false;
+      _enableSegmentTrim = null;
+      _segmentTrimSize = null;
     }
   }
 
@@ -72,12 +78,42 @@ public class QueryOptions {
   }
 
   @Nullable
+  public Boolean isEnableSegmentTrim() {
+    return _enableSegmentTrim;
+  }
+
+  @Nullable
+  public Integer getMinSegmentTrimSize() {
+    return _segmentTrimSize;
+  }
+
+  @Nullable
   public static Long getTimeoutMs(Map<String, String> queryOptions) {
     String timeoutMsString = queryOptions.get(Request.QueryOptionKey.TIMEOUT_MS);
     if (timeoutMsString != null) {
       long timeoutMs = Long.parseLong(timeoutMsString);
       Preconditions.checkState(timeoutMs > 0, "Query timeout must be positive, got: %s", timeoutMs);
       return timeoutMs;
+    } else {
+      return null;
+    }
+  }
+
+  @Nullable
+  public static Boolean getEnableSegmentTrim(Map<String, String> queryOptions) {
+    String enableSegmentTrim = queryOptions.get(Request.QueryOptionKey.SEGMENT_ENABLE_TRIM);
+    if (enableSegmentTrim != null) {
+      return Boolean.parseBoolean(enableSegmentTrim);
+    } else {
+      return null;
+    }
+  }
+
+  @Nullable
+  public static Integer getSegmentTrimSize(Map<String, String> queryOptions) {
+    String SegmentTrimSize = queryOptions.get(Request.QueryOptionKey.SEGMENT_MIN_TRIM_SIZE);
+    if (SegmentTrimSize != null) {
+      return Integer.parseInt(SegmentTrimSize);
     } else {
       return null;
     }

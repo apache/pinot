@@ -265,6 +265,20 @@ public class GroupByInSegmentTrimTest {
     expectedSize = 1000;
     data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
 
+    // Testcase4: low limit + low server trim size + query option size
+    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50 OPTION(segmentMinTrimSize=1000)");
+    trimSize = 0;
+    expectedSize = 1000;
+    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
+
+    // Testcase5: low limit + low server trim size + query option enable
+    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50 OPTION(segmentEnableTrim=true)");
+    trimSize = 0;
+    expectedSize = 1000;
+    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
+
     return data.toArray(new Object[data.size()][]);
   }
 

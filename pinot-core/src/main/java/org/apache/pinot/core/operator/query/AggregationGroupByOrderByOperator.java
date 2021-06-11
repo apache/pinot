@@ -33,6 +33,8 @@ import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
+import org.apache.pinot.core.util.GroupByUtils;
+import org.apache.pinot.core.util.QueryOptions;
 
 import static org.apache.pinot.core.util.GroupByUtils.getTableCapacity;
 
@@ -117,12 +119,13 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
       groupByExecutor.process(transformBlock);
     }
 
+    int minTrimSize = calculateMinTrimSize();
     // There is no OrderBy or minSegmentTrimSize is set to be negative or 0
-    if (_queryContext.getOrderByExpressions() == null || _minSegmentTrimSize <= 0) {
+    if (_queryContext.getOrderByExpressions() == null || minTrimSize <= 0) {
       // Build intermediate result block based on aggregation group-by result from the executor
       return new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
     }
-    int trimSize = getTableCapacity(_queryContext.getLimit(), _minSegmentTrimSize);
+    int trimSize = getTableCapacity(_queryContext.getLimit(), minTrimSize);
     // Num of groups hasn't reached the threshold
     if (groupByExecutor.getNumGroups() <= trimSize) {
       return new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
@@ -144,5 +147,20 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     long numEntriesScannedPostFilter = (long) _numDocsScanned * _transformOperator.getNumColumnsProjected();
     return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
         _numTotalDocs);
+  }
+
+  private int calculateMinTrimSize () {
+    // In query option, if a positive min trim size is given, we use it to override the server settings. Otherwise
+    // check if a simple boolean option is given and use default trim size.
+    QueryOptions queryOptions =  new QueryOptions(_queryContext.getQueryOptions());
+    Boolean queryOptionEnableTrim = queryOptions.isEnableSegmentTrim();
+    Integer queryOptionTrimSize = queryOptions.getMinSegmentTrimSize();
+    if (queryOptionTrimSize != null && queryOptionTrimSize > 0) {
+      return queryOptionTrimSize;
+    } else if (queryOptionEnableTrim != null && queryOptionEnableTrim) {
+      // TODO: if query option is true and a server minTrimSize is given, shall we use default value or server config?
+      return GroupByUtils.DEFAULT_MIN_NUM_GROUPS;
+    }
+    return _minSegmentTrimSize;
   }
 }
