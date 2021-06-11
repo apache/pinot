@@ -237,4 +237,8 @@ public class RequestStatistics {
   public boolean hasValidTableName() {
     return ! DEFAULT_TABLE_NAME.equals(_tableName);
   }
+
+  public int getNumRowsResultSet() {
+     return _numRowsResultSet;
+  }
 }
