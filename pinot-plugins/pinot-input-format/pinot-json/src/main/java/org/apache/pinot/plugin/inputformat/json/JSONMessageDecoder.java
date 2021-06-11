@@ -36,8 +36,8 @@ import org.slf4j.LoggerFactory;
 /**
  * An implementation of StreamMessageDecoder to read JSON records from a stream.
  */
-public class StreamJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(StreamJSONMessageDecoder.class);
+public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(JSONMessageDecoder.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final String JSON_RECORD_EXTRACTOR_CLASS =
       "org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor";

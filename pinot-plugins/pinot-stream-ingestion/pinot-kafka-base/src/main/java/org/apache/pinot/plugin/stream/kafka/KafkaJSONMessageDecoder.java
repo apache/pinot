@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.plugin.stream.kafka;
 
-import org.apache.pinot.plugin.inputformat.json.StreamJSONMessageDecoder;
+import org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder;
 
 
 /**
@@ -26,6 +26,6 @@ import org.apache.pinot.plugin.inputformat.json.StreamJSONMessageDecoder;
  * This class will be removed in a later release.
  */
 @Deprecated
-public class KafkaJSONMessageDecoder extends StreamJSONMessageDecoder {
+public class KafkaJSONMessageDecoder extends JSONMessageDecoder {
 
 }
