@@ -114,6 +114,11 @@ public class JsonStatementOptimizer implements StatementOptimizer {
    */
   private static Set<String> datetimeFunctions = getDateTimeFunctionList();
 
+  private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_INT_AST = new IntegerLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
+  private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_LONG_AST = new IntegerLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
+  private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT_AST = new FloatingPointLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT);
+  private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE_AST = new FloatingPointLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE);
+  private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_STRING_AST = new StringLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
   @Override
   public void optimize(PinotQuery query, @Nullable Schema schema) {
     // In SELECT clause, replace JSON path expressions with JSON_EXTRACT_SCALAR function with an alias.
@@ -163,10 +168,13 @@ public class JsonStatementOptimizer implements StatementOptimizer {
 
   /**
    * Replace an json path expression with an aliased JSON_EXTRACT_SCALAR function.
+   * @param expression input expression to rewrite into JSON_EXTRACT_SCALAR function if the expression is json path.
+   * @param outputDataType to keep track of output datatype of JSON_EXTRACT_SCALAR function which depends upon the outer
+   *                 function that json path expression appears in.
    * @return A {@link Pair} of values where the first value is alias for the input expression and second
    * value indicates whether json path expression was found (true) or not (false) in the expression.
    */
-  private static Pair<String, Boolean> optimizeJsonIdentifier(Expression expression, Schema schema, DataSchema.ColumnDataType dataType,
+  private static Pair<String, Boolean> optimizeJsonIdentifier(Expression expression, Schema schema, DataSchema.ColumnDataType outputDataType,
       boolean hasColumnAlias) {
     switch (expression.getType()) {
       case LITERAL:
@@ -177,7 +185,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
         String alias = expression.getIdentifier().getName();
         if (parts.length > 1 && isValidJSONColumn(parts[0], schema)) {
           // replace <column-name>.<json-path> with json_extract_scalar(<column-name>, '<json-path>', 'STRING', <JSON-null-value>)
-          Function jsonExtractScalarFunction = getJsonExtractFunction(parts, dataType);
+          Function jsonExtractScalarFunction = getJsonExtractFunction(parts, outputDataType);
           expression.setIdentifier(null);
           expression.setType(ExpressionType.FUNCTION);
           expression.setFunctionCall(jsonExtractScalarFunction);
@@ -193,22 +201,18 @@ public class JsonStatementOptimizer implements StatementOptimizer {
         StringBuffer alias = new StringBuffer();
         if (function.getOperator().toUpperCase().equals("AS")) {
           // We don't need to compute an alias for AS function since AS function defines its own alias.
-          hasJsonPathExpression = optimizeJsonIdentifier(operands.get(0), schema, dataType, false).getSecond();
+          hasJsonPathExpression = optimizeJsonIdentifier(operands.get(0), schema, outputDataType, false).getSecond();
           alias.append(function.getOperands().get(1).getIdentifier().getName());
         } else {
-          // For all functions besides AS function, process the operands and compute the alias that will be used if
-          // the function contains a json path expression.
+          // For all functions besides AS function, process the operands and compute the alias.
           alias.append(function.getOperator().toLowerCase(Locale.ROOT)).append("(");
-          dataType = DataSchema.ColumnDataType.STRING;
-          if (numericalFunctions.contains(function.getOperator().toUpperCase(Locale.ROOT))) {
-            dataType = DataSchema.ColumnDataType.DOUBLE;
-          } else if (datetimeFunctions.contains(function.getOperator().toUpperCase(Locale.ROOT))) {
-            dataType = DataSchema.ColumnDataType.LONG;
-          }
+
+          // Output datatype of JSON_EXTRACT_SCALAR will depend upon the function within which json path expression appears.
+          outputDataType = getJsonExtractOutputDataType(function);
 
           for (int i = 0; i < operands.size(); ++i) {
             // recursively check to see if there is a <json-column>.<json-path> identifier in this expression.
-            Pair<String, Boolean> operandResult = optimizeJsonIdentifier(operands.get(i), schema, dataType, false);
+            Pair<String, Boolean> operandResult = optimizeJsonIdentifier(operands.get(i), schema, outputDataType, false);
             hasJsonPathExpression |= operandResult.getSecond();
             if (i > 0) {
               alias.append(",");
@@ -264,26 +268,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
     operands
         .add(RequestUtils.createLiteralExpression(new StringLiteralAstNode(dataType.toString())));
 
-    LiteralAstNode defaultValue;
-    switch (dataType) {
-      case INT:
-        defaultValue = new IntegerLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
-        break;
-      case LONG:
-        defaultValue = new IntegerLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
-        break;
-      case FLOAT:
-        defaultValue = new FloatingPointLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT);
-        break;
-      case DOUBLE:
-        defaultValue = new FloatingPointLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE);
-        break;
-      case STRING:
-      default:
-        defaultValue = new StringLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
-    }
-
-    operands.add(RequestUtils.createLiteralExpression(defaultValue));
+    operands.add(RequestUtils.createLiteralExpression(getDefaultNullValueForType(dataType)));
     jsonExtractScalarFunction.setOperands(operands);
     return jsonExtractScalarFunction;
   }
@@ -462,6 +447,38 @@ public class JsonStatementOptimizer implements StatementOptimizer {
 
     result.append(aliasing ? "'" : "");
     return result.toString();
+  }
+
+  /** Given a datatype, return its default null value as a {@link LiteralAstNode} */
+  private static LiteralAstNode getDefaultNullValueForType(DataSchema.ColumnDataType dataType) {
+    switch (dataType) {
+      case INT:
+        return DEFAULT_DIMENSION_NULL_VALUE_OF_INT_AST;
+      case LONG:
+        return DEFAULT_DIMENSION_NULL_VALUE_OF_LONG_AST;
+      case FLOAT:
+        return DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT_AST;
+      case DOUBLE:
+        return DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE_AST;
+      case STRING:
+      default:
+        return DEFAULT_DIMENSION_NULL_VALUE_OF_STRING_AST;
+    }
+  }
+
+  /** Output datatype of JSON_EXTRACT_SCALAR depends upon the function within which json path expression appears. */
+  private static DataSchema.ColumnDataType getJsonExtractOutputDataType(Function function) {
+    DataSchema.ColumnDataType dataType = DataSchema.ColumnDataType.STRING;
+    if (numericalFunctions.contains(function.getOperator().toUpperCase(Locale.ROOT))) {
+      // If json path expression appears as argument of a numeric function, then it will be rewritten into a
+      // JSON_EXTRACT_SCALAR function that returns 'DOUBLE'
+      dataType = DataSchema.ColumnDataType.DOUBLE;
+    } else if (datetimeFunctions.contains(function.getOperator().toUpperCase(Locale.ROOT))) {
+      // If json path expression appears as argument of a datetime function, then it will be rewritten into a
+      // JSON_EXTRACT_SCALAR function that returns 'LONG'
+      dataType = DataSchema.ColumnDataType.LONG;
+    }
+    return dataType;
   }
 
   /** List of function that require input to be in a number. */
