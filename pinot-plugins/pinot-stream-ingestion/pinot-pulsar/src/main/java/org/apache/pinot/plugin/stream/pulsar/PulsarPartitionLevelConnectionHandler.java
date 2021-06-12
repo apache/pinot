@@ -29,6 +29,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Manages the Pulsar client connection, given the partition id and {@link PulsarConfig}
+ */
 public class PulsarPartitionLevelConnectionHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(PulsarPartitionLevelConnectionHandler.class);
 
@@ -39,6 +42,9 @@ public class PulsarPartitionLevelConnectionHandler {
   protected PulsarClient _pulsarClient = null;
   protected Reader<byte[]> _reader = null;
 
+  /**
+   * Creates a new instance of {@link PulsarClient} and {@link Reader}
+   */
   public PulsarPartitionLevelConnectionHandler(String clientId, StreamConfig streamConfig, int partition) {
     _config = new PulsarConfig(streamConfig, clientId);
     _clientId = clientId;
@@ -57,6 +63,10 @@ public class PulsarPartitionLevelConnectionHandler {
     }
   }
 
+  /**
+   * A pulsar partitioned topic with N partitions is comprised of N topics with topicName as prefix and portitionId as suffix.
+   * The method fetches the names of N partitioned topic and returns the topic name of {@param partition}
+   */
   protected String getPartitionedTopicName(int partition)
       throws Exception {
     List<String> partitionTopicList = _pulsarClient.getPartitionsForTopic(_topic).get();
@@ -66,5 +76,6 @@ public class PulsarPartitionLevelConnectionHandler {
   public void close()
       throws IOException {
     _reader.close();
+    _pulsarClient.close();
   }
 }
