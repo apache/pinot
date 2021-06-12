@@ -26,6 +26,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * {@link StreamPartitionMsgOffset} implementation for Pulsar {@link MessageId}
+ */
 public class MessageIdStreamOffset implements StreamPartitionMsgOffset {
   private Logger LOGGER = LoggerFactory.getLogger(MessageIdStreamOffset.class);
   private MessageId _messageId;
@@ -34,6 +37,11 @@ public class MessageIdStreamOffset implements StreamPartitionMsgOffset {
     _messageId = messageId;
   }
 
+  /**
+   * returns the class object from string message id in the format ledgerId:entryId:partitionId
+   * throws {@link IOException} if message if format is invalid.
+   * @param messageId
+   */
   public MessageIdStreamOffset(String messageId) {
     try {
       _messageId = MessageId.fromByteArray(messageId.getBytes(StandardCharsets.UTF_8));

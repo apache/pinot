@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.stream.pulsar;
 import java.util.Set;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamDecoderProvider;
 import org.apache.pinot.spi.stream.StreamLevelConsumer;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
@@ -30,6 +31,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * A {@link StreamLevelConsumer} implementation for the Pulsar stream
+ */
 public class PulsarStreamLevelConsumer implements StreamLevelConsumer {
   private Logger LOGGER;
 
@@ -62,6 +66,9 @@ public class PulsarStreamLevelConsumer implements StreamLevelConsumer {
     _reader = PulsarStreamLevelConsumerManager.acquirePulsarConsumerForConfig(_pulsarStreamLevelStreamConfig);
   }
 
+  /**
+   * Get next {@link GenericRow} after decoding pulsar {@link Message}
+   */
   @Override
   public GenericRow next(GenericRow destination) {
     try {

@@ -33,6 +33,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Implements pulsar high level connection manager.
+ */
 public class PulsarStreamLevelConsumerManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PulsarStreamLevelConsumerManager.class);
   private static final Long IN_USE = -1L;
@@ -43,6 +46,10 @@ public class PulsarStreamLevelConsumerManager {
   protected static PulsarClient _pulsarClient;
   protected static Reader<byte[]> _reader;
 
+  /**
+   * Get {@link Reader} for {@link PulsarConfig}. If the reader is already created we return the instance, otherwise
+   * a new reader is created.
+   */
   public static Reader<byte[]> acquirePulsarConsumerForConfig(PulsarConfig pulsarStreamLevelStreamConfig) {
     final ImmutableTriple<String, String, String> configKey =
         new ImmutableTriple<>(pulsarStreamLevelStreamConfig.getPulsarTopicName(),
@@ -86,6 +93,9 @@ public class PulsarStreamLevelConsumerManager {
     }
   }
 
+  /**
+   *  remove the {@link Reader} from consumer pool after closing it.
+   */
   public static void releasePulsarConsumer(final Reader<byte[]> pulsarConsumer) {
     synchronized (PulsarStreamLevelConsumerManager.class) {
       // Release the consumer, mark it for shutdown in the future

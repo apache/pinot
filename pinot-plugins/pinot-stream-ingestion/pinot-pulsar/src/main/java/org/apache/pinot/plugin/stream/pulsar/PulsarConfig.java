@@ -28,6 +28,10 @@ import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pulsar.client.api.MessageId;
 
 
+/**
+ * Pulsar specific stream config
+ * contains pulsar brokers list, start offset and group id/subscriber id if using high level consumer/
+ */
 public class PulsarConfig {
   public static final String STREAM_TYPE = "pulsar";
   public static final String BOOTSTRAP_SERVERS = "bootstrap.servers";
