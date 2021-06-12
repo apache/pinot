@@ -26,15 +26,18 @@ import java.util.Locale;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.scalar.ArithmeticFunctions;
+import org.apache.pinot.common.function.scalar.DateTimeFunctions;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.pql.parsers.pql2.ast.FloatingPointLiteralAstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.IntegerLiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.LiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -62,18 +65,18 @@ import org.apache.pinot.spi.utils.Pair;
  *   From:   SELECT MIN(jsonColumn.id - 5)
  *             FROM testTable
  *            WHERE jsonColumn.id IS NOT NULL
- *   To:     SELECT MIN(MINUS(JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'DOUBLE', '-Infinity'),5)) AS min(minus(jsonColum.id, '5'))
+ *   To:     SELECT MIN(MINUS(JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'DOUBLE', Double.NEGATIVE_INFINITY),5)) AS min(minus(jsonColum.id, '5'))
  *             FROM testTable
  *            WHERE JSON_MATCH('"$.id" IS NOT NULL')
  *
  * Example 3:
  *   From:  SELECT jsonColumn.id, count(*)
  *             FROM testTable
- *            WHERE jsonColumn.name.first = 'Daffy' OR jsonColumn.id > 10
+ *            WHERE jsonColumn.name.first = 'Daffy' OR jsonColumn.id = 101
  *         GROUP BY jsonColumn.id
- *   To:    SELECT MIN(JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'DOUBLE', '-Infinity')) AS min(jsonColumn.id)
+ *   To:    SELECT JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'STRING', 'null') AS jsonColumn.id, count(*)
  *             FROM testTable
- *            WHERE JSON_MATCH('"$.name.first" = ''Daffy''') OR JSON_MATCH('"$.id" = 10')
+ *            WHERE JSON_MATCH('"$.name.first" = ''Daffy''') OR JSON_MATCH('"$.id" = 101')
  *         GROUP BY JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'STRING', 'null');
  *
  * Example 4:
@@ -105,12 +108,18 @@ public class JsonStatementOptimizer implements StatementOptimizer {
    */
   private static Set<String> numericalFunctions = getNumericalFunctionList();
 
+  /**
+   * A list of functions that require json path expression to output LONG value. This allows us to implicitly convert
+   * the output of json path expression to LONG.
+   */
+  private static Set<String> datetimeFunctions = getDateTimeFunctionList();
+
   @Override
   public void optimize(PinotQuery query, @Nullable Schema schema) {
     // In SELECT clause, replace JSON path expressions with JSON_EXTRACT_SCALAR function with an alias.
     List<Expression> expressions = query.getSelectList();
     for (Expression expression : expressions) {
-      Pair<String, Boolean> result = optimizeJsonIdentifier(expression, schema, false, true);
+      Pair<String, Boolean> result = optimizeJsonIdentifier(expression, schema, DataSchema.ColumnDataType.STRING, true);
       if (expression.getType() == ExpressionType.FUNCTION && !expression.getFunctionCall().getOperator().equals("AS")
           && result.getSecond()) {
         // Since this is not an AS function (user-specified alias) and the function or its arguments contain json path
@@ -131,7 +140,16 @@ public class JsonStatementOptimizer implements StatementOptimizer {
     expressions = query.getGroupByList();
     if (expressions != null) {
       for (Expression expression : expressions) {
-        optimizeJsonIdentifier(expression, schema, false, false);
+        optimizeJsonIdentifier(expression, schema, DataSchema.ColumnDataType.STRING, false);
+      }
+    }
+
+    // In ORDER BY clause, replace JSON path expression with JSON_EXTRACT_SCALAR. This expression must match the
+    // corresponding SELECT list expression except for the alias.
+    expressions = query.getOrderByList();
+    if (expressions != null) {
+      for (Expression expression : expressions) {
+        optimizeJsonIdentifier(expression, schema, DataSchema.ColumnDataType.STRING, false);
       }
     }
 
@@ -139,7 +157,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
     // corresponding SELECT list expression except for the alias.
     Expression expression = query.getHavingExpression();
     if (expression != null) {
-      optimizeJsonIdentifier(expression, schema, false, false);
+      optimizeJsonIdentifier(expression, schema, DataSchema.ColumnDataType.STRING, false);
     }
   }
 
@@ -148,7 +166,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
    * @return A {@link Pair} of values where the first value is alias for the input expression and second
    * value indicates whether json path expression was found (true) or not (false) in the expression.
    */
-  private static Pair<String, Boolean> optimizeJsonIdentifier(Expression expression, Schema schema, boolean hasNumericalOutput,
+  private static Pair<String, Boolean> optimizeJsonIdentifier(Expression expression, Schema schema, DataSchema.ColumnDataType dataType,
       boolean hasColumnAlias) {
     switch (expression.getType()) {
       case LITERAL:
@@ -159,7 +177,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
         String alias = expression.getIdentifier().getName();
         if (parts.length > 1 && isValidJSONColumn(parts[0], schema)) {
           // replace <column-name>.<json-path> with json_extract_scalar(<column-name>, '<json-path>', 'STRING', <JSON-null-value>)
-          Function jsonExtractScalarFunction = getJsonExtractFunction(parts, hasNumericalOutput);
+          Function jsonExtractScalarFunction = getJsonExtractFunction(parts, dataType);
           expression.setIdentifier(null);
           expression.setType(ExpressionType.FUNCTION);
           expression.setFunctionCall(jsonExtractScalarFunction);
@@ -173,18 +191,32 @@ public class JsonStatementOptimizer implements StatementOptimizer {
 
         boolean hasJsonPathExpression = false;
         StringBuffer alias = new StringBuffer();
-        alias.append(function.getOperator().toLowerCase(Locale.ROOT)).append("(");
-        hasNumericalOutput = numericalFunctions.contains(function.getOperator().toLowerCase(Locale.ROOT));
-        for (int i = 0; i < operands.size(); ++i) {
-          // recursively check to see if there is a <json-column>.<json-path> identifier in this expression.
-          Pair<String, Boolean> operandResult = optimizeJsonIdentifier(operands.get(i), schema, hasNumericalOutput, false);
-          hasJsonPathExpression |= operandResult.getSecond();
-          if (i > 0) {
-            alias.append(",");
+        if (function.getOperator().toUpperCase().equals("AS")) {
+          // We don't need to compute an alias for AS function since AS function defines its own alias.
+          hasJsonPathExpression = optimizeJsonIdentifier(operands.get(0), schema, dataType, false).getSecond();
+          alias.append(function.getOperands().get(1).getIdentifier().getName());
+        } else {
+          // For all functions besides AS function, process the operands and compute the alias that will be used if
+          // the function contains a json path expression.
+          alias.append(function.getOperator().toLowerCase(Locale.ROOT)).append("(");
+          dataType = DataSchema.ColumnDataType.STRING;
+          if (numericalFunctions.contains(function.getOperator().toUpperCase(Locale.ROOT))) {
+            dataType = DataSchema.ColumnDataType.DOUBLE;
+          } else if (datetimeFunctions.contains(function.getOperator().toUpperCase(Locale.ROOT))) {
+            dataType = DataSchema.ColumnDataType.LONG;
           }
-          alias.append(operandResult.getFirst());
+
+          for (int i = 0; i < operands.size(); ++i) {
+            // recursively check to see if there is a <json-column>.<json-path> identifier in this expression.
+            Pair<String, Boolean> operandResult = optimizeJsonIdentifier(operands.get(i), schema, dataType, false);
+            hasJsonPathExpression |= operandResult.getSecond();
+            if (i > 0) {
+              alias.append(",");
+            }
+            alias.append(operandResult.getFirst());
+          }
+          alias.append(")");
         }
-        alias.append(")");
 
         return new Pair<>(alias.toString(), hasJsonPathExpression);
       }
@@ -221,20 +253,36 @@ public class JsonStatementOptimizer implements StatementOptimizer {
    * Output: JSON_EXTRACT_SCALAR('jsoncolumn','$.x.y.z[2]','STRING','null')
    *
    * @param parts All the subparts of a fully qualified identifier (json path expression).
-   * @param hasNumericalOutput true if json path expression must output a numerical value; otherwise, false.
+   * @param dataType Output datatype of JSON_EXTRACT_SCALAR function.
    * @return a Function with JSON_EXTRACT_SCALAR operator created using parts of fully qualified identifier name.
    */
-  private static Function getJsonExtractFunction(String[] parts, boolean hasNumericalOutput) {
+  private static Function getJsonExtractFunction(String[] parts, DataSchema.ColumnDataType dataType) {
     Function jsonExtractScalarFunction = new Function("JSON_EXTRACT_SCALAR");
     List<Expression> operands = new ArrayList<>();
     operands.add(RequestUtils.createIdentifierExpression(parts[0]));
     operands.add(RequestUtils.createLiteralExpression(new StringLiteralAstNode(getJsonPath(parts, false))));
     operands
-        .add(RequestUtils.createLiteralExpression(new StringLiteralAstNode(hasNumericalOutput ? "DOUBLE" : "STRING")));
+        .add(RequestUtils.createLiteralExpression(new StringLiteralAstNode(dataType.toString())));
 
-    LiteralAstNode defaultValue =
-        hasNumericalOutput ? new FloatingPointLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE)
-            : new StringLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_JSON);
+    LiteralAstNode defaultValue;
+    switch (dataType) {
+      case INT:
+        defaultValue = new IntegerLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
+        break;
+      case LONG:
+        defaultValue = new IntegerLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
+        break;
+      case FLOAT:
+        defaultValue = new FloatingPointLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT);
+        break;
+      case DOUBLE:
+        defaultValue = new FloatingPointLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE);
+        break;
+      case STRING:
+      default:
+        defaultValue = new StringLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
+    }
+
     operands.add(RequestUtils.createLiteralExpression(defaultValue));
     jsonExtractScalarFunction.setOperands(operands);
     return jsonExtractScalarFunction;
@@ -369,9 +417,9 @@ public class JsonStatementOptimizer implements StatementOptimizer {
       case NOT_IN:
         return " NOT IN ";
       case IS_NULL:
-        return " IS NULL ";
+        return " IS NULL";
       case IS_NOT_NULL:
-        return " IS NOT NULL ";
+        return " IS NOT NULL";
     }
     return " ";
   }
@@ -422,13 +470,24 @@ public class JsonStatementOptimizer implements StatementOptimizer {
     // Include all ArithmeticFunctions functions
     Method[] methods = ArithmeticFunctions.class.getDeclaredMethods();
     for (Method method : methods) {
-      set.add(method.getName());
+      set.add(method.getName().toUpperCase(Locale.ROOT));
     }
 
     // Include all aggregation functions
     AggregationFunctionType[] aggs = AggregationFunctionType.values();
     for (AggregationFunctionType agg : aggs) {
-      set.add(agg.getName());
+      set.add(agg.getName().toUpperCase(Locale.ROOT));
+    }
+
+    return set;
+  }
+
+  /** List of DateTime functions which require input to be of long type. */
+  public static Set<String> getDateTimeFunctionList() {
+    Set<String> set = new HashSet<>();
+    Method[] methods = DateTimeFunctions.class.getDeclaredMethods();
+    for (Method method : methods) {
+      set.add(method.getName().toUpperCase(Locale.ROOT));
     }
 
     return set;

@@ -28,6 +28,10 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
+/**
+ * Test cases to verify that {@link JsonStatementOptimizer} is properly rewriting queries that use JSON path expressions
+ * into equivalent queries that use JSON_MATCH and JSON_EXTRACT_SCALAR functions.
+ */
 public class JsonStatementOptimizerTest {
   private static final QueryOptimizer OPTIMIZER = new QueryOptimizer();
   private static final CalciteSqlCompiler SQL_COMPILER = new CalciteSqlCompiler();
@@ -41,130 +45,71 @@ public class JsonStatementOptimizerTest {
   @Test
   public void testJsonSelect() {
     // SELECT using a simple json path expression.
-    BrokerRequest sqlBrokerRequest1 = SQL_COMPILER.compileToBrokerRequest("SELECT jsonColumn.x FROM testTable");
-    PinotQuery pinotQuery1 = sqlBrokerRequest1.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery1, SCHEMA);
-
-    Assert.assertEquals(pinotQuery1.getSelectList().get(0).toString(),
-        "Expression(type:FUNCTION, functionCall:Function(operator:AS, operands:[Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.x>), Expression(type:LITERAL, literal:<Literal stringValue:STRING>), Expression(type:LITERAL, literal:<Literal stringValue:null>)])), Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn.x))]))");
+    assertEqualQueries("SELECT jsonColumn.x FROM testTable",
+        "SELECT JSON_EXTRACT_SCALAR(jsonColumn, '$.x', 'STRING', 'null') AS \"jsonColumn.x\" FROM testTable");
 
     // SELECT using json path expressions with array addressing.
-    BrokerRequest sqlBrokerRequest2 = SQL_COMPILER.compileToBrokerRequest("SELECT jsonColumn.data[0][1].a.b[0] FROM testTable");
-    PinotQuery pinotQuery2 = sqlBrokerRequest2.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery2, SCHEMA);
-
-    Assert.assertEquals(pinotQuery2.getSelectList().get(0).toString(),
-        "Expression(type:FUNCTION, functionCall:Function(operator:AS, operands:[Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.data[0][1].a.b[0]>), Expression(type:LITERAL, literal:<Literal stringValue:STRING>), Expression(type:LITERAL, literal:<Literal stringValue:null>)])), Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn.data[0][1].a.b[0]))]))");
+    assertEqualQueries("SELECT jsonColumn.data[0][1].a.b[0] FROM testTable",
+        "SELECT JSON_EXTRACT_SCALAR(jsonColumn, '$.data[0][1].a.b[0]', 'STRING', 'null') AS \"jsonColumn.data[0][1].a.b[0]\" FROM testTable");
 
     // SELECT using json path expressions within double quotes.
-    BrokerRequest sqlBrokerRequest3 = SQL_COMPILER.compileToBrokerRequest("SELECT \"jsonColumn.a.b.c[0][1][2][3].d.e.f[0].g\" FROM testTable");
-    PinotQuery pinotQuery3 = sqlBrokerRequest3.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery2, SCHEMA);
-
-    Assert.assertEquals(pinotQuery2.getSelectList().get(0).toString(),
-        "Expression(type:FUNCTION, functionCall:Function(operator:AS, operands:[Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.data[0][1].a.b[0]>), Expression(type:LITERAL, literal:<Literal stringValue:STRING>), Expression(type:LITERAL, literal:<Literal stringValue:null>)])), Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.data[0][1].a.b[0]>), Expression(type:LITERAL, literal:<Literal stringValue:STRING>), Expression(type:LITERAL, literal:<Literal stringValue:null>)]))]))");
+    assertEqualQueries("SELECT \"jsonColumn.a.b.c[0][1][2][3].d.e.f[0].g\" FROM testTable",
+        "SELECT JSON_EXTRACT_SCALAR(jsonColumn, '$.a.b.c[0][1][2][3].d.e.f[0].g', 'STRING', 'null') AS \"jsonColumn.a.b.c[0][1][2][3].d.e.f[0].g\" FROM testTable");
   }
 
   /** Test that a predicate comparing a json path expression with literal is properly converted into a JSON_MATCH function. */
   @Test
   public void testJsonFilter() {
-    // String literal
-    BrokerRequest sqlBrokerRequest1 =
-        SQL_COMPILER.compileToBrokerRequest("SELECT * FROM testTable WHERE jsonColumn.name.first = 'daffy'");
-    PinotQuery pinotQuery1 = sqlBrokerRequest1.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery1, SCHEMA);
+    // Comparing json path expression with a string value.
+    assertEqualQueries("SELECT * FROM testTable WHERE jsonColumn.name.first = 'daffy'",
+        "SELECT * FROM testTable WHERE JSON_MATCH(jsonColumn, '\"$.name.first\" = ''daffy''')");
 
-    Assert.assertEquals(pinotQuery1.getFilterExpression().toString(),
-        "Expression(type:FUNCTION, functionCall:Function(operator:JSON_MATCH, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:\"$.name.first\" = 'daffy'>)]))");
+    // Comparing json path expression with a  numerical value.
+    assertEqualQueries("SELECT * FROM testTable WHERE jsonColumn.id = 101",
+        "SELECT * FROM testTable WHERE JSON_MATCH(jsonColumn, '\"$.id\" = 101')");
 
-    // Numerical literal
-    BrokerRequest sqlBrokerRequest2 =
-        SQL_COMPILER.compileToBrokerRequest("SELECT * FROM testTable WHERE jsonColumn.id = 101");
-    PinotQuery pinotQuery2 = sqlBrokerRequest2.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery2, SCHEMA);
-
-    Assert.assertEquals(pinotQuery2.getFilterExpression().toString(),
-        "Expression(type:FUNCTION, functionCall:Function(operator:JSON_MATCH, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:\"$.id\" = 101>)]))");
+    // Comparing json path expression with a  numerical value and checking for null value.
+    assertEqualQueries("SELECT * FROM testTable WHERE jsonColumn.id IS NOT NULL AND jsonColumn.id = 101",
+        "SELECT * FROM testTable WHERE JSON_MATCH(jsonColumn, '\"$.id\" IS NOT NULL') AND JSON_MATCH(jsonColumn, '\"$.id\" = 101')");
   }
 
   /** Test that a json path expression in GROUP BY clause is properly converted into a JSON_EXTRACT_SCALAR function. */
   @Test
   public void testJsonGroupBy() {
-    BrokerRequest sqlBrokerRequest =
-        SQL_COMPILER.compileToBrokerRequest("SELECT jsonColumn.id, count(*) FROM testTable GROUP BY jsonColumn.id");
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
-
-    Assert.assertEquals(pinotQuery.getSelectList().get(0).toString(),
-        "Expression(type:FUNCTION, functionCall:Function(operator:AS, operands:[Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.id>), Expression(type:LITERAL, literal:<Literal stringValue:STRING>), Expression(type:LITERAL, literal:<Literal stringValue:null>)])), Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn.id))]))");
-
-    Assert.assertEquals(pinotQuery.getGroupByList().get(0).toString(),
-        "Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.id>), Expression(type:LITERAL, literal:<Literal stringValue:STRING>), Expression(type:LITERAL, literal:<Literal stringValue:null>)]))");
+    assertEqualQueries("SELECT jsonColumn.id, count(*) FROM testTable GROUP BY jsonColumn.id",
+        "SELECT JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'STRING', 'null') AS \"jsonColumn.id\", count(*) FROM testTable GROUP BY JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'STRING', 'null')");
   }
 
   /** Test that a json path expression in HAVING clause is properly converted into a JSON_EXTRACT_SCALAR function. */
   @Test
   public void testJsonGroupByHaving() {
-
-    // Test HAVING clause with a STRING value extracted using json path expression.
-    BrokerRequest sqlBrokerRequest1 =
-        SQL_COMPILER.compileToBrokerRequest("SELECT jsonColumn.name.last, count(*) FROM testTable GROUP BY jsonColumn.name.last HAVING jsonColumn.name.last = 'mouse'");
-    PinotQuery pinotQuery1 = sqlBrokerRequest1.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery1, SCHEMA);
-
-    Assert.assertEquals(pinotQuery1.getSelectList().get(0).toString(),
-        "Expression(type:FUNCTION, functionCall:Function(operator:AS, operands:[Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.name.last>), Expression(type:LITERAL, literal:<Literal stringValue:STRING>), Expression(type:LITERAL, literal:<Literal stringValue:null>)])), Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn.name.last))]))");
-
-    Assert.assertEquals(pinotQuery1.getGroupByList().get(0).toString(),
-        "Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.name.last>), Expression(type:LITERAL, literal:<Literal stringValue:STRING>), Expression(type:LITERAL, literal:<Literal stringValue:null>)]))");
-
-    Assert.assertEquals(pinotQuery1.getHavingExpression().toString(),
-        "Expression(type:FUNCTION, functionCall:Function(operator:EQUALS, operands:[Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.name.last>), Expression(type:LITERAL, literal:<Literal stringValue:STRING>), Expression(type:LITERAL, literal:<Literal stringValue:null>)])), Expression(type:LITERAL, literal:<Literal stringValue:mouse>)]))");
-
-    // Test HAVING clause with a DOUBLE value extract using json path expression.
-    BrokerRequest sqlBrokerRequest2 =
-        SQL_COMPILER.compileToBrokerRequest("SELECT jsonColumn.name.last, count(*) FROM testTable GROUP BY jsonColumn.name.last HAVING jsonColumn.name.last = 'mouse'");
-    PinotQuery pinotQuery2 = sqlBrokerRequest2.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery2, SCHEMA);
-
-    Assert.assertEquals(pinotQuery2.getSelectList().get(0).toString(),
-        "Expression(type:FUNCTION, functionCall:Function(operator:AS, operands:[Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.name.last>), Expression(type:LITERAL, literal:<Literal stringValue:STRING>), Expression(type:LITERAL, literal:<Literal stringValue:null>)])), Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn.name.last))]))");
-
-    Assert.assertEquals(pinotQuery2.getGroupByList().get(0).toString(),
-        "Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.name.last>), Expression(type:LITERAL, literal:<Literal stringValue:STRING>), Expression(type:LITERAL, literal:<Literal stringValue:null>)]))");
-
-    Assert.assertEquals(pinotQuery2.getHavingExpression().toString(),
-        "Expression(type:FUNCTION, functionCall:Function(operator:EQUALS, operands:[Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.name.last>), Expression(type:LITERAL, literal:<Literal stringValue:STRING>), Expression(type:LITERAL, literal:<Literal stringValue:null>)])), Expression(type:LITERAL, literal:<Literal stringValue:mouse>)]))");
+    assertEqualQueries(
+        "SELECT jsonColumn.name.last, count(*) FROM testTable GROUP BY jsonColumn.name.last HAVING jsonColumn.name.last = 'mouse'",
+        "SELECT JSON_EXTRACT_SCALAR(jsonColumn, '$.name.last', 'STRING', 'null') AS \"jsonColumn.name.last\", count(*) FROM testTable GROUP BY JSON_EXTRACT_SCALAR(jsonColumn, '$.name.last', 'STRING', 'null') HAVING JSON_EXTRACT_SCALAR(jsonColumn, '$.name.last', 'STRING', 'null') = 'mouse'");
   }
 
   /** Test a complex SQL statement with json path expression in SELECT, WHERE, and GROUP BY clauses. */
   @Test
   public void testJsonSelectFilterGroupBy() {
-    BrokerRequest sqlBrokerRequest = SQL_COMPILER.compileToBrokerRequest(
-        "SELECT jsonColumn.name.last, count(*) FROM testTable WHERE jsonColumn.id = 101 GROUP BY jsonColumn.name.last");
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
-
-    Assert.assertEquals(pinotQuery.getSelectList().get(0).toString(),
-        "Expression(type:FUNCTION, functionCall:Function(operator:AS, operands:[Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.name.last>), Expression(type:LITERAL, literal:<Literal stringValue:STRING>), Expression(type:LITERAL, literal:<Literal stringValue:null>)])), Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn.name.last))]))");
-
-    Assert.assertEquals(pinotQuery.getFilterExpression().toString(),
-        "Expression(type:FUNCTION, functionCall:Function(operator:JSON_MATCH, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:\"$.id\" = 101>)]))");
-
-    Assert.assertEquals(pinotQuery.getGroupByList().get(0).toString(),
-        "Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.name.last>), Expression(type:LITERAL, literal:<Literal stringValue:STRING>), Expression(type:LITERAL, literal:<Literal stringValue:null>)]))");
+    assertEqualQueries(
+        "SELECT jsonColumn.name.last, count(*) FROM testTable WHERE jsonColumn.id = 101 GROUP BY jsonColumn.name.last",
+        "SELECT JSON_EXTRACT_SCALAR(jsonColumn, '$.name.last', 'STRING', 'null') AS \"jsonColumn.name.last\", count(*) FROM testTable WHERE JSON_MATCH(jsonColumn, '\"$.id\" = 101') GROUP BY JSON_EXTRACT_SCALAR(jsonColumn, '$.name.last', 'STRING', 'null')");
   }
 
   /** Test an aggregation function over json path expression in SELECT clause. */
   @Test
-  public void testStringFunctionOverJsonPathSelectExpression() {
-    BrokerRequest sqlBrokerRequest =
-        SQL_COMPILER.compileToBrokerRequest("SELECT UPPER(jsonColumn.name.first) FROM testTable");
-    PinotQuery pinotQuery = sqlBrokerRequest.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery, SCHEMA);
+  public void testTransformFunctionOverJsonPathSelectExpression() {
+    // Apply string transform function on json path expression.
+    assertEqualQueries("SELECT UPPER(jsonColumn.name.first) FROM testTable",
+        "SELECT UPPER(JSON_EXTRACT_SCALAR(jsonColumn, '$.name.first', 'STRING', 'null')) AS \"upper(jsonColumn.name.first)\" FROM testTable");
 
-    Assert.assertEquals(pinotQuery.getSelectList().get(0).toString(),
-        "Expression(type:FUNCTION, functionCall:Function(operator:AS, operands:[Expression(type:FUNCTION, functionCall:Function(operator:UPPER, operands:[Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.name.first>), Expression(type:LITERAL, literal:<Literal stringValue:STRING>), Expression(type:LITERAL, literal:<Literal stringValue:null>)]))])), Expression(type:IDENTIFIER, identifier:Identifier(name:upper(jsonColumn.name.first)))]))");
+    // Apply date transform function on json path expression and check for IS NULL
+    assertEqualQueries("SELECT FROMEPOCHDAYS(jsonColumn.days) FROM testTable WHERE jsonColumn.days IS NULL",
+        "SELECT FROMEPOCHDAYS(JSON_EXTRACT_SCALAR(jsonColumn, '$.days', 'LONG', " + Long.MIN_VALUE + ")) AS \"fromepochdays(jsonColumn.days)\" FROM testTable WHERE JSON_MATCH(jsonColumn, '\"$.days\" IS NULL')");
+
+    // Apply date transform function on json path expression and check for IS NOT NULL
+    assertEqualQueries("SELECT FROMEPOCHDAYS(jsonColumn.days) FROM testTable WHERE jsonColumn.days IS NOT NULL",
+        "SELECT FROMEPOCHDAYS(JSON_EXTRACT_SCALAR(jsonColumn, '$.days', 'LONG', " + Long.MIN_VALUE + ")) AS \"fromepochdays(jsonColumn.days)\" FROM testTable WHERE JSON_MATCH(jsonColumn, '\"$.days\" IS NOT NULL')");
   }
 
   /** Test a numerical function over json path expression in SELECT clause. */
@@ -172,30 +117,34 @@ public class JsonStatementOptimizerTest {
   public void testNumericalFunctionOverJsonPathSelectExpression() {
 
     // Test without user-specified alias.
-    BrokerRequest sqlBrokerRequest1 =
-        SQL_COMPILER.compileToBrokerRequest("SELECT MAX(jsonColumn.id) FROM testTable");
-    PinotQuery pinotQuery1 = sqlBrokerRequest1.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery1, SCHEMA);
-
-    Assert.assertEquals(pinotQuery1.getSelectList().get(0).toString(),
-        "Expression(type:FUNCTION, functionCall:Function(operator:AS, operands:[Expression(type:FUNCTION, functionCall:Function(operator:MAX, operands:[Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.id>), Expression(type:LITERAL, literal:<Literal stringValue:DOUBLE>), Expression(type:LITERAL, literal:<Literal doubleValue:-Infinity>)]))])), Expression(type:IDENTIFIER, identifier:Identifier(name:max(jsonColumn.id)))]))");
+    assertEqualQueries("SELECT MAX(jsonColumn.id) FROM testTable",
+        "SELECT MAX(JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'DOUBLE', '" + Double.NEGATIVE_INFINITY + "')) AS \"max(jsonColumn.id)\" FROM testTable");
 
     // Test with user-specified alias.
-    BrokerRequest sqlBrokerRequest2 =
-        SQL_COMPILER.compileToBrokerRequest("SELECT MAX(jsonColumn.id) AS x FROM testTable");
-    PinotQuery pinotQuery2 = sqlBrokerRequest2.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery2, SCHEMA);
-
-    Assert.assertEquals(pinotQuery2.getSelectList().get(0).toString(),
-        "Expression(type:FUNCTION, functionCall:Function(operator:AS, operands:[Expression(type:FUNCTION, functionCall:Function(operator:MAX, operands:[Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.id>), Expression(type:LITERAL, literal:<Literal stringValue:DOUBLE>), Expression(type:LITERAL, literal:<Literal doubleValue:-Infinity>)]))])), Expression(type:IDENTIFIER, identifier:Identifier(name:x))]))");
+    assertEqualQueries("SELECT MAX(jsonColumn.id) AS x FROM testTable",
+        "SELECT MAX(JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'DOUBLE', '" + Double.NEGATIVE_INFINITY + "')) AS x FROM testTable");
 
     // Test with nested function calls (minus function being used within max function).
-    BrokerRequest sqlBrokerRequest3 =
-        SQL_COMPILER.compileToBrokerRequest("SELECT MAX(jsonColumn.id - 5) FROM testTable");
-    PinotQuery pinotQuery3 = sqlBrokerRequest3.getPinotQuery();
-    OPTIMIZER.optimize(pinotQuery3, SCHEMA);
+    assertEqualQueries("SELECT MAX(jsonColumn.id - 5) FROM testTable",
+        "SELECT MAX(JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'DOUBLE', '" + Double.NEGATIVE_INFINITY + "') - 5) AS \"max(minus(jsonColumn.id,'5'))\" FROM testTable");
+  }
 
-    Assert.assertEquals(pinotQuery3.getSelectList().get(0).toString(),
-        "Expression(type:FUNCTION, functionCall:Function(operator:AS, operands:[Expression(type:FUNCTION, functionCall:Function(operator:MAX, operands:[Expression(type:FUNCTION, functionCall:Function(operator:MINUS, operands:[Expression(type:FUNCTION, functionCall:Function(operator:JSON_EXTRACT_SCALAR, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:jsonColumn)), Expression(type:LITERAL, literal:<Literal stringValue:$.id>), Expression(type:LITERAL, literal:<Literal stringValue:DOUBLE>), Expression(type:LITERAL, literal:<Literal doubleValue:-Infinity>)])), Expression(type:LITERAL, literal:<Literal longValue:5>)]))])), Expression(type:IDENTIFIER, identifier:Identifier(name:max(minus(jsonColumn.id,'5'))))]))");
+  /**
+   * Given two queries, this function will validate that the query obtained after rewriting the first query is the
+   * same as the second query.
+   */
+  private static void assertEqualQueries(String queryOriginal, String queryAfterRewrite) {
+    BrokerRequest userBrokerRequest = SQL_COMPILER.compileToBrokerRequest(queryOriginal);
+    PinotQuery userQuery = userBrokerRequest.getPinotQuery();
+    OPTIMIZER.optimize(userQuery, SCHEMA);
+
+    BrokerRequest rewrittenBrokerRequest = SQL_COMPILER.compileToBrokerRequest(queryAfterRewrite);
+    PinotQuery rewrittenQuery = rewrittenBrokerRequest.getPinotQuery();
+    OPTIMIZER.optimize(rewrittenQuery, SCHEMA);
+
+    // Currently there is no way to specify Double.NEGATIVE_INFINITY in SQL, so in the test cases we specify string '-Infinity' as
+    // default null value, but change "stringValue:-Infinity" to "doubleValue:-Infinity" to adjust for internal rewrite.
+    Assert.assertEquals(userQuery.toString(),
+        rewrittenQuery.toString().replace("stringValue:-Infinity", "doubleValue:-Infinity"));
   }
 }
