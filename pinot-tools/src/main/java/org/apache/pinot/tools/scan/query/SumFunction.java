@@ -31,10 +31,13 @@ public class SumFunction extends AggregationFunc {
 
   @Override
   public ResultTable run() {
-    Double sum = 0.0;
+    double sum = 0.0;
 
     for (ResultTable.Row row : _rows) {
-      sum += new Double((row.get(_column, _name)).toString());
+      try {
+        sum += Double.parseDouble((row.get(_column, _name)).toString());
+      } catch (NumberFormatException ignored) { // if encounter a NumberFormatException, skip it
+      }
     }
 
     ResultTable resultTable = new ResultTable(new ArrayList<Pair>(), 1);
