@@ -1,19 +1,30 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.queries;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -116,7 +127,6 @@ public class JsonPathQueriesTest extends BaseQueriesTest {
     records.add(createRecord(13, 13, "days",
         "{\"name\": {\"first\": \"multi-dimensional-1\",\"last\": \"array\"},\"days\": 111}"));
 
-
     List<String> jsonIndexColumns = new ArrayList<>();
     jsonIndexColumns.add("jsonColumn");
     TABLE_CONFIG.getIndexingConfig().setJsonIndexColumns(jsonIndexColumns);
@@ -147,13 +157,13 @@ public class JsonPathQueriesTest extends BaseQueriesTest {
     Object[][] expecteds1 = {{"duck"}, {"mouse"}, {"duck"}};
     checkresult("SELECT jsonColumn.name.last FROM testTable LIMIT 3", expecteds1);
 
-    Object[][] expecteds2 = {{"null"}, {"null"}, {"null"}, {"null"}, {"null"}, {"null"}, {"null"}, {"null"}, {"null"},{"1"}};
+    Object[][] expecteds2 =
+        {{"null"}, {"null"}, {"null"}, {"null"}, {"null"}, {"null"}, {"null"}, {"null"}, {"null"}, {"1"}};
     checkresult("SELECT jsonColumn.data[0].e[2].z[0].i1 FROM testTable", expecteds2);
   }
 
   private void checkresult(String query, Object[][] expecteds) {
-    BrokerResponseNative
-        response1 = getBrokerResponseForOptimizedSqlQuery(query, SCHEMA);
+    BrokerResponseNative response1 = getBrokerResponseForOptimizedSqlQuery(query, SCHEMA);
     List<Object[]> rows = response1.getResultTable().getRows();
 
     Assert.assertEquals(rows.size(), expecteds.length);
@@ -168,23 +178,27 @@ public class JsonPathQueriesTest extends BaseQueriesTest {
   @Test
   public void testJsonFilter() {
     // Comparing json path expression with a string value.
-    Object[][] expecteds1 = {{1,"{\"name\":{\"first\":\"daffy\",\"last\":\"duck\"},\"id\":101,\"data\":[\"a\",\"b\",\"c\",\"d\"]}", 1L,"daffy duck"}};
+    Object[][] expecteds1 =
+        {{1, "{\"name\":{\"first\":\"daffy\",\"last\":\"duck\"},\"id\":101,\"data\":[\"a\",\"b\",\"c\",\"d\"]}", 1L, "daffy duck"}};
     checkresult("SELECT * FROM testTable WHERE jsonColumn.name.first = 'daffy' LIMIT 1", expecteds1);
 
     // Comparing json path expression with a numerical value.
-    Object[][] expecteds2 = {{1,"{\"name\":{\"first\":\"daffy\",\"last\":\"duck\"},\"id\":101,\"data\":[\"a\",\"b\",\"c\",\"d\"]}", 1L,"daffy duck"}};
+    Object[][] expecteds2 =
+        {{1, "{\"name\":{\"first\":\"daffy\",\"last\":\"duck\"},\"id\":101,\"data\":[\"a\",\"b\",\"c\",\"d\"]}", 1L, "daffy duck"}};
     checkresult("SELECT * FROM testTable WHERE JSON_MATCH(jsonColumn, '\"$.id\" = 101') LIMIT 1", expecteds2);
 
     // Comparing json path expression with a string value.
     Object[][] expecteds3 = {{4l}};
-    checkresult("SELECT count(*) FROM testTable WHERE JSON_MATCH(jsonColumn, '\"$.id\" IS NOT NULL') AND JSON_MATCH(jsonColumn, '\"$.id\" = 101')", expecteds3);
+    checkresult(
+        "SELECT count(*) FROM testTable WHERE JSON_MATCH(jsonColumn, '\"$.id\" IS NOT NULL') AND JSON_MATCH(jsonColumn, '\"$.id\" = 101')",
+        expecteds3);
   }
-
 
   /** Test that a json path expression in GROUP BY clause is properly converted into a JSON_EXTRACT_SCALAR function. */
   @Test
   public void testJsonGroupBy() {
-    Object[][] expecteds1 = {{"111", 20l}, {"101",4l}, {"null", 4l}, {"181",4l}, {"161.5", 4l}, {"171", 4l}, {"161", 4l}, {"141",4l}, {"131",4l}, {"121",4l}};
+    Object[][] expecteds1 =
+        {{"111", 20l}, {"101", 4l}, {"null", 4l}, {"181", 4l}, {"161.5", 4l}, {"171", 4l}, {"161", 4l}, {"141", 4l}, {"131", 4l}, {"121", 4l}};
     checkresult("SELECT jsonColumn.id, count(*) FROM testTable GROUP BY jsonColumn.id", expecteds1);
   }
 
@@ -192,16 +206,19 @@ public class JsonPathQueriesTest extends BaseQueriesTest {
   @Test
   public void testJsonGroupByHaving() {
     Object[][] expecteds1 = {{"mouse", 8l}};
-    checkresult("SELECT jsonColumn.name.last, count(*) FROM testTable GROUP BY jsonColumn.name.last HAVING jsonColumn.name.last = 'mouse'", expecteds1);
+    checkresult(
+        "SELECT jsonColumn.name.last, count(*) FROM testTable GROUP BY jsonColumn.name.last HAVING jsonColumn.name.last = 'mouse'",
+        expecteds1);
   }
 
   /** Test a complex SQL statement with json path expression in SELECT, WHERE, and GROUP BY clauses. */
   @Test
   public void testJsonSelectFilterGroupBy() {
     Object[][] expecteds1 = {{"duck", 4l}};
-    checkresult("SELECT jsonColumn.name.last, count(*) FROM testTable WHERE jsonColumn.id = 101 GROUP BY jsonColumn.name.last", expecteds1);
+    checkresult(
+        "SELECT jsonColumn.name.last, count(*) FROM testTable WHERE jsonColumn.id = 101 GROUP BY jsonColumn.name.last",
+        expecteds1);
   }
-
 
   /** Test an aggregation function over json path expression in SELECT clause. */
   @Test
@@ -212,13 +229,14 @@ public class JsonPathQueriesTest extends BaseQueriesTest {
 
     // Apply date transform function on json path expression and check for IS NULL
     Object[][] expecteds2 = {{Long.MIN_VALUE}};
-    checkresult("SELECT FROMEPOCHDAYS(jsonColumn.days) FROM testTable WHERE jsonColumn.days IS NULL LIMIT 1", expecteds2);
+    checkresult("SELECT FROMEPOCHDAYS(jsonColumn.days) FROM testTable WHERE jsonColumn.days IS NULL LIMIT 1",
+        expecteds2);
 
     // Apply date transform function on json path expression and check for IS NOT NULL
     Object[][] expecteds3 = {{9590400000l}};
-    checkresult("SELECT FROMEPOCHDAYS(jsonColumn.days) FROM testTable WHERE jsonColumn.days IS NOT NULL LIMIT 1", expecteds3);
+    checkresult("SELECT FROMEPOCHDAYS(jsonColumn.days) FROM testTable WHERE jsonColumn.days IS NOT NULL LIMIT 1",
+        expecteds3);
   }
-
 
   /** Test a numerical function over json path expression in SELECT clause. */
   @Test
