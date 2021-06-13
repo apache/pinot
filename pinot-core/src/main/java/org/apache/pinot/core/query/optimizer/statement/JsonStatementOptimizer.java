@@ -114,11 +114,15 @@ public class JsonStatementOptimizer implements StatementOptimizer {
    */
   private static Set<String> datetimeFunctions = getDateTimeFunctionList();
 
+  /**
+   * Null value constants for different column types. Used while rewriting json path expression to JSON_EXTRACT_SCALAR function.
+   */
   private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_INT_AST = new IntegerLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
   private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_LONG_AST = new IntegerLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
   private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT_AST = new FloatingPointLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT);
   private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE_AST = new FloatingPointLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE);
   private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_STRING_AST = new StringLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
+
   @Override
   public void optimize(PinotQuery query, @Nullable Schema schema) {
     // In SELECT clause, replace JSON path expressions with JSON_EXTRACT_SCALAR function with an alias.

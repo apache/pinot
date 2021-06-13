@@ -39,7 +39,7 @@ public class JsonStatementOptimizerTest {
       new Schema.SchemaBuilder().setSchemaName("testTable").addSingleValueDimension("intColumn", FieldSpec.DataType.INT)
           .addSingleValueDimension("longColumn", FieldSpec.DataType.LONG)
           .addSingleValueDimension("stringColumn", FieldSpec.DataType.STRING)
-          .addMultiValueDimension("jsonColumn", FieldSpec.DataType.JSON).build();
+          .addSingleValueDimension("jsonColumn", FieldSpec.DataType.JSON).build();
 
   /** Test that a json path expression in SELECT list is properly converted to a JSON_EXTRACT_SCALAR function within an AS function. */
   @Test
