@@ -33,6 +33,7 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
 
   private int _minLength = Integer.MAX_VALUE;
   private int _maxLength = 0;
+  private long _totalLength = 0;
   private ByteArray[] _sortedValues;
   private boolean _sealed = false;
 
@@ -50,6 +51,7 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
     int length = value.length();
     _minLength = Math.min(_minLength, length);
     _maxLength = Math.max(_maxLength, length);
+    _totalLength += length;
 
     totalNumberOfEntries++;
   }
@@ -89,6 +91,14 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
       return _maxLength;
     }
     throw new IllegalStateException("you must seal the collector first before asking for longest value");
+  }
+
+  @Override
+  public long getTotalLengthOfAllElements() {
+    if (_sealed) {
+      return _totalLength;
+    }
+    throw new IllegalStateException("you must seal the collector first before asking for total length of all values");
   }
 
   @Override

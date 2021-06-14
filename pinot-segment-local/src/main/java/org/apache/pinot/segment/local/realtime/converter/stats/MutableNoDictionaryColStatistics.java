@@ -68,6 +68,11 @@ public class MutableNoDictionaryColStatistics implements ColumnStatistics {
   }
 
   @Override
+  public long getTotalLengthOfAllElements() {
+    return -1;
+  }
+
+  @Override
   public boolean isSorted() {
     return false;
   }

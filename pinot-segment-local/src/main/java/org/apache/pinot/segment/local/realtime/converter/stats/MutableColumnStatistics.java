@@ -112,6 +112,11 @@ public class MutableColumnStatistics implements ColumnStatistics {
   }
 
   @Override
+  public long getTotalLengthOfAllElements() {
+    return -1;
+  }
+
+  @Override
   public boolean isSorted() {
     DataSourceMetadata dataSourceMetadata = _dataSource.getDataSourceMetadata();
 

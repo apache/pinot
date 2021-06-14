@@ -61,6 +61,12 @@ public interface ColumnStatistics extends Serializable {
    */
   int getLengthOfLargestElement();
 
+  /**
+   *
+   * @return For variable length objects, returns the total length of all the value. For others, returns -1.
+   */
+  long getTotalLengthOfAllElements();
+
   default boolean isFixedLength() {
     return getLengthOfShortestElement() == getLengthOfLargestElement();
   }

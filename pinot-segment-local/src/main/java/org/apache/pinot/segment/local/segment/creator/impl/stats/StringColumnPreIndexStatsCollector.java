@@ -30,6 +30,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
 
   private int _minLength = Integer.MAX_VALUE;
   private int _maxLength = 0;
+  private long _totalLength = 0;
   private String[] _sortedValues;
   private boolean _sealed = false;
 
@@ -48,6 +49,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
         int length = StringUtil.encodeUtf8(value).length;
         _minLength = Math.min(_minLength, length);
         _maxLength = Math.max(_maxLength, length);
+        _totalLength += length;
       }
 
       maxNumberOfMultiValues = Math.max(maxNumberOfMultiValues, values.length);
@@ -61,6 +63,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
       int valueLength = StringUtil.encodeUtf8(value).length;
       _minLength = Math.min(_minLength, valueLength);
       _maxLength = Math.max(_maxLength, valueLength);
+      _totalLength += valueLength;
 
       totalNumberOfEntries++;
     }
@@ -96,6 +99,14 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
       return _maxLength;
     }
     throw new IllegalStateException("you must seal the collector first before asking for longest value");
+  }
+
+  @Override
+  public long getTotalLengthOfAllElements() {
+    if (_sealed) {
+      return _totalLength;
+    }
+    throw new IllegalStateException("you must seal the collector first before asking for total length of all values");
   }
 
   @Override

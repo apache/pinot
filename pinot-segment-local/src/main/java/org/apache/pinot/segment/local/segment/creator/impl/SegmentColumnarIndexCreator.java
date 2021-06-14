@@ -631,6 +631,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       boolean hasJsonIndex) {
     int cardinality = columnIndexCreationInfo.getDistinctValueCount();
     properties.setProperty(getKeyFor(column, CARDINALITY), String.valueOf(cardinality));
+    properties.setProperty(getKeyFor(column, COLUMN_TOTAL_LENGTH), String.valueOf(columnIndexCreationInfo.getTotalLengthOfAllElements()));
     properties.setProperty(getKeyFor(column, TOTAL_DOCS), String.valueOf(totalDocs));
     DataType dataType = fieldSpec.getDataType();
     properties.setProperty(getKeyFor(column, DATA_TYPE), String.valueOf(dataType));

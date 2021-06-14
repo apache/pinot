@@ -31,6 +31,7 @@ public class DefaultColumnStatistics implements ColumnStatistics {
   private final int _cardinality = 1;
   private final int _lengthOfShortestElement = -1;
   private final int _lengthOfLargestElement = -1;
+  private final long _totalLengthOfAllElements = -1;
   private final boolean _isSorted;
   private final int _totalNumberOfEntries;
   private final int _maxNumberOfMultiValues;
@@ -74,6 +75,11 @@ public class DefaultColumnStatistics implements ColumnStatistics {
   @Override
   public int getLengthOfLargestElement() {
     return _lengthOfLargestElement;
+  }
+
+  @Override
+  public long getTotalLengthOfAllElements() {
+    return _totalLengthOfAllElements;
   }
 
   @Override

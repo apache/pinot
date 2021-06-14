@@ -75,6 +75,7 @@ public class V1Constants {
 
     public static class Column {
       public static final String CARDINALITY = "cardinality";
+      public static final String COLUMN_TOTAL_LENGTH = "columnTotalLength";
       public static final String TOTAL_DOCS = "totalDocs";
       public static final String DATA_TYPE = "dataType";
       public static final String BITS_PER_ELEMENT = "bitsPerElement";

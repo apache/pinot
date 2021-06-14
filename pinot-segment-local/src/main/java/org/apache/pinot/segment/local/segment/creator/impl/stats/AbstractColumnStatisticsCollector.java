@@ -121,6 +121,10 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
     return -1;
   }
 
+  public long getTotalLengthOfAllElements() {
+    return -1;
+  }
+
   public abstract void seal();
 
   /**

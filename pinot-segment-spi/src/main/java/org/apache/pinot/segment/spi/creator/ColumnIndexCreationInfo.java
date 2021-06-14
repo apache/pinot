@@ -97,6 +97,10 @@ public class ColumnIndexCreationInfo implements Serializable {
     return columnStatistics.getLengthOfLargestElement();
   }
 
+  public long getTotalLengthOfAllElements() {
+    return columnStatistics.getTotalLengthOfAllElements();
+  }
+
   public Set<Integer> getPartitions() {
     return columnStatistics.getPartitions();
   }
