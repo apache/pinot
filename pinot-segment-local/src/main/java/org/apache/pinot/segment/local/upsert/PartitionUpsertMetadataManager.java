@@ -26,7 +26,6 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -86,16 +85,11 @@ public class PartitionUpsertMetadataManager {
   /**
    * Initializes the upsert metadata for the given immutable segment.
    */
-  public void addSegment(ImmutableSegmentImpl immutableSegment, Iterator<RecordInfo> recordInfoIterator) {
-    addSegment(immutableSegment, recordInfoIterator, new ThreadSafeMutableRoaringBitmap());
-  }
-
-  @VisibleForTesting
-  void addSegment(ImmutableSegmentImpl immutableSegment, Iterator<RecordInfo> recordInfoIterator,
-      ThreadSafeMutableRoaringBitmap validDocIds) {
-    String segmentName = immutableSegment.getSegmentName();
+  public void addSegment(IndexSegment segment, Iterator<RecordInfo> recordInfoIterator) {
+    String segmentName = segment.getSegmentName();
     LOGGER.info("Adding upsert metadata for segment: {}", segmentName);
-    immutableSegment.enableUpsert(this, validDocIds);
+    ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
+    assert validDocIds != null;
 
     while (recordInfoIterator.hasNext()) {
       RecordInfo recordInfo = recordInfoIterator.next();
@@ -107,11 +101,11 @@ public class PartitionUpsertMetadataManager {
           // Update the record location when there is a tie to keep the newer record. Note that the record info iterator
           // will return records with incremental doc ids.
           IndexSegment currentSegment = currentRecordLocation.getSegment();
-          if (immutableSegment == currentSegment) {
+          if (segment == currentSegment) {
             if (recordInfo._timestamp >= currentRecordLocation.getTimestamp()) {
               validDocIds.remove(currentRecordLocation.getDocId());
               validDocIds.add(recordInfo._docId);
-              return new RecordLocation(immutableSegment, recordInfo._docId, recordInfo._timestamp);
+              return new RecordLocation(segment, recordInfo._docId, recordInfo._timestamp);
             } else {
               return currentRecordLocation;
             }
@@ -126,7 +120,7 @@ public class PartitionUpsertMetadataManager {
           if (segmentName.equals(currentSegmentName)) {
             if (recordInfo._timestamp >= currentRecordLocation.getTimestamp()) {
               validDocIds.add(recordInfo._docId);
-              return new RecordLocation(immutableSegment, recordInfo._docId, recordInfo._timestamp);
+              return new RecordLocation(segment, recordInfo._docId, recordInfo._timestamp);
             } else {
               return currentRecordLocation;
             }
@@ -144,14 +138,14 @@ public class PartitionUpsertMetadataManager {
             assert currentSegment.getValidDocIds() != null;
             currentSegment.getValidDocIds().remove(currentRecordLocation.getDocId());
             validDocIds.add(recordInfo._docId);
-            return new RecordLocation(immutableSegment, recordInfo._docId, recordInfo._timestamp);
+            return new RecordLocation(segment, recordInfo._docId, recordInfo._timestamp);
           } else {
             return currentRecordLocation;
           }
         } else {
           // New primary key
           validDocIds.add(recordInfo._docId);
-          return new RecordLocation(immutableSegment, recordInfo._docId, recordInfo._timestamp);
+          return new RecordLocation(segment, recordInfo._docId, recordInfo._timestamp);
         }
       });
     }

@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.utils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -68,11 +67,6 @@ import org.quartz.CronScheduleBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.data.FieldSpec.DataType.DOUBLE;
-import static org.apache.pinot.spi.data.FieldSpec.DataType.FLOAT;
-import static org.apache.pinot.spi.data.FieldSpec.DataType.INT;
-import static org.apache.pinot.spi.data.FieldSpec.DataType.LONG;
-
 
 /**
  * Utils related to table config operations
@@ -109,7 +103,7 @@ public final class TableConfigUtils {
     validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
     validateFieldConfigList(tableConfig.getFieldConfigList(), tableConfig.getIndexingConfig(), schema);
     validateUpsertConfig(tableConfig, schema);
-    validatePartialUpsertStrategies(schema, tableConfig);
+    validatePartialUpsertStrategies(tableConfig, schema);
     validateTaskConfigs(tableConfig);
   }
 
@@ -331,7 +325,7 @@ public final class TableConfigUtils {
    *  - consumer type must be low-level
    */
   @VisibleForTesting
-  public static void validateUpsertConfig(TableConfig tableConfig, Schema schema) {
+  static void validateUpsertConfig(TableConfig tableConfig, Schema schema) {
     if (tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE) {
       return;
     }
@@ -358,33 +352,38 @@ public final class TableConfigUtils {
   }
 
   /**
-   * Validates the partial upsert-related configurations
-   *  - INCREMENT merger cannot be applied to PK.
-   *  - INCREMENT merger should be numeric data types.
-   *  - enforce nullValueHandling for partial upsert tables.
+   * Validates the partial upsert-related configurations:
+   *  - Null handling must be enabled
+   *  - Merger cannot be applied to private key columns
+   *  - Merger cannot be applied to non-existing columns
+   *  - INCREMENT merger must be applied to numeric columns
    */
-  private static void validatePartialUpsertStrategies(Schema schema, TableConfig tableConfig) {
+  @VisibleForTesting
+  static void validatePartialUpsertStrategies(TableConfig tableConfig, Schema schema) {
     if (tableConfig.getUpsertMode() != UpsertConfig.Mode.PARTIAL) {
       return;
     }
 
     Preconditions.checkState(tableConfig.getIndexingConfig().isNullHandlingEnabled(),
-        "NullValueHandling is required to be enabled for partial upsert tables.");
+        "Null handling must be enabled for partial upsert tables");
 
-    Map<String, UpsertConfig.Strategy> partialUpsertStrategies =
-        tableConfig.getUpsertConfig().getPartialUpsertStrategies();
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    assert upsertConfig != null;
+    Map<String, UpsertConfig.Strategy> partialUpsertStrategies = upsertConfig.getPartialUpsertStrategies();
 
+    List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
     for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
-      Set<FieldSpec.DataType> numericsDataType = new HashSet<>(Arrays.asList(INT, LONG, FLOAT, DOUBLE));
+      String column = entry.getKey();
+      Preconditions.checkState(!primaryKeyColumns.contains(column), "Merger cannot be applied to primary key columns");
+
+      FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+      Preconditions.checkState(fieldSpec != null, "Merger cannot be applied to non-existing column: %s", column);
 
       if (entry.getValue() == UpsertConfig.Strategy.INCREMENT) {
-        Preconditions.checkState(schema.getPrimaryKeyColumns().contains(entry.getKey()),
-            "INCREMENT merger cannot be applied to PK.");
-
-        Preconditions.checkState(schema.getDateTimeNames().contains(entry.getKey()), "INCREMENT merger cannot be applied to Datetime columns.");
-
-        Preconditions.checkState(numericsDataType.contains(schema.getFieldSpecFor(entry.getKey()).getDataType()),
-            "INCREMENT merger should be numeric data types.");
+        Preconditions.checkState(fieldSpec.getDataType().getStoredType().isNumeric(),
+            "INCREMENT merger cannot be applied to non-numeric column: %s", column);
+        Preconditions.checkState(!schema.getDateTimeNames().contains(column),
+            "INCREMENT merger cannot be applied to date time column: %s", column);
       }
     }
   }

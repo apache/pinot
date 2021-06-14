@@ -35,6 +35,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Handler for partial-upsert.
+ */
 public class PartialUpsertHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(PartialUpsertHandler.class);
 
@@ -114,7 +117,7 @@ public class PartialUpsertHandler {
   }
 
   /**
-   * Handle partial upsert merge for given fieldName.
+   * Merges 2 records and returns the merged record.
    *
    * @param previousRecord the last derived full record during ingestion.
    * @param newRecord the new consumed record.

@@ -59,7 +59,7 @@ public class PartitionUpsertMetadataManagerTest {
     recordInfoList1.add(new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(0), 5, 100));
     ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
     ImmutableSegmentImpl segment1 = mockSegment(1, validDocIds1);
-    upsertMetadataManager.addSegment(segment1, recordInfoList1.iterator(), validDocIds1);
+    upsertMetadataManager.addSegment(segment1, recordInfoList1.iterator());
     // segment1: 0 -> {5, 100}, 1 -> {4, 120}, 2 -> {2, 100}
     checkRecordLocation(recordLocationMap, 0, segment1, 5, 100);
     checkRecordLocation(recordLocationMap, 1, segment1, 4, 120);
@@ -74,8 +74,8 @@ public class PartitionUpsertMetadataManagerTest {
     recordInfoList2.add(new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(3), 3, 80));
     recordInfoList2.add(new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(0), 4, 80));
     ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
-    ImmutableSegmentImpl segment2 = mockSegment(2, validDocIds1);
-    upsertMetadataManager.addSegment(segment2, recordInfoList2.iterator(), validDocIds2);
+    ImmutableSegmentImpl segment2 = mockSegment(2, validDocIds2);
+    upsertMetadataManager.addSegment(segment2, recordInfoList2.iterator());
     // segment1: 1 -> {4, 120}
     // segment2: 0 -> {0, 100}, 2 -> {2, 120}, 3 -> {3, 80}
     checkRecordLocation(recordLocationMap, 0, segment2, 0, 100);
@@ -88,7 +88,7 @@ public class PartitionUpsertMetadataManagerTest {
     // Replace (reload) the first segment
     ThreadSafeMutableRoaringBitmap newValidDocIds1 = new ThreadSafeMutableRoaringBitmap();
     ImmutableSegmentImpl newSegment1 = mockSegment(1, newValidDocIds1);
-    upsertMetadataManager.addSegment(newSegment1, recordInfoList1.iterator(), newValidDocIds1);
+    upsertMetadataManager.addSegment(newSegment1, recordInfoList1.iterator());
     // original segment1: 1 -> {4, 120}
     // segment2: 0 -> {0, 100}, 2 -> {2, 120}, 3 -> {3, 80}
     // new segment1: 1 -> {4, 120}
@@ -153,7 +153,7 @@ public class PartitionUpsertMetadataManagerTest {
     recordInfoList1.add(new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(2), 2, 100));
     ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
     ImmutableSegmentImpl segment1 = mockSegment(1, validDocIds1);
-    upsertMetadataManager.addSegment(segment1, recordInfoList1.iterator(), validDocIds1);
+    upsertMetadataManager.addSegment(segment1, recordInfoList1.iterator());
 
     // Update records from the second segment
     ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
@@ -219,13 +219,13 @@ public class PartitionUpsertMetadataManagerTest {
     recordInfoList1.add(new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(1), 1, 100));
     ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
     ImmutableSegmentImpl segment1 = mockSegment(1, validDocIds1);
-    upsertMetadataManager.addSegment(segment1, recordInfoList1.iterator(), validDocIds1);
+    upsertMetadataManager.addSegment(segment1, recordInfoList1.iterator());
     List<PartitionUpsertMetadataManager.RecordInfo> recordInfoList2 = new ArrayList<>();
     recordInfoList2.add(new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(2), 0, 100));
     recordInfoList2.add(new PartitionUpsertMetadataManager.RecordInfo(getPrimaryKey(3), 1, 100));
     ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
-    ImmutableSegmentImpl segment2 = mockSegment(2, validDocIds1);
-    upsertMetadataManager.addSegment(segment2, recordInfoList2.iterator(), validDocIds2);
+    ImmutableSegmentImpl segment2 = mockSegment(2, validDocIds2);
+    upsertMetadataManager.addSegment(segment2, recordInfoList2.iterator());
 
     // Remove the first segment
     upsertMetadataManager.removeSegment(segment1);
