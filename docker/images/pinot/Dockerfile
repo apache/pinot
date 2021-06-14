@@ -16,7 +16,7 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-ARG JAVA_VERSION=8
+ARG JAVA_VERSION=11
 FROM openjdk:${JAVA_VERSION} AS pinot_build_env
 
 LABEL MAINTAINER=dev@pinot.apache.org
