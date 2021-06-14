@@ -76,6 +76,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   // Unlimited parallel builds can cause high GC pauses during segment builds, causing
   // response times to suffer.
   private static final String MAX_PARALLEL_SEGMENT_BUILDS = "realtime.max.parallel.segment.builds";
+  private static final int DEFAULT_MAX_PARALLEL_SEGMENT_BUILDS = 4;
 
   // Key of whether to enable split commit
   private static final String ENABLE_SPLIT_COMMIT = "enable.split.commit";
@@ -210,7 +211,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   public int getMaxParallelSegmentBuilds() {
-    return _instanceDataManagerConfiguration.getProperty(MAX_PARALLEL_SEGMENT_BUILDS, 0);
+    return _instanceDataManagerConfiguration.getProperty(MAX_PARALLEL_SEGMENT_BUILDS, DEFAULT_MAX_PARALLEL_SEGMENT_BUILDS);
   }
 
   @Override

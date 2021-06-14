@@ -22,6 +22,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,7 +42,9 @@ import org.apache.pinot.spi.config.table.TunerConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -211,5 +214,55 @@ public class TableConfigUtils {
     ZNRecord znRecord = new ZNRecord(tableConfig.getTableName());
     znRecord.setSimpleFields(simpleFields);
     return znRecord;
+  }
+
+  /**
+   * Helper method to convert from legacy/deprecated configs into current version
+   * of TableConfig.
+   * <ul>
+   *   <li>Moves deprecated ingestion related configs into Ingestion Config.</li>
+   *   <li>The conversion happens in-place, the specified tableConfig is mutated in-place.</li>
+   * </ul>
+   *
+   * TODO: We should clear the values from deprecated configs after conversion.
+   *
+   * @param tableConfig Input table config.
+   */
+  public static void convertFromLegacyTableConfig(TableConfig tableConfig) {
+    // It is possible that indexing as well as ingestion configs exist, in which case we always honor ingestion config.
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    BatchIngestionConfig batchIngestionConfig =
+        (ingestionConfig != null) ? ingestionConfig.getBatchIngestionConfig() : null;
+
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    if (batchIngestionConfig == null) {
+      batchIngestionConfig = new BatchIngestionConfig(null, validationConfig.getSegmentPushType(),
+          validationConfig.getSegmentPushFrequency());
+    } else {
+      // This should not happen typically, but since we are in repair mode, might as well cover this corner case.
+      if (batchIngestionConfig.getSegmentIngestionType() == null) {
+        batchIngestionConfig.setSegmentIngestionType(validationConfig.getSegmentPushType());
+      }
+
+      if (batchIngestionConfig.getSegmentIngestionFrequency() == null) {
+        batchIngestionConfig.setSegmentIngestionFrequency(validationConfig.getSegmentPushFrequency());
+      }
+    }
+
+    StreamIngestionConfig streamIngestionConfig =
+        (ingestionConfig != null) ? ingestionConfig.getStreamIngestionConfig() : null;
+    if (streamIngestionConfig == null) {
+      streamIngestionConfig =
+          new StreamIngestionConfig(Collections.singletonList(tableConfig.getIndexingConfig().getStreamConfigs()));
+    }
+
+    if (ingestionConfig == null) {
+      ingestionConfig = new IngestionConfig(batchIngestionConfig, streamIngestionConfig, null, null, null);
+    } else {
+      ingestionConfig.setBatchIngestionConfig(batchIngestionConfig);
+      ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
+    }
+
+    tableConfig.setIngestionConfig(ingestionConfig);
   }
 }

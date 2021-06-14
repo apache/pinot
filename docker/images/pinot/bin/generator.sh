@@ -27,10 +27,11 @@ TEMPLATE_BASEDIR="$TEMP_DIR/generator"
 CONTROLLER_HOST="localhost"
 CONTROLLER_PORT="9000"
 CONTROLLER_SCHEME="http"
+AUTH_TOKEN=""
 
 export JAVA_OPTS="$(echo $JAVA_OPTS | sed -E 's/-javaagent\S+//')"
 
-USAGE="$(basename "$0") [-h] [-a PATH] [-c HOST:PORT] [-s SCHEME] [-j PATH] [-n ROWS] TEMPLATE_NAME [TABLE_NAME]
+USAGE="$(basename "$0") [-h] [-a PATH] [-c HOST:PORT] [-s SCHEME] [-t AUTH_TOKEN] [-j PATH] [-n ROWS] TEMPLATE_NAME [TABLE_NAME]
 
   where:
       -h  show this help text
@@ -38,9 +39,10 @@ USAGE="$(basename "$0") [-h] [-a PATH] [-c HOST:PORT] [-s SCHEME] [-j PATH] [-n 
       -c  set controller host and port (default: 'localhost:9000')
       -j  set jar path for resource extraction
       -n  set number of rows to generate (optional)
-      -s  set connection scheme (default: 'http')"
+      -s  set connection scheme (default: 'http')
+      -t  set auth token (optional)"
 
-while getopts ':ha:c:j:n:s:' OPTION; do
+while getopts ':ha:c:j:n:s:t:' OPTION; do
   case "$OPTION" in
     h) echo "$USAGE"
        exit
@@ -57,6 +59,8 @@ while getopts ':ha:c:j:n:s:' OPTION; do
     n) NUM_RECORDS="$OPTARG"
        ;;
     s) CONTROLLER_SCHEME="$OPTARG"
+       ;;
+    t) AUTH_TOKEN="$OPTARG"
        ;;
     :) printf "missing argument for -%s\n" "$OPTARG" >&2
        echo "$USAGE" >&2
@@ -154,6 +158,7 @@ fi
 
 echo "Adding table ${TABLE_NAME} from template ${TEMPLATE_NAME}"
 ${ADMIN_PATH} AddTable -exec \
+-authToken "${AUTH_TOKEN}" \
 -tableConfigFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_config.json" \
 -schemaFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json" \
 -controllerHost "${CONTROLLER_HOST}" \
@@ -168,6 +173,7 @@ fi
 
 echo "Uploading segment for ${TEMPLATE_NAME}"
 ${ADMIN_PATH} UploadSegment \
+-authToken "${AUTH_TOKEN}" \
 -tableName "${TABLE_NAME}" \
 -segmentDir "${SEGMENT_DIR}" \
 -controllerHost "${CONTROLLER_HOST}" \
