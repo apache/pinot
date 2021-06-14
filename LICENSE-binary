@@ -241,7 +241,7 @@ com.google.oauth-client:google-oauth-client:1.30.3
 com.jayway.jsonpath:json-path:2.4.0
 com.lmax:disruptor:3.3.4
 com.ning:async-http-client:1.9.21
-com.tdunning:t-digest:3.2
+com.tdunning:t-digest:3.3
 com.typesafe.netty:netty-reactive-streams-http:2.0.4
 com.typesafe.netty:netty-reactive-streams:2.0.4
 com.typesafe.scala-logging:scala-logging_2.11:3.9.0
