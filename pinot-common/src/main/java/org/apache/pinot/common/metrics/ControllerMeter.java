@@ -49,8 +49,7 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   NUMBER_TIMES_SCHEDULE_TASKS_CALLED("tasks", true),
   NUMBER_TASKS_SUBMITTED("tasks", false),
   NUMBER_SEGMENT_UPLOAD_TIMEOUT_EXCEEDED("SegmentUploadTimeouts", true),
-  CRON_SCHEDULER_JOB_TRIGGERED("cronSchedulerJobTriggered", false),
-  NUMBER_LLC_SEGMENTS_DEEP_STORE_UPLOAD_FIX_ERROR("llcSegmentDeepStoreUploadFixError", true);
+  CRON_SCHEDULER_JOB_TRIGGERED("cronSchedulerJobTriggered", false);
 
   private final String _brokerMeterName;
   private final String _unit;
