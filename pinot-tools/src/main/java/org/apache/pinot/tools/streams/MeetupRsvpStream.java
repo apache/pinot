@@ -96,7 +96,7 @@ public class MeetupRsvpStream {
         String eventId = "";
         if (event != null) {
           extractedJson.set("event_name", event.get("event_name"));
-          eventId = event.get("event_id").toString();
+          eventId = event.get("event_id").asText();
           extractedJson.put("event_id", eventId);
           extractedJson.set("event_time", event.get("time"));
         }
