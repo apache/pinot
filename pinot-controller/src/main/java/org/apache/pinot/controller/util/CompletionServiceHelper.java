@@ -71,7 +71,7 @@ public class CompletionServiceHelper {
           completionServiceResponse._failedResponseCount++;
           continue;
         }
-        completionServiceResponse._httpResponses.put(instance, getMethod.getResponseBodyAsString());
+        completionServiceResponse._httpResponses.put(uri.toString(), getMethod.getResponseBodyAsString());
       } catch (Exception e) {
         LOGGER.error("Connection error", e);
         completionServiceResponse._failedResponseCount++;
