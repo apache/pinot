@@ -19,6 +19,7 @@
 package org.apache.pinot.common.utils.helix;
 
 import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -494,5 +495,27 @@ public class HelixHelper {
   public static Set<InstanceConfig> getBrokerInstanceConfigsForTenant(List<InstanceConfig> instanceConfigs,
       String tenant) {
     return new HashSet<>(getInstancesConfigsWithTag(instanceConfigs, TagNameUtils.getBrokerTagForTenant(tenant)));
+  }
+
+  /**
+   * Updates hostname and port into Helix Instance config
+   * @param helixManager the HelixManager for updating
+   * @param clusterName the cluster name
+   * @param instanceId the helix instanceId of the instance
+   * @param hostName the hostname to use
+   * @param hostPort the hostport to use
+   */
+  public static void updateInstanceHostNamePort(HelixManager helixManager, String clusterName, String instanceId, String hostName, int hostPort) {
+    HelixAdmin admin = helixManager.getClusterManagmentTool();
+    InstanceConfig instanceConfig = admin.getInstanceConfig(clusterName, instanceId);
+    instanceConfig.setHostName(hostName);
+    instanceConfig.setPort(String.valueOf(hostPort));
+    // NOTE: Use HelixDataAccessor.setProperty() instead of HelixAdmin.setInstanceConfig() because the latter explicitly
+    // forbids instance host/port modification
+    HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
+    Preconditions.checkState(
+      helixDataAccessor.setProperty(helixDataAccessor.keyBuilder().instanceConfig(instanceId), instanceConfig),
+      "Failed to update instance config");
+
   }
 }

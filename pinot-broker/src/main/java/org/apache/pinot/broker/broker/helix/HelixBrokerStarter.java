@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.broker.helix;
 
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -54,6 +55,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.TableCache;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.transport.TlsConfig;
@@ -308,6 +310,7 @@ public class HelixBrokerStarter implements ServiceStartable {
     LOGGER.info("Connecting participant Helix manager");
     _participantHelixManager =
         HelixManagerFactory.getZKHelixManager(_clusterName, _brokerId, InstanceType.PARTICIPANT, _zkServers);
+
     // Register state model factory
     _participantHelixManager.getStateMachineEngine()
         .registerStateModelFactory(BrokerResourceOnlineOfflineStateModelFactory.getStateModelDef(),
@@ -319,6 +322,8 @@ public class HelixBrokerStarter implements ServiceStartable {
             new BrokerUserDefinedMessageHandlerFactory(_routingManager, queryQuotaManager));
     _participantHelixManager.connect();
     addInstanceTagIfNeeded();
+    updateHelixHost();
+
     _brokerMetrics
         .addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME, () -> _participantHelixManager.isConnected() ? 1L : 0L);
     _participantHelixManager
@@ -328,6 +333,20 @@ public class HelixBrokerStarter implements ServiceStartable {
     registerServiceStatusHandler();
 
     LOGGER.info("Finish starting Pinot broker");
+  }
+
+  private void updateHelixHost() {
+    boolean allowUpdateHelixHost = _brokerConf.getProperty(Broker.BROKER_DYNAMIC_HELIX_HOST, false);
+    if (!allowUpdateHelixHost) {
+      return;
+    }
+    String brokerHost = _brokerConf.getProperty(Broker.BROKER_NETTY_HOST, NetUtils.getHostnameOrAddress());
+    String brokerPort = _brokerConf.getProperty(Broker.BROKER_NETTY_PORT);
+    if ( Strings.isNullOrEmpty(brokerPort)) {
+      LOGGER.warn("{} enabled but did not provide a {}, will not update helix host name", Broker.BROKER_NETTY_HOST, Broker.BROKER_NETTY_PORT);
+      return;
+    }
+    HelixHelper.updateInstanceHostNamePort(_participantHelixManager, _clusterName, _brokerId, brokerHost, Integer.parseInt(brokerPort));
   }
 
   /**

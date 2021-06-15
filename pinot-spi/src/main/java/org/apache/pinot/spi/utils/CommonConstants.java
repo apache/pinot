@@ -199,6 +199,9 @@ public class CommonConstants {
 
     public static final String BROKER_TLS_PREFIX = "pinot.broker.tls";
     public static final String BROKER_NETTYTLS_ENABLED = "pinot.broker.nettytls.enabled";
+    public static final String BROKER_DYNAMIC_HELIX_HOST = "pinot.broker.dynamic.helix.host";
+    public static final String BROKER_NETTY_PORT = "pinot.broker.netty.port";
+    public static final String BROKER_NETTY_HOST = "pinot.broker.netty.host";
 
     public static class Request {
       public static final String PQL = "pql";
@@ -396,6 +399,8 @@ public class CommonConstants {
     // but we keep this default for backward compatibility in case someone relies on this format
     // see Server or Broker class for correct prefix format you should use
     public static final String DEFAULT_METRICS_PREFIX = "pinot.controller.";
+    public static final String CONTROLLER_DYNAMIC_HELIX_HOST = "pinot.controller.dynamic.helix.host";
+    public static final String CONTROLLER_HELIX_INSTANCE_ID = "pinot.controller.helix.instance.id";
   }
 
   public static class Minion {

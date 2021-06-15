@@ -19,6 +19,7 @@
 package org.apache.pinot.controller;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import com.google.common.primitives.Longs;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
@@ -55,6 +56,7 @@ import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -94,6 +96,7 @@ import org.apache.pinot.spi.utils.NetUtils;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 
 public class ControllerStarter implements ServiceStartable {
@@ -157,7 +160,11 @@ public class ControllerStarter implements ServiceStartable {
     int port = _listenerConfigs.get(0).getPort();
 
     _helixControllerInstanceId = host + "_" + port;
-    _helixParticipantInstanceId = LeadControllerUtils.generateParticipantInstanceId(host, port);
+    if (_config.getEnableDynamicHelixHost() && !Strings.isNullOrEmpty(_config.getHelixInstanceId())){
+      _helixParticipantInstanceId = _config.getHelixInstanceId();
+    } else {
+      _helixParticipantInstanceId = LeadControllerUtils.generateParticipantInstanceId(host, port);
+    }
     _isUpdateStateModel = _config.isUpdateSegmentStateModel();
     _enableBatchMessageMode = _config.getEnableBatchMessageMode();
 
@@ -339,7 +346,6 @@ public class ControllerStarter implements ServiceStartable {
     LOGGER.info("Initializing Helix participant manager");
     _helixParticipantManager = HelixManagerFactory
         .getZKHelixManager(_helixClusterName, _helixParticipantInstanceId, InstanceType.PARTICIPANT, _helixZkURL);
-
     // LeadControllerManager needs to be initialized before registering as Helix participant.
     LOGGER.info("Initializing lead controller manager");
     _leadControllerManager = new LeadControllerManager(_helixParticipantManager, _controllerMetrics);
@@ -446,6 +452,18 @@ public class ControllerStarter implements ServiceStartable {
     _serviceStatusCallbackList.add(generateServiceStatusCallback(_helixParticipantManager));
   }
 
+  private void updateHelixHost() {
+    if (!_config.getEnableDynamicHelixHost()) {
+      return;
+    }
+    if (Strings.isNullOrEmpty(_config.getControllerHost()) || Strings.isNullOrEmpty(_config.getControllerPort())) {
+      LOGGER.warn("Controller 'dynamic helix host' enabled but controller host or port not set. Will not update hostname");
+      return;
+    }
+    HelixHelper.updateInstanceHostNamePort(_helixParticipantManager, _helixClusterName, _helixParticipantInstanceId,
+      _config.getControllerHost(), Integer.parseInt(_config.getControllerPort()));
+  }
+
   private ServiceStatus.ServiceStatusCallback generateServiceStatusCallback(HelixManager helixManager) {
     return new ServiceStatus.ServiceStatusCallback() {
       private boolean _isStarted = false;
@@ -541,7 +559,7 @@ public class ControllerStarter implements ServiceStartable {
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg);
     }
-
+    updateHelixHost();
     LOGGER.info("Registering helix controller listener");
     // This registration is not needed when the leadControllerResource is enabled.
     // However, the resource can be disabled sometime while the cluster is in operation, so we keep it here. Plus, it does not add much overhead.
