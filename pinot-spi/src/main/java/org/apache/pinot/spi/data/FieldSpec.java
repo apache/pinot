@@ -502,6 +502,13 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         throw new IllegalArgumentException(String.format("Cannot convert value: '%s' to type: %s", value, this));
       }
     }
+
+    /**
+     * Checks whether the data type can be a sorted column.
+     */
+    public boolean canBeASortedColumn() {
+      return this != BYTES && this != JSON && this != STRUCT && this != MAP && this != LIST;
+    }
   }
 
   @Override

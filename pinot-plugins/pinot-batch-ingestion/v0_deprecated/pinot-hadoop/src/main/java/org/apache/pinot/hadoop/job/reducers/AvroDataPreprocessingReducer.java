@@ -19,7 +19,6 @@
 package org.apache.pinot.hadoop.job.reducers;
 
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.mapred.AvroKey;
 import org.apache.avro.mapred.AvroValue;
@@ -33,33 +32,43 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class SegmentPreprocessingReducer<T> extends Reducer<T, AvroValue<GenericRecord>, AvroKey<GenericRecord>, NullWritable> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPreprocessingReducer.class);
+public class AvroDataPreprocessingReducer<T> extends Reducer<T, AvroValue<GenericRecord>, AvroKey<GenericRecord>, NullWritable> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(AvroDataPreprocessingReducer.class);
 
   private AvroMultipleOutputs _multipleOutputs;
-  private AtomicInteger _counter;
-  private int _maxNumberOfRecords;
+  private long _numRecords;
+  private int _maxNumRecordsPerFile;
   private String _filePrefix;
 
   @Override
   public void setup(Context context) {
-    LOGGER.info("Using multiple outputs strategy.");
     Configuration configuration = context.getConfiguration();
-    _multipleOutputs = new AvroMultipleOutputs(context);
-    _counter = new AtomicInteger();
     // If it's 0, the output file won't be split into multiple files.
     // If not, output file will be split when the number of records reaches this number.
-    _maxNumberOfRecords = configuration.getInt(InternalConfigConstants.PARTITION_MAX_RECORDS_PER_FILE, 0);
-    LOGGER.info("Maximum number of records per file: {}", _maxNumberOfRecords);
-    _filePrefix = RandomStringUtils.randomAlphanumeric(4);
+    _maxNumRecordsPerFile = configuration.getInt(InternalConfigConstants.PREPROCESSING_MAX_NUM_RECORDS_PER_FILE, 0);
+    if (_maxNumRecordsPerFile > 0) {
+      LOGGER.info("Using multiple outputs strategy.");
+      _multipleOutputs = new AvroMultipleOutputs(context);
+      _numRecords = 0L;
+      _filePrefix = RandomStringUtils.randomAlphanumeric(4);
+      LOGGER.info("Initialized AvroDataPreprocessingReducer with maxNumRecordsPerFile: {}", _maxNumRecordsPerFile);
+    } else {
+      LOGGER.info("Initialized AvroDataPreprocessingReducer without limit on maxNumRecordsPerFile");
+    }
   }
 
   @Override
   public void reduce(final T inputRecord, final Iterable<AvroValue<GenericRecord>> values, final Context context)
       throws IOException, InterruptedException {
-    for (final AvroValue<GenericRecord> value : values) {
-      String fileName = generateFileName();
-      _multipleOutputs.write(new AvroKey<>(value.datum()), NullWritable.get(), fileName);
+    if (_maxNumRecordsPerFile > 0) {
+      for (final AvroValue<GenericRecord> value : values) {
+        String fileName = _filePrefix + (_numRecords++ / _maxNumRecordsPerFile);
+        _multipleOutputs.write(new AvroKey<>(value.datum()), NullWritable.get(), fileName);
+      }
+    } else {
+      for (final AvroValue<GenericRecord> value : values) {
+        context.write(new AvroKey<>(value.datum()), NullWritable.get());
+      }
     }
   }
 
@@ -72,13 +81,5 @@ public class SegmentPreprocessingReducer<T> extends Reducer<T, AvroValue<Generic
       _multipleOutputs = null;
     }
     LOGGER.info("Finished cleaning up reducer.");
-  }
-
-  private String generateFileName() {
-    if (_maxNumberOfRecords == 0) {
-      return _filePrefix;
-    } else {
-      return _filePrefix + (_counter.getAndIncrement() / _maxNumberOfRecords);
-    }
   }
 }
