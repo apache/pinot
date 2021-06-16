@@ -451,7 +451,8 @@ public class ControllerStarter implements ServiceStartable {
     _serviceStatusCallbackList.add(generateServiceStatusCallback(_helixParticipantManager));
   }
 
-  private void updateHelixHost() {
+  @VisibleForTesting
+  void updateHelixHost() {
     if (!_config.getEnableDynamicHelixHost()) {
       return;
     }
@@ -464,6 +465,7 @@ public class ControllerStarter implements ServiceStartable {
       controllerPort = Integer.parseInt(_config.getControllerPort());
     } catch (NumberFormatException ex) {
       LOGGER.error("Dynamic Helix Host enabled on Controller but port={} is not a number. Will skip updating helix hostname", _config.getControllerPort(), ex);
+      return;
     }
     HelixHelper.updateInstanceHostNamePort(_helixParticipantManager, _helixClusterName, _helixParticipantInstanceId,
       _config.getControllerHost(), controllerPort);

@@ -127,4 +127,24 @@ public class ControllerStarterTest extends ControllerTest {
     Assert.assertTrue(numberFormatCaught || validated);
   }
 
+  @Test
+  public void testIntegerPortBlockDirect() {
+    // since the testIntegerPortBlock() caused exception much earlier we test on function directly here.
+    controllerConfigMap.clear();
+    controllerConfigMap.put(CONTROLLER_DYNAMIC_HELIX_HOST, true);
+    controllerConfigMap.put(CONTROLLER_HOST, "strange_host.com");
+    controllerConfigMap.put(CONTROLLER_PORT, "not-a-number");
+    boolean numberFormatIssueDetected = false;
+    try {
+      ControllerStarter target = new ControllerStarter(new ControllerConf(controllerConfigMap));
+      target.updateHelixHost();
+      numberFormatIssueDetected = true;
+    } catch (NumberFormatException ex) {
+      numberFormatIssueDetected = true;
+    } catch (NullPointerException ex) {
+      numberFormatIssueDetected = false;
+      Assert.fail("We have not prevented updating wrong port number");
+    }
+    Assert.assertTrue(numberFormatIssueDetected);
+  }
 }

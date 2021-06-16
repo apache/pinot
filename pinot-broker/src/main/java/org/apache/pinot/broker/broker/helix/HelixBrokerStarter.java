@@ -350,10 +350,10 @@ public class HelixBrokerStarter implements ServiceStartable {
     int brokerPort = 0;
     try {
       brokerPort = Integer.parseInt(brokerPortStr);
+      HelixHelper.updateInstanceHostNamePort(helixManager, clusterName, brokerInstanceId, brokerHost, brokerPort);
     } catch (NumberFormatException ex) {
       LOGGER.error("Dynamic Helix Host enabled on Broker but port={} is not a number. Will skip updating helix hostname", brokerPortStr, ex);
     }
-    HelixHelper.updateInstanceHostNamePort(helixManager, clusterName, brokerInstanceId, brokerHost, brokerPort);
   }
 
   /**
