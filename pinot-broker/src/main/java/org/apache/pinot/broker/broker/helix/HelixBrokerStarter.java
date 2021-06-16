@@ -323,7 +323,6 @@ public class HelixBrokerStarter implements ServiceStartable {
     _participantHelixManager.connect();
     addInstanceTagIfNeeded();
     updateHelixHost(_brokerConf, _participantHelixManager, _clusterName, _brokerId);
-
     _brokerMetrics
         .addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME, () -> _participantHelixManager.isConnected() ? 1L : 0L);
     _participantHelixManager
