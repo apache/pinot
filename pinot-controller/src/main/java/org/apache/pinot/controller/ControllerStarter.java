@@ -456,11 +456,17 @@ public class ControllerStarter implements ServiceStartable {
       return;
     }
     if (Strings.isNullOrEmpty(_config.getControllerHost()) || Strings.isNullOrEmpty(_config.getControllerPort())) {
-      LOGGER.warn("Dynamic Helix Host enabled on Controller, but {} or {} not set. Will skip the feature", ControllerConf.CONTROLLER_HOST, ControllerConf.CONTROLLER_PORT);
+      LOGGER.warn("Dynamic Helix Host enabled on Controller, but host={}, port={} not set. Will skip updating helix hostname", _config.getControllerHost(), _config.getControllerPort());
       return;
     }
+    int controllerPort = 0;
+    try {
+      controllerPort = Integer.parseInt(_config.getControllerPort());
+    } catch (NumberFormatException ex) {
+      LOGGER.error("Dynamic Helix Host enabled on Controller but port={} is not a number. Will skip updating helix hostname", _config.getControllerPort(), ex);
+    }
     HelixHelper.updateInstanceHostNamePort(_helixParticipantManager, _helixClusterName, _helixParticipantInstanceId,
-      _config.getControllerHost(), Integer.parseInt(_config.getControllerPort()));
+      _config.getControllerHost(), controllerPort);
   }
 
   private ServiceStatus.ServiceStatusCallback generateServiceStatusCallback(HelixManager helixManager) {

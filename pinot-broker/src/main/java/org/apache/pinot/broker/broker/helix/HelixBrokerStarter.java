@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.broker.helix;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
@@ -321,7 +322,7 @@ public class HelixBrokerStarter implements ServiceStartable {
             new BrokerUserDefinedMessageHandlerFactory(_routingManager, queryQuotaManager));
     _participantHelixManager.connect();
     addInstanceTagIfNeeded();
-    updateHelixHost();
+    updateHelixHost(_brokerConf, _participantHelixManager, _clusterName, _brokerId);
 
     _brokerMetrics
         .addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME, () -> _participantHelixManager.isConnected() ? 1L : 0L);
@@ -334,18 +335,25 @@ public class HelixBrokerStarter implements ServiceStartable {
     LOGGER.info("Finish starting Pinot broker");
   }
 
-  private void updateHelixHost() {
-    boolean allowUpdateHelixHost = _brokerConf.getProperty(Broker.BROKER_DYNAMIC_HELIX_HOST, false);
+  @VisibleForTesting
+  static void updateHelixHost(PinotConfiguration brokerConf, HelixManager helixManager, String clusterName, String brokerInstanceId) {
+    boolean allowUpdateHelixHost = brokerConf.getProperty(Broker.BROKER_DYNAMIC_HELIX_HOST, false);
     if (!allowUpdateHelixHost) {
       return;
     }
-    String brokerHost = _brokerConf.getProperty(Broker.BROKER_NETTY_HOST, NetUtils.getHostnameOrAddress());
-    String brokerPort = _brokerConf.getProperty(Broker.BROKER_NETTY_PORT);
-    if ( Strings.isNullOrEmpty(brokerPort)) {
-      LOGGER.warn("Dynamic Helix Host enabled on host {} but brokerPort={} is null or empty, will not update helix host name", Broker.BROKER_NETTY_HOST, Broker.BROKER_NETTY_PORT);
+    String brokerHost = brokerConf.getProperty(Broker.BROKER_NETTY_HOST, NetUtils.getHostnameOrAddress());
+    String brokerPortStr = brokerConf.getProperty(Broker.BROKER_NETTY_PORT);
+    if ( Strings.isNullOrEmpty(brokerPortStr) || Strings.isNullOrEmpty(brokerHost)) {
+      LOGGER.warn("Dynamic Helix Host enabled, but host={} port={}, will skip updating helix host", brokerHost, brokerPortStr);
       return;
     }
-    HelixHelper.updateInstanceHostNamePort(_participantHelixManager, _clusterName, _brokerId, brokerHost, Integer.parseInt(brokerPort));
+    int brokerPort = 0;
+    try {
+      brokerPort = Integer.parseInt(brokerPortStr);
+    } catch (NumberFormatException ex) {
+      LOGGER.error("Dynamic Helix Host enabled on Broker but port={} is not a number. Will skip updating helix hostname", brokerPortStr, ex);
+    }
+    HelixHelper.updateInstanceHostNamePort(helixManager, clusterName, brokerInstanceId, brokerHost, brokerPort);
   }
 
   /**
