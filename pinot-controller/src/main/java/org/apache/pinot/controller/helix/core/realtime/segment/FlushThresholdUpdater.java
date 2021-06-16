@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.controller.helix.core.realtime.segment;
 
+import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 
 
@@ -34,5 +36,6 @@ public interface FlushThresholdUpdater {
    */
   void updateFlushThreshold(PartitionLevelStreamConfig streamConfig, LLCRealtimeSegmentZKMetadata newSegmentZKMetadata,
       CommittingSegmentDescriptor committingSegmentDescriptor,
-      @Nullable LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata, int maxNumPartitionsPerInstance);
+      @Nullable LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata, int maxNumPartitionsPerInstance,
+      List<PartitionGroupMetadata> partitionGroupMetadataList);
 }

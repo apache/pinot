@@ -19,9 +19,13 @@
 package org.apache.pinot.controller.helix.core.realtime.segment;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Comparator;
+import java.util.List;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
@@ -55,7 +59,8 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
   @Override
   public synchronized void updateFlushThreshold(PartitionLevelStreamConfig streamConfig,
       LLCRealtimeSegmentZKMetadata newSegmentZKMetadata, CommittingSegmentDescriptor committingSegmentDescriptor,
-      @Nullable LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata, int maxNumPartitionsPerInstance) {
+      @Nullable LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata, int maxNumPartitionsPerInstance,
+      List<PartitionGroupMetadata> partitionGroupMetadataList) {
     final long desiredSegmentSizeBytes = streamConfig.getFlushThresholdSegmentSizeBytes();
     final long timeThresholdMillis = streamConfig.getFlushThresholdTimeMillis();
     final int autotuneInitialRows = streamConfig.getFlushAutotuneInitialRows();
@@ -102,8 +107,14 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
     // less same characteristics at any one point in time).
     // However, when we start a new table or change controller mastership, we can have any partition completing first.
     // It is best to learn the ratio as quickly as we can, so we allow any partition to supply the value.
-    // FIXME: The stream may not have partition "0"
-    if (new LLCSegmentName(newSegmentName).getPartitionGroupId() == 0 || _latestSegmentRowsToSizeRatio == 0) {
+
+    // Partition group id 0 might not be available always. We take the smallest available partition id in that case to update the threshold
+    int smallestAvailablePartitionGroupId =
+        partitionGroupMetadataList.stream().min(Comparator.comparingInt(PartitionGroupMetadata::getPartitionGroupId))
+            .map(PartitionGroupMetadata::getPartitionGroupId).orElseGet(() -> 0);
+
+    if (new LLCSegmentName(newSegmentName).getPartitionGroupId() == smallestAvailablePartitionGroupId
+        || _latestSegmentRowsToSizeRatio == 0) {
       if (_latestSegmentRowsToSizeRatio > 0) {
         _latestSegmentRowsToSizeRatio =
             CURRENT_SEGMENT_RATIO_WEIGHT * currentRatio + PREVIOUS_SEGMENT_RATIO_WEIGHT * _latestSegmentRowsToSizeRatio;
