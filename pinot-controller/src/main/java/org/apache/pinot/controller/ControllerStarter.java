@@ -98,7 +98,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-
 public class ControllerStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerStarter.class);
 
@@ -457,7 +456,7 @@ public class ControllerStarter implements ServiceStartable {
       return;
     }
     if (Strings.isNullOrEmpty(_config.getControllerHost()) || Strings.isNullOrEmpty(_config.getControllerPort())) {
-      LOGGER.warn("Controller 'dynamic helix host' enabled but controller host or port not set. Will not update hostname");
+      LOGGER.warn("Dynamic Helix Host enabled on Controller, but {} or {} not set. Will skip the feature", ControllerConf.CONTROLLER_HOST, ControllerConf.CONTROLLER_PORT);
       return;
     }
     HelixHelper.updateInstanceHostNamePort(_helixParticipantManager, _helixClusterName, _helixParticipantInstanceId,

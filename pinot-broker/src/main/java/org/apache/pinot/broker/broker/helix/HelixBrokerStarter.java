@@ -310,7 +310,6 @@ public class HelixBrokerStarter implements ServiceStartable {
     LOGGER.info("Connecting participant Helix manager");
     _participantHelixManager =
         HelixManagerFactory.getZKHelixManager(_clusterName, _brokerId, InstanceType.PARTICIPANT, _zkServers);
-
     // Register state model factory
     _participantHelixManager.getStateMachineEngine()
         .registerStateModelFactory(BrokerResourceOnlineOfflineStateModelFactory.getStateModelDef(),
@@ -343,7 +342,7 @@ public class HelixBrokerStarter implements ServiceStartable {
     String brokerHost = _brokerConf.getProperty(Broker.BROKER_NETTY_HOST, NetUtils.getHostnameOrAddress());
     String brokerPort = _brokerConf.getProperty(Broker.BROKER_NETTY_PORT);
     if ( Strings.isNullOrEmpty(brokerPort)) {
-      LOGGER.warn("{} enabled but did not provide a {}, will not update helix host name", Broker.BROKER_NETTY_HOST, Broker.BROKER_NETTY_PORT);
+      LOGGER.warn("Dynamic Helix Host enabled on host {} but brokerPort={} is null or empty, will not update helix host name", Broker.BROKER_NETTY_HOST, Broker.BROKER_NETTY_PORT);
       return;
     }
     HelixHelper.updateInstanceHostNamePort(_participantHelixManager, _clusterName, _brokerId, brokerHost, Integer.parseInt(brokerPort));
