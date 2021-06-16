@@ -50,6 +50,8 @@ public class ServerSegmentMetadataReader {
   /**
    * This method is called when the API request is to fetch segment metadata for all segments of the table.
    * This method makes a MultiGet call to all servers that host their respective segments and gets the results.
+   * This method accept a list of column names as filter, and will return column metadata for the column in the
+   * list.
    * @return list of segments and their metadata as a JSON string
    */
   public List<String> getSegmentMetadataFromServer(String tableNameWithType,
@@ -68,7 +70,7 @@ public class ServerSegmentMetadataReader {
     CompletionServiceHelper completionServiceHelper =
         new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, timeoutMs);
+        completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, true, timeoutMs);
     List<String> segmentsMetadata = new ArrayList<>();
 
     int failedParses = 0;

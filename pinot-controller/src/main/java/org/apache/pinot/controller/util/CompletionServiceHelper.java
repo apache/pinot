@@ -32,6 +32,7 @@ import org.apache.pinot.common.http.MultiGetRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * This is a helper class that can be used to make HttpGet (MultiGet) calls and get the responses back.
  * The responses are returned as a string.
@@ -47,13 +48,26 @@ public class CompletionServiceHelper {
   private final BiMap<String, String> _endpointsToServers;
 
   public CompletionServiceHelper(Executor executor, HttpConnectionManager httpConnectionManager,
-                                 BiMap<String, String> endpointsToServers) {
+      BiMap<String, String> endpointsToServers) {
     _executor = executor;
     _httpConnectionManager = httpConnectionManager;
     _endpointsToServers = endpointsToServers;
   }
 
-  public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType, int timeoutMs) {
+  /**
+   * This method makes a MultiGet call to all given URLs.
+   * @param serverURLs server urls to send GET request.
+   * @param tableNameWithType table name with type suffix
+   * @param multiRequestPerServer it's possible that need to send multiple requests to a same server.
+   *                              If multiRequestPerServer is set as false, return as long as one of the requests get
+   *                              response; If multiRequestPerServer is set as true, wait until all requests
+   *                              get response.
+   * @param timeoutMs timeout in milliseconds to wait per request.
+   * @return CompletionServiceResponse Map of the endpoint(server instance, or full request path if
+   * multiRequestPerServer is true) to the response from that endpoint.
+   */
+  public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
+      boolean multiRequestPerServer, int timeoutMs) {
     CompletionServiceResponse completionServiceResponse = new CompletionServiceResponse();
 
     // TODO: use some service other than completion service so that we know which server encounters the error
@@ -64,14 +78,15 @@ public class CompletionServiceHelper {
       try {
         getMethod = completionService.take().get();
         URI uri = getMethod.getURI();
-        String instance = _endpointsToServers.get(
-            String.format("%s://%s:%d", uri.getScheme(), uri.getHost(), uri.getPort()));
+        String instance =
+            _endpointsToServers.get(String.format("%s://%s:%d", uri.getScheme(), uri.getHost(), uri.getPort()));
         if (getMethod.getStatusCode() >= 300) {
           LOGGER.error("Server: {} returned error: {}", instance, getMethod.getStatusCode());
           completionServiceResponse._failedResponseCount++;
           continue;
         }
-        completionServiceResponse._httpResponses.put(uri.toString(), getMethod.getResponseBodyAsString());
+        completionServiceResponse._httpResponses
+            .put(multiRequestPerServer ? uri.toString() : instance, getMethod.getResponseBodyAsString());
       } catch (Exception e) {
         LOGGER.error("Connection error", e);
         completionServiceResponse._failedResponseCount++;

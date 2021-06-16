@@ -140,6 +140,14 @@ public class TablesResource {
           Response.Status.NOT_FOUND);
     }
 
+    for (int i = 0; i < columns.size(); i++) {
+      try {
+        columns.set(i, URLDecoder.decode(columns.get(i), StandardCharsets.UTF_8.name()));
+      } catch (UnsupportedEncodingException e) {
+        throw new RuntimeException(e.getCause());
+      }
+    }
+
     try {
       return SegmentMetadataFetcher.getSegmentMetadata(segmentDataManager, columns);
     } catch (Exception e) {
