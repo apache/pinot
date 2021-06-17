@@ -77,7 +77,33 @@ rules:
   labels:
     taskType: "$1"
     status: "$2"
-# Pinot Broker
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.pinotLeadControllerResourceEnabled\"><>(\\w+)"
+  name: "pinot_controller_pinotLeadControllerResourceEnabled_$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.controllerLeaderPartitionCount\"><>(\\w+)"
+  name: "pinot_controller_controllerLeaderPartitionCount_$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.offlineTableEstimatedSize.(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_offlineTableEstimatedSize_$2"
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableQuota.(\\w+)_(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_tableQuota_$3"
+  labels:
+    table: "$1"
+    tableType: "$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableStorageQuotaUtilization.(\\w+)_(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_tableStorageQuotaUtilization_$3"
+  labels:
+    table: "$1"
+    tableType: "$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableStorageEstMissingSegmentPercent.(\\w+)_(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_tableStorageEstMissingSegmentPercent_$3"
+  labels:
+    table: "$1"
+    tableType: "$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.leadershipChangeWithoutCallback\"><>(\\w+)"
+  name: "pinot_controller_leadershipChangeWithoutCallback_$1"
+
+  # Pinot Broker
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+).authorization\"><>(\\w+)"
   name: "pinot_broker_authorization_$2"
   labels:
@@ -152,6 +178,8 @@ rules:
   name: "pinot_broker_exceptions_$1_$2"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.routingTableUpdateTime\"><>(\\w+)"
   name: "pinot_broker_routingTableUpdateTime_$1"
+
+
 # Pinot Server
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.documentCount.(\\w+)_(\\w+)\"><>(\\w+)"
   name: "pinot_server_documentCount_$3"
