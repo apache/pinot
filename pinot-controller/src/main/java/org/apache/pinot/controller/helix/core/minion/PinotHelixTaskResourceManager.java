@@ -286,6 +286,39 @@ public class PinotHelixTaskResourceManager {
   }
 
   /**
+   * Helper method to return a map of task names to corresponding task state
+   * where the task corresponds to the given Pinot table name. This is used to
+   * check status of all tasks for a given table.
+   * @param taskType Task Name
+   * @param tableNameWithType table name with type to filter on
+   * @return Map of filtered task name to corresponding state
+   */
+  public synchronized Map<String, TaskState> getTaskStatesByTable(String taskType, String tableNameWithType) {
+    Map<String, TaskState> filteredTaskStateMap = new HashMap<>();
+    Map<String, TaskState> taskStateMap = getTaskStates(taskType);
+
+    for (Map.Entry<String, TaskState> taskState : taskStateMap.entrySet()) {
+      String taskName = taskState.getKey();
+
+      // Iterate through all task configs associated with this task name
+      for (PinotTaskConfig taskConfig: getTaskConfigs(taskName)) {
+        Map<String, String> pinotConfigs = taskConfig.getConfigs();
+
+        // Filter task configs that matches this table name
+        if (pinotConfigs != null) {
+          String tableNameConfig = pinotConfigs.get("tableName");
+          if (tableNameConfig != null && tableNameConfig.equals(tableNameWithType)) {
+            // Found a match ! Track state for this particular task in the final result map
+            filteredTaskStateMap.put(taskName, taskStateMap.get(taskName));
+            break;
+          }
+        }
+      }
+    }
+    return filteredTaskStateMap;
+  }
+
+  /**
    * Helper method to convert task type to Helix JobQueue name.
    * <p>E.g. DummyTask -> TaskQueue_DummyTask
    *

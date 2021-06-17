@@ -25,9 +25,11 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
@@ -49,6 +51,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -62,10 +65,12 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.recommender.RecommenderDriver;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStats;
@@ -104,6 +109,9 @@ public class PinotTableRestletResource {
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
+
+  @Inject
+  PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
 
   @Inject
   ControllerConf _controllerConf;
@@ -605,17 +613,48 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
     try {
-      TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-      if (TableType.OFFLINE == tableType) {
-        // TODO: Support table status for offline table. Currently only supported for realtime.
-        throw new UnsupportedOperationException(
-            "Table status for OFFLINE table: " + tableName + " is currently unsupported");
+      TableType tableType = Constants.validateTableType(tableTypeStr);
+      if (tableType == null) {
+        throw new ControllerApplicationException(LOGGER, "Table type should either be realtime|offline",
+            Response.Status.BAD_REQUEST);
       }
-      String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
-      ConsumingSegmentInfoReader consumingSegmentInfoReader =
-          new ConsumingSegmentInfoReader(_executor, _connectionManager, _pinotHelixResourceManager);
-      TableStatus.IngestionStatus ingestionStatus = consumingSegmentInfoReader
-          .getIngestionStatus(tableNameWithType, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+      String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
+      if (!_pinotHelixResourceManager.hasTable(tableNameWithType)) {
+        throw new ControllerApplicationException(LOGGER,
+            "Specified table name: " + tableName + " of type: " + tableTypeStr + " does not exist.",
+            Response.Status.BAD_REQUEST);
+      }
+      TableStatus.IngestionStatus ingestionStatus = null;
+      if (TableType.OFFLINE == tableType) {
+        TableStatus.IngestionState ingestionState = TableStatus.IngestionState.HEALTHY;
+        String errorMessage = "";
+
+        // Retrieve all the Minion tasks and corresponding states for this table
+        Map<String, TaskState> taskStateMap = _pinotHelixTaskResourceManager
+            .getTaskStatesByTable(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE, tableNameWithType);
+        List<String> failedTasks = new ArrayList<>();
+
+        // Check if any of the tasks are in error state
+        for (Map.Entry<String, TaskState> taskStateEntry : taskStateMap.entrySet()) {
+          switch (taskStateEntry.getValue()) {
+            case FAILED:
+            case ABORTED:
+              failedTasks.add(taskStateEntry.getKey());
+            default:
+              continue;
+          }
+        }
+        if (failedTasks.size() > 0) {
+          ingestionState = TableStatus.IngestionState.UNHEALTHY;
+          errorMessage = "Follow ingestion tasks have failed: " + failedTasks.toString();
+        }
+        ingestionStatus = new TableStatus.IngestionStatus(ingestionState.toString(), errorMessage);
+      } else {
+        ConsumingSegmentInfoReader consumingSegmentInfoReader =
+            new ConsumingSegmentInfoReader(_executor, _connectionManager, _pinotHelixResourceManager);
+        ingestionStatus = consumingSegmentInfoReader
+            .getIngestionStatus(tableNameWithType, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+      }
       TableStatus tableStatus = new TableStatus(ingestionStatus);
       return JsonUtils.objectToPrettyString(tableStatus);
     } catch (Exception e) {
