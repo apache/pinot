@@ -20,7 +20,10 @@ package org.apache.pinot.core.operator.query;
 
 import java.util.Collection;
 import java.util.Map;
+import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.TableResizer;
@@ -36,6 +39,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.segment.spi.IndexSegment;
 
 import static org.apache.pinot.core.util.GroupByUtils.getTableCapacity;
 
@@ -61,7 +65,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
 
   private int _numDocsScanned = 0;
 
-  public AggregationGroupByOrderByOperator(AggregationFunction[] aggregationFunctions,
+  public AggregationGroupByOrderByOperator(IndexSegment indexSegment, AggregationFunction[] aggregationFunctions,
       ExpressionContext[] groupByExpressions, int maxInitialResultHolderCapacity, int numGroupsLimit,
       int minSegmentTrimSize, TransformOperator transformOperator, long numTotalDocs, QueryContext queryContext,
       boolean useStarTree) {
@@ -69,11 +73,30 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     _groupByExpressions = groupByExpressions;
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
-    _transformOperator = transformOperator;
     _numTotalDocs = numTotalDocs;
     _useStarTree = useStarTree;
     _queryContext = queryContext;
     _minSegmentTrimSize = minSegmentTrimSize;
+
+    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+    boolean enableGroupByOpt = true;
+    if (orderByExpressions != null) {
+      for (OrderByExpressionContext orderByExpressionContext : orderByExpressions) {
+        if (orderByExpressionContext.getExpression().getType() == ExpressionContext.Type.FUNCTION
+            && orderByExpressionContext.getExpression().getFunction().getType() == FunctionContext.Type.AGGREGATION) {
+          enableGroupByOpt = false;
+          break;
+        }
+      }
+    }
+    if (enableGroupByOpt) {
+      AggregationGroupByOptUtil aggregationGroupByOptUtil =
+          new AggregationGroupByOptUtil(indexSegment, queryContext, aggregationFunctions, groupByExpressions,
+              transformOperator, orderByExpressions);
+      _transformOperator = aggregationGroupByOptUtil.constructTransformOperator();
+    } else {
+      _transformOperator = transformOperator;
+    }
 
     // NOTE: The indexedTable expects that the the data schema will have group by columns before aggregation columns
     int numGroupByExpressions = groupByExpressions.length;
@@ -103,7 +126,6 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
-    //call AggregationGroupByNoOrderByOperator.getNextBlock();
     // Perform aggregation group-by on all the blocks
     GroupByExecutor groupByExecutor;
     if (_useStarTree) {
