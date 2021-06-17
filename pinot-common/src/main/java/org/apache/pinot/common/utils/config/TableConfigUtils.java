@@ -224,8 +224,6 @@ public class TableConfigUtils {
    *   <li>The conversion happens in-place, the specified tableConfig is mutated in-place.</li>
    * </ul>
    *
-   * TODO: We should clear the values from deprecated configs after conversion.
-   *
    * @param tableConfig Input table config.
    */
   public static void convertFromLegacyTableConfig(TableConfig tableConfig) {
@@ -235,34 +233,60 @@ public class TableConfigUtils {
         (ingestionConfig != null) ? ingestionConfig.getBatchIngestionConfig() : null;
 
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    String segmentPushType = validationConfig.getSegmentPushType();
+    String segmentPushFrequency = validationConfig.getSegmentPushFrequency();
+
     if (batchIngestionConfig == null) {
-      batchIngestionConfig = new BatchIngestionConfig(null, validationConfig.getSegmentPushType(),
-          validationConfig.getSegmentPushFrequency());
+      // Only create the config if any of the deprecated config is not null.
+      if (segmentPushType != null || segmentPushFrequency != null) {
+        batchIngestionConfig = new BatchIngestionConfig(null, segmentPushType, segmentPushFrequency);
+      }
     } else {
       // This should not happen typically, but since we are in repair mode, might as well cover this corner case.
       if (batchIngestionConfig.getSegmentIngestionType() == null) {
-        batchIngestionConfig.setSegmentIngestionType(validationConfig.getSegmentPushType());
+        batchIngestionConfig.setSegmentIngestionType(segmentPushType);
       }
 
       if (batchIngestionConfig.getSegmentIngestionFrequency() == null) {
-        batchIngestionConfig.setSegmentIngestionFrequency(validationConfig.getSegmentPushFrequency());
+        batchIngestionConfig.setSegmentIngestionFrequency(segmentPushFrequency);
       }
     }
 
     StreamIngestionConfig streamIngestionConfig =
         (ingestionConfig != null) ? ingestionConfig.getStreamIngestionConfig() : null;
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+
     if (streamIngestionConfig == null) {
-      streamIngestionConfig =
-          new StreamIngestionConfig(Collections.singletonList(tableConfig.getIndexingConfig().getStreamConfigs()));
+      Map<String, String> streamConfigs = indexingConfig.getStreamConfigs();
+
+      // Only set the new config if the deprecated one is set.
+      if (streamConfigs != null && !streamConfigs.isEmpty()) {
+        streamIngestionConfig = new StreamIngestionConfig(Collections.singletonList(streamConfigs));
+      }
     }
 
     if (ingestionConfig == null) {
-      ingestionConfig = new IngestionConfig(batchIngestionConfig, streamIngestionConfig, null, null, null);
+      if (batchIngestionConfig != null || streamIngestionConfig != null) {
+        ingestionConfig = new IngestionConfig(batchIngestionConfig, streamIngestionConfig, null, null, null);
+      }
     } else {
-      ingestionConfig.setBatchIngestionConfig(batchIngestionConfig);
-      ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
+      if (batchIngestionConfig != null) {
+        ingestionConfig.setBatchIngestionConfig(batchIngestionConfig);
+      }
+
+      if (streamIngestionConfig != null) {
+        ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
+      }
     }
 
-    tableConfig.setIngestionConfig(ingestionConfig);
+    // Set the new config fields.
+    if (ingestionConfig != null) {
+      tableConfig.setIngestionConfig(ingestionConfig);
+    }
+
+    // Clear the deprecated ones.
+    indexingConfig.setStreamConfigs(null);
+    validationConfig.setSegmentPushFrequency(null);
+    validationConfig.setSegmentPushType(null);
   }
 }
