@@ -21,7 +21,6 @@ package org.apache.pinot.controller.helix.core.realtime.segment;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Comparator;
 import java.util.List;
-import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
