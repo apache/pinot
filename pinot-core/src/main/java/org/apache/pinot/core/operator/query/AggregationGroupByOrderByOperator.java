@@ -103,6 +103,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
+    //call AggregationGroupByNoOrderByOperator.getNextBlock();
     // Perform aggregation group-by on all the blocks
     GroupByExecutor groupByExecutor;
     if (_useStarTree) {
