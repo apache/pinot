@@ -96,17 +96,13 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
   public AggregationGroupByOrderByOperator run() {
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     if (_transformPlanNode != null) {
-
-      if (checkOrderByOptimization()) {
-
-      }
       // Do not use star-tree
-      return new AggregationGroupByOrderByOperator(_aggregationFunctions, _groupByExpressions,
+      return new AggregationGroupByOrderByOperator(_indexSegment, _aggregationFunctions, _groupByExpressions,
           _maxInitialResultHolderCapacity, _numGroupsLimit, _minSegmentTrimSize, _transformPlanNode.run(), numTotalDocs,
           _queryContext, false);
     } else {
       // Use star-tree
-      return new AggregationGroupByOrderByOperator(_aggregationFunctions, _groupByExpressions,
+      return new AggregationGroupByOrderByOperator(_indexSegment, _aggregationFunctions, _groupByExpressions,
           _maxInitialResultHolderCapacity, _numGroupsLimit, _minSegmentTrimSize, _starTreeTransformPlanNode.run(),
           numTotalDocs, _queryContext, true);
     }

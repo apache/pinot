@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.query;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -31,9 +30,8 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.RowBasedBlockValueFetcher;
-import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.operator.ProjectionOperator;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -48,62 +46,50 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-public class AggregationGroupByNoOrderByOperator extends BaseOperator<IntermediateResultsBlock> {
-  private static final String OPERATOR_NAME = "AggregationGroupByNoOrderByOperator";
-
+public class AggregationGroupByOptUtil {
   private final IndexSegment _indexSegment;
-  private final List<ExpressionContext> _expressions;
-  private final List<ExpressionContext> _groupByExpressions;
   private final TransformOperator _transformOperator;
-  private final List<OrderByExpressionContext> _orderByExpressions;
-  private final int _numOrderByExpressions;
-  private final int _numGroupByExpressions;
-  private final TransformResultMetadata[] _orderByExpressionMetadata;
   private final AggregationFunction[] _aggregationFunctions;
-  // TODO: Optimize this limit
-  private final int ROW_LIMIT = 5000;
+  private final ExpressionContext[] _groupByExpressions;
+  private final List<OrderByExpressionContext> _orderByExpressions;
+  private final TransformResultMetadata[] _orderByExpressionMetadata;
+  private final int _limit;
+  private final int _numOrderByExpressions;
   private final PriorityQueue<Object[]> _rows;
-  //TODO: or use gorupKey generator
-  private final HashMap<Object[], List<Integer>> _groupByKeyMap;
-  private FieldSpec.DataType[] _storedTypes;
+  private final HashMap<Key, List<Integer>> _groupByKeyMap;
 
-  public AggregationGroupByNoOrderByOperator(IndexSegment indexSegment, QueryContext queryContext,
-      List<ExpressionContext> expressions, TransformOperator transformOperator,
-      List<OrderByExpressionContext> orderByExpressions) {
+  public AggregationGroupByOptUtil(IndexSegment indexSegment, QueryContext queryContext,
+      AggregationFunction[] aggregationFunctions, ExpressionContext[] groupByExpressions,
+      TransformOperator transformOperator, List<OrderByExpressionContext> orderByExpressions) {
     _indexSegment = indexSegment;
-    _expressions = expressions;
     _transformOperator = transformOperator;
+    _groupByExpressions = groupByExpressions;
+    _aggregationFunctions = aggregationFunctions;
+    // TODO: can we use shallow copy here?
+    _orderByExpressions = new ArrayList<>(orderByExpressions);
 
-    _groupByExpressions = queryContext.getGroupByExpressions();
-    assert _groupByExpressions != null;
-    _numGroupByExpressions = _groupByExpressions.size();
-    _aggregationFunctions = queryContext.getAggregationFunctions();
-    //TODO: assert orderBy is not null on the caller side
-    _orderByExpressions = orderByExpressions;
-    _numOrderByExpressions = _orderByExpressions.size();
-    _orderByExpressionMetadata = new TransformResultMetadata[_numOrderByExpressions];
-    for (int i = 0; i < _numOrderByExpressions; i++) {
+    Set<ExpressionContext> orderByExpressionsSet = new HashSet<>();
+    int numOrderByExpressions = _orderByExpressions.size();
+    int numGroupByExpressions = _groupByExpressions.length;
+    // pre-allocate space for groupBy keys as well
+    _orderByExpressionMetadata = new TransformResultMetadata[numGroupByExpressions];
+    for (int i = 0; i < numOrderByExpressions; i++) {
       ExpressionContext expression = _orderByExpressions.get(i).getExpression();
       _orderByExpressionMetadata[i] = _transformOperator.getResultMetadata(expression);
+      orderByExpressionsSet.add(expression);
     }
+    for (ExpressionContext expression : _groupByExpressions) {
+      if (!orderByExpressionsSet.contains(expression)) {
+        OrderByExpressionContext orderByExpressionContext = new OrderByExpressionContext(expression, true);
+        _orderByExpressions.add(orderByExpressionContext);
+        _orderByExpressionMetadata[numOrderByExpressions++] = _transformOperator.getResultMetadata(expression);
+      }
+    }
+    _numOrderByExpressions = numOrderByExpressions;
+    _limit = queryContext.getLimit();
 
-    _rows = new PriorityQueue<>(ROW_LIMIT, getComparator());
-    // TODO: Instead of object to int map, use primitive type map
+    _rows = new PriorityQueue<>(_limit, getComparator());
     _groupByKeyMap = new HashMap<>();
-  }
-
-  private void createKeyMap() {
-//    for (int i = 0; i < _numGroupByExpressions; i++) {
-//      ExpressionContext groupByExpression = _groupByExpressions.get(i);
-//      TransformResultMetadata transformResultMetadata = _transformOperator.getResultMetadata(groupByExpression);
-//      _storedTypes[i] = transformResultMetadata.getDataType().getStoredType();
-//      if (transformResultMetadata.hasDictionary()) {
-//        _dictionaries[i] = transformOperator.getDictionary(groupByExpression);
-//      } else {
-//        _onTheFlyDictionaries[i] = ValueToIdMapFactory.get(_storedTypes[i]);
-//      }
-//      _isSingleValueExpressions[i] = transformResultMetadata.isSingleValue();
-//    }
   }
 
   private Comparator<Object[]> getComparator() {
@@ -166,38 +152,33 @@ public class AggregationGroupByNoOrderByOperator extends BaseOperator<Intermedia
     };
   }
 
-  @Override
-  protected IntermediateResultsBlock getNextBlock() {
+  protected TransformOperator constructTransformOperator() {
     //Do it in two passes
     // Fetch the order-by expressions and docIds and insert them into the priority queue
-    // // Schema: orderBy expressions | groupBy expressions | docID
-    BlockValSet[] blockValSets = new BlockValSet[_numOrderByExpressions + _numGroupByExpressions + 1];
+    BlockValSet[] blockValSets = new BlockValSet[_numOrderByExpressions];
+    BlockValSet[] docIdValSets = new BlockValSet[1];
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
       for (int i = 0; i < _numOrderByExpressions; i++) {
         ExpressionContext expression = _orderByExpressions.get(i).getExpression();
         blockValSets[i] = transformBlock.getBlockValueSet(expression);
       }
-      for (int i = 0; i < _numGroupByExpressions; i++) {
-        ExpressionContext expression = _groupByExpressions.get(i);
-        blockValSets[_numOrderByExpressions + i] = transformBlock.getBlockValueSet(expression);
-      }
-      blockValSets[_numOrderByExpressions + _numGroupByExpressions] =
-          transformBlock.getBlockValueSet(CommonConstants.Segment.BuiltInVirtualColumn.DOCID);
+      docIdValSets[0] = transformBlock.getBlockValueSet(CommonConstants.Segment.BuiltInVirtualColumn.DOCID);
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
+      RowBasedBlockValueFetcher docIdValueFetcher = new RowBasedBlockValueFetcher(docIdValSets);
       int numDocsFetched = transformBlock.getNumDocs();
       for (int i = 0; i < numDocsFetched; i++) {
-        // TODO: Decide if we pre-allocate everything or do it separately
-        Object[] row = new Object[_numOrderByExpressions + _numGroupByExpressions + 1];
+        Object[] row = new Object[_numOrderByExpressions];
+        Object[] docId = new Object[1];
         blockValueFetcher.getRow(i, row, 0);
-        AddToPriorityQueue(row);
+        docIdValueFetcher.getRow(i, docId, 0);
+        AddToPriorityQueue(row, docId);
       }
     }
 
     int numRows = _rows.size();
-    List<Object[]> rowList = new ArrayList<>(numRows);
     MutableRoaringBitmap docIds = new MutableRoaringBitmap();
-    for (Map.Entry<Object[], List<Integer>> entry : _groupByKeyMap.entrySet()) {
+    for (Map.Entry<Key, List<Integer>> entry : _groupByKeyMap.entrySet()) {
       List<Integer> filteredDocIds = entry.getValue();
       for (Integer docId : filteredDocIds) {
         docIds.add(docId);
@@ -206,7 +187,7 @@ public class AggregationGroupByNoOrderByOperator extends BaseOperator<Intermedia
 
     // Make a new transform operator
     Set<ExpressionContext> expressionsToTransform =
-        AggregationFunctionUtils.collectExpressionsToTransform(_aggregationFunctions, _groupByExpressions.toArray(new ExpressionContext[0]));
+        AggregationFunctionUtils.collectExpressionsToTransform(_aggregationFunctions, _groupByExpressions);
     Set<String> columns = new HashSet<>();
     for (ExpressionContext expression : expressionsToTransform) {
       expression.getColumns(columns);
@@ -218,42 +199,41 @@ public class AggregationGroupByNoOrderByOperator extends BaseOperator<Intermedia
     // TODO: Create own BitmapDocIdSetOperator
     ProjectionOperator projectionOperator =
         new ProjectionOperator(dataSourceMap, new SelectionOrderByOperator.BitmapDocIdSetOperator(docIds, numRows));
-    TransformOperator transformOperator = new TransformOperator(projectionOperator, expressionsToTransform);
 
-    // TODO: handle star tree
-    AggregationGroupByOrderByOperator operator = new AggregationGroupByOrderByOperator(_aggregationFunctions, _groupByExpressions,
-       _maxInitialResultHolderCapacity, _numGroupsLimit, _minSegmentTrimSize, transformOperator, numTotalDocs,
-       _queryContext, false);
-
-    return operator.getNextBlock();
+    return new TransformOperator(projectionOperator, expressionsToTransform);
   }
 
-  private void AddToPriorityQueue(Object[] row) {
-    // PQ: row: orderBy experssion | groupBy expression | docID
-
-    // groupBy column: 000 001 000
-    if (_rows.size() < ROW_LIMIT) {
-      Object[] groupByKeys =
-          Arrays.copyOfRange(row, _numOrderByExpressions, _numOrderByExpressions + _numGroupByExpressions);
-      int docID = (int) row[_numOrderByExpressions + _numGroupByExpressions];
-      if (AddToMap(groupByKeys, docID)) {
+  private void AddToPriorityQueue(Object[] row, Object[] docIds) {
+    if (_rows.size() < _limit) {
+      Key groupByKeys = new Key(row);
+      int docId = (int) docIds[0];
+      if (AddToMap(groupByKeys, docId)) {
         _rows.add(row);
       }
-    } else if (_rows.comparator().compare(_rows.peek(), row) <= 0) {
-      Object[] groupByKeys =
-          Arrays.copyOfRange(row, _numOrderByExpressions, _numOrderByExpressions + _numGroupByExpressions);
-      int docID = (int) row[_numOrderByExpressions + _numGroupByExpressions];
-      if (AddToMap(groupByKeys, docID)) {
-        Object[] removedRow = _rows.poll();
-        Object[] removedGroupByKey =
-            Arrays.copyOfRange(removedRow, _numOrderByExpressions, _numOrderByExpressions + _numGroupByExpressions);
-        _groupByKeyMap.remove(removedGroupByKey);
-        _rows.offer(row);
+    } else {
+      int compareResult = _rows.comparator().compare(_rows.peek(), row);
+      if (compareResult < 0) {
+        Key groupByKeys = new Key(row);
+        int docId = (int) docIds[0];
+        if (AddToMap(groupByKeys, docId)) {
+          Object[] removedRow = _rows.poll();
+          Key removedGroupByKey = new Key(removedRow);
+          _groupByKeyMap.remove(removedGroupByKey);
+          _rows.offer(row);
+        }
+      } else if (compareResult == 0) {
+        Key groupByKeys = new Key(row);
+        int docId = (int) docIds[0];
+        List<Integer> docList = _groupByKeyMap.get(groupByKeys);
+        if (docList != null) {
+          docList.add(docId);
+          _groupByKeyMap.put(groupByKeys, docList);
+        }
       }
     }
   }
 
-  private boolean AddToMap(Object[] groupByKeys, int docID) {
+  private boolean AddToMap(Key groupByKeys, int docID) {
     // TODO: Use bitmap instead
     List<Integer> docList = _groupByKeyMap.get(groupByKeys);
     if (docList == null) {
@@ -264,10 +244,5 @@ public class AggregationGroupByNoOrderByOperator extends BaseOperator<Intermedia
       _groupByKeyMap.put(groupByKeys, docList);
       return false;
     }
-  }
-
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
   }
 }
