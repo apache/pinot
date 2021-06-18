@@ -65,6 +65,10 @@ public class CompatibilityOpsRunner {
     if (args.length != 2) {
       throw new IllegalArgumentException("Need exactly one file name and one generation_number as arguments");
     }
+    String port;
+    ClusterDescriptor.setControllerPort(System.getProperty("ControllerPort"));
+    ClusterDescriptor.setBrokerQueryPort(System.getProperty("BrokerQueryPort"));
+    ClusterDescriptor.setServerAdminPort(System.getProperty("ServerAdminPort"));
 
     CompatibilityOpsRunner runner = new CompatibilityOpsRunner(args[0], Integer.valueOf(args[1]));
     int exitStatus = 1;

@@ -123,7 +123,7 @@ public class QueryOp extends BaseOp {
         JsonNode actualJson = null;
         if (expectedJson != null) {
           try {
-            actualJson = ClusterTest.postSqlQuery(query, ClusterDescriptor.BROKER_URL);
+            actualJson = ClusterTest.postSqlQuery(query, ClusterDescriptor.getBrokerUrl());
           } catch (Exception e) {
             LOGGER.error("Comparison FAILED: Line: {} Exception caught while running query: '{}'", queryLineNum, query,
                 e);

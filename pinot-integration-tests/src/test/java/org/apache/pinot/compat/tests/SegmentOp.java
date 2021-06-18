@@ -220,7 +220,7 @@ public class SegmentOp extends BaseOp {
    */
   private void uploadSegment(File segmentTarFile)
       throws Exception {
-    URI controllerURI = FileUploadDownloadClient.getUploadSegmentURI(new URI(ClusterDescriptor.CONTROLLER_URL));
+    URI controllerURI = FileUploadDownloadClient.getUploadSegmentURI(new URI(ClusterDescriptor.getControllerUrl()));
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       fileUploadDownloadClient.uploadSegment(controllerURI, segmentTarFile.getName(), segmentTarFile, _tableName);
     }
@@ -260,7 +260,7 @@ public class SegmentOp extends BaseOp {
   private boolean verifyRoutingTableUpdated()
       throws Exception {
     String query = "SELECT count(*) FROM " + _tableName;
-    JsonNode result = ClusterTest.postSqlQuery(query, ClusterDescriptor.BROKER_URL);
+    JsonNode result = ClusterTest.postSqlQuery(query, ClusterDescriptor.getBrokerUrl());
     long startTime = System.currentTimeMillis();
     while (SqlResultComparator.isEmpty(result)) {
       if ((System.currentTimeMillis() - startTime) > DEFAULT_MAX_SLEEP_TIME_MS) {
@@ -271,7 +271,7 @@ public class SegmentOp extends BaseOp {
       }
       LOGGER.warn("Routing table has not been updated yet, will retry after {} ms.", DEFAULT_SLEEP_INTERVAL_MS);
       Thread.sleep(DEFAULT_SLEEP_INTERVAL_MS);
-      result = ClusterTest.postSqlQuery(query, ClusterDescriptor.BROKER_URL);
+      result = ClusterTest.postSqlQuery(query, ClusterDescriptor.getBrokerUrl());
     }
     LOGGER.info("Routing table has been updated.");
     return true;
@@ -290,7 +290,7 @@ public class SegmentOp extends BaseOp {
         _segmentName = _tableName + "_" + _generationNumber;
       }
 
-      ControllerTest.sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL)
+      ControllerTest.sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getControllerUrl())
           .forSegmentDelete(_tableName, _segmentName));
       return verifySegmentDeleted();
     } catch (Exception e) {
@@ -330,7 +330,7 @@ public class SegmentOp extends BaseOp {
   private TableViews.TableView getExternalViewForTable()
       throws IOException {
     return JsonUtils.stringToObject(ControllerTest.sendGetRequest(
-        ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forTableExternalView(_tableName)),
+        ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getControllerUrl()).forTableExternalView(_tableName)),
         TableViews.TableView.class);
   }
 
