@@ -320,7 +320,20 @@ public class HelixBrokerStarter implements ServiceStartable {
             new BrokerUserDefinedMessageHandlerFactory(_routingManager, queryQuotaManager));
     _participantHelixManager.connect();
 
-    updateInstanceConfigIfNeeded();
+    HelixHelper.updateInstanceConfigIfNeeded(
+      _participantHelixManager,
+      _brokerId,
+      _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_HOSTNAME),
+      String.valueOf(_listenerConfigs.get(0).getPort()),
+      () -> {
+        ImmutableList.Builder<String> defaultTags = ImmutableList.builder();
+        if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
+          defaultTags.add(TagNameUtils.getBrokerTagForTenant(null));
+        } else {
+          defaultTags.add(Helix.UNTAGGED_BROKER_INSTANCE);
+        }
+        return defaultTags.build();
+      });
 
     _brokerMetrics
         .addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME, () -> _participantHelixManager.isConnected() ? 1L : 0L);
@@ -359,23 +372,6 @@ public class HelixBrokerStarter implements ServiceStartable {
                 _clusterName, _brokerId, resourcesToMonitor, minResourcePercentForStartup),
             new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_participantHelixManager,
                 _clusterName, _brokerId, resourcesToMonitor, minResourcePercentForStartup))));
-  }
-
-  private void updateInstanceConfigIfNeeded() {
-    HelixHelper.updateInstanceConfigIfNeeded(
-      _participantHelixManager,
-      _brokerId,
-      _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_HOSTNAME),
-      String.valueOf(_listenerConfigs.get(0).getPort()),
-      () -> {
-        ImmutableList.Builder<String> defaultTags = ImmutableList.builder();
-        if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
-          defaultTags.add(TagNameUtils.getBrokerTagForTenant(null));
-        } else {
-          defaultTags.add(Helix.UNTAGGED_BROKER_INSTANCE);
-        }
-        return defaultTags.build();
-    });
   }
 
   @Override
