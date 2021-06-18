@@ -139,12 +139,13 @@ public class HelixBrokerStarter implements ServiceStartable {
     if (brokerHost == null) {
       brokerHost = _brokerConf.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils
           .getHostnameOrAddress() : NetUtils.getHostAddress();
+      brokerConf.setProperty(Broker.CONFIG_OF_BROKER_HOSTNAME, brokerHost);
     }
 
     _brokerId = _brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY,
       Helix.PREFIX_OF_BROKER_INSTANCE + brokerHost + "_" + _listenerConfigs.get(0).getPort());
 
-    _brokerConf.addProperty(Broker.CONFIG_OF_BROKER_ID, _brokerId);
+    _brokerConf.setProperty(Broker.CONFIG_OF_BROKER_ID, _brokerId);
   }
 
   private void setupHelixSystemProperties() {
@@ -361,14 +362,20 @@ public class HelixBrokerStarter implements ServiceStartable {
   }
 
   private void updateInstanceConfigIfNeeded() {
-    HelixHelper.updateInstanceConfigIfNeeded(_participantHelixManager, _clusterName, _brokerId, _brokerConf.getProperty(Broker.BROKER_NETTY_HOST), _brokerConf.getProperty(Broker.BROKER_NETTY_PORT), () -> {
-      ImmutableList.Builder<String> defaultTags = ImmutableList.builder();
-      if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
-        defaultTags.add(TagNameUtils.getBrokerTagForTenant(null));
-      } else {
-        defaultTags.add(Helix.UNTAGGED_BROKER_INSTANCE);
-      }
-      return defaultTags.build();
+    HelixHelper.updateInstanceConfigIfNeeded(
+      _participantHelixManager,
+      _clusterName,
+      _brokerId,
+      _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_HOSTNAME),
+      String.valueOf(_listenerConfigs.get(0).getPort()),
+      () -> {
+        ImmutableList.Builder<String> defaultTags = ImmutableList.builder();
+        if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
+          defaultTags.add(TagNameUtils.getBrokerTagForTenant(null));
+        } else {
+          defaultTags.add(Helix.UNTAGGED_BROKER_INSTANCE);
+        }
+        return defaultTags.build();
     });
   }
 

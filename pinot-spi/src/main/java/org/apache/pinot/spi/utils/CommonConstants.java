@@ -199,8 +199,6 @@ public class CommonConstants {
 
     public static final String BROKER_TLS_PREFIX = "pinot.broker.tls";
     public static final String BROKER_NETTYTLS_ENABLED = "pinot.broker.nettytls.enabled";
-    public static final String BROKER_NETTY_PORT = "pinot.broker.netty.port";
-    public static final String BROKER_NETTY_HOST = "pinot.broker.netty.host";
 
     public static class Request {
       public static final String PQL = "pql";

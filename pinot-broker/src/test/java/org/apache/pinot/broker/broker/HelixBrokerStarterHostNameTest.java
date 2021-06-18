@@ -51,9 +51,8 @@ public class HelixBrokerStarterHostNameTest extends ControllerTest {
     try {
 
       Map<String, Object> properties = new HashMap<>();
-      properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, 18099);
-      properties.put(CommonConstants.Broker.BROKER_NETTY_HOST, "strange.name.com");
-      properties.put(CommonConstants.Broker.BROKER_NETTY_PORT, 28099);
+      properties.put(CommonConstants.Broker.CONFIG_OF_BROKER_HOSTNAME, "strange.name.com");
+      properties.put(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, 28099);
       PinotConfiguration config = new PinotConfiguration(properties);
       _brokerStarter =
         new HelixBrokerStarter(config, getHelixClusterName(), getZkUrl());
@@ -75,9 +74,8 @@ public class HelixBrokerStarterHostNameTest extends ControllerTest {
     try {
       Map<String, Object> properties = new HashMap<>();
       properties.put(Helix.Instance.INSTANCE_ID_KEY, "Broker_strange.name.com_28099");
-      properties.put(CommonConstants.Broker.BROKER_NETTY_HOST, "strange.name.com");
-      properties.put(CommonConstants.Broker.BROKER_NETTY_PORT, 28099);
-      properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, 18099);
+      properties.put(CommonConstants.Broker.CONFIG_OF_BROKER_HOSTNAME, "strange.name.com");
+      properties.put(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, 28099);
       PinotConfiguration config = new PinotConfiguration(properties);
       _brokerStarter =
         new HelixBrokerStarter(config, getHelixClusterName(), getZkUrl());
@@ -98,9 +96,7 @@ public class HelixBrokerStarterHostNameTest extends ControllerTest {
     HelixBrokerStarter _brokerStarter = null;
     try {
       Map<String, Object> properties = new HashMap<>();
-      properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, 18099);
-      properties.put(CommonConstants.Broker.BROKER_NETTY_HOST, "");
-      properties.put(CommonConstants.Broker.BROKER_NETTY_PORT, 28099);
+      properties.put(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, 28099);
       PinotConfiguration config = new PinotConfiguration(properties);
       _brokerStarter =
         new HelixBrokerStarter(config, getHelixClusterName(), getZkUrl());
@@ -120,9 +116,8 @@ public class HelixBrokerStarterHostNameTest extends ControllerTest {
     HelixBrokerStarter _brokerStarter = null;
     try {
       Map<String, Object> properties = new HashMap<>();
-      properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, 18099);
-      properties.put(CommonConstants.Broker.BROKER_NETTY_HOST, "strange.name.com");
-      properties.put(CommonConstants.Broker.BROKER_NETTY_PORT, "not-a-port");
+      properties.put(CommonConstants.Broker.CONFIG_OF_BROKER_HOSTNAME, "strange.name.com");
+      properties.put(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, "not-a-port");
       PinotConfiguration config = new PinotConfiguration(properties);
       _brokerStarter =
         new HelixBrokerStarter(config, getHelixClusterName(), getZkUrl());
