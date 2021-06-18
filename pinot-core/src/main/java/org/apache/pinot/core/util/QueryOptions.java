@@ -43,9 +43,8 @@ public class QueryOptions {
       _responseFormatSQL = Request.SQL.equalsIgnoreCase(queryOptions.get(Request.QueryOptionKey.RESPONSE_FORMAT));
       _preserveType = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.PRESERVE_TYPE));
       _skipUpsert = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.SKIP_UPSERT));
-      _enableSegmentTrim = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.ENABLE_SEGMENT_TRIM));
-      String minSegmentTrimSize = queryOptions.get(Request.QueryOptionKey.MIN_SEGMENT_TRIM_SIZE);
-      _minSegmentTrimSize = minSegmentTrimSize != null ? Integer.parseInt(minSegmentTrimSize) : -1;
+      _enableSegmentTrim = isEnableSegmentTrim(queryOptions);
+      _minSegmentTrimSize = getMinSegmentTrimSize(queryOptions);
     } else {
       _timeoutMs = null;
       _groupByModeSQL = false;
@@ -101,11 +100,7 @@ public class QueryOptions {
   }
 
   public static boolean isEnableSegmentTrim(Map<String, String> queryOptions) {
-    String enableSegmentTrimString = queryOptions.get(Request.QueryOptionKey.ENABLE_SEGMENT_TRIM);
-    if (enableSegmentTrimString != null) {
-      return Boolean.parseBoolean(enableSegmentTrimString);
-    }
-    return false;
+    return Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.ENABLE_SEGMENT_TRIM));
   }
 
   public static int getMinSegmentTrimSize(Map<String, String> queryOptions) {
@@ -115,5 +110,4 @@ public class QueryOptions {
     }
     return -1;
   }
-
 }

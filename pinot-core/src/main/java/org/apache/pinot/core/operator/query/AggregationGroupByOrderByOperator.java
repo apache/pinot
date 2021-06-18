@@ -120,13 +120,13 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
       groupByExecutor.process(transformBlock);
     }
 
-    int minTrimSize = calculateMinSegmentTrimSize();
+    int minSegmentTrimSize = calculateMinSegmentTrimSize();
     // There is no OrderBy or minSegmentTrimSize is set to be negative or 0
-    if (_queryContext.getOrderByExpressions() == null || minTrimSize <= 0) {
+    if (_queryContext.getOrderByExpressions() == null || minSegmentTrimSize <= 0) {
       // Build intermediate result block based on aggregation group-by result from the executor
       return new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
     }
-    int trimSize = getTableCapacity(_queryContext.getLimit(), minTrimSize);
+    int trimSize = getTableCapacity(_queryContext.getLimit(), minSegmentTrimSize);
     // Num of groups hasn't reached the threshold
     if (groupByExecutor.getNumGroups() <= trimSize) {
       return new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
