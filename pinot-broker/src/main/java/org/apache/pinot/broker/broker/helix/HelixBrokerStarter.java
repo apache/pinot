@@ -364,7 +364,6 @@ public class HelixBrokerStarter implements ServiceStartable {
   private void updateInstanceConfigIfNeeded() {
     HelixHelper.updateInstanceConfigIfNeeded(
       _participantHelixManager,
-      _clusterName,
       _brokerId,
       _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_HOSTNAME),
       String.valueOf(_listenerConfigs.get(0).getPort()),

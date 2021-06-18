@@ -21,13 +21,13 @@ package org.apache.pinot.common.utils.helix;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import com.google.common.base.Supplier;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.I0Itec.zkclient.exception.ZkBadVersionException;
@@ -506,14 +506,14 @@ public class HelixHelper {
    * There is a callback lambda that can provide the tags if needed.
    * For example () -> ImmutableList.of("Default_tenant")
    * @param helixManager The Participant Manager
-   * @param clusterName The Helix cluster Name
    * @param instanceId the Helix instance id
    * @param hostName the Hostname to update
    * @param hostPort the host port to update
    * @param getDefaultTags Something like () -> ImmutableList.of("Default_tenant") to provide default tags
    */
-  public static void updateInstanceConfigIfNeeded(HelixManager helixManager, String clusterName, String instanceId, String hostName, String hostPort, Supplier<List<String>> getDefaultTags) {
+  public static void updateInstanceConfigIfNeeded(HelixManager helixManager, String instanceId, String hostName, String hostPort, Supplier<List<String>> getDefaultTags) {
     HelixAdmin admin = helixManager.getClusterManagmentTool();
+    String clusterName = helixManager.getClusterName();
     InstanceConfig instanceConfig = admin.getInstanceConfig(clusterName, instanceId);
     boolean needToUpdateInstanceConfig = false;
 

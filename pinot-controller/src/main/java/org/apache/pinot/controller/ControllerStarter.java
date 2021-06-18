@@ -547,7 +547,7 @@ public class ControllerStarter implements ServiceStartable {
       throw new RuntimeException(errorMsg);
     }
 
-    HelixHelper.updateInstanceConfigIfNeeded(_helixParticipantManager, _helixClusterName, _helixParticipantInstanceId,
+    HelixHelper.updateInstanceConfigIfNeeded(_helixParticipantManager, _helixParticipantInstanceId,
       _config.getControllerHost(), _config.getControllerPort(), null);
 
     LOGGER.info("Registering helix controller listener");

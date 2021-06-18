@@ -264,15 +264,20 @@ public class HelixServerStarter implements ServiceStartable {
   }
 
   private void updateInstanceConfigIfNeeded(String host, int port) {
-    HelixHelper.updateInstanceConfigIfNeeded(_helixManager, _helixClusterName, _instanceId, host, String.valueOf(port), () -> {
-      ImmutableList.Builder<String> defaultTags = ImmutableList.builder();
-      if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_helixManager.getHelixPropertyStore())) {
-        defaultTags.add(TagNameUtils.getOfflineTagForTenant(null));
-        defaultTags.add(TagNameUtils.getRealtimeTagForTenant(null));
-      } else {
-        defaultTags.add(Helix.UNTAGGED_SERVER_INSTANCE);
-      }
-      return defaultTags.build();
+    HelixHelper.updateInstanceConfigIfNeeded(
+      _helixManager,
+      _instanceId,
+      host,
+      String.valueOf(port),
+      () -> {
+        ImmutableList.Builder<String> defaultTags = ImmutableList.builder();
+        if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_helixManager.getHelixPropertyStore())) {
+          defaultTags.add(TagNameUtils.getOfflineTagForTenant(null));
+          defaultTags.add(TagNameUtils.getRealtimeTagForTenant(null));
+        } else {
+          defaultTags.add(Helix.UNTAGGED_SERVER_INSTANCE);
+        }
+        return defaultTags.build();
     });
   }
 

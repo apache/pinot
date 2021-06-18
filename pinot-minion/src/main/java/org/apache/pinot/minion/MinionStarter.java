@@ -228,7 +228,6 @@ public class MinionStarter implements ServiceStartable {
     _helixManager.connect();
     HelixHelper.updateInstanceConfigIfNeeded(
       _helixManager,
-      _helixManager.getClusterName(),
       _instanceId,
       _config.getProperty(CommonConstants.Helix.KEY_OF_MINION_HOST),
       _config.getProperty(CommonConstants.Helix.KEY_OF_MINION_PORT),
