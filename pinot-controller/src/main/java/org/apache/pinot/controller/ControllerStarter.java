@@ -19,6 +19,7 @@
 package org.apache.pinot.controller;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import com.google.common.primitives.Longs;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
@@ -55,6 +56,7 @@ import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -157,7 +159,11 @@ public class ControllerStarter implements ServiceStartable {
     int port = _listenerConfigs.get(0).getPort();
 
     _helixControllerInstanceId = host + "_" + port;
-    _helixParticipantInstanceId = LeadControllerUtils.generateParticipantInstanceId(host, port);
+    if (!Strings.isNullOrEmpty(_config.getHelixInstanceId())){
+      _helixParticipantInstanceId = _config.getHelixInstanceId();
+    } else {
+      _helixParticipantInstanceId = LeadControllerUtils.generateParticipantInstanceId(host, port);
+    }
     _isUpdateStateModel = _config.isUpdateSegmentStateModel();
     _enableBatchMessageMode = _config.getEnableBatchMessageMode();
 
@@ -339,7 +345,6 @@ public class ControllerStarter implements ServiceStartable {
     LOGGER.info("Initializing Helix participant manager");
     _helixParticipantManager = HelixManagerFactory
         .getZKHelixManager(_helixClusterName, _helixParticipantInstanceId, InstanceType.PARTICIPANT, _helixZkURL);
-
     // LeadControllerManager needs to be initialized before registering as Helix participant.
     LOGGER.info("Initializing lead controller manager");
     _leadControllerManager = new LeadControllerManager(_helixParticipantManager, _controllerMetrics);
@@ -541,6 +546,9 @@ public class ControllerStarter implements ServiceStartable {
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg);
     }
+
+    HelixHelper.updateInstanceConfigIfNeeded(_helixParticipantManager, _helixClusterName, _helixParticipantInstanceId,
+      _config.getControllerHost(), _config.getControllerPort(), null);
 
     LOGGER.info("Registering helix controller listener");
     // This registration is not needed when the leadControllerResource is enabled.

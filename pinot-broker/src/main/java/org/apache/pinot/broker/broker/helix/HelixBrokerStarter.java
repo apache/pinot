@@ -36,7 +36,6 @@ import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
-import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.Message;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -54,6 +53,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.TableCache;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.transport.TlsConfig;
@@ -142,9 +142,13 @@ public class HelixBrokerStarter implements ServiceStartable {
     }
 
     _brokerId = _brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY,
-        Helix.PREFIX_OF_BROKER_INSTANCE + brokerHost + "_" + _listenerConfigs.get(0).getPort());
+        brokerIdFromHostName(brokerHost, _listenerConfigs.get(0).getPort()));
 
     _brokerConf.addProperty(Broker.CONFIG_OF_BROKER_ID, _brokerId);
+  }
+
+  private static String brokerIdFromHostName(String brokerHost, int port) {
+    return Helix.PREFIX_OF_BROKER_INSTANCE + brokerHost + "_" + port;
   }
 
   private void setupHelixSystemProperties() {
@@ -318,7 +322,9 @@ public class HelixBrokerStarter implements ServiceStartable {
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(),
             new BrokerUserDefinedMessageHandlerFactory(_routingManager, queryQuotaManager));
     _participantHelixManager.connect();
-    addInstanceTagIfNeeded();
+
+    updateInstanceConfigIfNeeded();
+
     _brokerMetrics
         .addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME, () -> _participantHelixManager.isConnected() ? 1L : 0L);
     _participantHelixManager
@@ -358,17 +364,16 @@ public class HelixBrokerStarter implements ServiceStartable {
                 _clusterName, _brokerId, resourcesToMonitor, minResourcePercentForStartup))));
   }
 
-  private void addInstanceTagIfNeeded() {
-    InstanceConfig instanceConfig =
-        _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().instanceConfig(_brokerId));
-    List<String> instanceTags = instanceConfig.getTags();
-    if (instanceTags == null || instanceTags.isEmpty()) {
+  private void updateInstanceConfigIfNeeded() {
+    HelixHelper.updateInstanceConfigIfNeeded(_participantHelixManager, _clusterName, _brokerId, _brokerConf.getProperty(Broker.BROKER_NETTY_HOST), _brokerConf.getProperty(Broker.BROKER_NETTY_PORT), () -> {
+      ImmutableList.Builder<String> defaultTags = ImmutableList.builder();
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
-        _helixAdmin.addInstanceTag(_clusterName, _brokerId, TagNameUtils.getBrokerTagForTenant(null));
+        defaultTags.add(TagNameUtils.getBrokerTagForTenant(null));
       } else {
-        _helixAdmin.addInstanceTag(_clusterName, _brokerId, Helix.UNTAGGED_BROKER_INSTANCE);
+        defaultTags.add(Helix.UNTAGGED_BROKER_INSTANCE);
       }
-    }
+      return defaultTags.build();
+    });
   }
 
   @Override
