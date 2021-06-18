@@ -110,27 +110,4 @@ public class HelixBrokerStarterHostNameTest extends ControllerTest {
       }
     }
   }
-
-  @Test
-  public void testInvalidPortName() throws Exception {
-    HelixBrokerStarter _brokerStarter = null;
-    try {
-      Map<String, Object> properties = new HashMap<>();
-      properties.put(CommonConstants.Broker.CONFIG_OF_BROKER_HOSTNAME, "strange.name.com");
-      properties.put(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, "not-a-port");
-      PinotConfiguration config = new PinotConfiguration(properties);
-      _brokerStarter =
-        new HelixBrokerStarter(config, getHelixClusterName(), getZkUrl());
-      _brokerStarter.start();
-      InstanceConfig helixConfig = _helixAdmin.getInstanceConfig(getHelixClusterName(), config.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ID));
-      Assert.assertNotNull(helixConfig);
-      Assert.assertNotEquals("strange.name.com", helixConfig.getHostName());
-      Assert.assertNotEquals("not-a-port", helixConfig.getPort());
-    } finally {
-      if (_brokerStarter != null) {
-        _brokerStarter.stop();
-      }
-    }
-  }
-
 }
