@@ -156,6 +156,9 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
    */
   private int calculateMinSegmentTrimSize() {
     Map<String, String> options = _queryContext.getQueryOptions();
+    if (options == null) {
+      return _minSegmentTrimSize;
+    }
     boolean queryOptionEnableTrim = QueryOptions.getEnableSegmentTrim(options);
     int queryOptionTrimSize = QueryOptions.getSegmentTrimSize(options);
     if (queryOptionTrimSize > 0) {
