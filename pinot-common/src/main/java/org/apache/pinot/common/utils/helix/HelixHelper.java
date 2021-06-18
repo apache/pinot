@@ -20,6 +20,8 @@ package org.apache.pinot.common.utils.helix;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+import com.google.common.base.Supplier;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -498,24 +500,74 @@ public class HelixHelper {
   }
 
   /**
-   * Updates hostname and port into Helix Instance config
-   * @param helixManager the HelixManager for updating
-   * @param clusterName the cluster name
-   * @param instanceId the helix instanceId of the instance
-   * @param hostName the hostname to use
-   * @param hostPort the hostport to use
+   * Update host config in Helix if needed.
+   * The hostname and port cannot be null or empty;
+   * The port will be validated against integer.
+   * There is a callback lambda that can provide the tags if needed.
+   * For example () -> ImmutableList.of("Default_tenant")
+   * @param helixManager The Participant Manager
+   * @param clusterName The Helix cluster Name
+   * @param instanceId the Helix instance id
+   * @param hostName the Hostname to update
+   * @param hostPort the host port to update
+   * @param getDefaultTags Something like () -> ImmutableList.of("Default_tenant") to provide default tags
    */
-  public static void updateInstanceHostNamePort(HelixManager helixManager, String clusterName, String instanceId, String hostName, int hostPort) {
+  public static void updateInstanceConfigIfNeeded(HelixManager helixManager, String clusterName, String instanceId, String hostName, String hostPort, Supplier<List<String>> getDefaultTags) {
     HelixAdmin admin = helixManager.getClusterManagmentTool();
     InstanceConfig instanceConfig = admin.getInstanceConfig(clusterName, instanceId);
-    instanceConfig.setHostName(hostName);
-    instanceConfig.setPort(String.valueOf(hostPort));
+    boolean needToUpdateInstanceConfig = false;
+
+    // Add default instance tags if not exist
+    List<String> instanceTags = instanceConfig.getTags();
+    if (instanceTags == null || instanceTags.size() == 0) {
+      List<String> defaultTags = getDefaultTags == null ? null : getDefaultTags.get();
+      if (defaultTags != null && !defaultTags.isEmpty()) {
+        defaultTags.forEach(instanceConfig::addTag);
+        needToUpdateInstanceConfig = true;
+      }
+    }
+    if (updateHostNamePort(instanceConfig, hostName, hostPort)) {
+      needToUpdateInstanceConfig = true;
+    }
+
+    if (needToUpdateInstanceConfig) {
+      LOGGER.info("Updating instance config for instance: {} with instance tags: {}, host: {}, port: {}", instanceId,
+        instanceTags, hostName, hostPort);
+    } else {
+      LOGGER.info("Instance config for instance: {} has instance tags: {}, host: {}, port: {}, no need to update",
+        instanceId, instanceTags, hostName, hostPort);
+      return;
+    }
     // NOTE: Use HelixDataAccessor.setProperty() instead of HelixAdmin.setInstanceConfig() because the latter explicitly
     // forbids instance host/port modification
     HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
     Preconditions.checkState(
       helixDataAccessor.setProperty(helixDataAccessor.keyBuilder().instanceConfig(instanceId), instanceConfig),
       "Failed to update instance config");
+  }
 
+  private static boolean updateHostNamePort(InstanceConfig instanceConfig, String hostName, String hostPort) {
+    if (Strings.isNullOrEmpty(hostName) || Strings.isNullOrEmpty(hostPort)) {
+      LOGGER.info("host={} port={}, one of them is empty, skip updating helix host", hostName, hostPort);
+      return false;
+    }
+    try {
+      Integer.parseInt(hostPort);
+    } catch (NumberFormatException ex) {
+      LOGGER.error(
+        "Host port={} is not a number. Will skip updating helix hostname", hostPort, ex);
+      return false;
+    }
+    boolean updated = false;
+    if (!hostPort.equals(instanceConfig.getPort())) {
+      instanceConfig.setPort(hostPort);
+      updated = true;
+    }
+    // Update host and port if needed
+    if (!hostName.equals(instanceConfig.getHostName())) {
+      instanceConfig.setHostName(hostName);
+      updated = true;
+    }
+    return updated;
   }
 }

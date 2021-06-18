@@ -29,7 +29,6 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.controller.ControllerConf.CONTROLLER_HOST;
 import static org.apache.pinot.controller.ControllerConf.CONTROLLER_PORT;
 import static org.apache.pinot.controller.ControllerConf.HELIX_CLUSTER_NAME;
-import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONTROLLER_DYNAMIC_HELIX_HOST;
 
 public class ControllerStarterTest extends ControllerTest {
   private Map<String, Object> controllerConfigMap = new HashMap<>();
@@ -45,7 +44,6 @@ public class ControllerStarterTest extends ControllerTest {
     boolean controllerStarted = false;
     try {
       controllerConfigMap.clear();
-      controllerConfigMap.put(CONTROLLER_DYNAMIC_HELIX_HOST, true);
       controllerConfigMap.put(CONTROLLER_HOST, "strange_name.com");
       controllerConfigMap.put(CONTROLLER_PORT, 9527);
       startZk();
@@ -70,7 +68,6 @@ public class ControllerStarterTest extends ControllerTest {
     boolean controllerStarted = false;
     try {
       controllerConfigMap.clear();
-      controllerConfigMap.put(CONTROLLER_DYNAMIC_HELIX_HOST, false);
       controllerConfigMap.put(CONTROLLER_HOST, "strange_name.com");
       controllerConfigMap.put(CONTROLLER_PORT, 9527);
       startZk();
@@ -95,7 +92,6 @@ public class ControllerStarterTest extends ControllerTest {
     boolean controllerStarted = false;
     try {
       controllerConfigMap.clear();
-      controllerConfigMap.put(CONTROLLER_DYNAMIC_HELIX_HOST, true);
       controllerConfigMap.put(CONTROLLER_HOST, "");
       controllerConfigMap.put(CONTROLLER_PORT, 9527);
       startZk();
@@ -121,7 +117,6 @@ public class ControllerStarterTest extends ControllerTest {
     boolean numberFormatCaught = false;
     try {
       controllerConfigMap.clear();
-      controllerConfigMap.put(CONTROLLER_DYNAMIC_HELIX_HOST, true);
       controllerConfigMap.put(CONTROLLER_HOST, "strange_host.com");
       controllerConfigMap.put(CONTROLLER_PORT, "not-a-number");
       startZk();
@@ -143,26 +138,5 @@ public class ControllerStarterTest extends ControllerTest {
       stopZk();
     }
     Assert.assertTrue(numberFormatCaught || validated);
-  }
-
-  @Test
-  public void testIntegerPortBlockDirect() {
-    // since the testIntegerPortBlock() caused exception much earlier we test on function directly here.
-    controllerConfigMap.clear();
-    controllerConfigMap.put(CONTROLLER_DYNAMIC_HELIX_HOST, true);
-    controllerConfigMap.put(CONTROLLER_HOST, "strange_host.com");
-    controllerConfigMap.put(CONTROLLER_PORT, "not-a-number");
-    boolean numberFormatIssueDetected = false;
-    try {
-      ControllerStarter target = new ControllerStarter(new ControllerConf(controllerConfigMap));
-      target.updateHelixHost();
-      numberFormatIssueDetected = true;
-    } catch (NumberFormatException ex) {
-      numberFormatIssueDetected = true;
-    } catch (NullPointerException ex) {
-      numberFormatIssueDetected = false;
-      Assert.fail("We have not prevented updating wrong port number");
-    }
-    Assert.assertTrue(numberFormatIssueDetected);
   }
 }

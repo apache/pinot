@@ -35,7 +35,6 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONFIG_OF_CONTROLLER_METRICS_PREFIX;
-import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONTROLLER_DYNAMIC_HELIX_HOST;
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONTROLLER_HELIX_INSTANCE_ID;
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.DEFAULT_METRICS_PREFIX;
 
@@ -306,10 +305,6 @@ public class ControllerConf extends PinotConfiguration {
 
   public String getControllerPort() {
     return getProperty(CONTROLLER_PORT);
-  }
-
-  public boolean getEnableDynamicHelixHost() {
-    return getProperty(CONTROLLER_DYNAMIC_HELIX_HOST, false);
   }
 
   public String getHelixInstanceId() {

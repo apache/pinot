@@ -41,7 +41,7 @@ public class HelixHelperTest {
     Mockito.when(mockedAdmin.getInstanceConfig(clusterName, instanceId)).thenReturn(targetConfig);
     Mockito.when(mockedAccessor.keyBuilder()).thenReturn(new PropertyKey.Builder(clusterName));
     Mockito.when(mockedAccessor.setProperty(Mockito.any(PropertyKey.class), Mockito.eq(targetConfig))).thenReturn(true);
-    HelixHelper.updateInstanceHostNamePort(mockedManager, clusterName, instanceId, "strange.host.com", 234);
+    HelixHelper.updateInstanceConfigIfNeeded(mockedManager, clusterName, instanceId, "strange.host.com", "234", null);
     Mockito.verify(mockedAccessor).setProperty(Mockito.any(PropertyKey.class), Mockito.eq(targetConfig));
     Assert.assertEquals("strange.host.com", targetConfig.getHostName());
     Assert.assertEquals("234", targetConfig.getPort());

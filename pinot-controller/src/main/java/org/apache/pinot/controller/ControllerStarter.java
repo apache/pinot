@@ -159,7 +159,7 @@ public class ControllerStarter implements ServiceStartable {
     int port = _listenerConfigs.get(0).getPort();
 
     _helixControllerInstanceId = host + "_" + port;
-    if (_config.getEnableDynamicHelixHost() && !Strings.isNullOrEmpty(_config.getHelixInstanceId())){
+    if (!Strings.isNullOrEmpty(_config.getHelixInstanceId())){
       _helixParticipantInstanceId = _config.getHelixInstanceId();
     } else {
       _helixParticipantInstanceId = LeadControllerUtils.generateParticipantInstanceId(host, port);
@@ -451,26 +451,6 @@ public class ControllerStarter implements ServiceStartable {
     _serviceStatusCallbackList.add(generateServiceStatusCallback(_helixParticipantManager));
   }
 
-  @VisibleForTesting
-  void updateHelixHost() {
-    if (!_config.getEnableDynamicHelixHost()) {
-      return;
-    }
-    if (Strings.isNullOrEmpty(_config.getControllerHost()) || Strings.isNullOrEmpty(_config.getControllerPort())) {
-      LOGGER.warn("Dynamic Helix Host enabled on Controller, but host={}, port={} not set. Will skip updating helix hostname", _config.getControllerHost(), _config.getControllerPort());
-      return;
-    }
-    int controllerPort = 0;
-    try {
-      controllerPort = Integer.parseInt(_config.getControllerPort());
-    } catch (NumberFormatException ex) {
-      LOGGER.error("Dynamic Helix Host enabled on Controller but port={} is not a number. Will skip updating helix hostname", _config.getControllerPort(), ex);
-      return;
-    }
-    HelixHelper.updateInstanceHostNamePort(_helixParticipantManager, _helixClusterName, _helixParticipantInstanceId,
-      _config.getControllerHost(), controllerPort);
-  }
-
   private ServiceStatus.ServiceStatusCallback generateServiceStatusCallback(HelixManager helixManager) {
     return new ServiceStatus.ServiceStatusCallback() {
       private boolean _isStarted = false;
@@ -566,7 +546,10 @@ public class ControllerStarter implements ServiceStartable {
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg);
     }
-    updateHelixHost();
+
+    HelixHelper.updateInstanceConfigIfNeeded(_helixParticipantManager, _helixClusterName, _helixParticipantInstanceId,
+      _config.getControllerHost(), _config.getControllerPort(), null);
+
     LOGGER.info("Registering helix controller listener");
     // This registration is not needed when the leadControllerResource is enabled.
     // However, the resource can be disabled sometime while the cluster is in operation, so we keep it here. Plus, it does not add much overhead.

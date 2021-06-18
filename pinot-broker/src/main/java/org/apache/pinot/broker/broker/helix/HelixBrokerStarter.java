@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.broker.broker.helix;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -38,7 +36,6 @@ import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
-import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.Message;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -145,9 +142,13 @@ public class HelixBrokerStarter implements ServiceStartable {
     }
 
     _brokerId = _brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY,
-        Helix.PREFIX_OF_BROKER_INSTANCE + brokerHost + "_" + _listenerConfigs.get(0).getPort());
+        brokerIdFromHostName(brokerHost, _listenerConfigs.get(0).getPort()));
 
     _brokerConf.addProperty(Broker.CONFIG_OF_BROKER_ID, _brokerId);
+  }
+
+  private static String brokerIdFromHostName(String brokerHost, int port) {
+    return Helix.PREFIX_OF_BROKER_INSTANCE + brokerHost + "_" + port;
   }
 
   private void setupHelixSystemProperties() {
@@ -321,8 +322,9 @@ public class HelixBrokerStarter implements ServiceStartable {
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(),
             new BrokerUserDefinedMessageHandlerFactory(_routingManager, queryQuotaManager));
     _participantHelixManager.connect();
-    addInstanceTagIfNeeded();
-    updateHelixHost(_brokerConf, _participantHelixManager, _clusterName, _brokerId);
+
+    updateInstanceConfigIfNeeded();
+
     _brokerMetrics
         .addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME, () -> _participantHelixManager.isConnected() ? 1L : 0L);
     _participantHelixManager
@@ -332,27 +334,6 @@ public class HelixBrokerStarter implements ServiceStartable {
     registerServiceStatusHandler();
 
     LOGGER.info("Finish starting Pinot broker");
-  }
-
-  @VisibleForTesting
-  static void updateHelixHost(PinotConfiguration brokerConf, HelixManager helixManager, String clusterName, String brokerInstanceId) {
-    boolean allowUpdateHelixHost = brokerConf.getProperty(Broker.BROKER_DYNAMIC_HELIX_HOST, false);
-    if (!allowUpdateHelixHost) {
-      return;
-    }
-    String brokerHost = brokerConf.getProperty(Broker.BROKER_NETTY_HOST, NetUtils.getHostnameOrAddress());
-    String brokerPortStr = brokerConf.getProperty(Broker.BROKER_NETTY_PORT);
-    if ( Strings.isNullOrEmpty(brokerPortStr) || Strings.isNullOrEmpty(brokerHost)) {
-      LOGGER.warn("Dynamic Helix Host enabled, but host={} port={}, will skip updating helix host", brokerHost, brokerPortStr);
-      return;
-    }
-    int brokerPort = 0;
-    try {
-      brokerPort = Integer.parseInt(brokerPortStr);
-      HelixHelper.updateInstanceHostNamePort(helixManager, clusterName, brokerInstanceId, brokerHost, brokerPort);
-    } catch (NumberFormatException ex) {
-      LOGGER.error("Dynamic Helix Host enabled on Broker but port={} is not a number. Will skip updating helix hostname", brokerPortStr, ex);
-    }
   }
 
   /**
@@ -383,17 +364,16 @@ public class HelixBrokerStarter implements ServiceStartable {
                 _clusterName, _brokerId, resourcesToMonitor, minResourcePercentForStartup))));
   }
 
-  private void addInstanceTagIfNeeded() {
-    InstanceConfig instanceConfig =
-        _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().instanceConfig(_brokerId));
-    List<String> instanceTags = instanceConfig.getTags();
-    if (instanceTags == null || instanceTags.isEmpty()) {
+  private void updateInstanceConfigIfNeeded() {
+    HelixHelper.updateInstanceConfigIfNeeded(_participantHelixManager, _clusterName, _brokerId, _brokerConf.getProperty(Broker.BROKER_NETTY_HOST), _brokerConf.getProperty(Broker.BROKER_NETTY_PORT), () -> {
+      ImmutableList.Builder<String> defaultTags = ImmutableList.builder();
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
-        _helixAdmin.addInstanceTag(_clusterName, _brokerId, TagNameUtils.getBrokerTagForTenant(null));
+        defaultTags.add(TagNameUtils.getBrokerTagForTenant(null));
       } else {
-        _helixAdmin.addInstanceTag(_clusterName, _brokerId, Helix.UNTAGGED_BROKER_INSTANCE);
+        defaultTags.add(Helix.UNTAGGED_BROKER_INSTANCE);
       }
-    }
+      return defaultTags.build();
+    });
   }
 
   @Override
