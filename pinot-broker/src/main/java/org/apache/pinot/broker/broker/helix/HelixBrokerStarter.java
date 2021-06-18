@@ -142,13 +142,9 @@ public class HelixBrokerStarter implements ServiceStartable {
     }
 
     _brokerId = _brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY,
-        brokerIdFromHostName(brokerHost, _listenerConfigs.get(0).getPort()));
+      Helix.PREFIX_OF_BROKER_INSTANCE + brokerHost + "_" + _listenerConfigs.get(0).getPort());
 
     _brokerConf.addProperty(Broker.CONFIG_OF_BROKER_ID, _brokerId);
-  }
-
-  private static String brokerIdFromHostName(String brokerHost, int port) {
-    return Helix.PREFIX_OF_BROKER_INSTANCE + brokerHost + "_" + port;
   }
 
   private void setupHelixSystemProperties() {
