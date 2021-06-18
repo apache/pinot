@@ -63,6 +63,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -104,7 +105,7 @@ public class HelixBrokerStarter implements ServiceStartable {
   @Deprecated
   public HelixBrokerStarter(PinotConfiguration brokerConf, String clusterName, String zkServer)
       throws Exception {
-    this(brokerConf, clusterName, zkServer, null);
+    this(brokerConf, clusterName, zkServer, brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_HOSTNAME));
   }
 
   @Deprecated
