@@ -44,7 +44,8 @@ public class QueryOptions {
       _preserveType = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.PRESERVE_TYPE));
       _skipUpsert = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.SKIP_UPSERT));
       _enableSegmentTrim = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.ENABLE_SEGMENT_TRIM));
-      _minSegmentTrimSize = Integer.parseInt(queryOptions.get(Request.QueryOptionKey.MIN_SEGMENT_TRIM_SIZE));
+      String minSegmentTrimSize = queryOptions.get(Request.QueryOptionKey.MIN_SEGMENT_TRIM_SIZE);
+      _minSegmentTrimSize = minSegmentTrimSize != null ? Integer.parseInt(minSegmentTrimSize) : -1;
     } else {
       _timeoutMs = null;
       _groupByModeSQL = false;
@@ -54,26 +55,6 @@ public class QueryOptions {
       _enableSegmentTrim = false;
       _minSegmentTrimSize = -1;
     }
-  }
-
-  @Nullable
-  public static Long getTimeoutMs(Map<String, String> queryOptions) {
-    String timeoutMsString = queryOptions.get(Request.QueryOptionKey.TIMEOUT_MS);
-    if (timeoutMsString != null) {
-      long timeoutMs = Long.parseLong(timeoutMsString);
-      Preconditions.checkState(timeoutMs > 0, "Query timeout must be positive, got: %s", timeoutMs);
-      return timeoutMs;
-    } else {
-      return null;
-    }
-  }
-
-  public static boolean getEnableSegmentTrim(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.ENABLE_SEGMENT_TRIM));
-  }
-
-  public static int getSegmentTrimSize(Map<String, String> queryOptions) {
-    return Integer.parseInt(queryOptions.get(Request.QueryOptionKey.MIN_SEGMENT_TRIM_SIZE));
   }
 
   @Nullable
@@ -106,4 +87,33 @@ public class QueryOptions {
   public Integer getMinSegmentTrimSize() {
     return _minSegmentTrimSize;
   }
+
+  @Nullable
+  public static Long getTimeoutMs(Map<String, String> queryOptions) {
+    String timeoutMsString = queryOptions.get(Request.QueryOptionKey.TIMEOUT_MS);
+    if (timeoutMsString != null) {
+      long timeoutMs = Long.parseLong(timeoutMsString);
+      Preconditions.checkState(timeoutMs > 0, "Query timeout must be positive, got: %s", timeoutMs);
+      return timeoutMs;
+    } else {
+      return null;
+    }
+  }
+
+  public static boolean getEnableSegmentTrim(Map<String, String> queryOptions) {
+    String enableSegmentTrimString = queryOptions.get(Request.QueryOptionKey.ENABLE_SEGMENT_TRIM);
+    if (enableSegmentTrimString != null) {
+      return Boolean.parseBoolean(enableSegmentTrimString);
+    }
+    return false;
+  }
+
+  public static int getSegmentTrimSize(Map<String, String> queryOptions) {
+    String minSegmentTrimSize = queryOptions.get(Request.QueryOptionKey.MIN_SEGMENT_TRIM_SIZE);
+    if (minSegmentTrimSize != null) {
+      return Integer.parseInt(minSegmentTrimSize);
+    }
+    return -1;
+  }
+
 }
