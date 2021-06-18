@@ -100,7 +100,7 @@ public class QueryOptions {
     }
   }
 
-  public static boolean getEnableSegmentTrim(Map<String, String> queryOptions) {
+  public static boolean isEnableSegmentTrim(Map<String, String> queryOptions) {
     String enableSegmentTrimString = queryOptions.get(Request.QueryOptionKey.ENABLE_SEGMENT_TRIM);
     if (enableSegmentTrimString != null) {
       return Boolean.parseBoolean(enableSegmentTrimString);
@@ -108,7 +108,7 @@ public class QueryOptions {
     return false;
   }
 
-  public static int getSegmentTrimSize(Map<String, String> queryOptions) {
+  public static int getMinSegmentTrimSize(Map<String, String> queryOptions) {
     String minSegmentTrimSize = queryOptions.get(Request.QueryOptionKey.MIN_SEGMENT_TRIM_SIZE);
     if (minSegmentTrimSize != null) {
       return Integer.parseInt(minSegmentTrimSize);

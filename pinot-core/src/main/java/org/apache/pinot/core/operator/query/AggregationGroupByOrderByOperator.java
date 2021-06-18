@@ -159,8 +159,8 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     if (options == null) {
       return _minSegmentTrimSize;
     }
-    boolean queryOptionEnableTrim = QueryOptions.getEnableSegmentTrim(options);
-    int queryOptionTrimSize = QueryOptions.getSegmentTrimSize(options);
+    boolean queryOptionEnableTrim = QueryOptions.isEnableSegmentTrim(options);
+    int queryOptionTrimSize = QueryOptions.getMinSegmentTrimSize(options);
     if (queryOptionTrimSize > 0) {
       return queryOptionTrimSize;
     } else if (queryOptionEnableTrim && _minSegmentTrimSize <= 0) {
