@@ -396,6 +396,7 @@ public class CommonConstants {
     // but we keep this default for backward compatibility in case someone relies on this format
     // see Server or Broker class for correct prefix format you should use
     public static final String DEFAULT_METRICS_PREFIX = "pinot.controller.";
+    public static final String CONTROLLER_HELIX_INSTANCE_ID = "pinot.controller.helix.instance.id";
   }
 
   public static class Minion {
