@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.tuple.ImmutableTriple;
 import org.apache.pulsar.client.api.PulsarClient;

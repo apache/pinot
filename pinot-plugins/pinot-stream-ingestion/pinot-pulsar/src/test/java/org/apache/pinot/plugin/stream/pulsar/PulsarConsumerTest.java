@@ -120,7 +120,7 @@ public class PulsarConsumerTest {
     streamConfigMap.put("stream.pulsar.consumer.type", streamPulsarConsumerType);
     streamConfigMap.put("stream.pulsar.topic.name", TEST_TOPIC);
     streamConfigMap.put("stream.pulsar.bootstrap.servers", streamPulsarBrokerList);
-    streamConfigMap.put("stream.pulsar.start.position", "earliest");
+    streamConfigMap.put("stream.pulsar.consumer.prop.auto.offset.reset", "smallest");
     streamConfigMap.put("stream.pulsar.consumer.factory.class.name", getPulsarConsumerFactoryName());
     streamConfigMap.put("stream.pulsar.decoder.class.name", "decoderClass");
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);

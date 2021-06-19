@@ -20,9 +20,9 @@ package org.apache.pinot.plugin.stream.pulsar;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.HashMap;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
-import java.util.Properties;
+import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pulsar.client.api.MessageId;
@@ -35,9 +35,6 @@ import org.apache.pulsar.client.api.MessageId;
 public class PulsarConfig {
   public static final String STREAM_TYPE = "pulsar";
   public static final String BOOTSTRAP_SERVERS = "bootstrap.servers";
-  public static final String START_POSITION = "start.position";
-  public static final String EARLIEST = "earliest";
-  public static final String LATEST = "latest";
 
   private String _pulsarTopicName;
   private String _subscriberId;
@@ -47,22 +44,23 @@ public class PulsarConfig {
   public PulsarConfig(StreamConfig streamConfig, String subscriberId) {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
     _pulsarTopicName = streamConfig.getTopicName();
-    _bootstrapServers = streamConfigMap.get(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, BOOTSTRAP_SERVERS));
+    _bootstrapServers =
+        streamConfigMap.get(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, BOOTSTRAP_SERVERS));
     _subscriberId = subscriberId;
 
     Preconditions.checkNotNull(_bootstrapServers, "No brokers provided in the config");
 
-    String startPositionProperty = StreamConfigProperties.constructStreamProperty(STREAM_TYPE, START_POSITION);
-    String startPosition = streamConfigMap.getOrDefault(startPositionProperty, "latest");
-    if (startPosition.equalsIgnoreCase(EARLIEST)) {
+    OffsetCriteria offsetCriteria = streamConfig.getOffsetCriteria();
+
+    if (offsetCriteria.isSmallest()) {
       _initialMessageId = MessageId.earliest;
-    } else if (startPosition.equalsIgnoreCase(LATEST)) {
+    } else if (offsetCriteria.isLargest()) {
       _initialMessageId = MessageId.latest;
-    } else {
+    } else if (offsetCriteria.isCustom()) {
       try {
-        _initialMessageId = MessageId.fromByteArray(startPosition.getBytes());
+        _initialMessageId = MessageId.fromByteArray(offsetCriteria.getOffsetString().getBytes(StandardCharsets.UTF_8));
       } catch (IOException e) {
-        throw new RuntimeException("Invalid start position found: " + startPosition);
+        throw new RuntimeException("Invalid offset string found: " + offsetCriteria.getOffsetString());
       }
     }
   }

@@ -18,12 +18,10 @@
  */
 package org.apache.pinot.plugin.stream.pulsar;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.List;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pulsar.client.api.PulsarClient;
-import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.Reader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
