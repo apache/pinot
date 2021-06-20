@@ -30,7 +30,9 @@ import static org.testng.Assert.assertEquals;
 
 public class PreAggregatedPercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<Object, TDigest> {
   // Use non-default compression
-  private static final double COMPRESSION = 50;
+  private static final double COMPRESSION = 200;
+  private static final double MAX_ERROR = 0.02;
+
   private static final int MAX_VALUE = 10000;
 
   @Override
@@ -53,7 +55,7 @@ public class PreAggregatedPercentileTDigestStarTreeV2Test extends BaseStarTreeV2
 
   @Override
   void assertAggregatedValue(TDigest starTreeResult, TDigest nonStarTreeResult) {
-    double delta = MAX_VALUE * 0.05;
+    double delta = MAX_VALUE * MAX_ERROR;
     for (int i = 0; i <= 100; i++) {
       assertEquals(starTreeResult.quantile(i / 100.0), nonStarTreeResult.quantile(i / 100.0), delta);
     }
