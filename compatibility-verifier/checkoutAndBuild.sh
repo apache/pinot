@@ -50,7 +50,7 @@ function checkoutAndBuild() {
   # Pull the tag list so that we can check out by tag name
   git fetch --tags || exit 1
   git checkout $commitHash || exit 1
-  mvn install package -DskipTests -Pbin-dist || exit 1
+  mvn install package -DskipTests -Pbin-dist -T 4 -Djdk.version=8 || exit 1
   popd || exit 1
   exit 0
 }
@@ -117,7 +117,7 @@ workingDir=$(absPath "$workingDir")
 newTargetDir="$workingDir"/newTargetDir
 if [ -z "$newerCommit" ]; then
   echo "Compiling current tree as newer version"
-  (cd $cmdDir/.. && mvn install package -DskipTests -Pbin-dist && mvn -pl pinot-tools package -DskipTests && mvn -pl pinot-integration-tests package -DskipTests)
+  (cd $cmdDir/.. && mvn install package -DskipTests -Pbin-dist -T 4 -D jdk.version=8 && mvn -pl pinot-tools package -T 4 -DskipTests -Djdk.version=8 && mvn -pl pinot-integration-tests package -T 4 -DskipTests -Djdk.version=8)
   if [ $? -ne 0 ]; then
     echo Compile failed.
     exit 1
