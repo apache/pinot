@@ -79,7 +79,8 @@ public class HelixBrokerStarterTest extends ControllerTest {
     properties.put(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     properties.put(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
 
-    _brokerStarter = new HelixBrokerStarter(new PinotConfiguration(properties));
+    _brokerStarter = new HelixBrokerStarter();
+    _brokerStarter.init(new PinotConfiguration(properties));
     _brokerStarter.start();
 
     addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKERS - 1, true);

@@ -124,7 +124,8 @@ public abstract class ClusterTest extends ControllerTest {
       PinotConfiguration configuration = new PinotConfiguration(properties);
       overrideBrokerConf(configuration);
 
-      HelixBrokerStarter brokerStarter = new HelixBrokerStarter(configuration);
+      HelixBrokerStarter brokerStarter = new HelixBrokerStarter();
+      brokerStarter.init(configuration);
       brokerStarter.start();
       _brokerStarters.add(brokerStarter);
     }
@@ -140,11 +141,15 @@ public abstract class ClusterTest extends ControllerTest {
     properties.put(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
     properties.put(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
 
+    properties.put(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
+    properties.put(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
+    properties.put(Broker.CONFIG_OF_BROKER_HOSTNAME, LOCAL_HOST);
+
     PinotConfiguration configuration = new PinotConfiguration(properties);
     overrideBrokerConf(configuration);
 
-    HelixBrokerStarter brokerStarter =
-        new HelixBrokerStarter(configuration, getHelixClusterName(), getZkUrl(), LOCAL_HOST);
+    HelixBrokerStarter brokerStarter = new HelixBrokerStarter();
+    brokerStarter.init(configuration);
     brokerStarter.start();
     _brokerStarters.add(brokerStarter);
 
@@ -209,7 +214,8 @@ public abstract class ClusterTest extends ControllerTest {
         // Thread time measurement is disabled by default, enable it in integration tests.
         // TODO: this can be removed when we eventually enable thread time measurement by default.
         configuration.setProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
-        HelixServerStarter helixServerStarter = new HelixServerStarter(configuration);
+        HelixServerStarter helixServerStarter = new HelixServerStarter();
+        helixServerStarter.init(configuration);
         helixServerStarter.start();
         _serverStarters.add(helixServerStarter);
       }
@@ -223,12 +229,15 @@ public abstract class ClusterTest extends ControllerTest {
     _serverStarters = new ArrayList<>();
 
     Map<String, Object> properties = getDefaultServerConfiguration().toMap();
+    properties.put(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
+    properties.put(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
 
     PinotConfiguration configuration = new PinotConfiguration(properties);
     overrideServerConf(configuration);
 
     try {
-      HelixServerStarter helixServerStarter = new HelixServerStarter(getHelixClusterName(), getZkUrl(), configuration);
+      HelixServerStarter helixServerStarter = new HelixServerStarter();
+      helixServerStarter.init(configuration);
       _serverStarters.add(helixServerStarter);
       helixServerStarter.start();
     } catch (Exception e) {
@@ -248,7 +257,8 @@ public abstract class ClusterTest extends ControllerTest {
       PinotConfiguration minionConf = getDefaultMinionConfiguration();
       minionConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
       minionConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
-      _minionStarter = new MinionStarter(minionConf);
+      _minionStarter = new MinionStarter();
+      _minionStarter.init(minionConf);
       _minionStarter.start();
     } catch (Exception e) {
       throw new RuntimeException(e);
