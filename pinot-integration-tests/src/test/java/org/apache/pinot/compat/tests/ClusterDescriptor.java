@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.compat.tests;
 
-
+// TODO Support https, perhaps based on configuration
 public class ClusterDescriptor {
 
   private static final String DEFAULT_HOST = "localhost";
@@ -27,45 +27,51 @@ public class ClusterDescriptor {
   private static final String ZOOKEEPER_URL = String.format("http://%s:%s", DEFAULT_HOST, ZOOKEEPER_PORT);
   private static final String KAFKA_URL = String.format("http://%s:%s", DEFAULT_HOST, KAFKA_PORT);
 
-  private static String controllerPort = "9000";
-  private static String brokerQueryPort = "8099";
-  private static String serverAdminPort = "8097";
+  private String controllerPort = "9000";
+  private String brokerQueryPort = "8099";
+  private String serverAdminPort = "8097";
 
-  public static void setBrokerQueryPort(String port) {
+  private static final ClusterDescriptor INSTANCE = new ClusterDescriptor();
+
+  public static ClusterDescriptor getInstance() {
+    return INSTANCE;
+  }
+
+  public void setBrokerQueryPort(String port) {
     if (port != null && !port.isEmpty()) {
       brokerQueryPort = port;
     }
   }
 
-  public static void setControllerPort(String port) {
+  public void setControllerPort(String port) {
     if (port != null && !port.isEmpty()) {
       controllerPort = port;
     }
   }
 
-  public static void setServerAdminPort(String port) {
+  public void setServerAdminPort(String port) {
     if (port != null && !port.isEmpty()) {
       serverAdminPort = port;
     }
   }
 
-  public static String getControllerUrl() {
+  public String getControllerUrl() {
     return String.format("http://%s:%s", DEFAULT_HOST, controllerPort);
   }
 
-  public static String getBrokerUrl() {
+  public String getBrokerUrl() {
     return String.format("http://%s:%s", DEFAULT_HOST, brokerQueryPort);
   }
 
-  public static String getDefaultHost() {
+  public String getDefaultHost() {
     return DEFAULT_HOST;
   }
 
-  public static String getKafkaPort() {
+  public String getKafkaPort() {
     return KAFKA_PORT;
   }
 
-  public static String getServerAdminUrl() {
+  public String getServerAdminUrl() {
     return String.format("http://%s:%s", DEFAULT_HOST, serverAdminPort);
   }
 
