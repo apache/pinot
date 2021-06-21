@@ -41,7 +41,8 @@ import org.slf4j.LoggerFactory;
 public class PartialUpsertHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(PartialUpsertHandler.class);
 
-  private final Map<String, PartialUpsertMerger> _mergers = new HashMap<>();
+  // _column2Mergers maintains the mapping of merge strategies per columns.
+  private final Map<String, PartialUpsertMerger> _column2Mergers = new HashMap<>();
 
   private final HelixManager _helixManager;
   private final String _tableNameWithType;
@@ -52,7 +53,7 @@ public class PartialUpsertHandler {
     _helixManager = helixManager;
     _tableNameWithType = tableNameWithType;
     for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
-      _mergers.put(entry.getKey(), PartialUpsertMergerFactory.getMerger(entry.getValue()));
+      _column2Mergers.put(entry.getKey(), PartialUpsertMergerFactory.getMerger(entry.getValue()));
     }
   }
 
@@ -124,7 +125,7 @@ public class PartialUpsertHandler {
    * @return a new row after merge
    */
   public GenericRow merge(GenericRow previousRecord, GenericRow newRecord) {
-    for (Map.Entry<String, PartialUpsertMerger> entry : _mergers.entrySet()) {
+    for (Map.Entry<String, PartialUpsertMerger> entry : _column2Mergers.entrySet()) {
       String column = entry.getKey();
       if (!previousRecord.isNullValue(column)) {
         if (newRecord.isNullValue(column)) {

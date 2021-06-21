@@ -65,7 +65,7 @@ public class PartitionUpsertMetadataManager {
   private final ServerMetrics _serverMetrics;
   private final PartialUpsertHandler _partialUpsertHandler;
 
-  // TODO(upset): consider an off-heap KV store to persist this index to improve the recovery speed.
+  // TODO(upsert): consider an off-heap KV store to persist this mapping to improve the recovery speed.
   @VisibleForTesting
   final ConcurrentHashMap<PrimaryKey, RecordLocation> _primaryKeyToRecordLocationMap = new ConcurrentHashMap<>();
 

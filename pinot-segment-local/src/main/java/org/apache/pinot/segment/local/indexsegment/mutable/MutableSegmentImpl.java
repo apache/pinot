@@ -488,6 +488,7 @@ public class MutableSegmentImpl implements MutableSegment {
         // Update number of documents indexed at last to make the latest row queryable
         canTakeMore = _numDocsIndexed++ < _capacity;
       } else {
+        Preconditions.checkArgument(_aggregateMetrics, "Metrics aggregation must be enabled");
         assert _aggregateMetrics;
         aggregateMetrics(row, docId);
         canTakeMore = true;
@@ -936,6 +937,14 @@ public class MutableSegmentImpl implements MutableSegment {
     return segmentName + ":" + columnName + indexType;
   }
 
+  /**
+   * Helper function that returns docId, depends on the following scenarios.
+   * <ul>
+   *   <li> If metrics aggregation is enabled and if the dimension values were already seen, return existing docIds </li>
+   *   <li> Else, this function will create and return a new docId. </li>
+   * </ul>
+   *
+   * */
   private int getOrCreateDocId() {
     if (!_aggregateMetrics) {
       return _numDocsIndexed;

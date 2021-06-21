@@ -101,8 +101,14 @@ public class PartialUpsertQuickStart {
     Thread.sleep(15000);
 
     printStatus(Color.YELLOW, "***** Upsert quickstart setup complete *****");
+    printStatus(Color.YELLOW, "***** The expected behavior for total number of documents per PK should be 1 *****");
+    printStatus(Color.YELLOW,
+        "***** The expected behavior for total number of rsvp_counts per PK should >=1 since it's incremented and updated. *****");
 
-    String q1 = "select event_id, count(*), sum(rsvp_count) from meetupRsvp group by event_id order by sum(rsvp_count) desc limit 10";
+    // The expected behavior for total number of documents per PK should be 1.
+    // The expected behavior for total number of rsvp_counts per PK should >=1 since it's incremented and updated.
+    String q1 =
+        "select event_id, count(*), sum(rsvp_count) from meetupRsvp group by event_id order by sum(rsvp_count) desc limit 10";
     printStatus(Color.YELLOW, "Total number of documents, total number of rsvp_counts per event_id in the table");
     printStatus(Color.CYAN, "Query : " + q1);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));

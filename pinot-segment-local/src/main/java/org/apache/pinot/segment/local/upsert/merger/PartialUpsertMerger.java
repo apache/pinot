@@ -22,9 +22,9 @@ public interface PartialUpsertMerger {
   /**
    * Handle partial upsert merge.
    *
-   * @param previousValue the last derived full record during ingestion.
-   * @param currentValue the new consumed record.
-   * @return a new row after merge
+   * @param previousValue the value of given field from the last derived full record during ingestion.
+   * @param currentValue the value of given field from the new consumed record.
+   * @return a new value after merge
    */
   Object merge(Object previousValue, Object currentValue);
 }
