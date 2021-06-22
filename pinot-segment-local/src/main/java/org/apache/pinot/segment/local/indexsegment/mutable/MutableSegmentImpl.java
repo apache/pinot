@@ -488,7 +488,6 @@ public class MutableSegmentImpl implements MutableSegment {
         // Update number of documents indexed at last to make the latest row queryable
         canTakeMore = _numDocsIndexed++ < _capacity;
       } else {
-        Preconditions.checkArgument(_aggregateMetrics, "Metrics aggregation must be enabled");
         assert _aggregateMetrics;
         aggregateMetrics(row, docId);
         canTakeMore = true;
