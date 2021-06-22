@@ -79,8 +79,6 @@ rules:
     status: "$2"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.pinotLeadControllerResourceEnabled\"><>(\\w+)"
   name: "pinot_controller_pinotLeadControllerResourceEnabled_$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.controllerLeaderPartitionCount\"><>(\\w+)"
-  name: "pinot_controller_controllerLeaderPartitionCount_$1"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.offlineTableEstimatedSize.(\\w+)\"><>(\\w+)"
   name: "pinot_controller_offlineTableEstimatedSize_$2"
   labels:
@@ -100,8 +98,6 @@ rules:
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.leadershipChangeWithoutCallback\"><>(\\w+)"
-  name: "pinot_controller_leadershipChangeWithoutCallback_$1"
 
   # Pinot Broker
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+).authorization\"><>(\\w+)"
@@ -199,8 +195,6 @@ rules:
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.nettyConnectionBytesReceived\"\"><>(\\w+)"
-  name: "pinot_broker_nettyConnectionBytesReceived_$1"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.deserialization\"><>(\\w+)"
   name: "pinot_broker_deserialization_$2"
   labels:
@@ -209,7 +203,6 @@ rules:
   name: "pinot_broker_requestConnectionWait_$2"
   labels:
     table: "$1"
-
 
 # Pinot Server
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.documentCount.(\\w+)_(\\w+)\"><>(\\w+)"
@@ -290,80 +283,18 @@ rules:
   name: "pinot_server_netty_tcp_$2_$3"
   labels:
     id: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.(\\w+)_(\\w+).deletedSegmentCount\"><>(\\w+)"
-  name: "pinot_server_deletedSegmentCount_$3"
-  labels:
-    table: "$1"
-    tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.(\\w+)_(\\w+).realtimePartitionMismatch\"><>(\\w+)"
-  name: "pinot_server_realtimePartitionMismatch_$3"
-  labels:
-    table: "$1"
-    tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.(\\w+)_(\\w+).numDocsScanned\"><>(\\w+)"
-  name: "pinot_server_numDocsScanned_$3"
-  labels:
-    table: "$1"
-    tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.(\\w+)_(\\w+).numEntriesScannedInFilter\"><>(\\w+)"
-  name: "pinot_server_numEntriesScannedInFilter_$3"
-  labels:
-    table: "$1"
-    tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.(\\w+)_(\\w+).numEntriesScannedPostFilter\"><>(\\w+)"
-  name: "pinot_server_numEntriesScannedPostFilter_$3"
-  labels:
-    table: "$1"
-    tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.(\\w+)_(\\w+).numSegmentsQueried\"><>(\\w+)"
-  name: "pinot_server_numSegmentsQueried_$3"
-  labels:
-    table: "$1"
-    tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.(\\w+)_(\\w+).numSegmentsProcessed\"><>(\\w+)"
-  name: "pinot_server_numSegmentsProcessed_$3"
-  labels:
-    table: "$1"
-    tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.(\\w+)_(\\w+).numSegmentsMatched\"><>(\\w+)"
-  name: "pinot_server_numSegmentsMatched_$3"
-  labels:
-    table: "$1"
-    tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.(\\w+)_(\\w+).numMissingSegments\"><>(\\w+)"
-  name: "pinot_server_numMissingSegments_$3"
-  labels:
-    table: "$1"
-    tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.nettyConnectionBytesReceived\"><>(\\w+)"
-  name: "pinot_server_nettyConnectionBytesReceived_$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.nettyConnectionResponsesSent\"><>(\\w+)"
-  name: "pinot_server_nettyConnectionResponsesSent_$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.nettyConnectionBytesSent\"><>(\\w+)"
-  name: "pinot_server_nettyConnectionBytesSent_$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.lastRealtimeSegmentCreationDurationSeconds.(\\w+)_(\\w+)\\-(.+)\\-(\\w+)\"><>(\\w+)"
-  name: "pinot_server_lastRealtimeSegmentCreationDurationSeconds_$5"
-  labels:
-    table: "$1"
-    tableType: "$2"
-    topic: "$3"
-    partition: "$4"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeOffheapMemoryUsed.(\\w+)\"><>(\\w+)"
-  name: "pinot_server_realtimeOffheapMemoryUsed_$2"
-  labels:
-    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.nettyConnection(\\w+)\"><>(\\w+)"
+  name: "pinot_server_nettyConnection_$1_$2"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeSegmentNumPartitions.(\\w+)\"><>(\\w+)"
   name: "pinot_server_realtimeSegmentNumPartitions_$2"
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.llcSimultaneousSegmentBuilds\"><>(\\w+)"
-  name: "pinot_server_llcSimultaneousSegmentBuilds_$1"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.resizeTimeMs.(\\w+)_(\\w+)\"><>(\\w+)"
-  name: "pinot_server_resizeTimeMs_$1"
+  name: "pinot_server_resizeTimeMs_$3"
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.upsertPrimaryKeysCount.(\\w+)_(\\w+).\\(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.upsertPrimaryKeysCount.(\\w+)_(\\w+).(\\w+)\"><>(\\w+)"
   name: "pinot_server_upsertPrimaryKeysCount_$4"
   labels:
     table: "$1"
