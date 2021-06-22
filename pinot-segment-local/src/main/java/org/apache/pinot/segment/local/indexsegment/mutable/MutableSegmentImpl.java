@@ -178,20 +178,20 @@ public class MutableSegmentImpl implements MutableSegment {
             realtimeSegmentZKMetadata.getEndTime(), realtimeSegmentZKMetadata.getTimeUnit(),
             realtimeSegmentZKMetadata.getTotalDocs(), realtimeSegmentZKMetadata.getCrc(), _schema) {
           @Override
-      public int getTotalDocs() {
-        return _numDocsIndexed;
-      }
+          public int getTotalDocs() {
+            return _numDocsIndexed;
+          }
 
-      @Override
-      public long getLastIndexedTimestamp() {
-        return _lastIndexedTimeMs;
-      }
+          @Override
+          public long getLastIndexedTimestamp() {
+            return _lastIndexedTimeMs;
+          }
 
-      @Override
-      public long getLatestIngestionTimestamp() {
-        return _latestIngestionTimeMs;
-      }
-    };
+          @Override
+          public long getLatestIngestionTimestamp() {
+            return _latestIngestionTimeMs;
+          }
+        };
 
     _offHeap = config.isOffHeap();
     _memoryManager = config.getMemoryManager();
@@ -581,7 +581,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
           // Update forward index
           DataType dataType = fieldSpec.getDataType();
-          switch (dataType) {
+          switch (dataType.getStoredType()) {
             case INT:
               forwardIndex.setInt(docId, (Integer) value);
               break;
