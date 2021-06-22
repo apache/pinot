@@ -16,34 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.upsert;
+package org.apache.pinot.segment.local.upsert.merger;
 
-import org.apache.pinot.segment.spi.IndexSegment;
-
-
-/**
- * Indicate a record's location on the local host.
- */
-public class RecordLocation {
-  private final IndexSegment _segment;
-  private final int _docId;
-  private final long _timestamp;
-
-  public RecordLocation(IndexSegment indexSegment, int docId, long timestamp) {
-    _segment = indexSegment;
-    _docId = docId;
-    _timestamp = timestamp;
+public class IncrementMerger implements PartialUpsertMerger {
+  IncrementMerger() {
   }
 
-  public IndexSegment getSegment() {
-    return _segment;
+  /**
+   * Increment the new value from incoming row to the given field of previous record.
+   */
+  @Override
+  public Object merge(Object previousValue, Object currentValue) {
+    return addNumbers((Number) previousValue, (Number) currentValue);
   }
 
-  public int getDocId() {
-    return _docId;
-  }
-
-  public long getTimestamp() {
-    return _timestamp;
+  private static Number addNumbers(Number a, Number b) {
+    if (a instanceof Integer) {
+      return (Integer) a + (Integer) b;
+    } else if (a instanceof Long) {
+      return (Long) a + (Long) b;
+    } else if (a instanceof Float) {
+      return (Float) a + (Float) b;
+    } else {
+      return (Double) a + (Double) b;
+    }
   }
 }

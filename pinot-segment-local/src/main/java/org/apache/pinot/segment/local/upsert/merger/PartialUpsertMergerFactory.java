@@ -16,34 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.upsert;
+package org.apache.pinot.segment.local.upsert.merger;
 
-import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 
 
-/**
- * Indicate a record's location on the local host.
- */
-public class RecordLocation {
-  private final IndexSegment _segment;
-  private final int _docId;
-  private final long _timestamp;
-
-  public RecordLocation(IndexSegment indexSegment, int docId, long timestamp) {
-    _segment = indexSegment;
-    _docId = docId;
-    _timestamp = timestamp;
+public class PartialUpsertMergerFactory {
+  private PartialUpsertMergerFactory() {
   }
 
-  public IndexSegment getSegment() {
-    return _segment;
-  }
+  private static final OverwriteMerger OVERWRITE_MERGER = new OverwriteMerger();
+  private static final IncrementMerger INCREMENT_MERGER = new IncrementMerger();
 
-  public int getDocId() {
-    return _docId;
-  }
-
-  public long getTimestamp() {
-    return _timestamp;
+  public static PartialUpsertMerger getMerger(UpsertConfig.Strategy strategy) {
+    switch (strategy) {
+      case OVERWRITE:
+        return OVERWRITE_MERGER;
+      case INCREMENT:
+        return INCREMENT_MERGER;
+      default:
+        throw new IllegalStateException("Unsupported partial upsert strategy: " + strategy);
+    }
   }
 }

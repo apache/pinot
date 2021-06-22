@@ -175,7 +175,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
         // Use metadata/dictionary to solve the query if possible
         // NOTE: Skip the segment with valid doc index because the valid doc index is equivalent to a filter.
-        if (queryContext.getFilter() == null && indexSegment.getValidDocIndex() == null) {
+        if (queryContext.getFilter() == null && indexSegment.getValidDocIds() == null) {
           if (isFitForMetadataBasedPlan(queryContext)) {
             return new MetadataBasedAggregationPlanNode(indexSegment, queryContext);
           } else if (isFitForDictionaryBasedPlan(queryContext, indexSegment)) {
