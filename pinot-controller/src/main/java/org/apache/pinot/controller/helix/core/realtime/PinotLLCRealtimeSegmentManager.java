@@ -141,9 +141,9 @@ public class PinotLLCRealtimeSegmentManager {
    */
   private static final long MAX_SEGMENT_COMPLETION_TIME_MILLIS = 300_000L; // 5 MINUTES
   /**
-   * Controller waits this amount of time before asking servers to upload LLC segments without deep store copy.
+   * Controller waits this amount of time before asking servers to upload LLC segments missing in deep store.
    * The reason is after step 1 of segment completion is done (segment ZK metadata status changed to be DONE),
-   * servers may be still in the process of loading segments.
+   * servers may be still in the process of transitioning segments from CONSUMING to ONLINE states.
    * Only after that segments are in ONLINE status in external view for the controller to discover.
    */
   private static final long MIN_TIME_BEFORE_FIXING_SEGMENT_STORE_COPY_MILLIS = 300_000L; // 5 MINUTES
@@ -167,10 +167,10 @@ public class PinotLLCRealtimeSegmentManager {
   private AtomicInteger _numCompletingSegments = new AtomicInteger(0);
   private FileUploadDownloadClient _fileUploadDownloadClient;
   /**
-   * Map caching the LLC segment names without deep store download uri.
-   * Controller gets the LLC segment names from this map, and asks servers to upload the segments to segment store.
-   * This helps to alleviates excessive ZK access when fetching LLC segment list.
-   * Key: table name; Value: LLC segment names to be uploaded to segment store.
+   * Map caching the LLC segment names that are missing deep store download uri in segment metadata.
+   * Controller gets the LLC segment names from this map, and asks servers to upload the segments to deep store.
+   * This helps to alleviate excessive ZK access when fetching LLC segment list.
+   * Key: table name; Value: LLC segment names to be uploaded to deep store.
    */
   private Map<String, Queue<String>> _llcSegmentMapForUpload;
   // Fix the missing deep store copy of LLC segments created within this range
