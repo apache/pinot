@@ -54,7 +54,8 @@ public class PinotTaskManagerTest extends ControllerTest {
   }
 
   @Test
-  public void testDefaultPinotTaskManagerNoScheduler() {
+  public void testDefaultPinotTaskManagerNoScheduler()
+      throws Exception {
     startController();
     PinotTaskManager taskManager = _controllerStarter.getTaskManager();
     Assert.assertNull(taskManager.getScheduler());

@@ -73,7 +73,8 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   }
 
   @Override
-  public void startController() {
+  public void startController()
+      throws Exception {
     Map<String, Object> properties = getDefaultControllerConfiguration();
 
     properties.put(ControllerConf.ALLOW_HLC_TABLES, false);
