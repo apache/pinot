@@ -1376,13 +1376,13 @@ public class PinotLLCRealtimeSegmentManager {
    */
   public void uploadToSegmentStoreIfMissing(TableConfig tableConfig) {
     String realtimeTableName = tableConfig.getTableName();
-    if (_isStopping) {
-      LOGGER.info("Skipped fixing segment store copy of LLC segments for table {}, because segment manager is stopping.", realtimeTableName);
+    Queue<String> segmentQueue = _llcSegmentMapForUpload.get(realtimeTableName);
+    if (segmentQueue == null || segmentQueue.isEmpty()) {
       return;
     }
 
-    Queue<String> segmentQueue = _llcSegmentMapForUpload.get(realtimeTableName);
-    if (segmentQueue == null || segmentQueue.isEmpty()) {
+    if (_isStopping) {
+      LOGGER.info("Skipped fixing segment store copy of LLC segments for table {}, because segment manager is stopping.", realtimeTableName);
       return;
     }
 
