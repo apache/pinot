@@ -27,41 +27,49 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
  * Provides all config related to the batch data source, as configured in the table config's ingestion config
  */
 public class BatchConfig {
-  private final Map<String, String> _batchConfigMap;
-  private final String _tableNameWithType;
+  private Map<String, String> _batchConfigMap;
+  private String _tableNameWithType;
 
-  private final FileFormat _inputFormat;
-  private final String _inputDirURI;
-  private final String _inputFsClassName;
-  private final Map<String, String> _inputFsProps;
+  private FileFormat _inputFormat;
+  private String _inputDirURI;
+  private String _inputFsClassName;
+  private Map<String, String> _inputFsProps;
 
-  private final String _outputDirURI;
-  private final String _outputFsClassName;
-  private final Map<String, String> _outputFsProps;
-  private final boolean _overwriteOutput;
+  private String _outputDirURI;
+  private String _outputFsClassName;
+  private Map<String, String> _outputFsProps;
+  private boolean _overwriteOutput;
 
-  private final String _recordReaderClassName;
-  private final String _recordReaderConfigClassName;
-  private final Map<String, String> _recordReaderProps;
+  private String _recordReaderClassName;
+  private String _recordReaderConfigClassName;
+  private Map<String, String> _recordReaderProps;
 
-  private final String _segmentNameGeneratorType;
-  private final Map<String, String> _segmentNameGeneratorConfigs;
-  private final String _segmentName;
-  private final String _segmentNamePrefix;
-  private final String _segmentNamePostfix;
-  private final boolean _excludeSequenceId;
-  private final String _sequenceId;
+  private String _segmentNameGeneratorType;
+  private Map<String, String> _segmentNameGeneratorConfigs;
+  private String _segmentName;
+  private String _segmentNamePrefix;
+  private String _segmentNamePostfix;
+  private boolean _excludeSequenceId;
+  private String _sequenceId;
 
-  private final String _pushMode;
-  private final int _pushAttempts;
-  private final int _pushParallelism;
-  private final long _pushIntervalRetryMillis;
-  private final String _pushSegmentURIPrefix;
-  private final String _pushSegmentURISuffix;
-  private final String _pushControllerURI;
-  private final String _outputSegmentDirURI;
+  private String _pushMode;
+  private int _pushAttempts;
+  private int _pushParallelism;
+  private long _pushIntervalRetryMillis;
+  private String _pushSegmentURIPrefix;
+  private String _pushSegmentURISuffix;
+  private String _pushControllerURI;
+  private String _outputSegmentDirURI;
 
   public BatchConfig(String tableNameWithType, Map<String, String> batchConfigsMap) {
+    indexConfigKeys(tableNameWithType, batchConfigsMap, false);
+  }
+
+  public BatchConfig(String tableNameWithType, Map<String, String> batchConfigsMap, boolean obfuscateConfig) {
+    indexConfigKeys(tableNameWithType, batchConfigsMap, true);
+  }
+
+  public void indexConfigKeys(String tableNameWithType, Map<String, String> batchConfigsMap, boolean obfuscateConfig) {
     _batchConfigMap = batchConfigsMap;
     _tableNameWithType = tableNameWithType;
 
@@ -71,15 +79,27 @@ public class BatchConfig {
     } else {
       _inputFormat = null;
     }
+
     _inputDirURI = batchConfigsMap.get(BatchConfigProperties.INPUT_DIR_URI);
     _inputFsClassName = batchConfigsMap.get(BatchConfigProperties.INPUT_FS_CLASS);
-    _inputFsProps =
-        IngestionConfigUtils.extractPropsMatchingPrefix(batchConfigsMap, BatchConfigProperties.INPUT_FS_PROP_PREFIX);
 
     _outputDirURI = batchConfigsMap.get(BatchConfigProperties.OUTPUT_DIR_URI);
     _outputFsClassName = batchConfigsMap.get(BatchConfigProperties.OUTPUT_FS_CLASS);
+
+    _inputFsProps =
+        IngestionConfigUtils.extractPropsMatchingPrefix(batchConfigsMap, BatchConfigProperties.INPUT_FS_PROP_PREFIX);
     _outputFsProps =
         IngestionConfigUtils.extractPropsMatchingPrefix(batchConfigsMap, BatchConfigProperties.OUTPUT_FS_PROP_PREFIX);
+
+    if (obfuscateConfig){
+      for (Map.Entry<String, String> entry : _inputFsProps.entrySet()) {
+        batchConfigsMap.put(entry.getKey(), "*****");
+      }
+      for (Map.Entry<String, String> entry : _outputFsProps.entrySet()) {
+        batchConfigsMap.put(entry.getKey(), "*****");
+      }
+    }
+
     _overwriteOutput = Boolean.parseBoolean(batchConfigsMap.get(BatchConfigProperties.OVERWRITE_OUTPUT));
 
     _recordReaderClassName = batchConfigsMap.get(BatchConfigProperties.RECORD_READER_CLASS);

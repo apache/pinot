@@ -24,8 +24,10 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
@@ -56,7 +58,10 @@ import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.glassfish.grizzly.http.server.Request;
@@ -126,6 +131,23 @@ public class TableConfigsRestletResource {
       Schema schema = _pinotHelixResourceManager.getSchema(tableName);
       TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName);
       TableConfig realtimeTableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
+
+      IngestionConfig ingestionConfig = offlineTableConfig.getIngestionConfig();
+      if (ingestionConfig != null) {
+        BatchIngestionConfig batchIngestionConfig = ingestionConfig.getBatchIngestionConfig();
+        if (batchIngestionConfig != null) {
+          List<Map<String, String>> offlineBatchConfigMaps = batchIngestionConfig.getBatchConfigMaps();
+          List<Map<String, String>> batchConfigs = new ArrayList<>();
+          for(Map<String, String> batchConfigMap : offlineBatchConfigMaps){
+            BatchConfig batchObfuscatedConfig = new BatchConfig(tableName, batchConfigMap, true);
+            batchConfigs.add(batchObfuscatedConfig.getBatchConfigMap());
+          }
+          batchIngestionConfig.setBatchConfigMaps(batchConfigs);
+        }
+        ingestionConfig.setBatchIngestionConfig(batchIngestionConfig);
+      }
+      offlineTableConfig.setIngestionConfig(ingestionConfig);
+      
       TableConfigs config = new TableConfigs(tableName, schema, offlineTableConfig, realtimeTableConfig);
       return config.toJsonString();
     } catch (Exception e) {
