@@ -22,15 +22,11 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
-import java.util.zip.GZIPInputStream;
-import org.apache.avro.file.DataFileStream;
-import org.apache.avro.generic.GenericDatumReader;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.pinot.ingestion.common.ControllerRestApi;
 import org.apache.pinot.ingestion.common.JobConfigConstants;
+import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,26 +71,8 @@ public abstract class SegmentPreprocessingJob extends BaseSegmentJob {
   protected abstract void run()
       throws Exception;
 
-  /**
-   * Helper method that returns avro reader for the given avro file.
-   * If file name ends in 'gz' then returns the GZIP version, otherwise gives the regular reader.
-   *
-   * @param avroFile File to read
-   * @return Avro reader for the file.
-   * @throws IOException exception when accessing to IO
-   */
-  protected DataFileStream<GenericRecord> getAvroReader(Path avroFile)
-      throws IOException {
-    FileSystem fs = FileSystem.get(new Configuration());
-    if (avroFile.getName().endsWith("gz")) {
-      return new DataFileStream<>(new GZIPInputStream(fs.open(avroFile)), new GenericDatumReader<>());
-    } else {
-      return new DataFileStream<>(fs.open(avroFile), new GenericDatumReader<>());
-    }
-  }
-
   @Override
-  protected org.apache.pinot.spi.data.Schema getSchema()
+  protected Schema getSchema()
       throws IOException {
     try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
       if (controllerRestApi != null) {
