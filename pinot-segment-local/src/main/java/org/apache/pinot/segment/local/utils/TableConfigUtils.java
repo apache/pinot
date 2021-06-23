@@ -382,6 +382,11 @@ public final class TableConfigUtils {
         Preconditions.checkState(!schema.getDateTimeNames().contains(column),
             "INCREMENT merger cannot be applied to date time column: %s", column);
       }
+
+      if (entry.getValue() == UpsertConfig.Strategy.APPEND) {
+        Preconditions.checkState(!fieldSpec.isSingleValueField(),
+            "APPEND merger cannot be applied to single-value column: %s", column);
+      }
     }
   }
 

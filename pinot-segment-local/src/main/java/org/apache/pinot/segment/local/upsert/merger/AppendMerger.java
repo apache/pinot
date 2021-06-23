@@ -18,27 +18,31 @@
  */
 package org.apache.pinot.segment.local.upsert.merger;
 
-import org.apache.pinot.spi.config.table.UpsertConfig;
 
 
-public class PartialUpsertMergerFactory {
-  private PartialUpsertMergerFactory() {
+public class AppendMerger implements PartialUpsertMerger {
+  AppendMerger() {
   }
 
-  private static final AppendMerger APPEND_MERGER = new AppendMerger();
-  private static final IncrementMerger INCREMENT_MERGER = new IncrementMerger();
-  private static final OverwriteMerger OVERWRITE_MERGER = new OverwriteMerger();
+  /**
+   * Append the new value from incoming row to the given multi-value field of previous record.
+   */
+  @Override
+  public Object merge(Object previousValue, Object currentValue) {
+    return append((Object[]) previousValue, (Object[]) currentValue);
+  }
 
-  public static PartialUpsertMerger getMerger(UpsertConfig.Strategy strategy) {
-    switch (strategy) {
-      case APPEND:
-        return APPEND_MERGER;
-      case INCREMENT:
-        return INCREMENT_MERGER;
-      case OVERWRITE:
-        return OVERWRITE_MERGER;
-      default:
-        throw new IllegalStateException("Unsupported partial upsert strategy: " + strategy);
+  private static Object append(Object[] a, Object[] b) {
+    Object[] merged = new Object[a.length + b.length];
+    int count = 0;
+
+    for (int i = 0; i < a.length; i++) {
+      merged[i] = a[i];
+      count++;
     }
+    for (int j = 0; j < b.length; j++) {
+      merged[count++] = b[j];
+    }
+    return merged;
   }
 }

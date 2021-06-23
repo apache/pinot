@@ -1157,6 +1157,15 @@ public class TableConfigUtilsTest {
     }
 
     partialUpsertStratgies.clear();
+    partialUpsertStratgies.put("myCol2", UpsertConfig.Strategy.APPEND);
+    try {
+      TableConfigUtils.validatePartialUpsertStrategies(tableConfig, schema);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(), "APPEND merger cannot be applied to single-value column: myCol2");
+    }
+
+    partialUpsertStratgies.clear();
     partialUpsertStratgies.put("myTimeCol", UpsertConfig.Strategy.INCREMENT);
     try {
       TableConfigUtils.validatePartialUpsertStrategies(tableConfig, schema);

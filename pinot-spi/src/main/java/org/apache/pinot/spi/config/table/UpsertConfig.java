@@ -33,8 +33,8 @@ public class UpsertConfig extends BaseJsonConfig {
   }
 
   public enum Strategy {
-    // Todo: add APPEND, CUSTOM strategies
-    OVERWRITE, INCREMENT
+    // Todo: add UNION, CUSTOM strategies
+    APPEND, INCREMENT, OVERWRITE
   }
 
   private final Mode _mode;
