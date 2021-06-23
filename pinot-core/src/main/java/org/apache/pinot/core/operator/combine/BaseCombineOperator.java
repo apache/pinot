@@ -163,7 +163,7 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
         LOGGER.error("Caught exception while executing operator of index: {} (query: {})", operatorIndex, _queryContext,
             e);
         _blockingQueue.offer(new IntermediateResultsBlock(e));
-        throw e;
+        return;
       }
     }
   }

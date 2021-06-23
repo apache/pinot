@@ -41,6 +41,7 @@ import org.apache.pinot.pql.parsers.pql2.ast.IntegerLiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.LiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.Pair;
@@ -117,18 +118,23 @@ public class JsonStatementOptimizer implements StatementOptimizer {
   /**
    * Null value constants for different column types. Used while rewriting json path expression to JSON_EXTRACT_SCALAR function.
    */
-  private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_INT_AST = new IntegerLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
-  private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_LONG_AST = new IntegerLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
-  private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT_AST = new FloatingPointLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT);
-  private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE_AST = new FloatingPointLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE);
-  private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_STRING_AST = new StringLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
+  private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_INT_AST =
+      new IntegerLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
+  private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_LONG_AST =
+      new IntegerLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
+  private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT_AST =
+      new FloatingPointLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT);
+  private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE_AST =
+      new FloatingPointLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE);
+  private static LiteralAstNode DEFAULT_DIMENSION_NULL_VALUE_OF_STRING_AST =
+      new StringLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
 
   @Override
-  public void optimize(PinotQuery query, @Nullable Schema schema) {
+  public void optimize(PinotQuery query, @Nullable TableConfig config, @Nullable Schema schema) {
     // In SELECT clause, replace JSON path expressions with JSON_EXTRACT_SCALAR function with an alias.
     List<Expression> expressions = query.getSelectList();
     for (Expression expression : expressions) {
-      Pair<String, Boolean> result = optimizeJsonIdentifier(expression, schema, DataSchema.ColumnDataType.STRING, true);
+      Pair<String, Boolean> result = optimizeJsonIdentifier(expression, schema, DataSchema.ColumnDataType.STRING);
       if (expression.getType() == ExpressionType.FUNCTION && !expression.getFunctionCall().getOperator().equals("AS")
           && result.getSecond()) {
         // Since this is not an AS function (user-specified alias) and the function or its arguments contain json path
@@ -142,14 +148,14 @@ public class JsonStatementOptimizer implements StatementOptimizer {
     // In WHERE clause, replace JSON path expressions with JSON_MATCH function.
     Expression filter = query.getFilterExpression();
     if (filter != null) {
-      optimizeJsonPredicate(filter, schema);
+      optimizeJsonPredicate(filter, config, schema);
     }
 
     // In GROUP BY clause, replace JSON path expressions with JSON_EXTRACT_SCALAR function without an alias.
     expressions = query.getGroupByList();
     if (expressions != null) {
       for (Expression expression : expressions) {
-        optimizeJsonIdentifier(expression, schema, DataSchema.ColumnDataType.STRING, false);
+        optimizeJsonIdentifier(expression, schema, DataSchema.ColumnDataType.STRING);
       }
     }
 
@@ -158,7 +164,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
     expressions = query.getOrderByList();
     if (expressions != null) {
       for (Expression expression : expressions) {
-        optimizeJsonIdentifier(expression, schema, DataSchema.ColumnDataType.STRING, false);
+        optimizeJsonIdentifier(expression, schema, DataSchema.ColumnDataType.STRING);
       }
     }
 
@@ -166,7 +172,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
     // corresponding SELECT list expression except for the alias.
     Expression expression = query.getHavingExpression();
     if (expression != null) {
-      optimizeJsonIdentifier(expression, schema, DataSchema.ColumnDataType.STRING, false);
+      optimizeJsonIdentifier(expression, schema, DataSchema.ColumnDataType.STRING);
     }
   }
 
@@ -178,8 +184,8 @@ public class JsonStatementOptimizer implements StatementOptimizer {
    * @return A {@link Pair} of values where the first value is alias for the input expression and second
    * value indicates whether json path expression was found (true) or not (false) in the expression.
    */
-  private static Pair<String, Boolean> optimizeJsonIdentifier(Expression expression, Schema schema, DataSchema.ColumnDataType outputDataType,
-      boolean hasColumnAlias) {
+  private static Pair<String, Boolean> optimizeJsonIdentifier(Expression expression, @Nullable Schema schema,
+      DataSchema.ColumnDataType outputDataType) {
     switch (expression.getType()) {
       case LITERAL:
         return new Pair<>(getLiteralSQL(expression.getLiteral(), true), false);
@@ -205,7 +211,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
         StringBuffer alias = new StringBuffer();
         if (function.getOperator().toUpperCase().equals("AS")) {
           // We don't need to compute an alias for AS function since AS function defines its own alias.
-          hasJsonPathExpression = optimizeJsonIdentifier(operands.get(0), schema, outputDataType, false).getSecond();
+          hasJsonPathExpression = optimizeJsonIdentifier(operands.get(0), schema, outputDataType).getSecond();
           alias.append(function.getOperands().get(1).getIdentifier().getName());
         } else {
           // For all functions besides AS function, process the operands and compute the alias.
@@ -216,7 +222,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
 
           for (int i = 0; i < operands.size(); ++i) {
             // recursively check to see if there is a <json-column>.<json-path> identifier in this expression.
-            Pair<String, Boolean> operandResult = optimizeJsonIdentifier(operands.get(i), schema, outputDataType, false);
+            Pair<String, Boolean> operandResult = optimizeJsonIdentifier(operands.get(i), schema, outputDataType);
             hasJsonPathExpression |= operandResult.getSecond();
             if (i > 0) {
               alias.append(",");
@@ -269,8 +275,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
     List<Expression> operands = new ArrayList<>();
     operands.add(RequestUtils.createIdentifierExpression(parts[0]));
     operands.add(RequestUtils.createLiteralExpression(new StringLiteralAstNode(getJsonPath(parts, false))));
-    operands
-        .add(RequestUtils.createLiteralExpression(new StringLiteralAstNode(dataType.toString())));
+    operands.add(RequestUtils.createLiteralExpression(new StringLiteralAstNode(dataType.toString())));
 
     operands.add(RequestUtils.createLiteralExpression(getDefaultNullValueForType(dataType)));
     jsonExtractScalarFunction.setOperands(operands);
@@ -286,7 +291,8 @@ public class JsonStatementOptimizer implements StatementOptimizer {
    * Input : "jsonColumn.id = 4"
    * Output: "JSON_MATCH(jsonColumn, '\"$.id\" = 4')
    */
-  private static void optimizeJsonPredicate(Expression expression, Schema schema) {
+  private static void optimizeJsonPredicate(Expression expression, @Nullable TableConfig config,
+      @Nullable Schema schema) {
     if (expression.getType() == ExpressionType.FUNCTION) {
       Function function = expression.getFunctionCall();
       String operator = function.getOperator();
@@ -295,7 +301,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
       switch (kind) {
         case AND:
         case OR: {
-          operands.forEach(operand -> optimizeJsonPredicate(operand, schema));
+          operands.forEach(operand -> optimizeJsonPredicate(operand, config, schema));
           break;
         }
         case EQUALS:
@@ -309,15 +315,21 @@ public class JsonStatementOptimizer implements StatementOptimizer {
           if (left.getType() == ExpressionType.IDENTIFIER && right.getType() == ExpressionType.LITERAL) {
             String[] parts = getIdentifierParts(left.getIdentifier());
             if (parts.length > 1 && isValidJSONColumn(parts[0], schema)) {
-              Function jsonMatchFunction = new Function("JSON_MATCH");
+              if (isIndexedJSONColumn(parts[0], config)) {
+                Function jsonMatchFunction = new Function("JSON_MATCH");
 
-              List<Expression> jsonMatchFunctionOperands = new ArrayList<>();
-              jsonMatchFunctionOperands.add(RequestUtils.createIdentifierExpression(parts[0]));
-              jsonMatchFunctionOperands.add(RequestUtils.createLiteralExpression(new StringLiteralAstNode(
-                  getJsonPath(parts, true) + getOperatorSQL(kind) + getLiteralSQL(right.getLiteral(), false))));
-              jsonMatchFunction.setOperands(jsonMatchFunctionOperands);
+                List<Expression> jsonMatchFunctionOperands = new ArrayList<>();
+                jsonMatchFunctionOperands.add(RequestUtils.createIdentifierExpression(parts[0]));
+                jsonMatchFunctionOperands.add(RequestUtils.createLiteralExpression(new StringLiteralAstNode(
+                    getJsonPath(parts, true) + getOperatorSQL(kind) + getLiteralSQL(right.getLiteral(), false))));
+                jsonMatchFunction.setOperands(jsonMatchFunctionOperands);
 
-              expression.setFunctionCall(jsonMatchFunction);
+                expression.setFunctionCall(jsonMatchFunction);
+              } else {
+                left.clear();
+                left.setType(ExpressionType.FUNCTION);
+                left.setFunctionCall(getJsonExtractFunction(parts, getColumnTypeForLiteral(right.getLiteral())));
+              }
             }
           }
           break;
@@ -328,15 +340,21 @@ public class JsonStatementOptimizer implements StatementOptimizer {
           if (operand.getType() == ExpressionType.IDENTIFIER) {
             String[] parts = getIdentifierParts(operand.getIdentifier());
             if (parts.length > 1 && isValidJSONColumn(parts[0], schema)) {
-              Function jsonMatchFunction = new Function("JSON_MATCH");
+              if (isIndexedJSONColumn(parts[0], config)) {
+                Function jsonMatchFunction = new Function("JSON_MATCH");
 
-              List<Expression> jsonMatchFunctionOperands = new ArrayList<>();
-              jsonMatchFunctionOperands.add(RequestUtils.createIdentifierExpression(parts[0]));
-              jsonMatchFunctionOperands.add(RequestUtils.createLiteralExpression(
-                  new StringLiteralAstNode(getJsonPath(parts, true) + getOperatorSQL(kind))));
-              jsonMatchFunction.setOperands(jsonMatchFunctionOperands);
+                List<Expression> jsonMatchFunctionOperands = new ArrayList<>();
+                jsonMatchFunctionOperands.add(RequestUtils.createIdentifierExpression(parts[0]));
+                jsonMatchFunctionOperands.add(RequestUtils.createLiteralExpression(
+                    new StringLiteralAstNode(getJsonPath(parts, true) + getOperatorSQL(kind))));
+                jsonMatchFunction.setOperands(jsonMatchFunctionOperands);
 
-              expression.setFunctionCall(jsonMatchFunction);
+                expression.setFunctionCall(jsonMatchFunction);
+              } else {
+                operand.clear();
+                operand.setType(ExpressionType.FUNCTION);
+                operand.setFunctionCall(getJsonExtractFunction(parts, DataSchema.ColumnDataType.JSON));
+              }
             }
           }
           break;
@@ -381,9 +399,14 @@ public class JsonStatementOptimizer implements StatementOptimizer {
   }
 
   /** @return true if specified column has column datatype of JSON; otherwise, return false */
-  private static boolean isValidJSONColumn(String columnName, Schema schema) {
-    return schema.hasColumn(columnName) && schema.getFieldSpecFor(columnName).getDataType()
+  private static boolean isValidJSONColumn(String columnName, @Nullable Schema schema) {
+    return schema != null && schema.hasColumn(columnName) && schema.getFieldSpecFor(columnName).getDataType()
         .equals(FieldSpec.DataType.JSON);
+  }
+
+  /** @return true if specified column has a JSON Index. */
+  private static boolean isIndexedJSONColumn(String columnName, @Nullable TableConfig config) {
+    return config != null && config.getIndexingConfig().getJsonIndexColumns().contains(columnName);
   }
 
   /** @return symbolic representation of function operator delimited by spaces. */
@@ -427,10 +450,12 @@ public class JsonStatementOptimizer implements StatementOptimizer {
         result.append(String.valueOf(literal.getBinaryValue()));
         break;
       case BYTE_VALUE:
-        result.append(aliasing ? String.valueOf(literal.getByteValue()) : "'" + String.valueOf(literal.getByteValue()) + "'");
+        result.append(
+            aliasing ? String.valueOf(literal.getByteValue()) : "'" + String.valueOf(literal.getByteValue()) + "'");
         break;
       case SHORT_VALUE:
-        result.append(aliasing ? String.valueOf(literal.getShortValue()) : "'" + String.valueOf(literal.getShortValue()) + "'");
+        result.append(
+            aliasing ? String.valueOf(literal.getShortValue()) : "'" + String.valueOf(literal.getShortValue()) + "'");
         break;
       case INT_VALUE:
         result.append(String.valueOf(literal.getIntValue()));
@@ -445,12 +470,32 @@ public class JsonStatementOptimizer implements StatementOptimizer {
         result.append("'" + literal.getStringValue() + "'");
         break;
       case BINARY_VALUE:
-        result.append(aliasing ? String.valueOf(literal.getBinaryValue()) : "'" + String.valueOf(literal.getBinaryValue()) + "'");
+        result.append(
+            aliasing ? String.valueOf(literal.getBinaryValue()) : "'" + String.valueOf(literal.getBinaryValue()) + "'");
         break;
     }
 
     result.append(aliasing ? "'" : "");
     return result.toString();
+  }
+
+  private static DataSchema.ColumnDataType getColumnTypeForLiteral(Literal literal) {
+    switch (literal.getSetField()) {
+      case BOOL_VALUE:
+        return DataSchema.ColumnDataType.BOOLEAN;
+      case SHORT_VALUE:
+      case INT_VALUE:
+      case LONG_VALUE:
+        return DataSchema.ColumnDataType.LONG;
+      case DOUBLE_VALUE:
+        return DataSchema.ColumnDataType.DOUBLE;
+      case STRING_VALUE:
+        return DataSchema.ColumnDataType.STRING;
+      case BYTE_VALUE:
+      case BINARY_VALUE:
+        return DataSchema.ColumnDataType.BYTES;
+    }
+    return DataSchema.ColumnDataType.STRING;
   }
 
   /** Given a datatype, return its default null value as a {@link LiteralAstNode} */

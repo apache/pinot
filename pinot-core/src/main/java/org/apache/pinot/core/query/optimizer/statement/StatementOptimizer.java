@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.optimizer.statement;
 
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -30,5 +31,5 @@ import org.apache.pinot.spi.data.Schema;
 public interface StatementOptimizer {
 
   /** Optimize the given SQL statement. */
-  public void optimize(PinotQuery query, @Nullable Schema schema);
+  public void optimize(PinotQuery query, @Nullable TableConfig config, @Nullable Schema schema);
 }
