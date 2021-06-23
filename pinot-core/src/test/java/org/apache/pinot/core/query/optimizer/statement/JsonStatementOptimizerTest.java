@@ -51,6 +51,11 @@ public class JsonStatementOptimizerTest {
   /** Test that a json path expression in SELECT list is properly converted to a JSON_EXTRACT_SCALAR function within an AS function. */
   @Test
   public void testJsonSelect() {
+    // SELECT using json column.
+    assertEqualsQuery("SELECT jsonColumn FROM testTable",
+        "SELECT jsonColumn FROM testTable",
+        TABLE_CONFIG_WITH_INDEX, SCHEMA);
+
     // SELECT using a simple json path expression.
     assertEqualsQuery("SELECT jsonColumn.x FROM testTable",
         "SELECT JSON_EXTRACT_SCALAR(jsonColumn, '$.x', 'STRING', 'null') AS \"jsonColumn.x\" FROM testTable",

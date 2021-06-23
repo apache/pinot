@@ -22,7 +22,6 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.scalar.ArithmeticFunctions;
@@ -41,6 +40,7 @@ import org.apache.pinot.pql.parsers.pql2.ast.IntegerLiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.LiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -130,7 +130,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
       new StringLiteralAstNode(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
 
   @Override
-  public void optimize(PinotQuery query, @Nullable TableConfig config, @Nullable Schema schema) {
+  public void optimize(PinotQuery query, @Nullable TableConfig tableConfig, @Nullable Schema schema) {
     // In SELECT clause, replace JSON path expressions with JSON_EXTRACT_SCALAR function with an alias.
     List<Expression> expressions = query.getSelectList();
     for (Expression expression : expressions) {
@@ -148,7 +148,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
     // In WHERE clause, replace JSON path expressions with JSON_MATCH function.
     Expression filter = query.getFilterExpression();
     if (filter != null) {
-      optimizeJsonPredicate(filter, config, schema);
+      optimizeJsonPredicate(filter, tableConfig, schema);
     }
 
     // In GROUP BY clause, replace JSON path expressions with JSON_EXTRACT_SCALAR function without an alias.
@@ -215,7 +215,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
           alias.append(function.getOperands().get(1).getIdentifier().getName());
         } else {
           // For all functions besides AS function, process the operands and compute the alias.
-          alias.append(function.getOperator().toLowerCase(Locale.ROOT)).append("(");
+          alias.append(function.getOperator().toLowerCase()).append("(");
 
           // Output datatype of JSON_EXTRACT_SCALAR will depend upon the function within which json path expression appears.
           outputDataType = getJsonExtractOutputDataType(function);
@@ -291,7 +291,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
    * Input : "jsonColumn.id = 4"
    * Output: "JSON_MATCH(jsonColumn, '\"$.id\" = 4')
    */
-  private static void optimizeJsonPredicate(Expression expression, @Nullable TableConfig config,
+  private static void optimizeJsonPredicate(Expression expression, @Nullable TableConfig tableConfig,
       @Nullable Schema schema) {
     if (expression.getType() == ExpressionType.FUNCTION) {
       Function function = expression.getFunctionCall();
@@ -301,7 +301,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
       switch (kind) {
         case AND:
         case OR: {
-          operands.forEach(operand -> optimizeJsonPredicate(operand, config, schema));
+          operands.forEach(operand -> optimizeJsonPredicate(operand, tableConfig, schema));
           break;
         }
         case EQUALS:
@@ -315,7 +315,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
           if (left.getType() == ExpressionType.IDENTIFIER && right.getType() == ExpressionType.LITERAL) {
             String[] parts = getIdentifierParts(left.getIdentifier());
             if (parts.length > 1 && isValidJSONColumn(parts[0], schema)) {
-              if (isIndexedJSONColumn(parts[0], config)) {
+              if (isIndexedJSONColumn(parts[0], tableConfig)) {
                 Function jsonMatchFunction = new Function("JSON_MATCH");
 
                 List<Expression> jsonMatchFunctionOperands = new ArrayList<>();
@@ -340,7 +340,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
           if (operand.getType() == ExpressionType.IDENTIFIER) {
             String[] parts = getIdentifierParts(operand.getIdentifier());
             if (parts.length > 1 && isValidJSONColumn(parts[0], schema)) {
-              if (isIndexedJSONColumn(parts[0], config)) {
+              if (isIndexedJSONColumn(parts[0], tableConfig)) {
                 Function jsonMatchFunction = new Function("JSON_MATCH");
 
                 List<Expression> jsonMatchFunctionOperands = new ArrayList<>();
@@ -405,8 +405,22 @@ public class JsonStatementOptimizer implements StatementOptimizer {
   }
 
   /** @return true if specified column has a JSON Index. */
-  private static boolean isIndexedJSONColumn(String columnName, @Nullable TableConfig config) {
-    return config != null && config.getIndexingConfig().getJsonIndexColumns().contains(columnName);
+  private static boolean isIndexedJSONColumn(String columnName, @Nullable TableConfig tableConfig) {
+    if (tableConfig == null) {
+      return false;
+    }
+
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    if (indexingConfig == null) {
+      return false;
+    }
+
+    List<String> jsonIndexColumns = indexingConfig.getJsonIndexColumns();
+    if (jsonIndexColumns == null) {
+      return false;
+    }
+
+    return jsonIndexColumns.contains(columnName);
   }
 
   /** @return symbolic representation of function operator delimited by spaces. */
@@ -518,11 +532,11 @@ public class JsonStatementOptimizer implements StatementOptimizer {
   /** Output datatype of JSON_EXTRACT_SCALAR depends upon the function within which json path expression appears. */
   private static DataSchema.ColumnDataType getJsonExtractOutputDataType(Function function) {
     DataSchema.ColumnDataType dataType = DataSchema.ColumnDataType.STRING;
-    if (numericalFunctions.contains(function.getOperator().toUpperCase(Locale.ROOT))) {
+    if (numericalFunctions.contains(function.getOperator().toUpperCase())) {
       // If json path expression appears as argument of a numeric function, then it will be rewritten into a
       // JSON_EXTRACT_SCALAR function that returns 'DOUBLE'
       dataType = DataSchema.ColumnDataType.DOUBLE;
-    } else if (datetimeFunctions.contains(function.getOperator().toUpperCase(Locale.ROOT))) {
+    } else if (datetimeFunctions.contains(function.getOperator().toUpperCase())) {
       // If json path expression appears as argument of a datetime function, then it will be rewritten into a
       // JSON_EXTRACT_SCALAR function that returns 'LONG'
       dataType = DataSchema.ColumnDataType.LONG;
@@ -536,13 +550,13 @@ public class JsonStatementOptimizer implements StatementOptimizer {
     // Include all ArithmeticFunctions functions
     Method[] methods = ArithmeticFunctions.class.getDeclaredMethods();
     for (Method method : methods) {
-      set.add(method.getName().toUpperCase(Locale.ROOT));
+      set.add(method.getName().toUpperCase());
     }
 
     // Include all aggregation functions
     AggregationFunctionType[] aggs = AggregationFunctionType.values();
     for (AggregationFunctionType agg : aggs) {
-      set.add(agg.getName().toUpperCase(Locale.ROOT));
+      set.add(agg.getName().toUpperCase());
     }
 
     return set;
@@ -553,7 +567,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
     Set<String> set = new HashSet<>();
     Method[] methods = DateTimeFunctions.class.getDeclaredMethods();
     for (Method method : methods) {
-      set.add(method.getName().toUpperCase(Locale.ROOT));
+      set.add(method.getName().toUpperCase());
     }
 
     return set;

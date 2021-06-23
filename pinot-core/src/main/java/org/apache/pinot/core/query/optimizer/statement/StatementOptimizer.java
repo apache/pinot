@@ -31,5 +31,5 @@ import org.apache.pinot.spi.data.Schema;
 public interface StatementOptimizer {
 
   /** Optimize the given SQL statement. */
-  public void optimize(PinotQuery query, @Nullable TableConfig config, @Nullable Schema schema);
+  public void optimize(PinotQuery query, @Nullable TableConfig tableConfig, @Nullable Schema schema);
 }

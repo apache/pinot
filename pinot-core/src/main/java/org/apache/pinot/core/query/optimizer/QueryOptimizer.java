@@ -73,7 +73,7 @@ public class QueryOptimizer {
   }
 
   /** Optimizes the given SQL query. */
-  public void optimize(PinotQuery pinotQuery, @Nullable TableConfig config, @Nullable Schema schema) {
+  public void optimize(PinotQuery pinotQuery, @Nullable TableConfig tableConfig, @Nullable Schema schema) {
     Expression filterExpression = pinotQuery.getFilterExpression();
     if (filterExpression != null) {
       for (FilterOptimizer filterOptimizer : FILTER_OPTIMIZERS) {
@@ -84,7 +84,7 @@ public class QueryOptimizer {
 
     // Run statement optimizer after filter has already been optimized.
     for (StatementOptimizer statementOptimizer : STATEMENT_OPTIMIZERS) {
-      statementOptimizer.optimize(pinotQuery, config, schema);
+      statementOptimizer.optimize(pinotQuery, tableConfig, schema);
     }
   }
 }
