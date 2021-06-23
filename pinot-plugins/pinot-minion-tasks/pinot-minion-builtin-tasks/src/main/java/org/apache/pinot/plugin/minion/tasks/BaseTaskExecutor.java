@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.minion.tasks;
 
 import com.google.common.base.Preconditions;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionContext;
@@ -55,5 +56,13 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
     Schema schema = ZKMetadataProvider.getTableSchema(MINION_CONTEXT.getHelixPropertyStore(), tableName);
     Preconditions.checkState(schema != null, "Failed to find schema for table: %s", tableName);
     return schema;
+  }
+
+  protected long getSegmentCrc(String tableNameWithType, String segmentName) {
+    OfflineSegmentZKMetadata segmentZKMetadata = ZKMetadataProvider
+        .getOfflineSegmentZKMetadata(MINION_CONTEXT.getHelixPropertyStore(), tableNameWithType, segmentName);
+    Preconditions.checkState(segmentZKMetadata != null, "Failed to find segment metadata for table: %s, segment: %s",
+        tableNameWithType, segmentName);
+    return segmentZKMetadata.getCrc();
   }
 }
