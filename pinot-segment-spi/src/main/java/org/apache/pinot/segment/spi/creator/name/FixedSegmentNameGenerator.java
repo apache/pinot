@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.creator.name;
 
+import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
 
 /**
@@ -28,6 +29,8 @@ public class FixedSegmentNameGenerator implements SegmentNameGenerator {
   private final String _segmentName;
 
   public FixedSegmentNameGenerator(String segmentName) {
+    Preconditions.checkArgument(
+        segmentName != null && !segmentName.matches(INVALID_SEGMENT_NAME_REGEX));
     _segmentName = segmentName;
   }
 

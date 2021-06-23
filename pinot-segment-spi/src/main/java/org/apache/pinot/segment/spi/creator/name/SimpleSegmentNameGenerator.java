@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.creator.name;
 
+import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
 
 
@@ -39,12 +40,20 @@ public class SimpleSegmentNameGenerator implements SegmentNameGenerator {
   private final String _segmentNamePostfix;
 
   public SimpleSegmentNameGenerator(String segmentNamePrefix, @Nullable String segmentNamePostfix) {
+    Preconditions.checkArgument(
+        segmentNamePrefix != null && !segmentNamePrefix.matches(INVALID_SEGMENT_NAME_REGEX));
+    Preconditions.checkArgument(
+        segmentNamePostfix == null || !segmentNamePostfix.matches(INVALID_SEGMENT_NAME_REGEX));
     _segmentNamePrefix = segmentNamePrefix;
     _segmentNamePostfix = segmentNamePostfix;
   }
 
   @Override
   public String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue) {
+    Preconditions.checkArgument(
+        minTimeValue == null  || !minTimeValue.toString().matches(INVALID_SEGMENT_NAME_REGEX));
+    Preconditions.checkArgument(
+        maxTimeValue == null  || !maxTimeValue.toString().matches(INVALID_SEGMENT_NAME_REGEX));
     return JOINER
         .join(_segmentNamePrefix, minTimeValue, maxTimeValue, _segmentNamePostfix, sequenceId >= 0 ? sequenceId : null);
   }
