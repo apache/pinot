@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.function.scalar.ArithmeticFunctions;
 import org.apache.pinot.common.function.scalar.DateTimeFunctions;
 import org.apache.pinot.common.request.Expression;
@@ -370,7 +371,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
    *  two parts when joined together (name.first) represent a JSON path expression.
    */
   private static String[] getIdentifierParts(Identifier identifier) {
-    return identifier.getName().split("\\.");
+    return StringUtils.split(identifier.getName(), '.');
   }
 
   /**
