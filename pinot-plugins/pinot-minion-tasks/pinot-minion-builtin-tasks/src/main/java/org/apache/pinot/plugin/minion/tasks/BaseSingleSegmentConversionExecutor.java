@@ -74,7 +74,8 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
     if (Long.parseLong(originalSegmentCrc) != currentSegmentCrc) {
       LOGGER.info("Segment CRC does not match, skip the task. Original CRC: {}, current CRC: {}", originalSegmentCrc,
           currentSegmentCrc);
-      new SegmentConversionResult.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName).build();
+      return new SegmentConversionResult.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
+          .build();
     }
 
     LOGGER.info("Start executing {} on table: {}, segment: {} with downloadURL: {}, uploadURL: {}", taskType,
