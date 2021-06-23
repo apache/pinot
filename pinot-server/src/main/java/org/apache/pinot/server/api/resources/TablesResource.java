@@ -31,8 +31,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
@@ -52,19 +54,26 @@ import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
+import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.server.api.access.AccessControl;
 import org.apache.pinot.server.api.access.AccessControlFactory;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -115,6 +124,103 @@ public class TablesResource {
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }
+  }
+
+  @GET
+  @Encoded
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/tables/{tableName}/metadata")
+  @ApiOperation(value = "List metadata for all segments of a given table", notes = "List segments metadata of table hosted on this server")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"), @ApiResponse(code = 404, message = "Table not found")})
+  public String getTableSize(
+      @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") @DefaultValue("") List<String> columns)
+      throws WebApplicationException {
+    InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
+
+    if (instanceDataManager == null) {
+      throw new WebApplicationException("Invalid server initialization", Response.Status.INTERNAL_SERVER_ERROR);
+    }
+
+    TableDataManager tableDataManager = instanceDataManager.getTableDataManager(tableName);
+    if (tableDataManager == null) {
+      throw new WebApplicationException("Table: " + tableName + " is not found", Response.Status.NOT_FOUND);
+    }
+
+    for (int i = 0; i < columns.size(); i++) {
+      try {
+        columns.set(i, URLDecoder.decode(columns.get(i), StandardCharsets.UTF_8.name()));
+      } catch (UnsupportedEncodingException e) {
+        throw new RuntimeException(e.getCause());
+      }
+    }
+    Set<String> columnSet;
+    if (columns.size() == 1 && columns.get(0).equals("*")) {
+      columnSet = null;
+    } else {
+      columnSet = new HashSet<>(columns);
+    }
+
+    TableMetadataInfo tableMetadataInfo = new TableMetadataInfo();
+    tableMetadataInfo.tableName = tableDataManager.getTableName();
+
+    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
+    tableMetadataInfo.numSegments = segmentDataManagers.size();
+    try {
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        if (segmentDataManager instanceof ImmutableSegmentDataManager) {
+          ImmutableSegment immutableSegment = (ImmutableSegment) segmentDataManager.getSegment();
+          long segmentSizeBytes = immutableSegment.getSegmentSizeBytes();
+          SegmentMetadataImpl segmentMetadata =
+              (SegmentMetadataImpl) segmentDataManager.getSegment().getSegmentMetadata();
+
+          tableMetadataInfo.diskSizeInBytes += segmentSizeBytes;
+          tableMetadataInfo.numRows += segmentMetadata.getTotalDocs();
+
+          if (columnSet == null) {
+            columnSet = segmentMetadata.getAllColumns();
+          } else {
+            columnSet.retainAll(segmentMetadata.getAllColumns());
+          }
+          for (String column : columnSet) {
+
+            ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataMap().get(column);
+            int columnLength;
+            DataType dataType = columnMetadata.getDataType().getStoredType();
+            if (dataType.isFixedWidth()) {
+              // For type of fixed width: INT, LONG, FLOAT, DOUBLE, BOOLEAN (stored as INT), TIMESTAMP (stored as LONG),
+              // set the columnLength as the fixed width.
+              columnLength = dataType.size();
+            } else if (columnMetadata.hasDictionary()) {
+              // For type of variable width (String), if it's stored using dictionary encoding, set the columnLength as the max
+              // length in dictionary.
+              columnLength = columnMetadata.getColumnMaxLength();
+            } else if (dataType == DataType.STRING) {
+              // For type of variable width (String), if it's stored using raw bytes, set the columnLength as the length
+              // of the max value.
+              columnLength = ((String) columnMetadata.getMaxValue()).getBytes(StandardCharsets.UTF_8).length;
+            } else {
+              // For type of STRUCT, MAP, LIST, set the columnLength as DEFAULT_MAX_LENGTH (512).
+              columnLength = FieldSpec.DEFAULT_MAX_LENGTH;
+            }
+            int columnCardinality = segmentMetadata.getColumnMetadataMap().get(column).getCardinality();
+            tableMetadataInfo.columnLengthMap
+                .put(column, tableMetadataInfo.columnLengthMap.getOrDefault(column, 0) + columnLength);
+            tableMetadataInfo.columnCardinalityMap
+                .put(column, tableMetadataInfo.columnCardinalityMap.getOrDefault(column, 0) + columnCardinality);
+          }
+        }
+      }
+    } finally {
+      // we could release segmentDataManagers as we iterate in the loop above
+      // but this is cleaner with clear semantics of usage. Also, above loop
+      // executes fast so duration of holding segments is not a concern
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        tableDataManager.releaseSegment(segmentDataManager);
+      }
+    }
+
+    return ResourceUtils.convertToJsonString(tableMetadataInfo);
   }
 
   @GET
