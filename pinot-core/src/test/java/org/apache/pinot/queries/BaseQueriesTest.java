@@ -41,6 +41,7 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUt
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -240,8 +241,13 @@ public abstract class BaseQueriesTest {
    * <p>Use this to test the whole flow from server to broker.
    * <p>The result should be equivalent to querying 4 identical index segments.
    */
-  protected BrokerResponseNative getBrokerResponseForOptimizedSqlQuery(String sqlQuery, Schema schema) {
-    return getBrokerResponseForOptimizedSqlQuery(sqlQuery, schema, PLAN_MAKER);
+  protected BrokerResponseNative getBrokerResponseForOptimizedSqlQuery(String sqlQuery, @Nullable Schema schema) {
+    return getBrokerResponseForOptimizedSqlQuery(sqlQuery, null, schema, PLAN_MAKER);
+  }
+
+  protected BrokerResponseNative getBrokerResponseForOptimizedSqlQuery(String sqlQuery, @Nullable TableConfig config,
+      @Nullable Schema schema) {
+    return getBrokerResponseForOptimizedSqlQuery(sqlQuery, config, schema, PLAN_MAKER);
   }
 
   /**
@@ -249,9 +255,10 @@ public abstract class BaseQueriesTest {
    * <p>Use this to test the whole flow from server to broker.
    * <p>The result should be equivalent to querying 4 identical index segments.
    */
-  protected BrokerResponseNative getBrokerResponseForOptimizedSqlQuery(String sqlQuery, Schema schema, PlanMaker planMaker) {
+  protected BrokerResponseNative getBrokerResponseForOptimizedSqlQuery(String sqlQuery, @Nullable TableConfig config,
+      @Nullable Schema schema, PlanMaker planMaker) {
     BrokerRequest brokerRequest = SQL_COMPILER.compileToBrokerRequest(sqlQuery);
-    OPTIMIZER.optimize(brokerRequest.getPinotQuery(), schema);
+    OPTIMIZER.optimize(brokerRequest.getPinotQuery(), config, schema);
     Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
     if (queryOptions == null) {
       queryOptions = new HashMap<>();
