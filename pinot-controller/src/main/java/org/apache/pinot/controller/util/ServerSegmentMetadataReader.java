@@ -19,6 +19,9 @@
 package org.apache.pinot.controller.util;
 
 import com.google.common.collect.BiMap;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +29,7 @@ import java.util.concurrent.Executor;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 /**
  * This is a helper class that calls the server API endpoints to fetch server metadata and the segment reload status
@@ -46,23 +50,27 @@ public class ServerSegmentMetadataReader {
   /**
    * This method is called when the API request is to fetch segment metadata for all segments of the table.
    * This method makes a MultiGet call to all servers that host their respective segments and gets the results.
+   * This method accept a list of column names as filter, and will return column metadata for the column in the
+   * list.
    * @return list of segments and their metadata as a JSON string
    */
   public List<String> getSegmentMetadataFromServer(String tableNameWithType,
-                                                   Map<String, List<String>> serversToSegmentsMap,
-                                                   BiMap<String, String> endpoints, int timeoutMs) {
+      Map<String, List<String>> serversToSegmentsMap, BiMap<String, String> endpoints, List<String> columns,
+      int timeoutMs) {
     LOGGER.debug("Reading segment metadata from servers for table {}.", tableNameWithType);
     List<String> serverURLs = new ArrayList<>();
     for (Map.Entry<String, List<String>> serverToSegments : serversToSegmentsMap.entrySet()) {
       List<String> segments = serverToSegments.getValue();
       for (String segment : segments) {
-        serverURLs.add(generateSegmentMetadataServerURL(tableNameWithType, segment, endpoints.get(serverToSegments.getKey())));
+        serverURLs.add(generateSegmentMetadataServerURL(tableNameWithType, segment, columns,
+            endpoints.get(serverToSegments.getKey())));
       }
     }
     BiMap<String, String> endpointsToServers = endpoints.inverse();
-    CompletionServiceHelper completionServiceHelper = new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
+    CompletionServiceHelper completionServiceHelper =
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, timeoutMs);
+        completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, true, timeoutMs);
     List<String> segmentsMetadata = new ArrayList<>();
 
     int failedParses = 0;
@@ -83,7 +91,22 @@ public class ServerSegmentMetadataReader {
     return segmentsMetadata;
   }
 
-  private String generateSegmentMetadataServerURL(String tableNameWithType, String segmentName, String endpoint) {
-    return String.format("%s/tables/%s/segments/%s/metadata", endpoint, tableNameWithType, segmentName);
+  private String generateSegmentMetadataServerURL(String tableNameWithType, String segmentName, List<String> columns,
+      String endpoint) {
+    try {
+      tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8.name());
+      segmentName = URLEncoder.encode(segmentName, StandardCharsets.UTF_8.name());
+      String paramsStr = "";
+      if (columns != null) {
+        List<String> params = new ArrayList<>(columns.size());
+        for (String column : columns) {
+          params.add(String.format("columns=%s", column));
+        }
+        paramsStr = String.join("&", params);
+      }
+      return String.format("%s/tables/%s/segments/%s/metadata?%s", endpoint, tableNameWithType, segmentName, paramsStr);
+    } catch (UnsupportedEncodingException e) {
+      throw new RuntimeException(e.getCause());
+    }
   }
 }

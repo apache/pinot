@@ -33,6 +33,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.util.TestUtils;
@@ -44,7 +45,7 @@ import org.testng.annotations.Test;
 
 
 public class PinotControllerModeStatelessTest extends ControllerTest {
-  private static long TIMEOUT_IN_MS = 10_000L;
+  private static final long TIMEOUT_IN_MS = 10_000L;
 
   @BeforeClass
   public void setUp() {
@@ -52,7 +53,8 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
   }
 
   @Test
-  public void testHelixOnlyController() {
+  public void testHelixOnlyController()
+      throws Exception {
     // Start a Helix-only controller
     Map<String, Object> properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.HELIX_ONLY);
@@ -65,7 +67,8 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
   }
 
   @Test
-  public void testDualModeController() {
+  public void testDualModeController()
+      throws Exception {
     // Start the first dual-mode controller
     Map<String, Object> properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.DUAL);
@@ -113,7 +116,8 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
     // Start the second dual-mode controller
     properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.DUAL);
-    ControllerStarter secondDualModeController = getControllerStarter(new ControllerConf(properties));
+    ControllerStarter secondDualModeController = new ControllerStarter();
+    secondDualModeController.init(new PinotConfiguration(properties));
     secondDualModeController.start();
     TestUtils
         .waitForCondition(aVoid -> secondDualModeController.getHelixResourceManager().getHelixZkManager().isConnected(),
@@ -160,7 +164,8 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
     properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.DUAL);
 
-    ControllerStarter thirdDualModeController = getControllerStarter(new ControllerConf(properties));
+    ControllerStarter thirdDualModeController = new ControllerStarter();
+    thirdDualModeController.init(new PinotConfiguration(properties));
     thirdDualModeController.start();
     PinotHelixResourceManager pinotHelixResourceManager = thirdDualModeController.getHelixResourceManager();
     _helixManager = pinotHelixResourceManager.getHelixZkManager();
@@ -195,11 +200,13 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
   }
 
   @Test
-  public void testPinotOnlyController() {
+  public void testPinotOnlyController()
+      throws Exception {
     Map<String, Object> properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.PINOT_ONLY);
 
-    ControllerStarter firstPinotOnlyController = getControllerStarter(new ControllerConf(properties));
+    ControllerStarter firstPinotOnlyController = new ControllerStarter();
+    firstPinotOnlyController.init(new PinotConfiguration(properties));
 
     // Starting Pinot-only controller without Helix controller should fail
     try {
@@ -213,7 +220,8 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
     properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.HELIX_ONLY);
 
-    ControllerStarter helixOnlyController = new ControllerStarter(new ControllerConf(properties));
+    ControllerStarter helixOnlyController = new ControllerStarter();
+    helixOnlyController.init(new PinotConfiguration(properties));
     helixOnlyController.start();
     HelixManager helixControllerManager = helixOnlyController.getHelixControllerManager();
     HelixAdmin helixAdmin = helixControllerManager.getClusterManagmentTool();
@@ -232,7 +240,8 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
     properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.PINOT_ONLY);
 
-    ControllerStarter secondPinotOnlyController = getControllerStarter(new ControllerConf(properties));
+    ControllerStarter secondPinotOnlyController = new ControllerStarter();
+    secondPinotOnlyController.init(new PinotConfiguration(properties));
     secondPinotOnlyController.start();
     TestUtils.waitForCondition(
         aVoid -> secondPinotOnlyController.getHelixResourceManager().getHelixZkManager().isConnected(), TIMEOUT_IN_MS,

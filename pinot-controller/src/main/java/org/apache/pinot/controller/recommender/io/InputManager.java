@@ -46,6 +46,7 @@ import org.apache.pinot.controller.recommender.rules.io.params.FlagQueryRulePara
 import org.apache.pinot.controller.recommender.rules.io.params.InvertedSortedIndexJointRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.NoDictionaryOnHeapDictionaryJointRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.PartitionRuleParams;
+import org.apache.pinot.controller.recommender.rules.io.params.RangeIndexRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.RealtimeProvisioningRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.SegmentSizeRuleParams;
 import org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset;
@@ -101,6 +102,7 @@ public class InputManager {
   public InvertedSortedIndexJointRuleParams _invertedSortedIndexJointRuleParams =
       new InvertedSortedIndexJointRuleParams();
   public BloomFilterRuleParams _bloomFilterRuleParams = new BloomFilterRuleParams();
+  public RangeIndexRuleParams _rangeIndexRuleParams = new RangeIndexRuleParams();
   public NoDictionaryOnHeapDictionaryJointRuleParams _noDictionaryOnHeapDictionaryJointRuleParams =
       new NoDictionaryOnHeapDictionaryJointRuleParams();
   public FlagQueryRuleParams _flagQueryRuleParams = new FlagQueryRuleParams();
@@ -452,6 +454,10 @@ public class InputManager {
 
   public BloomFilterRuleParams getBloomFilterRuleParams() {
     return _bloomFilterRuleParams;
+  }
+
+  public RangeIndexRuleParams getRangeIndexRuleParams() {
+    return _rangeIndexRuleParams;
   }
 
   public RealtimeProvisioningRuleParams getRealtimeProvisioningRuleParams() {

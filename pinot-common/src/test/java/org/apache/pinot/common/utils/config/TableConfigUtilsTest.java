@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils.config;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
@@ -75,6 +76,13 @@ public class TableConfigUtilsTest {
     Map<String, String> actualStreamConfigsMap =
         tableConfig.getIngestionConfig().getStreamIngestionConfig().getStreamConfigMaps().get(0);
     Assert.assertEquals(actualStreamConfigsMap, expectedStreamConfigsMap);
+
+    // Assert that the deprecated fields are cleared.
+    Assert.assertNull(tableConfig.getIndexingConfig().getStreamConfigs());
+
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    Assert.assertNull(validationConfig.getSegmentPushFrequency());
+    Assert.assertNull(validationConfig.getSegmentPushType());
   }
 
   /**

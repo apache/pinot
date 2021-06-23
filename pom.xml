@@ -145,6 +145,7 @@
     <dropwizard-metrics.version>4.1.2</dropwizard-metrics.version>
     <snappy-java.version>1.1.1.7</snappy-java.version>
     <zstd-jni.version>1.4.9-5</zstd-jni.version>
+    <lz4-java.version>1.7.1</lz4-java.version>
     <log4j.version>2.11.2</log4j.version>
     <netty.version>4.1.54.Final</netty.version>
     <reactivestreams.version>1.0.3</reactivestreams.version>
@@ -539,6 +540,11 @@
         <groupId>com.github.luben</groupId>
         <artifactId>zstd-jni</artifactId>
         <version>${zstd-jni.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.lz4</groupId>
+        <artifactId>lz4-java</artifactId>
+        <version>${lz4-java.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.commons</groupId>
@@ -944,6 +950,11 @@
         <classifier>hadoop2</classifier>
       </dependency>
       <dependency>
+        <groupId>org.apache.orc</groupId>
+        <artifactId>orc-mapreduce</artifactId>
+        <version>1.5.9</version>
+      </dependency>
+      <dependency>
         <groupId>org.codehaus.jackson</groupId>
         <artifactId>jackson-core-asl</artifactId>
         <version>1.9.13</version>
@@ -981,7 +992,7 @@
       <dependency>
         <groupId>com.tdunning</groupId>
         <artifactId>t-digest</artifactId>
-        <version>3.3</version>
+        <version>3.2</version>
       </dependency>
       <dependency>
         <groupId>org.antlr</groupId>

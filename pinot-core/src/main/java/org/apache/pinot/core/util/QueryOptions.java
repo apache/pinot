@@ -33,6 +33,8 @@ public class QueryOptions {
   private final boolean _responseFormatSQL;
   private final boolean _preserveType;
   private final boolean _skipUpsert;
+  private final boolean _enableSegmentTrim;
+  private final int _minSegmentTrimSize;
 
   public QueryOptions(@Nullable Map<String, String> queryOptions) {
     if (queryOptions != null) {
@@ -41,12 +43,16 @@ public class QueryOptions {
       _responseFormatSQL = Request.SQL.equalsIgnoreCase(queryOptions.get(Request.QueryOptionKey.RESPONSE_FORMAT));
       _preserveType = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.PRESERVE_TYPE));
       _skipUpsert = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.SKIP_UPSERT));
+      _enableSegmentTrim = isEnableSegmentTrim(queryOptions);
+      _minSegmentTrimSize = getMinSegmentTrimSize(queryOptions);
     } else {
       _timeoutMs = null;
       _groupByModeSQL = false;
       _responseFormatSQL = false;
       _preserveType = false;
       _skipUpsert = false;
+      _enableSegmentTrim = false;
+      _minSegmentTrimSize = -1;
     }
   }
 
@@ -72,6 +78,16 @@ public class QueryOptions {
   }
 
   @Nullable
+  public Boolean isEnableSegmentTrim() {
+    return _enableSegmentTrim;
+  }
+
+  @Nullable
+  public Integer getMinSegmentTrimSize() {
+    return _minSegmentTrimSize;
+  }
+
+  @Nullable
   public static Long getTimeoutMs(Map<String, String> queryOptions) {
     String timeoutMsString = queryOptions.get(Request.QueryOptionKey.TIMEOUT_MS);
     if (timeoutMsString != null) {
@@ -81,5 +97,17 @@ public class QueryOptions {
     } else {
       return null;
     }
+  }
+
+  public static boolean isEnableSegmentTrim(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.ENABLE_SEGMENT_TRIM));
+  }
+
+  public static int getMinSegmentTrimSize(Map<String, String> queryOptions) {
+    String minSegmentTrimSize = queryOptions.get(Request.QueryOptionKey.MIN_SEGMENT_TRIM_SIZE);
+    if (minSegmentTrimSize != null) {
+      return Integer.parseInt(minSegmentTrimSize);
+    }
+    return -1;
   }
 }

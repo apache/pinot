@@ -103,6 +103,7 @@ public final class TableConfigUtils {
     validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
     validateFieldConfigList(tableConfig.getFieldConfigList(), tableConfig.getIndexingConfig(), schema);
     validateUpsertConfig(tableConfig, schema);
+    validatePartialUpsertStrategies(tableConfig, schema);
     validateTaskConfigs(tableConfig);
   }
 
@@ -324,7 +325,7 @@ public final class TableConfigUtils {
    *  - consumer type must be low-level
    */
   @VisibleForTesting
-  public static void validateUpsertConfig(TableConfig tableConfig, Schema schema) {
+  static void validateUpsertConfig(TableConfig tableConfig, Schema schema) {
     if (tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE) {
       return;
     }
@@ -348,6 +349,43 @@ public final class TableConfigUtils {
     Preconditions.checkState(
         CollectionUtils.isEmpty(tableConfig.getIndexingConfig().getStarTreeIndexConfigs()) && !tableConfig
             .getIndexingConfig().isEnableDefaultStarTree(), "The upsert table cannot have star-tree index.");
+  }
+
+  /**
+   * Validates the partial upsert-related configurations:
+   *  - Null handling must be enabled
+   *  - Merger cannot be applied to private key columns
+   *  - Merger cannot be applied to non-existing columns
+   *  - INCREMENT merger must be applied to numeric columns
+   */
+  @VisibleForTesting
+  static void validatePartialUpsertStrategies(TableConfig tableConfig, Schema schema) {
+    if (tableConfig.getUpsertMode() != UpsertConfig.Mode.PARTIAL) {
+      return;
+    }
+
+    Preconditions.checkState(tableConfig.getIndexingConfig().isNullHandlingEnabled(),
+        "Null handling must be enabled for partial upsert tables");
+
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    assert upsertConfig != null;
+    Map<String, UpsertConfig.Strategy> partialUpsertStrategies = upsertConfig.getPartialUpsertStrategies();
+
+    List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
+    for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
+      String column = entry.getKey();
+      Preconditions.checkState(!primaryKeyColumns.contains(column), "Merger cannot be applied to primary key columns");
+
+      FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+      Preconditions.checkState(fieldSpec != null, "Merger cannot be applied to non-existing column: %s", column);
+
+      if (entry.getValue() == UpsertConfig.Strategy.INCREMENT) {
+        Preconditions.checkState(fieldSpec.getDataType().getStoredType().isNumeric(),
+            "INCREMENT merger cannot be applied to non-numeric column: %s", column);
+        Preconditions.checkState(!schema.getDateTimeNames().contains(column),
+            "INCREMENT merger cannot be applied to date time column: %s", column);
+      }
+    }
   }
 
   /**
