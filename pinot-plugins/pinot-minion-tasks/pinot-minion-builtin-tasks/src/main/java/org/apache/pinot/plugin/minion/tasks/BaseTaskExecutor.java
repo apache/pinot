@@ -66,8 +66,11 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
         .getOfflineSegmentZKMetadata(MINION_CONTEXT.getHelixPropertyStore(), tableNameWithType, segmentName)
         : ZKMetadataProvider
             .getRealtimeSegmentZKMetadata(MINION_CONTEXT.getHelixPropertyStore(), tableNameWithType, segmentName);
-    Preconditions.checkState(segmentZKMetadata != null, "Failed to find segment metadata for table: %s, segment: %s",
-        tableNameWithType, segmentName);
-    return segmentZKMetadata.getCrc();
+    /*
+     * If the segmentZKMetadata is null, it is likely that the segment has been deleted, return -1 as CRC in this case,
+     * so that task can terminate early when verify CRC. If we throw exception, helix will keep retrying this forever
+     * and task status would be left unchanged without proper cleanup.
+     */
+    return segmentZKMetadata == null ? -1 : segmentZKMetadata.getCrc();
   }
 }
