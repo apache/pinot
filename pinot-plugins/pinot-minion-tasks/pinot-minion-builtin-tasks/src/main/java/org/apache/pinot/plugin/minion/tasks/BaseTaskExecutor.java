@@ -20,13 +20,15 @@ package org.apache.pinot.plugin.minion.tasks;
 
 import com.google.common.base.Preconditions;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 public abstract class BaseTaskExecutor implements PinotTaskExecutor {
@@ -59,8 +61,11 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
   }
 
   protected long getSegmentCrc(String tableNameWithType, String segmentName) {
-    OfflineSegmentZKMetadata segmentZKMetadata = ZKMetadataProvider
-        .getOfflineSegmentZKMetadata(MINION_CONTEXT.getHelixPropertyStore(), tableNameWithType, segmentName);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    SegmentZKMetadata segmentZKMetadata = tableType == TableType.OFFLINE ? ZKMetadataProvider
+        .getOfflineSegmentZKMetadata(MINION_CONTEXT.getHelixPropertyStore(), tableNameWithType, segmentName)
+        : ZKMetadataProvider
+            .getRealtimeSegmentZKMetadata(MINION_CONTEXT.getHelixPropertyStore(), tableNameWithType, segmentName);
     Preconditions.checkState(segmentZKMetadata != null, "Failed to find segment metadata for table: %s, segment: %s",
         tableNameWithType, segmentName);
     return segmentZKMetadata.getCrc();
