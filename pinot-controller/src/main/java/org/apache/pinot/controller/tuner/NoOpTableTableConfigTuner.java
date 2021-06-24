@@ -16,25 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.config.table.tuner;
+package org.apache.pinot.controller.tuner;
 
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TunerConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
-/**
- * Interface for Table Config Tuner.
- */
-public interface TableConfigTuner {
-  /**
-   * Used to initialize underlying implementation with Schema
-   * and custom properties (eg: metrics end point)
-   */
-  void init(TunerConfig props, Schema schema);
+@Tuner(name = "noopConfigTuner")
+public class NoOpTableTableConfigTuner implements TableConfigTuner {
+  @Override
+  public void init(TunerConfig props, Schema schema) {
+  }
 
-  /**
-   * Takes the original TableConfig and returns a tuned one
-   */
-  TableConfig apply(TableConfig initialConfig);
+  @Override
+  public TableConfig apply(TableConfig initialConfig) {
+    return initialConfig;
+  }
 }

@@ -30,7 +30,6 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
-import org.apache.pinot.common.config.tuner.TableConfigTunerRegistry;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.core.util.ReplicationUtils;
@@ -47,13 +46,11 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
-import org.apache.pinot.spi.config.table.TunerConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
-import org.apache.pinot.spi.config.table.tuner.TableConfigTuner;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
@@ -655,18 +652,6 @@ public final class TableConfigUtils {
       return indexingColumns.stream().filter(v -> !v.isEmpty()).collect(Collectors.toList());
     }
     return null;
-  }
-
-  /**
-   * Apply TunerConfig to the tableConfig
-   */
-  public static void applyTunerConfig(TableConfig tableConfig, Schema schema) {
-    TunerConfig tunerConfig = tableConfig.getTunerConfig();
-    if (tunerConfig != null && tunerConfig.getName() != null && !tunerConfig.getName().isEmpty()) {
-      TableConfigTuner tuner = TableConfigTunerRegistry.getTuner(tunerConfig.getName());
-      tuner.init(tunerConfig, schema);
-      tuner.apply(tableConfig);
-    }
   }
 
   /**
