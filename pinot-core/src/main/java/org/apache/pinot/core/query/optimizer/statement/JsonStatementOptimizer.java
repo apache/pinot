@@ -191,18 +191,20 @@ public class JsonStatementOptimizer implements StatementOptimizer {
       case LITERAL:
         return new Pair<>(getLiteralSQL(expression.getLiteral(), true), false);
       case IDENTIFIER: {
-        String[] parts = getIdentifierParts(expression.getIdentifier());
         boolean hasJsonPathExpression = false;
-        String alias = expression.getIdentifier().getName();
-        if (parts.length > 1 && isValidJSONColumn(parts[0], schema)) {
-          // replace <column-name>.<json-path> with json_extract_scalar(<column-name>, '<json-path>', 'STRING', <JSON-null-value>)
-          Function jsonExtractScalarFunction = getJsonExtractFunction(parts, outputDataType);
-          expression.setIdentifier(null);
-          expression.setType(ExpressionType.FUNCTION);
-          expression.setFunctionCall(jsonExtractScalarFunction);
-          hasJsonPathExpression = true;
+        String columnName = expression.getIdentifier().getName();
+        if (!schema.hasColumn(columnName)) {
+          String[] parts = getIdentifierParts(expression.getIdentifier());
+          if (parts.length > 1 && isValidJSONColumn(parts[0], schema)) {
+            // replace <column-name>.<json-path> with json_extract_scalar(<column-name>, '<json-path>', 'STRING', <JSON-null-value>)
+            Function jsonExtractScalarFunction = getJsonExtractFunction(parts, outputDataType);
+            expression.setIdentifier(null);
+            expression.setType(ExpressionType.FUNCTION);
+            expression.setFunctionCall(jsonExtractScalarFunction);
+            hasJsonPathExpression = true;
+          }
         }
-        return new Pair<>(alias, hasJsonPathExpression);
+        return new Pair<>(columnName, hasJsonPathExpression);
       }
       case FUNCTION: {
         Function function = expression.getFunctionCall();
@@ -314,22 +316,24 @@ public class JsonStatementOptimizer implements StatementOptimizer {
           Expression left = operands.get(0);
           Expression right = operands.get(1);
           if (left.getType() == ExpressionType.IDENTIFIER && right.getType() == ExpressionType.LITERAL) {
-            String[] parts = getIdentifierParts(left.getIdentifier());
-            if (parts.length > 1 && isValidJSONColumn(parts[0], schema)) {
-              if (isIndexedJSONColumn(parts[0], tableConfig)) {
-                Function jsonMatchFunction = new Function("JSON_MATCH");
+            if (!schema.hasColumn(left.getIdentifier().getName())) {
+              String[] parts = getIdentifierParts(left.getIdentifier());
+              if (parts.length > 1 && isValidJSONColumn(parts[0], schema)) {
+                if (isIndexedJSONColumn(parts[0], tableConfig)) {
+                  Function jsonMatchFunction = new Function("JSON_MATCH");
 
-                List<Expression> jsonMatchFunctionOperands = new ArrayList<>();
-                jsonMatchFunctionOperands.add(RequestUtils.createIdentifierExpression(parts[0]));
-                jsonMatchFunctionOperands.add(RequestUtils.createLiteralExpression(new StringLiteralAstNode(
-                    getJsonPath(parts, true) + getOperatorSQL(kind) + getLiteralSQL(right.getLiteral(), false))));
-                jsonMatchFunction.setOperands(jsonMatchFunctionOperands);
+                  List<Expression> jsonMatchFunctionOperands = new ArrayList<>();
+                  jsonMatchFunctionOperands.add(RequestUtils.createIdentifierExpression(parts[0]));
+                  jsonMatchFunctionOperands.add(RequestUtils.createLiteralExpression(new StringLiteralAstNode(
+                      getJsonPath(parts, true) + getOperatorSQL(kind) + getLiteralSQL(right.getLiteral(), false))));
+                  jsonMatchFunction.setOperands(jsonMatchFunctionOperands);
 
-                expression.setFunctionCall(jsonMatchFunction);
-              } else {
-                left.clear();
-                left.setType(ExpressionType.FUNCTION);
-                left.setFunctionCall(getJsonExtractFunction(parts, getColumnTypeForLiteral(right.getLiteral())));
+                  expression.setFunctionCall(jsonMatchFunction);
+                } else {
+                  left.clear();
+                  left.setType(ExpressionType.FUNCTION);
+                  left.setFunctionCall(getJsonExtractFunction(parts, getColumnTypeForLiteral(right.getLiteral())));
+                }
               }
             }
           }
@@ -339,22 +343,24 @@ public class JsonStatementOptimizer implements StatementOptimizer {
         case IS_NOT_NULL: {
           Expression operand = operands.get(0);
           if (operand.getType() == ExpressionType.IDENTIFIER) {
-            String[] parts = getIdentifierParts(operand.getIdentifier());
-            if (parts.length > 1 && isValidJSONColumn(parts[0], schema)) {
-              if (isIndexedJSONColumn(parts[0], tableConfig)) {
-                Function jsonMatchFunction = new Function("JSON_MATCH");
+            if (!schema.hasColumn(operand.getIdentifier().getName())) {
+              String[] parts = getIdentifierParts(operand.getIdentifier());
+              if (parts.length > 1 && isValidJSONColumn(parts[0], schema)) {
+                if (isIndexedJSONColumn(parts[0], tableConfig)) {
+                  Function jsonMatchFunction = new Function("JSON_MATCH");
 
-                List<Expression> jsonMatchFunctionOperands = new ArrayList<>();
-                jsonMatchFunctionOperands.add(RequestUtils.createIdentifierExpression(parts[0]));
-                jsonMatchFunctionOperands.add(RequestUtils.createLiteralExpression(
-                    new StringLiteralAstNode(getJsonPath(parts, true) + getOperatorSQL(kind))));
-                jsonMatchFunction.setOperands(jsonMatchFunctionOperands);
+                  List<Expression> jsonMatchFunctionOperands = new ArrayList<>();
+                  jsonMatchFunctionOperands.add(RequestUtils.createIdentifierExpression(parts[0]));
+                  jsonMatchFunctionOperands.add(RequestUtils.createLiteralExpression(
+                      new StringLiteralAstNode(getJsonPath(parts, true) + getOperatorSQL(kind))));
+                  jsonMatchFunction.setOperands(jsonMatchFunctionOperands);
 
-                expression.setFunctionCall(jsonMatchFunction);
-              } else {
-                operand.clear();
-                operand.setType(ExpressionType.FUNCTION);
-                operand.setFunctionCall(getJsonExtractFunction(parts, DataSchema.ColumnDataType.JSON));
+                  expression.setFunctionCall(jsonMatchFunction);
+                } else {
+                  operand.clear();
+                  operand.setType(ExpressionType.FUNCTION);
+                  operand.setFunctionCall(getJsonExtractFunction(parts, DataSchema.ColumnDataType.JSON));
+                }
               }
             }
           }
