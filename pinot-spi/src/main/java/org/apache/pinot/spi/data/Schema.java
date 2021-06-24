@@ -653,7 +653,8 @@ public final class Schema implements Serializable {
         .isEqualIgnoreOrder(_dateTimeFieldSpecs, that._dateTimeFieldSpecs) && EqualityUtils
         .isEqualIgnoreOrder(_complexFieldSpecs, that._complexFieldSpecs) && EqualityUtils
         .isEqualMap(_fieldSpecMap, that._fieldSpecMap) && EqualityUtils
-        .isEqual(_primaryKeyColumns, that._primaryKeyColumns);
+        .isEqual(_primaryKeyColumns, that._primaryKeyColumns) && EqualityUtils
+        .isEqual(_hasJSONColumn, that._hasJSONColumn);
   }
 
   /**
