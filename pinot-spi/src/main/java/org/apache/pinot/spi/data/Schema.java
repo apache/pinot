@@ -689,6 +689,7 @@ public final class Schema implements Serializable {
     result = EqualityUtils.hashCodeOf(result, _complexFieldSpecs);
     result = EqualityUtils.hashCodeOf(result, _fieldSpecMap);
     result = EqualityUtils.hashCodeOf(result, _primaryKeyColumns);
+    result = EqualityUtils.hashCodeOf(result, _hasJSONColumn);
     return result;
   }
 
