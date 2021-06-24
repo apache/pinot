@@ -132,6 +132,11 @@ public class JsonStatementOptimizer implements StatementOptimizer {
 
   @Override
   public void optimize(PinotQuery query, @Nullable TableConfig tableConfig, @Nullable Schema schema) {
+    // If schema doesn't have any JSON columns, there is no need to run this optimizer.
+    if (schema == null || !schema.hasJSONColumn()) {
+      return;
+    }
+
     // In SELECT clause, replace JSON path expressions with JSON_EXTRACT_SCALAR function with an alias.
     List<Expression> expressions = query.getSelectList();
     for (Expression expression : expressions) {
