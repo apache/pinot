@@ -37,6 +37,7 @@ import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.minion.exception.FatalException;
 import org.apache.pinot.minion.exception.TaskCancelledException;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -74,8 +75,8 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
     if (Long.parseLong(originalSegmentCrc) != currentSegmentCrc) {
       LOGGER.info("Segment CRC does not match, skip the task. Original CRC: {}, current CRC: {}", originalSegmentCrc,
           currentSegmentCrc);
-      return new SegmentConversionResult.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
-          .build();
+      throw new FatalException(taskType + " on table: " + tableNameWithType + ", segment: " + segmentName
+          + " failed due to CRC mismatch, original CRC: " + originalSegmentCrc + " current CRC: " + currentSegmentCrc);
     }
 
     LOGGER.info("Start executing {} on table: {}, segment: {} with downloadURL: {}, uploadURL: {}", taskType,
