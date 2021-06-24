@@ -24,6 +24,7 @@ import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pulsar.client.admin.PulsarAdmin;
@@ -122,6 +123,9 @@ public class PulsarConsumerTest {
     streamConfigMap.put("stream.pulsar.bootstrap.servers", streamPulsarBrokerList);
     streamConfigMap.put("stream.pulsar.consumer.prop.auto.offset.reset", "smallest");
     streamConfigMap.put("stream.pulsar.consumer.factory.class.name", getPulsarConsumerFactoryName());
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty("pulsar", StreamConfigProperties.STREAM_FETCH_TIMEOUT_MILLIS),
+        "1000");
     streamConfigMap.put("stream.pulsar.decoder.class.name", "decoderClass");
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 

@@ -22,6 +22,7 @@ import com.google.common.collect.Iterables;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -37,6 +38,7 @@ import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 /**
  * A {@link PartitionGroupConsumer} implementation for the Pulsar stream
@@ -72,6 +74,7 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
     } catch (TimeoutException e) {
       // The fetchMessages has thrown an exception. Most common cause is the timeout.
       // We return the records fetched till now along with the next start offset.
+      pulsarResultFuture.cancel(true);
       return new PulsarMessageBatch(buildOffsetFilteringIterable(messagesList, startMessageId, endMessageId));
     } catch (Exception e) {
       LOGGER.warn("Error while fetching records from Pulsar", e);
@@ -93,6 +96,10 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
           }
         }
         messagesList.add(nextMessage);
+
+        if (Thread.interrupted()) {
+          break;
+        }
       }
 
       return new PulsarMessageBatch(buildOffsetFilteringIterable(messagesList, startMessageId, endMessageId));
@@ -115,5 +122,18 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
   public void close()
       throws IOException {
     super.close();
+    shutdownAndAwaitTermination();
+  }
+
+  void shutdownAndAwaitTermination() {
+    _executorService.shutdown();
+    try {
+      if (!_executorService.awaitTermination(60, TimeUnit.SECONDS)) {
+        _executorService.shutdownNow();
+      }
+    } catch (InterruptedException ie) {
+      _executorService.shutdownNow();
+      Thread.currentThread().interrupt();
+    }
   }
 }
