@@ -118,8 +118,8 @@ public class PartialUpsertQuickStart {
     printStatus(Color.GREEN, "***************************************************");
 
     // The expected behavior for nums of values in group_name fields should equals to rsvp_counts.
-    String q2 = "select event_id, group_name, rsvp_count from meetupRsvp where rsvp_count >1 order by rsvp_count desc limit 10";
-    printStatus(Color.YELLOW, "Event_id, group_name, rsvp_count per per event_id in the table");
+    String q2 = "select event_id, group_name, venue_name, rsvp_count from meetupRsvp where rsvp_count >1 order by rsvp_count desc limit 10";
+    printStatus(Color.YELLOW, "Event_id, group_name, venue_name, rsvp_count per per event_id in the table");
     printStatus(Color.YELLOW,
         "***** The expected behavior for nums of values in group_name fields should equals to rsvp_count. *****");
     printStatus(Color.CYAN, "Query : " + q2);

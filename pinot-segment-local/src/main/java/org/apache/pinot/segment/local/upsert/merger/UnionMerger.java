@@ -18,30 +18,32 @@
  */
 package org.apache.pinot.segment.local.upsert.merger;
 
-import org.apache.pinot.spi.config.table.UpsertConfig;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Set;
+import java.util.TreeSet;
 
 
-public class PartialUpsertMergerFactory {
-  private PartialUpsertMergerFactory() {
+public class UnionMerger implements PartialUpsertMerger {
+  UnionMerger() {
   }
 
-  private static final AppendMerger APPEND_MERGER = new AppendMerger();
-  private static final IncrementMerger INCREMENT_MERGER = new IncrementMerger();
-  private static final OverwriteMerger OVERWRITE_MERGER = new OverwriteMerger();
-  private static final UnionMerger UNION_MERGER = new UnionMerger();
+  /**
+   * Append the new value from incoming row to the given multi-value field of previous record.
+   */
+  @Override
+  public Object merge(Object previousValue, Object currentValue) {
+    return union((Object[]) previousValue, (Object[]) currentValue);
+  }
 
-  public static PartialUpsertMerger getMerger(UpsertConfig.Strategy strategy) {
-    switch (strategy) {
-      case APPEND:
-        return APPEND_MERGER;
-      case INCREMENT:
-        return INCREMENT_MERGER;
-      case OVERWRITE:
-        return OVERWRITE_MERGER;
-      case UNION:
-        return UNION_MERGER;
-      default:
-        throw new IllegalStateException("Unsupported partial upsert strategy: " + strategy);
+  private static Object union(Object[] a, Object[] b) {
+    Set<Object> union = new TreeSet<>();
+    for (int i = 0; i < a.length; i++) {
+      union.add(a[i]);
     }
+    for (int j = 0; j < b.length; j++) {
+      union.add(b[j]);
+    }
+    return union.toArray();
   }
 }

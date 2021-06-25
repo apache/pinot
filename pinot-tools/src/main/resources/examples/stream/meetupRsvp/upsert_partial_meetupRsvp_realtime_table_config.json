@@ -48,7 +48,8 @@
     "mode": "PARTIAL",
     "partialUpsertStrategies":{
       "rsvp_count": "INCREMENT",
-      "group_name": "APPEND"
+      "group_name": "UNION",
+      "venue_name": "APPEND"
     }
   }
 }
