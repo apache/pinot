@@ -65,6 +65,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.recommender.RecommenderDriver;
+import org.apache.pinot.controller.tuner.TableConfigTunerUtils;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -148,7 +149,7 @@ public class PinotTableRestletResource {
 
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
 
-      TableConfigUtils.applyTunerConfig(tableConfig, schema);
+      TableConfigTunerUtils.applyTunerConfig(tableConfig, schema);
 
       // TableConfigUtils.validate(...) is used across table create/update.
       TableConfigUtils.validate(tableConfig, schema);

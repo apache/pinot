@@ -16,13 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.config.tuner;
+package org.apache.pinot.controller.tuner;
 
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TunerConfig;
-import org.apache.pinot.spi.config.table.tuner.TableConfigTuner;
-import org.apache.pinot.spi.config.table.tuner.Tuner;
 import org.apache.pinot.spi.data.Schema;
 
 

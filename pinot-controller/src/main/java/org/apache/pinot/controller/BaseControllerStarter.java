@@ -74,6 +74,7 @@ import org.apache.pinot.controller.helix.core.retention.RetentionManager;
 import org.apache.pinot.controller.helix.core.statemodel.LeadControllerResourceMasterSlaveStateModelFactory;
 import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
+import org.apache.pinot.controller.tuner.TableConfigTunerRegistry;
 import org.apache.pinot.controller.validation.BrokerResourceValidationManager;
 import org.apache.pinot.controller.validation.OfflineSegmentIntervalChecker;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
@@ -176,6 +177,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       _executorService =
           Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("restapi-multiget-thread-%d").build());
     }
+
+    // Initialize the table config tuner registry.
+    TableConfigTunerRegistry.init(_config.getTableConfigTunerPackages());
   }
 
   private void inferHostnameIfNeeded(ControllerConf config) {
