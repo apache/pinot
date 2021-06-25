@@ -18,12 +18,16 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import java.io.IOException;
 import java.util.Collections;
+
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.Command;
+import org.apache.pinot.tools.utils.OutputFormatUtils;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +50,12 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
 
   @Option(name = "-query", required = true, metaVar = "<string>", usage = "Query string to perform.")
   private String _query;
+
+  @Option(name = "-outputFormat", required = false, metaVar = "<string>", usage = "Output data format.")
+  private String _outputFormat = null;
+
+  @Option(name = "-outputPath", required = false, metaVar = "<string>", usage = "Path to store result table.")
+  private String _outputPath = null;
 
   @Option(name = "-user", required = false, metaVar = "<String>", usage = "Username for basic auth.")
   private String _user;
@@ -126,6 +136,16 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
     return this;
   }
 
+  public PostQueryCommand setOutputPath(String outputPath) {
+    _outputPath = outputPath;
+    return this;
+  }
+
+  public PostQueryCommand setOutputFormat(String outputFormat) {
+    _outputFormat = outputFormat;
+    return this;
+  }
+
   public String run()
       throws Exception {
     if (_brokerHost == null) {
@@ -142,7 +162,16 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
       request = JsonUtils.objectToString(Collections.singletonMap(Request.PQL, _query));
     }
 
-    return sendRequest("POST", urlString, request, makeAuthHeader(makeAuthToken(_authToken, _user, _password)));
+    String brokerResponse = sendRequest("POST", urlString, request, makeAuthHeader(makeAuthToken(_authToken, _user, _password)));
+    if (_outputPath != null) {
+      try {
+        BrokerResponseNative response = JsonUtils.stringToObject(brokerResponse, BrokerResponseNative.class);
+        OutputFormatUtils.saveResponse(response, _outputPath, _outputFormat);
+      } catch (IOException | UnsupportedOperationException e) {
+        e.printStackTrace();
+      }
+    }
+    return brokerResponse;
   }
 
   @Override

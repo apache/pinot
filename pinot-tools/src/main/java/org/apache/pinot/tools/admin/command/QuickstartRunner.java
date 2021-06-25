@@ -247,9 +247,15 @@ public class QuickstartRunner {
 
   public JsonNode runQuery(String query)
       throws Exception {
+    return runQuery(query, null, null);
+  }
+
+  public JsonNode runQuery(String query, String outputPath, String outputFormat)
+      throws Exception {
     int brokerPort = _brokerPorts.get(RANDOM.nextInt(_brokerPorts.size()));
     return JsonUtils.stringToJsonNode(new PostQueryCommand().setBrokerPort(String.valueOf(brokerPort))
-        .setQueryType(CommonConstants.Broker.Request.SQL).setAuthToken(_authToken).setQuery(query).run());
+        .setQueryType(CommonConstants.Broker.Request.SQL).setAuthToken(_authToken)
+        .setOutputPath(outputPath).setOutputFormat(outputFormat).setQuery(query).run());
   }
 
   public static void registerDefaultPinotFS() {

@@ -221,18 +221,25 @@ public class Quickstart extends QuickStartBase {
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q3)));
     printStatus(Color.GREEN, "***************************************************");
 
+    File quickstartTmpOutputDir = new File(_tmpDir, String.valueOf(System.currentTimeMillis()));
+    Preconditions.checkState(quickstartTmpOutputDir.mkdirs());
+
+    File output4 = new File(quickstartTmpOutputDir, "q4_result.json");
     String q4 =
         "select playerName, sum(runs) from baseballStats where yearID>=2000 group by playerName order by sum(runs) "
             + "desc limit 10";
     printStatus(Color.YELLOW, "Top 10 run scorers after 2000");
     printStatus(Color.CYAN, "Query : " + q4);
-    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q4)));
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q4, output4.getPath(), null)));
+    printStatus(Color.YELLOW, "Results are also stored in: " + output4);
     printStatus(Color.GREEN, "***************************************************");
 
+    File output5 = new File(quickstartTmpOutputDir, "q5_result.csv");
     String q5 = "select playerName, runs, homeRuns from baseballStats order by yearID limit 10";
     printStatus(Color.YELLOW, "Print playerName,runs,homeRuns for 10 records from the table and order them by yearID");
     printStatus(Color.CYAN, "Query : " + q5);
-    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q5)));
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q5, output5.getPath(), "CSV")));
+    printStatus(Color.YELLOW, "Results are also stored in: " + output5);
     printStatus(Color.GREEN, "***************************************************");
 
     printStatus(Color.GREEN, "You can always go to http://localhost:9000 to play around in the query console");
