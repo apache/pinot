@@ -51,6 +51,7 @@ import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.restlet.resources.SystemResourceInfo;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
 import org.apache.pinot.common.utils.config.TagNameUtils;
@@ -486,6 +487,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
     _helixAdmin.setConfig(_instanceConfigScope,
         Collections.singletonMap(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(false)));
+
+    // Set the system resource info (CPU, Memory, etc) in the InstanceConfig.
+    setInstanceResourceInfo(_helixAdmin, _helixClusterName, _instanceId, new SystemResourceInfo().toMap());
+
     LOGGER.info("Pinot server ready");
 
     // Create metrics for mmap stuff
@@ -706,4 +711,20 @@ public abstract class BaseServerStarter implements ServiceStartable {
   public PinotConfiguration getConfig() {
     return _serverConf;
   }
+
+  /**
+   * Helper method to set system resource info into instance config.
+   *
+   * @param helixAdmin Helix Admin
+   * @param helixClusterName Name of Helix cluster
+   * @param instanceId Id of instance for which to set the system resource info
+   * @param systemResourceMap Map containing system resource info
+   */
+  private void setInstanceResourceInfo(HelixAdmin helixAdmin, String helixClusterName, String instanceId,
+      Map<String, String> systemResourceMap) {
+    InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(helixClusterName, instanceId);
+    instanceConfig.getRecord().setMapField(Helix.Instance.SYSTEM_RESOURCE_INFO_KEY, systemResourceMap);
+    helixAdmin.setInstanceConfig(helixClusterName, instanceId, instanceConfig);
+  }
+
 }
