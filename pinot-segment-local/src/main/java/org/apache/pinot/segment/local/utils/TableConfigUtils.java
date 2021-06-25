@@ -354,6 +354,8 @@ public final class TableConfigUtils {
    *  - Merger cannot be applied to private key columns
    *  - Merger cannot be applied to non-existing columns
    *  - INCREMENT merger must be applied to numeric columns
+   *  - APPEND/UNION merger cannot be applied to single-value columns
+   *  - INCREMENT/APPEND/UNION merger cannot be applied to date time column
    */
   @VisibleForTesting
   static void validatePartialUpsertStrategies(TableConfig tableConfig, Schema schema) {
@@ -383,9 +385,12 @@ public final class TableConfigUtils {
             "INCREMENT merger cannot be applied to date time column: %s", column);
       }
 
-      if (entry.getValue() == UpsertConfig.Strategy.APPEND) {
-        Preconditions.checkState(!fieldSpec.isSingleValueField(),
-            "APPEND merger cannot be applied to single-value column: %s", column);
+      if (entry.getValue() == UpsertConfig.Strategy.APPEND || entry.getValue() == UpsertConfig.Strategy.UNION) {
+        Preconditions
+            .checkState(!fieldSpec.isSingleValueField(), "%s merger cannot be applied to single-value column: %s",
+                entry.getValue().toString(), column);
+        Preconditions.checkState(!schema.getDateTimeNames().contains(column),
+            "%s merger cannot be applied to date time column: %s", entry.getValue().toString(), column);
       }
     }
   }
