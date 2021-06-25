@@ -29,19 +29,23 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.task.JobConfig;
+import org.apache.helix.task.JobContext;
 import org.apache.helix.task.JobQueue;
 import org.apache.helix.task.TaskConfig;
 import org.apache.helix.task.TaskDriver;
+import org.apache.helix.task.TaskPartitionState;
 import org.apache.helix.task.TaskState;
 import org.apache.helix.task.WorkflowConfig;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
  * The class <code>PinotHelixTaskResourceManager</code> manages all the task resources in Pinot cluster.
+ * In case you are wondering why methods that access taskDriver are synchronized, see comment in PR #1437
  */
 public class PinotHelixTaskResourceManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotHelixTaskResourceManager.class);
@@ -60,7 +64,8 @@ public class PinotHelixTaskResourceManager {
 
   /**
    * Get all task types.
-   *
+   * @note: It reads all resource config back and check which are workflows and which are jobs, so it can take some time
+   * if there are a lot of tasks.
    * @return Set of all task types
    */
   public synchronized Set<String> getTaskTypes() {
@@ -226,7 +231,6 @@ public class PinotHelixTaskResourceManager {
 
     return parentTaskName;
   }
-
   /**
    * Get all tasks for the given task type.
    *
@@ -256,6 +260,50 @@ public class PinotHelixTaskResourceManager {
       taskStates.put(getPinotTaskName(entry.getKey()), entry.getValue());
     }
     return taskStates;
+  }
+
+  /**
+   * This method helps compute the percentage done for a task (that may have many partitions or sub-tasks).
+   * @param parentTaskName (e.g. "Task_TestTask_1624403781879")
+   * @return a pair of integers, first one being the total number partitions and the second being number of partitions
+   * still running or yet to run.
+   */
+  public synchronized TaskCount getTaskCount(String parentTaskName) {
+    JobContext jobContext = _taskDriver.getJobContext(getHelixJobName(parentTaskName));
+    TaskCount taskCount = new TaskCount();
+    for (int partition : jobContext.getPartitionSet()) {
+      taskCount.addToTotal(1);
+      TaskPartitionState state = jobContext.getPartitionState(partition);
+      // Helix returns state as null if the task is not enqueued anywhere yet
+      if (state == null) {
+        // task is not yet assigned to a participant
+        taskCount.addToWaiting(1);
+      } else if (state.equals(TaskPartitionState.INIT) || state.equals(TaskPartitionState.RUNNING)) {
+        taskCount.addToRunning(1);
+      } else if (state.equals(TaskPartitionState.TASK_ERROR)) {
+        taskCount.addToError(1);
+      }
+    }
+    return taskCount;
+  }
+
+  /**
+   * Returns a set of Task names (in the form "Task_TestTask_1624403781879") that are in progress or not started yet.
+   *
+   * @param taskType
+   * @return Set of task names
+   */
+  public synchronized Set<String> getTasksInProgress(String taskType) {
+    Set<String> tasksInProgress = new HashSet<>();
+    Map<String, TaskState> helixJobStates =
+        _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType)).getJobStates();
+
+    for (Map.Entry<String, TaskState> entry : helixJobStates.entrySet()) {
+      if (entry.getValue().equals(TaskState.NOT_STARTED) || entry.getValue().equals(TaskState.IN_PROGRESS)) {
+        tasksInProgress.add(getPinotTaskName(entry.getKey()));
+      }
+    }
+    return tasksInProgress;
   }
 
   /**
@@ -329,5 +377,54 @@ public class PinotHelixTaskResourceManager {
    */
   private static String getTaskType(String name) {
     return name.split(TASK_NAME_SEPARATOR)[1];
+  }
+
+  public static class TaskCount {
+    private int _waiting;   // Number of tasks waiting to be scheduled on minions
+    private int _error;     // Number of tasks in error
+    private int _running;   // Number of tasks currently running in minions
+    private int _total;     // Total number of tasks in the batch
+
+    public TaskCount() {
+    }
+
+    public void addToWaiting(int waiting) {
+      _waiting += waiting;
+    }
+
+    public void addToRunning(int running) {
+      _running += running;
+    }
+
+    public void addToTotal(int total) {
+      _total += total;
+    }
+
+    public void addToError(int error) {
+      _error += error;
+    }
+
+    public int getWaiting() {
+      return _waiting;
+    }
+
+    public int getRunning() {
+      return _running;
+    }
+
+    public int getTotal() {
+      return _total;
+    }
+
+    public int getError() {
+      return _error;
+    }
+
+    public void accumulate(TaskCount other) {
+      addToWaiting(other.getWaiting());
+      addToRunning(other.getRunning());
+      addToError(other.getError());
+      addToTotal(other.getTotal());
+    }
   }
 }
