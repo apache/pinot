@@ -20,6 +20,8 @@ package org.apache.pinot.integration.tests;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metrics.ControllerGauge;
@@ -85,18 +87,32 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     startMinion();
   }
 
+  private void verifyTaskCount(String task, int errors, int waiting, int running, int total) {
+    PinotHelixTaskResourceManager.TaskCount taskCount = _helixTaskResourceManager.getTaskCount(task);
+    assertEquals(taskCount.getError(), errors);
+    assertEquals(taskCount.getWaiting(), waiting);
+    assertEquals(taskCount.getRunning(), running);
+    assertEquals(taskCount.getTotal(), total);
+  }
+
   @Test
   public void testStopResumeDeleteTaskQueue() {
     // Hold the task
     HOLD.set(true);
 
     // Should create the task queues and generate a task
-    assertNotNull(_taskManager.scheduleTasks().get(TASK_TYPE));
+    String task1 = _taskManager.scheduleTasks().get(TASK_TYPE);
+    assertNotNull(task1);
     assertTrue(_helixTaskResourceManager.getTaskQueues()
         .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(TASK_TYPE)));
+    assertTrue(_helixTaskResourceManager.getTasksInProgress(TASK_TYPE).contains(task1));
 
+    verifyTaskCount(task1, 0, 1, 1, 2);
     // Should generate one more task
-    assertNotNull(_taskManager.scheduleTask(TASK_TYPE));
+    String task2 = _taskManager.scheduleTask(TASK_TYPE);
+    assertNotNull(task2);
+    assertTrue(_helixTaskResourceManager.getTasksInProgress(TASK_TYPE).contains(task2));
+    verifyTaskCount(task2, 0, 2, 0, 2);
 
     // Should not generate more tasks
     assertNull(_taskManager.scheduleTasks().get(TASK_TYPE));

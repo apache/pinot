@@ -60,9 +60,8 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
     for (String taskType : taskTypes) {
       TaskCount accumulated = new TaskCount();
       Set<String> tasksInProgress = _helixTaskResourceManager.getTasksInProgress(taskType);
-      int numRunningTasks = 0;
+      final int numRunningTasks = tasksInProgress.size();
       for (String task : tasksInProgress) {
-        numRunningTasks++;
         TaskCount taskCount = _helixTaskResourceManager.getTaskCount(task);
         accumulated.accumulate(taskCount);
       }

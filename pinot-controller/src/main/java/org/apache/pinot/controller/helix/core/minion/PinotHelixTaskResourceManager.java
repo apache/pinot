@@ -263,16 +263,16 @@ public class PinotHelixTaskResourceManager {
   }
 
   /**
-   * This method helps compute the percentage done for a task (that may have many partitions or sub-tasks).
+   * This method returns a count of sub-tasks in various states, given the top-level task name.
    * @param parentTaskName (e.g. "Task_TestTask_1624403781879")
-   * @return a pair of integers, first one being the total number partitions and the second being number of partitions
-   * still running or yet to run.
+   * @return TaskCount object
    */
   public synchronized TaskCount getTaskCount(String parentTaskName) {
     JobContext jobContext = _taskDriver.getJobContext(getHelixJobName(parentTaskName));
+    Set<Integer> partitionSet = jobContext.getPartitionSet();
     TaskCount taskCount = new TaskCount();
-    for (int partition : jobContext.getPartitionSet()) {
-      taskCount.addToTotal(1);
+    taskCount.addToTotal(partitionSet.size());
+    for (int partition : partitionSet) {
       TaskPartitionState state = jobContext.getPartitionState(partition);
       // Helix returns state as null if the task is not enqueued anywhere yet
       if (state == null) {
