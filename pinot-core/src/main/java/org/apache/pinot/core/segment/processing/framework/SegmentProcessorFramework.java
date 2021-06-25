@@ -27,12 +27,18 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
+import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileReader;
+import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileRecordReader;
+import org.apache.pinot.core.segment.processing.mapper.SegmentMapper;
+import org.apache.pinot.core.segment.processing.reducer.Reducer;
+import org.apache.pinot.core.segment.processing.reducer.ReducerFactory;
+import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
+import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -116,11 +122,8 @@ public class SegmentProcessorFramework {
         .checkState(segmentFiles != null && segmentFiles.length > 0, "Failed to find segments under input dir: %s",
             _inputSegmentsDir.getAbsolutePath());
 
-    // Mapper phase.
-    LOGGER.info("Beginning mapper phase. Processing segments: {}", Arrays.toString(_inputSegmentsDir.list()));
-    SegmentMapperConfig mapperConfig =
-        new SegmentMapperConfig(_tableConfig, _schema, _segmentProcessorConfig.getRecordTransformerConfig(),
-            _segmentProcessorConfig.getRecordFilterConfig(), _segmentProcessorConfig.getPartitionerConfigs());
+    // Map phase
+    LOGGER.info("Beginning map phase on segments: {}", Arrays.toString(_inputSegmentsDir.list()));
     List<RecordReader> recordReaders = new ArrayList<>(segmentFiles.length);
     for (File indexDir : segmentFiles) {
       String fileName = indexDir.getName();
@@ -139,56 +142,61 @@ public class SegmentProcessorFramework {
       recordReader.init(indexDir, null, null, true);
       recordReaders.add(recordReader);
     }
-    SegmentMapper mapper = new SegmentMapper(recordReaders, mapperConfig, _mapperOutputDir);
+    SegmentMapper mapper = new SegmentMapper(recordReaders, _segmentProcessorConfig, _mapperOutputDir);
     Map<String, GenericRowFileManager> partitionToFileManagerMap = mapper.map();
     for (RecordReader recordReader : recordReaders) {
       recordReader.close();
     }
+    FileUtils.deleteDirectory(_mapperInputDir);
 
     // Check for mapper output files
-    int numPartitions = partitionToFileManagerMap.size();
-    Preconditions.checkState(numPartitions > 0, "No partition generated from mapper phase");
+    if (partitionToFileManagerMap.isEmpty()) {
+      LOGGER.info("No partition generated from mapper phase, skipping the reducer phase");
+      return;
+    }
 
-    // Reducer phase.
-    LOGGER.info("Beginning reducer phase on partitions: {}", partitionToFileManagerMap.keySet());
+    // Reduce phase
+    LOGGER.info("Beginning reduce phase on partitions: {}", partitionToFileManagerMap.keySet());
     for (Map.Entry<String, GenericRowFileManager> entry : partitionToFileManagerMap.entrySet()) {
-      String partition = entry.getKey();
+      String partitionId = entry.getKey();
       GenericRowFileManager fileManager = entry.getValue();
-      // Set partition as reducerId
-      SegmentReducerConfig reducerConfig =
-          new SegmentReducerConfig(_schema, _segmentProcessorConfig.getCollectorConfig(),
-              _segmentProcessorConfig.getSegmentConfig().getMaxNumRecordsPerSegment());
-      SegmentReducer reducer = new SegmentReducer(partition, fileManager, reducerConfig, _reducerOutputDir);
-      reducer.reduce();
-      reducer.cleanup();
+      Reducer reducer = ReducerFactory.getReducer(partitionId, fileManager, _segmentProcessorConfig, _reducerOutputDir);
+      entry.setValue(reducer.reduce());
+    }
+
+    // Segment creation phase
+    LOGGER.info("Beginning segment creation phase on partitions: {}", partitionToFileManagerMap.keySet());
+    SegmentGeneratorConfig generatorConfig = new SegmentGeneratorConfig(_tableConfig, _schema);
+    generatorConfig.setOutDir(_outputSegmentsDir.getPath());
+    // TODO: Use NormalizedDateSegmentNameGenerator
+    generatorConfig.setSegmentNamePrefix(_segmentProcessorConfig.getSegmentConfig().getSegmentNamePrefix());
+    int maxNumRecordsPerSegment = _segmentProcessorConfig.getSegmentConfig().getMaxNumRecordsPerSegment();
+    CompositeTransformer passThroughTransformer = CompositeTransformer.getPassThroughTransformer();
+    int sequenceId = 0;
+    for (Map.Entry<String, GenericRowFileManager> entry : partitionToFileManagerMap.entrySet()) {
+      String partitionId = entry.getKey();
+      GenericRowFileManager fileManager = entry.getValue();
+      GenericRowFileReader fileReader = fileManager.getFileReader();
+      int numRows = fileReader.getNumRows();
+      int numSortFields = fileReader.getNumSortFields();
+      LOGGER.info("Start creating segments on partition: {}, numRows: {}, numSortFields: {}", partitionId, numRows,
+          numSortFields);
+      GenericRowFileRecordReader recordReader = fileReader.getRecordReader();
+      for (int startRowId = 0; startRowId < numRows; startRowId += maxNumRecordsPerSegment, sequenceId++) {
+        int endRowId = Math.min(startRowId + maxNumRecordsPerSegment, numRows);
+        LOGGER.info("Start creating segment of sequenceId: {} with row range: {} to {}", sequenceId, startRowId,
+            endRowId);
+        generatorConfig.setSequenceId(sequenceId);
+        GenericRowFileRecordReader recordReaderForRange = recordReader.getRecordReaderForRange(startRowId, endRowId);
+        SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+        driver.init(generatorConfig, new RecordReaderSegmentCreationDataSource(recordReaderForRange),
+            passThroughTransformer, null);
+        driver.build();
+      }
       fileManager.cleanUp();
     }
 
-    // Check for reducer output files
-    File[] reducerOutputFiles = _reducerOutputDir.listFiles();
-    if (reducerOutputFiles.length == 0) {
-      throw new IllegalStateException(
-          "No files found in reducer output directory: " + _reducerOutputDir.getAbsolutePath()
-              + ". Exiting SegmentProcessorFramework.");
-    }
-
-    // Segment generation phase.
-    LOGGER.info("Beginning segment generation phase. Processing files: {}", Arrays.toString(_reducerOutputDir.list()));
-    // Reducer output directory will have 1 or more avro files
-    int segmentNum = 0;
-    for (File resultFile : reducerOutputFiles) {
-      SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, _schema);
-      segmentGeneratorConfig.setTableName(_tableConfig.getTableName());
-      segmentGeneratorConfig.setOutDir(_outputSegmentsDir.getAbsolutePath());
-      segmentGeneratorConfig.setInputFilePath(resultFile.getAbsolutePath());
-      segmentGeneratorConfig.setFormat(FileFormat.AVRO);
-      segmentGeneratorConfig.setSequenceId(segmentNum++);
-      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-      driver.init(segmentGeneratorConfig);
-      driver.build();
-    }
-
-    LOGGER.info("Successfully converted segments from: {} to {}", _inputSegmentsDir,
+    LOGGER.info("Successfully converted segments from: {} to {}", Arrays.toString(_inputSegmentsDir.list()),
         Arrays.toString(_outputSegmentsDir.list()));
   }
 

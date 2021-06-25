@@ -75,16 +75,16 @@ public class GenericRowSerDeTest {
     PinotDataBuffer dataBuffer = PinotDataBuffer.allocateDirect(bytes.length, PinotDataBuffer.NATIVE_ORDER, null);
     dataBuffer.readFrom(0L, bytes);
     GenericRowDeserializer deserializer = new GenericRowDeserializer(dataBuffer, _fieldSpecs, false);
-    GenericRow reuse = new GenericRow();
-    deserializer.deserialize(0L, reuse);
-    Map<String, Object> actualValueMap = reuse.getFieldToValueMap();
+    GenericRow buffer = new GenericRow();
+    deserializer.deserialize(0L, buffer);
+    Map<String, Object> actualValueMap = buffer.getFieldToValueMap();
     Map<String, Object> expectedValueMap = _row.getFieldToValueMap();
     // NOTE: Cannot directly assert equals on maps because they contain arrays
     assertEquals(actualValueMap.size(), expectedValueMap.size());
     for (Map.Entry<String, Object> entry : expectedValueMap.entrySet()) {
       assertEquals(actualValueMap.get(entry.getKey()), entry.getValue());
     }
-    assertTrue(reuse.getNullValueFields().isEmpty());
+    assertTrue(buffer.getNullValueFields().isEmpty());
   }
 
   @Test
@@ -94,9 +94,9 @@ public class GenericRowSerDeTest {
     PinotDataBuffer dataBuffer = PinotDataBuffer.allocateDirect(bytes.length, PinotDataBuffer.NATIVE_ORDER, null);
     dataBuffer.readFrom(0L, bytes);
     GenericRowDeserializer deserializer = new GenericRowDeserializer(dataBuffer, _fieldSpecs, true);
-    GenericRow reuse = new GenericRow();
-    deserializer.deserialize(0L, reuse);
-    assertEquals(reuse, _row);
+    GenericRow buffer = new GenericRow();
+    deserializer.deserialize(0L, buffer);
+    assertEquals(buffer, _row);
   }
 
   @Test
@@ -108,30 +108,28 @@ public class GenericRowSerDeTest {
     PinotDataBuffer dataBuffer = PinotDataBuffer.allocateDirect(bytes.length, PinotDataBuffer.NATIVE_ORDER, null);
     dataBuffer.readFrom(0L, bytes);
     GenericRowDeserializer deserializer = new GenericRowDeserializer(dataBuffer, fieldSpecs, true);
-    GenericRow reuse = new GenericRow();
-    deserializer.deserialize(0L, reuse);
-    Map<String, Object> fieldToValueMap = reuse.getFieldToValueMap();
+    GenericRow buffer = new GenericRow();
+    deserializer.deserialize(0L, buffer);
+    Map<String, Object> fieldToValueMap = buffer.getFieldToValueMap();
     assertEquals(fieldToValueMap.size(), 2);
     assertEquals(fieldToValueMap.get("intSV"), _row.getValue("intSV"));
     assertEquals(fieldToValueMap.get("nullSV"), _row.getValue("nullSV"));
-    Set<String> nullValueFields = reuse.getNullValueFields();
+    Set<String> nullValueFields = buffer.getNullValueFields();
     assertEquals(nullValueFields, Collections.singleton("nullSV"));
   }
 
   @Test
-  public void testPartialDeserialize() {
+  public void testCompare() {
     GenericRowSerializer serializer = new GenericRowSerializer(_fieldSpecs, true);
     byte[] bytes = serializer.serialize(_row);
-    PinotDataBuffer dataBuffer = PinotDataBuffer.allocateDirect(bytes.length, PinotDataBuffer.NATIVE_ORDER, null);
+    long numBytes = bytes.length;
+    PinotDataBuffer dataBuffer = PinotDataBuffer.allocateDirect(numBytes * 2, PinotDataBuffer.NATIVE_ORDER, null);
     dataBuffer.readFrom(0L, bytes);
+    dataBuffer.readFrom(numBytes, bytes);
     GenericRowDeserializer deserializer = new GenericRowDeserializer(dataBuffer, _fieldSpecs, true);
-    Object[] values = deserializer.partialDeserialize(0L, 7);
-    assertEquals(values[0], _row.getValue("intSV"));
-    assertEquals(values[1], _row.getValue("longSV"));
-    assertEquals(values[2], _row.getValue("floatSV"));
-    assertEquals(values[3], _row.getValue("doubleSV"));
-    assertEquals(values[4], _row.getValue("stringSV"));
-    assertEquals(values[5], _row.getValue("bytesSV"));
-    assertEquals(values[6], _row.getValue("nullSV"));
+    int numFields = _fieldSpecs.size();
+    for (int i = 0; i < numFields; i++) {
+      assertEquals(deserializer.compare(0L, numBytes, i), 0);
+    }
   }
 }
