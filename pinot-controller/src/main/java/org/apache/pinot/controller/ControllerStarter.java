@@ -547,8 +547,9 @@ public class ControllerStarter implements ServiceStartable {
       throw new RuntimeException(errorMsg);
     }
 
-    HelixHelper.updateInstanceConfigIfNeeded(_helixParticipantManager, _helixParticipantInstanceId,
-      _config.getControllerHost(), _config.getControllerPort(), null);
+    HelixHelper.addDefaultTags(_helixParticipantManager, _helixParticipantInstanceId, null);
+    HelixHelper.updateHostNamePort(_helixParticipantManager, _helixParticipantInstanceId, _config.getControllerHost(),
+        _config.getControllerPort());
 
     LOGGER.info("Registering helix controller listener");
     // This registration is not needed when the leadControllerResource is enabled.

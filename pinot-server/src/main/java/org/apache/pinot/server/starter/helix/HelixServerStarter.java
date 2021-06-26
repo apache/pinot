@@ -263,24 +263,6 @@ public class HelixServerStarter implements ServiceStartable {
         new ServiceStatus.MultipleCallbackServiceStatusCallback(serviceStatusCallbackListBuilder.build()));
   }
 
-  private void updateInstanceConfigIfNeeded(String host, int port) {
-    HelixHelper.updateInstanceConfigIfNeeded(
-      _helixManager,
-      _instanceId,
-      host,
-      String.valueOf(port),
-      () -> {
-        ImmutableList.Builder<String> defaultTags = ImmutableList.builder();
-        if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_helixManager.getHelixPropertyStore())) {
-          defaultTags.add(TagNameUtils.getOfflineTagForTenant(null));
-          defaultTags.add(TagNameUtils.getRealtimeTagForTenant(null));
-        } else {
-          defaultTags.add(Helix.UNTAGGED_SERVER_INSTANCE);
-        }
-        return defaultTags.build();
-    });
-  }
-
   private void setupHelixSystemProperties() {
     // NOTE: Helix will disconnect the manager and disable the instance if it detects flapping (too frequent disconnect
     // from ZooKeeper). Setting flapping time window to a small value can avoid this from happening. Helix ignores the
@@ -374,8 +356,17 @@ public class HelixServerStarter implements ServiceStartable {
     LOGGER.info("Connecting Helix manager");
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
-    updateInstanceConfigIfNeeded(_host, _port);
-
+    HelixHelper.addDefaultTags(_helixManager, _instanceId, () -> {
+          ImmutableList.Builder<String> defaultTags = ImmutableList.builder();
+          if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_helixManager.getHelixPropertyStore())) {
+            defaultTags.add(TagNameUtils.getOfflineTagForTenant(null));
+            defaultTags.add(TagNameUtils.getRealtimeTagForTenant(null));
+          } else {
+            defaultTags.add(Helix.UNTAGGED_SERVER_INSTANCE);
+          }
+          return defaultTags.build();
+        });
+    HelixHelper.updateHostNamePort(_helixManager, _instanceId, _host, _port);
     // Start restlet server for admin API endpoint
     String accessControlFactoryClass =
         _serverConf.getProperty(Server.ACCESS_CONTROL_FACTORY_CLASS, Server.DEFAULT_ACCESS_CONTROL_FACTORY_CLASS);

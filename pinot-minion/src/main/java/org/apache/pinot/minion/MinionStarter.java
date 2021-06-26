@@ -226,12 +226,11 @@ public class MinionStarter implements ServiceStartable {
     _helixManager.getStateMachineEngine().registerStateModelFactory("Task", new TaskStateModelFactory(_helixManager,
         new TaskFactoryRegistry(_taskExecutorFactoryRegistry, _eventObserverFactoryRegistry).getTaskFactoryRegistry()));
     _helixManager.connect();
-    HelixHelper.updateInstanceConfigIfNeeded(
-      _helixManager,
-      _instanceId,
+    HelixHelper.addDefaultTags(_helixManager, _instanceId,
+        () -> ImmutableList.of(CommonConstants.Helix.UNTAGGED_MINION_INSTANCE));
+    HelixHelper.updateHostNamePort(_helixManager, _instanceId,
       _config.getProperty(CommonConstants.Helix.KEY_OF_MINION_HOST),
-      _config.getProperty(CommonConstants.Helix.KEY_OF_MINION_PORT),
-      () -> ImmutableList.of(CommonConstants.Helix.UNTAGGED_MINION_INSTANCE)
+      _config.getProperty(CommonConstants.Helix.KEY_OF_MINION_PORT)
     );
     minionContext.setHelixPropertyStore(_helixManager.getHelixPropertyStore());
 

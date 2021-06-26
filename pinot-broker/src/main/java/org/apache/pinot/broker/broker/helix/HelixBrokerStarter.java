@@ -101,6 +101,8 @@ public class HelixBrokerStarter implements ServiceStartable {
 
   // Participant Helix manager handles Helix functionality such as state transitions and messages
   private HelixManager _participantHelixManager;
+  private String _brokerHost;
+  private int _brokerPort;
 
   @Deprecated
   public HelixBrokerStarter(PinotConfiguration brokerConf, String clusterName, String zkServer)
@@ -130,21 +132,21 @@ public class HelixBrokerStarter implements ServiceStartable {
   public HelixBrokerStarter(PinotConfiguration brokerConf) throws Exception {
     _brokerConf = brokerConf;
     _listenerConfigs = ListenerConfigUtil.buildBrokerConfigs(brokerConf);
+    _brokerPort = _listenerConfigs.get(0).getPort();
     setupHelixSystemProperties();
 
     _clusterName = brokerConf.getProperty(Helix.CONFIG_OF_CLUSTER_NAME);
 
     // Remove all white-spaces from the list of zkServers (if any).
     _zkServers = brokerConf.getProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER).replaceAll("\\s+", "");
-    String brokerHost = brokerConf.getProperty(Broker.CONFIG_OF_BROKER_HOSTNAME);
-    if (brokerHost == null) {
-      brokerHost = _brokerConf.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils
+    _brokerHost = brokerConf.getProperty(Broker.CONFIG_OF_BROKER_HOSTNAME);
+    if (_brokerHost == null) {
+      _brokerHost = _brokerConf.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils
           .getHostnameOrAddress() : NetUtils.getHostAddress();
-      brokerConf.setProperty(Broker.CONFIG_OF_BROKER_HOSTNAME, brokerHost);
     }
 
     _brokerId = _brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY,
-      Helix.PREFIX_OF_BROKER_INSTANCE + brokerHost + "_" + _listenerConfigs.get(0).getPort());
+      Helix.PREFIX_OF_BROKER_INSTANCE + _brokerHost + "_" + _brokerPort);
 
     _brokerConf.setProperty(Broker.CONFIG_OF_BROKER_ID, _brokerId);
   }
@@ -321,20 +323,17 @@ public class HelixBrokerStarter implements ServiceStartable {
             new BrokerUserDefinedMessageHandlerFactory(_routingManager, queryQuotaManager));
     _participantHelixManager.connect();
 
-    HelixHelper.updateInstanceConfigIfNeeded(
-      _participantHelixManager,
-      _brokerId,
-      _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_HOSTNAME),
-      String.valueOf(_listenerConfigs.get(0).getPort()),
-      () -> {
-        ImmutableList.Builder<String> defaultTags = ImmutableList.builder();
-        if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
-          defaultTags.add(TagNameUtils.getBrokerTagForTenant(null));
-        } else {
-          defaultTags.add(Helix.UNTAGGED_BROKER_INSTANCE);
-        }
-        return defaultTags.build();
-      });
+    HelixHelper.addDefaultTags(_participantHelixManager, _brokerId, () -> {
+      ImmutableList.Builder<String> defaultTags = ImmutableList.builder();
+      if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
+        defaultTags.add(TagNameUtils.getBrokerTagForTenant(null));
+      } else {
+        defaultTags.add(Helix.UNTAGGED_BROKER_INSTANCE);
+      }
+      return defaultTags.build();
+    });
+
+    HelixHelper.updateHostNamePort(_participantHelixManager, _brokerId, _brokerHost, _brokerPort);
 
     _brokerMetrics
         .addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME, () -> _participantHelixManager.isConnected() ? 1L : 0L);

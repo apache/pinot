@@ -500,67 +500,61 @@ public class HelixHelper {
   }
 
   /**
-   * Update host config in Helix if needed.
-   * The hostname and port cannot be null or empty;
-   * The port will be validated against integer.
-   * There is a callback lambda that can provide the tags if needed.
-   * For example () -> ImmutableList.of("Default_tenant")
-   * @param helixManager The Participant Manager
-   * @param instanceId the Helix instance id
-   * @param hostName the Hostname to update
-   * @param hostPort the host port to update
-   * @param getDefaultTags Something like () -> ImmutableList.of("Default_tenant") to provide default tags
+   * Add default tags to instance if the instance has no tags Note for the getDefaultTags: it is a
+   * lambda so it may not be invoked if instance already has tags. * For example () ->
+   * ImmutableList.of("Default_tenant")
+   *
+   * @param helixManager The helix manager for update
+   * @param instanceId the Helix instance Id
+   * @param getDefaultTags the default tags lambda. Something like () -> ImmutableList.of("Default_tenant") to provide default tags
    */
-  public static void updateInstanceConfigIfNeeded(HelixManager helixManager, String instanceId, String hostName, String hostPort, Supplier<List<String>> getDefaultTags) {
-    HelixAdmin admin = helixManager.getClusterManagmentTool();
-    String clusterName = helixManager.getClusterName();
-    InstanceConfig instanceConfig = admin.getInstanceConfig(clusterName, instanceId);
-    boolean needToUpdateInstanceConfig = false;
-
+  public static void addDefaultTags(
+      HelixManager helixManager, String instanceId, Supplier<List<String>> getDefaultTags) {
+    InstanceConfig instanceConfig = getInstanceConfig(helixManager, instanceId);
     // Add default instance tags if not exist
     List<String> instanceTags = instanceConfig.getTags();
     if (instanceTags == null || instanceTags.size() == 0) {
       List<String> defaultTags = getDefaultTags == null ? null : getDefaultTags.get();
       if (defaultTags != null && !defaultTags.isEmpty()) {
         defaultTags.forEach(instanceConfig::addTag);
-        needToUpdateInstanceConfig = true;
+        LOGGER.info("Updating instance tags {} for instance: {}", instanceId, instanceTags);
+        updateInstanceConfig(helixManager, instanceConfig);
       }
     }
-    if (updateHostNamePort(instanceConfig, hostName, hostPort)) {
-      needToUpdateInstanceConfig = true;
-    }
+  }
 
-    if (needToUpdateInstanceConfig) {
-      LOGGER.info("Updating instance config for instance: {} with instance tags: {}, host: {}, port: {}", instanceId,
-        instanceTags, hostName, hostPort);
-    } else {
-      LOGGER.info("Instance config for instance: {} has instance tags: {}, host: {}, port: {}, no need to update",
-        instanceId, instanceTags, hostName, hostPort);
-      return;
-    }
+  private static InstanceConfig getInstanceConfig(HelixManager helixManager, String instanceId) {
+    HelixAdmin admin = helixManager.getClusterManagmentTool();
+    String clusterName = helixManager.getClusterName();
+    return admin.getInstanceConfig(clusterName, instanceId);
+  }
+
+  private static void updateInstanceConfig(HelixManager helixManager, InstanceConfig instanceConfig) {
     // NOTE: Use HelixDataAccessor.setProperty() instead of HelixAdmin.setInstanceConfig() because the latter explicitly
     // forbids instance host/port modification
     HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
     Preconditions.checkState(
-      helixDataAccessor.setProperty(helixDataAccessor.keyBuilder().instanceConfig(instanceId), instanceConfig),
-      "Failed to update instance config");
+        helixDataAccessor.setProperty(helixDataAccessor.keyBuilder().instanceConfig(instanceConfig.getId()), instanceConfig),
+        "Failed to update instance config");
   }
 
-  private static boolean updateHostNamePort(InstanceConfig instanceConfig, String hostName, String hostPort) {
-    if (Strings.isNullOrEmpty(hostName) || Strings.isNullOrEmpty(hostPort)) {
-      LOGGER.info("host={} port={}, one of them is empty, skip updating helix host", hostName, hostPort);
-      return false;
-    }
-    try {
-      Integer.parseInt(hostPort);
-    } catch (NumberFormatException ex) {
-      LOGGER.error(
-        "Host port={} is not a number. Will skip updating helix hostname", hostPort, ex);
+  /**
+   * Update Helix Host and Name if the values are reasonable.
+   * @param helixManager the Helix Manager to get control
+   * @param instanceId the Helix instance Id
+   * @param hostName the Host name
+   * @param hostPort the Host port
+   * @return true if it is updated
+   */
+  public static boolean updateHostNamePort(HelixManager helixManager, String instanceId, String hostName, int hostPort) {
+    InstanceConfig instanceConfig = getInstanceConfig(helixManager, instanceId);
+    if (Strings.isNullOrEmpty(hostName)) {
+      LOGGER.info("host is empty, skip updating helix host.");
       return false;
     }
     boolean updated = false;
-    if (!hostPort.equals(instanceConfig.getPort())) {
-      instanceConfig.setPort(hostPort);
+    if (!String.valueOf(hostPort).equals(instanceConfig.getPort())) {
+      instanceConfig.setPort(String.valueOf(hostPort));
       updated = true;
     }
     // Update host and port if needed
@@ -569,5 +563,27 @@ public class HelixHelper {
       updated = true;
     }
     return updated;
+  }
+  /**
+   * Update Helix Host and Name if the values are reasonable.
+   * @param helixManager the Helix Manager to get control
+   * @param instanceId the Helix instance Id
+   * @param hostName the Host name
+   * @param hostPort the Host port
+   * @return true if it is updated
+   */
+  public static boolean updateHostNamePort(HelixManager helixManager, String instanceId, String hostName, String hostPort) {
+    if (Strings.isNullOrEmpty(hostPort)) {
+      LOGGER.error("Host port is empty. Will skip updating helix hostname");
+      return false;
+    }
+    try {
+      int port = Integer.parseInt(hostPort);
+      return updateHostNamePort(helixManager, instanceId, hostName, port);
+    } catch (NumberFormatException ex) {
+      LOGGER.error(
+        "Host port={} is not a number. Will skip updating helix hostname", hostPort, ex);
+      return false;
+    }
   }
 }
