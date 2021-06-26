@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.server.starter.helix;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -33,7 +32,6 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;

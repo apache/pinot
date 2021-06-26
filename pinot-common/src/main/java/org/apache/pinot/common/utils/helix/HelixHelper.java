@@ -573,6 +573,7 @@ public class HelixHelper {
       instanceConfig.setHostName(hostName);
       updated = true;
     }
+    updateInstanceConfig(helixManager, instanceConfig);
     return updated;
   }
   /**

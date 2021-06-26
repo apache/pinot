@@ -35,7 +35,6 @@ import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
-import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.Message;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
