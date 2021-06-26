@@ -34,7 +34,7 @@ import org.testng.annotations.Test;
 public class HelixBrokerStarterHostNameTest extends ControllerTest {
 
   @BeforeTest
-  public void setupCluster() {
+  public void setupCluster() throws Exception {
     System.setProperty("zk.serializer.znrecord.write.size.limit.bytes", "40024024");
     startZk();
     startController();
