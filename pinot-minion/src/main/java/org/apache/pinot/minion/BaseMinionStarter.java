@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.minion;
 
+import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -37,6 +38,7 @@ import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.transport.TlsConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
@@ -76,6 +78,8 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   protected EventObserverFactoryRegistry _eventObserverFactoryRegistry;
   protected MinionAdminApiApplication _minionAdminApplication;
   protected List<ListenerConfig> _listenerConfigs;
+  protected String _host;
+  protected int _port;
 
   @Override
   public void init(PinotConfiguration config)
@@ -83,12 +87,12 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     _config = config;
     String helixClusterName = _config.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
     String zkAddress = _config.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER);
-    String host = _config.getProperty(CommonConstants.Helix.KEY_OF_MINION_HOST,
+    _host = _config.getProperty(CommonConstants.Helix.KEY_OF_MINION_HOST,
         _config.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils
             .getHostnameOrAddress() : NetUtils.getHostAddress());
-    int port = _config.getProperty(CommonConstants.Helix.KEY_OF_MINION_PORT, CommonConstants.Minion.DEFAULT_HELIX_PORT);
+    _port = _config.getProperty(CommonConstants.Helix.KEY_OF_MINION_PORT, CommonConstants.Minion.DEFAULT_HELIX_PORT);
     _instanceId = _config.getProperty(CommonConstants.Helix.Instance.INSTANCE_ID_KEY,
-        CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE + host + "_" + port);
+        CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE + _host + "_" + _port);
     _listenerConfigs = ListenerConfigUtil.buildMinionAdminConfigs(_config);
     setupHelixSystemProperties();
     _helixManager = new ZKHelixManager(helixClusterName, _instanceId, InstanceType.PARTICIPANT, zkAddress);
@@ -213,6 +217,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
         new TaskFactoryRegistry(_taskExecutorFactoryRegistry, _eventObserverFactoryRegistry).getTaskFactoryRegistry()));
     _helixManager.connect();
     addInstanceTagIfNeeded();
+    HelixHelper.updateHostNamePort(_helixManager, _instanceId, _host, _port);
     minionContext.setHelixPropertyStore(_helixManager.getHelixPropertyStore());
 
     LOGGER.info("Starting minion admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
@@ -269,13 +274,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
    * Tags Pinot Minion instance if needed.
    */
   private void addInstanceTagIfNeeded() {
-    HelixAdmin helixAdmin = _helixManager.getClusterManagmentTool();
-    String clusterName = _helixManager.getClusterName();
-    InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(clusterName, _instanceId);
-    List<String> instanceTags = instanceConfig == null ? new ArrayList<>(0) : instanceConfig.getTags();
-    if (instanceTags.isEmpty()) {
-      LOGGER.info("Adding default Helix tag: {} to Pinot minion", CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
-      helixAdmin.addInstanceTag(clusterName, _instanceId, CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
-    }
+    HelixHelper.addDefaultTags(_helixManager, _instanceId,
+        () -> ImmutableList.of(CommonConstants.Helix.UNTAGGED_MINION_INSTANCE));
   }
 }

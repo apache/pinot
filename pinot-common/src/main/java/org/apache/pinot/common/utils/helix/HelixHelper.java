@@ -523,13 +523,24 @@ public class HelixHelper {
     }
   }
 
-  private static InstanceConfig getInstanceConfig(HelixManager helixManager, String instanceId) {
+  /**
+   * Returns the instance config for a specific instance ID
+   * @param helixManager the Helix manager
+   * @param instanceId the unique ID for instance
+   * @return An InstanceConfig that we can update
+   */
+  public static InstanceConfig getInstanceConfig(HelixManager helixManager, String instanceId) {
     HelixAdmin admin = helixManager.getClusterManagmentTool();
     String clusterName = helixManager.getClusterName();
     return admin.getInstanceConfig(clusterName, instanceId);
   }
 
-  private static void updateInstanceConfig(HelixManager helixManager, InstanceConfig instanceConfig) {
+  /**
+   * Update instance config into Helix properly
+   * @param helixManager the HelixManager for access
+   * @param instanceConfig the updated Helix Config
+   */
+  public static void updateInstanceConfig(HelixManager helixManager, InstanceConfig instanceConfig) {
     // NOTE: Use HelixDataAccessor.setProperty() instead of HelixAdmin.setInstanceConfig() because the latter explicitly
     // forbids instance host/port modification
     HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();

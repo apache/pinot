@@ -54,6 +54,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
@@ -254,33 +255,21 @@ public abstract class BaseServerStarter implements ServiceStartable {
         new ServiceStatus.MultipleCallbackServiceStatusCallback(serviceStatusCallbackListBuilder.build()));
   }
 
-  private void updateInstanceConfigIfNeeded(String host, int port) {
-    InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(_helixClusterName, _instanceId);
-    boolean needToUpdateInstanceConfig = false;
-
-    // Add default instance tags if not exist
-    List<String> instanceTags = instanceConfig.getTags();
-    if (instanceTags == null || instanceTags.size() == 0) {
+  private void updateInstanceConfigIfNeeded() {
+    HelixHelper.addDefaultTags(_helixManager, _instanceId, () -> {
+      ImmutableList.Builder<String> defaultTags = ImmutableList.builder();
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_helixManager.getHelixPropertyStore())) {
-        instanceConfig.addTag(TagNameUtils.getOfflineTagForTenant(null));
-        instanceConfig.addTag(TagNameUtils.getRealtimeTagForTenant(null));
+        defaultTags.add(TagNameUtils.getOfflineTagForTenant(null));
+        defaultTags.add(TagNameUtils.getRealtimeTagForTenant(null));
       } else {
-        instanceConfig.addTag(Helix.UNTAGGED_SERVER_INSTANCE);
+        defaultTags.add(Helix.UNTAGGED_SERVER_INSTANCE);
       }
-      needToUpdateInstanceConfig = true;
-    }
+      return defaultTags.build();
+    });
 
-    // Update host and port if needed
-    if (!host.equals(instanceConfig.getHostName())) {
-      instanceConfig.setHostName(host);
-      needToUpdateInstanceConfig = true;
-    }
-    String portStr = Integer.toString(port);
-    if (!portStr.equals(instanceConfig.getPort())) {
-      instanceConfig.setPort(portStr);
-      needToUpdateInstanceConfig = true;
-    }
+    HelixHelper.updateHostNamePort(_helixManager, _instanceId, _host, _port);
 
+    InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, _instanceId);
     // Update instance config with environment properties
     if (_pinotEnvironmentProvider != null) {
       // Retrieve failure domain information and add to the environment properties map
@@ -295,25 +284,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
       if (existingEnvironmentConfigsMap == null || !existingEnvironmentConfigsMap.equals(environmentProperties)) {
         instanceConfig.getRecord().setMapField(CommonConstants.ENVIRONMENT_IDENTIFIER, environmentProperties);
         LOGGER.info("Adding environment properties: {} for instance: {}", environmentProperties, _instanceId);
-        needToUpdateInstanceConfig = true;
+        HelixHelper.updateInstanceConfig(_helixManager, instanceConfig);
       }
     }
 
-    if (needToUpdateInstanceConfig) {
-      LOGGER.info("Updating instance config for instance: {} with instance tags: {}, host: {}, port: {}", _instanceId,
-          instanceTags, host, port);
-    } else {
-      LOGGER.info("Instance config for instance: {} has instance tags: {}, host: {}, port: {}, no need to update",
-          _instanceId, instanceTags, host, port);
-      return;
-    }
-
-    // NOTE: Use HelixDataAccessor.setProperty() instead of HelixAdmin.setInstanceConfig() because the latter explicitly
-    // forbids instance host/port modification
-    HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
-    Preconditions.checkState(
-        helixDataAccessor.setProperty(helixDataAccessor.keyBuilder().instanceConfig(_instanceId), instanceConfig),
-        "Failed to update instance config");
   }
 
   private void setupHelixSystemProperties() {
@@ -409,7 +383,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     LOGGER.info("Connecting Helix manager");
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
-    updateInstanceConfigIfNeeded(_host, _port);
+    updateInstanceConfigIfNeeded();
 
     // Start restlet server for admin API endpoint
     String accessControlFactoryClass =

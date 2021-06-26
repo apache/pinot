@@ -53,6 +53,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.TableCache;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.transport.TlsConfig;
@@ -98,28 +99,31 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected ClusterChangeMediator _clusterChangeMediator;
   // Participant Helix manager handles Helix functionality such as state transitions and messages
   protected HelixManager _participantHelixManager;
+  protected String _brokerHost;
+  protected int _brokerPort;
 
   @Override
   public void init(PinotConfiguration brokerConf)
       throws Exception {
     _brokerConf = brokerConf;
     _listenerConfigs = ListenerConfigUtil.buildBrokerConfigs(brokerConf);
+    _brokerPort = _listenerConfigs.get(0).getPort();
     setupHelixSystemProperties();
 
     _clusterName = brokerConf.getProperty(Helix.CONFIG_OF_CLUSTER_NAME);
 
     // Remove all white-spaces from the list of zkServers (if any).
     _zkServers = brokerConf.getProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER).replaceAll("\\s+", "");
-    String brokerHost = brokerConf.getProperty(Broker.CONFIG_OF_BROKER_HOSTNAME);
-    if (brokerHost == null) {
-      brokerHost = _brokerConf.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils
+    _brokerHost = brokerConf.getProperty(Broker.CONFIG_OF_BROKER_HOSTNAME);
+    if (_brokerHost == null) {
+      _brokerHost = _brokerConf.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils
           .getHostnameOrAddress() : NetUtils.getHostAddress();
     }
 
     _brokerId = _brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY,
-        Helix.PREFIX_OF_BROKER_INSTANCE + brokerHost + "_" + _listenerConfigs.get(0).getPort());
+        Helix.PREFIX_OF_BROKER_INSTANCE + _brokerHost + "_" + _brokerPort);
 
-    _brokerConf.addProperty(Broker.CONFIG_OF_BROKER_ID, _brokerId);
+    _brokerConf.setProperty(Broker.CONFIG_OF_BROKER_ID, _brokerId);
   }
 
   private void setupHelixSystemProperties() {
@@ -294,6 +298,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
             new BrokerUserDefinedMessageHandlerFactory(_routingManager, queryQuotaManager));
     _participantHelixManager.connect();
     addInstanceTagIfNeeded();
+    HelixHelper.updateHostNamePort(_participantHelixManager, _brokerId, _brokerHost, _brokerPort);
     _brokerMetrics
         .addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME, () -> _participantHelixManager.isConnected() ? 1L : 0L);
     _participantHelixManager
@@ -334,16 +339,15 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   }
 
   private void addInstanceTagIfNeeded() {
-    InstanceConfig instanceConfig =
-        _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().instanceConfig(_brokerId));
-    List<String> instanceTags = instanceConfig.getTags();
-    if (instanceTags == null || instanceTags.isEmpty()) {
+    HelixHelper.addDefaultTags(_participantHelixManager, _brokerId, () -> {
+      ImmutableList.Builder<String> defaultTags = ImmutableList.builder();
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
-        _helixAdmin.addInstanceTag(_clusterName, _brokerId, TagNameUtils.getBrokerTagForTenant(null));
+        defaultTags.add(TagNameUtils.getBrokerTagForTenant(null));
       } else {
-        _helixAdmin.addInstanceTag(_clusterName, _brokerId, Helix.UNTAGGED_BROKER_INSTANCE);
+        defaultTags.add(Helix.UNTAGGED_BROKER_INSTANCE);
       }
-    }
+      return defaultTags.build();
+    });
   }
 
   @Override

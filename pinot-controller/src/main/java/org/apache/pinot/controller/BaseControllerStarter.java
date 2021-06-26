@@ -56,6 +56,7 @@ import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -550,6 +551,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg);
     }
+    HelixHelper.addDefaultTags(_helixParticipantManager, _helixParticipantInstanceId, null);
+    HelixHelper.updateHostNamePort(_helixParticipantManager, _helixParticipantInstanceId, _config.getControllerHost(),
+        _config.getControllerPort());
 
     LOGGER.info("Registering helix controller listener");
     // This registration is not needed when the leadControllerResource is enabled.
