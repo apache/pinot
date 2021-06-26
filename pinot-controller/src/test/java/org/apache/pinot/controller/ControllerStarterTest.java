@@ -40,7 +40,7 @@ public class ControllerStarterTest extends ControllerTest {
   }
 
   @Test
-  public void testControllerHostNameOverride() {
+  public void testControllerHostNameOverride() throws Exception {
     boolean controllerStarted = false;
     try {
       controllerConfigMap.clear();
@@ -64,7 +64,7 @@ public class ControllerStarterTest extends ControllerTest {
   }
 
   @Test
-  public void testSkippingControllerHostNameOverride() {
+  public void testSkippingControllerHostNameOverride() throws Exception {
     boolean controllerStarted = false;
     try {
       controllerConfigMap.clear();
@@ -88,7 +88,7 @@ public class ControllerStarterTest extends ControllerTest {
   }
 
   @Test
-  public void testMissingControllerHostName() {
+  public void testMissingControllerHostName() throws Exception {
     boolean controllerStarted = false;
     try {
       controllerConfigMap.clear();
@@ -111,7 +111,7 @@ public class ControllerStarterTest extends ControllerTest {
   }
 
   @Test
-  public void testIntegerPortBlock() {
+  public void testIntegerPortBlock() throws Exception {
     boolean controllerStarted = false;
     boolean validated = false;
     boolean numberFormatCaught = false;
