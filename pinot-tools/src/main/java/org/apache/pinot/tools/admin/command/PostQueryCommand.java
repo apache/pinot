@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import java.io.IOException;
 import java.util.Collections;
-
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
@@ -167,7 +165,7 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
       try {
         BrokerResponseNative response = JsonUtils.stringToObject(brokerResponse, BrokerResponseNative.class);
         OutputFormatUtils.saveResponse(response, _outputPath, _outputFormat);
-      } catch (IOException | UnsupportedOperationException e) {
+      } catch (Exception e) {
         e.printStackTrace();
       }
     }
