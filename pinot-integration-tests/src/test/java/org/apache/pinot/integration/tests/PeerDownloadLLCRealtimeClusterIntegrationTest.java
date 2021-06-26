@@ -132,7 +132,8 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
 
 
   @Override
-  public void startController() {
+  public void startController()
+      throws Exception {
     Map<String, Object> controllerConfig = getDefaultControllerConfiguration();
     controllerConfig.put(ALLOW_HLC_TABLES, false);
     controllerConfig.put(ENABLE_SPLIT_COMMIT, _enableSplitCommit);

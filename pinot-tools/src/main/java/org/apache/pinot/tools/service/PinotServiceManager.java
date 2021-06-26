@@ -19,12 +19,12 @@
 package org.apache.pinot.tools.service;
 
 import com.google.common.collect.ImmutableList;
+import java.lang.reflect.InvocationTargetException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.common.utils.ServiceStatus;
-import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.minion.MinionStarter;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
@@ -87,31 +87,39 @@ public class PinotServiceManager {
       throws Exception {
     switch (role) {
       case CONTROLLER:
-        return startController(new ControllerConf(properties));
+        String controllerStarterClassName = (String) properties
+            .getOrDefault(CommonConstants.Helix.CONFIG_OF_PINOT_CONTROLLER_STARTABLE_CLASS,
+                ControllerStarter.class.getName());
+        return startController(controllerStarterClassName, new PinotConfiguration(properties));
       case BROKER:
-        return startBroker(new PinotConfiguration(properties));
+        String brokerStarterClassName = (String) properties
+            .getOrDefault(CommonConstants.Helix.CONFIG_OF_PINOT_BROKER_STARTABLE_CLASS,
+                HelixBrokerStarter.class.getName());
+        return startBroker(brokerStarterClassName, new PinotConfiguration(properties));
       case SERVER:
-        return startServer(new PinotConfiguration(properties));
+        String serverStarterClassName = (String) properties
+            .getOrDefault(CommonConstants.Helix.CONFIG_OF_PINOT_SERVER_STARTABLE_CLASS,
+                HelixServerStarter.class.getName());
+        return startServer(serverStarterClassName, new PinotConfiguration(properties));
       case MINION:
-        return startMinion(new PinotConfiguration(properties));
+        String minionStarterClassName = (String) properties
+            .getOrDefault(CommonConstants.Helix.CONFIG_OF_PINOT_MINION_STARTABLE_CLASS, MinionStarter.class.getName());
+        return startMinion(minionStarterClassName, new PinotConfiguration(properties));
     }
     return null;
   }
 
-  public String startController(ControllerConf controllerConf)
+  public String startController(String controllerStarterClassName, PinotConfiguration controllerConf)
       throws Exception {
     LOGGER.info("Trying to start Pinot Controller...");
-    if (controllerConf.getHelixClusterName() == null) {
-      controllerConf.setHelixClusterName(_clusterName);
+    if (!controllerConf.containsKey(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME)) {
+      controllerConf.setProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
     }
-    try {
-      if (controllerConf.getZkStr() == null) {
-        controllerConf.setZkStr(_zkAddress);
-      }
-    } catch (Exception e) {
-      controllerConf.setZkStr(_zkAddress);
+    if (!controllerConf.containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER)) {
+      controllerConf.setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
     }
-    ControllerStarter controllerStarter = new ControllerStarter(controllerConf);
+    ServiceStartable controllerStarter = getServiceStartable(controllerStarterClassName);
+    controllerStarter.init(controllerConf);
     controllerStarter.start();
     String instanceId = controllerStarter.getInstanceId();
     _runningInstanceMap.put(instanceId, controllerStarter);
@@ -119,7 +127,7 @@ public class PinotServiceManager {
     return instanceId;
   }
 
-  public String startBroker(PinotConfiguration brokerConf)
+  public String startBroker(String brokerStarterClassName, PinotConfiguration brokerConf)
       throws Exception {
     LOGGER.info("Trying to start Pinot Broker...");
     if (!brokerConf.containsKey(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME)) {
@@ -128,9 +136,10 @@ public class PinotServiceManager {
     if (!brokerConf.containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER)) {
       brokerConf.setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
     }
-    HelixBrokerStarter brokerStarter;
+    ServiceStartable brokerStarter;
     try {
-      brokerStarter = new HelixBrokerStarter(brokerConf);
+      brokerStarter = getServiceStartable(brokerStarterClassName);
+      brokerStarter.init(brokerConf);
     } catch (Exception e) {
       LOGGER.error("Failed to initialize Pinot Broker Starter", e);
       throw e;
@@ -147,7 +156,7 @@ public class PinotServiceManager {
     return instanceId;
   }
 
-  public String startServer(PinotConfiguration serverConf)
+  public String startServer(String serverStarterClassName, PinotConfiguration serverConf)
       throws Exception {
     LOGGER.info("Trying to start Pinot Server...");
 
@@ -158,7 +167,8 @@ public class PinotServiceManager {
     if (!serverConf.containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER)) {
       serverConf.setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
     }
-    HelixServerStarter serverStarter = new HelixServerStarter(serverConf);
+    ServiceStartable serverStarter = getServiceStartable(serverStarterClassName);
+    serverStarter.init(serverConf);
     serverStarter.start();
 
     String instanceId = serverStarter.getInstanceId();
@@ -167,7 +177,7 @@ public class PinotServiceManager {
     return instanceId;
   }
 
-  public String startMinion(PinotConfiguration minionConf)
+  public String startMinion(String minionStarterClassName, PinotConfiguration minionConf)
       throws Exception {
     LOGGER.info("Trying to start Pinot Minion...");
     if (!minionConf.containsKey(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME)) {
@@ -176,7 +186,8 @@ public class PinotServiceManager {
     if (!minionConf.containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER)) {
       minionConf.setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
     }
-    MinionStarter minionStarter = new MinionStarter(minionConf);
+    ServiceStartable minionStarter = getServiceStartable(minionStarterClassName);
+    minionStarter.init(minionConf);
     minionStarter.start();
 
     String instanceId = minionStarter.getInstanceId();
@@ -260,5 +271,13 @@ public class PinotServiceManager {
 
   public boolean stopPinotInstanceById(String instanceName) {
     return stopPinotInstance(_runningInstanceMap.get(instanceName));
+  }
+
+  private ServiceStartable getServiceStartable(String serviceStartableClassName) {
+    try {
+      return (ServiceStartable) Class.forName(serviceStartableClassName).getDeclaredConstructor().newInstance();
+    } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException | ClassNotFoundException e) {
+      throw new RuntimeException("Failed to instantiate ServiceStartable " + serviceStartableClassName, e);
+    }
   }
 }

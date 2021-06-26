@@ -25,10 +25,10 @@ import java.util.Random;
 import java.util.Set;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
-import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.pql.parsers.utils.Pair;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -38,11 +38,12 @@ import org.testng.annotations.Test;
 
 
 public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
-  private static long TIMEOUT_IN_MS = 10_000L;
+  private static final long TIMEOUT_IN_MS = 10_000L;
   private HashMap<Integer, String> _partitionToTableMap;
 
   @BeforeClass
-  public void setUp() {
+  public void setUp()
+      throws Exception {
     startZk();
     startController();
 
@@ -52,7 +53,8 @@ public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
   }
 
   @Test
-  public void testControllerLeaderLocator() {
+  public void testControllerLeaderLocator()
+      throws Exception {
     Set<String> resultSet = new HashSet<>();
     FakeControllerLeaderLocator controllerLeaderLocator = FakeControllerLeaderLocator.getInstance();
 
@@ -66,7 +68,8 @@ public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
     validateResultSet(controllerLeaderLocator, resultSet, 1, "Failed to get only one pair of controller");
 
     Map<String, Object> properties = getDefaultControllerConfiguration();
-    ControllerStarter secondControllerStarter = new ControllerStarter(new ControllerConf(properties));
+    ControllerStarter secondControllerStarter = new ControllerStarter();
+    secondControllerStarter.init(new PinotConfiguration(properties));
     secondControllerStarter.start();
 
     TestUtils

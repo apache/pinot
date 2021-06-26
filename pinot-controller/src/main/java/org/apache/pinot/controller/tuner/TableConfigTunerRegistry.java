@@ -16,13 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.config.tuner;
+package org.apache.pinot.controller.tuner;
 
-import java.util.HashMap;
+import com.google.common.base.Preconditions;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.spi.config.table.tuner.TableConfigTuner;
-import org.apache.pinot.spi.config.table.tuner.Tuner;
+import java.util.concurrent.ConcurrentHashMap;
 import org.reflections.Reflections;
 import org.reflections.scanners.ResourcesScanner;
 import org.reflections.scanners.SubTypesScanner;
@@ -42,19 +44,39 @@ public class TableConfigTunerRegistry {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TableConfigTunerRegistry.class);
-  private static final Map<String, TableConfigTuner> _configTunerMap = new HashMap<>();
+  private static final Map<String, TableConfigTuner> _configTunerMap = new ConcurrentHashMap<>();
+  private static boolean _init = false;
 
-  static {
+  /**
+   * Init method that initializes the _configTunerMap with all available tuners.
+   * <ul>
+   *   <li>Scans all packages specified, for class paths that have 'tuner' in path.</li>
+   *   <li>Looks for {@link Tuner} annotation for classes and adds them to the map. </li>
+   *   <li>Also, asserts that init was not already called before.</li>
+   * </ul>
+   * @param packages Packages to scan.
+   */
+  public static void init(List<String> packages) {
+    if (_init) {
+      LOGGER.info("TableConfigTunerRegistry already initialized, skipping.");
+      return;
+    }
+    long startTime = System.currentTimeMillis();
+
+    List<URL> urls = new ArrayList<>();
+    for (String pack : packages) {
+      urls.addAll(ClasspathHelper.forPackage(pack));
+    }
+
     Reflections reflections = new Reflections(
-        new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache.pinot"))
-            .filterInputsBy(new FilterBuilder.Include(".*\\.tuner\\..*"))
+        new ConfigurationBuilder().setUrls(urls).filterInputsBy(new FilterBuilder.Include(".*\\.tuner\\..*"))
             .setScanners(new ResourcesScanner(), new TypeAnnotationsScanner(), new SubTypesScanner()));
     Set<Class<?>> classes = reflections.getTypesAnnotatedWith(Tuner.class);
     classes.forEach(tunerClass -> {
       Tuner tunerAnnotation = tunerClass.getAnnotation(Tuner.class);
       if (tunerAnnotation.enabled()) {
         if (tunerAnnotation.name().isEmpty()) {
-          LOGGER.error("Cannot register an unnamed config tuner for annotation {} ", tunerAnnotation.toString());
+          LOGGER.error("Cannot register an unnamed config tuner for annotation {} ", tunerAnnotation);
         } else {
           String tunerName = tunerAnnotation.name();
           TableConfigTuner tuner;
@@ -67,11 +89,14 @@ public class TableConfigTunerRegistry {
         }
       }
     });
-    LOGGER.info("Initialized TableConfigTunerRegistry with {} tuners: {}", _configTunerMap.size(),
-        _configTunerMap.keySet());
+
+    _init = true;
+    LOGGER.info("Initialized TableConfigTunerRegistry with {} tuners: {} in {} ms", _configTunerMap.size(),
+        _configTunerMap.keySet(), (System.currentTimeMillis() - startTime));
   }
 
   public static TableConfigTuner getTuner(String name) {
+    Preconditions.checkState(_init, "TableConfigTunerRegistry not yet initialized.");
     return _configTunerMap.get(name);
   }
 }

@@ -16,26 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.config.table.tuner;
+package org.apache.pinot.segment.local.upsert.merger;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 
 
-/**
- * Annotation class for TableConfigTuner implementations. The corresponding classes
- * are auto-registered during startup.
- *
- * NOTE:
- * 1. The annotated class must be under the package of name 'org.apache.pinot.*.tuner.*'
- * to be auto-registered.
- */
-@Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.TYPE)
-public @interface Tuner {
-  boolean enabled() default true;
+public class PartialUpsertMergerFactory {
+  private PartialUpsertMergerFactory() {
+  }
 
-  String name() default "";
+  private static final OverwriteMerger OVERWRITE_MERGER = new OverwriteMerger();
+  private static final IncrementMerger INCREMENT_MERGER = new IncrementMerger();
+
+  public static PartialUpsertMerger getMerger(UpsertConfig.Strategy strategy) {
+    switch (strategy) {
+      case OVERWRITE:
+        return OVERWRITE_MERGER;
+      case INCREMENT:
+        return INCREMENT_MERGER;
+      default:
+        throw new IllegalStateException("Unsupported partial upsert strategy: " + strategy);
+    }
+  }
 }

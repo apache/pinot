@@ -27,7 +27,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
-import org.apache.pinot.segment.spi.index.reader.ValidDocIndexReader;
+import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -217,8 +217,8 @@ public class SelectionQuerySegmentPrunerTest {
     when(indexSegment.getSegmentMetadata()).thenReturn(segmentMetadata);
     when(segmentMetadata.getTotalDocs()).thenReturn(totalDocs);
     if (upsert) {
-      ValidDocIndexReader validDocIndex = mock(ValidDocIndexReader.class);
-      when(indexSegment.getValidDocIndex()).thenReturn(validDocIndex);
+      ThreadSafeMutableRoaringBitmap validDocIds = mock(ThreadSafeMutableRoaringBitmap.class);
+      when(indexSegment.getValidDocIds()).thenReturn(validDocIds);
     }
     return indexSegment;
   }

@@ -44,6 +44,7 @@ public class RecommenderConstants {
     public static final boolean DEFAULT_RECOMMEND_PINOT_TABLE_PARTITION = true;
     public static final boolean DEFAULT_RECOMMEND_INVERTED_SORTED_INDEX_JOINT = true;
     public static final boolean DEFAULT_RECOMMEND_BLOOM_FILTER = true;
+    public static final boolean DEFAULT_RECOMMEND_RANGE_INDEX = true;
     public static final boolean DEFAULT_RECOMMEND_NO_DICTIONARY_ONHEAP_DICTIONARY_JOINT = true;
     public static final boolean DEFAULT_RECOMMEND_AGGREGATE_METRICS = true;
     public static final boolean DEFAULT_RECOMMEND_REALTIME_PROVISIONING = true;
@@ -63,6 +64,10 @@ public class RecommenderConstants {
   public static class BloomFilterRule {
     public static final long DEFAULT_THRESHOLD_MAX_CARDINALITY_BLOOMFILTER = 1000_000;
     public static final double DEFAULT_THRESHOLD_MIN_PERCENT_EQ_BLOOMFILTER = 0.5d;
+  }
+
+  public static class RangeIndexRule {
+    public static final double DEFAULT_THRESHOLD_MIN_PERCENT_RANGE_INDEX = 0.4;
   }
 
   public static class NoDictionaryOnHeapDictionaryJointRule {

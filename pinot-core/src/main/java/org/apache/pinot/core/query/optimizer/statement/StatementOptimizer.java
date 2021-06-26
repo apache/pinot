@@ -16,25 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.config.table.tuner;
+package org.apache.pinot.core.query.optimizer.statement;
 
+import javax.annotation.Nullable;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TunerConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
 /**
- * Interface for Table Config Tuner.
+ * Interface for optimizing a particular class of SQL statement. Optimizers that implement this interface may modify
+ * several or all parts of the SQL statement.
  */
-public interface TableConfigTuner {
-  /**
-   * Used to initialize underlying implementation with Schema
-   * and custom properties (eg: metrics end point)
-   */
-  void init(TunerConfig props, Schema schema);
+public interface StatementOptimizer {
 
-  /**
-   * Takes the original TableConfig and returns a tuned one
-   */
-  TableConfig apply(TableConfig initialConfig);
+  /** Optimize the given SQL statement. */
+  public void optimize(PinotQuery query, @Nullable TableConfig tableConfig, @Nullable Schema schema);
 }

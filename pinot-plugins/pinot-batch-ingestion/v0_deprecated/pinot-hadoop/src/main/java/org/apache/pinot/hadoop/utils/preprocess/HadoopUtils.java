@@ -16,23 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.config.tuner;
+package org.apache.pinot.hadoop.utils.preprocess;
 
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TunerConfig;
-import org.apache.pinot.spi.config.table.tuner.TableConfigTuner;
-import org.apache.pinot.spi.config.table.tuner.Tuner;
-import org.apache.pinot.spi.data.Schema;
+import java.io.IOException;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 
 
-@Tuner(name = "noopConfigTuner")
-public class NoOpTableTableConfigTuner implements TableConfigTuner {
-  @Override
-  public void init(TunerConfig props, Schema schema) {
+public class HadoopUtils {
+  private HadoopUtils() {
   }
 
-  @Override
-  public TableConfig apply(TableConfig initialConfig) {
-    return initialConfig;
+  public static final Configuration DEFAULT_CONFIGURATION;
+  public static final FileSystem DEFAULT_FILE_SYSTEM;
+
+  static {
+    DEFAULT_CONFIGURATION = new Configuration();
+    try {
+      DEFAULT_FILE_SYSTEM = FileSystem.get(DEFAULT_CONFIGURATION);
+    } catch (IOException e) {
+      throw new IllegalStateException("Failed to get the default file system", e);
+    }
   }
 }

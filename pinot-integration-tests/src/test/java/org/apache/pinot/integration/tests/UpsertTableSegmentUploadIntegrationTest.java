@@ -147,7 +147,8 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
   }
 
   @Override
-  protected void startController() {
+  protected void startController()
+      throws Exception {
     Map<String, Object> controllerConfig = getDefaultControllerConfiguration();
     // Perform realtime segment validation every second with 1 second initial delay.
     controllerConfig

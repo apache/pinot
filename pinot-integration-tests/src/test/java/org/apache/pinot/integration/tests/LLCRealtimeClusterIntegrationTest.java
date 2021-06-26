@@ -73,12 +73,13 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   }
 
   @Override
-  public void startController() {
+  public void startController()
+      throws Exception {
     Map<String, Object> properties = getDefaultControllerConfiguration();
-    
+
     properties.put(ControllerConf.ALLOW_HLC_TABLES, false);
     properties.put(ControllerConf.ENABLE_SPLIT_COMMIT, _enableSplitCommit);
-    
+
     startController(properties);
     enableResourceConfigForLeadControllerResource(_enableLeadControllerResource);
   }
@@ -94,7 +95,6 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
       configuration.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_SPLIT_COMMIT, true);
       configuration.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_COMMIT_END_WITH_METADATA, true);
     }
-    configuration.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_RELOAD_CONSUMING_SEGMENT, true);
   }
 
   @BeforeClass

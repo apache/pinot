@@ -54,17 +54,18 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
-import org.apache.pinot.segment.local.realtime.impl.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.V3RemoveIndexException;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
+import org.apache.pinot.segment.local.upsert.PartialUpsertHandler;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -158,9 +159,18 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", _tableNameWithType);
     _upsertMode = tableConfig.getUpsertMode();
     if (isUpsertEnabled()) {
+      UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+      assert upsertConfig != null;
       Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
-      _tableUpsertMetadataManager = new TableUpsertMetadataManager(_tableNameWithType, _serverMetrics);
+
+      PartialUpsertHandler partialUpsertHandler = null;
+      if (isPartialUpsertEnabled()) {
+        partialUpsertHandler =
+            new PartialUpsertHandler(_helixManager, _tableNameWithType, upsertConfig.getPartialUpsertStrategies());
+      }
+      _tableUpsertMetadataManager =
+          new TableUpsertMetadataManager(_tableNameWithType, _serverMetrics, partialUpsertHandler);
       _primaryKeyColumns = schema.getPrimaryKeyColumns();
       Preconditions.checkState(!CollectionUtils.isEmpty(_primaryKeyColumns),
           "Primary key columns must be configured for upsert");
@@ -232,6 +242,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     return _upsertMode != UpsertConfig.Mode.NONE;
   }
 
+  public boolean isPartialUpsertEnabled() {
+    return _upsertMode == UpsertConfig.Mode.PARTIAL;
+  }
+
   /*
    * This call comes in one of two ways:
    * For HL Segments:
@@ -300,11 +314,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       // The segment is uploaded to an upsert enabled realtime table. Download the segment and load.
       Preconditions.checkArgument(realtimeSegmentZKMetadata instanceof LLCRealtimeSegmentZKMetadata,
           "Upload segment is not LLC segment");
-      String downURL = ((LLCRealtimeSegmentZKMetadata)realtimeSegmentZKMetadata).getDownloadUrl();
-      Preconditions.checkNotNull(downURL, "Upload segment metadata has no download url");
-      downloadSegmentFromDeepStore(segmentName, indexLoadingConfig, downURL);
-      _logger.info("Downloaded, untarred and add segment {} of table {} from {}", segmentName, tableConfig.getTableName(),
-          downURL);
+      String downloadUrl = ((LLCRealtimeSegmentZKMetadata) realtimeSegmentZKMetadata).getDownloadUrl();
+      Preconditions.checkNotNull(downloadUrl, "Upload segment metadata has no download url");
+      downloadSegmentFromDeepStore(segmentName, indexLoadingConfig, downloadUrl);
+      _logger
+          .info("Downloaded, untarred and add segment {} of table {} from {}", segmentName, tableConfig.getTableName(),
+              downloadUrl);
       return;
     }
 
@@ -354,17 +369,20 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   private void handleUpsert(ImmutableSegmentImpl immutableSegment) {
+    String segmentName = immutableSegment.getSegmentName();
+    int partitionGroupId = SegmentUtils
+        .getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, _primaryKeyColumns.get(0));
+    PartitionUpsertMetadataManager partitionUpsertMetadataManager =
+        _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionGroupId);
+    ThreadSafeMutableRoaringBitmap validDocIds = new ThreadSafeMutableRoaringBitmap();
+    immutableSegment.enableUpsert(partitionUpsertMetadataManager, validDocIds);
+
     Map<String, PinotSegmentColumnReader> columnToReaderMap = new HashMap<>();
     for (String primaryKeyColumn : _primaryKeyColumns) {
       columnToReaderMap.put(primaryKeyColumn, new PinotSegmentColumnReader(immutableSegment, primaryKeyColumn));
     }
     columnToReaderMap.put(_timeColumnName, new PinotSegmentColumnReader(immutableSegment, _timeColumnName));
     int numTotalDocs = immutableSegment.getSegmentMetadata().getTotalDocs();
-    String segmentName = immutableSegment.getSegmentName();
-    int partitionGroupId = SegmentUtils
-        .getRealtimeSegmentPartitionId(segmentName, this.getTableName(), _helixManager, _primaryKeyColumns.get(0));
-    PartitionUpsertMetadataManager partitionUpsertMetadataManager =
-        _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionGroupId);
     int numPrimaryKeyColumns = _primaryKeyColumns.size();
     Iterator<PartitionUpsertMetadataManager.RecordInfo> recordInfoIterator =
         new Iterator<PartitionUpsertMetadataManager.RecordInfo>() {
@@ -392,9 +410,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
             return new PartitionUpsertMetadataManager.RecordInfo(primaryKey, _docId++, timestamp);
           }
         };
-    ThreadSafeMutableRoaringBitmap validDocIds =
-        partitionUpsertMetadataManager.addSegment(segmentName, recordInfoIterator);
-    immutableSegment.enableUpsert(partitionUpsertMetadataManager, validDocIds);
+    partitionUpsertMetadataManager.addSegment(immutableSegment, recordInfoIterator);
   }
 
   public void downloadAndReplaceSegment(String segmentName, LLCRealtimeSegmentZKMetadata llcSegmentMetadata,

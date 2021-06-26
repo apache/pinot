@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.util;
+package org.apache.pinot.segment.local.utils;
 
 import com.google.common.collect.Lists;
 import java.util.Arrays;
@@ -25,8 +25,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.tier.TierFactory;
-import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
-import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -243,7 +241,8 @@ public class TableConfigUtilsTest {
 
     // valid filterFunction
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setIngestionConfig(new IngestionConfig(null, null, new FilterConfig("Groovy({x == 10}, x)"), null, null)).build();
+        .setIngestionConfig(new IngestionConfig(null, null, new FilterConfig("Groovy({x == 10}, x)"), null, null))
+        .build();
     TableConfigUtils.validate(tableConfig, schema);
 
     // invalid filter function
@@ -272,8 +271,8 @@ public class TableConfigUtilsTest {
 
     // transformed column not in schema
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
-        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("myCol", "reverse(anotherCol)")), null))
-        .build();
+        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("myCol", "reverse(anotherCol)")),
+            null)).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for transformedColumn not present in schema");
@@ -286,8 +285,8 @@ public class TableConfigUtilsTest {
             .build();
     // valid transform configs
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
-        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("myCol", "reverse(anotherCol)")), null))
-        .build();
+        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("myCol", "reverse(anotherCol)")),
+            null)).build();
     TableConfigUtils.validate(tableConfig, schema);
 
     schema =
@@ -301,8 +300,8 @@ public class TableConfigUtilsTest {
 
     // null transform column name
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
-        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig(null, "reverse(anotherCol)")), null))
-        .build();
+        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig(null, "reverse(anotherCol)")),
+            null)).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for null column name in transform config");
@@ -322,8 +321,8 @@ public class TableConfigUtilsTest {
 
     // invalid function
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
-        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("myCol", "fakeFunction(col)")), null))
-        .build();
+        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("myCol", "fakeFunction(col)")),
+            null)).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for invalid transform function in transform config");
@@ -333,8 +332,8 @@ public class TableConfigUtilsTest {
 
     // invalid function
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
-        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("myCol", "Groovy(badExpr)")), null))
-        .build();
+        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("myCol", "Groovy(badExpr)")),
+            null)).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for invalid transform function in transform config");
@@ -367,8 +366,8 @@ public class TableConfigUtilsTest {
     // duplicate transform config
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
         new IngestionConfig(null, null, null,
-            Lists.newArrayList(new TransformConfig("myCol", "reverse(x)"), new TransformConfig("myCol", "lower(y)")), null))
-        .build();
+            Lists.newArrayList(new TransformConfig("myCol", "reverse(x)"), new TransformConfig("myCol", "lower(y)")),
+            null)).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail due to duplicate transform config");
@@ -385,9 +384,10 @@ public class TableConfigUtilsTest {
 
   @Test
   public void ingestionStreamConfigsTest() {
-    Map<String, String> fakeMap = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
+    Map<String, String> streamConfigs = getStreamConfigs();
     IngestionConfig ingestionConfig =
-        new IngestionConfig(null, new StreamIngestionConfig(Lists.newArrayList(fakeMap, fakeMap)), null, null, null);
+        new IngestionConfig(null, new StreamIngestionConfig(Lists.newArrayList(streamConfigs, streamConfigs)), null,
+            null, null);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
             .setIngestionConfig(ingestionConfig).build();
@@ -401,15 +401,16 @@ public class TableConfigUtilsTest {
     }
 
     // stream config should be valid
-    ingestionConfig = new IngestionConfig(null, new StreamIngestionConfig(Lists.newArrayList(fakeMap)), null, null, null);
+    ingestionConfig =
+        new IngestionConfig(null, new StreamIngestionConfig(Lists.newArrayList(streamConfigs)), null, null, null);
     tableConfig.setIngestionConfig(ingestionConfig);
     TableConfigUtils.validateIngestionConfig(tableConfig, null);
 
-    fakeMap.remove(StreamConfigProperties.STREAM_TYPE);
+    streamConfigs.remove(StreamConfigProperties.STREAM_TYPE);
     try {
       TableConfigUtils.validateIngestionConfig(tableConfig, null);
       Assert.fail("Should fail for invalid stream configs map");
-    } catch (Exception e) {
+    } catch (IllegalStateException e) {
       // expected
     }
   }
@@ -724,7 +725,8 @@ public class TableConfigUtilsTest {
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     try {
       FieldConfig fieldConfig =
-          new FieldConfig("intCol", FieldConfig.EncodingType.DICTIONARY, null, FieldConfig.CompressionCodec.SNAPPY, null);
+          new FieldConfig("intCol", FieldConfig.EncodingType.DICTIONARY, null, FieldConfig.CompressionCodec.SNAPPY,
+              null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail since dictionary encoding does not support compression codec snappy");
@@ -735,7 +737,8 @@ public class TableConfigUtilsTest {
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     try {
       FieldConfig fieldConfig =
-          new FieldConfig("intCol", FieldConfig.EncodingType.DICTIONARY, null, FieldConfig.CompressionCodec.ZSTANDARD, null);
+          new FieldConfig("intCol", FieldConfig.EncodingType.DICTIONARY, null, FieldConfig.CompressionCodec.ZSTANDARD,
+              null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail since dictionary encoding does not support compression codec zstandard");
@@ -899,8 +902,8 @@ public class TableConfigUtilsTest {
       // expected
     }
 
-    starTreeIndexConfig =
-        new StarTreeIndexConfig(Arrays.asList("multiValCol"), Arrays.asList("multiValCol"), Arrays.asList("SUM__multiValCol"), 1);
+    starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("multiValCol"), Arrays.asList("multiValCol"),
+        Arrays.asList("SUM__multiValCol"), 1);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setStarTreeIndexConfigs(Arrays.asList(starTreeIndexConfig)).build();
     try {
@@ -948,8 +951,9 @@ public class TableConfigUtilsTest {
       // expected
     }
 
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setJsonIndexColumns(Arrays.asList("intCol")).build();
+    tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setJsonIndexColumns(Arrays.asList("intCol"))
+            .build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for Json index defined on non string column");
@@ -966,8 +970,8 @@ public class TableConfigUtilsTest {
       // expected
     }
 
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setRangeIndexColumns(columnList).
-        build();
+    tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setRangeIndexColumns(columnList).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
@@ -975,8 +979,7 @@ public class TableConfigUtilsTest {
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setRangeIndexColumns(columnList)
-        .setNoDictionaryColumns(columnList).
-            build();
+        .setNoDictionaryColumns(columnList).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for range index defined on non numeric/no-dictionary column");
@@ -984,8 +987,8 @@ public class TableConfigUtilsTest {
       // Expected
     }
 
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setVarLengthDictionaryColumns(Arrays.asList("intCol")).
-        build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setVarLengthDictionaryColumns(Arrays.asList("intCol")).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for Var length dictionary defined for non string/bytes column");
@@ -993,8 +996,8 @@ public class TableConfigUtilsTest {
       // expected
     }
 
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setJsonIndexColumns(Arrays.asList("multiValCol")).
-        build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setJsonIndexColumns(Arrays.asList("multiValCol")).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for Json Index defined on a multi value column");
@@ -1036,56 +1039,58 @@ public class TableConfigUtilsTest {
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).build();
     try {
       TableConfigUtils.validateUpsertConfig(tableConfig, schema);
-    } catch (Exception e) {
+      Assert.fail();
+    } catch (IllegalStateException e) {
       Assert.assertEquals(e.getMessage(), "Upsert table is for realtime table only.");
     }
+
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).build();
     try {
       TableConfigUtils.validateUpsertConfig(tableConfig, schema);
-    } catch (Exception e) {
+      Assert.fail();
+    } catch (IllegalStateException e) {
       Assert.assertEquals(e.getMessage(), "Upsert table must have primary key columns in the schema");
     }
+
     schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
             .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
     try {
       TableConfigUtils.validateUpsertConfig(tableConfig, schema);
-    } catch (Exception e) {
+      Assert.fail();
+    } catch (IllegalStateException e) {
       Assert
           .assertEquals(e.getMessage(), "Could not find streamConfigs for REALTIME table: " + TABLE_NAME + "_REALTIME");
     }
-    Map<String, String> streamConfigs = new HashMap<>();
-    streamConfigs.put("stream.kafka.consumer.type", "highLevel");
-    streamConfigs.put("streamType", "kafka");
-    streamConfigs.put("stream.kafka.topic.name", "test");
-    streamConfigs
-        .put("stream.kafka.decoder.class.name", "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder");
+
+    Map<String, String> streamConfigs = getStreamConfigs();
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).setStreamConfigs(streamConfigs).build();
     try {
       TableConfigUtils.validateUpsertConfig(tableConfig, schema);
-    } catch (Exception e) {
+      Assert.fail();
+    } catch (IllegalStateException e) {
       Assert.assertEquals(e.getMessage(), "Upsert table must use low-level streaming consumer type");
     }
+
     streamConfigs.put("stream.kafka.consumer.type", "simple");
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).setStreamConfigs(streamConfigs).build();
     try {
       TableConfigUtils.validateUpsertConfig(tableConfig, schema);
-    } catch (Exception e) {
+      Assert.fail();
+    } catch (IllegalStateException e) {
       Assert.assertEquals(e.getMessage(),
           "Upsert table must use strict replica-group (i.e. strictReplicaGroup) based routing");
     }
+
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
         .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
         .setStreamConfigs(streamConfigs).build();
-    try {
-      TableConfigUtils.validateUpsertConfig(tableConfig, schema);
-    } catch (Exception e) {
-      Assert.fail("Should not fail upsert validation");
-    }
+    TableConfigUtils.validateUpsertConfig(tableConfig, schema);
+
     StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Lists.newArrayList("myCol"), null, Collections
         .singletonList(new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, "myCol").toColumnName()), 10);
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
@@ -1094,8 +1099,80 @@ public class TableConfigUtilsTest {
         .setStarTreeIndexConfigs(Lists.newArrayList(starTreeIndexConfig)).setStreamConfigs(streamConfigs).build();
     try {
       TableConfigUtils.validateUpsertConfig(tableConfig, schema);
-    } catch (Exception e) {
+      Assert.fail();
+    } catch (IllegalStateException e) {
       Assert.assertEquals(e.getMessage(), "The upsert table cannot have star-tree index.");
     }
+  }
+
+  @Test
+  public void testValidatePartialUpsertConfig() {
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol1", FieldSpec.DataType.LONG)
+            .addSingleValueDimension("myCol2", FieldSpec.DataType.STRING)
+            .addDateTime("myTimeCol", FieldSpec.DataType.LONG, "1:DAYS:EPOCH", "1:DAYS")
+            .setPrimaryKeyColumns(Lists.newArrayList("myCol1")).build();
+
+    Map<String, String> streamConfigs = getStreamConfigs();
+    streamConfigs.put("stream.kafka.consumer.type", "simple");
+    Map<String, UpsertConfig.Strategy> partialUpsertStratgies = new HashMap<>();
+    partialUpsertStratgies.put("myCol1", UpsertConfig.Strategy.INCREMENT);
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.PARTIAL, partialUpsertStratgies))
+        .setNullHandlingEnabled(false)
+        .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
+        .setStreamConfigs(streamConfigs).build();
+    try {
+      TableConfigUtils.validatePartialUpsertStrategies(tableConfig, schema);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(), "Null handling must be enabled for partial upsert tables");
+    }
+
+    tableConfig.getIndexingConfig().setNullHandlingEnabled(true);
+    try {
+      TableConfigUtils.validatePartialUpsertStrategies(tableConfig, schema);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(), "Merger cannot be applied to primary key columns");
+    }
+
+    partialUpsertStratgies.clear();
+    partialUpsertStratgies.put("randomCol", UpsertConfig.Strategy.OVERWRITE);
+    try {
+      TableConfigUtils.validatePartialUpsertStrategies(tableConfig, schema);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(), "Merger cannot be applied to non-existing column: randomCol");
+    }
+
+    partialUpsertStratgies.clear();
+    partialUpsertStratgies.put("myCol2", UpsertConfig.Strategy.INCREMENT);
+    try {
+      TableConfigUtils.validatePartialUpsertStrategies(tableConfig, schema);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(), "INCREMENT merger cannot be applied to non-numeric column: myCol2");
+    }
+
+    partialUpsertStratgies.clear();
+    partialUpsertStratgies.put("myTimeCol", UpsertConfig.Strategy.INCREMENT);
+    try {
+      TableConfigUtils.validatePartialUpsertStrategies(tableConfig, schema);
+      Assert.fail();
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(), "INCREMENT merger cannot be applied to date time column: myTimeCol");
+    }
+  }
+
+  private Map<String, String> getStreamConfigs() {
+    Map<String, String> streamConfigs = new HashMap<>();
+    streamConfigs.put("streamType", "kafka");
+    streamConfigs.put("stream.kafka.consumer.type", "highLevel");
+    streamConfigs.put("stream.kafka.topic.name", "test");
+    streamConfigs
+        .put("stream.kafka.decoder.class.name", "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder");
+    return streamConfigs;
   }
 }
