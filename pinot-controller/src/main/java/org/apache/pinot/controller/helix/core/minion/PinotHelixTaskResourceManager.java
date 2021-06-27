@@ -36,6 +36,7 @@ import org.apache.helix.task.TaskDriver;
 import org.apache.helix.task.TaskPartitionState;
 import org.apache.helix.task.TaskState;
 import org.apache.helix.task.WorkflowConfig;
+import org.apache.helix.task.WorkflowContext;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.Pair;
@@ -253,8 +254,13 @@ public class PinotHelixTaskResourceManager {
    * @return Map from task name to task state
    */
   public synchronized Map<String, TaskState> getTaskStates(String taskType) {
-    Map<String, TaskState> helixJobStates =
-        _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType)).getJobStates();
+    Map<String, TaskState> helixJobStates = new HashMap<>();
+    WorkflowContext workflowContext = _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType));
+
+    if (workflowContext == null) {
+      return helixJobStates;
+    }
+    helixJobStates = workflowContext.getJobStates();
     Map<String, TaskState> taskStates = new HashMap<>(helixJobStates.size());
     for (Map.Entry<String, TaskState> entry : helixJobStates.entrySet()) {
       taskStates.put(getPinotTaskName(entry.getKey()), entry.getValue());
@@ -268,9 +274,13 @@ public class PinotHelixTaskResourceManager {
    * @return TaskCount object
    */
   public synchronized TaskCount getTaskCount(String parentTaskName) {
-    JobContext jobContext = _taskDriver.getJobContext(getHelixJobName(parentTaskName));
-    Set<Integer> partitionSet = jobContext.getPartitionSet();
     TaskCount taskCount = new TaskCount();
+    JobContext jobContext = _taskDriver.getJobContext(getHelixJobName(parentTaskName));
+
+    if (jobContext == null) {
+      return taskCount;
+    }
+    Set<Integer> partitionSet = jobContext.getPartitionSet();
     taskCount.addToTotal(partitionSet.size());
     for (int partition : partitionSet) {
       TaskPartitionState state = jobContext.getPartitionState(partition);

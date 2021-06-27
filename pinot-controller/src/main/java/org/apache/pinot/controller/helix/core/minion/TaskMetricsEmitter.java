@@ -29,6 +29,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * This class emits task metrics for each type of minion task that is set up in
+ * a Pinot cluster. It is intended to be scheduled with a fairly high frequency,
+ * of the order of minutes.
+ * See ControllerConf class for the default value.
+ */
 public class TaskMetricsEmitter extends BasePeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(TaskMetricsEmitter.class);
   private final static String TASK_NAME = "TaskMetricsEmitter";
