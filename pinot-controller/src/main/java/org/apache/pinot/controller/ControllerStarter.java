@@ -19,6 +19,8 @@
 package org.apache.pinot.controller;
 
 import java.io.File;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
