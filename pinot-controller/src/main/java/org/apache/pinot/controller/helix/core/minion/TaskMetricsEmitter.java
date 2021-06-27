@@ -65,22 +65,26 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
     Set<String> taskTypes = _helixTaskResourceManager.getTaskTypes();
     for (String taskType : taskTypes) {
       TaskCount accumulated = new TaskCount();
-      Set<String> tasksInProgress = _helixTaskResourceManager.getTasksInProgress(taskType);
-      final int numRunningTasks = tasksInProgress.size();
-      for (String task : tasksInProgress) {
-        TaskCount taskCount = _helixTaskResourceManager.getTaskCount(task);
-        accumulated.accumulate(taskCount);
+      try {
+        Set<String> tasksInProgress = _helixTaskResourceManager.getTasksInProgress(taskType);
+        final int numRunningTasks = tasksInProgress.size();
+        for (String task : tasksInProgress) {
+          TaskCount taskCount = _helixTaskResourceManager.getTaskCount(task);
+          accumulated.accumulate(taskCount);
+        }
+        // Emit metrics for taskType.
+        _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.NUM_MINION_TASKS_IN_PROGRESS, taskType, numRunningTasks);
+        _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.NUM_MINION_SUBTASKS_RUNNING, taskType, accumulated.getRunning());
+        _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.NUM_MINION_SUBTASKS_WAITING, taskType, accumulated.getWaiting());
+        _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.NUM_MINION_SUBTASKS_ERROR, taskType, accumulated.getError());
+        int total = accumulated.getTotal();
+        int percent = total != 0 ? (accumulated.getWaiting() + accumulated.getRunning()) * 100 / total : 0;
+        _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PERCENT_MINION_SUBTASKS_IN_QUEUE, taskType, percent);
+        percent = total != 0 ? accumulated.getError() * 100 / total : 0;
+        _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PERCENT_MINION_SUBTASKS_IN_ERROR, taskType, percent);
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while getting metrics for task type {}", taskType, e);
       }
-      // Emit metrics for taskType.
-      _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.NUM_MINION_TASKS_IN_PROGRESS, taskType, numRunningTasks);
-      _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.NUM_MINION_SUBTASKS_RUNNING, taskType, accumulated.getRunning());
-      _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.NUM_MINION_SUBTASKS_WAITING, taskType, accumulated.getWaiting());
-      _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.NUM_MINION_SUBTASKS_ERROR, taskType, accumulated.getError());
-      int total = accumulated.getTotal();
-      int percent = total != 0 ? (accumulated.getWaiting() + accumulated.getRunning()) * 100 / total : 0;
-      _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PERCENT_MINION_SUBTASKS_IN_QUEUE, taskType, percent);
-      percent = total != 0 ? accumulated.getError() * 100 / total : 0;
-      _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PERCENT_MINION_SUBTASKS_IN_ERROR, taskType, percent);
     }
   }
 }

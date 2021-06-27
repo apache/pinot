@@ -304,8 +304,12 @@ public class PinotHelixTaskResourceManager {
    */
   public synchronized Set<String> getTasksInProgress(String taskType) {
     Set<String> tasksInProgress = new HashSet<>();
-    Map<String, TaskState> helixJobStates =
-        _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType)).getJobStates();
+    WorkflowContext workflowContext = _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType));
+    if (workflowContext == null) {
+      return tasksInProgress;
+    }
+
+    Map<String, TaskState> helixJobStates = workflowContext.getJobStates();
 
     for (Map.Entry<String, TaskState> entry : helixJobStates.entrySet()) {
       if (entry.getValue().equals(TaskState.NOT_STARTED) || entry.getValue().equals(TaskState.IN_PROGRESS)) {

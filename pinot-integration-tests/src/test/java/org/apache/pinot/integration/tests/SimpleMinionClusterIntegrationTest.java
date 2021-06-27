@@ -97,6 +97,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   public void testStopResumeDeleteTaskQueue() {
     // Hold the task
     HOLD.set(true);
+    assertEquals(_helixTaskResourceManager.getTasksInProgress(TASK_TYPE).size(),0);
     verifyTaskCount("Task_" + TASK_TYPE + "_1624403781879", 0, 0, 0, 0);
 
     // Should create the task queues and generate a task
