@@ -22,8 +22,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.helix.HelixManager;
+import org.apache.helix.task.JobContext;
 import org.apache.helix.task.Task;
 import org.apache.helix.task.TaskConfig;
+import org.apache.helix.task.TaskDriver;
 import org.apache.helix.task.TaskFactory;
 import org.apache.helix.task.TaskResult;
 import org.apache.pinot.core.common.MinionConstants;
@@ -37,6 +40,7 @@ import org.apache.pinot.minion.exception.TaskCancelledException;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
 import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
 import org.apache.pinot.minion.executor.TaskExecutorFactoryRegistry;
+import org.apache.pinot.minion.metrics.MinionGauge;
 import org.apache.pinot.minion.metrics.MinionMeter;
 import org.apache.pinot.minion.metrics.MinionMetrics;
 import org.apache.pinot.minion.metrics.MinionQueryPhase;
@@ -71,6 +75,14 @@ public class TaskFactoryRegistry {
             @Override
             public TaskResult run() {
               MinionMetrics minionMetrics = MinionContext.getInstance().getMinionMetrics();
+
+              HelixManager helixManager = context.getManager();
+              JobContext jobContext = TaskDriver.getJobContext(helixManager, context.getJobConfig().getJobId());
+              // jobContext.getStartTime() return the time in milliseconds of job being put into helix queue.
+              long jobInQueueTime = jobContext.getStartTime();
+              long jobDequeueTime = System.currentTimeMillis();
+              minionMetrics.addPhaseTiming(taskType, MinionQueryPhase.TASK_QUEUEING, jobDequeueTime - jobInQueueTime);
+              minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, 1L);
 
               PinotTaskConfig pinotTaskConfig = PinotTaskConfig.fromHelixTaskConfig(_taskConfig);
               if (StringUtils.isBlank(pinotTaskConfig.getConfigs().get(MinionConstants.AUTH_TOKEN))) {
@@ -108,6 +120,8 @@ public class TaskFactoryRegistry {
                 minionMetrics.addMeteredTableValue(taskType, MinionMeter.NUMBER_TASKS_FAILED, 1L);
                 LOGGER.error("Caught exception while executing task: {}", _taskConfig.getId(), e);
                 return new TaskResult(TaskResult.Status.FAILED, e.toString());
+              } finally {
+                minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, -1L);
               }
             }
 
