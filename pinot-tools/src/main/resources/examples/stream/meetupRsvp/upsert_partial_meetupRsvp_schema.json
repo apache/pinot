@@ -8,7 +8,8 @@
   "dimensionFieldSpecs": [
     {
       "dataType": "STRING",
-      "name": "venue_name"
+      "name": "venue_name",
+      "singleValueField": false
     },
     {
       "dataType": "STRING",
