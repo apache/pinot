@@ -31,6 +31,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.I0Itec.zkclient.exception.ZkBadVersionException;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
@@ -515,9 +516,9 @@ public class HelixHelper {
     List<String> instanceTags = instanceConfig.getTags();
     if (instanceTags == null || instanceTags.size() == 0) {
       List<String> defaultTags = getDefaultTags == null ? null : getDefaultTags.get();
-      if (defaultTags != null && !defaultTags.isEmpty()) {
+      if (!CollectionUtils.isEmpty(defaultTags)) {
         defaultTags.forEach(instanceConfig::addTag);
-        LOGGER.info("Updating instance tags {} for instance: {}", instanceId, instanceTags);
+        LOGGER.info("Updating instance tags {} for instance: {}", instanceTags, instanceId);
         updateInstanceConfig(helixManager, instanceConfig);
       }
     }
@@ -564,11 +565,11 @@ public class HelixHelper {
       return false;
     }
     boolean updated = false;
+    // Update host and port if needed
     if (!String.valueOf(hostPort).equals(instanceConfig.getPort())) {
       instanceConfig.setPort(String.valueOf(hostPort));
       updated = true;
     }
-    // Update host and port if needed
     if (!hostName.equals(instanceConfig.getHostName())) {
       instanceConfig.setHostName(hostName);
       updated = true;
