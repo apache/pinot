@@ -97,6 +97,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   public void testStopResumeDeleteTaskQueue() {
     // Hold the task
     HOLD.set(true);
+    // No tasks before we start.
     assertEquals(_helixTaskResourceManager.getTasksInProgress(TASK_TYPE).size(),0);
     verifyTaskCount("Task_" + TASK_TYPE + "_1624403781879", 0, 0, 0, 0);
 
@@ -107,14 +108,21 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
         .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(TASK_TYPE)));
     assertTrue(_helixTaskResourceManager.getTasksInProgress(TASK_TYPE).contains(task1));
 
+    // Since we have two tables, two sub-tasks are generated -- one for each table.
+    // The default concurrent sub-tasks per minion instance is 1, and we have one minion
+    // instance spun up. So, one sub-tasks gets scheduled in a minion, and the other one
+    // waits.
     verifyTaskCount(task1, 0, 1, 1, 2);
-    // Should generate one more task
+    // Should generate one more task, with two sub-tasks. Both of these sub-tasks will wait
+    // since we have one minion instance that is still running one of the sub-tasks.
     String task2 = _taskManager.scheduleTask(TASK_TYPE);
     assertNotNull(task2);
     assertTrue(_helixTaskResourceManager.getTasksInProgress(TASK_TYPE).contains(task2));
     verifyTaskCount(task2, 0, 2, 0, 2);
 
-    // Should not generate more tasks
+    // Should not generate more tasks since SimpleMinionClusterIntegrationTests.NUM_TASKS is 2.
+    // Our test task generator does not generate if there are already this many sub-tasks in the
+    // running+waiting count already.
     assertNull(_taskManager.scheduleTasks().get(TASK_TYPE));
     assertNull(_taskManager.scheduleTask(TASK_TYPE));
 
