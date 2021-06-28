@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.segment.local.upsert.merger;
 
-
-
+/**
+ * Merges 2 records and returns the merged record.
+ * Append the new value from incoming row to the existing value from multi-value field. Then return the merged record.
+ * Append merger allows duplicated records in the multi-value field.
+ */
 public class AppendMerger implements PartialUpsertMerger {
   AppendMerger() {
   }

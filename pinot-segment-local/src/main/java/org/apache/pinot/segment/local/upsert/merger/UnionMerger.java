@@ -21,13 +21,17 @@ package org.apache.pinot.segment.local.upsert.merger;
 import java.util.Set;
 import java.util.TreeSet;
 
-
+/**
+ * Merges 2 records and returns the merged record.
+ * Added the new value from incoming row to the existing value from multi-value field. Then return the merged record.
+ * Union merger will dedup duplicated records in the multi-value field.
+ */
 public class UnionMerger implements PartialUpsertMerger {
   UnionMerger() {
   }
 
   /**
-   * Append the new value from incoming row to the given multi-value field of previous record.
+   * Union the new value from incoming row to the given multi-value field of previous record.
    */
   @Override
   public Object merge(Object previousValue, Object currentValue) {
