@@ -90,7 +90,7 @@ public class HelixBrokerStarterHostNameTest extends ControllerTest {
       }
     }
   }
-
+  
   @Test
   public void testEmptyHostName() throws Exception {
     HelixBrokerStarter _brokerStarter = null;

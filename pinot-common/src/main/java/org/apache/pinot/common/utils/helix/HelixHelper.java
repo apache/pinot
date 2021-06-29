@@ -602,6 +602,23 @@ public class HelixHelper {
   }
 
   /**
+   * Update the commonly needed settings for Helix Instance.
+   * If port is not a number, we will still update the tags.
+   * @param helixManager HelixManager for access
+   * @param instanceId the instance Id for the update
+   * @param host the Hostname
+   * @param port the port
+   * @param getDefaultTags lambda to get default tags. E.g., () -> ImmutableList.of("DefaultTenant") for default tags
+   * @return true if updated, false if not updated
+   */
+  public static boolean updateCommonInstanceConfig(HelixManager helixManager, String instanceId, String host,
+      int port, @NotNull Supplier<List<String>> getDefaultTags) {
+    // even if port is not a number, the default tags will still be applied
+    // so here we convert int to string instead to allow partial failure in code
+    return updateCommonInstanceConfig(helixManager, instanceId, host, String.valueOf(port), getDefaultTags);
+  }
+
+  /**
    * Update the commonly needed settings for Helix Instance
    * @param helixManager HelixManager for access
    * @param instanceId the instance Id for the update

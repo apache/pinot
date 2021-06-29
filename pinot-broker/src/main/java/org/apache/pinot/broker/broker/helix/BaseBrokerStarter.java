@@ -338,7 +338,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   }
 
   private void updateInstanceConfigIfNeeded() {
-    HelixHelper.updateCommonInstanceConfig(_participantHelixManager, _brokerId, _brokerHost, _brokerId, () -> {
+    HelixHelper.updateCommonInstanceConfig(_participantHelixManager, _brokerId, _brokerHost, _brokerPort, () -> {
       ImmutableList.Builder<String> defaultTags = ImmutableList.builder();
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
         defaultTags.add(TagNameUtils.getBrokerTagForTenant(null));
