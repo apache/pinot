@@ -35,6 +35,7 @@ import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.Message;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -296,8 +297,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(),
             new BrokerUserDefinedMessageHandlerFactory(_routingManager, queryQuotaManager));
     _participantHelixManager.connect();
-    addInstanceTagIfNeeded();
-    HelixHelper.updateHostNamePort(_participantHelixManager, _brokerId, _brokerHost, _brokerPort);
+
+    updateInstanceConfigIfNeeded();
     _brokerMetrics
         .addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME, () -> _participantHelixManager.isConnected() ? 1L : 0L);
     _participantHelixManager
@@ -337,8 +338,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
                 _clusterName, _brokerId, resourcesToMonitor, minResourcePercentForStartup))));
   }
 
-  private void addInstanceTagIfNeeded() {
-    HelixHelper.addDefaultTags(_participantHelixManager, _brokerId, () -> {
+  private void updateInstanceConfigIfNeeded() {
+    HelixHelper.updateCommonInstanceConfig(_participantHelixManager, _brokerId, _brokerHost, _brokerId, () -> {
       ImmutableList.Builder<String> defaultTags = ImmutableList.builder();
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
         defaultTags.add(TagNameUtils.getBrokerTagForTenant(null));

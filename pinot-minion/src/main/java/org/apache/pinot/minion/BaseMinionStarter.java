@@ -213,8 +213,8 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     _helixManager.getStateMachineEngine().registerStateModelFactory("Task", new TaskStateModelFactory(_helixManager,
         new TaskFactoryRegistry(_taskExecutorFactoryRegistry, _eventObserverFactoryRegistry).getTaskFactoryRegistry()));
     _helixManager.connect();
-    addInstanceTagIfNeeded();
-    HelixHelper.updateHostNamePort(_helixManager, _instanceId, _host, _port);
+    HelixHelper.updateCommonInstanceConfig(_helixManager, _instanceId, _host, String.valueOf(_port),
+        () -> ImmutableList.of(CommonConstants.Helix.UNTAGGED_MINION_INSTANCE));
     minionContext.setHelixPropertyStore(_helixManager.getHelixPropertyStore());
 
     LOGGER.info("Starting minion admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
@@ -267,11 +267,4 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     LOGGER.info("Pinot minion stopped");
   }
 
-  /**
-   * Tags Pinot Minion instance if needed.
-   */
-  private void addInstanceTagIfNeeded() {
-    HelixHelper.addDefaultTags(_helixManager, _instanceId,
-        () -> ImmutableList.of(CommonConstants.Helix.UNTAGGED_MINION_INSTANCE));
-  }
 }

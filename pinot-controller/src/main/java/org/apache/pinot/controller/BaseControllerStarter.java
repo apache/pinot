@@ -20,6 +20,7 @@ package org.apache.pinot.controller;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Longs;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
@@ -45,16 +46,19 @@ import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.api.listeners.ControllerChangeListener;
 import org.apache.helix.model.ClusterConstraints;
 import org.apache.helix.model.ConstraintItem;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.model.Message;
 import org.apache.helix.task.TaskDriver;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
@@ -551,9 +555,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg);
     }
-    HelixHelper.addDefaultTags(_helixParticipantManager, _helixParticipantInstanceId, null);
-    HelixHelper.updateHostNamePort(_helixParticipantManager, _helixParticipantInstanceId, _config.getControllerHost(),
-        _config.getControllerPort());
+    HelixHelper
+        .updateCommonInstanceConfig(_helixParticipantManager, _helixParticipantInstanceId, _config.getControllerHost(),
+            _config.getControllerPort(), ImmutableList::of);
 
     LOGGER.info("Registering helix controller listener");
     // This registration is not needed when the leadControllerResource is enabled.
