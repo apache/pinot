@@ -155,7 +155,7 @@ public class SegmentGenerationWithBytesTypeTest {
   @Test
   public void testMetadata() {
     Assert.assertTrue(_segment.getDataSource(FIXED_BYTE_SORTED_COLUMN).getDataSourceMetadata().isSorted());
-    Assert.assertFalse(_segment.getSegmentMetadata().hasDictionary(FIXED_BYTES_NO_DICT_COLUMN));
+    Assert.assertFalse(_segment.getSegmentMetadata().getColumnMetadataFor(FIXED_BYTES_NO_DICT_COLUMN).hasDictionary());
   }
 
   @Test
@@ -207,8 +207,8 @@ public class SegmentGenerationWithBytesTypeTest {
     IndexSegment segment = buildSegmentFromAvro(schema, AVRO_DIR_NAME, AVRO_NAME, SEGMENT_NAME);
     SegmentMetadata metadata = segment.getSegmentMetadata();
 
-    Assert.assertTrue(metadata.hasDictionary(FIXED_BYTES_UNSORTED_COLUMN));
-    Assert.assertTrue(metadata.hasDictionary(VARIABLE_BYTES_COLUMN));
+    Assert.assertTrue(metadata.getColumnMetadataFor(FIXED_BYTES_UNSORTED_COLUMN).hasDictionary());
+    Assert.assertTrue(metadata.getColumnMetadataFor(VARIABLE_BYTES_COLUMN).hasDictionary());
 
     PinotSegmentRecordReader reader = new PinotSegmentRecordReader(new File(AVRO_DIR_NAME, SEGMENT_NAME));
     GenericRow row = new GenericRow();

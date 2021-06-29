@@ -23,18 +23,16 @@ import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.datasource.EmptyDataSource;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
-import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -42,8 +40,6 @@ import org.slf4j.LoggerFactory;
  * Such an IndexSegment contains only the metadata, and no indexes
  */
 public class EmptyIndexSegment implements ImmutableSegment {
-  private static final Logger LOGGER = LoggerFactory.getLogger(EmptyIndexSegment.class);
-
   private final SegmentMetadataImpl _segmentMetadata;
 
   public EmptyIndexSegment(SegmentMetadataImpl segmentMetadata) {

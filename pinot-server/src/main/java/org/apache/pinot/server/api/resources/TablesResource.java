@@ -61,7 +61,6 @@ import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.server.api.access.AccessControl;
 import org.apache.pinot.server.api.access.AccessControlFactory;
 import org.apache.pinot.server.starter.ServerInstance;
@@ -171,9 +170,8 @@ public class TablesResource {
     try {
       Map<String, String> segmentCrcForTable = new HashMap<>();
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        SegmentMetadataImpl segmentMetadata =
-            (SegmentMetadataImpl) segmentDataManager.getSegment().getSegmentMetadata();
-        segmentCrcForTable.put(segmentDataManager.getSegmentName(), segmentMetadata.getCrc());
+        segmentCrcForTable
+            .put(segmentDataManager.getSegmentName(), segmentDataManager.getSegment().getSegmentMetadata().getCrc());
       }
       return ResourceUtils.convertToJsonString(segmentCrcForTable);
     } catch (Exception e) {

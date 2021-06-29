@@ -28,7 +28,7 @@ import org.apache.pinot.segment.local.segment.index.readers.constant.ConstantMVF
 import org.apache.pinot.segment.local.segment.index.readers.constant.ConstantMVInvertedIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.constant.ConstantSortedIndexReader;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
-import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
@@ -80,8 +80,8 @@ public class DefaultNullValueVirtualColumnProvider extends BaseVirtualColumnProv
   }
 
   @Override
-  public ColumnMetadata buildMetadata(VirtualColumnContext context) {
-    return getColumnMetadataBuilder(context).setCardinality(1).setHasDictionary(true).setHasInvertedIndex(true)
-        .setIsSorted(context.getFieldSpec().isSingleValueField()).build();
+  public ColumnMetadataImpl buildMetadata(VirtualColumnContext context) {
+    return getColumnMetadataBuilder(context).setCardinality(1).setSorted(context.getFieldSpec().isSingleValueField())
+        .setHasDictionary(true).build();
   }
 }

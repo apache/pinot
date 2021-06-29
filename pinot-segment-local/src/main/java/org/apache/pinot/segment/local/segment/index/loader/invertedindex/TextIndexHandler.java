@@ -45,9 +45,10 @@ import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
 import org.apache.pinot.segment.local.segment.index.readers.forward.BaseChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
+import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.creator.TextIndexType;
-import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -91,12 +92,12 @@ public class TextIndexHandler {
   private final SegmentVersion _segmentVersion;
   private final Set<ColumnMetadata> _textIndexColumns = new HashSet<>();
 
-  public TextIndexHandler(File indexDir, SegmentMetadataImpl segmentMetadata, Set<String> textIndexColumns,
+  public TextIndexHandler(File indexDir, SegmentMetadata segmentMetadata, Set<String> textIndexColumns,
       SegmentDirectory.Writer segmentWriter) {
     _indexDir = indexDir;
     _segmentWriter = segmentWriter;
     _segmentName = segmentMetadata.getName();
-    _segmentVersion = SegmentVersion.valueOf(segmentMetadata.getVersion());
+    _segmentVersion = segmentMetadata.getVersion();
 
     for (String column : textIndexColumns) {
       ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
@@ -155,8 +156,8 @@ public class TextIndexHandler {
       if (!hasDictionary) {
         // text index on raw column, just read the raw forward index
         VarByteChunkSVForwardIndexReader rawIndexReader = (VarByteChunkSVForwardIndexReader) forwardIndexReader;
-        BaseChunkSVForwardIndexReader.ChunkReaderContext
-            chunkReaderContext = (BaseChunkSVForwardIndexReader.ChunkReaderContext) readerContext;
+        BaseChunkSVForwardIndexReader.ChunkReaderContext chunkReaderContext =
+            (BaseChunkSVForwardIndexReader.ChunkReaderContext) readerContext;
         for (int docId = 0; docId < numDocs; docId++) {
           textIndexCreator.add(rawIndexReader.getString(docId, chunkReaderContext));
         }

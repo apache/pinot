@@ -33,11 +33,11 @@ import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexContainer;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
-import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
@@ -87,7 +87,7 @@ public class ImmutableSegmentLoader {
     SegmentMetadataImpl localSegmentMetadata = new SegmentMetadataImpl(indexDir);
     if (segmentVersionToLoad != null && !SegmentDirectoryPaths.segmentDirectoryFor(indexDir, segmentVersionToLoad)
         .isDirectory()) {
-      SegmentVersion segmentVersionOnDisk = localSegmentMetadata.getSegmentVersion();
+      SegmentVersion segmentVersionOnDisk = localSegmentMetadata.getVersion();
       if (segmentVersionOnDisk != segmentVersionToLoad) {
         LOGGER.info("Segment: {} needs to be converted from version: {} to {}", segmentName, segmentVersionOnDisk,
             segmentVersionToLoad);
