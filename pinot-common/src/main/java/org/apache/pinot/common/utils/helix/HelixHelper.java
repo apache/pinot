@@ -517,7 +517,7 @@ public class HelixHelper {
       InstanceConfig instanceConfig, @NotNull Supplier<List<String>> getDefaultTags) {
     // Add default instance tags if not exist
     List<String> instanceTags = instanceConfig.getTags();
-    if (instanceTags == null || instanceTags.size() == 0) {
+    if (instanceTags.isEmpty()) {
       List<String> defaultTags = getDefaultTags.get();
       if (!CollectionUtils.isEmpty(defaultTags)) {
         defaultTags.forEach(instanceConfig::addTag);
@@ -551,7 +551,7 @@ public class HelixHelper {
     HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
     Preconditions.checkState(
         helixDataAccessor.setProperty(helixDataAccessor.keyBuilder().instanceConfig(instanceConfig.getId()), instanceConfig),
-        "Failed to update instance config");
+        "Failed to update instance config for id=" + instanceConfig.getId());
   }
 
   /**
