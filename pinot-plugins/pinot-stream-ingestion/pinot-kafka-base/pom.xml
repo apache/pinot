@@ -42,7 +42,6 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-json</artifactId>
       <version>${project.version}</version>
-      <scope>test</scope>
     </dependency>
   </dependencies>
 </project>
