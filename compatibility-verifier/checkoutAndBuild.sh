@@ -35,6 +35,8 @@ function usage() {
   echo -e "    To compare this checkout with previous commit: '${cmdName} -w /tmp/wd'"
   echo -e "    To compare this checkout with some older tag or hash: '${cmdName} -o release-0.7.1 -w /tmp/wd'"
   echo -e "    To compare any two previous tags or hashes: '${cmdName} -o release-0.7.1 -n 637cc3494 -w /tmp/wd"
+  echo -e "Environment:"
+  echo -e "    Additional maven build options can be passed in via environment varibale MAVEN_OPTS"
   exit 1
 }
 
@@ -50,7 +52,7 @@ function checkoutAndBuild() {
   # Pull the tag list so that we can check out by tag name
   git fetch --tags || exit 1
   git checkout $commitHash || exit 1
-  mvn install package -DskipTests -Pbin-dist -T 4 -Djdk.version=8 || exit 1
+  mvn install package -DskipTests -Pbin-dist -T 4 -Djdk.version=8 ${MAVEN_OPTS} || exit 1
   popd || exit 1
   exit 0
 }
@@ -117,7 +119,7 @@ workingDir=$(absPath "$workingDir")
 newTargetDir="$workingDir"/newTargetDir
 if [ -z "$newerCommit" ]; then
   echo "Compiling current tree as newer version"
-  (cd $cmdDir/.. && mvn install package -DskipTests -Pbin-dist -T 4 -D jdk.version=8 && mvn -pl pinot-tools package -T 4 -DskipTests -Djdk.version=8 && mvn -pl pinot-integration-tests package -T 4 -DskipTests -Djdk.version=8)
+  (cd $cmdDir/.. && mvn install package -DskipTests -Pbin-dist -T 4 -D jdk.version=8 ${MAVEN_OPTS} && mvn -pl pinot-tools package -T 4 -DskipTests -Djdk.version=8 ${MAVEN_OPTS} && mvn -pl pinot-integration-tests package -T 4 -DskipTests -Djdk.version=8 ${MAVEN_OPTS})
   if [ $? -ne 0 ]; then
     echo Compile failed.
     exit 1
