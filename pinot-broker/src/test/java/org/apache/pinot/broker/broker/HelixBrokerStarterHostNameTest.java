@@ -90,7 +90,30 @@ public class HelixBrokerStarterHostNameTest extends ControllerTest {
       }
     }
   }
-  
+
+  @Test
+  public void testDefaultSimpleConfig() throws Exception {
+    HelixBrokerStarter _brokerStarter = null;
+    try {
+      Map<String, Object> properties = new HashMap<>();
+      properties.put(CommonConstants.Broker.CONFIG_OF_BROKER_HOSTNAME, "strange.name.com");
+      properties.put(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, 28099);
+      PinotConfiguration config = new PinotConfiguration(properties);
+      _brokerStarter =
+          new HelixBrokerStarter(config, getHelixClusterName(), getZkUrl());
+      _brokerStarter.start();
+      InstanceConfig helixConfig = _helixAdmin.getInstanceConfig(getHelixClusterName(), config.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ID));
+      Assert.assertNotNull(helixConfig);
+      Assert.assertEquals("strange.name.com", helixConfig.getHostName());
+      Assert.assertEquals("28099", helixConfig.getPort());
+      Assert.assertEquals("Broker_strange.name.com_28099", helixConfig.getId());
+    } finally {
+      if (_brokerStarter != null) {
+        _brokerStarter.stop();
+      }
+    }
+  }
+
   @Test
   public void testEmptyHostName() throws Exception {
     HelixBrokerStarter _brokerStarter = null;
