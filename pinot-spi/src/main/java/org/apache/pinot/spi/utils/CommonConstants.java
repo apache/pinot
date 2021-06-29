@@ -124,6 +124,7 @@ public class CommonConstants {
       public static final String ADMIN_HTTPS_PORT_KEY = "adminHttpsPort";
       public static final String GRPC_PORT_KEY = "grpcPort";
       public static final String NETTYTLS_PORT_KEY = "nettyTlsPort";
+      public static final String SYSTEM_RESOURCE_INFO_KEY = "SYSTEM_RESOURCE_INFO";
     }
 
     public static final String SET_INSTANCE_ID_TO_HOSTNAME_KEY = "pinot.set.instance.id.to.hostname";
