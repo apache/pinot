@@ -80,16 +80,15 @@ public class TaskFactoryRegistry {
               long jobInQueueTime = jobContext.getStartTime();
               long jobDequeueTime = System.currentTimeMillis();
               _minionMetrics.addPhaseTiming(taskType, MinionQueryPhase.TASK_QUEUEING, jobDequeueTime - jobInQueueTime);
+              long startTimeMillis = System.currentTimeMillis();
               try {
                 _minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, 1L);
-                long startTimeMillis = System.currentTimeMillis();
-                TaskResult result = runInternal();
+                return runInternal();
+              } finally {
+                _minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, -1L);
                 long timeSpentInMillis = System.currentTimeMillis() - startTimeMillis;
                 _minionMetrics.addPhaseTiming(taskType, MinionQueryPhase.TASK_EXECUTION, timeSpentInMillis);
                 LOGGER.info("Task: {} completed in: {}ms", _taskConfig.getId(), timeSpentInMillis);
-                return result;
-              } finally {
-                _minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, -1L);
               }
             }
 
