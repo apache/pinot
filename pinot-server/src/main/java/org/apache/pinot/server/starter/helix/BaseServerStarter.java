@@ -254,7 +254,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   }
 
   private void updateInstanceConfigIfNeeded() {
-    HelixHelper.addDefaultTags(_helixManager, _instanceId, () -> {
+    HelixHelper.updateCommonInstanceConfig(_helixManager, _instanceId, _host, String.valueOf(_port), () -> {
       ImmutableList.Builder<String> defaultTags = ImmutableList.builder();
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_helixManager.getHelixPropertyStore())) {
         defaultTags.add(TagNameUtils.getOfflineTagForTenant(null));
@@ -264,8 +264,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
       }
       return defaultTags.build();
     });
-
-    HelixHelper.updateHostNamePort(_helixManager, _instanceId, _host, _port);
 
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, _instanceId);
     // Update instance config with environment properties
