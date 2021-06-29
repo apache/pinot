@@ -77,18 +77,17 @@ public class TaskFactoryRegistry {
               HelixManager helixManager = context.getManager();
               JobContext jobContext = TaskDriver.getJobContext(helixManager, context.getJobConfig().getJobId());
               // jobContext.getStartTime() return the time in milliseconds of job being put into helix queue.
-              long jobInQueueTime = jobContext.getStartTime();
-              long jobDequeueTime = System.currentTimeMillis();
-              _minionMetrics.addPhaseTiming(taskType, MinionQueryPhase.TASK_QUEUEING, jobDequeueTime - jobInQueueTime);
-              long startTimeMillis = System.currentTimeMillis();
+              long jobInQueueTimeMs = jobContext.getStartTime();
+              long jobDequeueTimeMs = System.currentTimeMillis();
+              _minionMetrics.addPhaseTiming(taskType, MinionQueryPhase.TASK_QUEUEING, jobDequeueTimeMs - jobInQueueTimeMs);
               try {
                 _minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, 1L);
                 return runInternal();
               } finally {
                 _minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, -1L);
-                long timeSpentInMillis = System.currentTimeMillis() - startTimeMillis;
-                _minionMetrics.addPhaseTiming(taskType, MinionQueryPhase.TASK_EXECUTION, timeSpentInMillis);
-                LOGGER.info("Task: {} completed in: {}ms", _taskConfig.getId(), timeSpentInMillis);
+                long executionTimeMs = System.currentTimeMillis() - jobDequeueTimeMs;
+                _minionMetrics.addPhaseTiming(taskType, MinionQueryPhase.TASK_EXECUTION, executionTimeMs);
+                LOGGER.info("Task: {} completed in: {}ms", _taskConfig.getId(), executionTimeMs);
               }
             }
 
