@@ -613,8 +613,8 @@ public class HelixHelper {
    */
   public static boolean updateCommonInstanceConfig(HelixManager helixManager, String instanceId, String host,
       int port, @NotNull Supplier<List<String>> getDefaultTags) {
-    // even if port is not a number, the default tags will still be applied
-    // so here we convert int to string instead to allow partial failure in code
+    // if port is not a number, the default tags will still be applied
+    // so here we convert int to string to allow validation inside each functional group
     return updateCommonInstanceConfig(helixManager, instanceId, host, String.valueOf(port), getDefaultTags);
   }
 
