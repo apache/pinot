@@ -117,6 +117,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private static final String TEST_MISSING_COLUMNS_QUERY = "SELECT COUNT(*) FROM mytable WHERE AirlineID > 0";
   private static final String SELECT_STAR_QUERY = "SELECT * FROM mytable";
 
+  private static final String DISK_SIZE_IN_BYTES_KEY = "diskSizeInBytes";
+  private static final String NUM_SEGMENTS_KEY = "numSegments";
+  private static final String NUM_ROWS_KEY = "numRows";
+  private static final String COLUMN_AVG_LENGTH_MAP_KEY = "columnAvgLengthMap";
+  private static final String COLUMN_AVG_CARDINALITY_MAP_KEY = "columnAvgCardinalityMap";
+  private static final int DISK_SIZE_IN_BYTES = 20270480;
+  private static final int NUM_ROWS = 115545;
+
   private final List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbacks =
       new ArrayList<>(getNumBrokers() + getNumServers());
   private String _schemaFileName = DEFAULT_SCHEMA_FILE_NAME;
@@ -352,8 +360,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(todayStr, expectedTodayStr);
 
     String oneHourAgoTodayStr = response.get("resultTable").get("rows").get(0).get(1).asText();
-    String expectedOneHourAgoTodayStr =
-        Instant.now().minus(Duration.parse("PT1H")).atZone(ZoneId.of("UTC")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
+    String expectedOneHourAgoTodayStr = Instant.now().minus(Duration.parse("PT1H")).atZone(ZoneId.of("UTC"))
+        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
     assertEquals(oneHourAgoTodayStr, expectedOneHourAgoTodayStr);
   }
 
@@ -363,7 +371,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     long ONE_HOUR_IN_MS = TimeUnit.HOURS.toMillis(1);
     long currentTsMin = System.currentTimeMillis();
     long oneHourAgoTsMin = currentTsMin - ONE_HOUR_IN_MS;
-    String sqlQuery = "SELECT 1, now() as currentTs, ago('PT1H') as oneHourAgoTs, 'abc', toDateTime(now(), 'yyyy-MM-dd z') as today, now(), ago('PT1H')";
+    String sqlQuery =
+        "SELECT 1, now() as currentTs, ago('PT1H') as oneHourAgoTs, 'abc', toDateTime(now(), 'yyyy-MM-dd z') as today, now(), ago('PT1H')";
     JsonNode response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
     long currentTsMax = System.currentTimeMillis();
     long oneHourAgoTsMax = currentTsMax - ONE_HOUR_IN_MS;
@@ -1626,5 +1635,41 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testHardcodedServerPartitionedSqlQueries()
       throws Exception {
     super.testHardcodedServerPartitionedSqlQueries();
+  }
+
+  @Test
+  public void testAggregateMetadataAPI()
+      throws IOException {
+    JsonNode oneColumnResponse = JsonUtils
+        .stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=DestCityMarketID"));
+    assertEquals(oneColumnResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
+    assertEquals(oneColumnResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
+    assertEquals(oneColumnResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
+    assertEquals(oneColumnResponse.get(COLUMN_AVG_LENGTH_MAP_KEY).size(), 1);
+    assertEquals(oneColumnResponse.get(COLUMN_AVG_CARDINALITY_MAP_KEY).size(), 1);
+
+    JsonNode threeColumnsResponse = JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl
+        + "/tables/mytable/metadata?columns=DivActualElapsedTime&columns=CRSElapsedTime&columns=OriginStateName"));
+    assertEquals(threeColumnsResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
+    assertEquals(threeColumnsResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
+    assertEquals(threeColumnsResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
+    assertEquals(threeColumnsResponse.get(COLUMN_AVG_LENGTH_MAP_KEY).size(), 3);
+    assertEquals(threeColumnsResponse.get(COLUMN_AVG_CARDINALITY_MAP_KEY).size(), 3);
+
+    JsonNode zeroColumnResponse =
+        JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata"));
+    assertEquals(zeroColumnResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
+    assertEquals(zeroColumnResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
+    assertEquals(zeroColumnResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
+    assertEquals(zeroColumnResponse.get(COLUMN_AVG_LENGTH_MAP_KEY).size(), 0);
+    assertEquals(zeroColumnResponse.get(COLUMN_AVG_CARDINALITY_MAP_KEY).size(), 0);
+
+    JsonNode allColumnResponse =
+        JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=*"));
+    assertEquals(allColumnResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
+    assertEquals(allColumnResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
+    assertEquals(allColumnResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
+    assertEquals(allColumnResponse.get(COLUMN_AVG_LENGTH_MAP_KEY).size(), 82);
+    assertEquals(allColumnResponse.get(COLUMN_AVG_CARDINALITY_MAP_KEY).size(), 82);
   }
 }
