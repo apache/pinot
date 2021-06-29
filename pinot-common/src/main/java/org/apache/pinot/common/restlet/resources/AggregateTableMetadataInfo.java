@@ -27,7 +27,7 @@ import java.util.Map;
 public class AggregateTableMetadataInfo {
   public long diskSizeInBytes = 0;
   public int numSegments = 0;
-  public long numOfRows = 0;
+  public long numRows = 0;
   public Map<String, Double> columnAvgLengthMap = new HashMap<>();
   public Map<String, Double> columnAvgCardinalityMap = new HashMap<>();
 }

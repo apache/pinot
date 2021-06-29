@@ -88,7 +88,7 @@ public class ServerSegmentMetadataReader {
         TableMetadataInfo tableMetadataInfo =
             JsonUtils.stringToObject(streamResponse.getValue(), TableMetadataInfo.class);
         aggregateTableMetadataInfo.diskSizeInBytes += tableMetadataInfo.diskSizeInBytes;
-        aggregateTableMetadataInfo.numOfRows += tableMetadataInfo.numRows;
+        aggregateTableMetadataInfo.numRows += tableMetadataInfo.numRows;
         totalNumSegments += tableMetadataInfo.numSegments;
         tableMetadataInfo.columnLengthMap
             .forEach((k, v) -> aggregateTableMetadataInfo.columnAvgLengthMap.merge(k, (double) v, Double::sum));
