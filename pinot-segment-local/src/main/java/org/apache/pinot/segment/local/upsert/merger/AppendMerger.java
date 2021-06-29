@@ -35,12 +35,11 @@ public class AppendMerger implements PartialUpsertMerger {
     return append((Object[]) previousValue, (Object[]) currentValue);
   }
 
-  private static Object append(Object[] a, Object[] b) {
-    Object[] merged = new Object[a.length + b.length];
-    int count = 0;
+  private static Object append(Object[] source, Object[] param) {
+    Object[] merged = new Object[source.length + param.length];
 
-    System.arraycopy(a, 0, merged, 0, a.length);
-    System.arraycopy(b, 0, merged, a.length, b.length);
+    System.arraycopy(source, 0, merged, 0, source.length);
+    System.arraycopy(param, 0, merged, source.length, param.length);
     return merged;
   }
 }
