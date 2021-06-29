@@ -20,7 +20,6 @@ package org.apache.pinot.minion.taskfactory;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.task.JobContext;
@@ -81,10 +80,17 @@ public class TaskFactoryRegistry {
               long jobInQueueTime = jobContext.getStartTime();
               long jobDequeueTime = System.currentTimeMillis();
               _minionMetrics.addPhaseTiming(taskType, MinionQueryPhase.TASK_QUEUEING, jobDequeueTime - jobInQueueTime);
-              _minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, 1L);
-              TaskResult result = runInternal();
-              _minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, -1L);
-              return result;
+              try {
+                _minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, 1L);
+                long startTimeMillis = System.currentTimeMillis();
+                TaskResult result = runInternal();
+                long timeSpentInMillis = System.currentTimeMillis() - startTimeMillis;
+                _minionMetrics.addPhaseTiming(taskType, MinionQueryPhase.TASK_EXECUTION, timeSpentInMillis);
+                LOGGER.info("Task: {} completed in: {}ms", _taskConfig.getId(), timeSpentInMillis);
+                return result;
+              } finally {
+                _minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, -1L);
+              }
             }
 
             private TaskResult runInternal() {
@@ -100,14 +106,10 @@ public class TaskFactoryRegistry {
                   pinotTaskConfig.getConfigs());
 
               try {
-                long startTimeInNanos = System.nanoTime();
                 Object executionResult = _taskExecutor.executeTask(pinotTaskConfig);
-                long timeSpentInNanos = System.nanoTime() - startTimeInNanos;
                 _eventObserver.notifyTaskSuccess(pinotTaskConfig, executionResult);
                 _minionMetrics.addMeteredTableValue(taskType, MinionMeter.NUMBER_TASKS_COMPLETED, 1L);
-                _minionMetrics.addPhaseTiming(taskType, MinionQueryPhase.TASK_EXECUTION, timeSpentInNanos);
-                LOGGER.info("Task: {} completed in: {}ms", _taskConfig.getId(),
-                    TimeUnit.NANOSECONDS.toMillis(timeSpentInNanos));
+                LOGGER.info("Task: {} succeeded", _taskConfig.getId());
                 return new TaskResult(TaskResult.Status.COMPLETED, "Succeeded");
               } catch (TaskCancelledException e) {
                 _eventObserver.notifyTaskCancelled(pinotTaskConfig);
