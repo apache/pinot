@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.tuner;
 
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TunerConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -28,11 +29,11 @@ public class TableConfigTunerUtils {
   /**
    * Apply TunerConfig to the tableConfig
    */
-  public static void applyTunerConfig(TableConfig tableConfig, Schema schema) {
+  public static void applyTunerConfig(PinotHelixResourceManager pinotHelixResourceManager, TableConfig tableConfig, Schema schema) {
     TunerConfig tunerConfig = tableConfig.getTunerConfig();
     if (tunerConfig != null && tunerConfig.getName() != null && !tunerConfig.getName().isEmpty()) {
       TableConfigTuner tuner = TableConfigTunerRegistry.getTuner(tunerConfig.getName());
-      tuner.init(tunerConfig, schema);
+      tuner.init(pinotHelixResourceManager, tunerConfig, schema);
       tuner.apply(tableConfig);
     }
   }

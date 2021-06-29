@@ -51,7 +51,7 @@ public class TunerRegistryTest {
         new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTunerConfig(_tunerConfig).build();
     TableConfigTunerRegistry.init(Arrays.asList(DEFAULT_TABLE_CONFIG_TUNER_PACKAGES));
     TableConfigTuner tuner = TableConfigTunerRegistry.getTuner(TUNER_NAME);
-    tuner.init(_tunerConfig, schema);
+    tuner.init(null, _tunerConfig, schema);
     TableConfig result = tuner.apply(tableConfig);
     Assert.assertEquals(result, tableConfig);
   }
