@@ -36,7 +36,7 @@ function usage() {
   echo -e "    To compare this checkout with some older tag or hash: '${cmdName} -o release-0.7.1 -w /tmp/wd'"
   echo -e "    To compare any two previous tags or hashes: '${cmdName} -o release-0.7.1 -n 637cc3494 -w /tmp/wd"
   echo -e "Environment:"
-  echo -e "    Additional maven build options can be passed in via environment varibale PINOT_MAVEN_OPTS"
+  echo -e "    Additional maven build options can be passed in via environment variable PINOT_MAVEN_OPTS"
   exit 1
 }
 
