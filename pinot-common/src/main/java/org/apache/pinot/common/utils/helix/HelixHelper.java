@@ -521,7 +521,7 @@ public class HelixHelper {
       List<String> defaultTags = getDefaultTags.get();
       if (!CollectionUtils.isEmpty(defaultTags)) {
         defaultTags.forEach(instanceConfig::addTag);
-        LOGGER.info("Updating instance tags {} for Id {}", instanceTags, instanceConfig.getId());
+        LOGGER.info("Updating instance Id {} with default tags {}", instanceConfig.getId(), instanceTags);
         return true;
       }
     }
