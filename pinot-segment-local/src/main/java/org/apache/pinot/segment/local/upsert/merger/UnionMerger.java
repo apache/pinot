@@ -38,12 +38,12 @@ public class UnionMerger implements PartialUpsertMerger {
     return union((Object[]) previousValue, (Object[]) currentValue);
   }
 
-  private static Object union(Object[] source, Object[] param) {
+  private static Object union(Object[] a, Object[] b) {
     Set<Object> union = new TreeSet<>();
-    for (Object value: source) {
+    for (Object value: a) {
       union.add(value);
     }
-    for (Object value: param) {
+    for (Object value: b) {
       union.add(value);
     }
     return union.toArray();
