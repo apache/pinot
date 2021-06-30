@@ -191,7 +191,7 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
         KinesisConsumerFactory.class.getName());
     streamConfigMap
         .put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_DECODER_CLASS),
-            "org.apache.pinot.plugin.inputformat.json.StreamJSONMessageDecoder");
+            "org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder");
     streamConfigMap.put(KinesisConfig.REGION, REGION);
     streamConfigMap.put(KinesisConfig.MAX_RECORDS_TO_FETCH, String.valueOf(MAX_RECORDS_TO_FETCH));
     streamConfigMap.put(KinesisConfig.SHARD_ITERATOR_TYPE, ShardIteratorType.AFTER_SEQUENCE_NUMBER.toString());
