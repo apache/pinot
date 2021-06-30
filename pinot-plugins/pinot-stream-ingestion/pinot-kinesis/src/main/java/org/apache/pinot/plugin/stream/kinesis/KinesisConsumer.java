@@ -87,10 +87,10 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
 
     try {
       return kinesisFetchResultFuture.get(timeoutMs, TimeUnit.MILLISECONDS);
-    } catch (TimeoutException e){
+    } catch (TimeoutException e) {
       kinesisFetchResultFuture.cancel(true);
       return handleException((KinesisPartitionGroupOffset) startCheckpoint, recordList);
-    } catch(Exception e) {
+    } catch (Exception e) {
       return handleException((KinesisPartitionGroupOffset) startCheckpoint, recordList);
     }
   }
@@ -174,7 +174,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     } catch (KinesisException e) {
       LOGGER.warn("Encountered unknown unrecoverable AWS exception", e);
       throw new RuntimeException(e);
-    } catch (AbortedException e){
+    } catch (AbortedException e) {
       LOGGER.warn("Task aborted due to exception.", e);
       return handleException(kinesisStartCheckpoint, recordList);
     } catch (Throwable e) {
@@ -225,5 +225,4 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
       Thread.currentThread().interrupt();
     }
   }
-
 }
