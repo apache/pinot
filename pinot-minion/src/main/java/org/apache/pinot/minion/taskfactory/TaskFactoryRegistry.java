@@ -20,10 +20,12 @@ package org.apache.pinot.minion.taskfactory;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.helix.HelixManager;
+import org.apache.helix.task.JobContext;
 import org.apache.helix.task.Task;
 import org.apache.helix.task.TaskConfig;
+import org.apache.helix.task.TaskDriver;
 import org.apache.helix.task.TaskFactory;
 import org.apache.helix.task.TaskResult;
 import org.apache.pinot.core.common.MinionConstants;
@@ -37,6 +39,7 @@ import org.apache.pinot.minion.exception.TaskCancelledException;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
 import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
 import org.apache.pinot.minion.executor.TaskExecutorFactoryRegistry;
+import org.apache.pinot.minion.metrics.MinionGauge;
 import org.apache.pinot.minion.metrics.MinionMeter;
 import org.apache.pinot.minion.metrics.MinionMetrics;
 import org.apache.pinot.minion.metrics.MinionQueryPhase;
@@ -67,11 +70,28 @@ public class TaskFactoryRegistry {
             private final TaskConfig _taskConfig = context.getTaskConfig();
             private final PinotTaskExecutor _taskExecutor = taskExecutorFactory.create();
             private final MinionEventObserver _eventObserver = eventObserverFactory.create();
+            private final MinionMetrics _minionMetrics = MinionContext.getInstance().getMinionMetrics();
 
             @Override
             public TaskResult run() {
-              MinionMetrics minionMetrics = MinionContext.getInstance().getMinionMetrics();
+              HelixManager helixManager = context.getManager();
+              JobContext jobContext = TaskDriver.getJobContext(helixManager, context.getJobConfig().getJobId());
+              // jobContext.getStartTime() return the time in milliseconds of job being put into helix queue.
+              long jobInQueueTimeMs = jobContext.getStartTime();
+              long jobDequeueTimeMs = System.currentTimeMillis();
+              _minionMetrics.addPhaseTiming(taskType, MinionQueryPhase.TASK_QUEUEING, jobDequeueTimeMs - jobInQueueTimeMs);
+              try {
+                _minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, 1L);
+                return runInternal();
+              } finally {
+                _minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, -1L);
+                long executionTimeMs = System.currentTimeMillis() - jobDequeueTimeMs;
+                _minionMetrics.addPhaseTiming(taskType, MinionQueryPhase.TASK_EXECUTION, executionTimeMs);
+                LOGGER.info("Task: {} completed in: {}ms", _taskConfig.getId(), executionTimeMs);
+              }
+            }
 
+            private TaskResult runInternal() {
               PinotTaskConfig pinotTaskConfig = PinotTaskConfig.fromHelixTaskConfig(_taskConfig);
               if (StringUtils.isBlank(pinotTaskConfig.getConfigs().get(MinionConstants.AUTH_TOKEN))) {
                 pinotTaskConfig.getConfigs()
@@ -79,33 +99,29 @@ public class TaskFactoryRegistry {
               }
 
               _eventObserver.notifyTaskStart(pinotTaskConfig);
-              minionMetrics.addMeteredTableValue(taskType, MinionMeter.NUMBER_TASKS_EXECUTED, 1L);
+              _minionMetrics.addMeteredTableValue(taskType, MinionMeter.NUMBER_TASKS_EXECUTED, 1L);
               LOGGER.info("Start running {}: {} with configs: {}", pinotTaskConfig.getTaskType(), _taskConfig.getId(),
                   pinotTaskConfig.getConfigs());
 
               try {
-                long startTimeInNanos = System.nanoTime();
                 Object executionResult = _taskExecutor.executeTask(pinotTaskConfig);
-                long timeSpentInNanos = System.nanoTime() - startTimeInNanos;
                 _eventObserver.notifyTaskSuccess(pinotTaskConfig, executionResult);
-                minionMetrics.addMeteredTableValue(taskType, MinionMeter.NUMBER_TASKS_COMPLETED, 1L);
-                minionMetrics.addPhaseTiming(taskType, MinionQueryPhase.TASK_EXECUTION, timeSpentInNanos);
-                LOGGER.info("Task: {} completed in: {}ms", _taskConfig.getId(),
-                    TimeUnit.NANOSECONDS.toMillis(timeSpentInNanos));
+                _minionMetrics.addMeteredTableValue(taskType, MinionMeter.NUMBER_TASKS_COMPLETED, 1L);
+                LOGGER.info("Task: {} succeeded", _taskConfig.getId());
                 return new TaskResult(TaskResult.Status.COMPLETED, "Succeeded");
               } catch (TaskCancelledException e) {
                 _eventObserver.notifyTaskCancelled(pinotTaskConfig);
-                minionMetrics.addMeteredTableValue(taskType, MinionMeter.NUMBER_TASKS_CANCELLED, 1L);
+                _minionMetrics.addMeteredTableValue(taskType, MinionMeter.NUMBER_TASKS_CANCELLED, 1L);
                 LOGGER.info("Task: {} got cancelled", _taskConfig.getId(), e);
                 return new TaskResult(TaskResult.Status.CANCELED, e.toString());
               } catch (FatalException e) {
                 _eventObserver.notifyTaskError(pinotTaskConfig, e);
-                minionMetrics.addMeteredTableValue(taskType, MinionMeter.NUMBER_TASKS_FATAL_FAILED, 1L);
+                _minionMetrics.addMeteredTableValue(taskType, MinionMeter.NUMBER_TASKS_FATAL_FAILED, 1L);
                 LOGGER.error("Caught fatal exception while executing task: {}", _taskConfig.getId(), e);
                 return new TaskResult(TaskResult.Status.FATAL_FAILED, e.toString());
               } catch (Exception e) {
                 _eventObserver.notifyTaskError(pinotTaskConfig, e);
-                minionMetrics.addMeteredTableValue(taskType, MinionMeter.NUMBER_TASKS_FAILED, 1L);
+                _minionMetrics.addMeteredTableValue(taskType, MinionMeter.NUMBER_TASKS_FAILED, 1L);
                 LOGGER.error("Caught exception while executing task: {}", _taskConfig.getId(), e);
                 return new TaskResult(TaskResult.Status.FAILED, e.toString());
               }
