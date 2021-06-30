@@ -19,7 +19,6 @@
 package org.apache.pinot.common.metrics;
 
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.metrics.AbstractMetrics;
 
 
 public enum MinionTimer implements AbstractMetrics.Timer {
