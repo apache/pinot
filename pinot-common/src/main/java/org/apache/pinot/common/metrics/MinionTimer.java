@@ -16,35 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.minion.metrics;
+package org.apache.pinot.common.metrics;
 
+import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metrics.AbstractMetrics;
-import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
-import org.apache.pinot.spi.utils.CommonConstants;
 
 
-public class MinionMetrics extends AbstractMetrics<MinionQueryPhase, MinionMeter, MinionGauge, MinionTimer> {
+public enum MinionTimer implements AbstractMetrics.Timer {
+  ;
 
-  public MinionMetrics(PinotMetricsRegistry metricsRegistry) {
-    this(CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX, metricsRegistry);
-  }
+  private final String _timerName;
+  private final boolean _global;
 
-  public MinionMetrics(String prefix, PinotMetricsRegistry metricsRegistry) {
-    super(prefix, metricsRegistry, MinionMetrics.class);
-  }
-
-  @Override
-  protected MinionQueryPhase[] getQueryPhases() {
-    return MinionQueryPhase.values();
+  MinionTimer(boolean global) {
+    _timerName = Utils.toCamelCase(name().toLowerCase());
+    _global = global;
   }
 
   @Override
-  protected MinionMeter[] getMeters() {
-    return MinionMeter.values();
+  public String getTimerName() {
+    return _timerName;
   }
 
   @Override
-  protected MinionGauge[] getGauges() {
-    return MinionGauge.values();
+  public boolean isGlobal() {
+    return _global;
   }
 }
