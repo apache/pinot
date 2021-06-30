@@ -70,11 +70,13 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.recommender.RecommenderDriver;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
+import org.apache.pinot.controller.util.TableIngestionStatusHelper;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStats;
 import org.apache.pinot.spi.config.table.TableStatus;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -626,34 +628,13 @@ public class PinotTableRestletResource {
       }
       TableStatus.IngestionStatus ingestionStatus = null;
       if (TableType.OFFLINE == tableType) {
-        TableStatus.IngestionState ingestionState = TableStatus.IngestionState.HEALTHY;
-        String errorMessage = "";
-
-        // Retrieve all the Minion tasks and corresponding states for this table
-        Map<String, TaskState> taskStateMap = _pinotHelixTaskResourceManager
-            .getTaskStatesByTable(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE, tableNameWithType);
-        List<String> failedTasks = new ArrayList<>();
-
-        // Check if any of the tasks are in error state
-        for (Map.Entry<String, TaskState> taskStateEntry : taskStateMap.entrySet()) {
-          switch (taskStateEntry.getValue()) {
-            case FAILED:
-            case ABORTED:
-              failedTasks.add(taskStateEntry.getKey());
-            default:
-              continue;
-          }
-        }
-        if (failedTasks.size() > 0) {
-          ingestionState = TableStatus.IngestionState.UNHEALTHY;
-          errorMessage = "Follow ingestion tasks have failed: " + failedTasks.toString();
-        }
-        ingestionStatus = new TableStatus.IngestionStatus(ingestionState.toString(), errorMessage);
+        ingestionStatus = TableIngestionStatusHelper
+            .getOfflineTableIngestionStatus(tableNameWithType, _pinotHelixResourceManager,
+                _pinotHelixTaskResourceManager);
       } else {
-        ConsumingSegmentInfoReader consumingSegmentInfoReader =
-            new ConsumingSegmentInfoReader(_executor, _connectionManager, _pinotHelixResourceManager);
-        ingestionStatus = consumingSegmentInfoReader
-            .getIngestionStatus(tableNameWithType, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+        ingestionStatus = TableIngestionStatusHelper.getRealtimeTableIngestionStatus(tableNameWithType,
+            _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000, _executor, _connectionManager,
+            _pinotHelixResourceManager);
       }
       TableStatus tableStatus = new TableStatus(ingestionStatus);
       return JsonUtils.objectToPrettyString(tableStatus);

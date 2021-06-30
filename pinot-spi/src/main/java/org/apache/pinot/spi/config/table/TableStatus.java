@@ -33,7 +33,8 @@ public class TableStatus {
 
   public enum IngestionState {
     HEALTHY,
-    UNHEALTHY
+    UNHEALTHY,
+    UNKNOWN
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)

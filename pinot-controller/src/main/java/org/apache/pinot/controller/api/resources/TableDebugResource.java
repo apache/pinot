@@ -61,8 +61,11 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.debug.TableDebugInfo;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
+import org.apache.pinot.controller.util.TableIngestionStatusHelper;
 import org.apache.pinot.controller.util.TableSizeReader;
+import org.apache.pinot.spi.config.table.TableStatus;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -87,7 +90,11 @@ public class TableDebugResource {
   PinotHelixResourceManager _pinotHelixResourceManager;
 
   @Inject
+  PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
+
+  @Inject
   Executor _executor;
+
   @Inject
   HttpConnectionManager _connectionManager;
 
@@ -152,14 +159,33 @@ public class TableDebugResource {
     // Table size summary.
     TableDebugInfo.TableSizeSummary tableSizeSummary = getTableSize(tableNameWithType);
 
+    TableStatus.IngestionStatus ingestionStatus = getIngestionStatus(tableNameWithType, tableType);
+
     // Number of segments in the table.
     IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
     int numSegments = (idealState != null) ? idealState.getPartitionSet().size() : 0;
 
-    return new TableDebugInfo(tableNameWithType, tableSizeSummary,
+    return new TableDebugInfo(tableNameWithType, ingestionStatus, tableSizeSummary,
         _pinotHelixResourceManager.getBrokerInstancesForTable(tableName, tableType).size(),
         _pinotHelixResourceManager.getServerInstancesForTable(tableName, tableType).size(), numSegments,
         segmentDebugInfos, serverDebugInfos, brokerDebugInfos);
+  }
+
+  private TableStatus.IngestionStatus getIngestionStatus(String tableNameWithType, TableType tableType) {
+    try {
+      switch (tableType) {
+        case OFFLINE:
+          return TableIngestionStatusHelper.getOfflineTableIngestionStatus(tableNameWithType, _pinotHelixResourceManager,
+              _pinotHelixTaskResourceManager);
+        case REALTIME:
+          return TableIngestionStatusHelper.getRealtimeTableIngestionStatus(tableNameWithType,
+              _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000, _executor, _connectionManager,
+              _pinotHelixResourceManager);
+      }
+    } catch (Exception e) {
+      return TableStatus.IngestionStatus.newIngestionStatus(TableStatus.IngestionState.UNKNOWN, e.getMessage());
+    }
+    return null;
   }
 
   private TableDebugInfo.TableSizeSummary getTableSize(String tableNameWithType) {
