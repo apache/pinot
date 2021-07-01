@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.core.plan.AggregationGroupByOrderByPlanNode;
 import org.apache.pinot.core.plan.AggregationGroupByPlanNode;
 import org.apache.pinot.core.plan.AggregationPlanNode;
 import org.apache.pinot.core.plan.DictionaryBasedAggregationPlanNode;
@@ -172,13 +173,13 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
         AggregationPlanNode.class, AggregationPlanNode.class});
     entries.add(
         new Object[]{"select sum(column1) from testTable group by daysSinceEpoch", /*aggregation with group by query*/
-            AggregationGroupByPlanNode.class, AggregationGroupByPlanNode.class});
+            AggregationGroupByOrderByPlanNode.class, AggregationGroupByOrderByPlanNode.class});
     entries.add(
         new Object[]{"select count(*),min(column17) from testTable", /*multiple aggregations query, one from metadata, one from dictionary*/
             AggregationPlanNode.class, AggregationPlanNode.class});
     entries.add(
         new Object[]{"select count(*),min(daysSinceEpoch) from testTable group by daysSinceEpoch", /*multiple aggregations with group by*/
-            AggregationGroupByPlanNode.class, AggregationGroupByPlanNode.class});
+            AggregationGroupByOrderByPlanNode.class, AggregationGroupByOrderByPlanNode.class});
 
     return entries.toArray(new Object[entries.size()][]);
   }

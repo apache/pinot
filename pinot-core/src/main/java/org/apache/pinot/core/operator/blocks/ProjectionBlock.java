@@ -50,6 +50,10 @@ public class ProjectionBlock implements Block {
     return new ProjectionBlockValSet(_dataBlockCache, column, _dataSourceMap.get(column));
   }
 
+//  public int[] getDocIdArray() {
+//    return _dataBlockCache.getDocIdArray();
+//  }
+
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
     throw new UnsupportedOperationException();

@@ -43,6 +43,7 @@ import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 public class BrokerRequestToQueryContextConverter {
@@ -95,6 +96,8 @@ public class BrokerRequestToQueryContextConverter {
       for (Expression thriftExpression : groupByList) {
         groupByExpressions.add(RequestContextUtils.getExpression(thriftExpression));
       }
+      pinotQuery.putToQueryOptions(CommonConstants.Broker.Request.QueryOptionKey.GROUP_BY_MODE,
+          CommonConstants.Broker.Request.SQL);
     }
 
     // ORDER BY

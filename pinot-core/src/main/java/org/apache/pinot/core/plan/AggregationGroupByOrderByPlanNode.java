@@ -18,10 +18,15 @@
  */
 package org.apache.pinot.core.plan;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -32,6 +37,8 @@ import org.apache.pinot.core.startree.plan.StarTreeTransformPlanNode;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
+import org.apache.pinot.spi.utils.CommonConstants;
+
 
 /**
  * The <code>AggregationGroupByOrderByPlanNode</code> class provides the execution plan for aggregation group-by order-by query on a
@@ -45,9 +52,11 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
   private final int _minSegmentTrimSize;
   private final AggregationFunction[] _aggregationFunctions;
   private final ExpressionContext[] _groupByExpressions;
+  private final List<OrderByExpressionContext> _orderByExpressionContexts;
   private final TransformPlanNode _transformPlanNode;
   private final StarTreeTransformPlanNode _starTreeTransformPlanNode;
   private final QueryContext _queryContext;
+  private final boolean _enableGroupByOpt;
 
   public AggregationGroupByOrderByPlanNode(IndexSegment indexSegment, QueryContext queryContext,
       int maxInitialResultHolderCapacity, int numGroupsLimit, int minSegmentTrimSize) {
@@ -61,6 +70,8 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
     _groupByExpressions = groupByExpressions.toArray(new ExpressionContext[0]);
     _queryContext = queryContext;
     _minSegmentTrimSize = minSegmentTrimSize;
+    List<OrderByExpressionContext> orderByExpressionContexts = queryContext.getOrderByExpressions();
+    _orderByExpressionContexts = Objects.requireNonNullElseGet(orderByExpressionContexts, ArrayList::new);
 
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();
     if (starTrees != null && !StarTreeUtils.isStarTreeDisabled(queryContext)) {
@@ -75,6 +86,7 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
                 .isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, _groupByExpressions,
                     predicateEvaluatorsMap.keySet())) {
               _transformPlanNode = null;
+              _enableGroupByOpt = false;
               _starTreeTransformPlanNode =
                   new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, _groupByExpressions,
                       predicateEvaluatorsMap, queryContext.getDebugOptions());
@@ -87,6 +99,10 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
 
     Set<ExpressionContext> expressionsToTransform =
         AggregationFunctionUtils.collectExpressionsToTransform(_aggregationFunctions, _groupByExpressions);
+    _enableGroupByOpt = checkOrderByOptimization();
+    if (_enableGroupByOpt) {
+      expressionsToTransform.add(ExpressionContext.forIdentifier(CommonConstants.Segment.BuiltInVirtualColumn.DOCID));
+    }
     _transformPlanNode =
         new TransformPlanNode(_indexSegment, queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL);
     _starTreeTransformPlanNode = null;
@@ -98,13 +114,36 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
     if (_transformPlanNode != null) {
       // Do not use star-tree
       return new AggregationGroupByOrderByOperator(_indexSegment, _aggregationFunctions, _groupByExpressions,
-          _maxInitialResultHolderCapacity, _numGroupsLimit, _minSegmentTrimSize, _transformPlanNode.run(), numTotalDocs,
-          _queryContext, false);
+          _orderByExpressionContexts.toArray(new OrderByExpressionContext[0]), _maxInitialResultHolderCapacity,
+          _numGroupsLimit, _minSegmentTrimSize, _transformPlanNode.run(), numTotalDocs, _queryContext,
+          _enableGroupByOpt, false);
     } else {
       // Use star-tree
       return new AggregationGroupByOrderByOperator(_indexSegment, _aggregationFunctions, _groupByExpressions,
-          _maxInitialResultHolderCapacity, _numGroupsLimit, _minSegmentTrimSize, _starTreeTransformPlanNode.run(),
-          numTotalDocs, _queryContext, true);
+          _orderByExpressionContexts.toArray(new OrderByExpressionContext[0]), _maxInitialResultHolderCapacity,
+          _numGroupsLimit, _minSegmentTrimSize, _starTreeTransformPlanNode.run(), numTotalDocs, _queryContext,
+          _enableGroupByOpt, true);
     }
+  }
+
+  private boolean checkOrderByOptimization() {
+    if (_queryContext.getHavingFilter() != null) {
+      return false;
+    }
+    Set<ExpressionContext> orderByExpressionsSet = new HashSet<>();
+    for (OrderByExpressionContext orderByExpressionContext : _orderByExpressionContexts) {
+      ExpressionContext expression = orderByExpressionContext.getExpression();
+      if (expression.getType() == ExpressionContext.Type.FUNCTION
+          && expression.getFunction().getType() == FunctionContext.Type.AGGREGATION) {
+        return false;
+      }
+      orderByExpressionsSet.add(expression);
+    }
+    for (ExpressionContext groupByExpression: _groupByExpressions) {
+      if (!orderByExpressionsSet.contains(groupByExpression)) {
+        _orderByExpressionContexts.add(new OrderByExpressionContext(groupByExpression, true));
+      }
+    }
+    return true;
   }
 }

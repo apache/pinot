@@ -81,7 +81,7 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
     DataSchema expectedDataSchema =
         new DataSchema(new String[]{"valuein(column7,'363','469','246','100000')", "countmv(column6)"},
             new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG});
-    QueriesTestUtils.testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, Lists
+    QueriesTestUtils.testInterSegmentResultTable(brokerResponse, 400000L, 0L, 1200000L, 400000L, Lists
         .newArrayList(new Object[]{469, (long) 33576}, new Object[]{246, (long) 24300},
             new Object[]{363, (long) 35436}), 3, expectedDataSchema);
 

@@ -23,8 +23,10 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
+import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.DistinctOperator;
+import org.apache.pinot.core.plan.AggregationGroupByOrderByPlanNode;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -72,7 +74,7 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   }
 
   @Test
-  public void testSmallAggregationGroupBy() {
+  public void testSmallAggregationGroupByPQL() {
     String query = "SELECT" + AGGREGATION + " FROM testTable" + SMALL_GROUP_BY;
 
     // Test query without filter.
@@ -90,6 +92,32 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     resultsBlock = aggregationGroupByOperator.nextBlock();
     QueriesTestUtils
         .testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 6129L, 84134L, 30645L,
+            30000L);
+    QueriesTestUtils
+        .testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(), "242920", 3L, 4348938306L,
+            407993712, 296467636, 5803888725L, 3L);
+  }
+
+  @Test
+  public void testSmallAggregationGroupBySQL() {
+    String query = "SELECT" + AGGREGATION + " FROM testTable" + SMALL_GROUP_BY;
+
+    // Test query without filter.
+    AggregationGroupByOrderByOperator aggregationGroupByOrderByOperator = getOperatorForSqlQuery(query);
+    IntermediateResultsBlock resultsBlock = aggregationGroupByOrderByOperator.nextBlock();
+    QueriesTestUtils
+        .testInnerSegmentExecutionStatistics(aggregationGroupByOrderByOperator.getExecutionStatistics(), 30000L, 0L, 180000L,
+            30000L);
+    QueriesTestUtils
+        .testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(), "11270", 1L, 815409257L,
+            1215316262, 1328642550, 788414092L, 1L);
+
+    query = "SELECT" + AGGREGATION + " FROM testTable" + QUERY_FILTER + SMALL_GROUP_BY;
+    // Test query with filter.
+    aggregationGroupByOrderByOperator = getOperatorForSqlQuery(query);
+    resultsBlock = aggregationGroupByOrderByOperator.nextBlock();
+    QueriesTestUtils
+        .testInnerSegmentExecutionStatistics(aggregationGroupByOrderByOperator.getExecutionStatistics(), 6129L, 84134L, 36774L,
             30000L);
     QueriesTestUtils
         .testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(), "242920", 3L, 4348938306L,
@@ -121,6 +149,30 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   }
 
   @Test
+  public void testMediumAggregationGroupBySQL() {
+    String query = "SELECT" + AGGREGATION + " FROM testTable" + MEDIUM_GROUP_BY + " LIMIT 10000";
+
+    // Test query without filter.
+    AggregationGroupByOrderByOperator aggregationGroupByOrderByOperator = getOperatorForSqlQuery(query);
+    IntermediateResultsBlock resultsBlock = aggregationGroupByOrderByOperator.nextBlock();
+    QueriesTestUtils
+        .testInnerSegmentExecutionStatistics(aggregationGroupByOrderByOperator.getExecutionStatistics(), 30000L, 0L, 240000,
+            30000L);
+    QueriesTestUtils
+        .testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(), "1813102948\0P\0HEuxNvH",
+            4L, 2062187196L, 1988589001, 394608493, 4782388964L, 4L);
+    query = "SELECT" + AGGREGATION + " FROM testTable" + QUERY_FILTER + MEDIUM_GROUP_BY + " LIMIT 10000";
+    // Test query with filter.
+    aggregationGroupByOrderByOperator = getOperatorForSqlQuery(query);
+    resultsBlock = aggregationGroupByOrderByOperator.nextBlock();
+    QueriesTestUtils
+        .testInnerSegmentExecutionStatistics(aggregationGroupByOrderByOperator.getExecutionStatistics(), 6129L, 84134L, 49032,
+            30000L);
+    QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
+        "1176631727\0P\0KrNxpdycSiwoRohEiTIlLqDHnx", 1L, 716185211L, 489993380, 371110078, 487714191L, 1L);
+//  }}
+  }
+  @Test
   public void testLargeAggregationGroupBy() {
     String query = "SELECT" + AGGREGATION + " FROM testTable" + LARGE_GROUP_BY;
 
@@ -145,6 +197,30 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   }
 
   @Test
+  public void testLargeAggregationGroupBySQL() {
+    String query = "SELECT" + AGGREGATION + " FROM testTable" + LARGE_GROUP_BY + " LIMIT 10000";
+
+    // Test query without filter.
+    AggregationGroupByOrderByOperator aggregationGroupByOrderByOperator = getOperatorForSqlQuery(query);
+    IntermediateResultsBlock resultsBlock = aggregationGroupByOrderByOperator.nextBlock();
+    QueriesTestUtils
+        .testInnerSegmentExecutionStatistics(aggregationGroupByOrderByOperator.getExecutionStatistics(), 30000L, 0L, 240000L,
+            30000L);
+    QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
+        "484569489\00016200443\0001159557463\0P\0MaztCmmxxgguBUxPti", 2L, 969138978L, 995355481, 16200443, 2222394270L,
+        2L);
+    query = "SELECT" + AGGREGATION + " FROM testTable" + QUERY_FILTER + LARGE_GROUP_BY + " LIMIT 10000";
+    // Test query with filter.
+    aggregationGroupByOrderByOperator = getOperatorForSqlQuery(query);
+    resultsBlock = aggregationGroupByOrderByOperator.nextBlock();
+    QueriesTestUtils
+        .testInnerSegmentExecutionStatistics(aggregationGroupByOrderByOperator.getExecutionStatistics(), 6129L, 84134L, 49032L,
+            30000L);
+    QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
+        "1318761745\000353175528\0001172307870\0P\0HEuxNvH", 2L, 2637523490L, 557154208, 353175528, 2427862396L, 2L);
+  }
+
+  @Test
   public void testVeryLargeAggregationGroupBy() {
     String query = "SELECT" + AGGREGATION + " FROM testTable" + VERY_LARGE_GROUP_BY;
 
@@ -163,6 +239,31 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     resultsBlock = aggregationGroupByOperator.nextBlock();
     QueriesTestUtils
         .testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 6129L, 84134L, 55161L,
+            30000L);
+    QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
+        "1361199163\000178133991\000296467636\000788414092\0001719301234\0P\0MaztCmmxxgguBUxPti\0001284373442\000752388855",
+        1L, 1361199163L, 178133991, 296467636, 788414092L, 1L);
+  }
+
+  @Test
+  public void testVeryLargeAggregationGroupBySQL() {
+    String query = "SELECT" + AGGREGATION + " FROM testTable" + VERY_LARGE_GROUP_BY + " LIMIT 100000";
+
+    // Test query without filter.
+    AggregationGroupByOrderByOperator aggregationGroupByOperator = getOperatorForSqlQuery(query);
+    IntermediateResultsBlock resultsBlock = aggregationGroupByOperator.nextBlock();
+    QueriesTestUtils
+        .testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 30000L, 0L, 300000L,
+            30000L);
+    QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
+        "1784773968\000204243323\000628170461\0001985159279\000296467636\0P\0HEuxNvH\000402773817\0002047180536", 1L,
+        1784773968L, 204243323, 628170461, 1985159279L, 1L);
+    query = "SELECT" + AGGREGATION + " FROM testTable" + QUERY_FILTER + VERY_LARGE_GROUP_BY + " LIMIT 100000";
+    // Test query with filter.
+    aggregationGroupByOperator = getOperatorForSqlQuery(query);
+    resultsBlock = aggregationGroupByOperator.nextBlock();
+    QueriesTestUtils
+        .testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 6129L, 84134L, 61290L,
             30000L);
     QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
         "1361199163\000178133991\000296467636\000788414092\0001719301234\0P\0MaztCmmxxgguBUxPti\0001284373442\000752388855",
