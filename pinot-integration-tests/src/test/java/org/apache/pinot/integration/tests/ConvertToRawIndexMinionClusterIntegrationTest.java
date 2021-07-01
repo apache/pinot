@@ -104,7 +104,7 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
     for (File indexDir : indexDirs) {
       SegmentMetadata segmentMetadata = new SegmentMetadataImpl(indexDir);
       for (String columnName : segmentMetadata.getSchema().getColumnNames()) {
-        Assert.assertTrue(segmentMetadata.hasDictionary(columnName));
+        Assert.assertTrue(segmentMetadata.getColumnMetadataFor(columnName).hasDictionary());
       }
     }
 
@@ -155,11 +155,11 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
         List<String> rawIndexColumns = Arrays.asList(StringUtils.split(COLUMNS_TO_CONVERT, ','));
         for (String columnName : segmentMetadata.getSchema().getColumnNames()) {
           if (rawIndexColumns.contains(columnName)) {
-            if (segmentMetadata.hasDictionary(columnName)) {
+            if (segmentMetadata.getColumnMetadataFor(columnName).hasDictionary()) {
               return false;
             }
           } else {
-            if (!segmentMetadata.hasDictionary(columnName)) {
+            if (!segmentMetadata.getColumnMetadataFor(columnName).hasDictionary()) {
               return false;
             }
           }
