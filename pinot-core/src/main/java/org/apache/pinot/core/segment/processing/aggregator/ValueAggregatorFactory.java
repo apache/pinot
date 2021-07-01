@@ -16,36 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.processing.collector;
+package org.apache.pinot.core.segment.processing.aggregator;
 
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
  * Factory class to create instances of value aggregator from the given name.
  */
 public class ValueAggregatorFactory {
-  public enum ValueAggregatorType {
-    SUM, MAX, MIN
-  }
-
   private ValueAggregatorFactory() {
   }
 
   /**
-   * Construct a ValueAggregator from the given aggregator type
+   * Constructs a ValueAggregator from the given aggregation type.
    */
-  public static ValueAggregator getValueAggregator(String aggregatorTypeStr, FieldSpec.DataType dataType) {
-    ValueAggregatorType aggregatorType = ValueAggregatorType.valueOf(aggregatorTypeStr.toUpperCase());
-    switch (aggregatorType) {
-      case SUM:
-        return new SumValueAggregator(dataType);
-      case MAX:
-        return new MaxValueAggregator(dataType);
+  public static ValueAggregator getValueAggregator(AggregationFunctionType aggregationType, DataType dataType) {
+    switch (aggregationType) {
       case MIN:
         return new MinValueAggregator(dataType);
+      case MAX:
+        return new MaxValueAggregator(dataType);
+      case SUM:
+        return new SumValueAggregator(dataType);
       default:
-        throw new IllegalStateException("Unsupported value aggregator type : " + aggregatorTypeStr);
+        throw new IllegalStateException("Unsupported aggregation type: " + aggregationType);
     }
   }
 }

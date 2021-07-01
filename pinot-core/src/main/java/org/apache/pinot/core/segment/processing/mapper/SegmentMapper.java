@@ -16,27 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.processing.framework;
+package org.apache.pinot.core.segment.processing.mapper;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.segment.processing.filter.RecordFilter;
 import org.apache.pinot.core.segment.processing.filter.RecordFilterFactory;
+import org.apache.pinot.core.segment.processing.framework.SegmentProcessorConfig;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
 import org.apache.pinot.core.segment.processing.transformer.RecordTransformer;
 import org.apache.pinot.core.segment.processing.transformer.RecordTransformerFactory;
-import org.apache.pinot.core.segment.processing.utils.SegmentProcessingUtils;
+import org.apache.pinot.core.segment.processing.utils.SegmentProcessorUtils;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.DataTypeTransformer;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
@@ -66,6 +67,7 @@ public class SegmentMapper {
 
   private final List<FieldSpec> _fieldSpecs;
   private final boolean _includeNullFields;
+  private final int _numSortFields;
 
   // TODO: Merge the following transformers into one. Currently we need an extra DataTypeTransformer in the end in case
   //       _recordTransformer changes the data type.
@@ -76,26 +78,25 @@ public class SegmentMapper {
 
   private final Partitioner[] _partitioners;
   private final String[] _partitionsBuffer;
-  private final Map<String, GenericRowFileManager> _partitionToFileManagerMap = new HashMap<>();
+  // NOTE: Use TreeMap so that the order is deterministic
+  private final Map<String, GenericRowFileManager> _partitionToFileManagerMap = new TreeMap<>();
 
-  public SegmentMapper(List<RecordReader> recordReaders, SegmentMapperConfig mapperConfig, File mapperOutputDir) {
+  public SegmentMapper(List<RecordReader> recordReaders, SegmentProcessorConfig processorConfig, File mapperOutputDir) {
     _recordReaders = recordReaders;
     _mapperOutputDir = mapperOutputDir;
 
-    TableConfig tableConfig = mapperConfig.getTableConfig();
-    Schema schema = mapperConfig.getSchema();
-    List<String> sortOrder = tableConfig.getIndexingConfig().getSortedColumn();
-    if (CollectionUtils.isNotEmpty(sortOrder)) {
-      _fieldSpecs = SegmentProcessingUtils.getFieldSpecs(schema, sortOrder);
-    } else {
-      _fieldSpecs = SegmentProcessingUtils.getFieldSpecs(schema);
-    }
+    TableConfig tableConfig = processorConfig.getTableConfig();
+    Schema schema = processorConfig.getSchema();
+    Pair<List<FieldSpec>, Integer> pair = SegmentProcessorUtils
+        .getFieldSpecs(schema, processorConfig.getMergeType(), tableConfig.getIndexingConfig().getSortedColumn());
+    _fieldSpecs = pair.getLeft();
+    _numSortFields = pair.getRight();
     _includeNullFields = tableConfig.getIndexingConfig().isNullHandlingEnabled();
     _defaultRecordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
-    _recordFilter = RecordFilterFactory.getRecordFilter(mapperConfig.getRecordFilterConfig());
-    _recordTransformer = RecordTransformerFactory.getRecordTransformer(mapperConfig.getRecordTransformerConfig());
+    _recordFilter = RecordFilterFactory.getRecordFilter(processorConfig.getRecordFilterConfig());
+    _recordTransformer = RecordTransformerFactory.getRecordTransformer(processorConfig.getRecordTransformerConfig());
     _dataTypeTransformer = new DataTypeTransformer(schema);
-    List<PartitionerConfig> partitionerConfigs = mapperConfig.getPartitionerConfigs();
+    List<PartitionerConfig> partitionerConfigs = processorConfig.getPartitionerConfigs();
     int numPartitioners = partitionerConfigs.size();
     _partitioners = new Partitioner[numPartitioners];
     _partitionsBuffer = new String[numPartitioners];
@@ -166,7 +167,7 @@ public class SegmentMapper {
     if (fileManager == null) {
       File partitionOutputDir = new File(_mapperOutputDir, partition);
       FileUtils.forceMkdir(partitionOutputDir);
-      fileManager = new GenericRowFileManager(partitionOutputDir, _fieldSpecs, _includeNullFields);
+      fileManager = new GenericRowFileManager(partitionOutputDir, _fieldSpecs, _includeNullFields, _numSortFields);
       _partitionToFileManagerMap.put(partition, fileManager);
     }
 

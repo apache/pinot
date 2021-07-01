@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.processing.collector;
+package org.apache.pinot.core.segment.processing.aggregator;
 
 import org.apache.pinot.spi.data.FieldSpec;
 

@@ -16,19 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.processing.collector;
+package org.apache.pinot.core.segment.processing.aggregator;
 
 import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
- * Sum value aggregator
+ * Min value aggregator
  */
-public class SumValueAggregator implements ValueAggregator {
+public class MinValueAggregator implements ValueAggregator {
 
   private final FieldSpec.DataType _dataType;
 
-  public SumValueAggregator(FieldSpec.DataType dataType) {
+  public MinValueAggregator(FieldSpec.DataType dataType) {
     _dataType = dataType;
   }
 
@@ -37,19 +37,19 @@ public class SumValueAggregator implements ValueAggregator {
     Object result;
     switch (_dataType) {
       case INT:
-        result = ((Number) value1).intValue() + ((Number) value2).intValue();
+        result = Math.min(((Number) value1).intValue(), ((Number) value2).intValue());
         break;
       case LONG:
-        result = ((Number) value1).longValue() + ((Number) value2).longValue();
+        result = Math.min(((Number) value1).longValue(), ((Number) value2).longValue());
         break;
       case FLOAT:
-        result = ((Number) value1).floatValue() + ((Number) value2).floatValue();
+        result = Math.min(((Number) value1).floatValue(), ((Number) value2).floatValue());
         break;
       case DOUBLE:
-        result = ((Number) value1).doubleValue() + ((Number) value2).doubleValue();
+        result = Math.min(((Number) value1).doubleValue(), ((Number) value2).doubleValue());
         break;
       default:
-        throw new IllegalArgumentException("Unsupported metric type for SUM aggregator : " + _dataType);
+        throw new IllegalArgumentException("Unsupported metric type : " + _dataType);
     }
     return result;
   }

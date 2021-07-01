@@ -37,15 +37,39 @@ public class GenericRowFileManager {
   private final File _dataFile;
   private final List<FieldSpec> _fieldSpecs;
   private final boolean _includeNullFields;
+  private final int _numSortFields;
 
   private GenericRowFileWriter _fileWriter;
   private GenericRowFileReader _fileReader;
 
-  public GenericRowFileManager(File outputDir, List<FieldSpec> fieldSpecs, boolean includeNullFields) {
+  public GenericRowFileManager(File outputDir, List<FieldSpec> fieldSpecs, boolean includeNullFields,
+      int numSortFields) {
     _offsetFile = new File(outputDir, OFFSET_FILE_NAME);
     _dataFile = new File(outputDir, DATA_FILE_NAME);
     _fieldSpecs = fieldSpecs;
     _includeNullFields = includeNullFields;
+    _numSortFields = numSortFields;
+  }
+
+  /**
+   * Returns the field specs for the files.
+   */
+  public List<FieldSpec> getFieldSpecs() {
+    return _fieldSpecs;
+  }
+
+  /**
+   * Returns {@code true} if the file contains null fields, {@code false} otherwise.
+   */
+  public boolean isIncludeNullFields() {
+    return _includeNullFields;
+  }
+
+  /**
+   * Returns the number of sort fields.
+   */
+  public int getNumSortFields() {
+    return _numSortFields;
   }
 
   /**
@@ -80,7 +104,7 @@ public class GenericRowFileManager {
     if (_fileReader == null) {
       Preconditions.checkState(_offsetFile.exists(), "Record offset file: %s does not exist", _offsetFile);
       Preconditions.checkState(_dataFile.exists(), "Record data file: %s does not exist", _dataFile);
-      _fileReader = new GenericRowFileReader(_offsetFile, _dataFile, _fieldSpecs, _includeNullFields);
+      _fileReader = new GenericRowFileReader(_offsetFile, _dataFile, _fieldSpecs, _includeNullFields, _numSortFields);
     }
     return _fileReader;
   }

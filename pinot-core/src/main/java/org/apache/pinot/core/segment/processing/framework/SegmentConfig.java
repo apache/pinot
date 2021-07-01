@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import javax.annotation.Nullable;
 
 
 /**
@@ -29,23 +30,29 @@ import com.google.common.base.Preconditions;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SegmentConfig {
-
   private static final int DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT = 5_000_000;
+
   private final int _maxNumRecordsPerSegment;
-  // TODO: more configs such as segment name prefix
+  private final String _segmentNamePrefix;
 
   @JsonCreator
-  private SegmentConfig(@JsonProperty(value = "maxNumRecordsPerSegment") int maxNumRecordsPerSegment) {
+  private SegmentConfig(@JsonProperty(value = "maxNumRecordsPerSegment", required = true) int maxNumRecordsPerSegment,
+      @JsonProperty("segmentNamePrefix") @Nullable String segmentNamePrefix) {
     Preconditions.checkState(maxNumRecordsPerSegment > 0, "Max num records per segment must be > 0");
     _maxNumRecordsPerSegment = maxNumRecordsPerSegment;
+    _segmentNamePrefix = segmentNamePrefix;
   }
 
   /**
    * The max number of records allowed per segment
    */
-  @JsonProperty
   public int getMaxNumRecordsPerSegment() {
     return _maxNumRecordsPerSegment;
+  }
+
+  @Nullable
+  public String getSegmentNamePrefix() {
+    return _segmentNamePrefix;
   }
 
   /**
@@ -53,20 +60,27 @@ public class SegmentConfig {
    */
   public static class Builder {
     private int _maxNumRecordsPerSegment = DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT;
+    private String _segmentNamePrefix;
 
     public Builder setMaxNumRecordsPerSegment(int maxNumRecordsPerSegment) {
       _maxNumRecordsPerSegment = maxNumRecordsPerSegment;
       return this;
     }
 
+    public Builder setSegmentNamePrefix(String segmentNamePrefix) {
+      _segmentNamePrefix = segmentNamePrefix;
+      return this;
+    }
+
     public SegmentConfig build() {
       Preconditions.checkState(_maxNumRecordsPerSegment > 0, "Max num records per segment must be > 0");
-      return new SegmentConfig(_maxNumRecordsPerSegment);
+      return new SegmentConfig(_maxNumRecordsPerSegment, _segmentNamePrefix);
     }
   }
 
   @Override
   public String toString() {
-    return "SegmentsConfig{" + "_maxNumRecordsPerSegment=" + _maxNumRecordsPerSegment + '}';
+    return "SegmentConfig{" + "_maxNumRecordsPerSegment=" + _maxNumRecordsPerSegment + ", _segmentNamePrefix='"
+        + _segmentNamePrefix + '\'' + '}';
   }
 }

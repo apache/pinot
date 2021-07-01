@@ -16,41 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.processing.collector;
-
-import java.io.Closeable;
-import java.io.IOException;
-import java.util.Iterator;
-import org.apache.pinot.spi.data.readers.GenericRow;
-
+package org.apache.pinot.core.segment.processing.framework;
 
 /**
- * Collects and stores GenericRows
+ * The MergeType defines how the segments should be merged.
  */
-public interface Collector extends Closeable {
+public enum MergeType {
 
   /**
-   * Collects the given GenericRow and stores it
-   * @param genericRow the generic row to add to the collection
+   * Concatenates the rows.
    */
-  void collect(GenericRow genericRow)
-      throws IOException;
+  CONCAT,
 
   /**
-   * Finish any pre-exit processing and seal the collection for reading
-   * Provide an iterator for the GenericRows in the collection
+   * Aggregates the metric values based on the configured aggregation types on unique dimension + time column values.
    */
-  Iterator<GenericRow> iterator()
-      throws IOException;
+  ROLLUP,
 
   /**
-   * The number of rows in the collection
+   * Deduplicates rows with the same values.
    */
-  int size();
-
-  /**
-   * Resets the collection of this collector by deleting all existing GenericRows
-   */
-  void reset()
-      throws IOException;
+  DEDUP
 }

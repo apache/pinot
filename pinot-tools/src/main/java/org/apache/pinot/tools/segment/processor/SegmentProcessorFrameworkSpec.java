@@ -19,11 +19,13 @@
 package org.apache.pinot.tools.segment.processor;
 
 import java.util.List;
-import org.apache.pinot.core.segment.processing.collector.CollectorConfig;
+import java.util.Map;
 import org.apache.pinot.core.segment.processing.filter.RecordFilterConfig;
+import org.apache.pinot.core.segment.processing.framework.MergeType;
 import org.apache.pinot.core.segment.processing.framework.SegmentConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.transformer.RecordTransformerConfig;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 /**
@@ -36,10 +38,11 @@ public class SegmentProcessorFrameworkSpec {
   private String _tableConfigFile;
   private String _schemaFile;
 
+  private MergeType _mergeType;
   private RecordTransformerConfig _recordTransformerConfig;
   private RecordFilterConfig _recordFilterConfig;
   private List<PartitionerConfig> _partitionerConfigs;
-  private CollectorConfig _collectorConfig;
+  private Map<String, AggregationFunctionType> _aggregationTypes;
   private SegmentConfig _segmentConfig;
 
   public String getInputSegmentsDir() {
@@ -74,6 +77,14 @@ public class SegmentProcessorFrameworkSpec {
     _schemaFile = schemaFile;
   }
 
+  public MergeType getMergeType() {
+    return _mergeType;
+  }
+
+  public void setMergeType(MergeType mergeType) {
+    _mergeType = mergeType;
+  }
+
   public RecordTransformerConfig getRecordTransformerConfig() {
     return _recordTransformerConfig;
   }
@@ -98,12 +109,12 @@ public class SegmentProcessorFrameworkSpec {
     _partitionerConfigs = partitionerConfigs;
   }
 
-  public CollectorConfig getCollectorConfig() {
-    return _collectorConfig;
+  public Map<String, AggregationFunctionType> getAggregationTypes() {
+    return _aggregationTypes;
   }
 
-  public void setCollectorConfig(CollectorConfig collectorConfig) {
-    _collectorConfig = collectorConfig;
+  public void setAggregationTypes(Map<String, AggregationFunctionType> aggregationTypes) {
+    _aggregationTypes = aggregationTypes;
   }
 
   public SegmentConfig getSegmentConfig() {
