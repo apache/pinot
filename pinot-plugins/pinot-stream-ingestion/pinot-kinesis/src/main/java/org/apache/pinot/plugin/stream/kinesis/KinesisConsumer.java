@@ -138,7 +138,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
           }
         }
 
-        if (getRecordsResponse.hasChildShards()) {
+        if (getRecordsResponse.hasChildShards() && !getRecordsResponse.childShards().isEmpty()) {
           //This statement returns true only when end of current shard has reached.
           isEndOfShard = true;
           break;

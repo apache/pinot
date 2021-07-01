@@ -435,7 +435,7 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
         .join(",", h2FieldNameAndTypes.toArray(new String[h2FieldNameAndTypes.size()])) + ")").execute();
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
     dropRealtimeTable(getTableName());
