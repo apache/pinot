@@ -143,7 +143,7 @@ public class PluginManager {
       pluginsToLoad = Arrays.asList(pluginsInclude.split(","));
       LOGGER.info("Trying to load plugins: [{}]", Arrays.toString(pluginsToLoad.toArray()));
     } else {
-      LOGGER.info("Loading all plugins. Please use env variable '{}' to customize.", PLUGINS_INCLUDE_PROPERTY_NAME,
+      LOGGER.info("Loading all plugins. Please use env variable '{}' to customize. [{}]", PLUGINS_INCLUDE_PROPERTY_NAME,
           Arrays.toString(jarFiles.toArray()));
     }
     for (File jarFile : jarFiles) {
@@ -180,12 +180,12 @@ public class PluginManager {
     for (File jarFile : jarFiles) {
       try {
         urlList.add(jarFile.toURI().toURL());
-        LOGGER.info("Successfully loaded plugin [{}] from jar file [{}]", pluginName, jarFile);
       } catch (MalformedURLException e) {
         LOGGER.error("Unable to load plugin [{}] jar file [{}]", pluginName, jarFile, e);
       }
     }
     PluginClassLoader classLoader = createClassLoader(urlList);
+    LOGGER.info("Successfully loaded plugin [{}] from jar files [{}]", pluginName, Arrays.toString(urlList.toArray()));
     _registry.put(new Plugin(pluginName), classLoader);
   }
 
