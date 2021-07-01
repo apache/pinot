@@ -143,7 +143,7 @@ public class PluginManager {
       pluginsToLoad = Arrays.asList(pluginsInclude.split(","));
       LOGGER.info("Trying to load plugins: [{}]", Arrays.toString(pluginsToLoad.toArray()));
     } else {
-      LOGGER.info("Loading all plugins. Please use env variable '{}' to customize. [{}]", PLUGINS_INCLUDE_PROPERTY_NAME,
+      LOGGER.info("Please use env variable '{}' to customize plugins to load. Loading all plugins: {}", PLUGINS_INCLUDE_PROPERTY_NAME,
           Arrays.toString(jarFiles.toArray()));
     }
     for (File jarFile : jarFiles) {
@@ -185,7 +185,7 @@ public class PluginManager {
       }
     }
     PluginClassLoader classLoader = createClassLoader(urlList);
-    LOGGER.info("Successfully loaded plugin [{}] from jar files [{}]", pluginName, Arrays.toString(urlList.toArray()));
+    LOGGER.info("Successfully loaded plugin [{}] from jar files: {}", pluginName, Arrays.toString(urlList.toArray()));
     _registry.put(new Plugin(pluginName), classLoader);
   }
 
