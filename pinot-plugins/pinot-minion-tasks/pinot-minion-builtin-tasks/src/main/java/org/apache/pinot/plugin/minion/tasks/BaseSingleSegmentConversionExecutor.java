@@ -70,6 +70,14 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
     String originalSegmentCrc = configs.get(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY);
     String authToken = configs.get(MinionConstants.AUTH_TOKEN);
 
+    long currentSegmentCrc = getSegmentCrc(tableNameWithType, segmentName);
+    if (Long.parseLong(originalSegmentCrc) != currentSegmentCrc) {
+      LOGGER.info("Segment CRC does not match, skip the task. Original CRC: {}, current CRC: {}", originalSegmentCrc,
+          currentSegmentCrc);
+      return new SegmentConversionResult.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
+          .build();
+    }
+
     LOGGER.info("Start executing {} on table: {}, segment: {} with downloadURL: {}, uploadURL: {}", taskType,
         tableNameWithType, segmentName, downloadURL, uploadURL);
 

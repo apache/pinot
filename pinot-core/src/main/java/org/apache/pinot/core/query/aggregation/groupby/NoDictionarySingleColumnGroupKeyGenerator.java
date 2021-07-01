@@ -200,6 +200,11 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     }
   }
 
+  @Override
+  public int getNumKeys() {
+    return _groupKeyMap.size();
+  }
+
   private int getKeyForValue(int value) {
     Int2IntMap map = (Int2IntMap) _groupKeyMap;
     int groupId = map.get(value);

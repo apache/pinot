@@ -16,13 +16,14 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-ARG JAVA_VERSION=8
+ARG JAVA_VERSION=11
 FROM openjdk:${JAVA_VERSION} AS pinot_build_env
 
 LABEL MAINTAINER=dev@pinot.apache.org
 
 ARG PINOT_BRANCH=master
 ARG KAFKA_VERSION=2.0
+ARG JDK_VERSION=11
 ARG PINOT_GIT_URL="https://github.com/apache/incubator-pinot.git"
 RUN echo "Trying to build Pinot from [ ${PINOT_GIT_URL} ] on branch [ ${PINOT_BRANCH} ] with Kafka version [ ${KAFKA_VERSION} ]"
 ENV PINOT_HOME=/opt/pinot
@@ -53,7 +54,7 @@ RUN  wget http://archive.apache.org/dist/thrift/0.12.0/thrift-0.12.0.tar.gz -O /
 RUN git clone ${PINOT_GIT_URL} ${PINOT_BUILD_DIR} && \
     cd ${PINOT_BUILD_DIR} && \
     git checkout ${PINOT_BRANCH} && \
-    mvn install package -DskipTests -Pbin-dist -Pbuild-shaded-jar -Dkafka.version=${KAFKA_VERSION} && \
+    mvn install package -DskipTests -Pbin-dist -Pbuild-shaded-jar -Dkafka.version=${KAFKA_VERSION} -Djdk.version=${JDK_VERSION} && \
     mkdir -p ${PINOT_HOME}/configs && \
     mkdir -p ${PINOT_HOME}/data && \
     cp -r pinot-distribution/target/apache-pinot-*-bin/apache-pinot-*-bin/* ${PINOT_HOME}/. && \

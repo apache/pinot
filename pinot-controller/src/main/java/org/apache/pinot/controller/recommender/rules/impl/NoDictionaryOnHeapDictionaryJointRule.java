@@ -84,8 +84,7 @@ public class NoDictionaryOnHeapDictionaryJointRule extends AbstractRule {
     // Exclude cols already having index
     noDictCols.removeAll(_output.getIndexConfig().getInvertedIndexColumns());
     noDictCols.remove(_output.getIndexConfig().getSortedColumn());
-    noDictCols.removeAll(_output.getIndexConfig()
-        .getRangeIndexColumns()); // TODO: Remove this after range index is implemented for no-dictionary
+    noDictCols.removeAll(_output.getIndexConfig().getRangeIndexColumns());
     LOGGER.debug("noDictCols {}", noDictCols);
 
     // Exclude MV cols TODO: currently no index column is only applicable for SV columns, change this after it's supported for MV

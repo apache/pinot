@@ -432,11 +432,12 @@ public class PinotHelixResourceManager {
    * Update a given instance for the specified Instance ID
    */
   public synchronized PinotResourceManagerResponse updateInstance(String instanceIdToUpdate, Instance newInstance) {
-    if (getHelixInstanceConfig(instanceIdToUpdate) == null) {
+    InstanceConfig instanceConfig = getHelixInstanceConfig(instanceIdToUpdate);
+    if (instanceConfig == null) {
       return PinotResourceManagerResponse.failure("Instance " + instanceIdToUpdate + " does not exists");
     } else {
-      InstanceConfig newConfig = InstanceUtils.toHelixInstanceConfig(newInstance);
-      if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceIdToUpdate), newConfig)) {
+      InstanceUtils.updateHelixInstanceConfig(instanceConfig, newInstance);
+      if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceIdToUpdate), instanceConfig)) {
         return PinotResourceManagerResponse.failure("Unable to update instance: " + instanceIdToUpdate);
       }
       return PinotResourceManagerResponse.SUCCESS;
@@ -1667,23 +1668,19 @@ public class PinotHelixResourceManager {
     }
     String segmentZKMetadataPath =
         ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName);
-    Preconditions.checkState(
-        _propertyStore.set(segmentZKMetadataPath, znRecord, AccessOption.PERSISTENT),
+    Preconditions.checkState(_propertyStore.set(segmentZKMetadataPath, znRecord, AccessOption.PERSISTENT),
         "Failed to set segment ZK metadata for table: " + tableNameWithType + ", segment: " + segmentName);
     LOGGER.info("Added segment: {} of table: {} to property store", segmentName, tableNameWithType);
     assignTableSegment(tableNameWithType, segmentName, segmentZKMetadataPath, instancePartitionsType);
   }
-
 
   private void assignTableSegment(String tableNameWithType, String segmentName, String segmentZKMetadataPath,
       InstancePartitionsType instancePartitionsType) {
     // Assign instances for the segment and add it into IdealState
     try {
       TableConfig tableConfig = getTableConfig(tableNameWithType);
-      Preconditions
-          .checkState(tableConfig != null, "Failed to find table config for table: " + tableNameWithType);
-      SegmentAssignment segmentAssignment =
-          SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig);
+      Preconditions.checkState(tableConfig != null, "Failed to find table config for table: " + tableNameWithType);
+      SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig);
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = Collections
           .singletonMap(instancePartitionsType, InstancePartitionsUtils
               .fetchOrComputeInstancePartitions(_helixZkManager, tableConfig, instancePartitionsType));
@@ -1713,8 +1710,8 @@ public class PinotHelixResourceManager {
       if (_propertyStore.remove(segmentZKMetadataPath, AccessOption.PERSISTENT)) {
         LOGGER.info("Deleted segment ZK metadata for segment: {} of table: {}", segmentName, tableNameWithType);
       } else {
-        LOGGER
-            .error("Failed to deleted segment ZK metadata for segment: {} of table: {}", segmentName, tableNameWithType);
+        LOGGER.error("Failed to deleted segment ZK metadata for segment: {} of table: {}", segmentName,
+            tableNameWithType);
       }
       throw e;
     }
@@ -1757,7 +1754,8 @@ public class PinotHelixResourceManager {
     // ZK metadata to refresh the segment (server will compare the segment ZK metadata with the local metadata to decide
     // whether to download the new segment; broker will update the the segment partition info & time boundary based on
     // the segment ZK metadata)
-    ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata, CommonConstants.Segment.SegmentType.OFFLINE);
+    ZKMetadataUtils
+        .updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata, CommonConstants.Segment.SegmentType.OFFLINE);
     offlineSegmentZKMetadata.setRefreshTime(System.currentTimeMillis());
     offlineSegmentZKMetadata.setDownloadUrl(downloadUrl);
     offlineSegmentZKMetadata.setCrypterName(crypter);

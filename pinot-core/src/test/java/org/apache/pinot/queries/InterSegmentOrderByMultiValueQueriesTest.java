@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -36,6 +37,19 @@ public class InterSegmentOrderByMultiValueQueriesTest extends BaseMultiValueQuer
   public void testGroupByOrderByMVSQLResults(String query, List<Object[]> expectedResults,
       long expectedNumEntriesScannedPostFilter, DataSchema expectedDataSchema) {
     BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+    QueriesTestUtils
+        .testInterSegmentResultTable(brokerResponse, 400000L, 0, expectedNumEntriesScannedPostFilter, 400000L,
+            expectedResults, expectedResults.size(), expectedDataSchema);
+  }
+
+  /**
+   * Tests the in-segment build option for GroupBy OrderBy query. (No trim)
+   */
+  @Test(dataProvider = "orderByDataProvider")
+  public void testGroupByOrderByMVSegmentTrimSQLResults(String query, List<Object[]> expectedResults,
+      long expectedNumEntriesScannedPostFilter, DataSchema expectedDataSchema) {
+    InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2(1);
+    BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query, planMaker);
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0, expectedNumEntriesScannedPostFilter, 400000L,
             expectedResults, expectedResults.size(), expectedDataSchema);

@@ -137,7 +137,7 @@ public class PinotSegmentsMetadataTest {
   private List<String> testMetadataResponse(String table, Map<String, List<String>> serverToSegmentsMap,
                                             BiMap<String, String> endpoints) {
     ServerSegmentMetadataReader metadataReader = new ServerSegmentMetadataReader(executor, connectionManager);
-    return metadataReader.getSegmentMetadataFromServer(table, serverToSegmentsMap, endpoints, timeoutMsec);
+    return metadataReader.getSegmentMetadataFromServer(table, serverToSegmentsMap, endpoints, null, timeoutMsec);
   }
 
   private Map<String, List<String>> getServerToSegments(List<String> servers) {

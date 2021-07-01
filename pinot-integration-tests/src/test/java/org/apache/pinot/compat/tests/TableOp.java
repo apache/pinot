@@ -107,7 +107,8 @@ public class TableOp extends BaseOp {
         put("Content-type", "application/json");
       }};
       ControllerTest
-          .sendPostRequest(ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forSchemaCreate(),
+          .sendPostRequest(ControllerRequestURLBuilder.baseUrl(
+              ClusterDescriptor.getInstance().getControllerUrl()).forSchemaCreate(),
               FileUtils.readFileToString(new File(getAbsoluteFileName(_schemaFileName))), headers);
       return true;
     } catch (IOException e) {
@@ -119,7 +120,8 @@ public class TableOp extends BaseOp {
   private boolean createTable() {
     try {
       ControllerTest
-          .sendPostRequest(ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forTableCreate(),
+          .sendPostRequest(ControllerRequestURLBuilder.baseUrl(
+              ClusterDescriptor.getInstance().getControllerUrl()).forTableCreate(),
               FileUtils.readFileToString(new File(getAbsoluteFileName(_tableConfigFileName))));
       return true;
     } catch (IOException e) {
@@ -131,7 +133,8 @@ public class TableOp extends BaseOp {
   private boolean deleteTable() {
     try {
       TableConfig tableConfig = JsonUtils.fileToObject(new File(getAbsoluteFileName(_tableConfigFileName)), TableConfig.class);
-      ControllerTest.sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL)
+      ControllerTest.sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(
+          ClusterDescriptor.getInstance().getControllerUrl())
           .forTableDelete(tableConfig.getTableName()));
       return true;
     } catch (IOException e) {

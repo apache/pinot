@@ -39,9 +39,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.Controller.DEFAULT_METR
 
 
 public class ControllerConf extends PinotConfiguration {
-  public static final List<String> SUPPORTED_PROTOCOLS = Arrays.asList(
-      CommonConstants.HTTP_PROTOCOL,
-      CommonConstants.HTTPS_PROTOCOL);
+  public static final List<String> SUPPORTED_PROTOCOLS =
+      Arrays.asList(CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL);
 
   public static final String CONTROLLER_VIP_HOST = "controller.vip.host";
   public static final String CONTROLLER_VIP_PORT = "controller.vip.port";
@@ -65,6 +64,10 @@ public class ControllerConf extends PinotConfiguration {
   public static final String EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT = "controller.upload.onlineToOfflineTimeout";
   public static final String CONTROLLER_MODE = "controller.mode";
   public static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY = "controller.resource.rebalance.strategy";
+
+  // Comma separated list of list of packages that contain TableConfigTuners to be added to the registry
+  public static final String TABLE_CONFIG_TUNER_PACKAGES = "controller.table.config.tuner.packages";
+  public static final String DEFAULT_TABLE_CONFIG_TUNER_PACKAGES = "org.apache.pinot";
 
   public enum ControllerMode {
     DUAL, PINOT_ONLY, HELIX_ONLY
@@ -91,9 +94,11 @@ public class ControllerConf extends PinotConfiguration {
     public static final String STATUS_CHECKER_WAIT_FOR_PUSH_TIME_IN_SECONDS =
         "controller.statuschecker.waitForPushTimeInSeconds";
     public static final String TASK_MANAGER_FREQUENCY_IN_SECONDS = "controller.task.frequencyInSeconds";
-    public static final String MINION_INSTANCES_CLEANUP_TASK_FREQUENCY_IN_SECONDS = "controller.minion.instances.cleanup.task.frequencyInSeconds";
-    public static final String MINION_INSTANCES_CLEANUP_TASK_INITIAL_DELAY_SECONDS = "controller.minion.instances.cleanup.task.initialDelaySeconds";
-
+    public static final String MINION_INSTANCES_CLEANUP_TASK_FREQUENCY_IN_SECONDS =
+        "controller.minion.instances.cleanup.task.frequencyInSeconds";
+    public static final String MINION_INSTANCES_CLEANUP_TASK_INITIAL_DELAY_SECONDS =
+        "controller.minion.instances.cleanup.task.initialDelaySeconds";
+    public static final String TASK_METRICS_EMITTER_FREQUENCY_IN_SECONDS = "controller.minion.task.metrics.emitter.frequencyInSeconds";
 
     public static final String PINOT_TASK_MANAGER_SCHEDULER_ENABLED = "controller.task.scheduler.enabled";
     @Deprecated
@@ -136,6 +141,7 @@ public class ControllerConf extends PinotConfiguration {
     private static final int DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
     private static final int DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
     private static final int DEFAULT_STATUS_CONTROLLER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
+    private static final int DEFAULT_TASK_METRICS_EMITTER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
     private static final int DEFAULT_STATUS_CONTROLLER_WAIT_FOR_PUSH_TIME_IN_SECONDS = 10 * 60; // 10 minutes
     private static final int DEFAULT_TASK_MANAGER_FREQUENCY_IN_SECONDS = -1; // Disabled
     private static final int DEFAULT_MINION_INSTANCES_CLEANUP_TASK_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
@@ -191,7 +197,7 @@ public class ControllerConf extends PinotConfiguration {
   public ControllerConf() {
     super(new HashMap<>());
   }
-  
+
   public ControllerConf(Map<String, Object> baseProperties) {
     super(baseProperties);
   }
@@ -305,7 +311,7 @@ public class ControllerConf extends PinotConfiguration {
   public String getControllerPort() {
     return getProperty(CONTROLLER_PORT);
   }
-  
+
   public List<String> getControllerAccessProtocols() {
     return getProperty(CONTROLLER_ACCESS_PROTOCOLS,
         getControllerPort() == null ? Arrays.asList("http") : Arrays.asList());
@@ -394,7 +400,7 @@ public class ControllerConf extends PinotConfiguration {
 
             // No protocol defines a port as VIP. Fallback on legacy controller.port property.
             .orElseGet(this::getControllerPort));
-  }  
+  }
 
   public String getControllerVipProtocol() {
     return getSupportedProtocol(CONTROLLER_VIP_PROTOCOL);
@@ -439,9 +445,8 @@ public class ControllerConf extends PinotConfiguration {
    * @return
    */
   public int getRealtimeSegmentValidationFrequencyInSeconds() {
-    return Optional
-        .ofNullable(
-            getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS, Integer.class))
+    return Optional.ofNullable(
+        getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS, Integer.class))
 
         .orElseGet(() -> getProperty(ControllerPeriodicTasksConf.DEPRECATED_VALIDATION_MANAGER_FREQUENCY_IN_SECONDS,
             ControllerPeriodicTasksConf.DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS));
@@ -460,9 +465,8 @@ public class ControllerConf extends PinotConfiguration {
    * @return
    */
   public int getBrokerResourceValidationFrequencyInSeconds() {
-    return Optional
-        .ofNullable(
-            getProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS, Integer.class))
+    return Optional.ofNullable(
+        getProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS, Integer.class))
 
         .orElseGet(() -> getProperty(ControllerPeriodicTasksConf.DEPRECATED_VALIDATION_MANAGER_FREQUENCY_IN_SECONDS,
             ControllerPeriodicTasksConf.DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS));
@@ -486,6 +490,16 @@ public class ControllerConf extends PinotConfiguration {
   public void setStatusCheckerFrequencyInSeconds(int statusCheckerFrequencyInSeconds) {
     setProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_FREQUENCY_IN_SECONDS,
         Integer.toString(statusCheckerFrequencyInSeconds));
+  }
+
+  public int getTaskMetricsEmitterFrequencyInSeconds() {
+    return getProperty(ControllerPeriodicTasksConf.TASK_METRICS_EMITTER_FREQUENCY_IN_SECONDS,
+        ControllerPeriodicTasksConf.DEFAULT_TASK_METRICS_EMITTER_FREQUENCY_IN_SECONDS);
+  }
+
+  public void setTaskMetricsEmitterFrequencyInSeconds(int taskMetricsEmitterFrequencyInSeconds) {
+    setProperty(ControllerPeriodicTasksConf.TASK_METRICS_EMITTER_FREQUENCY_IN_SECONDS,
+        Integer.toString(taskMetricsEmitterFrequencyInSeconds));
   }
 
   public int getStatusCheckerWaitForPushTimeInSeconds() {
@@ -569,7 +583,8 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public void setMinionInstancesCleanupTaskFrequencyInSeconds(int frequencyInSeconds) {
-    setProperty(ControllerPeriodicTasksConf.MINION_INSTANCES_CLEANUP_TASK_FREQUENCY_IN_SECONDS, Integer.toString(frequencyInSeconds));
+    setProperty(ControllerPeriodicTasksConf.MINION_INSTANCES_CLEANUP_TASK_FREQUENCY_IN_SECONDS,
+        Integer.toString(frequencyInSeconds));
   }
 
   public long getMinionInstancesCleanupTaskInitialDelaySeconds() {
@@ -578,7 +593,8 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public void setMinionInstancesCleanupTaskInitialDelaySeconds(int initialDelaySeconds) {
-    setProperty(ControllerPeriodicTasksConf.MINION_INSTANCES_CLEANUP_TASK_INITIAL_DELAY_SECONDS, Integer.toString(initialDelaySeconds));
+    setProperty(ControllerPeriodicTasksConf.MINION_INSTANCES_CLEANUP_TASK_INITIAL_DELAY_SECONDS,
+        Integer.toString(initialDelaySeconds));
   }
 
   public int getDefaultTableMinReplicas() {
@@ -690,7 +706,8 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public String getLeadControllerResourceRebalanceStrategy() {
-    return getProperty(LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY, DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY);
+    return getProperty(LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY,
+        DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY);
   }
 
   public boolean getHLCTablesAllowed() {
@@ -709,6 +726,10 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(CONTROLLER_BROKER_PORT_OVERRIDE, -1);
   }
 
+  public List<String> getTableConfigTunerPackages() {
+    return Arrays.asList(getProperty(TABLE_CONFIG_TUNER_PACKAGES, DEFAULT_TABLE_CONFIG_TUNER_PACKAGES).split("\\s*,\\s*"));
+  }
+
   private long convertPeriodToSeconds(String timeStr) {
     long seconds;
     try {
@@ -722,8 +743,7 @@ public class ControllerConf extends PinotConfiguration {
 
   private String getSupportedProtocol(String property) {
     String value = getProperty(property, CommonConstants.HTTP_PROTOCOL);
-    Preconditions.checkArgument(SUPPORTED_PROTOCOLS.contains(value),
-        "Unsupported %s protocol '%s'", property, value);
+    Preconditions.checkArgument(SUPPORTED_PROTOCOLS.contains(value), "Unsupported %s protocol '%s'", property, value);
     return value;
   }
 }

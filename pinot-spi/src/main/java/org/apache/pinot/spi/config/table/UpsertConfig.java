@@ -21,6 +21,8 @@ package org.apache.pinot.spi.config.table;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
@@ -30,16 +32,38 @@ public class UpsertConfig extends BaseJsonConfig {
     FULL, PARTIAL, NONE
   }
 
-  private final Mode _mode;
+  public enum Strategy {
+    // Todo: add APPEND, CUSTOM strategies
+    OVERWRITE, INCREMENT
+  }
 
-  @JsonCreator
+  private final Mode _mode;
+  private final Map<String, Strategy> _partialUpsertStrategies;
+
   public UpsertConfig(@JsonProperty(value = "mode", required = true) Mode mode) {
     Preconditions.checkArgument(mode != null, "Upsert mode must be configured");
-    Preconditions.checkArgument(mode != Mode.PARTIAL, "Partial upsert mode is not supported");
     _mode = mode;
+    _partialUpsertStrategies = null;
+  }
+
+  @JsonCreator
+  public UpsertConfig(@JsonProperty(value = "mode", required = true) Mode mode,
+      @JsonProperty(value = "partialUpsertStrategies") Map<String, Strategy> partialUpsertStrategies) {
+    Preconditions.checkArgument(mode != null, "Upsert mode must be configured");
+    _mode = mode;
+
+    if (mode == Mode.PARTIAL) {
+      _partialUpsertStrategies = partialUpsertStrategies != null ? partialUpsertStrategies : new HashMap<>();
+    } else {
+      _partialUpsertStrategies = null;
+    }
   }
 
   public Mode getMode() {
     return _mode;
+  }
+
+  public Map<String, Strategy> getPartialUpsertStrategies() {
+    return _partialUpsertStrategies;
   }
 }

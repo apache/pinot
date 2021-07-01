@@ -44,6 +44,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 import org.apache.pinot.core.query.config.QueryExecutorConfig;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
+import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.QueryOptions;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -56,28 +57,32 @@ import org.slf4j.LoggerFactory;
  * The <code>InstancePlanMakerImplV2</code> class is the default implementation of {@link PlanMaker}.
  */
 public class InstancePlanMakerImplV2 implements PlanMaker {
-  private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);
-
   public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY_KEY = "max.init.group.holder.capacity";
   public static final int DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY = 10_000;
   public static final String NUM_GROUPS_LIMIT = "num.groups.limit";
   public static final int DEFAULT_NUM_GROUPS_LIMIT = 100_000;
-
+  public static final String ENABLE_SEGMENT_GROUP_TRIM = "enable.segment.group.trim";
+  public static final boolean DEFAULT_ENABLE_SEGMENT_GROUP_TRIM = false;
+  public static final String MIN_SEGMENT_GROUP_TRIM_SIZE = "min.segment.group.trim.size";
+  public static final int DEFAULT_MIN_SEGMENT_GROUP_TRIM_SIZE = -1;
   // set as pinot.server.query.executor.groupby.trim.threshold
   public static final String GROUPBY_TRIM_THRESHOLD = "groupby.trim.threshold";
   public static final int DEFAULT_GROUPBY_TRIM_THRESHOLD = 1_000_000;
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);
   private final int _maxInitialResultHolderCapacity;
   // Limit on number of groups stored for each segment, beyond which no new group will be created
   private final int _numGroupsLimit;
   // Used for SQL GROUP BY (server combine)
   private final int _groupByTrimThreshold;
+  private final int _minSegmentGroupTrimSize;
 
   @VisibleForTesting
   public InstancePlanMakerImplV2() {
     _maxInitialResultHolderCapacity = DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY;
     _numGroupsLimit = DEFAULT_NUM_GROUPS_LIMIT;
     _groupByTrimThreshold = DEFAULT_GROUPBY_TRIM_THRESHOLD;
+    _minSegmentGroupTrimSize = DEFAULT_MIN_SEGMENT_GROUP_TRIM_SIZE;
   }
 
   @VisibleForTesting
@@ -85,6 +90,15 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
     _groupByTrimThreshold = DEFAULT_GROUPBY_TRIM_THRESHOLD;
+    _minSegmentGroupTrimSize = DEFAULT_MIN_SEGMENT_GROUP_TRIM_SIZE;
+  }
+
+  @VisibleForTesting
+  public InstancePlanMakerImplV2(int minSegmentGroupTrimSize) {
+    _maxInitialResultHolderCapacity = DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY;
+    _numGroupsLimit = DEFAULT_NUM_GROUPS_LIMIT;
+    _groupByTrimThreshold = DEFAULT_GROUPBY_TRIM_THRESHOLD;
+    _minSegmentGroupTrimSize = minSegmentGroupTrimSize;
   }
 
   /**
@@ -105,8 +119,22 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     Preconditions.checkState(_maxInitialResultHolderCapacity <= _numGroupsLimit,
         "Invalid configuration: maxInitialResultHolderCapacity: %d must be smaller or equal to numGroupsLimit: %d",
         _maxInitialResultHolderCapacity, _numGroupsLimit);
-    LOGGER.info("Initializing plan maker with maxInitialResultHolderCapacity: {}, numGroupsLimit: {}",
-        _maxInitialResultHolderCapacity, _numGroupsLimit);
+    boolean enableSegmentGroupTrim =
+        queryExecutorConfig.getConfig().getProperty(ENABLE_SEGMENT_GROUP_TRIM, DEFAULT_ENABLE_SEGMENT_GROUP_TRIM);
+    int minSegmentGroupTrimSize =
+        queryExecutorConfig.getConfig().getProperty(MIN_SEGMENT_GROUP_TRIM_SIZE, DEFAULT_MIN_SEGMENT_GROUP_TRIM_SIZE);
+
+    if (minSegmentGroupTrimSize > 0) {
+      _minSegmentGroupTrimSize = minSegmentGroupTrimSize;
+    } else if (enableSegmentGroupTrim) {
+      _minSegmentGroupTrimSize = GroupByUtils.DEFAULT_MIN_NUM_GROUPS;
+    } else {
+      _minSegmentGroupTrimSize = DEFAULT_MIN_SEGMENT_GROUP_TRIM_SIZE;
+    }
+    LOGGER.info(
+        "Initializing plan maker with maxInitialResultHolderCapacity: {}, numGroupsLimit: {}, enableSegmentTrim: {}, minSegmentGroupTrimSize: {}",
+        _maxInitialResultHolderCapacity, _numGroupsLimit, minSegmentGroupTrimSize > 0 || enableSegmentGroupTrim,
+        _minSegmentGroupTrimSize);
   }
 
   @Override
@@ -138,7 +166,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         // new Combine operator only when GROUP_BY_MODE explicitly set to SQL
         if (queryOptions.isGroupByModeSQL()) {
           return new AggregationGroupByOrderByPlanNode(indexSegment, queryContext, _maxInitialResultHolderCapacity,
-              _numGroupsLimit);
+              _numGroupsLimit, _minSegmentGroupTrimSize);
         }
         return new AggregationGroupByPlanNode(indexSegment, queryContext, _maxInitialResultHolderCapacity,
             _numGroupsLimit);
@@ -147,7 +175,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
         // Use metadata/dictionary to solve the query if possible
         // NOTE: Skip the segment with valid doc index because the valid doc index is equivalent to a filter.
-        if (queryContext.getFilter() == null && indexSegment.getValidDocIndex() == null) {
+        if (queryContext.getFilter() == null && indexSegment.getValidDocIds() == null) {
           if (isFitForMetadataBasedPlan(queryContext)) {
             return new MetadataBasedAggregationPlanNode(indexSegment, queryContext);
           } else if (isFitForDictionaryBasedPlan(queryContext, indexSegment)) {

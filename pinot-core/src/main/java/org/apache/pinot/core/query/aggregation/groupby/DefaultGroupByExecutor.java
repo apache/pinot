@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby;
 
+import java.util.Collection;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.data.table.IntermediateRecord;
+import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -143,5 +146,15 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   @Override
   public AggregationGroupByResult getResult() {
     return new AggregationGroupByResult(_groupKeyGenerator, _aggregationFunctions, _groupByResultHolders);
+  }
+
+  @Override
+  public int getNumGroups() {
+    return _groupKeyGenerator.getNumKeys();
+  }
+
+  @Override
+  public Collection<IntermediateRecord> trimGroupByResult(int trimSize, TableResizer tableResizer) {
+    return tableResizer.trimInSegmentResults(_groupKeyGenerator.getGroupKeys(), _groupByResultHolders, trimSize);
   }
 }
