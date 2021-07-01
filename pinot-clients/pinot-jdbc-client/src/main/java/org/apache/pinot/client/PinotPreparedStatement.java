@@ -33,6 +33,7 @@ import org.apache.pinot.client.utils.DateTimeUtils;
 public class PinotPreparedStatement extends AbstractBasePreparedStatement {
 
   private static final String QUERY_FORMAT = "sql";
+  public static final String LIMIT_STATEMENT = "LIMIT";
   private Connection _connection;
   private org.apache.pinot.client.Connection _session;
   private ResultSetGroup _resultSetGroup;
@@ -40,13 +41,17 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
   private String _query;
   private boolean _closed;
   private ResultSet _resultSet;
+  private Integer _maxRows = Integer.MAX_VALUE;
 
   public PinotPreparedStatement(PinotConnection connection, String query) {
     _connection = connection;
     _session = connection.getSession();
-    _query = query;
     _closed = false;
-    _preparedStatement = new PreparedStatement(_session, new Request(QUERY_FORMAT, query));
+    _query = query;
+    if(!_query.contains(LIMIT_STATEMENT)) {
+      _query = _query.concat(" " + LIMIT_STATEMENT + " " + _maxRows);
+    }
+    _preparedStatement = new PreparedStatement(_session, new Request(QUERY_FORMAT, _query));
   }
 
   @Override
@@ -234,7 +239,6 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
     return execute(sql);
   }
 
-
   @Override
   public ResultSet getResultSet()
       throws SQLException {
@@ -255,6 +259,30 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
       throws SQLException {
     validateState();
     return _connection;
+  }
+
+  @Override
+  public int getFetchSize()
+      throws SQLException {
+    return _maxRows;
+  }
+
+  @Override
+  public void setFetchSize(int rows)
+      throws SQLException {
+    _maxRows = rows;
+  }
+
+  @Override
+  public int getMaxRows()
+      throws SQLException {
+    return _maxRows;
+  }
+
+  @Override
+  public void setMaxRows(int max)
+      throws SQLException {
+    _maxRows = max;
   }
 
   @Override

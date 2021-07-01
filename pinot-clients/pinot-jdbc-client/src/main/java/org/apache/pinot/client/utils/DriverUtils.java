@@ -19,6 +19,7 @@
 package org.apache.pinot.client.utils;
 
 import java.net.URI;
+import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.Collections;
 import java.util.List;
@@ -99,6 +100,9 @@ public class DriverUtils {
       case "BYTES":
         columnsSQLDataType = Types.BINARY;
         break;
+      case "TIMESTAMP":
+        columnsSQLDataType = Types.TIMESTAMP;
+        break;
       default:
         columnsSQLDataType = Types.NULL;
     }
@@ -131,6 +135,9 @@ public class DriverUtils {
         break;
       case "BYTES":
         columnsJavaClassName = byte.class.getTypeName();
+        break;
+      case "TIMESTAMP":
+        columnsJavaClassName = Timestamp.class.getTypeName();
         break;
       default:
         columnsJavaClassName = String.class.getTypeName();

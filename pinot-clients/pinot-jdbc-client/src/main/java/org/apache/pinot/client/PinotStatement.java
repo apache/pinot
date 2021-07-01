@@ -27,11 +27,13 @@ import org.apache.pinot.client.base.AbstractBaseStatement;
 public class PinotStatement extends AbstractBaseStatement {
 
   private static final String QUERY_FORMAT = "sql";
+  public static final String LIMIT_STATEMENT = "LIMIT";
   private Connection _connection;
   private org.apache.pinot.client.Connection _session;
   private ResultSetGroup _resultSetGroup;
   private boolean _closed;
   private ResultSet _resultSet;
+  private Integer _maxRows = Integer.MAX_VALUE;
 
   public PinotStatement(PinotConnection connection) {
     _connection = connection;
@@ -59,6 +61,9 @@ public class PinotStatement extends AbstractBaseStatement {
       throws SQLException {
     validateState();
     try {
+      if(!sql.contains(LIMIT_STATEMENT)) {
+        sql = sql.concat(" " + LIMIT_STATEMENT + " " + _maxRows);
+      }
       Request request = new Request(QUERY_FORMAT, sql);
       _resultSetGroup = _session.execute(request);
       if (_resultSetGroup.getResultSetCount() == 0) {
@@ -114,6 +119,30 @@ public class PinotStatement extends AbstractBaseStatement {
       throws SQLException {
     validateState();
     return _connection;
+  }
+
+  @Override
+  public int getFetchSize()
+      throws SQLException {
+    return _maxRows;
+  }
+
+  @Override
+  public void setFetchSize(int rows)
+      throws SQLException {
+    _maxRows = rows;
+  }
+
+  @Override
+  public int getMaxRows()
+      throws SQLException {
+    return _maxRows;
+  }
+
+  @Override
+  public void setMaxRows(int max)
+      throws SQLException {
+    _maxRows = max;
   }
 
   @Override

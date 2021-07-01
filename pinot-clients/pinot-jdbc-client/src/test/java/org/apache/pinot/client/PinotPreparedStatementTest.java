@@ -51,7 +51,9 @@ public class PinotPreparedStatementTest {
     preparedStatement.setFloat(6, 1.4f);
     preparedStatement.executeQuery();
 
-    Assert.assertEquals(_dummyPinotClientTransport.getLastQuery(),
+    String lastExecutedQuery = _dummyPinotClientTransport.getLastQuery();
+
+    Assert.assertEquals(lastExecutedQuery.substring(0, lastExecutedQuery.indexOf("LIMIT")).stripTrailing(),
         "SELECT * FROM dummy WHERE name = 'foo' and age = 20 and score = 98.1 and ts = 123456789 and eligible = 'true' and sub_score = 1.4");
 
     preparedStatement.clearParameters();
@@ -63,7 +65,9 @@ public class PinotPreparedStatementTest {
     preparedStatement.setFloat(6, 0);
     preparedStatement.executeQuery();
 
-    Assert.assertEquals(_dummyPinotClientTransport.getLastQuery(),
+    lastExecutedQuery = _dummyPinotClientTransport.getLastQuery();
+
+    Assert.assertEquals(lastExecutedQuery.substring(0, lastExecutedQuery.indexOf("LIMIT")).stripTrailing(),
         "SELECT * FROM dummy WHERE name = '' and age = 0 and score = 0.0 and ts = 0 and eligible = 'false' and sub_score = 0.0");
   }
 
@@ -81,8 +85,9 @@ public class PinotPreparedStatementTest {
 
     String expectedDate = DateTimeUtils.dateToString(new Date(currentTimestamp));
     String expectedTime = DateTimeUtils.timeStampToString(new Timestamp(currentTimestamp));
+    String lastExecutedQuery = _dummyPinotClientTransport.getLastQuery();
 
-    Assert.assertEquals(_dummyPinotClientTransport.getLastQuery(), String
+    Assert.assertEquals(lastExecutedQuery.substring(0, lastExecutedQuery.indexOf("LIMIT")).stripTrailing(), String
         .format("SELECT * FROM dummy WHERE date = '%s' and updated_at = '%s' and created_at = '%s'", expectedDate,
             expectedTime, expectedTime));
   }
@@ -96,13 +101,16 @@ public class PinotPreparedStatementTest {
     String value = "1234567891011121314151617181920";
     preparedStatement.setBigDecimal(1, new BigDecimal(value));
     preparedStatement.executeQuery();
-    Assert.assertEquals(_dummyPinotClientTransport.getLastQuery(),
+
+    String lastExecutedQuery = _dummyPinotClientTransport.getLastQuery();
+    Assert.assertEquals(lastExecutedQuery.substring(0, lastExecutedQuery.indexOf("LIMIT")).stripTrailing(),
         String.format("SELECT * FROM dummy WHERE value = '%s'", value));
 
     preparedStatement.clearParameters();
     preparedStatement.setBytes(1, value.getBytes());
     preparedStatement.executeQuery();
-    Assert.assertEquals(_dummyPinotClientTransport.getLastQuery(),
+    lastExecutedQuery = _dummyPinotClientTransport.getLastQuery();
+    Assert.assertEquals(lastExecutedQuery.substring(0, lastExecutedQuery.indexOf("LIMIT")).stripTrailing(),
         String.format("SELECT * FROM dummy WHERE value = '%s'", Hex.encodeHexString(value.getBytes())));
   }
 }
