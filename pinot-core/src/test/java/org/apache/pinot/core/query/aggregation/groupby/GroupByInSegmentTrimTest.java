@@ -80,7 +80,7 @@ public class GroupByInSegmentTrimTest {
   private static IndexSegment _indexSegment;
   private static String[] _columns;
   private static double[][] _inputData;
-  private static List<Map<Key, Double>> _resultMaps;
+  private static Map<Double, Double> _resultMap;
 
   /**
    * Initializations prior to the test:
@@ -92,7 +92,7 @@ public class GroupByInSegmentTrimTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    _resultMaps = new ArrayList<>();
+    _resultMap = new HashMap<>();
     // Current Schema: Columns: metrics_0(double), metrics_1(double)
     _inputData = new double[NUM_COLUMN][NUM_ROWS];
     _columns = new String[NUM_COLUMN];
@@ -173,10 +173,12 @@ public class GroupByInSegmentTrimTest {
         genericRow.putValue(metricName, value);
       }
       // Compute the max result and insert into a grouped map
+      Double key = _inputData[0][i];
+      Double value = _inputData[1][i];
+      computeMaxResult(key, value);
       rows.add(genericRow);
       baseValue += 10;
     }
-    computeMaxResult();
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(config, new GenericRowRecordReader(rows));
     driver.build();
@@ -205,23 +207,10 @@ public class GroupByInSegmentTrimTest {
    * Helper method to compute the aggregation result grouped by the key
    *
    */
-  private void computeMaxResult() {
-    HashMap<Key, Double> lowCardinalityResult = new HashMap<>();
-    HashMap<Key, Double> highCardinalityResult = new HashMap<>();
-    for (int i = 0; i < _inputData.length; i++) {
-      Key singleColKey = new Key(new Object[]{_inputData[i][0]});
-      Key multiColKey = new Key(new Object[]{_inputData[i][0], _inputData[i][1], _inputData[i][2]});
-      for (int j = 0; j < _inputData.length; j++) {
-        if (lowCardinalityResult.get(singleColKey) == null || lowCardinalityResult.get(singleColKey) < _inputData[i][1]) {
-          lowCardinalityResult.put(singleColKey, _inputData[i][1]);
-        }
-        if (highCardinalityResult.get(multiColKey) == null || highCardinalityResult.get(multiColKey) < _inputData[i][1]) {
-          highCardinalityResult.put(multiColKey, _inputData[i][1]);
-        }
+  private void computeMaxResult(Double key, Double value) {
+      if(_resultMap.get(key) == null || _resultMap.get(key) < value) {
+        _resultMap.put(key, value);
       }
-    }
-    _resultMaps.add(lowCardinalityResult);
-    _resultMaps.add(highCardinalityResult);
   }
 
   /**
@@ -301,7 +290,7 @@ public class GroupByInSegmentTrimTest {
   @DataProvider
   public static Object[][] groupByQueryDataProvider() {
     List<Object[]> data = new ArrayList<>();
-    ArrayList<Pair<Double[], Double>> expectedResult = computeExpectedResult(true);
+    ArrayList<Pair<Double, Double>> expectedResult = computeExpectedResult(true);
     // Testcase1: limit 100
     QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
         "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0, metric_1, metric_2 limit 100");
@@ -373,9 +362,9 @@ public class GroupByInSegmentTrimTest {
    * @param sortOnFirst the sorting strategy
    * @return A list of expected results
    */
-  private static ArrayList<Pair<Double[], Double>> computeExpectedResult(boolean sortOnFirst) {
-    ArrayList<Pair<Key, Double>> result = new ArrayList<>();
-    for (Map.Entry<Key, Double> entry : _resultMap.entrySet()) {
+  private static ArrayList<Pair<Double, Double>> computeExpectedResult(boolean sortOnFirst) {
+    ArrayList<Pair<Double, Double>> result = new ArrayList<>();
+    for (Map.Entry<Double, Double> entry : _resultMap.entrySet()) {
       result.add(new Pair<>(entry.getKey(), entry.getValue()));
     }
     if (sortOnFirst) {

@@ -242,7 +242,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
       numNoDict += hasDict[i] ? 0 : 1;
     }
     //TODO: Determine reasonable threshold
-    if (!longOverflow && cardinalityProduct < _limit || cardinalityProduct < 1000000) {
+    if (!longOverflow && cardinalityProduct < _limit || cardinalityProduct < 500000) {
       return _transformOperator;
     }
     BlockValSet[] blockValSets = new BlockValSet[numNoDict];
