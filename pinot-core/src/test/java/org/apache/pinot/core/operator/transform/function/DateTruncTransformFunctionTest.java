@@ -113,8 +113,7 @@ public class DateTruncTransformFunctionTest {
       ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(
           String.format("dateTrunc('%s', \"%s\", '%s', '%s')", unit, TIME_COLUMN, TimeUnit.MILLISECONDS, tz));
       TransformFunction transformFunction = TransformFunctionFactory.get(expression, dataSourceMap);
-      Assert.assertTrue(transformFunction instanceof DateTruncTransformFunction);
-      Assert.assertEquals(transformFunction.getName(), DateTruncTransformFunction.FUNCTION_NAME);
+      Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
       long[] longValues = transformFunction.transformToLongValuesSV(projectionBlock);
       Assert.assertEquals(longValues[0], expected);
     } finally {
