@@ -31,6 +31,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.joda.time.DateTimeField;
 
 /**
+ * The following class is now Deprecated. All functions have been moved to {@link org.apache.pinot.common.function.scalar.DateTimeFunctions}
  * The <code>DateTruncTransformationFunction</code> class implements the sql compatible date_trunc function for TIMESTAMP type.
  * <p>
  *  <ul>
@@ -75,6 +76,7 @@ import org.joda.time.DateTimeField;
  *   </li>
  * </ul>
  */
+@Deprecated
 public class DateTruncTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "dateTrunc";
   public static final String EXAMPLE_INVOCATION =

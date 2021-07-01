@@ -594,6 +594,18 @@ public class DateTimeFunctions {
   }
 
   /**
+   * The sql compatible date_trunc function for epoch time
+   * @param unit truncate to unit (millisecond, second, minute, hour, day, week, month, quarter, year)
+   * @param timeValue value to truncate
+   * @return truncated timeValue in TimeUnit.MILLISECONDS
+   */
+  @ScalarFunction
+  public static Timestamp dateTrunc(String unit, long timeValue){
+    long result =  dateTrunc(unit, timeValue, TimeUnit.MILLISECONDS.name());
+    return new Timestamp(result);
+  }
+
+  /**
    * The sql compatible date_trunc function for epoch time.
    * @param unit truncate to unit (millisecond, second, minute, hour, day, week, month, quarter, year)
    * @param timeValue value to truncate

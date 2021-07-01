@@ -87,7 +87,6 @@ public class TransformFunctionFactory {
           put(canonicalize(TransformFunctionType.JSONEXTRACTKEY.getName().toLowerCase()), JsonExtractKeyTransformFunction.class);
           put(canonicalize(TransformFunctionType.TIMECONVERT.getName().toLowerCase()), TimeConversionTransformFunction.class);
           put(canonicalize(TransformFunctionType.DATETIMECONVERT.getName().toLowerCase()), DateTimeConversionTransformFunction.class);
-          put(canonicalize(TransformFunctionType.DATETRUNC.getName().toLowerCase()), DateTruncTransformFunction.class);
           put(canonicalize(TransformFunctionType.ARRAYLENGTH.getName().toLowerCase()), ArrayLengthTransformFunction.class);
           put(canonicalize(TransformFunctionType.VALUEIN.getName().toLowerCase()), ValueInTransformFunction.class);
           put(canonicalize(TransformFunctionType.MAPVALUE.getName().toLowerCase()), MapValueTransformFunction.class);
