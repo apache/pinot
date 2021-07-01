@@ -20,29 +20,26 @@ package org.apache.pinot.segment.local.upsert.merger;
 
 /**
  * Merges 2 records and returns the merged record.
- * Add the new value from incoming row to the existing value from numeric field. Then return the merged record.
+ * Append the new value from incoming row to the existing value from multi-value field. Then return the merged record.
+ * Append merger allows duplicated records in the multi-value field.
  */
-public class IncrementMerger implements PartialUpsertMerger {
-  IncrementMerger() {
+public class AppendMerger implements PartialUpsertMerger {
+  AppendMerger() {
   }
 
   /**
-   * Increment the new value from incoming row to the given field of previous record.
+   * Append the new value from incoming row to the given multi-value field of previous record.
    */
   @Override
   public Object merge(Object previousValue, Object currentValue) {
-    return addNumbers((Number) previousValue, (Number) currentValue);
+    return append((Object[]) previousValue, (Object[]) currentValue);
   }
 
-  private static Number addNumbers(Number a, Number b) {
-    if (a instanceof Integer) {
-      return (Integer) a + (Integer) b;
-    } else if (a instanceof Long) {
-      return (Long) a + (Long) b;
-    } else if (a instanceof Float) {
-      return (Float) a + (Float) b;
-    } else {
-      return (Double) a + (Double) b;
-    }
+  private static Object append(Object[] a, Object[] b) {
+    Object[] merged = new Object[a.length + b.length];
+
+    System.arraycopy(a, 0, merged, 0, a.length);
+    System.arraycopy(b, 0, merged, a.length, b.length);
+    return merged;
   }
 }

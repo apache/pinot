@@ -18,31 +18,34 @@
  */
 package org.apache.pinot.segment.local.upsert.merger;
 
+import java.util.Set;
+import java.util.TreeSet;
+
 /**
  * Merges 2 records and returns the merged record.
- * Add the new value from incoming row to the existing value from numeric field. Then return the merged record.
+ * Added the new value from incoming row to the existing value from multi-value field. Then return the merged record.
+ * Union merger will dedup duplicated records in the multi-value field.
  */
-public class IncrementMerger implements PartialUpsertMerger {
-  IncrementMerger() {
+public class UnionMerger implements PartialUpsertMerger {
+  UnionMerger() {
   }
 
   /**
-   * Increment the new value from incoming row to the given field of previous record.
+   * Union the new value from incoming row to the given multi-value field of previous record.
    */
   @Override
   public Object merge(Object previousValue, Object currentValue) {
-    return addNumbers((Number) previousValue, (Number) currentValue);
+    return union((Object[]) previousValue, (Object[]) currentValue);
   }
 
-  private static Number addNumbers(Number a, Number b) {
-    if (a instanceof Integer) {
-      return (Integer) a + (Integer) b;
-    } else if (a instanceof Long) {
-      return (Long) a + (Long) b;
-    } else if (a instanceof Float) {
-      return (Float) a + (Float) b;
-    } else {
-      return (Double) a + (Double) b;
+  private static Object union(Object[] a, Object[] b) {
+    Set<Object> union = new TreeSet<>();
+    for (Object value: a) {
+      union.add(value);
     }
+    for (Object value: b) {
+      union.add(value);
+    }
+    return union.toArray();
   }
 }
