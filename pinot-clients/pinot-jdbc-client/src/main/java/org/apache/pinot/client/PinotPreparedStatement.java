@@ -34,7 +34,7 @@ import org.apache.pinot.client.utils.DriverUtils;
 public class PinotPreparedStatement extends AbstractBasePreparedStatement {
 
   private static final String QUERY_FORMAT = "sql";
-  public static final String LIMIT_STATEMENT = "LIMIT";
+  private static final String LIMIT_STATEMENT = "LIMIT";
   private Connection _connection;
   private org.apache.pinot.client.Connection _session;
   private ResultSetGroup _resultSetGroup;
