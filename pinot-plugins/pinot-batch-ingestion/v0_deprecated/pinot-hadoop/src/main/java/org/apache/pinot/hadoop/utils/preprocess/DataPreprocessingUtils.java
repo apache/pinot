@@ -75,12 +75,14 @@ public class DataPreprocessingUtils {
     }
   }
 
-  public static Set<Operation> getOperations(Set<Operation> operationSet, String preprocessingOperationsString) {
+  public static void getOperations(Set<Operation> operationSet, String preprocessingOperationsString) {
     String[] preprocessingOpsArray = preprocessingOperationsString.split(",");
     for (String preprocessingOps : preprocessingOpsArray) {
-      operationSet.add(Operation.getOperation(preprocessingOps.trim().toUpperCase()));
+      String trimmedOps = preprocessingOps.trim().toUpperCase();
+      if (!trimmedOps.isEmpty()) {
+        operationSet.add(Operation.getOperation(trimmedOps));
+      }
     }
-    return operationSet;
   }
 
   public enum Operation {
