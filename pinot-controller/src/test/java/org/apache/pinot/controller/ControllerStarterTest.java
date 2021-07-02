@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.helix.model.InstanceConfig;
@@ -28,6 +29,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.controller.ControllerConf.CONTROLLER_HOST;
 import static org.apache.pinot.controller.ControllerConf.CONTROLLER_PORT;
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONFIG_OF_INSTANCE_ID;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.CONTROLLER_INSTANCE;
 import static org.testng.Assert.assertEquals;
 
 
@@ -57,6 +59,7 @@ public class ControllerStarterTest extends ControllerTest {
     assertEquals(instanceConfig.getInstanceName(), instanceId);
     assertEquals(instanceConfig.getHostName(), "myHost");
     assertEquals(instanceConfig.getPort(), "1234");
+    assertEquals(instanceConfig.getTags(), Collections.singleton(CONTROLLER_INSTANCE));
 
     stopController();
     stopZk();
@@ -77,6 +80,7 @@ public class ControllerStarterTest extends ControllerTest {
     assertEquals(instanceConfig.getInstanceName(), instanceId);
     assertEquals(instanceConfig.getHostName(), "myHost");
     assertEquals(instanceConfig.getPort(), "1234");
+    assertEquals(instanceConfig.getTags(), Collections.singleton(CONTROLLER_INSTANCE));
 
     stopController();
     stopZk();
