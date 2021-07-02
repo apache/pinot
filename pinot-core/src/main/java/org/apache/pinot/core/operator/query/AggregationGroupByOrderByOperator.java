@@ -327,7 +327,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
 
     return (o1, o2) -> {
       for (int i = 0; i < numOrderByExpressions; i++) {
-
+        // TODO: Handle orderBy funcions
         // TODO: Evaluate the performance of casting to Comparable and avoid the switch
         Object v1 = o1[i];
         Object v2 = o2[i];

@@ -133,8 +133,7 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
     Set<ExpressionContext> orderByExpressionsSet = new HashSet<>();
     for (OrderByExpressionContext orderByExpressionContext : _orderByExpressionContexts) {
       ExpressionContext expression = orderByExpressionContext.getExpression();
-      if (expression.getType() == ExpressionContext.Type.FUNCTION
-          && expression.getFunction().getType() == FunctionContext.Type.AGGREGATION) {
+      if (expression.getType() == ExpressionContext.Type.FUNCTION) {
         return false;
       }
       orderByExpressionsSet.add(expression);

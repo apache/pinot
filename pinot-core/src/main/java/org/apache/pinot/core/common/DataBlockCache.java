@@ -79,8 +79,6 @@ public class DataBlockCache {
     return _length;
   }
 
-  //public int[] getDocIdArray() { return _docIds; }
-
   /**
    * SINGLE-VALUED COLUMN API
    */

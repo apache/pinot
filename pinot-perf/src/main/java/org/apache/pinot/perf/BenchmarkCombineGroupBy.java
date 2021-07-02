@@ -98,7 +98,7 @@ public class BenchmarkCombineGroupBy {
     }
 
     _queryContext = QueryContextConverterUtils
-        .getQueryContextFromSQL("SELECT sum(m1), max(m2) FROM testTable GROUP BY d1, d2 ORDER BY d1 LIMIT 500");
+        .getQueryContextFromSQL("SELECT sum(m1), max(m2) FROM testTable GROUP BY d1, d2 ORDER BY sum(m1) LIMIT 500");
     _aggregationFunctions = _queryContext.getAggregationFunctions();
     assert _aggregationFunctions != null;
     _dataSchema = new DataSchema(new String[]{"d1", "d2", "sum(m1)", "max(m2)"},
