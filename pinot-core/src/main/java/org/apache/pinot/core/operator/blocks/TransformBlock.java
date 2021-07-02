@@ -55,8 +55,6 @@ public class TransformBlock implements Block {
     }
   }
 
-//  public int[] getDocIdArray() { return _projectionBlock.getDocIdArray(); }
-
   public BlockValSet getBlockValueSet(String column) {
     return _projectionBlock.getBlockValueSet(column);
   }
