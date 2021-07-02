@@ -28,6 +28,7 @@ import PinotMethodUtils from './utils/PinotMethodUtils';
 import CustomNotification from './components/CustomNotification';
 import { NotificationContextProvider } from './components/Notification/NotificationContextProvider';
 import app_state from './app_state';
+import { AuthWorkflow } from 'Models';
 
 const useStyles = makeStyles(() =>
   createStyles({
@@ -42,7 +43,15 @@ const useStyles = makeStyles(() =>
 const App = () => {
   const [clusterName, setClusterName] = React.useState('');
   const [loading, setLoading] = React.useState(true);
+  const oidcSignInFormRef = React.useRef<HTMLFormElement>(null);
   const [isAuthenticated, setIsAuthenticated] = React.useState(null);
+  const [issuer, setIssuer] = React.useState(null);
+  const [redirectUri, setRedirectUri] = React.useState(null);
+  const [clientId, setClientId] = React.useState(null);
+  const [authWorkflow, setAuthWorkflow] = React.useState(null);
+  const [authorizationEndopoint, setAuthorizationEndopoint] = React.useState(
+    null
+  );
 
   const fetchClusterName = async () => {
     const clusterNameResponse = await PinotMethodUtils.getClusterName();
@@ -64,22 +73,92 @@ const App = () => {
   };
 
   const getAuthInfo = async () => {
-    const authInfoResponse = await PinotMethodUtils.getAuthInfo()
-    // If authInfoResponse has workflow set to anything but BASIC,
-    // it doesn't require authentication.
-    if(authInfoResponse?.workflow !== 'BASIC'){
-      setIsAuthenticated(true);
-    } else {
-      setLoading(false);
-    }
-  }
+    const authInfoResponse = await PinotMethodUtils.getAuthInfo();
+    // Issuer URL, if available
+    setIssuer(
+      authInfoResponse && authInfoResponse.issuer ? authInfoResponse.issuer : ''
+    );
+    // Redirect URI, if available
+    setRedirectUri(
+      authInfoResponse && authInfoResponse.redirectUri
+        ? authInfoResponse.redirectUri
+        : ''
+    );
+    // Client Id, if available
+    setClientId(
+      authInfoResponse && authInfoResponse.clientId
+        ? authInfoResponse.clientId
+        : ''
+    );
+    // Authentication workflow
+    setAuthWorkflow(
+      authInfoResponse && authInfoResponse.workflow
+        ? authInfoResponse.workflow
+        : AuthWorkflow.NONE
+    );
+  };
 
-  React.useEffect(()=>{
+  const initAuthWorkflow = async () => {
+    switch (authWorkflow) {
+      case AuthWorkflow.NONE: {
+        // No authentication required
+        setIsAuthenticated(true);
+
+        break;
+      }
+      case AuthWorkflow.BASIC: {
+        // Basic authentication, handled by login page
+        setLoading(false);
+
+        break;
+      }
+      case AuthWorkflow.OIDC: {
+        // OIDC authentication, check to see if access token is available in the URL
+        const accessToken = PinotMethodUtils.getAccessTokenFromHashParams();
+        if (accessToken) {
+          app_state.authWorkflow = AuthWorkflow.OIDC;
+          app_state.authToken = accessToken;
+
+          setIsAuthenticated(true);
+        } else {
+          // Get authorization endpoint
+          const openIdConfigResponse = await PinotMethodUtils.getWellKnownOpenIdConfiguration(
+            issuer
+          );
+          setAuthorizationEndopoint(
+            openIdConfigResponse && openIdConfigResponse.authorization_endpoint
+              ? openIdConfigResponse.authorization_endpoint
+              : ''
+          );
+
+          setLoading(false);
+        }
+
+        break;
+      }
+      default: {
+        // Empty
+      }
+    }
+  };
+
+  React.useEffect(() => {
     getAuthInfo();
   }, []);
 
-  React.useEffect(()=>{
-    if(isAuthenticated){
+  React.useEffect(() => {
+    initAuthWorkflow();
+  }, [authWorkflow]);
+
+  React.useEffect(() => {
+    if (authorizationEndopoint && oidcSignInFormRef && oidcSignInFormRef.current) {
+      // Authorization endpoint available; submit signin form
+      oidcSignInFormRef.current.submit();
+    }
+  }, [authorizationEndopoint]);
+
+  React.useEffect(() => {
+    if (isAuthenticated) {
       fetchClusterConfig();
       fetchClusterName();
     }
@@ -109,37 +188,60 @@ const App = () => {
     <MuiThemeProvider theme={theme}>
       <NotificationContextProvider>
         <CustomNotification />
-        {
-          loading ?
-            <CircularProgress className={classes.loader} size={80}/>
-          :
-          <Router>
-            <Switch>
-              {getRouterData().map(({ path, Component }, key) => (
-                <Route
-                  exact
-                  path={path}
-                  key={key}
-                  render={props => {
-                    if(path === '/login'){
-                      return loginRender(Component, props);
-                    } else if(isAuthenticated){
-                      // default render
-                      return componentRender(Component, props);
-                    } else {
-                      return (
-                        <Redirect to="/login"/>
-                      );
-                    }
-                  }}
-                />
-              ))}
-              <Route path="*">
-                <Redirect to={app_state.queryConsoleOnlyView ? "/query" : "/"} />
-              </Route>
-            </Switch>
-          </Router>
-        }
+        {/* OIDC auth workflow */}
+        {authWorkflow && authWorkflow === AuthWorkflow.OIDC ? (
+          <>
+            {/* OIDC sign in form */}
+            <form
+              hidden
+              action={authorizationEndopoint}
+              method="post"
+              ref={oidcSignInFormRef}
+            >
+              <input readOnly name="client_id" value={clientId} />
+              <input readOnly name="redirect_uri" value={redirectUri} />
+              <input readOnly name="scope" value="email openid" />
+              <input readOnly name="state" value="true-redirect-uri" />
+              <input readOnly name="response_type" value="id_token token" />
+              <input readOnly name="nonce" value="random_string" />
+              <input type="submit" value="" />
+            </form>
+          </>
+        ) : (
+          <>
+            {/* Non-OIDC auth workflow */}
+            {loading ? (
+              <CircularProgress className={classes.loader} size={80} />
+            ) : (
+              <Router>
+                <Switch>
+                  {getRouterData().map(({ path, Component }, key) => (
+                    <Route
+                      exact
+                      path={path}
+                      key={key}
+                      render={(props) => {
+                        if (path === '/login') {
+                          return loginRender(Component, props);
+                        } else if (isAuthenticated) {
+                          // default render
+                          return componentRender(Component, props);
+                        } else {
+                          return <Redirect to="/login" />;
+                        }
+                      }}
+                    />
+                  ))}
+                  <Route path="*">
+                    <Redirect
+                      to={app_state.queryConsoleOnlyView ? '/query' : '/'}
+                    />
+                  </Route>
+                </Switch>
+              </Router>
+            )}
+          </>
+        )}
       </NotificationContextProvider>
     </MuiThemeProvider>
   );

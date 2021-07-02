@@ -149,4 +149,10 @@ declare module 'Models' {
     tenantName: string,
     error: string
   }
+
+  export const enum AuthWorkflow {
+    NONE = 'NONE',
+    BASIC = 'BASIC',
+    OIDC = 'OIDC',
+  }
 }
