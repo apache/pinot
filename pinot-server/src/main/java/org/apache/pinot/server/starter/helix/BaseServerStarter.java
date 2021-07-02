@@ -114,7 +114,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected String _zkAddress;
   protected PinotConfiguration _serverConf;
   protected List<ListenerConfig> _listenerConfigs;
-  protected String _host;
+  protected String _hostname;
   protected int _port;
   protected String _instanceId;
   protected HelixConfigScope _instanceConfigScope;
@@ -135,14 +135,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _helixClusterName = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
     _zkAddress = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER);
 
-    _host = _serverConf.getProperty(Helix.KEY_OF_SERVER_NETTY_HOST,
+    _hostname = _serverConf.getProperty(Helix.KEY_OF_SERVER_NETTY_HOST,
         _serverConf.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils.getHostnameOrAddress()
             : NetUtils.getHostAddress());
     _port = _serverConf.getProperty(Helix.KEY_OF_SERVER_NETTY_PORT, Helix.DEFAULT_SERVER_NETTY_PORT);
 
     String instanceId = _serverConf.getProperty(Server.CONFIG_OF_INSTANCE_ID);
     if (instanceId == null) {
-      instanceId = Helix.PREFIX_OF_SERVER_INSTANCE + _host + "_" + _port;
+      instanceId = Helix.PREFIX_OF_SERVER_INSTANCE + _hostname + "_" + _port;
       _serverConf.addProperty(Server.CONFIG_OF_INSTANCE_ID, instanceId);
     }
     _instanceId = instanceId;
@@ -256,7 +256,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
   private void updateInstanceConfigIfNeeded() {
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, _instanceId);
-    boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _host, _port);
+    boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
     updated |= HelixHelper.addDefaultTags(instanceConfig, () -> {
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_helixManager.getHelixPropertyStore())) {
         return Arrays.asList(TagNameUtils.getOfflineTagForTenant(null), TagNameUtils.getRealtimeTagForTenant(null));

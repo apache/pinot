@@ -70,7 +70,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   private static final String HTTPS_ENABLED = "enabled";
 
   protected PinotConfiguration _config;
-  protected String _host;
+  protected String _hostname;
   protected int _port;
   protected String _instanceId;
   protected HelixManager _helixManager;
@@ -85,12 +85,12 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     _config = config;
     String helixClusterName = _config.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
     String zkAddress = _config.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER);
-    _host = _config.getProperty(CommonConstants.Helix.KEY_OF_MINION_HOST,
+    _hostname = _config.getProperty(CommonConstants.Helix.KEY_OF_MINION_HOST,
         _config.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils
             .getHostnameOrAddress() : NetUtils.getHostAddress());
     _port = _config.getProperty(CommonConstants.Helix.KEY_OF_MINION_PORT, CommonConstants.Minion.DEFAULT_HELIX_PORT);
     _instanceId = _config.getProperty(CommonConstants.Helix.Instance.INSTANCE_ID_KEY,
-        CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE + _host + "_" + _port);
+        CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE + _hostname + "_" + _port);
     _listenerConfigs = ListenerConfigUtil.buildMinionAdminConfigs(_config);
     setupHelixSystemProperties();
     _helixManager = new ZKHelixManager(helixClusterName, _instanceId, InstanceType.PARTICIPANT, zkAddress);
@@ -242,7 +242,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
 
   private void updateInstanceConfigIfNeeded() {
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, _instanceId);
-    boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _host, _port);
+    boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
     updated |= HelixHelper.addDefaultTags(instanceConfig,
         () -> Collections.singletonList(CommonConstants.Helix.UNTAGGED_MINION_INSTANCE));
     if (updated) {

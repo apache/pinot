@@ -119,6 +119,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected ExecutorService _executorService;
   protected String _helixZkURL;
   protected String _helixClusterName;
+  protected String _hostname;
+  protected int _port;
   protected String _helixControllerInstanceId;
   protected String _helixParticipantInstanceId;
   protected boolean _isUpdateStateModel;
@@ -149,22 +151,21 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   public void init(PinotConfiguration pinotConfiguration)
       throws Exception {
     _config = new ControllerConf(pinotConfiguration.toMap());
-    inferHostnameIfNeeded(_config);
     setupHelixSystemProperties();
+    _listenerConfigs = ListenerConfigUtil.buildControllerConfigs(_config);
     _controllerMode = _config.getControllerMode();
     // Helix related settings.
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_config.getZkStr());
     _helixClusterName = _config.getHelixClusterName();
-    _listenerConfigs = ListenerConfigUtil.buildControllerConfigs(_config);
-    String host = _config.getControllerHost();
-    int port = _listenerConfigs.get(0).getPort();
-
-    _helixControllerInstanceId = host + "_" + port;
+    inferHostnameIfNeeded(_config);
+    _hostname = _config.getControllerHost();
+    _port = _listenerConfigs.get(0).getPort();
+    _helixControllerInstanceId = _hostname + "_" + _port;
     String instanceIdFromConfig = _config.getInstanceId();
     if (StringUtils.isNotEmpty(instanceIdFromConfig)) {
       _helixParticipantInstanceId = instanceIdFromConfig;
     } else {
-      _helixParticipantInstanceId = LeadControllerUtils.generateParticipantInstanceId(host, port);
+      _helixParticipantInstanceId = LeadControllerUtils.generateParticipantInstanceId(_hostname, _port);
     }
     _isUpdateStateModel = _config.isUpdateSegmentStateModel();
     _enableBatchMessageMode = _config.getEnableBatchMessageMode();
@@ -574,8 +575,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   private void updateInstanceConfigIfNeeded() {
     InstanceConfig instanceConfig =
         HelixHelper.getInstanceConfig(_helixParticipantManager, _helixParticipantInstanceId);
-    if (HelixHelper.updateHostnamePort(instanceConfig, _config.getControllerHost(),
-        Integer.parseInt(_config.getControllerPort()))) {
+    if (HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port)) {
       HelixHelper.updateInstanceConfig(_helixParticipantManager, instanceConfig);
     }
   }
