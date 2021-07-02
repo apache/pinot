@@ -35,6 +35,7 @@ import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.Message;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -115,12 +116,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _zkServers = brokerConf.getProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER).replaceAll("\\s+", "");
     _brokerHost = brokerConf.getProperty(Broker.CONFIG_OF_BROKER_HOSTNAME);
     if (_brokerHost == null) {
-      _brokerHost = _brokerConf.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils
-          .getHostnameOrAddress() : NetUtils.getHostAddress();
+      _brokerHost =
+          _brokerConf.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils.getHostnameOrAddress()
+              : NetUtils.getHostAddress();
     }
 
-    _brokerId = _brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY,
-        Helix.PREFIX_OF_BROKER_INSTANCE + _brokerHost + "_" + _brokerPort);
+    _brokerId = _brokerConf
+        .getProperty(Helix.Instance.INSTANCE_ID_KEY, Helix.PREFIX_OF_BROKER_INSTANCE + _brokerHost + "_" + _brokerPort);
 
     _brokerConf.setProperty(Broker.CONFIG_OF_BROKER_ID, _brokerId);
   }
@@ -243,11 +245,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_brokerConf, Broker.BROKER_TLS_PREFIX);
 
     if (_brokerConf.getProperty(Broker.BROKER_NETTYTLS_ENABLED, false)) {
-      _brokerRequestHandler = new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager,
-          _accessControlFactory, queryQuotaManager, tableCache, _brokerMetrics, tlsDefaults);
+      _brokerRequestHandler =
+          new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
+              queryQuotaManager, tableCache, _brokerMetrics, tlsDefaults);
     } else {
-      _brokerRequestHandler = new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager,
-          _accessControlFactory, queryQuotaManager, tableCache, _brokerMetrics, null);
+      _brokerRequestHandler =
+          new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
+              queryQuotaManager, tableCache, _brokerMetrics, null);
     }
 
     LOGGER.info("Starting broker admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
@@ -309,6 +313,21 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     LOGGER.info("Finish starting Pinot broker");
   }
 
+  private void updateInstanceConfigIfNeeded() {
+    InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_participantHelixManager, _brokerId);
+    boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _brokerHost, _brokerPort);
+    updated |= HelixHelper.addDefaultTags(instanceConfig, () -> {
+      if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
+        return Collections.singletonList(TagNameUtils.getBrokerTagForTenant(null));
+      } else {
+        return Collections.singletonList(Helix.UNTAGGED_BROKER_INSTANCE);
+      }
+    });
+    if (updated) {
+      HelixHelper.updateInstanceConfig(_participantHelixManager, instanceConfig);
+    }
+  }
+
   /**
    * Fetches the resources to monitor and registers the {@link org.apache.pinot.common.utils.ServiceStatus.ServiceStatusCallback}s
    */
@@ -335,18 +354,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
                 _clusterName, _brokerId, resourcesToMonitor, minResourcePercentForStartup),
             new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_participantHelixManager,
                 _clusterName, _brokerId, resourcesToMonitor, minResourcePercentForStartup))));
-  }
-
-  private void updateInstanceConfigIfNeeded() {
-    HelixHelper.updateCommonInstanceConfig(_participantHelixManager, _brokerId, _brokerHost, _brokerPort, () -> {
-      ImmutableList.Builder<String> defaultTags = ImmutableList.builder();
-      if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
-        defaultTags.add(TagNameUtils.getBrokerTagForTenant(null));
-      } else {
-        defaultTags.add(Helix.UNTAGGED_BROKER_INSTANCE);
-      }
-      return defaultTags.build();
-    });
   }
 
   @Override

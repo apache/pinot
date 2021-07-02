@@ -19,8 +19,6 @@
 package org.apache.pinot.controller;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Strings;
-import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Longs;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
@@ -46,6 +44,7 @@ import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.api.listeners.ControllerChangeListener;
 import org.apache.helix.model.ClusterConstraints;
 import org.apache.helix.model.ConstraintItem;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.model.Message;
 import org.apache.helix.task.TaskDriver;
@@ -161,8 +160,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     int port = _listenerConfigs.get(0).getPort();
 
     _helixControllerInstanceId = host + "_" + port;
-    if (!Strings.isNullOrEmpty(_config.getHelixInstanceId())){
-      _helixParticipantInstanceId = _config.getHelixInstanceId();
+    String instanceIdFromConfig = _config.getInstanceId();
+    if (StringUtils.isNotEmpty(instanceIdFromConfig)) {
+      _helixParticipantInstanceId = instanceIdFromConfig;
     } else {
       _helixParticipantInstanceId = LeadControllerUtils.generateParticipantInstanceId(host, port);
     }
@@ -552,9 +552,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg);
     }
-    HelixHelper
-        .updateCommonInstanceConfig(_helixParticipantManager, _helixParticipantInstanceId, _config.getControllerHost(),
-            _config.getControllerPort(), ImmutableList::of);
+    updateInstanceConfigIfNeeded();
 
     LOGGER.info("Registering helix controller listener");
     // This registration is not needed when the leadControllerResource is enabled.
@@ -570,6 +568,15 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     } catch (Exception e) {
       throw new RuntimeException(
           "Error registering resource config listener for " + CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME, e);
+    }
+  }
+
+  private void updateInstanceConfigIfNeeded() {
+    InstanceConfig instanceConfig =
+        HelixHelper.getInstanceConfig(_helixParticipantManager, _helixParticipantInstanceId);
+    if (HelixHelper.updateHostnamePort(instanceConfig, _config.getControllerHost(),
+        Integer.parseInt(_config.getControllerPort()))) {
+      HelixHelper.updateInstanceConfig(_helixParticipantManager, instanceConfig);
     }
   }
 

@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.minion;
 
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.io.FileUtils;
@@ -29,6 +29,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.InstanceType;
 import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.manager.zk.ZKHelixManager;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.task.TaskStateModelFactory;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
@@ -69,14 +70,14 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   private static final String HTTPS_ENABLED = "enabled";
 
   protected PinotConfiguration _config;
+  protected String _host;
+  protected int _port;
   protected String _instanceId;
   protected HelixManager _helixManager;
   protected TaskExecutorFactoryRegistry _taskExecutorFactoryRegistry;
   protected EventObserverFactoryRegistry _eventObserverFactoryRegistry;
   protected MinionAdminApiApplication _minionAdminApplication;
   protected List<ListenerConfig> _listenerConfigs;
-  protected String _host;
-  protected int _port;
 
   @Override
   public void init(PinotConfiguration config)
@@ -213,8 +214,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     _helixManager.getStateMachineEngine().registerStateModelFactory("Task", new TaskStateModelFactory(_helixManager,
         new TaskFactoryRegistry(_taskExecutorFactoryRegistry, _eventObserverFactoryRegistry).getTaskFactoryRegistry()));
     _helixManager.connect();
-    HelixHelper.updateCommonInstanceConfig(_helixManager, _instanceId, _host, _port,
-        () -> ImmutableList.of(CommonConstants.Helix.UNTAGGED_MINION_INSTANCE));
+    updateInstanceConfigIfNeeded();
     minionContext.setHelixPropertyStore(_helixManager.getHelixPropertyStore());
 
     LOGGER.info("Starting minion admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
@@ -238,6 +238,16 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     });
 
     LOGGER.info("Pinot minion started");
+  }
+
+  private void updateInstanceConfigIfNeeded() {
+    InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, _instanceId);
+    boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _host, _port);
+    updated |= HelixHelper.addDefaultTags(instanceConfig,
+        () -> Collections.singletonList(CommonConstants.Helix.UNTAGGED_MINION_INSTANCE));
+    if (updated) {
+      HelixHelper.updateInstanceConfig(_helixManager, instanceConfig);
+    }
   }
 
   /**
@@ -266,5 +276,4 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     }
     LOGGER.info("Pinot minion stopped");
   }
-
 }

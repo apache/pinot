@@ -21,8 +21,8 @@ package org.apache.pinot.server.starter.helix;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -36,6 +36,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.SystemPropertyKeys;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
@@ -160,8 +161,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     // Set data table version send to broker.
     DataTableBuilder.setCurrentDataTableVersion(_serverConf
-        .getProperty(Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION,
-            Server.DEFAULT_CURRENT_DATA_TABLE_VERSION));
+        .getProperty(Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION, Server.DEFAULT_CURRENT_DATA_TABLE_VERSION));
   }
 
   /**
@@ -170,7 +170,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
    */
   @Nullable
   private PinotEnvironmentProvider initializePinotEnvironmentProvider() {
-    PinotConfiguration environmentProviderConfigs = _serverConf.subset(Server.PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY);
+    PinotConfiguration environmentProviderConfigs =
+        _serverConf.subset(Server.PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY);
     if (environmentProviderConfigs.toMap().isEmpty()) {
       LOGGER.info("No environment provider config values provided for server property: {}",
           Server.PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY);
@@ -254,36 +255,35 @@ public abstract class BaseServerStarter implements ServiceStartable {
   }
 
   private void updateInstanceConfigIfNeeded() {
-    HelixHelper.updateCommonInstanceConfig(_helixManager, _instanceId, _host, String.valueOf(_port), () -> {
-      ImmutableList.Builder<String> defaultTags = ImmutableList.builder();
-      if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_helixManager.getHelixPropertyStore())) {
-        defaultTags.add(TagNameUtils.getOfflineTagForTenant(null));
-        defaultTags.add(TagNameUtils.getRealtimeTagForTenant(null));
-      } else {
-        defaultTags.add(Helix.UNTAGGED_SERVER_INSTANCE);
-      }
-      return defaultTags.build();
-    });
-
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, _instanceId);
+    boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _host, _port);
+    updated |= HelixHelper.addDefaultTags(instanceConfig, () -> {
+      if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_helixManager.getHelixPropertyStore())) {
+        return Arrays.asList(TagNameUtils.getOfflineTagForTenant(null), TagNameUtils.getRealtimeTagForTenant(null));
+      } else {
+        return Collections.singletonList(Helix.UNTAGGED_SERVER_INSTANCE);
+      }
+    });
     // Update instance config with environment properties
     if (_pinotEnvironmentProvider != null) {
       // Retrieve failure domain information and add to the environment properties map
       String failureDomain = _pinotEnvironmentProvider.getFailureDomain();
-      Map<String, String> environmentProperties = new HashMap<>();
-      environmentProperties.put(CommonConstants.INSTANCE_FAILURE_DOMAIN, failureDomain);
+      Map<String, String> environmentProperties =
+          Collections.singletonMap(CommonConstants.INSTANCE_FAILURE_DOMAIN, failureDomain);
 
       // Fetch existing environment properties map from instance configs
-      Map<String, String> existingEnvironmentConfigsMap = instanceConfig.getRecord().getMapField(
-          CommonConstants.ENVIRONMENT_IDENTIFIER);
+      ZNRecord znRecord = instanceConfig.getRecord();
+      Map<String, String> existingEnvironmentConfigsMap = znRecord.getMapField(CommonConstants.ENVIRONMENT_IDENTIFIER);
 
-      if (existingEnvironmentConfigsMap == null || !existingEnvironmentConfigsMap.equals(environmentProperties)) {
-        instanceConfig.getRecord().setMapField(CommonConstants.ENVIRONMENT_IDENTIFIER, environmentProperties);
-        LOGGER.info("Adding environment properties: {} for instance: {}", environmentProperties, _instanceId);
-        HelixHelper.updateInstanceConfig(_helixManager, instanceConfig);
+      if (!environmentProperties.equals(existingEnvironmentConfigsMap)) {
+        LOGGER.info("Updating instance: {} with environment properties: {}", environmentProperties, _instanceId);
+        znRecord.setMapField(CommonConstants.ENVIRONMENT_IDENTIFIER, environmentProperties);
+        updated = true;
       }
     }
-
+    if (updated) {
+      HelixHelper.updateInstanceConfig(_helixManager, instanceConfig);
+    }
   }
 
   private void setupHelixSystemProperties() {
@@ -400,8 +400,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _adminApiApplication.start(_listenerConfigs);
 
     // Update http admin port
-    Optional<ListenerConfig> adminApiHttp = _listenerConfigs.stream()
-        .filter(listener -> CommonConstants.HTTP_PROTOCOL.equals(listener.getProtocol())).findFirst();
+    Optional<ListenerConfig> adminApiHttp =
+        _listenerConfigs.stream().filter(listener -> CommonConstants.HTTP_PROTOCOL.equals(listener.getProtocol()))
+            .findFirst();
     if (adminApiHttp.isPresent()) {
       _helixAdmin.setConfig(_instanceConfigScope,
           Collections.singletonMap(Instance.ADMIN_PORT_KEY, String.valueOf(adminApiHttp.get().getPort())));
@@ -410,8 +411,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
 
     // Update https admin port
-    Optional<ListenerConfig> adminApiHttps = _listenerConfigs.stream()
-        .filter(listener -> CommonConstants.HTTPS_PROTOCOL.equals(listener.getProtocol())).findFirst();
+    Optional<ListenerConfig> adminApiHttps =
+        _listenerConfigs.stream().filter(listener -> CommonConstants.HTTPS_PROTOCOL.equals(listener.getProtocol()))
+            .findFirst();
     if (adminApiHttps.isPresent()) {
       _helixAdmin.setConfig(_instanceConfigScope,
           Collections.singletonMap(Instance.ADMIN_HTTPS_PORT_KEY, String.valueOf(adminApiHttps.get().getPort())));
@@ -466,7 +468,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
     serverMetrics.addCallbackGauge("memory.allocationFailureCount", PinotDataBuffer::getAllocationFailureCount);
 
     // Track metric for queries disabled
-    _serverQueriesDisabledTracker = new ServerQueriesDisabledTracker(_helixClusterName, _instanceId, _helixManager, serverMetrics);
+    _serverQueriesDisabledTracker =
+        new ServerQueriesDisabledTracker(_helixClusterName, _instanceId, _helixManager, serverMetrics);
     _serverQueriesDisabledTracker.start();
 
     _realtimeLuceneIndexRefreshState = RealtimeLuceneIndexRefreshState.getInstance();

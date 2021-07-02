@@ -35,7 +35,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONFIG_OF_CONTROLLER_METRICS_PREFIX;
-import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONTROLLER_HELIX_INSTANCE_ID;
+import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONFIG_OF_INSTANCE_ID;
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.DEFAULT_METRICS_PREFIX;
 
 
@@ -311,10 +311,10 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(CONTROLLER_PORT);
   }
 
-  public String getHelixInstanceId() {
-    return getProperty(CONTROLLER_HELIX_INSTANCE_ID);
+  public String getInstanceId() {
+    return getProperty(CONFIG_OF_INSTANCE_ID);
   }
-  
+
   public List<String> getControllerAccessProtocols() {
     return getProperty(CONTROLLER_ACCESS_PROTOCOLS,
         getControllerPort() == null ? Arrays.asList("http") : Arrays.asList());
@@ -720,7 +720,8 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public List<String> getTableConfigTunerPackages() {
-    return Arrays.asList(getProperty(TABLE_CONFIG_TUNER_PACKAGES, DEFAULT_TABLE_CONFIG_TUNER_PACKAGES).split("\\s*,\\s*"));
+    return Arrays
+        .asList(getProperty(TABLE_CONFIG_TUNER_PACKAGES, DEFAULT_TABLE_CONFIG_TUNER_PACKAGES).split("\\s*,\\s*"));
   }
 
   private long convertPeriodToSeconds(String timeStr) {

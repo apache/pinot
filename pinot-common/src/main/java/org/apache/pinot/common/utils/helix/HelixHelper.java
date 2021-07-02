@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.utils.helix;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
@@ -30,10 +29,8 @@ import java.util.concurrent.Callable;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import javax.validation.constraints.NotNull;
 import org.I0Itec.zkclient.exception.ZkBadVersionException;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
@@ -61,7 +58,8 @@ public class HelixHelper {
   private static final String ENABLE_COMPRESSIONS_KEY = "enableCompression";
 
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
-  private static final RetryPolicy DEFAULT_TABLE_IDEALSTATES_UPDATE_RETRY_POLICY = RetryPolicies.randomDelayRetryPolicy(20, 100L, 200L);
+  private static final RetryPolicy DEFAULT_TABLE_IDEALSTATES_UPDATE_RETRY_POLICY =
+      RetryPolicies.randomDelayRetryPolicy(20, 100L, 200L);
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixHelper.class);
   private static final ZNRecordSerializer ZN_RECORD_SERIALIZER = new ZNRecordSerializer();
 
@@ -503,36 +501,7 @@ public class HelixHelper {
   }
 
   /**
-   * Add default tags to instance if the instance has no tags Note for the getDefaultTags: it is a
-   * lambda so it may not be invoked if instance already has tags. * For example () ->
-   * ImmutableList.of("Default_tenant")
-   *
-   * This will not actually perform the update to zk, we will need to call UpdateInstanceConfig() to commit
-   * @param instanceConfig instance config to process
-   * @param getDefaultTags the default tags lambda. Something like () -> ImmutableList.of("Default_tenant") to provide default tags
-   * @return true if updated, false if not updated
-   */
-  @VisibleForTesting
-  static boolean addDefaultTags(
-      InstanceConfig instanceConfig, @NotNull Supplier<List<String>> getDefaultTags) {
-    // Add default instance tags if not exist
-    List<String> instanceTags = instanceConfig.getTags();
-    if (instanceTags.isEmpty()) {
-      List<String> defaultTags = getDefaultTags.get();
-      if (!CollectionUtils.isEmpty(defaultTags)) {
-        defaultTags.forEach(instanceConfig::addTag);
-        LOGGER.info("Updating instance Id {} with default tags {}", instanceConfig.getId(), instanceTags);
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
-   * Returns the instance config for a specific instance ID
-   * @param helixManager the Helix manager
-   * @param instanceId the unique ID for instance
-   * @return An InstanceConfig that we can update
+   * Returns the instance config for a specific instance.
    */
   public static InstanceConfig getInstanceConfig(HelixManager helixManager, String instanceId) {
     HelixAdmin admin = helixManager.getClusterManagmentTool();
@@ -541,102 +510,57 @@ public class HelixHelper {
   }
 
   /**
-   * Update instance config into Helix properly
-   * @param helixManager the HelixManager for access
-   * @param instanceConfig the updated Helix Config
+   * Updates instance config to the Helix property store.
    */
   public static void updateInstanceConfig(HelixManager helixManager, InstanceConfig instanceConfig) {
     // NOTE: Use HelixDataAccessor.setProperty() instead of HelixAdmin.setInstanceConfig() because the latter explicitly
     // forbids instance host/port modification
     HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
-    Preconditions.checkState(
-        helixDataAccessor.setProperty(helixDataAccessor.keyBuilder().instanceConfig(instanceConfig.getId()), instanceConfig),
-        "Failed to update instance config for id=" + instanceConfig.getId());
+    Preconditions.checkState(helixDataAccessor
+            .setProperty(helixDataAccessor.keyBuilder().instanceConfig(instanceConfig.getId()), instanceConfig),
+        "Failed to update instance config for instance: " + instanceConfig.getId());
   }
 
   /**
-   * Update Helix Host and Name if the values are reasonable.
-   * @param instanceConfig the instance config to be updated
-   * @param hostName the Host name
-   * @param hostPort the Host port
-   * @return true if it is updated
+   * Updates hostname and port in the instance config, returns {@code true} if the value is updated, {@code false}
+   * otherwise.
    */
-  private static boolean updateHostNamePort(InstanceConfig instanceConfig, String hostName, int hostPort) {
-    if (StringUtils.isEmpty(hostName)) {
-      LOGGER.warn("host is empty, skip updating helix host.");
-      return false;
-    }
+  public static boolean updateHostnamePort(InstanceConfig instanceConfig, String hostname, int port) {
     boolean updated = false;
-    // Update host and port if needed
-    if (!String.valueOf(hostPort).equals(instanceConfig.getPort())) {
-      instanceConfig.setPort(String.valueOf(hostPort));
+    String existingHostname = instanceConfig.getHostName();
+    if (!hostname.equals(existingHostname)) {
+      LOGGER.info("Updating instance: {} with hostname: {}", instanceConfig.getId(), hostname);
+      instanceConfig.setHostName(hostname);
       updated = true;
     }
-    if (!hostName.equals(instanceConfig.getHostName())) {
-      instanceConfig.setHostName(hostName);
+    String portStr = Integer.toString(port);
+    String existingPortStr = instanceConfig.getPort();
+    if (!portStr.equals(existingPortStr)) {
+      LOGGER.info("Updating instance: {} with port: {}", instanceConfig.getId(), port);
+      instanceConfig.setPort(portStr);
       updated = true;
     }
     return updated;
   }
-  /**
-   * Update Helix Host and Name if the values are reasonable.
-   * @param instanceConfig the instance config to be updated
-   * @param hostName the Host name
-   * @param hostPort the Host port
-   * @return true if it is updated
-   */
-  @VisibleForTesting
-  static boolean updateHostNamePort(InstanceConfig instanceConfig, String hostName, String hostPort) {
-    if (StringUtils.isEmpty(hostName) || StringUtils.isEmpty(hostPort)) {
-      LOGGER.warn("Host name or port is empty. Will skip updating helix hostname");
-      return false;
-    }
-    try {
-      int port = Integer.parseInt(hostPort);
-      return updateHostNamePort(instanceConfig, hostName, port);
-    } catch (NumberFormatException ex) {
-      LOGGER.warn(
-        "Host port={} is not a number. Will skip updating helix hostname", hostPort, ex);
-      return false;
-    }
-  }
 
   /**
-   * Update the commonly needed settings for Helix Instance.
-   * If port is not a number, we will still update the tags.
-   * @param helixManager HelixManager for access
-   * @param instanceId the instance Id for the update
-   * @param host the Hostname
-   * @param port the port
-   * @param getDefaultTags lambda to get default tags. E.g., () -> ImmutableList.of("DefaultTenant") for default tags
-   * @return true if updated, false if not updated
+   * Adds default tags to the instance config if no tag exists, returns {@code true} if the default tags are added,
+   * {@code false} otherwise.
+   * <p>The {@code defaultTagsSupplier} is a function which is only invoked when the instance does not have any tag.
+   * E.g. () -> Collections.singletonList("DefaultTenant_BROKER").
    */
-  public static boolean updateCommonInstanceConfig(HelixManager helixManager, String instanceId, String host,
-      int port, @NotNull Supplier<List<String>> getDefaultTags) {
-    // if port is not a number, the default tags will still be applied
-    // so here we convert int to string to allow validation inside each functional group
-    return updateCommonInstanceConfig(helixManager, instanceId, host, String.valueOf(port), getDefaultTags);
-  }
-
-  /**
-   * Update the commonly needed settings for Helix Instance
-   * @param helixManager HelixManager for access
-   * @param instanceId the instance Id for the update
-   * @param host the Hostname
-   * @param port the port
-   * @param getDefaultTags lambda to get default tags. E.g., () -> ImmutableList.of("DefaultTenant") for default tags
-   * @return true if updated, false if not updated
-   */
-  public static boolean updateCommonInstanceConfig(HelixManager helixManager, String instanceId, String host,
-      String port, @NotNull Supplier<List<String>> getDefaultTags) {
-    InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(helixManager, instanceId);
-    boolean updated = HelixHelper.addDefaultTags(instanceConfig, getDefaultTags);
-    if (HelixHelper.updateHostNamePort(instanceConfig, host, port)) {
-      updated = true;
+  public static boolean addDefaultTags(InstanceConfig instanceConfig, Supplier<List<String>> defaultTagsSupplier) {
+    List<String> instanceTags = instanceConfig.getTags();
+    if (instanceTags.isEmpty()) {
+      List<String> defaultTags = defaultTagsSupplier.get();
+      if (!CollectionUtils.isEmpty(defaultTags)) {
+        LOGGER.info("Updating instance: {} with default tags: {}", instanceConfig.getId(), instanceTags);
+        for (String defaultTag : defaultTags) {
+          instanceConfig.addTag(defaultTag);
+        }
+        return true;
+      }
     }
-    if (updated) {
-      HelixHelper.updateInstanceConfig(helixManager, instanceConfig);
-    }
-    return updated;
+    return false;
   }
 }

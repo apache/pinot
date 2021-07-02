@@ -18,80 +18,61 @@
  */
 package org.apache.pinot.common.utils.helix;
 
-import com.google.common.collect.ImmutableList;
-import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixDataAccessor;
-import org.apache.helix.HelixManager;
-import org.apache.helix.PropertyKey;
+import java.util.Arrays;
+import java.util.List;
 import org.apache.helix.model.InstanceConfig;
-import org.mockito.Mockito;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
+
+
 public class HelixHelperTest {
-  @Test
-  public void testAddDefaultTags() {
-    HelixManager mockedManager = Mockito.mock(HelixManager.class);
-    HelixDataAccessor mockedAccessor = Mockito.mock(HelixDataAccessor.class);
-    HelixAdmin mockedAdmin = Mockito.mock(HelixAdmin.class);
-    Mockito.when(mockedManager.getHelixDataAccessor()).thenReturn(mockedAccessor);
-    Mockito.when(mockedManager.getClusterManagmentTool()).thenReturn(mockedAdmin);
-    final String clusterName = "amazing_cluster";
-    Mockito.when(mockedManager.getClusterName()).thenReturn(clusterName);
-    final String instanceId = "some_unique_id";
-    InstanceConfig targetConfig = new InstanceConfig(instanceId);
-    Mockito.when(mockedAdmin.getInstanceConfig(clusterName, instanceId)).thenReturn(targetConfig);
-    Mockito.when(mockedAccessor.keyBuilder()).thenReturn(new PropertyKey.Builder(clusterName));
-    Mockito.when(mockedAccessor.setProperty(Mockito.any(PropertyKey.class), Mockito.eq(targetConfig))).thenReturn(true);
-    Assert.assertTrue(HelixHelper.addDefaultTags(targetConfig, () -> ImmutableList.of("some_tag", "other_tag")));
-    Assert.assertEquals(ImmutableList.of("some_tag", "other_tag"), targetConfig.getTags());
-  }
 
   @Test
   public void testUpdateHostName() {
-    HelixManager mockedManager = Mockito.mock(HelixManager.class);
-    HelixDataAccessor mockedAccessor = Mockito.mock(HelixDataAccessor.class);
-    HelixAdmin mockedAdmin = Mockito.mock(HelixAdmin.class);
-    Mockito.when(mockedManager.getHelixDataAccessor()).thenReturn(mockedAccessor);
-    Mockito.when(mockedManager.getClusterManagmentTool()).thenReturn(mockedAdmin);
-    final String clusterName = "amazing_cluster";
-    Mockito.when(mockedManager.getClusterName()).thenReturn(clusterName);
-    final String instanceId = "some_unique_id";
-    InstanceConfig targetConfig = new InstanceConfig(instanceId);
-    Mockito.when(mockedAdmin.getInstanceConfig(clusterName, instanceId)).thenReturn(targetConfig);
-    Mockito.when(mockedAccessor.keyBuilder()).thenReturn(new PropertyKey.Builder(clusterName));
-    Mockito.when(mockedAccessor.setProperty(Mockito.any(PropertyKey.class), Mockito.eq(targetConfig))).thenReturn(true);
-    HelixHelper.updateHostNamePort(targetConfig, "strange.host.com", "234");
-    Assert.assertEquals("strange.host.com", targetConfig.getHostName());
-    Assert.assertEquals("234", targetConfig.getPort());
+    String instanceId = "myInstance";
+    InstanceConfig instanceConfig = new InstanceConfig(instanceId);
+    assertEquals(instanceConfig.getInstanceName(), instanceId);
+    assertNull(instanceConfig.getHostName());
+    assertNull(instanceConfig.getPort());
 
+    assertTrue(HelixHelper.updateHostnamePort(instanceConfig, "myHost", 1234));
+    assertEquals(instanceConfig.getInstanceName(), instanceId);
+    assertEquals(instanceConfig.getHostName(), "myHost");
+    assertEquals(instanceConfig.getPort(), "1234");
+
+    assertTrue(HelixHelper.updateHostnamePort(instanceConfig, "myHost2", 1234));
+    assertEquals(instanceConfig.getInstanceName(), instanceId);
+    assertEquals(instanceConfig.getHostName(), "myHost2");
+    assertEquals(instanceConfig.getPort(), "1234");
+
+    assertTrue(HelixHelper.updateHostnamePort(instanceConfig, "myHost2", 2345));
+    assertEquals(instanceConfig.getInstanceName(), instanceId);
+    assertEquals(instanceConfig.getHostName(), "myHost2");
+    assertEquals(instanceConfig.getPort(), "2345");
+
+    assertFalse(HelixHelper.updateHostnamePort(instanceConfig, "myHost2", 2345));
+    assertEquals(instanceConfig.getInstanceName(), instanceId);
+    assertEquals(instanceConfig.getHostName(), "myHost2");
+    assertEquals(instanceConfig.getPort(), "2345");
   }
 
   @Test
-  public void testRejectWrongInteger() {
-    final String instanceId = "some_unique_id";
-    InstanceConfig targetConfig = new InstanceConfig(instanceId);
-    Assert.assertFalse(HelixHelper.updateHostNamePort(targetConfig, "strange.host.com", "bla"));
-    Assert.assertFalse(HelixHelper.updateHostNamePort(targetConfig, "strange.host.com", null));
-  }
+  public void testAddDefaultTags() {
+    String instanceId = "myInstance";
+    InstanceConfig instanceConfig = new InstanceConfig(instanceId);
+    List<String> defaultTags = Arrays.asList("tag1", "tag2");
+    assertTrue(HelixHelper.addDefaultTags(instanceConfig, () -> defaultTags));
+    assertEquals(instanceConfig.getTags(), defaultTags);
 
-  @Test
-  public void testUpdateCommonInstanceConfig() {
-    HelixManager mockedManager = Mockito.mock(HelixManager.class);
-    HelixDataAccessor mockedAccessor = Mockito.mock(HelixDataAccessor.class);
-    HelixAdmin mockedAdmin = Mockito.mock(HelixAdmin.class);
-    Mockito.when(mockedManager.getHelixDataAccessor()).thenReturn(mockedAccessor);
-    Mockito.when(mockedManager.getClusterManagmentTool()).thenReturn(mockedAdmin);
-    final String clusterName = "amazing_cluster";
-    Mockito.when(mockedManager.getClusterName()).thenReturn(clusterName);
-    final String instanceId = "some_unique_id";
-    InstanceConfig targetConfig = new InstanceConfig(instanceId);
-    Mockito.when(mockedAdmin.getInstanceConfig(clusterName, instanceId)).thenReturn(targetConfig);
-    Mockito.when(mockedAccessor.keyBuilder()).thenReturn(new PropertyKey.Builder(clusterName));
-    Mockito.when(mockedAccessor.setProperty(Mockito.any(PropertyKey.class), Mockito.eq(targetConfig))).thenReturn(true);
-    Assert.assertTrue(HelixHelper.updateCommonInstanceConfig(mockedManager, instanceId, "strange.host.com", "2048", () -> ImmutableList.of("some_tag", "other_tag")));
-    Mockito.when(mockedAccessor.setProperty(Mockito.any(PropertyKey.class), Mockito.eq(targetConfig))).thenReturn(true);
-    Assert.assertEquals(ImmutableList.of("some_tag", "other_tag"), targetConfig.getTags());
-  }
+    assertFalse(HelixHelper.addDefaultTags(instanceConfig, () -> defaultTags));
+    assertEquals(instanceConfig.getTags(), defaultTags);
 
+    List<String> otherTags = Arrays.asList("tag3", "tag4");
+    assertFalse(HelixHelper.addDefaultTags(instanceConfig, () -> otherTags));
+    assertEquals(instanceConfig.getTags(), defaultTags);
+  }
 }

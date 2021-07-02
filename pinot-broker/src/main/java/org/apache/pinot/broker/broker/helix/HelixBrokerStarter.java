@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.broker.broker.helix;
 
-import com.google.common.base.Strings;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -54,7 +53,9 @@ public class HelixBrokerStarter extends BaseBrokerStarter {
   private static PinotConfiguration applyBrokerConfigs(PinotConfiguration brokerConf, String clusterName, String zkServers, @Nullable String brokerHost) {
     brokerConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
     brokerConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkServers);
-    if (!Strings.isNullOrEmpty(brokerHost)) {
+    if (brokerHost == null) {
+      brokerConf.clearProperty(Broker.CONFIG_OF_BROKER_HOSTNAME);
+    } else {
       brokerConf.setProperty(Broker.CONFIG_OF_BROKER_HOSTNAME, brokerHost);
     }
     return brokerConf;
