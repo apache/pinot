@@ -34,7 +34,7 @@ public class PinotStatement extends AbstractBaseStatement {
   private ResultSetGroup _resultSetGroup;
   private boolean _closed;
   private ResultSet _resultSet;
-  private int _maxRows = Short.MAX_VALUE;
+  private int _maxRows = Integer.MAX_VALUE;
 
   public PinotStatement(PinotConnection connection) {
     _connection = connection;
