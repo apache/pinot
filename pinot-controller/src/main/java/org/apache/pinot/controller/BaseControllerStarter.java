@@ -26,6 +26,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -575,7 +576,10 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   private void updateInstanceConfigIfNeeded() {
     InstanceConfig instanceConfig =
         HelixHelper.getInstanceConfig(_helixParticipantManager, _helixParticipantInstanceId);
-    if (HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port)) {
+    boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
+    updated |= HelixHelper
+        .addDefaultTags(instanceConfig, () -> Collections.singletonList(CommonConstants.Helix.CONTROLLER_INSTANCE));
+    if (updated) {
       HelixHelper.updateInstanceConfig(_helixParticipantManager, instanceConfig);
     }
   }
