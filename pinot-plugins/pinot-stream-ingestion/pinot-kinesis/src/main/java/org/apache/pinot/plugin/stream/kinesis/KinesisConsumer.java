@@ -28,10 +28,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.core.exception.AbortedException;
 import software.amazon.awssdk.services.kinesis.KinesisClient;
 import software.amazon.awssdk.services.kinesis.model.ExpiredIteratorException;
 import software.amazon.awssdk.services.kinesis.model.GetRecordsRequest;
@@ -85,6 +87,9 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
 
     try {
       return kinesisFetchResultFuture.get(timeoutMs, TimeUnit.MILLISECONDS);
+    } catch (TimeoutException e) {
+      kinesisFetchResultFuture.cancel(true);
+      return handleException((KinesisPartitionGroupOffset) startCheckpoint, recordList);
     } catch (Exception e) {
       return handleException((KinesisPartitionGroupOffset) startCheckpoint, recordList);
     }
@@ -140,11 +145,16 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
 
         if (getRecordsResponse.hasChildShards() && !getRecordsResponse.childShards().isEmpty()) {
           //This statement returns true only when end of current shard has reached.
+          // hasChildShards only checks if the childShard is null and is a valid instance.
           isEndOfShard = true;
           break;
         }
 
         shardIterator = getRecordsResponse.nextShardIterator();
+
+        if (Thread.interrupted()) {
+          break;
+        }
       }
 
       return new KinesisRecordsBatch(recordList, startShardToSequenceNum.getKey(), isEndOfShard);
@@ -164,6 +174,9 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     } catch (KinesisException e) {
       LOGGER.warn("Encountered unknown unrecoverable AWS exception", e);
       throw new RuntimeException(e);
+    } catch (AbortedException e) {
+      LOGGER.warn("Task aborted due to exception.", e);
+      return handleException(kinesisStartCheckpoint, recordList);
     } catch (Throwable e) {
       // non transient errors
       LOGGER.error("Unknown fetchRecords exception", e);
@@ -198,5 +211,18 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
   @Override
   public void close() {
     super.close();
+    shutdownAndAwaitTermination();
+  }
+
+  void shutdownAndAwaitTermination() {
+    _executorService.shutdown();
+    try {
+      if (!_executorService.awaitTermination(60, TimeUnit.SECONDS)) {
+        _executorService.shutdownNow();
+      }
+    } catch (InterruptedException ie) {
+      _executorService.shutdownNow();
+      Thread.currentThread().interrupt();
+    }
   }
 }
