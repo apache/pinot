@@ -600,9 +600,8 @@ public class DateTimeFunctions {
    * @return truncated timeValue in TimeUnit.MILLISECONDS
    */
   @ScalarFunction
-  public static Timestamp dateTrunc(String unit, long timeValue){
-    long result =  dateTrunc(unit, timeValue, TimeUnit.MILLISECONDS.name());
-    return new Timestamp(result);
+  public long dateTrunc(String unit, long timeValue){
+    return dateTrunc(unit, timeValue, TimeUnit.MILLISECONDS.name());
   }
 
   /**

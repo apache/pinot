@@ -30,8 +30,8 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.joda.time.DateTimeField;
 
+
 /**
- * The following class is now Deprecated. All functions have been moved to {@link org.apache.pinot.common.function.scalar.DateTimeFunctions}
  * The <code>DateTruncTransformationFunction</code> class implements the sql compatible date_trunc function for TIMESTAMP type.
  * <p>
  *  <ul>
@@ -76,7 +76,6 @@ import org.joda.time.DateTimeField;
  *   </li>
  * </ul>
  */
-@Deprecated
 public class DateTruncTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "dateTrunc";
   public static final String EXAMPLE_INVOCATION =
@@ -97,14 +96,16 @@ public class DateTruncTransformFunction extends BaseTransformFunction {
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     Preconditions.checkArgument(arguments.size() >= 3 && arguments.size() <= 5,
-        "Between three to five arguments are required, example: %s", EXAMPLE_INVOCATION);
+        "Between two to five arguments are required, example: %s", EXAMPLE_INVOCATION);
     String unit = ((LiteralTransformFunction) arguments.get(0)).getLiteral().toLowerCase();
     TransformFunction valueArgument = arguments.get(1);
     Preconditions.checkArgument(
         !(valueArgument instanceof LiteralTransformFunction) && valueArgument.getResultMetadata().isSingleValue(),
         "The second argument of dateTrunc transform function must be a single-valued column or a transform function");
     _mainTransformFunction = valueArgument;
-    String inputTimeUnitStr = ((LiteralTransformFunction) arguments.get(2)).getLiteral().toUpperCase();
+    String inputTimeUnitStr =
+        (arguments.size() >= 3) ? ((LiteralTransformFunction) arguments.get(2)).getLiteral().toUpperCase()
+            : TimeUnit.MILLISECONDS.name();
     _inputTimeUnit = TimeUnit.valueOf(inputTimeUnitStr);
 
     String timeZone = arguments.size() >= 4 ? ((LiteralTransformFunction) arguments.get(3)).getLiteral() : UTC_TZ;
