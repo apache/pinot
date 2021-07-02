@@ -42,7 +42,7 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
   private String _query;
   private boolean _closed;
   private ResultSet _resultSet;
-  private int _maxRows = Integer.MAX_VALUE;
+  private int _maxRows = Short.MAX_VALUE;
 
   public PinotPreparedStatement(PinotConnection connection, String query) {
     _connection = connection;
