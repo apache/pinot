@@ -22,18 +22,19 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import org.apache.pinot.client.base.AbstractBaseStatement;
+import org.apache.pinot.client.utils.DriverUtils;
 
 
 public class PinotStatement extends AbstractBaseStatement {
 
   private static final String QUERY_FORMAT = "sql";
-  public static final String LIMIT_STATEMENT = "LIMIT";
+  private static final String LIMIT_STATEMENT = "LIMIT";
   private Connection _connection;
   private org.apache.pinot.client.Connection _session;
   private ResultSetGroup _resultSetGroup;
   private boolean _closed;
   private ResultSet _resultSet;
-  private Integer _maxRows = Integer.MAX_VALUE;
+  private int _maxRows = Integer.MAX_VALUE;
 
   public PinotStatement(PinotConnection connection) {
     _connection = connection;
@@ -61,7 +62,7 @@ public class PinotStatement extends AbstractBaseStatement {
       throws SQLException {
     validateState();
     try {
-      if(!sql.contains(LIMIT_STATEMENT)) {
+      if(!DriverUtils.queryContainsLimitStatement(sql)) {
         sql = sql.concat(" " + LIMIT_STATEMENT + " " + _maxRows);
       }
       Request request = new Request(QUERY_FORMAT, sql);

@@ -28,6 +28,7 @@ import java.sql.Timestamp;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.client.base.AbstractBasePreparedStatement;
 import org.apache.pinot.client.utils.DateTimeUtils;
+import org.apache.pinot.client.utils.DriverUtils;
 
 
 public class PinotPreparedStatement extends AbstractBasePreparedStatement {
@@ -41,14 +42,14 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
   private String _query;
   private boolean _closed;
   private ResultSet _resultSet;
-  private Integer _maxRows = Integer.MAX_VALUE;
+  private int _maxRows = Integer.MAX_VALUE;
 
   public PinotPreparedStatement(PinotConnection connection, String query) {
     _connection = connection;
     _session = connection.getSession();
     _closed = false;
     _query = query;
-    if(!_query.contains(LIMIT_STATEMENT)) {
+    if(!DriverUtils.queryContainsLimitStatement(_query)) {
       _query = _query.concat(" " + LIMIT_STATEMENT + " " + _maxRows);
     }
     _preparedStatement = new PreparedStatement(_session, new Request(QUERY_FORMAT, _query));

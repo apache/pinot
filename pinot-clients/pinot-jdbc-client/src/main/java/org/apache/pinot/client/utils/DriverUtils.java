@@ -23,6 +23,8 @@ import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.Collections;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,6 +36,7 @@ public class DriverUtils {
   public static final String QUERY_SEPERATOR = "&";
   public static final String PARAM_SEPERATOR = "=";
   public static final String CONTROLLER = "controller";
+  private static final String LIMIT_STATEMENT_REGEX = "\\s(limit)\\s";
 
   private DriverUtils() {
   }
@@ -143,5 +146,11 @@ public class DriverUtils {
         columnsJavaClassName = String.class.getTypeName();
     }
     return columnsJavaClassName;
+  }
+
+  public static boolean queryContainsLimitStatement(String query) {
+    Pattern pattern = Pattern.compile(LIMIT_STATEMENT_REGEX, Pattern.CASE_INSENSITIVE);
+    Matcher matcher = pattern.matcher(query);
+    return matcher.find();
   }
 }
