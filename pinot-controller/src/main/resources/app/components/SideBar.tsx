@@ -98,7 +98,7 @@ const useStyles = makeStyles((theme: Theme) =>
       position: 'absolute',
       whiteSpace: 'nowrap',
       backgroundColor: 'inherit',
-      padding: '8px 8px 8px 0',
+      padding: '7px 8px 7px 0',
       borderRadius: '0 4px 4px 0',
       zIndex: 9
     },

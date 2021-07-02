@@ -71,6 +71,7 @@
     "fs": "0.0.1-security",
     "html-loader": "0.5.5",
     "html-webpack-plugin": "^4.2.1",
+    "json-bigint": "^1.0.0",
     "jsonlint": "^1.6.3",
     "lodash": "^4.17.17",
     "moment": "^2.27.0",
