@@ -44,6 +44,7 @@ import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.api.listeners.ControllerChangeListener;
 import org.apache.helix.model.ClusterConstraints;
 import org.apache.helix.model.ConstraintItem;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.model.Message;
 import org.apache.helix.task.TaskDriver;
@@ -55,6 +56,7 @@ import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -117,6 +119,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected ExecutorService _executorService;
   protected String _helixZkURL;
   protected String _helixClusterName;
+  protected String _hostname;
+  protected int _port;
   protected String _helixControllerInstanceId;
   protected String _helixParticipantInstanceId;
   protected boolean _isUpdateStateModel;
@@ -147,18 +151,22 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   public void init(PinotConfiguration pinotConfiguration)
       throws Exception {
     _config = new ControllerConf(pinotConfiguration.toMap());
-    inferHostnameIfNeeded(_config);
     setupHelixSystemProperties();
+    _listenerConfigs = ListenerConfigUtil.buildControllerConfigs(_config);
     _controllerMode = _config.getControllerMode();
     // Helix related settings.
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_config.getZkStr());
     _helixClusterName = _config.getHelixClusterName();
-    _listenerConfigs = ListenerConfigUtil.buildControllerConfigs(_config);
-    String host = _config.getControllerHost();
-    int port = _listenerConfigs.get(0).getPort();
-
-    _helixControllerInstanceId = host + "_" + port;
-    _helixParticipantInstanceId = LeadControllerUtils.generateParticipantInstanceId(host, port);
+    inferHostnameIfNeeded(_config);
+    _hostname = _config.getControllerHost();
+    _port = _listenerConfigs.get(0).getPort();
+    _helixControllerInstanceId = _hostname + "_" + _port;
+    String instanceIdFromConfig = _config.getInstanceId();
+    if (StringUtils.isNotEmpty(instanceIdFromConfig)) {
+      _helixParticipantInstanceId = instanceIdFromConfig;
+    } else {
+      _helixParticipantInstanceId = LeadControllerUtils.generateParticipantInstanceId(_hostname, _port);
+    }
     _isUpdateStateModel = _config.isUpdateSegmentStateModel();
     _enableBatchMessageMode = _config.getEnableBatchMessageMode();
 
@@ -545,6 +553,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg);
     }
+    updateInstanceConfigIfNeeded();
 
     LOGGER.info("Registering helix controller listener");
     // This registration is not needed when the leadControllerResource is enabled.
@@ -560,6 +569,14 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     } catch (Exception e) {
       throw new RuntimeException(
           "Error registering resource config listener for " + CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME, e);
+    }
+  }
+
+  private void updateInstanceConfigIfNeeded() {
+    InstanceConfig instanceConfig =
+        HelixHelper.getInstanceConfig(_helixParticipantManager, _helixParticipantInstanceId);
+    if (HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port)) {
+      HelixHelper.updateInstanceConfig(_helixParticipantManager, instanceConfig);
     }
   }
 

@@ -19,15 +19,18 @@
 package org.apache.pinot.common.utils.helix;
 
 import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.I0Itec.zkclient.exception.ZkBadVersionException;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
@@ -55,7 +58,8 @@ public class HelixHelper {
   private static final String ENABLE_COMPRESSIONS_KEY = "enableCompression";
 
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
-  private static final RetryPolicy DEFAULT_TABLE_IDEALSTATES_UPDATE_RETRY_POLICY = RetryPolicies.randomDelayRetryPolicy(20, 100L, 200L);
+  private static final RetryPolicy DEFAULT_TABLE_IDEALSTATES_UPDATE_RETRY_POLICY =
+      RetryPolicies.randomDelayRetryPolicy(20, 100L, 200L);
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixHelper.class);
   private static final ZNRecordSerializer ZN_RECORD_SERIALIZER = new ZNRecordSerializer();
 
@@ -494,5 +498,69 @@ public class HelixHelper {
   public static Set<InstanceConfig> getBrokerInstanceConfigsForTenant(List<InstanceConfig> instanceConfigs,
       String tenant) {
     return new HashSet<>(getInstancesConfigsWithTag(instanceConfigs, TagNameUtils.getBrokerTagForTenant(tenant)));
+  }
+
+  /**
+   * Returns the instance config for a specific instance.
+   */
+  public static InstanceConfig getInstanceConfig(HelixManager helixManager, String instanceId) {
+    HelixAdmin admin = helixManager.getClusterManagmentTool();
+    String clusterName = helixManager.getClusterName();
+    return admin.getInstanceConfig(clusterName, instanceId);
+  }
+
+  /**
+   * Updates instance config to the Helix property store.
+   */
+  public static void updateInstanceConfig(HelixManager helixManager, InstanceConfig instanceConfig) {
+    // NOTE: Use HelixDataAccessor.setProperty() instead of HelixAdmin.setInstanceConfig() because the latter explicitly
+    // forbids instance host/port modification
+    HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
+    Preconditions.checkState(helixDataAccessor
+            .setProperty(helixDataAccessor.keyBuilder().instanceConfig(instanceConfig.getId()), instanceConfig),
+        "Failed to update instance config for instance: " + instanceConfig.getId());
+  }
+
+  /**
+   * Updates hostname and port in the instance config, returns {@code true} if the value is updated, {@code false}
+   * otherwise.
+   */
+  public static boolean updateHostnamePort(InstanceConfig instanceConfig, String hostname, int port) {
+    boolean updated = false;
+    String existingHostname = instanceConfig.getHostName();
+    if (!hostname.equals(existingHostname)) {
+      LOGGER.info("Updating instance: {} with hostname: {}", instanceConfig.getId(), hostname);
+      instanceConfig.setHostName(hostname);
+      updated = true;
+    }
+    String portStr = Integer.toString(port);
+    String existingPortStr = instanceConfig.getPort();
+    if (!portStr.equals(existingPortStr)) {
+      LOGGER.info("Updating instance: {} with port: {}", instanceConfig.getId(), port);
+      instanceConfig.setPort(portStr);
+      updated = true;
+    }
+    return updated;
+  }
+
+  /**
+   * Adds default tags to the instance config if no tag exists, returns {@code true} if the default tags are added,
+   * {@code false} otherwise.
+   * <p>The {@code defaultTagsSupplier} is a function which is only invoked when the instance does not have any tag.
+   * E.g. () -> Collections.singletonList("DefaultTenant_BROKER").
+   */
+  public static boolean addDefaultTags(InstanceConfig instanceConfig, Supplier<List<String>> defaultTagsSupplier) {
+    List<String> instanceTags = instanceConfig.getTags();
+    if (instanceTags.isEmpty()) {
+      List<String> defaultTags = defaultTagsSupplier.get();
+      if (!CollectionUtils.isEmpty(defaultTags)) {
+        LOGGER.info("Updating instance: {} with default tags: {}", instanceConfig.getId(), instanceTags);
+        for (String defaultTag : defaultTags) {
+          instanceConfig.addTag(defaultTag);
+        }
+        return true;
+      }
+    }
+    return false;
   }
 }
