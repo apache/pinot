@@ -79,6 +79,13 @@ public class StreamConfig {
   private final Map<String, String> _streamConfigMap = new HashMap<>();
 
   /**
+   * AWS Kinesis specific properties
+   */
+  private final String _aws_region;
+  private final String _aws_access_key;
+  private final String _aws_secret_key;
+
+  /**
    * Initializes a StreamConfig using the map of stream configs from the table config
    */
   public StreamConfig(String tableNameWithType, Map<String, String> streamConfigMap) {
@@ -182,6 +189,13 @@ public class StreamConfig {
     _groupId = streamConfigMap.get(groupIdKey);
 
     _streamConfigMap.putAll(streamConfigMap);
+
+    /**
+     * If else to obfuscate these properties
+     */
+    _aws_region = streamConfigMap.get(StreamConfigProperties.AWS_REGION);
+    _aws_access_key = streamConfigMap.get(StreamConfigProperties.AWS_ACCESS_KEY);
+    _aws_secret_key = streamConfigMap.get(StreamConfigProperties.AWS_SECRET_KEY);
   }
 
   private long extractFlushThresholdSegmentSize(Map<String, String> streamConfigMap) {

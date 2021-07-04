@@ -104,6 +104,13 @@ public class StreamConfigProperties {
   public static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "realtime.segment.commit.timeoutSeconds";
 
   /**
+   * AWS Kinesis specific properties
+   */
+  public static final String AWS_REGION = "region";
+  public static final String AWS_ACCESS_KEY = "accessKey";
+  public static final String AWS_SECRET_KEY = "secretKey";
+
+  /**
    * Helper method to create a stream specific property
    */
   public static String constructStreamProperty(String streamType, String property) {
