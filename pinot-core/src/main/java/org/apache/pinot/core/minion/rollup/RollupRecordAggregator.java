@@ -23,8 +23,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.minion.segment.RecordAggregator;
-import org.apache.pinot.core.segment.processing.collector.ValueAggregator;
-import org.apache.pinot.core.segment.processing.collector.ValueAggregatorFactory;
+import org.apache.pinot.core.segment.processing.aggregator.ValueAggregator;
+import org.apache.pinot.core.segment.processing.aggregator.ValueAggregatorFactory;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -38,7 +39,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  * whose metric column values are aggregated based on the given aggregator functions.
  */
 public class RollupRecordAggregator implements RecordAggregator {
-  private static final String DEFAULT_VALUE_AGGREGATOR_TYPE = ValueAggregatorFactory.ValueAggregatorType.SUM.toString();
+  private static final String DEFAULT_VALUE_AGGREGATOR_TYPE = AggregationFunctionType.SUM.name();
 
   private final Map<String, ValueAggregator> _valueAggregatorMap;
   private final Schema _schema;
@@ -53,7 +54,9 @@ public class RollupRecordAggregator implements RecordAggregator {
       if (!fieldSpec.isVirtualColumn() && fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC) {
         String metricName = fieldSpec.getName();
         String aggregateType = aggregateTypes.getOrDefault(metricName, DEFAULT_VALUE_AGGREGATOR_TYPE);
-        ValueAggregator valueAggregator = ValueAggregatorFactory.getValueAggregator(aggregateType, fieldSpec.getDataType());
+        ValueAggregator valueAggregator = ValueAggregatorFactory
+            .getValueAggregator(AggregationFunctionType.getAggregationFunctionType(aggregateType),
+                fieldSpec.getDataType());
         _valueAggregatorMap.put(metricName, valueAggregator);
       }
     }

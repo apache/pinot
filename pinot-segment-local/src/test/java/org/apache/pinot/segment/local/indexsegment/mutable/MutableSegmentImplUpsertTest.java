@@ -61,7 +61,7 @@ public class MutableSegmentImplUpsertTest {
     _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
     File jsonFile = new File(dataResourceUrl.getFile());
     _partitionUpsertMetadataManager =
-        new TableUpsertMetadataManager("testTable_REALTIME", Mockito.mock(ServerMetrics.class))
+        new TableUpsertMetadataManager("testTable_REALTIME", Mockito.mock(ServerMetrics.class), null)
             .getOrCreatePartitionManager(0);
     _mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
@@ -81,7 +81,7 @@ public class MutableSegmentImplUpsertTest {
 
   @Test
   public void testUpsertIngestion() {
-    ImmutableRoaringBitmap bitmap = _mutableSegmentImpl.getValidDocIndex().getValidDocBitmap();
+    ImmutableRoaringBitmap bitmap = _mutableSegmentImpl.getValidDocIds().getMutableRoaringBitmap();
     Assert.assertFalse(bitmap.contains(0));
     Assert.assertTrue(bitmap.contains(1));
     Assert.assertTrue(bitmap.contains(2));

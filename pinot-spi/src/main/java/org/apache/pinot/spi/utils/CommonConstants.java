@@ -37,8 +37,7 @@ public class CommonConstants {
    * The state of the consumer for a given segment
    */
   public enum ConsumerState {
-    CONSUMING,
-    NOT_CONSUMING // In error state
+    CONSUMING, NOT_CONSUMING // In error state
   }
 
   public static class Table {
@@ -125,6 +124,7 @@ public class CommonConstants {
       public static final String ADMIN_HTTPS_PORT_KEY = "adminHttpsPort";
       public static final String GRPC_PORT_KEY = "grpcPort";
       public static final String NETTYTLS_PORT_KEY = "nettyTlsPort";
+      public static final String SYSTEM_RESOURCE_INFO_KEY = "SYSTEM_RESOURCE_INFO";
     }
 
     public static final String SET_INSTANCE_ID_TO_HOSTNAME_KEY = "pinot.set.instance.id.to.hostname";
@@ -153,6 +153,11 @@ public class CommonConstants {
     public static final String PINOT_SERVICE_ROLE = "pinot.service.role";
     public static final String CONFIG_OF_CLUSTER_NAME = "pinot.cluster.name";
     public static final String CONFIG_OF_ZOOKEEPR_SERVER = "pinot.zk.server";
+
+    public static final String CONFIG_OF_PINOT_CONTROLLER_STARTABLE_CLASS = "pinot.controller.startable.class";
+    public static final String CONFIG_OF_PINOT_BROKER_STARTABLE_CLASS = "pinot.broker.startable.class";
+    public static final String CONFIG_OF_PINOT_SERVER_STARTABLE_CLASS = "pinot.server.startable.class";
+    public static final String CONFIG_OF_PINOT_MINION_STARTABLE_CLASS = "pinot.minion.startable.class";
   }
 
   public static class Broker {
@@ -253,7 +258,8 @@ public class CommonConstants {
         "pinot.server.instance.realtime.alloc.offheap.direct";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.server.storage.factory";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.server.crypter";
-    public static final String CONFIG_OF_VALUE_PRUNER_IN_PREDICATE_THRESHOLD = "pinot.server.query.executor.pruner.columnvaluesegmentpruner.inpredicate.threshold";
+    public static final String CONFIG_OF_VALUE_PRUNER_IN_PREDICATE_THRESHOLD =
+        "pinot.server.query.executor.pruner.columnvaluesegmentpruner.inpredicate.threshold";
     public static final int DEFAULT_VALUE_PRUNER_IN_PREDICATE_THRESHOLD = 10;
 
     /**
@@ -273,8 +279,8 @@ public class CommonConstants {
     public static final int DEFAULT_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS = 0;
 
     public static final String DEFAULT_READ_MODE = "mmap";
-    // Whether to reload consuming segment on scheme update. Will change default behavior to true when this feature is stabilized
-    public static final boolean DEFAULT_RELOAD_CONSUMING_SEGMENT = false;
+    // Whether to reload consuming segment on scheme update
+    public static final boolean DEFAULT_RELOAD_CONSUMING_SEGMENT = true;
     public static final String DEFAULT_INSTANCE_BASE_DIR =
         System.getProperty("java.io.tmpdir") + File.separator + "PinotServer";
     public static final String DEFAULT_INSTANCE_DATA_DIR = DEFAULT_INSTANCE_BASE_DIR + File.separator + "index";
@@ -379,7 +385,8 @@ public class CommonConstants {
     public static final int DEFAULT_CURRENT_DATA_TABLE_VERSION = 3;
 
     // Environment Provider Configs
-    public static final String PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY = "pinot.server.environmentProvider.factory";
+    public static final String PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY =
+        "pinot.server.environmentProvider.factory";
     public static final String ENVIRONMENT_PROVIDER_CLASS_NAME = "pinot.server.environmentProvider.className";
   }
 
@@ -398,6 +405,8 @@ public class CommonConstants {
     // but we keep this default for backward compatibility in case someone relies on this format
     // see Server or Broker class for correct prefix format you should use
     public static final String DEFAULT_METRICS_PREFIX = "pinot.controller.";
+
+    public static final String CONFIG_OF_INSTANCE_ID = "pinot.controller.instance.id";
   }
 
   public static class Minion {

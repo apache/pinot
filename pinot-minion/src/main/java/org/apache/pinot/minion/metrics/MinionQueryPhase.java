@@ -23,7 +23,8 @@ import org.apache.pinot.common.metrics.AbstractMetrics;
 
 
 public enum MinionQueryPhase implements AbstractMetrics.QueryPhase {
-  TASK_EXECUTION;
+  TASK_EXECUTION,
+  TASK_QUEUEING;
 
   private final String _queryPhaseName;
 

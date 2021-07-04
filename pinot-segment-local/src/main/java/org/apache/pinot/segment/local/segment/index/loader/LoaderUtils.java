@@ -23,7 +23,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import javax.annotation.Nonnull;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
@@ -33,7 +32,7 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVFo
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.sorted.SortedIndexReaderImpl;
-import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
@@ -157,7 +156,7 @@ public class LoaderUtils {
    * </ul>
    * <p>Should be called before trying to load the segment or metadata from index directory.
    */
-  public static void reloadFailureRecovery(@Nonnull File indexDir)
+  public static void reloadFailureRecovery(File indexDir)
       throws IOException {
     File parentDir = indexDir.getParentFile();
 

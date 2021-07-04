@@ -21,7 +21,7 @@ package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import org.apache.pinot.segment.local.realtime.impl.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 

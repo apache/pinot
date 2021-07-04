@@ -54,6 +54,7 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.tuner.TableConfigTunerUtils;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.TableConfigs;
@@ -373,7 +374,7 @@ public class TableConfigsRestletResource {
   }
 
   private void tuneConfig(TableConfig tableConfig, Schema schema) {
-    TableConfigUtils.applyTunerConfig(tableConfig, schema);
+    TableConfigTunerUtils.applyTunerConfig(_pinotHelixResourceManager, tableConfig, schema);
     TableConfigUtils.ensureMinReplicas(tableConfig, _controllerConf.getDefaultTableMinReplicas());
     TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
   }

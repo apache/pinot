@@ -92,11 +92,12 @@ public class SegmentProcessorFrameworkCommand extends AbstractBaseAdminCommand i
     TableConfig tableConfig =
         JsonUtils.fileToObject(new File(segmentProcessorFrameworkSpec.getTableConfigFile()), TableConfig.class);
     SegmentProcessorConfig segmentProcessorConfig =
-        new SegmentProcessorConfig.Builder().setSchema(schema).setTableConfig(tableConfig)
+        new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema)
+            .setMergeType(segmentProcessorFrameworkSpec.getMergeType())
             .setRecordTransformerConfig(segmentProcessorFrameworkSpec.getRecordTransformerConfig())
             .setRecordFilterConfig(segmentProcessorFrameworkSpec.getRecordFilterConfig())
             .setPartitionerConfigs(segmentProcessorFrameworkSpec.getPartitionerConfigs())
-            .setCollectorConfig(segmentProcessorFrameworkSpec.getCollectorConfig())
+            .setAggregationTypes(segmentProcessorFrameworkSpec.getAggregationTypes())
             .setSegmentConfig(segmentProcessorFrameworkSpec.getSegmentConfig()).build();
 
     SegmentProcessorFramework framework =

@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -134,39 +135,50 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
 
   @VisibleForTesting
   File getFileFor(String column, ColumnIndexType indexType) {
-    String filename;
+    String fileExtension;
     switch (indexType) {
       case DICTIONARY:
-        filename = _segmentMetadata.getDictionaryFileName(column);
+        fileExtension = V1Constants.Dict.FILE_EXTENSION;
         break;
       case FORWARD_INDEX:
-        filename = _segmentMetadata.getForwardIndexFileName(column);
+        ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
+        if (columnMetadata.isSingleValue()) {
+          if (!columnMetadata.hasDictionary()) {
+            fileExtension = V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION;
+          } else if (columnMetadata.isSorted()) {
+            fileExtension = V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
+          } else {
+            fileExtension = V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
+          }
+        } else {
+          fileExtension = V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION;
+        }
         break;
       case INVERTED_INDEX:
-        filename = _segmentMetadata.getBitmapInvertedIndexFileName(column);
+        fileExtension = V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION;
         break;
       case RANGE_INDEX:
-        filename = _segmentMetadata.getBitmapRangeIndexFileName(column);
+        fileExtension = V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION;
         break;
       case BLOOM_FILTER:
-        filename = _segmentMetadata.getBloomFilterFileName(column);
+        fileExtension = V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION;
         break;
       case NULLVALUE_VECTOR:
-        filename = _segmentMetadata.getNullValueVectorFileName(column);
+        fileExtension = V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION;
         break;
       case TEXT_INDEX:
-        filename = column + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION;
+        fileExtension = V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION;
         break;
       case FST_INDEX:
-        filename = column + V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
+        fileExtension = V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
         break;
       case JSON_INDEX:
-        filename = column + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION;
+        fileExtension = V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION;
         break;
       default:
-        throw new UnsupportedOperationException("Unknown index type: " + indexType.toString());
+        throw new IllegalStateException("Unsupported index type: " + indexType);
     }
-    return new File(_segmentDirectory, filename);
+    return new File(_segmentDirectory, column + fileExtension);
   }
 
   private PinotDataBuffer mapForWrites(File file, long sizeBytes, String context)

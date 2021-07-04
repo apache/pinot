@@ -40,7 +40,8 @@ public class ServerStarterIntegrationTest extends ControllerTest {
   private static final int CUSTOM_PORT = 10001;
 
   @BeforeClass
-  public void setUp() {
+  public void setUp()
+      throws Exception {
     startZk();
     startController();
   }
@@ -56,7 +57,8 @@ public class ServerStarterIntegrationTest extends ControllerTest {
       throws Exception {
     serverConf.setProperty(CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     serverConf.setProperty(CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
-    HelixServerStarter helixServerStarter = new HelixServerStarter(serverConf);
+    HelixServerStarter helixServerStarter = new HelixServerStarter();
+    helixServerStarter.init(serverConf);
     helixServerStarter.start();
     helixServerStarter.stop();
 

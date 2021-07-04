@@ -74,6 +74,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -153,17 +154,19 @@ public abstract class ControllerTestUtils {
     return properties;
   }
 
-  public static void startController(Map<String, Object> properties) {
+  public static void startController(Map<String, Object> properties)
+      throws Exception {
     Preconditions.checkState(_controllerStarter == null);
 
     _controllerConfig = new ControllerConf(properties);
 
-    _controllerPort = Integer.valueOf(_controllerConfig.getControllerPort());
+    _controllerPort = Integer.parseInt(_controllerConfig.getControllerPort());
     _controllerBaseApiUrl = "http://localhost:" + _controllerPort;
     _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl);
     _controllerDataDir = _controllerConfig.getDataDir();
 
-    _controllerStarter = getControllerStarter(_controllerConfig);
+    _controllerStarter = new ControllerStarter();
+    _controllerStarter.init(new PinotConfiguration(properties));
     _controllerStarter.start();
     _helixResourceManager = _controllerStarter.getHelixResourceManager();
     _helixManager = _controllerStarter.getHelixControllerManager();
@@ -192,10 +195,6 @@ public abstract class ControllerTestUtils {
     configAccessor.set(scope, CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_KEY, Boolean.toString(true));
     //Set hyperloglog log2m value to 12.
     configAccessor.set(scope, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(12));
-  }
-
-  protected static ControllerStarter getControllerStarter(ControllerConf config) {
-    return new ControllerStarter(config);
   }
 
   public static ControllerConf getControllerConfig() {

@@ -46,6 +46,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.data.FieldSpec.DataType.JSON;
 import static org.apache.pinot.spi.data.FieldSpec.DataType.STRING;
 
 
@@ -79,6 +80,10 @@ public final class Schema implements Serializable {
   private transient final List<String> _dimensionNames = new ArrayList<>();
   private transient final List<String> _metricNames = new ArrayList<>();
   private transient final List<String> _dateTimeNames = new ArrayList<>();
+
+  // Set to true if this schema has a JSON column (used to quickly decide whether to run JsonStatementOptimizer on
+  // queries or not).
+  private boolean _hasJSONColumn;
 
   public static Schema fromFile(File schemaFile)
       throws IOException {
@@ -211,6 +216,7 @@ public final class Schema implements Serializable {
         throw new UnsupportedOperationException("Unsupported field type: " + fieldType);
     }
 
+    _hasJSONColumn |= fieldSpec.getDataType().equals(JSON);
     _fieldSpecMap.put(columnName, fieldSpec);
   }
 
@@ -254,6 +260,10 @@ public final class Schema implements Serializable {
 
   public boolean hasColumn(String columnName) {
     return _fieldSpecMap.containsKey(columnName);
+  }
+
+  public boolean hasJSONColumn() {
+    return _hasJSONColumn;
   }
 
   @JsonIgnore
@@ -643,7 +653,8 @@ public final class Schema implements Serializable {
         .isEqualIgnoreOrder(_dateTimeFieldSpecs, that._dateTimeFieldSpecs) && EqualityUtils
         .isEqualIgnoreOrder(_complexFieldSpecs, that._complexFieldSpecs) && EqualityUtils
         .isEqualMap(_fieldSpecMap, that._fieldSpecMap) && EqualityUtils
-        .isEqual(_primaryKeyColumns, that._primaryKeyColumns);
+        .isEqual(_primaryKeyColumns, that._primaryKeyColumns) && EqualityUtils
+        .isEqual(_hasJSONColumn, that._hasJSONColumn);
   }
 
   /**
@@ -678,6 +689,7 @@ public final class Schema implements Serializable {
     result = EqualityUtils.hashCodeOf(result, _complexFieldSpecs);
     result = EqualityUtils.hashCodeOf(result, _fieldSpecMap);
     result = EqualityUtils.hashCodeOf(result, _primaryKeyColumns);
+    result = EqualityUtils.hashCodeOf(result, _hasJSONColumn);
     return result;
   }
 

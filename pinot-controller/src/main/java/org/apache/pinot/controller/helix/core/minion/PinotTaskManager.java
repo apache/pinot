@@ -401,8 +401,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   @Nullable
   private String scheduleTask(PinotTaskGenerator taskGenerator, List<TableConfig> enabledTableConfigs,
       boolean isLeader) {
-    LOGGER.info("Trying to schedule task type: {}, with table config: {}, isLeader: {}", taskGenerator.getTaskType(),
-        enabledTableConfigs, isLeader);
+    LOGGER.info("Trying to schedule task type: {}, isLeader: {}", taskGenerator.getTaskType(), isLeader);
     List<PinotTaskConfig> pinotTaskConfigs = taskGenerator.generateTasks(enabledTableConfigs);
     if (!isLeader) {
       taskGenerator.nonLeaderCleanUp();

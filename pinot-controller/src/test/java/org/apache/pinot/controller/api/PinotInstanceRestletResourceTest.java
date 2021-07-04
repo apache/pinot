@@ -128,10 +128,10 @@ public class PinotInstanceRestletResourceTest {
     checkNumInstances(listInstancesUrl, counts[0] + 4);
 
     // Check that the instances are properly created
-    checkInstanceInfo("Broker_1.2.3.4_1234", "Broker_1.2.3.4", 1234, new String[0], null, null, false);
-    checkInstanceInfo("Server_1.2.3.4_2345", "Server_1.2.3.4", 2345, new String[0], null, null, 8090, 8091, false);
-    checkInstanceInfo("Broker_2.3.4.5_1234", "Broker_2.3.4.5", 1234, new String[]{"tag_BROKER"}, null, null, false);
-    checkInstanceInfo("Server_2.3.4.5_2345", "Server_2.3.4.5", 2345, new String[]{"tag_OFFLINE", "tag_REALTIME"},
+    checkInstanceInfo("Broker_1.2.3.4_1234", "1.2.3.4", 1234, new String[0], null, null, false);
+    checkInstanceInfo("Server_1.2.3.4_2345", "1.2.3.4", 2345, new String[0], null, null, 8090, 8091, false);
+    checkInstanceInfo("Broker_2.3.4.5_1234", "2.3.4.5", 1234, new String[]{"tag_BROKER"}, null, null, false);
+    checkInstanceInfo("Server_2.3.4.5_2345", "2.3.4.5", 2345, new String[]{"tag_OFFLINE", "tag_REALTIME"},
         new String[]{"tag_OFFLINE", "tag_REALTIME"}, new int[]{0, 1}, 18090, 18091, false);
 
     // Test PUT Instance API
@@ -150,9 +150,8 @@ public class PinotInstanceRestletResourceTest {
     String serverInstanceUrl = ControllerTestUtils.getControllerRequestURLBuilder().forInstance(serverInstanceId);
     ControllerTestUtils.sendPutRequest(serverInstanceUrl, newServerInstance.toJsonString());
 
-    checkInstanceInfo(brokerInstanceId, "Broker_1.2.3.4", 1234, new String[]{newBrokerTag}, null, null, false);
-    checkInstanceInfo(serverInstanceId, "Server_1.2.3.4", 2345, new String[]{newServerTag}, null, null, 28090, 28091,
-        true);
+    checkInstanceInfo(brokerInstanceId, "1.2.3.4", 1234, new String[]{newBrokerTag}, null, null, false);
+    checkInstanceInfo(serverInstanceId, "1.2.3.4", 2345, new String[]{newServerTag}, null, null, 28090, 28091, true);
 
     // Test Instance updateTags API
     String brokerInstanceUpdateTagsUrl = ControllerTestUtils.getControllerRequestURLBuilder()
@@ -162,9 +161,9 @@ public class PinotInstanceRestletResourceTest {
         .forInstanceUpdateTags(serverInstanceId,
             Lists.newArrayList("tag_REALTIME", "newTag_OFFLINE", "newTag_REALTIME"));
     ControllerTestUtils.sendPutRequest(serverInstanceUpdateTagsUrl);
-    checkInstanceInfo(brokerInstanceId, "Broker_1.2.3.4", 1234, new String[]{"tag_BROKER", "newTag_BROKER"}, null, null,
+    checkInstanceInfo(brokerInstanceId, "1.2.3.4", 1234, new String[]{"tag_BROKER", "newTag_BROKER"}, null, null,
         false);
-    checkInstanceInfo(serverInstanceId, "Server_1.2.3.4", 2345,
+    checkInstanceInfo(serverInstanceId, "1.2.3.4", 2345,
         new String[]{"tag_REALTIME", "newTag_OFFLINE", "newTag_REALTIME"}, null, null, 28090, 28091, true);
   }
 

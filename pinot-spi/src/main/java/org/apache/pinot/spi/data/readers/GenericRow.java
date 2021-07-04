@@ -204,6 +204,13 @@ public class GenericRow implements Serializable {
   }
 
   /**
+   * Marks a field as {@code non-null} and returns whether the field was marked as {@code null}.
+   */
+  public boolean removeNullValueField(String fieldName) {
+    return _nullValueFields.remove(fieldName);
+  }
+
+  /**
    * Removes all the fields from the row.
    */
   public void clear() {
@@ -223,7 +230,8 @@ public class GenericRow implements Serializable {
     }
     if (obj instanceof GenericRow) {
       GenericRow that = (GenericRow) obj;
-      return _nullValueFields.equals(that._nullValueFields) && EqualityUtils.isEqual(_fieldToValueMap, that._fieldToValueMap);
+      return _nullValueFields.equals(that._nullValueFields) && EqualityUtils
+          .isEqual(_fieldToValueMap, that._fieldToValueMap);
     }
     return false;
   }

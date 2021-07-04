@@ -24,14 +24,14 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.minion.Granularity;
 import org.apache.pinot.core.common.MinionConstants;
-import org.apache.pinot.core.segment.processing.collector.CollectorFactory;
-import org.apache.pinot.core.segment.processing.collector.ValueAggregatorFactory;
+import org.apache.pinot.core.segment.processing.framework.MergeType;
 import org.apache.pinot.pql.parsers.utils.Pair;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 
 public class MergeRollupTaskUtils {
-
+  //@formatter:off
   private static final String[] validMergeProperties = {
       MinionConstants.MergeRollupTask.MERGE_TYPE_KEY,
       MinionConstants.MergeRollupTask.BUFFER_TIME,
@@ -40,20 +40,20 @@ public class MergeRollupTaskUtils {
   };
 
   private static final String[] validMergeType = {
-      CollectorFactory.CollectorType.CONCAT.name(),
-      CollectorFactory.CollectorType.ROLLUP.name()
+      MergeType.CONCAT.name(),
+      MergeType.ROLLUP.name()
   };
+  //@formatter:on
 
-  public static Map<String, ValueAggregatorFactory.ValueAggregatorType> getRollupAggregationTypeMap(
-      Map<String, String> mergeRollupConfig) {
-    Map<String, ValueAggregatorFactory.ValueAggregatorType> rollupAggregationTypeMap = new HashMap<>();
+  public static Map<String, AggregationFunctionType> getRollupAggregationTypes(Map<String, String> mergeRollupConfig) {
+    Map<String, AggregationFunctionType> aggregationTypes = new HashMap<>();
     for (Map.Entry<String, String> entry : mergeRollupConfig.entrySet()) {
       if (entry.getKey().startsWith(MinionConstants.MergeRollupTask.AGGREGATE_KEY_PREFIX)) {
-        rollupAggregationTypeMap.put(getAggregateColumn(entry.getKey()),
-            ValueAggregatorFactory.ValueAggregatorType.valueOf(entry.getValue().toUpperCase()));
+        aggregationTypes.put(getAggregateColumn(entry.getKey()),
+            AggregationFunctionType.getAggregationFunctionType(entry.getValue()));
       }
     }
-    return rollupAggregationTypeMap;
+    return aggregationTypes;
   }
 
   public static Map<Granularity, MergeProperties> getAllMergeProperties(Map<String, String> mergeRollupConfig) {
@@ -71,23 +71,23 @@ public class MergeRollupTaskUtils {
     Map<Granularity, MergeProperties> allMergeProperties = new HashMap<>();
     for (Map.Entry<Granularity, Map<String, String>> entry : mergePropertiesMap.entrySet()) {
       Map<String, String> properties = entry.getValue();
-      MergeProperties mergeProperties = new MergeProperties(
-          properties.get(MinionConstants.MergeRollupTask.MERGE_TYPE_KEY).toUpperCase(),
-          TimeUtils.convertPeriodToMillis(properties.get(MinionConstants.MergeRollupTask.BUFFER_TIME)),
-          Long.parseLong(properties.get(MinionConstants.MergeRollupTask.MAX_NUM_RECORDS_PER_SEGMENT)),
-          Long.parseLong(properties.get(MinionConstants.MergeRollupTask.MAX_NUM_RECORDS_PER_TASK)));
+      MergeProperties mergeProperties =
+          new MergeProperties(properties.get(MinionConstants.MergeRollupTask.MERGE_TYPE_KEY).toUpperCase(),
+              TimeUtils.convertPeriodToMillis(properties.get(MinionConstants.MergeRollupTask.BUFFER_TIME)),
+              Long.parseLong(properties.get(MinionConstants.MergeRollupTask.MAX_NUM_RECORDS_PER_SEGMENT)),
+              Long.parseLong(properties.get(MinionConstants.MergeRollupTask.MAX_NUM_RECORDS_PER_TASK)));
       allMergeProperties.put(entry.getKey(), mergeProperties);
     }
     return allMergeProperties;
   }
 
   private static String getAggregateColumn(String rollupAggregateConfigKey) {
-    return rollupAggregateConfigKey.split(
-        MinionConstants.MergeRollupTask.AGGREGATE_KEY_PREFIX + MinionConstants.DOT_SEPARATOR)[1];
+    return rollupAggregateConfigKey
+        .split(MinionConstants.MergeRollupTask.AGGREGATE_KEY_PREFIX + MinionConstants.DOT_SEPARATOR)[1];
   }
 
-  private static Pair<Granularity, String> getGranularityAndPropertyPair(
-      String mergePropertyConfigKey, String mergePropertyConfigValue) {
+  private static Pair<Granularity, String> getGranularityAndPropertyPair(String mergePropertyConfigKey,
+      String mergePropertyConfigValue) {
     String[] components = StringUtils.split(mergePropertyConfigKey, MinionConstants.DOT_SEPARATOR);
     Preconditions.checkState(components.length == 3);
     Preconditions.checkState(isValidMergeProperties(components[2]));

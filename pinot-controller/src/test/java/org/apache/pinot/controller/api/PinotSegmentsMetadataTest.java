@@ -216,10 +216,6 @@ public class PinotSegmentsMetadataTest {
             "  \"startTimeReadable\" : null,\n" +
             "  \"endTimeMillis\" : null,\n" +
             "  \"endTimeReadable\" : null,\n" +
-            "  \"pushTimeMillis\" : -9223372036854775808,\n" +
-            "  \"pushTimeReadable\" : null,\n" +
-            "  \"refreshTimeMillis\" : -9223372036854775808,\n" +
-            "  \"refreshTimeReadable\" : null,\n" +
             "  \"segmentVersion\" : \"v3\",\n" +
             "  \"creatorName\" : null,\n" +
             "  \"paddingCharacter\" : \"\\u0000\",\n" +

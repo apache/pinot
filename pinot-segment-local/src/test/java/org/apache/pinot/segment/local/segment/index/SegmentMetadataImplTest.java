@@ -26,9 +26,9 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
-import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -82,13 +82,10 @@ public class SegmentMetadataImplTest {
     JsonNode jsonMeta = metadata.toJson(null);
     assertEquals(jsonMeta.get("segmentName").asText(), metadata.getName());
     Assert.assertEquals(jsonMeta.get("crc").asLong(), Long.valueOf(metadata.getCrc()).longValue());
-    Assert.assertEquals(jsonMeta.get("paddingCharacter").asText(), String.valueOf(metadata.getPaddingCharacter()));
     Assert.assertTrue(jsonMeta.get("creatorName").isNull());
     assertEquals(jsonMeta.get("creationTimeMillis").asLong(), metadata.getIndexCreationTime());
     assertEquals(jsonMeta.get("startTimeMillis").asLong(), metadata.getTimeInterval().getStartMillis());
     assertEquals(jsonMeta.get("endTimeMillis").asLong(), metadata.getTimeInterval().getEndMillis());
-    assertEquals(jsonMeta.get("pushTimeMillis").asLong(), metadata.getPushTime());
-    assertEquals(jsonMeta.get("refreshTimeMillis").asLong(), metadata.getPushTime());
     assertEquals(jsonMeta.get("custom").get("k1").asText(), metadata.getCustomMap().get("k1"));
     assertEquals(jsonMeta.get("custom").get("k2").asText(), metadata.getCustomMap().get("k2"));
 
@@ -102,7 +99,6 @@ public class SegmentMetadataImplTest {
       assertEquals(jsonColumnMeta.get("cardinality").asInt(), columnMeta.getCardinality());
       assertEquals(jsonColumnMeta.get("bitsPerElement").asInt(), columnMeta.getBitsPerElement());
       assertEquals(jsonColumnMeta.get("sorted").asBoolean(), columnMeta.isSorted());
-      assertEquals(jsonColumnMeta.get("containsNulls").asBoolean(), columnMeta.hasNulls());
       assertEquals(jsonColumnMeta.get("hasDictionary").asBoolean(), columnMeta.hasDictionary());
     }
   }

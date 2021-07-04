@@ -21,8 +21,8 @@ package org.apache.pinot.plugin.minion.tasks.merge_rollup;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.minion.Granularity;
-import org.apache.pinot.core.segment.processing.collector.CollectorFactory;
-import org.apache.pinot.core.segment.processing.collector.ValueAggregatorFactory;
+import org.apache.pinot.core.segment.processing.framework.MergeType;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -51,13 +51,13 @@ public class MergeRollupTaskUtilsTest {
 
   @Test
   public void testGetRollupAggregationTypeMap() {
-    Map<String, ValueAggregatorFactory.ValueAggregatorType> rollupAggregationTypeMap =
-        MergeRollupTaskUtils.getRollupAggregationTypeMap(_mergeRollupTaskConfig);
+    Map<String, AggregationFunctionType> rollupAggregationTypeMap =
+        MergeRollupTaskUtils.getRollupAggregationTypes(_mergeRollupTaskConfig);
     Assert.assertEquals(rollupAggregationTypeMap.size(), 2);
     Assert.assertTrue(rollupAggregationTypeMap.containsKey(METRIC_COLUMN_A));
     Assert.assertTrue(rollupAggregationTypeMap.containsKey(METRIC_COLUMN_B));
-    Assert.assertEquals(rollupAggregationTypeMap.get(METRIC_COLUMN_A), ValueAggregatorFactory.ValueAggregatorType.SUM);
-    Assert.assertEquals(rollupAggregationTypeMap.get(METRIC_COLUMN_B), ValueAggregatorFactory.ValueAggregatorType.MAX);
+    Assert.assertEquals(rollupAggregationTypeMap.get(METRIC_COLUMN_A), AggregationFunctionType.SUM);
+    Assert.assertEquals(rollupAggregationTypeMap.get(METRIC_COLUMN_B), AggregationFunctionType.MAX);
   }
 
   @Test
@@ -69,13 +69,13 @@ public class MergeRollupTaskUtilsTest {
     Assert.assertTrue(allMergeProperties.containsKey(Granularity.MONTHLY));
 
     MergeProperties dailyProperty = allMergeProperties.get(Granularity.DAILY);
-    Assert.assertEquals(dailyProperty.getMergeType(), CollectorFactory.CollectorType.CONCAT.name());
+    Assert.assertEquals(dailyProperty.getMergeType(), MergeType.CONCAT.name());
     Assert.assertEquals(dailyProperty.getBufferTimeMs(), 172800000L);
     Assert.assertEquals(dailyProperty.getMaxNumRecordsPerSegment(), 1000000L);
     Assert.assertEquals(dailyProperty.getMaxNumRecordsPerTask(), 5000000L);
 
     MergeProperties monthlyProperty = allMergeProperties.get(Granularity.MONTHLY);
-    Assert.assertEquals(monthlyProperty.getMergeType(), CollectorFactory.CollectorType.ROLLUP.name());
+    Assert.assertEquals(monthlyProperty.getMergeType(), MergeType.ROLLUP.name());
     Assert.assertEquals(monthlyProperty.getBufferTimeMs(), 2592000000L);
     Assert.assertEquals(monthlyProperty.getMaxNumRecordsPerSegment(), 2000000L);
     Assert.assertEquals(monthlyProperty.getMaxNumRecordsPerTask(), 5000000L);
