@@ -80,7 +80,10 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   TASK_STATUS("taskStatus", false),
 
   // Number of dropped minion instances
-  DROPPED_MINION_INSTANCES("droppedMinionInstances", true);
+  DROPPED_MINION_INSTANCES("droppedMinionInstances", true),
+
+  // Number of online minion instances
+  ONLINE_MINION_INSTANCES("onlineMinionInstances", true);
 
   private final String gaugeName;
   private final String unit;
