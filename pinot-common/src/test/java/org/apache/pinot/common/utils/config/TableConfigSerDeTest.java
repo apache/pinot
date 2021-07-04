@@ -246,7 +246,7 @@ public class TableConfigSerDeTest {
     }
     {
       // with upsert config
-      UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+      UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL, null);
 
       TableConfig tableConfig = tableConfigBuilder.setUpsertConfig(upsertConfig).build();
 
