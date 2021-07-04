@@ -147,7 +147,7 @@ public class TableConfigsRestletResource {
         ingestionConfig.setBatchIngestionConfig(batchIngestionConfig);
       }
       offlineTableConfig.setIngestionConfig(ingestionConfig);
-      
+
       TableConfigs config = new TableConfigs(tableName, schema, offlineTableConfig, realtimeTableConfig);
       return config.toJsonString();
     } catch (Exception e) {
