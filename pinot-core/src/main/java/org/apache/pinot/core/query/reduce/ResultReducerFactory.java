@@ -18,13 +18,11 @@
  */
 package org.apache.pinot.core.query.reduce;
 
-import org.apache.pinot.core.operator.query.DictionaryBasedAggregationOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
-import javax.swing.plaf.DesktopIconUI;
 import java.util.AbstractCollection;
 
 
