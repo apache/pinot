@@ -26,6 +26,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Reducer for reducing partial results for DISTINCT operation when being executed using dictionary based plan
+ */
 public class DistinctUsingDictionaryDataTableReducer implements DataTableReducer {
     private final DistinctAggregationFunction _distinctAggregationFunction;
     private final boolean _responseFormatSql;
@@ -110,12 +113,14 @@ public class DistinctUsingDictionaryDataTableReducer implements DataTableReducer
         int numColumns = columnDataTypes.length;
         Iterator<Record> iterator = abstractCollection.iterator();
 
+        assert numColumns == 1;
+
         while (iterator.hasNext()) {
-            Object[] values = iterator.next().getValues();
+            Object value = iterator.next();
             Serializable[] row = new Serializable[numColumns];
-            for (int i = 0; i < numColumns; i++) {
-                row[i] = columnDataTypes[i].convertAndFormat(values[i]);
-            }
+
+            row[0] = (Serializable) value;
+
             rows.add(row);
         }
         return new SelectionResults(Arrays.asList(dataSchema.getColumnNames()), rows);
@@ -126,12 +131,15 @@ public class DistinctUsingDictionaryDataTableReducer implements DataTableReducer
         DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
         int numColumns = columnDataTypes.length;
         Iterator<Record> iterator = abstractCollection.iterator();
+
+        assert numColumns == 1;
+
         while (iterator.hasNext()) {
-            Object[] values = iterator.next().getValues();
+            Object value = iterator.next();
             Object[] row = new Object[numColumns];
-            for (int i = 0; i < numColumns; i++) {
-                row[i] = columnDataTypes[i].convertAndFormat(values[i]);
-            }
+
+            row[0] = value;
+
             rows.add(row);
         }
         return new ResultTable(dataSchema, rows);

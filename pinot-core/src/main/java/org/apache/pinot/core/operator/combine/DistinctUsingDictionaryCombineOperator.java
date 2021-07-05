@@ -14,8 +14,12 @@ import java.util.AbstractCollection;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 
+/**
+ * Operator which combines partial results for DISTINCT operation when being executed
+ * using the dictionary
+ */
 public class DistinctUsingDictionaryCombineOperator extends BaseCombineOperator {
-    private static final String OPERATOR_NAME = "DistinctCombineOperator";
+    private static final String OPERATOR_NAME = "DistinctUsingDictionaryCombineOperator";
 
     private final boolean _hasOrderBy;
 
@@ -89,7 +93,7 @@ public class DistinctUsingDictionaryCombineOperator extends BaseCombineOperator 
     }
 
     /**
-     * Validate that merged set and set to be merged are of the same type
+     * Validate that merged set and set to be merged are of the same type when the sets are of ObjectOpenHashSet type
      */
     private void validateArgumentTypes(ObjectOpenHashSet mergedSet, ObjectOpenHashSet toMergeSet) {
         Object setObject = mergedSet.iterator().next();

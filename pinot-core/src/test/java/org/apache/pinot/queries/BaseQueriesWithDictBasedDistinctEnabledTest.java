@@ -12,6 +12,9 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 
 import static org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2.USE_DICTIONARY_FOR_DISTINCT;
 
+/**
+ * Base class for tests that wish to use DISTINCT with Dictionary based plan
+ */
 public abstract class BaseQueriesWithDictBasedDistinctEnabledTest extends BaseQueriesTest {
 
     protected static PlanMaker PLAN_MAKER_WITH_DICTAGG;
