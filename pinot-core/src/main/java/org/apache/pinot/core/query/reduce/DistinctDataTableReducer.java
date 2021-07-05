@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.reduce;
 
 import java.io.Serializable;
-import java.util.AbstractCollection;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -72,7 +71,6 @@ public class DistinctDataTableReducer implements DataTableReducer {
 
     // Gather all non-empty DistinctTables
     List<DistinctTable> nonEmptyDistinctTables = new ArrayList<>(dataTableMap.size());
-
     for (DataTable dataTable : dataTableMap.values()) {
       DistinctTable distinctTable = dataTable.getObject(0, 0);
       if (distinctTable.size() > 0) {
