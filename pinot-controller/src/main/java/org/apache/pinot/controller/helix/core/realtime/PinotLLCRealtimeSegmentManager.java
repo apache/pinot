@@ -74,9 +74,9 @@ import org.apache.pinot.controller.helix.core.realtime.segment.FlushThresholdUpd
 import org.apache.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
 import org.apache.pinot.controller.util.SegmentCompletionUtils;
+import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
-import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
@@ -1340,7 +1340,9 @@ public class PinotLLCRealtimeSegmentManager {
       List<String> segmentNames = ZKMetadataProvider.getLLCRealtimeSegments(_propertyStore, tableNameWithType);
       for (String segmentName : segmentNames) {
         try {
-          if (!isLLCSegmentWithinValidationRange(segmentName, currentTimeMs)) {
+          // Only fetch recently created LLC segment to alleviate ZK access. Validate segment creation time from segment name.
+          LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+          if (currentTimeMs - llcSegmentName.getCreationTimeMs() > _validationRangeForLLCSegmentsDeepStoreCopyMs) {
             continue;
           }
 
@@ -1356,16 +1358,6 @@ public class PinotLLCRealtimeSegmentManager {
           LOGGER.error("Failed to fetch the LLC segment {} ZK metadata", segmentName);
         }
       }
-  }
-
-  /**
-   * Only validate recently created LLC segment for missing deep store download url.
-   * The time range check is based on segment name. This step helps to alleviate ZK access.
-   */
-  private boolean isLLCSegmentWithinValidationRange(String segmentName, long currentTimeMs) {
-    LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-    long creationTimeMs = llcSegmentName.getCreationTimeMs();
-    return currentTimeMs - creationTimeMs < _validationRangeForLLCSegmentsDeepStoreCopyMs;
   }
 
   /**
@@ -1403,19 +1395,26 @@ public class PinotLLCRealtimeSegmentManager {
       }
 
       try {
+        // Only fix recently created segment. Validate segment creation time based on name.
+        LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+        if (getCurrentTimeMs() - llcSegmentName.getCreationTimeMs() > _validationRangeForLLCSegmentsDeepStoreCopyMs) {
+          LOGGER.info("Skipped fixing LLC segment {} which is created before deep store upload retry time range", segmentName);
+          continue;
+        }
+
         Stat stat = new Stat();
         LLCRealtimeSegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(realtimeTableName, segmentName, stat);
-        // if the download url is already fixed, skip the fix for this segment.
+        // If the download url is already fixed, skip the fix for this segment. It could happen
         if (!CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(segmentZKMetadata.getDownloadUrl())) {
           LOGGER.info("Skipped fixing LLC segment {} whose deep store download url is already available", segmentName);
           continue;
         }
-        // skip the fix for the segment if it is already out of retention.
+        // Skip the fix for the segment if it is already out of retention.
         if (retentionStrategy.isPurgeable(realtimeTableName, segmentZKMetadata)) {
           LOGGER.info("Skipped fixing LLC segment {} which is already out of retention", segmentName);
           continue;
         }
-        // delay the fix to next round if not enough time elapsed since segment metadata update
+        // Delay the fix to next round if not enough time elapsed since segment metadata update
         if (!isExceededMinTimeToFixSegmentStoreCopy(stat)) {
           segmentsNotFixed.offer(segmentName);
           continue;
