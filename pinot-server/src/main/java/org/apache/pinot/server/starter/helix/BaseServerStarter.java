@@ -141,12 +141,19 @@ public abstract class BaseServerStarter implements ServiceStartable {
             : NetUtils.getHostAddress());
     _port = _serverConf.getProperty(Helix.KEY_OF_SERVER_NETTY_PORT, Helix.DEFAULT_SERVER_NETTY_PORT);
 
-    String instanceId = _serverConf.getProperty(Server.CONFIG_OF_INSTANCE_ID);
-    if (instanceId == null) {
-      instanceId = Helix.PREFIX_OF_SERVER_INSTANCE + _hostname + "_" + _port;
-      _serverConf.addProperty(Server.CONFIG_OF_INSTANCE_ID, instanceId);
+    _instanceId = _serverConf.getProperty(Server.CONFIG_OF_INSTANCE_ID);
+    if (_instanceId != null) {
+      // NOTE:
+      //   - Force all instances to have the same prefix in order to derive the instance type based on the instance id
+      //   - Only log a warning instead of throw exception here for backward-compatibility
+      if (!_instanceId.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
+        LOGGER.warn("Instance id '{}' does not have prefix '{}'", _instanceId, Helix.PREFIX_OF_SERVER_INSTANCE);
+      }
+    } else {
+      _instanceId = Helix.PREFIX_OF_SERVER_INSTANCE + _hostname + "_" + _port;
+      // NOTE: Need to add the instance id to the config because it is required in HelixInstanceDataManagerConfig
+      _serverConf.addProperty(Server.CONFIG_OF_INSTANCE_ID, _instanceId);
     }
-    _instanceId = instanceId;
 
     _instanceConfigScope =
         new HelixConfigScopeBuilder(ConfigScopeProperty.PARTICIPANT, _helixClusterName).forParticipant(_instanceId)
@@ -699,5 +706,4 @@ public abstract class BaseServerStarter implements ServiceStartable {
     instanceConfig.getRecord().setMapField(Helix.Instance.SYSTEM_RESOURCE_INFO_KEY, systemResourceMap);
     helixAdmin.setInstanceConfig(helixClusterName, instanceId, instanceConfig);
   }
-
 }

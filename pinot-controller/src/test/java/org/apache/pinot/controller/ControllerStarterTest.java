@@ -31,6 +31,7 @@ import static org.apache.pinot.controller.ControllerConf.CONTROLLER_PORT;
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONFIG_OF_INSTANCE_ID;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.CONTROLLER_INSTANCE;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.fail;
 
 
 public class ControllerStarterTest extends ControllerTest {
@@ -46,7 +47,8 @@ public class ControllerStarterTest extends ControllerTest {
   @Test
   public void testHostnamePortOverride()
       throws Exception {
-    _configOverride.put(CONFIG_OF_INSTANCE_ID, "myInstance");
+    _configOverride.clear();
+    _configOverride.put(CONFIG_OF_INSTANCE_ID, "Controller_myInstance");
     _configOverride.put(CONTROLLER_HOST, "myHost");
     _configOverride.put(CONTROLLER_PORT, 1234);
 
@@ -54,7 +56,7 @@ public class ControllerStarterTest extends ControllerTest {
     startController();
 
     String instanceId = _controllerStarter.getInstanceId();
-    assertEquals(instanceId, "myInstance");
+    assertEquals(instanceId, "Controller_myInstance");
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, instanceId);
     assertEquals(instanceConfig.getInstanceName(), instanceId);
     assertEquals(instanceConfig.getHostName(), "myHost");
@@ -66,8 +68,28 @@ public class ControllerStarterTest extends ControllerTest {
   }
 
   @Test
+  public void testInvalidInstanceId()
+      throws Exception {
+    _configOverride.clear();
+    _configOverride.put(CONFIG_OF_INSTANCE_ID, "myInstance");
+    _configOverride.put(CONTROLLER_HOST, "myHost");
+    _configOverride.put(CONTROLLER_PORT, 1234);
+
+    startZk();
+    try {
+      startController();
+      fail();
+    } catch (IllegalStateException e) {
+      // Expected
+    } finally {
+      stopZk();
+    }
+  }
+
+  @Test
   public void testDefaultInstanceId()
       throws Exception {
+    _configOverride.clear();
     _configOverride.put(CONTROLLER_HOST, "myHost");
     _configOverride.put(CONTROLLER_PORT, 1234);
 

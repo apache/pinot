@@ -52,7 +52,7 @@ public class HelixBrokerStarterHostnamePortTest extends ControllerTest {
     Map<String, Object> properties = new HashMap<>();
     properties.put(CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
     properties.put(CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
-    properties.put(INSTANCE_ID_KEY, "myInstance");
+    properties.put(INSTANCE_ID_KEY, "Broker_myInstance");
     properties.put(CONFIG_OF_BROKER_HOSTNAME, "myHost");
     properties.put(KEY_OF_BROKER_QUERY_PORT, 1234);
 
@@ -61,13 +61,27 @@ public class HelixBrokerStarterHostnamePortTest extends ControllerTest {
     brokerStarter.start();
 
     String instanceId = brokerStarter.getInstanceId();
-    assertEquals(instanceId, "myInstance");
+    assertEquals(instanceId, "Broker_myInstance");
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, instanceId);
     assertEquals(instanceConfig.getInstanceName(), instanceId);
     assertEquals(instanceConfig.getHostName(), "myHost");
     assertEquals(instanceConfig.getPort(), "1234");
 
     brokerStarter.stop();
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class)
+  public void testInvalidInstanceId()
+      throws Exception {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
+    properties.put(CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
+    properties.put(INSTANCE_ID_KEY, "myInstance");
+    properties.put(CONFIG_OF_BROKER_HOSTNAME, "myHost");
+    properties.put(KEY_OF_BROKER_QUERY_PORT, 1234);
+
+    HelixBrokerStarter brokerStarter = new HelixBrokerStarter();
+    brokerStarter.init(new PinotConfiguration(properties));
   }
 
   @Test

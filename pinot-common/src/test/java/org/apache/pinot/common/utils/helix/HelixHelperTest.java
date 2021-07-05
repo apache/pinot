@@ -33,7 +33,7 @@ public class HelixHelperTest {
 
   @Test
   public void testUpdateHostName() {
-    String instanceId = "myInstance";
+    String instanceId = "Server_myInstance";
     InstanceConfig instanceConfig = new InstanceConfig(instanceId);
     assertEquals(instanceConfig.getInstanceName(), instanceId);
     assertNull(instanceConfig.getHostName());
