@@ -18,10 +18,14 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import org.apache.pinot.core.operator.query.DictionaryBasedAggregationOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+
+import javax.swing.plaf.DesktopIconUI;
+import java.util.AbstractCollection;
 
 
 /**
@@ -33,7 +37,7 @@ public final class ResultReducerFactory {
   /**
    * Constructs the right result reducer based on the given query context.
    */
-  public static DataTableReducer getResultReducer(QueryContext queryContext) {
+  public static DataTableReducer getResultReducer(QueryContext queryContext, Object object) {
     AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
     if (aggregationFunctions == null) {
       // Selection query
@@ -44,6 +48,10 @@ public final class ResultReducerFactory {
         // Aggregation only query
         if (aggregationFunctions.length == 1 && aggregationFunctions[0].getType() == AggregationFunctionType.DISTINCT) {
           // Distinct query
+          if (object != null && object instanceof AbstractCollection) {
+            return new DistinctUsingDictionaryDataTableReducer(queryContext, (DistinctAggregationFunction) aggregationFunctions[0]);
+          }
+
           return new DistinctDataTableReducer(queryContext, (DistinctAggregationFunction) aggregationFunctions[0]);
         } else {
           return new AggregationDataTableReducer(queryContext);

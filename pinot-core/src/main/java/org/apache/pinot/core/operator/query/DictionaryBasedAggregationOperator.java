@@ -53,12 +53,14 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
   private final AggregationFunction[] _aggregationFunctions;
   private final Map<String, Dictionary> _dictionaryMap;
   private final int _numTotalDocs;
+  private final int _limit;
 
   public DictionaryBasedAggregationOperator(AggregationFunction[] aggregationFunctions,
-      Map<String, Dictionary> dictionaryMap, int numTotalDocs) {
+      Map<String, Dictionary> dictionaryMap, int numTotalDocs, int limit) {
     _aggregationFunctions = aggregationFunctions;
     _dictionaryMap = dictionaryMap;
     _numTotalDocs = numTotalDocs;
+    _limit = limit;
   }
 
   @Override
@@ -80,11 +82,16 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
           aggregationResults
               .add(new MinMaxRangePair(dictionary.getDoubleValue(0), dictionary.getDoubleValue(dictionarySize - 1)));
           break;
+        case DISTINCT:
         case DISTINCTCOUNT:
           switch (dictionary.getValueType()) {
             case INT:
               IntOpenHashSet intSet = new IntOpenHashSet(dictionarySize);
               for (int dictId = 0; dictId < dictionarySize; dictId++) {
+                if (dictId == _limit) {
+                  break;
+                }
+
                 intSet.add(dictionary.getIntValue(dictId));
               }
               aggregationResults.add(intSet);
@@ -92,6 +99,10 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
             case LONG:
               LongOpenHashSet longSet = new LongOpenHashSet(dictionarySize);
               for (int dictId = 0; dictId < dictionarySize; dictId++) {
+                if (dictId == _limit) {
+                  break;
+                }
+
                 longSet.add(dictionary.getLongValue(dictId));
               }
               aggregationResults.add(longSet);
@@ -99,6 +110,10 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
             case FLOAT:
               FloatOpenHashSet floatSet = new FloatOpenHashSet(dictionarySize);
               for (int dictId = 0; dictId < dictionarySize; dictId++) {
+                if (dictId == _limit) {
+                  break;
+                }
+
                 floatSet.add(dictionary.getFloatValue(dictId));
               }
               aggregationResults.add(floatSet);
@@ -106,6 +121,10 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
             case DOUBLE:
               DoubleOpenHashSet doubleSet = new DoubleOpenHashSet(dictionarySize);
               for (int dictId = 0; dictId < dictionarySize; dictId++) {
+                if (dictId == _limit) {
+                  break;
+                }
+
                 doubleSet.add(dictionary.getDoubleValue(dictId));
               }
               aggregationResults.add(doubleSet);
@@ -113,6 +132,10 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
             case STRING:
               ObjectOpenHashSet<String> stringSet = new ObjectOpenHashSet<>(dictionarySize);
               for (int dictId = 0; dictId < dictionarySize; dictId++) {
+                if (dictId == _limit) {
+                  break;
+                }
+
                 stringSet.add(dictionary.getStringValue(dictId));
               }
               aggregationResults.add(stringSet);
@@ -120,6 +143,10 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
             case BYTES:
               ObjectOpenHashSet<ByteArray> bytesSet = new ObjectOpenHashSet<>(dictionarySize);
               for (int dictId = 0; dictId < dictionarySize; dictId++) {
+                if (dictId == _limit) {
+                  break;
+                }
+
                 bytesSet.add(new ByteArray(dictionary.getBytesValue(dictId)));
               }
               aggregationResults.add(bytesSet);

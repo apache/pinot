@@ -36,6 +36,7 @@ public class DictionaryBasedAggregationPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
   private final AggregationFunction[] _aggregationFunctions;
   private final Map<String, Dictionary> _dictionaryMap;
+  private final int _limit;
 
   /**
    * Constructor for the class.
@@ -52,11 +53,13 @@ public class DictionaryBasedAggregationPlanNode implements PlanNode {
       String column = ((ExpressionContext) aggregationFunction.getInputExpressions().get(0)).getIdentifier();
       _dictionaryMap.computeIfAbsent(column, k -> _indexSegment.getDataSource(k).getDictionary());
     }
+
+    _limit = queryContext.getLimit();
   }
 
   @Override
   public DictionaryBasedAggregationOperator run() {
     return new DictionaryBasedAggregationOperator(_aggregationFunctions, _dictionaryMap,
-        _indexSegment.getSegmentMetadata().getTotalDocs());
+        _indexSegment.getSegmentMetadata().getTotalDocs(), _limit);
   }
 }

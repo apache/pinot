@@ -180,6 +180,7 @@ public class AggregationFunctionUtils {
     return functionName.equalsIgnoreCase(AggregationFunctionType.MIN.name())
         || functionName.equalsIgnoreCase(AggregationFunctionType.MAX.name())
         || functionName.equalsIgnoreCase(AggregationFunctionType.MINMAXRANGE.name())
+            || functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCT.name())
         || functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())
         || functionName.equalsIgnoreCase(AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT.name());
     //@formatter:on

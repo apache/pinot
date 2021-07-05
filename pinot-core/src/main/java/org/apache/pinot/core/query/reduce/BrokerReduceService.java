@@ -272,7 +272,10 @@ public class BrokerReduceService {
     }
 
     QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
-    DataTableReducer dataTableReducer = ResultReducerFactory.getResultReducer(queryContext);
+
+    // Assuming all elements in the merged data table are of same type
+    Object internalObject = dataTableMap.values().iterator().next().getObject(0, 0);
+    DataTableReducer dataTableReducer = ResultReducerFactory.getResultReducer(queryContext, internalObject);
     dataTableReducer.reduceAndSetResults(rawTableName, cachedDataSchema, dataTableMap, brokerResponseNative,
         new DataTableReducerContext(_reduceExecutorService, _maxReduceThreadsPerQuery, reduceTimeOutMs,
             _groupByTrimThreshold), brokerMetrics);

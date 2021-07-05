@@ -32,10 +32,13 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.combine.AggregationOnlyCombineOperator;
 import org.apache.pinot.core.operator.combine.DistinctCombineOperator;
+import org.apache.pinot.core.operator.combine.DistinctUsingDictionaryCombineOperator;
 import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
 import org.apache.pinot.core.operator.combine.GroupByOrderByCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOnlyCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOrderByCombineOperator;
+import org.apache.pinot.core.operator.query.DictionaryBasedAggregationOperator;
+import org.apache.pinot.core.operator.query.DistinctOperator;
 import org.apache.pinot.core.operator.streaming.StreamingSelectionOnlyCombineOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
@@ -196,7 +199,18 @@ public class CombinePlanNode implements PlanNode {
       }
     } else {
       assert QueryContextUtils.isDistinctQuery(_queryContext);
+      return getDistinctExecutionSelectedOperator(operators);
+    }
+  }
+
+  private Operator<IntermediateResultsBlock> getDistinctExecutionSelectedOperator(List<Operator> operators) {
+    // Assumption -- All operators in the operators list will be of the same type
+    if (operators.get(0) instanceof DictionaryBasedAggregationOperator) {
+      return new DistinctUsingDictionaryCombineOperator(operators, _queryContext, _executorService, _endTimeMs);
+    } else if (operators.get(0) instanceof DistinctOperator) {
       return new DistinctCombineOperator(operators, _queryContext, _executorService, _endTimeMs);
     }
+
+    throw new IllegalArgumentException("Unknown operator type");
   }
 }

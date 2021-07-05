@@ -69,6 +69,10 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public static final String GROUPBY_TRIM_THRESHOLD = "groupby.trim.threshold";
   public static final int DEFAULT_GROUPBY_TRIM_THRESHOLD = 1_000_000;
 
+  // set as pinot.server.query.executor.use.dictionary.for.distinct;
+  public static final String USE_DICTIONARY_FOR_DISTINCT = "use.dictionary.for.distinct";
+  public static final boolean DEFAULT_USE_DICTIONARY_FOR_DISTINCT = false;
+
   private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);
   private final int _maxInitialResultHolderCapacity;
   // Limit on number of groups stored for each segment, beyond which no new group will be created
@@ -77,12 +81,16 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   private final int _groupByTrimThreshold;
   private final int _minSegmentGroupTrimSize;
 
+  // Used for controlling if DISTINCT can be executed using dictionary
+  private final boolean _useDictionaryForDistinct;
+
   @VisibleForTesting
   public InstancePlanMakerImplV2() {
     _maxInitialResultHolderCapacity = DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY;
     _numGroupsLimit = DEFAULT_NUM_GROUPS_LIMIT;
     _groupByTrimThreshold = DEFAULT_GROUPBY_TRIM_THRESHOLD;
     _minSegmentGroupTrimSize = DEFAULT_MIN_SEGMENT_GROUP_TRIM_SIZE;
+    _useDictionaryForDistinct = DEFAULT_USE_DICTIONARY_FOR_DISTINCT;
   }
 
   @VisibleForTesting
@@ -91,6 +99,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     _numGroupsLimit = numGroupsLimit;
     _groupByTrimThreshold = DEFAULT_GROUPBY_TRIM_THRESHOLD;
     _minSegmentGroupTrimSize = DEFAULT_MIN_SEGMENT_GROUP_TRIM_SIZE;
+    _useDictionaryForDistinct = DEFAULT_USE_DICTIONARY_FOR_DISTINCT;
   }
 
   @VisibleForTesting
@@ -99,6 +108,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     _numGroupsLimit = DEFAULT_NUM_GROUPS_LIMIT;
     _groupByTrimThreshold = DEFAULT_GROUPBY_TRIM_THRESHOLD;
     _minSegmentGroupTrimSize = minSegmentGroupTrimSize;
+    _useDictionaryForDistinct = DEFAULT_USE_DICTIONARY_FOR_DISTINCT;
   }
 
   /**
@@ -116,6 +126,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     _numGroupsLimit = queryExecutorConfig.getConfig().getProperty(NUM_GROUPS_LIMIT, DEFAULT_NUM_GROUPS_LIMIT);
     _groupByTrimThreshold =
         queryExecutorConfig.getConfig().getProperty(GROUPBY_TRIM_THRESHOLD, DEFAULT_GROUPBY_TRIM_THRESHOLD);
+    _useDictionaryForDistinct =
+            queryExecutorConfig.getConfig().getProperty(USE_DICTIONARY_FOR_DISTINCT, DEFAULT_USE_DICTIONARY_FOR_DISTINCT);
     Preconditions.checkState(_maxInitialResultHolderCapacity <= _numGroupsLimit,
         "Invalid configuration: maxInitialResultHolderCapacity: %d must be smaller or equal to numGroupsLimit: %d",
         _maxInitialResultHolderCapacity, _numGroupsLimit);
@@ -158,7 +170,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     } else {
       indexSegment.prefetch(queryContext.getColumns());
     }
-    if (QueryContextUtils.isAggregationQuery(queryContext)) {
+    if (QueryContextUtils.isAggregationQuery(queryContext) ||
+            (QueryContextUtils.isDistinctQuery(queryContext) && _useDictionaryForDistinct)) {
       List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
       if (groupByExpressions != null) {
         // Aggregation group-by query
@@ -182,6 +195,11 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
             return new DictionaryBasedAggregationPlanNode(indexSegment, queryContext);
           }
         }
+
+        if (QueryContextUtils.isDistinctQuery(queryContext)) {
+          return new DistinctPlanNode(indexSegment, queryContext);
+        }
+
         return new AggregationPlanNode(indexSegment, queryContext);
       }
     } else if (QueryContextUtils.isSelectionQuery(queryContext)) {
@@ -244,6 +262,12 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       String functionName = function.getFunctionName();
       if (!AggregationFunctionUtils.isFitForDictionaryBasedComputation(functionName)) {
         return false;
+      }
+
+      if (QueryContextUtils.isDistinctQuery(queryContext)) {
+        if (function.getArguments().size() > 1) {
+          return false;
+        }
       }
 
       ExpressionContext argument = function.getArguments().get(0);
