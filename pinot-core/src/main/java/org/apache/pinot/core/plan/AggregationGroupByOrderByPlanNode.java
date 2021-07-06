@@ -70,7 +70,11 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
     _queryContext = queryContext;
     _minSegmentTrimSize = minSegmentTrimSize;
     List<OrderByExpressionContext> orderByExpressionContexts = queryContext.getOrderByExpressions();
-    _orderByExpressionContexts = Objects.requireNonNullElseGet(orderByExpressionContexts, ArrayList::new);
+    if (orderByExpressionContexts == null) {
+      _orderByExpressionContexts = new ArrayList<>();
+    } else {
+      _orderByExpressionContexts = orderByExpressionContexts;
+    }
 
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();
     if (starTrees != null && !StarTreeUtils.isStarTreeDisabled(queryContext)) {
