@@ -23,6 +23,7 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -167,6 +168,9 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
     Map<String, Object> properties = new HashMap<>();
     if (_configFileName != null) {
       properties.putAll(PinotConfigUtils.readConfigFromFile(_configFileName));
+      // Override the zkAddress and clusterName to ensure ServiceManager is connecting to the right Zookeeper and Cluster.
+      _zkAddress = MapUtils.getString(properties, CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
+      _clusterName = MapUtils.getString(properties, CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
     } else {
       properties.putAll(PinotConfigUtils.generateServerConf(_clusterName, _zkAddress, _serverHost, _serverPort,
           _serverAdminPort, _dataDir, _segmentDir));
