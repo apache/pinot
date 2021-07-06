@@ -35,6 +35,8 @@ import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.utils.ByteArray;
 
+import static org.apache.pinot.segment.spi.AggregationFunctionType.DISTINCT;
+
 
 /**
  * Aggregation operator that utilizes dictionary for serving aggregation queries.
@@ -88,7 +90,9 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
             case INT:
               IntOpenHashSet intSet = new IntOpenHashSet(dictionarySize);
               for (int dictId = 0; dictId < dictionarySize; dictId++) {
-                if (dictId == _limit) {
+
+                // Enforce limits only for DISTINCT
+                if (aggregationFunction.getType() == DISTINCT && dictId == _limit) {
                   break;
                 }
 
@@ -99,7 +103,7 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
             case LONG:
               LongOpenHashSet longSet = new LongOpenHashSet(dictionarySize);
               for (int dictId = 0; dictId < dictionarySize; dictId++) {
-                if (dictId == _limit) {
+                if (aggregationFunction.getType() == DISTINCT && dictId == _limit) {
                   break;
                 }
 
@@ -110,7 +114,7 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
             case FLOAT:
               FloatOpenHashSet floatSet = new FloatOpenHashSet(dictionarySize);
               for (int dictId = 0; dictId < dictionarySize; dictId++) {
-                if (dictId == _limit) {
+                if (aggregationFunction.getType() == DISTINCT && dictId == _limit) {
                   break;
                 }
 
@@ -121,7 +125,7 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
             case DOUBLE:
               DoubleOpenHashSet doubleSet = new DoubleOpenHashSet(dictionarySize);
               for (int dictId = 0; dictId < dictionarySize; dictId++) {
-                if (dictId == _limit) {
+                if (aggregationFunction.getType() == DISTINCT && dictId == _limit) {
                   break;
                 }
 
@@ -132,7 +136,7 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
             case STRING:
               ObjectOpenHashSet<String> stringSet = new ObjectOpenHashSet<>(dictionarySize);
               for (int dictId = 0; dictId < dictionarySize; dictId++) {
-                if (dictId == _limit) {
+                if (aggregationFunction.getType() == DISTINCT && dictId == _limit) {
                   break;
                 }
 
@@ -143,7 +147,7 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
             case BYTES:
               ObjectOpenHashSet<ByteArray> bytesSet = new ObjectOpenHashSet<>(dictionarySize);
               for (int dictId = 0; dictId < dictionarySize; dictId++) {
-                if (dictId == _limit) {
+                if (aggregationFunction.getType() == DISTINCT && dictId == _limit) {
                   break;
                 }
 

@@ -19,6 +19,8 @@
 package org.apache.pinot.core.query.reduce;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+
+import java.nio.BufferUnderflowException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +44,7 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
+import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -274,7 +277,17 @@ public class BrokerReduceService {
     QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
 
     // Assuming all elements in the merged data table are of same type
-    Object internalObject = dataTableMap.values().iterator().next().getObject(0, 0);
+    Object internalObject = null;
+
+    if (QueryContextUtils.isDistinctQuery(queryContext)) {
+      // The object may not be present in all cases, so handle the situation by catching the relevant exceptions
+      try {
+        internalObject = dataTableMap.values().iterator().next().getObject(0, 0);
+      } catch (NullPointerException | BufferUnderflowException e) {
+        // No-op
+      }
+    }
+
     DataTableReducer dataTableReducer = ResultReducerFactory.getResultReducer(queryContext, internalObject);
     dataTableReducer.reduceAndSetResults(rawTableName, cachedDataSchema, dataTableMap, brokerResponseNative,
         new DataTableReducerContext(_reduceExecutorService, _maxReduceThreadsPerQuery, reduceTimeOutMs,
