@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.reduce;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-
 import java.nio.BufferUnderflowException;
 import java.util.Iterator;
 import java.util.List;

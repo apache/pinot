@@ -18,12 +18,11 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import java.util.AbstractCollection;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-
-import java.util.AbstractCollection;
 
 
 /**
