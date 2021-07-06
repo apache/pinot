@@ -81,6 +81,96 @@ public class GroupByInSegmentTrimTest {
   private static double[][] _inputData;
   private static Map<Double, Double> _resultMap;
 
+  @DataProvider
+  public static Object[][] groupByQueryDataProvider() {
+    List<Object[]> data = new ArrayList<>();
+    ArrayList<Pair<Double, Double>> expectedResult = computeExpectedResult(true);
+    // Testcase1: limit 100
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0, metric_1, metric_2 limit 100");
+    int trimSize = 1000;
+    int expectedSize = 100;
+    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
+
+    // Testcase2: low limit
+    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0, metric_1, metric_2 limit 10");
+    trimSize = 1000;
+    expectedSize = 10;
+    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
+
+    // Testcase3: high limit + low trim size
+    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0, metric_1, metric_2 limit 100");
+    trimSize = 10;
+    // Only 100 results
+    expectedSize = queryContext.getLimit();
+    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
+
+    return data.toArray(new Object[data.size()][]);
+  }
+
+  @DataProvider
+  public static Object[][] groupByOrderByQueryDataProvider() {
+    List<Object[]> data = new ArrayList<>();
+    ArrayList<Pair<Double, Double>> expectedResult = computeExpectedResult(false);
+    // Testcase1: low limit + high trim size
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 1");
+    int trimSize = 100;
+    int expectedSize = max(trimSize, 5 * queryContext.getLimit());
+    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
+    // Testcase2: high limit + low trim size
+    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50");
+    trimSize = 10;
+    expectedSize = max(trimSize, 5 * queryContext.getLimit());
+    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
+    // Testcase3: high limit + high trim size (No trim)
+    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 500");
+    trimSize = 1000;
+    expectedSize = 1000;
+    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
+
+    // Testcase4: low limit + low server trim size + query option size
+    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50 OPTION(minSegmentTrimSize=1000)");
+    trimSize = 0;
+    expectedSize = 1000;
+    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
+
+    // Testcase5: low limit + low server trim size + query option enable
+    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50 OPTION(enableSegmentTrim=true)");
+    trimSize = 0;
+    expectedSize = 1000;
+    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
+
+    return data.toArray(new Object[data.size()][]);
+  }
+
+  /**
+   * Helper method to compute the expected result
+   *
+   * @param sortOnFirst the sorting strategy
+   * @return A list of expected results
+   */
+  private static ArrayList<Pair<Double, Double>> computeExpectedResult(boolean sortOnFirst) {
+    ArrayList<Pair<Double, Double>> result = new ArrayList<>();
+    for (Map.Entry<Double, Double> entry : _resultMap.entrySet()) {
+      result.add(new Pair<>(entry.getKey(), entry.getValue()));
+    }
+    if (sortOnFirst) {
+      // Sort on first column and ASC
+      result.sort((o1, o2) -> (int) (o1.getFirst() - o2.getFirst()));
+    } else {
+      // Sort on second column and DESC
+      result.sort((o1, o2) -> (int) (o2.getSecond() - o1.getSecond()));
+    }
+    return result;
+  }
+
   /**
    * Initializations prior to the test:
    * - Build a segment with metric columns (that will be aggregated and grouped) containing
@@ -207,9 +297,9 @@ public class GroupByInSegmentTrimTest {
    *
    */
   private void computeMaxResult(Double key, Double value) {
-      if(_resultMap.get(key) == null || _resultMap.get(key) < value) {
-        _resultMap.put(key, value);
-      }
+    if (_resultMap.get(key) == null || _resultMap.get(key) < value) {
+      _resultMap.put(key, value);
+    }
   }
 
   /**
@@ -256,7 +346,8 @@ public class GroupByInSegmentTrimTest {
    *
    * @return A list of expected results
    */
-  private ArrayList<Pair<Double, Double>> extractNoOrderByAggregationResult(AggregationGroupByResult aggregationGroupByResult) {
+  private ArrayList<Pair<Double, Double>> extractNoOrderByAggregationResult(
+      AggregationGroupByResult aggregationGroupByResult) {
     ArrayList<Pair<Double, Double>> result = new ArrayList<>();
     Iterator<GroupKeyGenerator.GroupKey> iterator = aggregationGroupByResult.getGroupKeyIterator();
     int i = 0;
@@ -283,96 +374,6 @@ public class GroupByInSegmentTrimTest {
       result.add(new Pair<>((Double) head._record.getValues()[0], (Double) head._record.getValues()[1]));
     }
     Collections.reverse(result);
-    return result;
-  }
-
-  @DataProvider
-  public static Object[][] groupByQueryDataProvider() {
-    List<Object[]> data = new ArrayList<>();
-    ArrayList<Pair<Double, Double>> expectedResult = computeExpectedResult(true);
-    // Testcase1: limit 100
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0, metric_1, metric_2 limit 100");
-    int trimSize = 1000;
-    int expectedSize = 100;
-    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
-
-    // Testcase2: low limit
-    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0, metric_1, metric_2 limit 10");
-    trimSize = 1000;
-    expectedSize = 10;
-    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
-
-    // Testcase3: high limit + low trim size
-    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0, metric_1, metric_2 limit 100");
-    trimSize = 10;
-    // Only 100 results
-    expectedSize = queryContext.getLimit();
-    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
-
-    return data.toArray(new Object[data.size()][]);
-  }
-
-  @DataProvider
-  public static Object[][] groupByOrderByQueryDataProvider() {
-    List<Object[]> data = new ArrayList<>();
-    ArrayList<Pair<Double, Double>> expectedResult = computeExpectedResult(false);
-    // Testcase1: low limit + high trim size
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 1");
-    int trimSize = 100;
-    int expectedSize = max(trimSize, 5 * queryContext.getLimit());
-    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
-    // Testcase2: high limit + low trim size
-    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50");
-    trimSize = 10;
-    expectedSize = max(trimSize, 5 * queryContext.getLimit());
-    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
-    // Testcase3: high limit + high trim size (No trim)
-    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 500");
-    trimSize = 1000;
-    expectedSize = 1000;
-    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
-
-    // Testcase4: low limit + low server trim size + query option size
-    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50 OPTION(minSegmentTrimSize=1000)");
-    trimSize = 0;
-    expectedSize = 1000;
-    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
-
-    // Testcase5: low limit + low server trim size + query option enable
-    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50 OPTION(enableSegmentTrim=true)");
-    trimSize = 0;
-    expectedSize = 1000;
-    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
-
-    return data.toArray(new Object[data.size()][]);
-  }
-
-  /**
-   * Helper method to compute the expected result
-   *
-   * @param sortOnFirst the sorting strategy
-   * @return A list of expected results
-   */
-  private static ArrayList<Pair<Double, Double>> computeExpectedResult(boolean sortOnFirst) {
-    ArrayList<Pair<Double, Double>> result = new ArrayList<>();
-    for (Map.Entry<Double, Double> entry : _resultMap.entrySet()) {
-      result.add(new Pair<>(entry.getKey(), entry.getValue()));
-    }
-    if (sortOnFirst) {
-      // Sort on first column and ASC
-      result.sort((o1, o2) -> (int) (o1.getFirst() - o2.getFirst()));
-    } else {
-      // Sort on second column and DESC
-      result.sort((o1, o2) -> (int) (o2.getSecond() - o1.getSecond()));
-    }
     return result;
   }
 }

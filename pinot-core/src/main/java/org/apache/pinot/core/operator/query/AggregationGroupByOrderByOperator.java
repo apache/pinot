@@ -213,11 +213,13 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     return constructNewTransformOperator(orderByExpressionMetadataList.toArray(new TransformResultMetadata[0]));
   }
 
+  /**
+   * Two pass approach for orderBy on groupBy columns. Fetch the orderBy columns to rank the top results
+   * whose docIds will be used to construct a new transform operator for aggregations.
+   */
   private TransformOperator constructNewTransformOperator(TransformResultMetadata[] orderByExpressionMetadata) {
     int numOrderByExpressions = _orderByExpressionContexts.length;
     HashMap<Key, MutableRoaringBitmap> groupByKeyMap = new HashMap<>();
-    //Do it in two passes
-    // Fetch the order-by expressions and docIds and insert them into the priority queue
     TransformBlock transformBlock;
 
     Dictionary[] dictionaries = new Dictionary[numOrderByExpressions];
@@ -225,6 +227,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     int numNoDict = 0;
     long cardinalityProduct = 1L;
     boolean longOverflow = false;
+    // Get dictionaries and calculate cardinalities
     for (int i = 0; i < numOrderByExpressions; i++) {
       ExpressionContext expression = _orderByExpressionContexts[i].getExpression();
       hasDict[i] = orderByExpressionMetadata[i].hasDictionary();
@@ -253,6 +256,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
       int numDocsFetched = transformBlock.getNumDocs();
       int[] docIds = transformBlock.getBlockValueSet("$docId").getIntValuesSV();
       int dictionaryIdsIndex = 0;
+      // For dictionary-based columns, we fetch the dictionary ids. Otherwise fetch the actual value
       for (int i = 0; i < numOrderByExpressions; i++) {
         ExpressionContext expression = _orderByExpressionContexts[i].getExpression();
         BlockValSet blockValSet = transformBlock.getBlockValueSet(expression);
@@ -267,6 +271,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
       // TODO: Add special optimization for all dict condition
       for (int i = 0; i < numDocsFetched; i++) {
         int docId = docIds[i];
+        // Generate key based on the dictionary Id/fetched values
         Object[] keys = new Object[numOrderByExpressions];
         Object[] row = new Object[numNoDict];
         if (numNoDict != 0) {
@@ -306,7 +311,6 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     for (String column : columns) {
       dataSourceMap.put(column, _indexSegment.getDataSource(column));
     }
-    // TODO: Create own BitmapDocIdSetOperator
     ProjectionOperator projectionOperator =
         new ProjectionOperator(dataSourceMap, new BitmapDocIdSetOperator(docIds, numDocs));
 
@@ -316,7 +320,6 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
   private Comparator<Object[]> getComparator(TransformResultMetadata[] orderByExpressionMetadata,
       int numOrderByExpressions, Dictionary[] dictionaries, boolean[] hasDict) {
     // Compare all single-value columns
-    // TODO: Handle MV value comparison
     FieldSpec.DataType[] storedTypes = new FieldSpec.DataType[numOrderByExpressions];
     // Use multiplier -1 or 1 to control ascending/descending order
     int[] multipliers = new int[numOrderByExpressions];
@@ -371,6 +374,11 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     };
   }
 
+  /**
+   * This function first checks if the group key present in the hash map, and add docId to its
+   * bit map if there is existing entry. Otherwise create a new entry for the hash map and priority
+   * queue
+   */
   private void AddToObjectPriorityQueue(Object[] row, int docId, PriorityQueue<Object[]> rows,
       HashMap<Key, MutableRoaringBitmap> groupByKeyMap) {
     if (rows.size() < _limit) {

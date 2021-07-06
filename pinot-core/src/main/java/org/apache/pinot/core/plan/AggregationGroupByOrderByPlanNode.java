@@ -100,6 +100,7 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
         AggregationFunctionUtils.collectExpressionsToTransform(_aggregationFunctions, _groupByExpressions);
     _enableGroupByOpt = checkOrderByOptimization();
     if (_enableGroupByOpt) {
+      // Add docIds
       expressionsToTransform.add(ExpressionContext.forIdentifier(CommonConstants.Segment.BuiltInVirtualColumn.DOCID));
     }
     _transformPlanNode =
