@@ -33,6 +33,8 @@ public class CommonConstants {
 
   public static final String KEY_OF_AUTH_TOKEN = "auth.token";
 
+  public static final String TABLE_NAME = "tableName";
+
   /**
    * The state of the consumer for a given segment
    */

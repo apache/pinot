@@ -42,6 +42,8 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.TABLE_NAME;
+
 
 /**
  * The class <code>PinotHelixTaskResourceManager</code> manages all the task resources in Pinot cluster.
@@ -367,7 +369,7 @@ public class PinotHelixTaskResourceManager {
 
         // Filter task configs that matches this table name
         if (pinotConfigs != null) {
-          String tableNameConfig = pinotConfigs.get("tableName");
+          String tableNameConfig = pinotConfigs.get(TABLE_NAME);
           if (tableNameConfig != null && tableNameConfig.equals(tableNameWithType)) {
             // Found a match ! Track state for this particular task in the final result map
             filteredTaskStateMap.put(taskName, taskStateMap.get(taskName));
