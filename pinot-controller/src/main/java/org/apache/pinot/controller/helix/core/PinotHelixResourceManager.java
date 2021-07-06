@@ -193,7 +193,7 @@ public class PinotHelixResourceManager {
                 // Backward-compatible with legacy hostname of format 'Server_<hostname>'
                 String hostname = instanceConfig.getHostName();
                 if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
-                  hostname = hostname.substring(Helix.PREFIX_OF_SERVER_INSTANCE.length());
+                  hostname = hostname.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
                 }
 
                 String protocol = CommonConstants.HTTP_PROTOCOL;

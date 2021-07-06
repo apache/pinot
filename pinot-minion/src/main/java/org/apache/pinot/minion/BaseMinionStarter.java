@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.minion;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
@@ -89,8 +90,14 @@ public abstract class BaseMinionStarter implements ServiceStartable {
         _config.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils
             .getHostnameOrAddress() : NetUtils.getHostAddress());
     _port = _config.getProperty(CommonConstants.Helix.KEY_OF_MINION_PORT, CommonConstants.Minion.DEFAULT_HELIX_PORT);
-    _instanceId = _config.getProperty(CommonConstants.Helix.Instance.INSTANCE_ID_KEY,
-        CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE + _hostname + "_" + _port);
+    _instanceId = _config.getProperty(CommonConstants.Helix.Instance.INSTANCE_ID_KEY);
+    if (_instanceId != null) {
+      // NOTE: Force all instances to have the same prefix in order to derive the instance type based on the instance id
+      Preconditions.checkState(_instanceId.startsWith(CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE),
+          "Instance id must have prefix '%s', got '%s'", CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE, _instanceId);
+    } else {
+      _instanceId = CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE + _hostname + "_" + _port;
+    }
     _listenerConfigs = ListenerConfigUtil.buildMinionAdminConfigs(_config);
     setupHelixSystemProperties();
     _helixManager = new ZKHelixManager(helixClusterName, _instanceId, InstanceType.PARTICIPANT, zkAddress);

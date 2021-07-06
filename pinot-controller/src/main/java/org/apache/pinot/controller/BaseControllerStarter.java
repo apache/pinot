@@ -19,6 +19,7 @@
 package org.apache.pinot.controller;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
@@ -161,10 +162,18 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     inferHostnameIfNeeded(_config);
     _hostname = _config.getControllerHost();
     _port = _listenerConfigs.get(0).getPort();
+    // NOTE: Use <hostname>_<port> as Helix controller instance id because ControllerLeaderLocator relies on this format
+    //       to parse the leader controller's hostname and port
+    // TODO: Use the same instance id for controller and participant when leadControllerResource is always enabled after
+    //       releasing 0.8.0
     _helixControllerInstanceId = _hostname + "_" + _port;
-    String instanceIdFromConfig = _config.getInstanceId();
-    if (StringUtils.isNotEmpty(instanceIdFromConfig)) {
-      _helixParticipantInstanceId = instanceIdFromConfig;
+    _helixParticipantInstanceId = _config.getInstanceId();
+    if (_helixParticipantInstanceId != null) {
+      // NOTE: Force all instances to have the same prefix in order to derive the instance type based on the instance id
+      Preconditions
+          .checkState(_helixParticipantInstanceId.startsWith(CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE),
+              "Instance id must have prefix '%s', got '%s'", CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE,
+              _helixParticipantInstanceId);
     } else {
       _helixParticipantInstanceId = LeadControllerUtils.generateParticipantInstanceId(_hostname, _port);
     }
@@ -355,7 +364,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     // LeadControllerManager needs to be initialized before registering as Helix participant.
     LOGGER.info("Initializing lead controller manager");
-    _leadControllerManager = new LeadControllerManager(_helixParticipantManager, _controllerMetrics);
+    _leadControllerManager =
+        new LeadControllerManager(_helixControllerInstanceId, _helixParticipantManager, _controllerMetrics);
 
     LOGGER.info("Registering and connecting Helix participant manager as Helix Participant role");
     registerAndConnectAsHelixParticipant();

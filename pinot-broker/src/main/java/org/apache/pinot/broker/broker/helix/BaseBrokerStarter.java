@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.broker.helix;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -83,7 +84,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected String _zkServers;
   protected String _hostname;
   protected int _port;
-  protected String _brokerId;
+  protected String _instanceId;
   protected final List<ClusterChangeHandler> _externalViewChangeHandlers = new ArrayList<>();
   protected final List<ClusterChangeHandler> _instanceConfigChangeHandlers = new ArrayList<>();
   protected final List<ClusterChangeHandler> _liveInstanceChangeHandlers = new ArrayList<>();
@@ -121,10 +122,16 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
     _port = _listenerConfigs.get(0).getPort();
 
-    _brokerId = _brokerConf
-        .getProperty(Helix.Instance.INSTANCE_ID_KEY, Helix.PREFIX_OF_BROKER_INSTANCE + _hostname + "_" + _port);
+    _instanceId = _brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY);
+    if (_instanceId != null) {
+      // NOTE: Force all instances to have the same prefix in order to derive the instance type based on the instance id
+      Preconditions.checkState(_instanceId.startsWith(Helix.PREFIX_OF_BROKER_INSTANCE),
+          "Instance id must have prefix '%s', got '%s'", Helix.PREFIX_OF_BROKER_INSTANCE, _instanceId);
+    } else {
+      _instanceId = Helix.PREFIX_OF_BROKER_INSTANCE + _hostname + "_" + _port;
+    }
 
-    _brokerConf.setProperty(Broker.CONFIG_OF_BROKER_ID, _brokerId);
+    _brokerConf.setProperty(Broker.CONFIG_OF_BROKER_ID, _instanceId);
   }
 
   private void setupHelixSystemProperties() {
@@ -169,7 +176,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
   @Override
   public String getInstanceId() {
-    return _brokerId;
+    return _instanceId;
   }
 
   @Override
@@ -185,7 +192,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     LOGGER.info("Connecting spectator Helix manager");
     _spectatorHelixManager =
-        HelixManagerFactory.getZKHelixManager(_clusterName, _brokerId, InstanceType.SPECTATOR, _zkServers);
+        HelixManagerFactory.getZKHelixManager(_clusterName, _instanceId, InstanceType.SPECTATOR, _zkServers);
     _spectatorHelixManager.connect();
     _helixAdmin = _spectatorHelixManager.getClusterManagmentTool();
     _propertyStore = _spectatorHelixManager.getHelixPropertyStore();
@@ -236,7 +243,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _routingManager.init(_spectatorHelixManager);
     _accessControlFactory = AccessControlFactory.loadFactory(_brokerConf.subset(Broker.ACCESS_CONTROL_CONFIG_PREFIX));
     HelixExternalViewBasedQueryQuotaManager queryQuotaManager =
-        new HelixExternalViewBasedQueryQuotaManager(_brokerMetrics, _brokerId);
+        new HelixExternalViewBasedQueryQuotaManager(_brokerMetrics, _instanceId);
     queryQuotaManager.init(_spectatorHelixManager);
     // Initialize FunctionRegistry before starting the broker request handler
     FunctionRegistry.init();
@@ -289,7 +296,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     LOGGER.info("Connecting participant Helix manager");
     _participantHelixManager =
-        HelixManagerFactory.getZKHelixManager(_clusterName, _brokerId, InstanceType.PARTICIPANT, _zkServers);
+        HelixManagerFactory.getZKHelixManager(_clusterName, _instanceId, InstanceType.PARTICIPANT, _zkServers);
     // Register state model factory
     _participantHelixManager.getStateMachineEngine()
         .registerStateModelFactory(BrokerResourceOnlineOfflineStateModelFactory.getStateModelDef(),
@@ -313,7 +320,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   }
 
   private void updateInstanceConfigIfNeeded() {
-    InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_participantHelixManager, _brokerId);
+    InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_participantHelixManager, _instanceId);
     boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
     updated |= HelixHelper.addDefaultTags(instanceConfig, () -> {
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
@@ -336,7 +343,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         _helixAdmin.getResourceIdealState(_clusterName, Helix.BROKER_RESOURCE_INSTANCE);
     if (brokerResourceIdealState != null && brokerResourceIdealState.isEnabled()) {
       for (String partitionName : brokerResourceIdealState.getPartitionSet()) {
-        if (brokerResourceIdealState.getInstanceSet(partitionName).contains(_brokerId)) {
+        if (brokerResourceIdealState.getInstanceSet(partitionName).contains(_instanceId)) {
           resourcesToMonitor.add(Helix.BROKER_RESOURCE_INSTANCE);
           break;
         }
@@ -348,11 +355,11 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
             Broker.DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START);
 
     LOGGER.info("Registering service status handler");
-    ServiceStatus.setServiceStatusCallback(_brokerId, new ServiceStatus.MultipleCallbackServiceStatusCallback(
+    ServiceStatus.setServiceStatusCallback(_instanceId, new ServiceStatus.MultipleCallbackServiceStatusCallback(
         ImmutableList.of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_participantHelixManager,
-                _clusterName, _brokerId, resourcesToMonitor, minResourcePercentForStartup),
+                _clusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup),
             new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_participantHelixManager,
-                _clusterName, _brokerId, resourcesToMonitor, minResourcePercentForStartup))));
+                _clusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup))));
   }
 
   @Override
@@ -385,10 +392,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _spectatorHelixManager.disconnect();
 
     LOGGER.info("Deregistering service status handler");
-    ServiceStatus.removeServiceStatusCallback(_brokerId);
+    ServiceStatus.removeServiceStatusCallback(_instanceId);
     LOGGER.info("Shutdown Broker Metrics Registry");
     _metricsRegistry.shutdown();
-    LOGGER.info("Finish shutting down Pinot broker for {}", _brokerId);
+    LOGGER.info("Finish shutting down Pinot broker for {}", _instanceId);
   }
 
   public HelixManager getSpectatorHelixManager() {
