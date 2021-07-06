@@ -376,7 +376,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     results = Lists.newArrayList(new Object[]{140528.0, 28L}, new Object[]{194355.0, 12L}, new Object[]{532157.0, 12L});
     dataSchema = new DataSchema(new String[]{"sub(column1,'100000')", "count(*)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.LONG});
-    numEntriesScannedPostFilter = 240000;
+    numEntriesScannedPostFilter = 120000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
@@ -386,7 +386,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     results = Lists.newArrayList(new Object[]{140528.0, 28L}, new Object[]{194355.0, 12L}, new Object[]{532157.0, 12L});
     dataSchema = new DataSchema(new String[]{"sub(column1,'100000')", "count(*)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.LONG});
-    numEntriesScannedPostFilter = 240000;
+    numEntriesScannedPostFilter = 120000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
@@ -664,7 +664,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     result1 = Lists.newArrayList(28L, 12L, 12L);
     results = new ArrayList<>();
     results.add(result1);
-    numEntriesScannedPostFilter = 240000;
+    numEntriesScannedPostFilter = 120000;
     data.add(
         new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 
@@ -674,7 +674,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     result1 = Lists.newArrayList(28L, 12L, 12L);
     results = new ArrayList<>();
     results.add(result1);
-    numEntriesScannedPostFilter = 240000;
+    numEntriesScannedPostFilter = 120000;
     data.add(
         new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 

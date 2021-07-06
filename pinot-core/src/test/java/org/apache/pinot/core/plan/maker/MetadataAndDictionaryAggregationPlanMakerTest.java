@@ -27,7 +27,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.plan.AggregationGroupByOrderByPlanNode;
-import org.apache.pinot.core.plan.AggregationGroupByPlanNode;
 import org.apache.pinot.core.plan.AggregationPlanNode;
 import org.apache.pinot.core.plan.DictionaryBasedAggregationPlanNode;
 import org.apache.pinot.core.plan.MetadataBasedAggregationPlanNode;

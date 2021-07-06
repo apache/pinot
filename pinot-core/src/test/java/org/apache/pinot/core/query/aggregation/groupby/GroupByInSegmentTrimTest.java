@@ -29,7 +29,6 @@ import java.util.Map;
 import java.util.PriorityQueue;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.data.table.IntermediateRecord;
-import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.plan.AggregationGroupByOrderByPlanNode;

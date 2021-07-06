@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
@@ -131,6 +130,7 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
       return false;
     }
     Set<ExpressionContext> orderByExpressionsSet = new HashSet<>();
+    // Filter out function expressions
     for (OrderByExpressionContext orderByExpressionContext : _orderByExpressionContexts) {
       ExpressionContext expression = orderByExpressionContext.getExpression();
       if (expression.getType() == ExpressionContext.Type.FUNCTION) {
@@ -138,6 +138,7 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
       }
       orderByExpressionsSet.add(expression);
     }
+    // Add group by expressions to order by expressions
     for (ExpressionContext groupByExpression: _groupByExpressions) {
       if (!orderByExpressionsSet.contains(groupByExpression)) {
         _orderByExpressionContexts.add(new OrderByExpressionContext(groupByExpression, true));
