@@ -62,6 +62,11 @@ public interface BrokerResponse {
   void setOfflineThreadCpuTimeNs(long offlineThreadCpuTimeNs);
 
   /**
+   * Set the total number of rows in result set
+   */
+  void setNumRowsResultSet(int numRowsResultSet);
+
+  /**
    * Convert the broker response to JSON String.
    */
   String toJsonString()
@@ -146,4 +151,9 @@ public interface BrokerResponse {
    * Get the total thread cpu time used against offline table in request handling, into the broker response.
    */
   long getOfflineThreadCpuTimeNs();
+
+  /**
+   * Get the total number of rows in result set
+   */
+  int getNumRowsResultSet();
 }

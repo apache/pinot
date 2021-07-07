@@ -46,7 +46,8 @@ public class ConvertToRawIndexTaskExecutor extends BaseSingleSegmentConversionEx
   }
 
   @Override
-  protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier() {
+  protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier(
+      PinotTaskConfig pinotTaskConfig, SegmentConversionResult segmentConversionResult) {
     return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE, Collections
         .singletonMap(MinionConstants.ConvertToRawIndexTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX,
             String.valueOf(System.currentTimeMillis())));

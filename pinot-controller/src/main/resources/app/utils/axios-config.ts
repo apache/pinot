@@ -51,3 +51,5 @@ const handleConfig = (config: any) => {
 export const baseApi = axios.create({ baseURL: '/' });
 baseApi.interceptors.request.use(handleConfig, handleError);
 baseApi.interceptors.response.use(handleResponse, handleError);
+
+export const transformApi = axios.create({baseURL: '/', transformResponse: [data => data]});

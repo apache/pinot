@@ -42,6 +42,7 @@ import org.apache.commons.httpclient.methods.multipart.Part;
 import org.apache.commons.httpclient.methods.multipart.StringPart;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
@@ -74,6 +75,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -149,21 +151,33 @@ public abstract class ControllerTest {
     return properties;
   }
 
-  protected void startController() {
+  protected void startController()
+      throws Exception {
     startController(getDefaultControllerConfiguration());
   }
 
-  protected void startController(Map<String, Object> properties) {
+  protected void startController(Map<String, Object> properties)
+      throws Exception {
     Preconditions.checkState(_controllerStarter == null);
 
     ControllerConf config = new ControllerConf(properties);
 
-    _controllerPort = Integer.valueOf(config.getControllerPort());
-    _controllerBaseApiUrl = "http://localhost:" + _controllerPort;
+    String controllerScheme = "http";
+    if (StringUtils.isNotBlank(config.getControllerVipProtocol())) {
+      controllerScheme = config.getControllerVipProtocol();
+    }
+
+    _controllerPort = DEFAULT_CONTROLLER_PORT;
+    if (StringUtils.isNotBlank(config.getControllerPort())) {
+      _controllerPort = Integer.parseInt(config.getControllerPort());
+    }
+
+    _controllerBaseApiUrl = controllerScheme + "://localhost:" + _controllerPort;
     _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl);
     _controllerDataDir = config.getDataDir();
 
-    _controllerStarter = getControllerStarter(config);
+    _controllerStarter = getControllerStarter();
+    _controllerStarter.init(new PinotConfiguration(properties));
     _controllerStarter.start();
     _helixResourceManager = _controllerStarter.getHelixResourceManager();
     _helixManager = _controllerStarter.getHelixControllerManager();
@@ -194,8 +208,8 @@ public abstract class ControllerTest {
     configAccessor.set(scope, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(12));
   }
 
-  protected ControllerStarter getControllerStarter(ControllerConf config) {
-    return new ControllerStarter(config);
+  protected ControllerStarter getControllerStarter() {
+    return new ControllerStarter();
   }
 
   protected int getControllerPort() {

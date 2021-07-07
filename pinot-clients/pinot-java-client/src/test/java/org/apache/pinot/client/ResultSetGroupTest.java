@@ -20,10 +20,9 @@ package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.InputStream;
+import java.util.Collections;
 import java.util.concurrent.Future;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
@@ -33,7 +32,6 @@ import org.testng.annotations.Test;
  */
 public class ResultSetGroupTest {
   private final DummyJsonTransport _dummyJsonTransport = new DummyJsonTransport();
-  private PinotClientTransportFactory _previousTransportFactory = null;
 
   @Test
   public void testDeserializeSelectionResultSet() {
@@ -120,19 +118,8 @@ public class ResultSetGroupTest {
 
   private ResultSetGroup getResultSet(String resourceName) {
     _dummyJsonTransport._resource = resourceName;
-    Connection connection = ConnectionFactory.fromHostList("dummy");
+    Connection connection = ConnectionFactory.fromHostList(Collections.singletonList("dummy"), _dummyJsonTransport);
     return connection.execute("dummy");
-  }
-
-  @BeforeClass
-  public void overridePinotClientTransport() {
-    _previousTransportFactory = ConnectionFactory._transportFactory;
-    ConnectionFactory._transportFactory = new DummyJsonTransportFactory();
-  }
-
-  @AfterClass
-  public void resetPinotClientTransport() {
-    ConnectionFactory._transportFactory = _previousTransportFactory;
   }
 
   static class DummyJsonTransport implements PinotClientTransport {

@@ -137,7 +137,7 @@ public class PinotSegmentsMetadataTest {
   private List<String> testMetadataResponse(String table, Map<String, List<String>> serverToSegmentsMap,
                                             BiMap<String, String> endpoints) {
     ServerSegmentMetadataReader metadataReader = new ServerSegmentMetadataReader(executor, connectionManager);
-    return metadataReader.getSegmentMetadataFromServer(table, serverToSegmentsMap, endpoints, timeoutMsec);
+    return metadataReader.getSegmentMetadataFromServer(table, serverToSegmentsMap, endpoints, null, timeoutMsec);
   }
 
   private Map<String, List<String>> getServerToSegments(List<String> servers) {
@@ -216,10 +216,6 @@ public class PinotSegmentsMetadataTest {
             "  \"startTimeReadable\" : null,\n" +
             "  \"endTimeMillis\" : null,\n" +
             "  \"endTimeReadable\" : null,\n" +
-            "  \"pushTimeMillis\" : -9223372036854775808,\n" +
-            "  \"pushTimeReadable\" : null,\n" +
-            "  \"refreshTimeMillis\" : -9223372036854775808,\n" +
-            "  \"refreshTimeReadable\" : null,\n" +
             "  \"segmentVersion\" : \"v3\",\n" +
             "  \"creatorName\" : null,\n" +
             "  \"paddingCharacter\" : \"\\u0000\",\n" +

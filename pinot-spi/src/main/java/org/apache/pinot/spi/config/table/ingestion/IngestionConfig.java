@@ -32,10 +32,10 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 public class IngestionConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("Config related to the batch data sources")
-  private final BatchIngestionConfig _batchIngestionConfig;
+  private BatchIngestionConfig _batchIngestionConfig;
 
   @JsonPropertyDescription("Config related to the stream data sources")
-  private final StreamIngestionConfig _streamIngestionConfig;
+  private StreamIngestionConfig _streamIngestionConfig;
 
   @JsonPropertyDescription("Config related to filtering records during ingestion")
   private final FilterConfig _filterConfig;
@@ -82,5 +82,13 @@ public class IngestionConfig extends BaseJsonConfig {
   @Nullable
   public ComplexTypeConfig getComplexTypeConfig() {
     return _complexTypeConfig;
+  }
+
+  public void setBatchIngestionConfig(BatchIngestionConfig batchIngestionConfig) {
+    _batchIngestionConfig = batchIngestionConfig;
+  }
+
+  public void setStreamIngestionConfig(StreamIngestionConfig streamIngestionConfig) {
+    _streamIngestionConfig = streamIngestionConfig;
   }
 }

@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -34,6 +35,8 @@ import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.postaggregation.PostAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -128,7 +131,7 @@ public class TableResizer {
     for (int i = 0; i < _numOrderByExpressions; i++) {
       intermediateRecordValues[i] = _orderByValueExtractors[i].extract(record);
     }
-    return new IntermediateRecord(key, intermediateRecordValues);
+    return new IntermediateRecord(key, intermediateRecordValues, record);
   }
 
   /**
@@ -166,7 +169,7 @@ public class TableResizer {
         PriorityQueue<IntermediateRecord> priorityQueue =
             convertToIntermediateRecordsPQ(recordsMap, trimToSize, comparator);
         for (IntermediateRecord recordToRetain : priorityQueue) {
-          trimmedRecordsMap.put(recordToRetain._key, recordsMap.get(recordToRetain._key));
+          trimmedRecordsMap.put(recordToRetain._key, recordToRetain._record);
         }
         return trimmedRecordsMap;
       }
@@ -203,34 +206,51 @@ public class TableResizer {
     }
     int numRecordsToRetain = Math.min(numRecords, trimToSize);
     // make PQ of sorted records to retain
-    PriorityQueue<IntermediateRecord> priorityQueue = convertToIntermediateRecordsPQ(recordsMap, numRecordsToRetain, _intermediateRecordComparator.reversed());
+    PriorityQueue<IntermediateRecord> priorityQueue =
+        convertToIntermediateRecordsPQ(recordsMap, numRecordsToRetain, _intermediateRecordComparator.reversed());
     Record[] sortedArray = new Record[numRecordsToRetain];
     while (!priorityQueue.isEmpty()) {
       IntermediateRecord intermediateRecord = priorityQueue.poll();
-      Record record = recordsMap.get(intermediateRecord._key);
-      sortedArray[--numRecordsToRetain] = record;
+      sortedArray[--numRecordsToRetain] = intermediateRecord._record;;
     }
     return Arrays.asList(sortedArray);
   }
 
   /**
-   * Helper class to store a subset of Record fields
-   * IntermediateRecord is derived from a Record
-   * Some of the main properties of an IntermediateRecord are:
-   *
-   * 1. Key in IntermediateRecord is expected to be identical to the one in the Record
-   * 2. For values, IntermediateRecord should only have the columns needed for order by
-   * 3. Inside the values, the columns should be ordered by the order by sequence
-   * 4. For order by on aggregations, final results should extracted if the intermediate result is non-comparable
+   * Trims the aggregation results using a priority queue and returns the priority queue.
+   * This method is to be called from individual segment if the intermediate results need to be trimmed.
    */
-  private static class IntermediateRecord {
-    final Key _key;
-    final Comparable[] _values;
+  public PriorityQueue<IntermediateRecord> trimInSegmentResults(Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator,
+      GroupByResultHolder[] _groupByResultHolders, int size) {
+    int numAggregationFunctions = _aggregationFunctions.length;
+    int numColumns = numAggregationFunctions + _numGroupByExpressions;
 
-    IntermediateRecord(Key key, Comparable[] values) {
-      _key = key;
-      _values = values;
+    // Get comparator
+    Comparator<IntermediateRecord> comparator = _intermediateRecordComparator.reversed();
+    PriorityQueue<IntermediateRecord> priorityQueue = new PriorityQueue<>(size, comparator);
+    while (groupKeyIterator.hasNext()) {
+      // Iterate over keys
+      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
+      Object[] keys = groupKey._keys;
+      Object[] values = Arrays.copyOf(keys, numColumns);
+      int groupId = groupKey._groupId;
+      for (int i = 0; i < numAggregationFunctions; i++) {
+        values[_numGroupByExpressions + i] =
+            _aggregationFunctions[i].extractGroupByResult(_groupByResultHolders[i], groupId);
+      }
+      // {key, intermediate_record, record}
+      IntermediateRecord intermediateRecord = getIntermediateRecord(new Key(keys), new Record(values));
+      if (priorityQueue.size() < size) {
+        priorityQueue.offer(intermediateRecord);
+      } else {
+        IntermediateRecord peek = priorityQueue.peek();
+        if (comparator.compare(peek, intermediateRecord) < 0) {
+          priorityQueue.poll();
+          priorityQueue.offer(intermediateRecord);
+        }
+      }
     }
+    return priorityQueue;
   }
 
   /**

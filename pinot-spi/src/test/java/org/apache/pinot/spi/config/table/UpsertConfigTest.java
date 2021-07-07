@@ -18,25 +18,23 @@
  */
 package org.apache.pinot.spi.config.table;
 
+import java.util.HashMap;
+import java.util.Map;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.fail;
 
 
 public class UpsertConfigTest {
 
   @Test
   public void testUpsertConfig() {
-    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    assertEquals(upsertConfig.getMode(), UpsertConfig.Mode.FULL);
+    UpsertConfig upsertConfig1 = new UpsertConfig(UpsertConfig.Mode.FULL, null);
+    assertEquals(upsertConfig1.getMode(), UpsertConfig.Mode.FULL);
 
-    // Test illegal arguments
-    try {
-      new UpsertConfig(UpsertConfig.Mode.PARTIAL);
-      fail();
-    } catch (IllegalArgumentException e) {
-      // Expected
-    }
+    Map<String, UpsertConfig.Strategy> partialUpsertStratgies = new HashMap<>();
+    partialUpsertStratgies.put("myCol", UpsertConfig.Strategy.INCREMENT);
+    UpsertConfig upsertConfig2 = new UpsertConfig(UpsertConfig.Mode.PARTIAL, partialUpsertStratgies);
+    assertEquals(upsertConfig2.getPartialUpsertStrategies(), partialUpsertStratgies);
   }
 }

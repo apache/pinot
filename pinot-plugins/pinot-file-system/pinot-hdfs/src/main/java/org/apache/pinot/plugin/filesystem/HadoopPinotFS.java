@@ -146,7 +146,7 @@ public class HadoopPinotFS extends PinotFS {
       // _hadoopFS.listFiles(path, false) will not return directories as files, thus use listStatus(path) here.
       List<FileStatus> files = listStatus(path, recursive);
       for (FileStatus file : files) {
-        filePathStrings.add(file.getPath().toUri().getRawPath());
+        filePathStrings.add(file.getPath().toString());
       }
     } else {
       throw new IllegalArgumentException("segmentUri is not valid");

@@ -1,0 +1,67 @@
+{
+  "metricFieldSpecs": [
+    {
+      "dataType": "INT",
+      "name": "rsvp_count"
+    }
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "STRING",
+      "name": "venue_name",
+      "singleValueField": false
+    },
+    {
+      "dataType": "STRING",
+      "name": "event_name"
+    },
+    {
+      "dataType": "STRING",
+      "name": "event_id"
+    },
+    {
+      "dataType": "TIMESTAMP",
+      "name": "event_time"
+    },
+    {
+      "dataType": "STRING",
+      "name": "group_city"
+    },
+    {
+      "dataType": "STRING",
+      "name": "group_country"
+    },
+    {
+      "dataType": "LONG",
+      "name": "group_id"
+    },
+    {
+      "dataType": "STRING",
+      "name": "group_name",
+      "singleValueField": false
+    },
+    {
+      "dataType": "DOUBLE",
+      "name": "group_lat"
+    },
+    {
+      "dataType": "DOUBLE",
+      "name": "group_lon"
+    },
+    {
+      "dataType": "BYTES",
+      "name": "location",
+      "transformFunction": "toSphericalGeography(stPoint(group_lon,group_lat))"
+    }
+  ],
+  "dateTimeFieldSpecs": [
+    {
+      "name": "mtime",
+      "dataType": "TIMESTAMP",
+      "format": "1:MILLISECONDS:TIMESTAMP",
+      "granularity": "1:MILLISECONDS"
+    }
+  ],
+  "schemaName": "meetupRsvp",
+  "primaryKeyColumns": ["event_id"]
+}

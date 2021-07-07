@@ -76,6 +76,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   // Unlimited parallel builds can cause high GC pauses during segment builds, causing
   // response times to suffer.
   private static final String MAX_PARALLEL_SEGMENT_BUILDS = "realtime.max.parallel.segment.builds";
+  private static final int DEFAULT_MAX_PARALLEL_SEGMENT_BUILDS = 4;
 
   // Key of whether to enable split commit
   private static final String ENABLE_SPLIT_COMMIT = "enable.split.commit";
@@ -210,7 +211,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   public int getMaxParallelSegmentBuilds() {
-    return _instanceDataManagerConfiguration.getProperty(MAX_PARALLEL_SEGMENT_BUILDS, 0);
+    return _instanceDataManagerConfiguration.getProperty(MAX_PARALLEL_SEGMENT_BUILDS, DEFAULT_MAX_PARALLEL_SEGMENT_BUILDS);
   }
 
   @Override
@@ -226,7 +227,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public PinotConfiguration getTierConfigs() {
     String tierBackend = getTierBackend();
-    String tierConfigsPrefix = String.format("%s.%s.", TIER_CONFIGS_PREFIX, tierBackend);
+    String tierConfigsPrefix = String.format("%s.%s", TIER_CONFIGS_PREFIX, tierBackend);
     Map<String, Object> tierConfigs =
         new HashMap<>(_instanceDataManagerConfiguration.subset(tierConfigsPrefix).toMap());
     if (!tierConfigs.containsKey(READ_MODE)) {

@@ -215,15 +215,19 @@ public class SegmentDeletionManager {
       PinotFS pinotFS = PinotFSFactory.create(deletedDirURI.getScheme());
 
       try {
-        // Check that the directory for deleted segments exists.
+        // Directly return when the deleted directory does not exist (no segment deleted yet)
+        if (!pinotFS.exists(deletedDirURI)) {
+          return;
+        }
+
         if (!pinotFS.isDirectory(deletedDirURI)) {
-          LOGGER.warn("Deleted segment directory {} does not exist or it is not directory.", deletedDirURI.toString());
+          LOGGER.warn("Deleted segments URI: {} is not a directory", deletedDirURI);
           return;
         }
 
         String[] tableNameDirs = pinotFS.listFiles(deletedDirURI, false);
         if (tableNameDirs == null) {
-          LOGGER.warn("Deleted segment directory {} does not exist.", deletedDirURI.toString());
+          LOGGER.warn("Failed to list files from the deleted segments directory: {}", deletedDirURI);
           return;
         }
 

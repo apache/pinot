@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Collections;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
@@ -76,18 +77,30 @@ public class LiteralOnlyBrokerRequestTest {
   public void testLiteralOnlyTransformBrokerRequestFromSQL() {
     Assert
         .assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery("SELECT now()")));
+    Assert.assertTrue(
+        BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery("SELECT ago('PT1H')")));
     Assert.assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(
         CalciteSqlParser.compileToPinotQuery("SELECT now(), fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z')")));
+    Assert.assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(
+        CalciteSqlParser.compileToPinotQuery("SELECT ago('PT1H'), fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z')")));
     Assert.assertTrue(
         BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery("SELECT now() FROM myTable")));
+    Assert.assertTrue(BaseBrokerRequestHandler
+        .isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery("SELECT ago('PT1H') FROM myTable")));
     Assert.assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser
         .compileToPinotQuery("SELECT now(), fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') FROM myTable")));
+    Assert.assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser
+        .compileToPinotQuery("SELECT ago('PT1H'), fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') FROM myTable")));
+    Assert.assertFalse(BaseBrokerRequestHandler
+        .isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery("SELECT count(*) from foo where bar > ago('PT1H')")));
   }
 
   @Test
   public void testLiteralOnlyWithAsBrokerRequestFromSQL() {
     Assert.assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery(
         "SELECT now() AS currentTs, fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') AS firstDayOf2020")));
+    Assert.assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery(
+        "SELECT ago('PT1H') AS currentTs, fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') AS firstDayOf2020")));
   }
 
   @Test
@@ -138,6 +151,27 @@ public class LiteralOnlyBrokerRequestTest {
     Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0).length, 2);
     Assert.assertTrue(Long.parseLong(brokerResponse.getResultTable().getRows().get(0)[0].toString()) > currentTsMin);
     Assert.assertTrue(Long.parseLong(brokerResponse.getResultTable().getRows().get(0)[0].toString()) < currentTsMax);
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0)[1], 1577836800000L);
+    Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
+
+
+    long ONE_HOUR_IN_MS = TimeUnit.HOURS.toMillis(1);
+    long oneHourAgoTsMin = System.currentTimeMillis() - ONE_HOUR_IN_MS;
+     request = new ObjectMapper().readTree(
+        "{\"sql\":\"SELECT ago('PT1H') as oneHourAgoTs, fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') as firstDayOf2020\"}");
+     requestStats = new RequestStatistics();
+     brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    long oneHourAgoTsMax = System.currentTimeMillis() - ONE_HOUR_IN_MS;
+    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), "oneHourAgoTs");
+    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(0),
+        DataSchema.ColumnDataType.LONG);
+    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(1), "firstDayOf2020");
+    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(1),
+        DataSchema.ColumnDataType.LONG);
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().size(), 1);
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0).length, 2);
+    Assert.assertTrue(Long.parseLong(brokerResponse.getResultTable().getRows().get(0)[0].toString()) >= oneHourAgoTsMin);
+    Assert.assertTrue(Long.parseLong(brokerResponse.getResultTable().getRows().get(0)[0].toString()) <= oneHourAgoTsMax);
     Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0)[1], 1577836800000L);
     Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
   }

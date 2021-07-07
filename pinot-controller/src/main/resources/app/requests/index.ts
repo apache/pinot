@@ -28,7 +28,7 @@ const headers = {
   'Accept': 'text/plain, */*; q=0.01'
 };
 
-import { baseApi } from '../utils/axios-config';
+import { baseApi, transformApi } from '../utils/axios-config';
 
 export const getTenants = (): Promise<AxiosResponse<Tenants>> =>
   baseApi.get('/tenants');
@@ -97,7 +97,7 @@ export const getTableSchema = (name: string): Promise<AxiosResponse<TableSchema>
   baseApi.get(`/tables/${name}/schema`);
 
 export const getQueryResult = (params: Object, url: string): Promise<AxiosResponse<SQLResult>> =>
-  baseApi.post(`/${url}`, params, {headers});
+  transformApi.post(`/${url}`, params, {headers});
 
 export const getClusterInfo = (): Promise<AxiosResponse<ClusterName>> =>
   baseApi.get('/cluster/info');

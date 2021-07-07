@@ -63,7 +63,7 @@ public class QueryInvertedSortedIndexRecommender {
   private boolean _useOverwrittenIndices;
   private IndexConfig _indexOverwritten;
   private InvertedSortedIndexJointRuleParams _params;
-  private int _numDimsIndexApplicable;
+  private int _numColumnsIndexApplicable;
   private String _queryType;
 
   /**
@@ -531,11 +531,6 @@ public class QueryInvertedSortedIndexRecommender {
           .setRecommendationPriorityEnum(RecommendationPriorityEnum.NON_CANDIDATE_SCAN) // won't recommend index
           .setnESI(nESI).setPercentSelected(_params.PERCENT_SELECT_FOR_FUNCTION).setnESIWithIdx(nESI).build();
     }
-    // Not a valid dimension name
-    else if (!_inputManager.isDim(colName)) {
-      LOGGER.error("Error: Column {} should not appear in filter", colName);
-      return null;
-    }
     // e.g. a > 10 / b between 1 and 10
     else if (type == Predicate.Type.RANGE) {
       LOGGER.trace("Entering RANGE clause: {}", leafPredicate);
@@ -744,7 +739,7 @@ public class QueryInvertedSortedIndexRecommender {
       queryInvertedSortedIndexRecommender._params = this._invertedSortedIndexJointRuleParams;
       queryInvertedSortedIndexRecommender._useOverwrittenIndices = this._useOverwrittenIndices;
       queryInvertedSortedIndexRecommender._inputManager = this._inputManager;
-      queryInvertedSortedIndexRecommender._numDimsIndexApplicable = _inputManager.getNumDimsInvertedSortedApplicable();
+      queryInvertedSortedIndexRecommender._numColumnsIndexApplicable = _inputManager.getNumColumnsInvertedSortedApplicable();
       queryInvertedSortedIndexRecommender._indexOverwritten = _inputManager.getOverWrittenConfigs().getIndexConfig();
       queryInvertedSortedIndexRecommender._queryType = _inputManager.getQueryType();
 
@@ -753,6 +748,6 @@ public class QueryInvertedSortedIndexRecommender {
   }
 
   private FixedLenBitset MUTABLE_EMPTY_SET() {
-    return new FixedLenBitset(_numDimsIndexApplicable);
+    return new FixedLenBitset(_numColumnsIndexApplicable);
   }
 }

@@ -51,6 +51,9 @@ public class ChunkCompressorFactory {
       case ZSTANDARD:
         return new ZstandardCompressor();
 
+      case LZ4:
+        return new LZ4Compressor();
+
       default:
         throw new IllegalArgumentException("Illegal compressor name " + compressionType);
     }
@@ -72,6 +75,9 @@ public class ChunkCompressorFactory {
 
       case ZSTANDARD:
         return new ZstandardDecompressor();
+
+      case LZ4:
+        return new LZ4Decompressor();
 
       default:
         throw new IllegalArgumentException("Illegal compressor name " + compressionType);

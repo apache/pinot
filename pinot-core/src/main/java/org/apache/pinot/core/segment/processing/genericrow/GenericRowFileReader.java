@@ -36,8 +36,10 @@ public class GenericRowFileReader implements Closeable {
   private final PinotDataBuffer _offsetBuffer;
   private final PinotDataBuffer _dataBuffer;
   private final GenericRowDeserializer _deserializer;
+  private final int _numSortFields;
 
-  public GenericRowFileReader(File offsetFile, File dataFile, List<FieldSpec> fieldSpecs, boolean includeNullFields)
+  public GenericRowFileReader(File offsetFile, File dataFile, List<FieldSpec> fieldSpecs, boolean includeNullFields,
+      int numSortFields)
       throws IOException {
     long offsetFileLength = offsetFile.length();
     _numRows = (int) (offsetFileLength >>> 3); // offsetFileLength / Long.BYTES
@@ -46,6 +48,7 @@ public class GenericRowFileReader implements Closeable {
     _dataBuffer = PinotDataBuffer
         .mapFile(dataFile, true, 0L, dataFile.length(), PinotDataBuffer.NATIVE_ORDER, "GenericRow data buffer");
     _deserializer = new GenericRowDeserializer(_dataBuffer, fieldSpecs, includeNullFields);
+    _numSortFields = numSortFields;
   }
 
   /**
@@ -56,20 +59,34 @@ public class GenericRowFileReader implements Closeable {
   }
 
   /**
-   * Reads the data of the given row id into the given reusable row.
+   * Returns the number of sort fields.
    */
-  public GenericRow read(int rowId, GenericRow reuse) {
-    long offset = _offsetBuffer.getLong((long) rowId << 3); // rowId * Long.BYTES
-    _deserializer.deserialize(offset, reuse);
-    return reuse;
+  public int getNumSortFields() {
+    return _numSortFields;
   }
 
   /**
-   * Reads the first several fields of the given row id.
+   * Reads the data of the given row id into the given buffer row.
    */
-  public Object[] partialRead(int rowId, int numFields) {
-    long offset = _offsetBuffer.getLong((long) rowId << 3);
-    return _deserializer.partialDeserialize(offset, numFields);
+  public void read(int rowId, GenericRow buffer) {
+    long offset = _offsetBuffer.getLong((long) rowId << 3); // rowId * Long.BYTES
+    _deserializer.deserialize(offset, buffer);
+  }
+
+  /**
+   * Compares the rows at the given row ids. Only compare the values for the sort fields.
+   */
+  public int compare(int rowId1, int rowId2) {
+    long offset1 = _offsetBuffer.getLong((long) rowId1 << 3); // rowId1 * Long.BYTES
+    long offset2 = _offsetBuffer.getLong((long) rowId2 << 3); // rowId2 * Long.BYTES
+    return _deserializer.compare(offset1, offset2, _numSortFields);
+  }
+
+  /**
+   * Returns a record reader for the rows within the file. Records are sorted if sort order is configured.
+   */
+  public GenericRowFileRecordReader getRecordReader() {
+    return new GenericRowFileRecordReader(this);
   }
 
   @Override

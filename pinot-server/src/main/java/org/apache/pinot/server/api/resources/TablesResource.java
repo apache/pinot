@@ -24,7 +24,10 @@ import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import java.io.File;
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -58,7 +61,6 @@ import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.server.api.access.AccessControl;
 import org.apache.pinot.server.api.access.AccessControlFactory;
 import org.apache.pinot.server.starter.ServerInstance;
@@ -116,6 +118,7 @@ public class TablesResource {
   }
 
   @GET
+  @Encoded
   @Path("/tables/{tableName}/segments/{segmentName}/metadata")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Provide segment metadata", notes = "Provide segments metadata for the segment on server")
@@ -125,10 +128,23 @@ public class TablesResource {
       @ApiParam(value = "Segment name", required = true) @PathParam("segmentName") String segmentName,
       @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") @DefaultValue("") List<String> columns) {
     TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
+    try {
+      segmentName = URLDecoder.decode(segmentName, StandardCharsets.UTF_8.name());
+    } catch (UnsupportedEncodingException e) {
+      throw new RuntimeException(e.getCause());
+    }
     SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
     if (segmentDataManager == null) {
       throw new WebApplicationException(String.format("Table %s segments %s does not exist", tableName, segmentName),
           Response.Status.NOT_FOUND);
+    }
+
+    for (int i = 0; i < columns.size(); i++) {
+      try {
+        columns.set(i, URLDecoder.decode(columns.get(i), StandardCharsets.UTF_8.name()));
+      } catch (UnsupportedEncodingException e) {
+        throw new RuntimeException(e.getCause());
+      }
     }
 
     try {
@@ -154,9 +170,8 @@ public class TablesResource {
     try {
       Map<String, String> segmentCrcForTable = new HashMap<>();
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        SegmentMetadataImpl segmentMetadata =
-            (SegmentMetadataImpl) segmentDataManager.getSegment().getSegmentMetadata();
-        segmentCrcForTable.put(segmentDataManager.getSegmentName(), segmentMetadata.getCrc());
+        segmentCrcForTable
+            .put(segmentDataManager.getSegmentName(), segmentDataManager.getSegment().getSegmentMetadata().getCrc());
       }
       return ResourceUtils.convertToJsonString(segmentCrcForTable);
     } catch (Exception e) {

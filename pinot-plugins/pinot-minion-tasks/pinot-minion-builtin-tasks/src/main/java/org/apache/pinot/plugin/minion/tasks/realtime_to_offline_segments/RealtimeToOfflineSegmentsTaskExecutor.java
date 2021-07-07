@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,14 +30,13 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
-import org.apache.pinot.core.segment.processing.collector.CollectorConfig;
-import org.apache.pinot.core.segment.processing.collector.CollectorFactory;
-import org.apache.pinot.core.segment.processing.collector.ValueAggregatorFactory;
 import org.apache.pinot.core.segment.processing.filter.RecordFilterConfig;
 import org.apache.pinot.core.segment.processing.filter.RecordFilterFactory;
+import org.apache.pinot.core.segment.processing.framework.MergeType;
 import org.apache.pinot.core.segment.processing.framework.SegmentConfig;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorConfig;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorFramework;
@@ -46,6 +46,7 @@ import org.apache.pinot.core.segment.processing.transformer.RecordTransformerCon
 import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.plugin.minion.tasks.BaseMultipleSegmentsConversionExecutor;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -144,13 +145,14 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
 
     String timeColumnTransformFunction =
         configs.get(MinionConstants.RealtimeToOfflineSegmentsTask.TIME_COLUMN_TRANSFORM_FUNCTION_KEY);
-    String collectorTypeStr = configs.get(MinionConstants.RealtimeToOfflineSegmentsTask.COLLECTOR_TYPE_KEY);
-    Map<String, String> aggregatorConfigs = new HashMap<>();
+    // TODO: Rename the config key
+    String mergeTypeStr = configs.get(MinionConstants.RealtimeToOfflineSegmentsTask.COLLECTOR_TYPE_KEY);
+    Map<String, AggregationFunctionType> aggregationTypes = new HashMap<>();
     for (Map.Entry<String, String> entry : configs.entrySet()) {
       String key = entry.getKey();
       if (key.endsWith(MinionConstants.RealtimeToOfflineSegmentsTask.AGGREGATION_TYPE_KEY_SUFFIX)) {
         String column = key.split(MinionConstants.RealtimeToOfflineSegmentsTask.AGGREGATION_TYPE_KEY_SUFFIX)[0];
-        aggregatorConfigs.put(column, entry.getValue());
+        aggregationTypes.put(column, AggregationFunctionType.getAggregationFunctionType(entry.getValue()));
       }
     }
     String numRecordsPerSegment =
@@ -158,6 +160,9 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
 
     SegmentProcessorConfig.Builder segmentProcessorConfigBuilder =
         new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema);
+    if (mergeTypeStr != null) {
+      segmentProcessorConfigBuilder.setMergeType(MergeType.valueOf(mergeTypeStr.toUpperCase()));
+    }
 
     // Time rollup using configured time transformation function
     if (timeColumnTransformFunction != null) {
@@ -179,11 +184,10 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
       segmentProcessorConfigBuilder.setPartitionerConfigs(Lists.newArrayList(partitionerConfig));
     }
 
-    // Aggregations using configured Collector
-    List<String> sortedColumns = tableConfig.getIndexingConfig().getSortedColumn();
-    CollectorConfig collectorConfig =
-        getCollectorConfig(collectorTypeStr, aggregatorConfigs, schemaColumns, sortedColumns);
-    segmentProcessorConfigBuilder.setCollectorConfig(collectorConfig);
+    // Reducer config
+    if (!aggregationTypes.isEmpty()) {
+      segmentProcessorConfigBuilder.setAggregationTypes(aggregationTypes);
+    }
 
     // Segment config
     if (numRecordsPerSegment != null) {
@@ -233,6 +237,13 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     RealtimeToOfflineSegmentsTaskMetadata newMinionMetadata =
         new RealtimeToOfflineSegmentsTaskMetadata(realtimeTableName, _nextWatermark);
     _minionTaskZkMetadataManager.setRealtimeToOfflineSegmentsTaskMetadata(newMinionMetadata, _expectedVersion);
+  }
+
+  @Override
+  protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier(PinotTaskConfig pinotTaskConfig,
+      SegmentConversionResult segmentConversionResult) {
+    return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE,
+        Collections.emptyMap());
   }
 
   /**
@@ -289,34 +300,6 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
         "Partition column: %s is not a physical column in the schema", partitionColumn);
     return new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TABLE_PARTITION_CONFIG)
         .setColumnName(partitionColumn).setColumnPartitionConfig(columnPartitionMap.get(partitionColumn)).build();
-  }
-
-  /**
-   * Construct a {@link CollectorConfig} using configured collector configs and sorted columns from table config
-   */
-  private CollectorConfig getCollectorConfig(String collectorTypeStr, Map<String, String> aggregateConfigs,
-      Set<String> schemaColumns, List<String> sortedColumns) {
-    CollectorFactory.CollectorType collectorType = collectorTypeStr == null ? CollectorFactory.CollectorType.CONCAT
-        : CollectorFactory.CollectorType.valueOf(collectorTypeStr.toUpperCase());
-
-    Map<String, ValueAggregatorFactory.ValueAggregatorType> aggregatorTypeMap = new HashMap<>();
-    for (Map.Entry<String, String> entry : aggregateConfigs.entrySet()) {
-      String column = entry.getKey();
-      Preconditions
-          .checkState(schemaColumns.contains(column), "Aggregate column: %s is not a physical column in the schema",
-              column);
-      aggregatorTypeMap.put(column, ValueAggregatorFactory.ValueAggregatorType.valueOf(entry.getValue().toUpperCase()));
-    }
-
-    if (sortedColumns != null) {
-      for (String column : sortedColumns) {
-        Preconditions
-            .checkState(schemaColumns.contains(column), "Sorted column: %s is not a physical column in the schema",
-                column);
-      }
-    }
-    return new CollectorConfig.Builder().setCollectorType(collectorType).setAggregatorTypeMap(aggregatorTypeMap)
-        .setSortOrder(sortedColumns).build();
   }
 
   /**

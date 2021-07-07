@@ -23,6 +23,7 @@ import org.apache.pinot.common.metrics.AbstractMetrics;
 
 
 public enum MinionGauge implements AbstractMetrics.Gauge {
+  NUMBER_OF_TASKS("tasks", true),
   ;
 
   private final String _gaugeName;

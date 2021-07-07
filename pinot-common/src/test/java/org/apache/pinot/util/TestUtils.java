@@ -106,4 +106,34 @@ public class TestUtils {
       Assert.fail("Failed to meet condition in " + timeoutMs + "ms" + errorMessageSuffix);
     }
   }
+
+  /**
+   * Wait for a result to be returned
+   *
+   * @param supplier result value supplier
+   * @param timeoutMs timeout
+   * @return result value (non-throwable)
+   * @throws InterruptedException if {@code Thread.sleep()} is interrupted
+   */
+  public static <T> T waitForResult(SupplierWithException<T> supplier, long timeoutMs)
+      throws InterruptedException {
+    long tEnd = System.currentTimeMillis() + timeoutMs;
+    while (tEnd > System.currentTimeMillis()) {
+      try {
+        return supplier.get();
+      } catch (Throwable ignore) {
+        // ignore
+      }
+
+      Thread.sleep(1000);
+    }
+
+    throw new IllegalStateException("Failed to return result in " + timeoutMs + "ms");
+  }
+
+  @FunctionalInterface
+  public interface SupplierWithException<T> {
+    T get()
+        throws Exception;
+  }
 }

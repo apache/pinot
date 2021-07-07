@@ -40,8 +40,6 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.environmentprovider.PinotEnvironmentProvider;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -49,12 +47,10 @@ import org.slf4j.LoggerFactory;
  */
 public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(AzureEnvironmentProvider.class);
-
   protected static final String MAX_RETRY = "maxRetry";
   protected static final String IMDS_ENDPOINT = "imdsEndpoint";
-  protected static final String CONNECTION_TIMEOUT = "connectionTimeout";
-  protected static final String REQUEST_TIMEOUT = "requestTimeout";
+  protected static final String CONNECTION_TIMEOUT_MILLIS = "connectionTimeoutMillis";
+  protected static final String REQUEST_TIMEOUT_MILLIS = "requestTimeoutMillis";
   private static final String COMPUTE = "compute";
   private static final String METADATA = "Metadata";
   private static final String PLATFORM_FAULT_DOMAIN = "platformFaultDomain";
@@ -73,12 +69,12 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
 
     _maxRetry = Integer.parseInt(pinotConfiguration.getProperty(MAX_RETRY));
     _imdsEndpoint = pinotConfiguration.getProperty(IMDS_ENDPOINT);
-    int connectionTimeout = Integer.parseInt(pinotConfiguration.getProperty(CONNECTION_TIMEOUT));
-    int requestTimeout = Integer.parseInt(pinotConfiguration.getProperty(REQUEST_TIMEOUT));
+    int connectionTimeoutMillis = Integer.parseInt(pinotConfiguration.getProperty(CONNECTION_TIMEOUT_MILLIS));
+    int requestTimeoutMillis = Integer.parseInt(pinotConfiguration.getProperty(REQUEST_TIMEOUT_MILLIS));
 
     final RequestConfig requestConfig = RequestConfig.custom()
-        .setConnectTimeout(connectionTimeout)
-        .setConnectionRequestTimeout(requestTimeout)
+        .setConnectTimeout(connectionTimeoutMillis)
+        .setConnectionRequestTimeout(requestTimeoutMillis)
         .build();
 
     final HttpRequestRetryHandler httpRequestRetryHandler = (iOException, executionCount, httpContext) ->

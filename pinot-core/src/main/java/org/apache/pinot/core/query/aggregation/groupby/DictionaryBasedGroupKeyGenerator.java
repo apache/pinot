@@ -206,6 +206,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     return _rawKeyHolder.getStringGroupKeys();
   }
 
+  @Override
+  public int getNumKeys() { return _rawKeyHolder.getNumKeys(); }
+
   private interface RawKeyHolder {
 
     /**
@@ -240,11 +243,18 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
      * Returns an iterator of {@link StringGroupKey}. Use this interface to iterate through all the group keys.
      */
     Iterator<StringGroupKey> getStringGroupKeys();
+
+    /**
+     * Returns current number of unique keys
+     */
+    int getNumKeys();
+
   }
 
   private class ArrayBasedHolder implements RawKeyHolder {
     // TODO: using bitmap might better
     private final boolean[] _flags = new boolean[_globalGroupIdUpperBound];
+    private int _numKeys = 0;
 
     @Override
     public void processSingleValue(int numDocs, int[] outGroupIds) {
@@ -254,6 +264,10 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
           groupId = groupId * _cardinalities[j] + _singleValueDictIds[j][i];
         }
         outGroupIds[i] = groupId;
+        // if the flag is false, then increase the key num
+        if (!_flags[groupId]) {
+          _numKeys++;
+        }
         _flags[groupId] = true;
       }
     }
@@ -263,6 +277,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       for (int i = 0; i < numDocs; i++) {
         int[] groupIds = getIntRawKeys(i);
         for (int groupId : groupIds) {
+          if (!_flags[groupId]) {
+            _numKeys++;
+          }
           _flags[groupId] = true;
         }
         outGroupIds[i] = groupIds;
@@ -330,6 +347,11 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
           throw new UnsupportedOperationException();
         }
       };
+    }
+
+    @Override
+    public int getNumKeys() {
+      return _numKeys;
     }
   }
 
@@ -418,6 +440,11 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
           throw new UnsupportedOperationException();
         }
       };
+    }
+
+    @Override
+    public int getNumKeys() {
+      return _groupIdMap.size();
     }
   }
 
@@ -634,6 +661,10 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         }
       };
     }
+    @Override
+    public int getNumKeys() {
+      return _groupIdMap.size();
+    }
   }
 
   /**
@@ -835,6 +866,11 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
           throw new UnsupportedOperationException();
         }
       };
+    }
+
+    @Override
+    public int getNumKeys() {
+      return _groupIdMap.size();
     }
   }
 

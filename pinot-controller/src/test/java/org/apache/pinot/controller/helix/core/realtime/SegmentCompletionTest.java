@@ -1417,7 +1417,8 @@ public class SegmentCompletionTest {
 
     protected MockSegmentCompletionManager(HelixManager helixManager, PinotLLCRealtimeSegmentManager segmentManager,
         boolean isLeader, ControllerMetrics controllerMetrics) {
-      super(helixManager, segmentManager, controllerMetrics, new LeadControllerManager(helixManager, controllerMetrics),
+      super(helixManager, segmentManager, controllerMetrics,
+          new LeadControllerManager("localhost_1234", helixManager, controllerMetrics),
           SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds());
       _isLeader = isLeader;
     }

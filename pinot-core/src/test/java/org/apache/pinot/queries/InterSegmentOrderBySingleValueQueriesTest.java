@@ -30,6 +30,7 @@ import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.testng.Assert;
@@ -70,6 +71,21 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     QueriesTestUtils.testInterSegmentGroupByOrderByResultPQL(brokerResponse, expectedNumDocsScanned,
         expectedNumEntriesScannedInFilter, expectedNumEntriesScannedPostFilter, expectedNumTotalDocs, expectedGroups,
         expectedValues, true);
+  }
+
+  /**
+   * Tests the in-segment build option for GroupBy OrderBy query. (No trim)
+   */
+  @Test(dataProvider = "orderBySQLResultTableProvider")
+  public void testGroupByOrderByMVSegmentTrimSQLResults(String query, List<Object[]> expectedResults,
+      long expectedNumDocsScanned, long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter,
+      long expectedNumTotalDocs, DataSchema expectedDataSchema) {
+    InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2(1);
+    BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query, planMaker);
+    QueriesTestUtils
+        .testInterSegmentResultTable(brokerResponse, expectedNumDocsScanned, expectedNumEntriesScannedInFilter,
+            expectedNumEntriesScannedPostFilter, expectedNumTotalDocs, expectedResults, expectedResults.size(),
+            expectedDataSchema);
   }
 
   /**

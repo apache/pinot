@@ -19,6 +19,7 @@
 package org.apache.pinot.integration.tests.plugin.minion.tasks;
 
 import java.util.Map;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.integration.tests.SimpleMinionClusterIntegrationTest;
 import org.apache.pinot.minion.exception.TaskCancelledException;
@@ -26,6 +27,7 @@ import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
 import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
 import org.apache.pinot.plugin.minion.tasks.BaseTaskExecutor;
+import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
 import org.apache.pinot.spi.annotations.minion.TaskExecutorFactory;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -75,6 +77,12 @@ public class TestTaskExecutorFactory implements PinotTaskExecutorFactory {
           }
         } while (SimpleMinionClusterIntegrationTest.HOLD.get());
         return true;
+      }
+
+      @Override
+      protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier(
+          PinotTaskConfig pinotTaskConfig, SegmentConversionResult segmentConversionResult) {
+        throw new UnsupportedOperationException();
       }
     };
   }

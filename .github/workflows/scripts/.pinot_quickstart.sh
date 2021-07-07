@@ -40,12 +40,38 @@ netstat -i
 
 # Java version
 java -version
+jdk_version() {
+  IFS='
+'
+  # remove \r for Cygwin
+  lines=$(java -Xms32M -Xmx32M -version 2>&1 | tr '\r' '\n')
+  for line in $lines; do
+    if test -z $result && echo "$line" | grep -q 'version "'
+    then
+      ver=$(echo $line | sed -e 's/.*version "\(.*\)"\(.*\)/\1/; 1q')
+      # on macOS, sed doesn't support '?'
+      if case $ver in "1."*) true;; *) false;; esac;
+      then
+        result=$(echo $ver | sed -e 's/1\.\([0-9]*\)\(.*\)/\1/; 1q')
+      else
+        result=$(echo $ver | sed -e 's/\([0-9]*\)\(.*\)/\1/; 1q')
+      fi
+    fi
+  done
+  unset IFS
+  echo "$result"
+}
+JAVA_VER="$(jdk_version)"
 
 # Build
 PASS=0
 for i in $(seq 1 2)
 do
-  mvn clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true
+  if [ "$JAVA_VER" -gt 11 ] ; then
+    mvn clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true -Djdk.version=11
+  else
+    mvn clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true -Djdk.version=${JAVA_VER}
+  fi
   if [ $? -eq 0 ]; then
     PASS=1
     break;

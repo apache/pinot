@@ -61,6 +61,7 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -202,8 +203,9 @@ public class CalciteSqlParser {
           List<Expression> distinctExpressions = function.getOperands();
           for (Expression orderByExpression : orderByList) {
             // NOTE: Order-by is always a Function with the ordering of the Expression
-            if (!distinctExpressions.contains(orderByExpression.getFunctionCall().getOperands().get(0)))
+            if (!distinctExpressions.contains(orderByExpression.getFunctionCall().getOperands().get(0))) {
               throw new IllegalStateException("ORDER-BY columns should be included in the DISTINCT columns");
+            }
           }
         }
       }
@@ -595,46 +597,59 @@ public class CalciteSqlParser {
   // supports literal.
   // E.g. 'WHERE a > b' will be updated to 'WHERE a - b > 0'
   private static Expression updateComparisonPredicate(Expression expression) {
-    Function functionCall = expression.getFunctionCall();
-    if (functionCall != null) {
-      SqlKind sqlKind = SqlKind.OTHER_FUNCTION;
+    Function function = expression.getFunctionCall();
+    if (function != null) {
+      String operator = function.getOperator().toUpperCase();
+      FilterKind filterKind;
       try {
-        sqlKind = SqlKind.valueOf(functionCall.getOperator().toUpperCase());
+        filterKind = FilterKind.valueOf(operator);
       } catch (Exception e) {
-        // Do nothing
+        throw new SqlCompilationException("Unsupported filter kind: " + operator);
       }
-      switch (sqlKind) {
+      List<Expression> operands = function.getOperands();
+      switch (filterKind) {
+        case AND:
+        case OR:
+          operands.replaceAll(CalciteSqlParser::updateComparisonPredicate);
+          break;
         case EQUALS:
         case NOT_EQUALS:
         case GREATER_THAN:
         case GREATER_THAN_OR_EQUAL:
         case LESS_THAN:
         case LESS_THAN_OR_EQUAL:
-          // Handle predicate like 'WHERE 10=a'
-          if (functionCall.getOperands().get(0).getLiteral() != null) {
-            functionCall.setOperator(getOppositeOperator(functionCall.getOperator()));
-            List<Expression> oldOperands = functionCall.getOperands();
-            Expression tempExpr = oldOperands.get(0);
-            oldOperands.set(0, oldOperands.get(1));
-            oldOperands.set(1, tempExpr);
+          Expression firstOperand = operands.get(0);
+          Expression secondOperand = operands.get(1);
+
+          // Handle predicate like '10 = a' -> 'a = 10'
+          if (firstOperand.isSetLiteral()) {
+            if (!secondOperand.isSetLiteral()) {
+              function.setOperator(getOppositeOperator(filterKind).name());
+              operands.set(0, secondOperand);
+              operands.set(1, firstOperand);
+            }
+            break;
           }
-          if (functionCall.getOperands().get(1).getLiteral() != null) {
-            return expression;
+
+          // Handle predicate like 'a > b' -> 'a - b > 0'
+          if (!secondOperand.isSetLiteral()) {
+            Expression minusExpression = RequestUtils.getFunctionExpression(SqlKind.MINUS.name());
+            minusExpression.getFunctionCall().setOperands(Arrays.asList(firstOperand, secondOperand));
+            operands.set(0, minusExpression);
+            operands.set(1, RequestUtils.getLiteralExpression(0));
+            break;
           }
-          Expression comparisonFunction = RequestUtils.getFunctionExpression(functionCall.getOperator());
-          List<Expression> exprList = new ArrayList<>();
-          exprList.add(getLeftOperand(functionCall));
-          exprList.add(RequestUtils.getLiteralExpression(0));
-          comparisonFunction.getFunctionCall().setOperands(exprList);
-          return comparisonFunction;
+
+          break;
         default:
-          List<Expression> newOperands = new ArrayList<>();
-          int operandsSize = functionCall.getOperandsSize();
-          for (int i = 0; i < operandsSize; i++) {
-            Expression operand = functionCall.getOperands().get(i);
-            newOperands.add(updateComparisonPredicate(operand));
+          int numOperands = operands.size();
+          for (int i = 1; i < numOperands; i++) {
+            if (!operands.get(i).isSetLiteral()) {
+              throw new SqlCompilationException(String
+                  .format("For %s predicate, the operands except for the first one must be literal, got: %s",
+                      filterKind, expression));
+            }
           }
-          functionCall.setOperands(newOperands);
       }
     }
     return expression;
@@ -647,34 +662,21 @@ public class CalciteSqlParser {
    *  from "<" to ">",
    *  from ">=" to "<=",
    *  from "<=" to ">=".
-   *
-   * @param operator
-   * @return opposite operator
    */
-  private static String getOppositeOperator(String operator) {
-    switch (operator.toUpperCase()) {
-      case "GREATER_THAN":
-        return "LESS_THAN";
-      case "GREATER_THAN_OR_EQUAL":
-        return "LESS_THAN_OR_EQUAL";
-      case "LESS_THAN":
-        return "GREATER_THAN";
-      case "LESS_THAN_OR_EQUAL":
-        return "GREATER_THAN_OR_EQUAL";
+  private static FilterKind getOppositeOperator(FilterKind filterKind) {
+    switch (filterKind) {
+      case GREATER_THAN:
+        return FilterKind.LESS_THAN;
+      case GREATER_THAN_OR_EQUAL:
+        return FilterKind.LESS_THAN_OR_EQUAL;
+      case LESS_THAN:
+        return FilterKind.GREATER_THAN;
+      case LESS_THAN_OR_EQUAL:
+        return FilterKind.GREATER_THAN_OR_EQUAL;
       default:
         // Do nothing
-        return operator;
+        return filterKind;
     }
-  }
-
-  private static Expression getLeftOperand(Function functionCall) {
-    Expression minusFunction = RequestUtils.getFunctionExpression(SqlKind.MINUS.toString());
-    List<Expression> updatedOperands = new ArrayList<>();
-    for (Expression operand : functionCall.getOperands()) {
-      updatedOperands.add(updateComparisonPredicate(operand));
-    }
-    minusFunction.getFunctionCall().setOperands(updatedOperands);
-    return minusFunction;
   }
 
   private static void applyAlias(Map<Identifier, Expression> aliasMap, PinotQuery pinotQuery) {
@@ -925,7 +927,15 @@ public class CalciteSqlParser {
         break;
       case OTHER:
       case OTHER_FUNCTION:
+      case DOT:
         functionName = functionNode.getOperator().getName().toUpperCase();
+        if (functionName.equals("ITEM") || functionName.equals("DOT")) {
+          // Calcite parses path expression such as "data[0][1].a.b[0]" into a chain of ITEM and/or DOT
+          // functions. Collapse this chain into an identifier.
+          StringBuffer path = new StringBuffer();
+          compilePathExpression(functionName, functionNode, path);
+          return RequestUtils.getIdentifierExpression(path.toString());
+        }
         break;
       default:
         functionName = functionKind.name();
@@ -946,6 +956,56 @@ public class CalciteSqlParser {
     Expression functionExpression = RequestUtils.getFunctionExpression(functionName);
     functionExpression.getFunctionCall().setOperands(operands);
     return functionExpression;
+  }
+
+  /**
+   * Convert Calcite operator tree made up of ITEM and DOT functions to an identifier. For example, the operator tree
+   * shown below will be converted to IDENTIFIER "jsoncolumn.data[0][1].a.b[0]".
+   *
+   * ├── ITEM(jsoncolumn.data[0][1].a.b[0])
+   *      ├── LITERAL (0)
+   *      └── DOT (jsoncolumn.daa[0][1].a.b)
+   *            ├── IDENTIFIER (b)
+   *            └── DOT (jsoncolumn.data[0][1].a)
+   *                  ├── IDENTIFIER (a)
+   *                  └── ITEM (jsoncolumn.data[0][1])
+   *                        ├── LITERAL (1)
+   *                        └── ITEM (jsoncolumn.data[0])
+   *                              ├── LITERAL (1)
+   *                              └── IDENTIFIER (jsoncolumn.data)
+   *
+   * @param functionName Name of the function ("DOT" or "ITEM")
+   * @param functionNode Root node of the DOT and/or ITEM operator function chain.
+   * @param path String representation of path represented by DOT and/or ITEM function chain.
+   */
+  private static void compilePathExpression(String functionName, SqlBasicCall functionNode, StringBuffer path) {
+    SqlNode[] operands = functionNode.getOperands();
+
+    // Compile first operand of the function (either an identifier or another DOT and/or ITEM function).
+    SqlKind kind0 = operands[0].getKind();
+    if (kind0 == SqlKind.IDENTIFIER) {
+      path.append(((SqlIdentifier) operands[0]).toString());
+    } else if (kind0 == SqlKind.DOT || kind0 == SqlKind.OTHER_FUNCTION) {
+      SqlBasicCall function0 = (SqlBasicCall) operands[0];
+      String name0 = function0.getOperator().getName();
+      if (name0.equals("ITEM") || name0.equals("DOT")) {
+        compilePathExpression(name0, function0, path);
+      } else {
+        throw new SqlCompilationException("SELECT list item has bad path expression.");
+      }
+    } else {
+      throw new SqlCompilationException("SELECT list item has bad path expression.");
+    }
+
+    // Compile second operand of the function (either an identifier or literal).
+    SqlKind kind1 = operands[1].getKind();
+    if (kind1 == SqlKind.IDENTIFIER) {
+      path.append(".").append(((SqlIdentifier) operands[1]).getSimple());
+    } else if (kind1 == SqlKind.LITERAL) {
+      path.append("[").append(((SqlLiteral) operands[1]).toValue()).append("]");
+    } else {
+      throw new SqlCompilationException("SELECT list item has bad path expression.");
+    }
   }
 
   private static void validateFunction(String functionName, List<Expression> operands) {

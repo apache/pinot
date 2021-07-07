@@ -31,19 +31,26 @@ public class InternalConfigConstants {
   public static final String SEGMENT_TIME_FORMAT = "segment.time.format";
   public static final String SEGMENT_TIME_SDF_PATTERN = "segment.time.sdf.pattern";
 
+  // The operations of preprocessing that is enabled.
+  public static final String PREPROCESS_OPERATIONS = "preprocessing.operations";
+
   // Partitioning configs
   public static final String PARTITION_COLUMN_CONFIG = "partition.column";
   public static final String NUM_PARTITIONS_CONFIG = "num.partitions";
   public static final String PARTITION_FUNCTION_CONFIG = "partition.function";
 
-  public static final String SORTED_COLUMN_CONFIG = "sorted.column";
+  public static final String SORTING_COLUMN_CONFIG = "sorting.column";
+  public static final String SORTING_COLUMN_TYPE = "sorting.type";
   public static final String ENABLE_PARTITIONING = "enable.partitioning";
 
-  // max records per file in each partition. No effect otherwise.
+  @Deprecated
+  // Use PREPROCESSING_MAX_NUM_RECORDS_PER_FILE.
   public static final String PARTITION_MAX_RECORDS_PER_FILE = "partition.max.records.per.file";
+  // max records per file in each partition. No effect otherwise.
+  public static final String PREPROCESSING_MAX_NUM_RECORDS_PER_FILE = "preprocessing.max.num.records.per.file";
 
   // Number of segments we want generated.
-  public static final String PREPROCESS_NUM_FILES = "preprocess.num.files";
+  public static final String PREPROCESSING_NUM_REDUCERS = "preprocessing.num.reducers";
 
   public static final String FAIL_ON_SCHEMA_MISMATCH = "fail.on.schema.mismatch";
 }
