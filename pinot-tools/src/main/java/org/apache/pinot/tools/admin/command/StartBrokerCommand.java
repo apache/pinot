@@ -118,9 +118,10 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
       throws Exception {
     try {
       LOGGER.info("Executing command: " + toString());
+      Map<String, Object> brokerConf = getBrokerConf();
       StartServiceManagerCommand startServiceManagerCommand =
           new StartServiceManagerCommand().setZkAddress(_zkAddress).setClusterName(_clusterName).setPort(-1)
-              .setBootstrapServices(new String[0]).addBootstrapService(ServiceRole.BROKER, getBrokerConf());
+              .setBootstrapServices(new String[0]).addBootstrapService(ServiceRole.BROKER, brokerConf);
       startServiceManagerCommand.execute();
       String pidFile = ".pinotAdminBroker-" + System.currentTimeMillis() + ".pid";
       savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);

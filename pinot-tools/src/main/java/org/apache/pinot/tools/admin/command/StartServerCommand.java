@@ -149,9 +149,10 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
       throws Exception {
     try {
       LOGGER.info("Executing command: " + toString());
+      Map<String, Object> serverConf = getServerConf();
       StartServiceManagerCommand startServiceManagerCommand =
           new StartServiceManagerCommand().setZkAddress(_zkAddress).setClusterName(_clusterName).setPort(-1)
-              .setBootstrapServices(new String[0]).addBootstrapService(ServiceRole.SERVER, getServerConf());
+              .setBootstrapServices(new String[0]).addBootstrapService(ServiceRole.SERVER, serverConf);
       startServiceManagerCommand.execute();
       String pidFile = ".pinotAdminServer-" + System.currentTimeMillis() + ".pid";
       savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
