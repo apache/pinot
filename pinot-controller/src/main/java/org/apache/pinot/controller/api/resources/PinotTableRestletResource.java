@@ -62,11 +62,12 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.recommender.RecommenderDriver;
 import org.apache.pinot.controller.tuner.TableConfigTunerUtils;
-import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
+import org.apache.pinot.controller.util.TableIngestionStatusHelper;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStats;
@@ -105,6 +106,9 @@ public class PinotTableRestletResource {
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
+
+  @Inject
+  PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
 
   @Inject
   ControllerConf _controllerConf;
@@ -606,17 +610,27 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
     try {
-      TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-      if (TableType.OFFLINE == tableType) {
-        // TODO: Support table status for offline table. Currently only supported for realtime.
-        throw new UnsupportedOperationException(
-            "Table status for OFFLINE table: " + tableName + " is currently unsupported");
+      TableType tableType = Constants.validateTableType(tableTypeStr);
+      if (tableType == null) {
+        throw new ControllerApplicationException(LOGGER, "Table type should either be realtime|offline",
+            Response.Status.BAD_REQUEST);
       }
-      String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
-      ConsumingSegmentInfoReader consumingSegmentInfoReader =
-          new ConsumingSegmentInfoReader(_executor, _connectionManager, _pinotHelixResourceManager);
-      TableStatus.IngestionStatus ingestionStatus = consumingSegmentInfoReader
-          .getIngestionStatus(tableNameWithType, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+      String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
+      if (!_pinotHelixResourceManager.hasTable(tableNameWithType)) {
+        throw new ControllerApplicationException(LOGGER,
+            "Specified table name: " + tableName + " of type: " + tableTypeStr + " does not exist.",
+            Response.Status.BAD_REQUEST);
+      }
+      TableStatus.IngestionStatus ingestionStatus = null;
+      if (TableType.OFFLINE == tableType) {
+        ingestionStatus = TableIngestionStatusHelper
+            .getOfflineTableIngestionStatus(tableNameWithType, _pinotHelixResourceManager,
+                _pinotHelixTaskResourceManager);
+      } else {
+        ingestionStatus = TableIngestionStatusHelper.getRealtimeTableIngestionStatus(tableNameWithType,
+            _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000, _executor, _connectionManager,
+            _pinotHelixResourceManager);
+      }
       TableStatus tableStatus = new TableStatus(ingestionStatus);
       return JsonUtils.objectToPrettyString(tableStatus);
     } catch (Exception e) {

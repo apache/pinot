@@ -42,6 +42,8 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.TABLE_NAME;
+
 
 /**
  * The class <code>PinotHelixTaskResourceManager</code> manages all the task resources in Pinot cluster.
@@ -344,6 +346,39 @@ public class PinotHelixTaskResourceManager {
       taskConfigs.add(PinotTaskConfig.fromHelixTaskConfig(helixTaskConfig));
     }
     return taskConfigs;
+  }
+
+  /**
+   * Helper method to return a map of task names to corresponding task state
+   * where the task corresponds to the given Pinot table name. This is used to
+   * check status of all tasks for a given table.
+   * @param taskType Task Name
+   * @param tableNameWithType table name with type to filter on
+   * @return Map of filtered task name to corresponding state
+   */
+  public synchronized Map<String, TaskState> getTaskStatesByTable(String taskType, String tableNameWithType) {
+    Map<String, TaskState> filteredTaskStateMap = new HashMap<>();
+    Map<String, TaskState> taskStateMap = getTaskStates(taskType);
+
+    for (Map.Entry<String, TaskState> taskState : taskStateMap.entrySet()) {
+      String taskName = taskState.getKey();
+
+      // Iterate through all task configs associated with this task name
+      for (PinotTaskConfig taskConfig: getTaskConfigs(taskName)) {
+        Map<String, String> pinotConfigs = taskConfig.getConfigs();
+
+        // Filter task configs that matches this table name
+        if (pinotConfigs != null) {
+          String tableNameConfig = pinotConfigs.get(TABLE_NAME);
+          if (tableNameConfig != null && tableNameConfig.equals(tableNameWithType)) {
+            // Found a match ! Track state for this particular task in the final result map
+            filteredTaskStateMap.put(taskName, taskStateMap.get(taskName));
+            break;
+          }
+        }
+      }
+    }
+    return filteredTaskStateMap;
   }
 
   /**
