@@ -92,9 +92,10 @@ public class StartMinionCommand extends AbstractBaseAdminCommand implements Comm
       throws Exception {
     try {
       LOGGER.info("Executing command: " + toString());
+      Map<String, Object> minionConf = getMinionConf();
       StartServiceManagerCommand startServiceManagerCommand =
           new StartServiceManagerCommand().setZkAddress(_zkAddress).setClusterName(_clusterName).setPort(-1)
-              .setBootstrapServices(new String[0]).addBootstrapService(ServiceRole.MINION, getMinionConf());
+              .setBootstrapServices(new String[0]).addBootstrapService(ServiceRole.MINION, minionConf);
       startServiceManagerCommand.execute();
       String pidFile = ".pinotAdminMinion-" + System.currentTimeMillis() + ".pid";
       savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
