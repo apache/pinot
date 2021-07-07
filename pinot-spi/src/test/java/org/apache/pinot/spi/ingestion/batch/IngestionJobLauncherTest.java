@@ -30,7 +30,7 @@ import org.testng.annotations.Test;
 public class IngestionJobLauncherTest {
 
   @Test
-  public void testIngestionJobLauncherWithTemplate() 
+  public void testIngestionJobLauncherWithTemplate()
       throws IOException, ClassNotFoundException {
     Map<String, Object> context =
         GroovyTemplateUtils.getTemplateContext(Arrays.asList("year=2020", "month=05", "day=06"));
