@@ -33,6 +33,7 @@ import javax.annotation.Nullable;
  *   <li>Sequence id</li>
  * </ul>
  */
+@SuppressWarnings("serial")
 public class SimpleSegmentNameGenerator implements SegmentNameGenerator {
   private final String _segmentNamePrefix;
   private final String _segmentNamePostfix;
@@ -43,7 +44,7 @@ public class SimpleSegmentNameGenerator implements SegmentNameGenerator {
   }
 
   @Override
-  public String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue) {
+  public String generateSegmentName(int sequenceId, Object minTimeValue, Object maxTimeValue, String inputFilePath) {
     return JOINER
         .join(_segmentNamePrefix, minTimeValue, maxTimeValue, _segmentNamePostfix, sequenceId >= 0 ? sequenceId : null);
   }

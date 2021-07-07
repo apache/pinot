@@ -18,12 +18,11 @@
  */
 package org.apache.pinot.segment.spi.creator.name;
 
-import javax.annotation.Nullable;
-
 
 /**
  * Fixed segment name generator which always returns the fixed segment name.
  */
+@SuppressWarnings("serial")
 public class FixedSegmentNameGenerator implements SegmentNameGenerator {
   private final String _segmentName;
 
@@ -32,7 +31,7 @@ public class FixedSegmentNameGenerator implements SegmentNameGenerator {
   }
 
   @Override
-  public String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue) {
+  public String generateSegmentName(int sequenceId, Object minTimeValue, Object maxTimeValue, String inputFilePath) {
     return _segmentName;
   }
 
