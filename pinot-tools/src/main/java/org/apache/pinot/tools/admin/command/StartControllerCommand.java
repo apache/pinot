@@ -161,6 +161,10 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
     Map<String, Object> properties = new HashMap<>();
     if (_configFileName != null) {
       properties.putAll(PinotConfigUtils.generateControllerConf(_configFileName));
+      // Override the zkAddress and clusterName to ensure ServiceManager is connecting to the right Zookeeper and Cluster.
+      // Configs existence is already verified.
+      _zkAddress = properties.get(ControllerConf.ZK_STR).toString();
+      _clusterName = properties.get(ControllerConf.HELIX_CLUSTER_NAME).toString();
     } else {
       if (_controllerHost == null) {
         _controllerHost = NetUtils.getHostAddress();
