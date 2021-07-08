@@ -16,10 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.minion.metrics;
+package org.apache.pinot.common.metrics;
 
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.metrics.AbstractMetrics;
 
 
 public enum MinionMeter implements AbstractMetrics.Meter {
