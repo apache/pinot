@@ -25,7 +25,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.proto.Server;
-import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.core.plan.AggregationGroupByOrderByPlanNode;
