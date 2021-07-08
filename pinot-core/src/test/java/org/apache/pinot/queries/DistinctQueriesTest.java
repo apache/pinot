@@ -266,6 +266,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
             assertTrue(values[0] instanceof String);
             actualValues.add(Integer.parseInt((String) values[0]));
           }
+          //TODO: atri
+          System.out.println("QUERY IS" + " " + query);
           assertEquals(actualValues, expectedValues);
         }
       }
@@ -336,6 +338,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
             assertTrue(values[0] instanceof Number);
             actualValues.add(((Number) values[0]).intValue());
           }
+          System.out.println("QUERY IS " + query);
           assertEquals(actualValues, expectedValues);
         }
       }
