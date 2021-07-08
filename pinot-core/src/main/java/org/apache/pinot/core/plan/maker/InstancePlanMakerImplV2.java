@@ -191,7 +191,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       return new SelectionPlanNode(indexSegment, queryContext);
     } else {
       assert QueryContextUtils.isDistinctQuery(queryContext);
-      return getDistinctExecutionNode(indexSegment, queryContext);
+      return getDistinctPlanNode(indexSegment, queryContext);
     }
   }
 
@@ -271,7 +271,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   /**
    * Returns dictionary based distinct plan node iff supported, else distinct plan node
    */
-  private PlanNode getDistinctExecutionNode(IndexSegment indexSegment, QueryContext queryContext) {
+  private PlanNode getDistinctPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
     AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
 
     // If we have gotten here, it must have been verified that there is only on aggregation function in the context
@@ -286,8 +286,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       if (expression.getType() == ExpressionContext.Type.IDENTIFIER) {
         String column = expression.getIdentifier();
         Dictionary dictionary = indexSegment.getDataSource(column).getDictionary();
-        if (dictionary != null && dictionary.isSorted()) {
-          return new DictionaryBasedDistinctPlanNode(indexSegment, queryContext);
+        if (dictionary != null) {
+          return new DictionaryBasedDistinctPlanNode(indexSegment, queryContext, dictionary);
         }
       }
     }

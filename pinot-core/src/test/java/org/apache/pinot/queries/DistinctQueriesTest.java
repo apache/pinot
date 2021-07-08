@@ -245,21 +245,13 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       // String columns
       //@formatter:off
       List<String> queries = Arrays
-          .asList("SELECT DISTINCT(stringColumn) FROM testTable ORDER BY stringColumn");
+          .asList("SELECT DISTINCT(stringColumn) FROM testTable");
       //@formatter:on
       Set<Integer> expectedValues = new HashSet<>();
 
-      expectedValues.add(0);
-      expectedValues.add(16);
-      expectedValues.add(17);
-      expectedValues.add(1);
-      expectedValues.add(10);
-      expectedValues.add(11);
-      expectedValues.add(12);
-      expectedValues.add(13);
-      expectedValues.add(14);
-      expectedValues.add(15);
-
+      for (int i = 0; i < 10; i++) {
+        expectedValues.add(i);
+      }
 
       for (String query : queries) {
         DistinctTable pqlDistinctTable = getDistinctTableInnerSegment(query, true);

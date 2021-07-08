@@ -21,17 +21,19 @@ package org.apache.pinot.core.operator.query;
 import it.unimi.dsi.fastutil.ints.IntHeapPriorityQueue;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntPriorityQueue;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
@@ -41,30 +43,32 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
 
+import static org.apache.pinot.core.query.distinct.DistinctExecutor.MAX_INITIAL_CAPACITY;
+
+
 /**
  * Operator which executes DISTINCT operation based on dictionary
  */
 public class DictionaryBasedDistinctOperator extends DistinctOperator {
     private static final String OPERATOR_NAME = "DictionaryBasedDistinctOperator";
-    int MAX_INITIAL_CAPACITY = 10000;
 
     private final DistinctAggregationFunction _distinctAggregationFunction;
-    private final Map<String, Dictionary> _dictionaryMap;
+    private final Dictionary _dictionary;
     private final int _numTotalDocs;
     private final TransformOperator _transformOperator;
-    private final IntOpenHashSet _dictIdSet;
+    private IntSet _dictIdSet;
 
     private IntPriorityQueue _priorityQueue;
 
     private boolean _hasOrderBy;
 
     public DictionaryBasedDistinctOperator(IndexSegment indexSegment, DistinctAggregationFunction distinctAggregationFunction,
-                                           Map<String, Dictionary> dictionaryMap, int numTotalDocs,
+                                           Dictionary dictionary, int numTotalDocs,
                                            TransformOperator transformOperator) {
         super(indexSegment, distinctAggregationFunction, transformOperator);
 
         _distinctAggregationFunction = distinctAggregationFunction;
-        _dictionaryMap = dictionaryMap;
+        _dictionary = dictionary;
         _numTotalDocs = numTotalDocs;
         _transformOperator = transformOperator;
         _dictIdSet = new IntOpenHashSet();
@@ -75,6 +79,7 @@ public class DictionaryBasedDistinctOperator extends DistinctOperator {
             OrderByExpressionContext orderByExpressionContext = orderByExpressionContexts.get(0);
             int limit = _distinctAggregationFunction.getLimit();
             int comparisonFactor = orderByExpressionContext.isAsc() ? -1 : 1;
+
             _priorityQueue =
                     new IntHeapPriorityQueue(Math.min(limit, MAX_INITIAL_CAPACITY), (i1, i2) -> (i1 - i2) * comparisonFactor);
             _hasOrderBy = true;
@@ -84,34 +89,39 @@ public class DictionaryBasedDistinctOperator extends DistinctOperator {
     @Override
     protected IntermediateResultsBlock getNextBlock() {
         int limit = _distinctAggregationFunction.getLimit();
-        String column = _distinctAggregationFunction.getInputExpressions().get(0).getIdentifier();
+        ExpressionContext expression = _distinctAggregationFunction.getInputExpressions().get(0);
 
         assert _distinctAggregationFunction.getType() == AggregationFunctionType.DISTINCT;
 
-        Dictionary dictionary = _dictionaryMap.get(column);
-        int dictionarySize = dictionary.length();
+        TransformBlock transformBlock = _transformOperator.nextBlock();
+        BlockValSet blockValueSet = transformBlock.getBlockValueSet(expression);
+        int[] dictIds = blockValueSet.getDictionaryIdsSV();
+        int numDocs = transformBlock.getNumDocs();
 
-        for (int dictId = 0; dictId < dictionarySize; dictId++) {
+        if (_dictionary.isSorted()) {
             if (!_hasOrderBy) {
-                _dictIdSet.add(dictId);
+                for (int i = 0; i < numDocs; i++) {
+                    _dictIdSet.add(dictIds[i]);
 
-                if (_dictIdSet.size() >= limit) {
-                    break;
+                    if (_dictIdSet.size() >= limit) {
+                        break;
+                    }
                 }
             } else {
-                // We already ascertained that the dictionary is sorted, hence we can use IDs instead of actual values
-                // to determine order
-                if (!_dictIdSet.contains(dictId)) {
-                    if (_dictIdSet.size() < limit) {
-                        _dictIdSet.add(dictId);
-                        _priorityQueue.enqueue(dictId);
-                    } else {
-                        int firstDictId = _priorityQueue.firstInt();
-                        if (_priorityQueue.comparator().compare(dictId, firstDictId) > 0) {
-                            _dictIdSet.remove(firstDictId);
+                for (int i = 0; i < numDocs; i++) {
+                    int dictId = dictIds[i];
+                    if (!_dictIdSet.contains(dictId)) {
+                        if (_dictIdSet.size() < limit) {
                             _dictIdSet.add(dictId);
-                            _priorityQueue.dequeueInt();
                             _priorityQueue.enqueue(dictId);
+                        } else {
+                            int firstDictId = _priorityQueue.firstInt();
+                            if (_priorityQueue.comparator().compare(dictId, firstDictId) > 0) {
+                                _dictIdSet.remove(firstDictId);
+                                _dictIdSet.add(dictId);
+                                _priorityQueue.dequeueInt();
+                                _priorityQueue.enqueue(dictId);
+                            }
                         }
                     }
                 }
@@ -128,11 +138,8 @@ public class DictionaryBasedDistinctOperator extends DistinctOperator {
      * Build the final result for this operation
      */
     private DistinctTable buildResult() {
-        String column = _distinctAggregationFunction.getInputExpressions().get(0).getIdentifier();
 
         assert _distinctAggregationFunction.getType() == AggregationFunctionType.DISTINCT;
-
-        Dictionary dictionary = _dictionaryMap.get(column);
 
         List<ExpressionContext> expressions = _distinctAggregationFunction.getInputExpressions();
         ExpressionContext expression = expressions.get(0);
@@ -143,8 +150,14 @@ public class DictionaryBasedDistinctOperator extends DistinctOperator {
         List<Record> records = new ArrayList<>(_dictIdSet.size());
         Iterator<Integer> dictIdIterator = _dictIdSet.iterator();
 
-        for(int i = 0; i < _dictIdSet.size(); i++) {
-            records.add(new Record(new Object[]{dictionary.getInternal(dictIdIterator.next())}));
+        if (!_dictionary.isSorted()) {
+            for (int i = 0; i < _dictionary.length(); i++) {
+                records.add(new Record(new Object[]{_dictionary.getInternal(i)}));
+            }
+        } else {
+            for (int i = 0; i < _dictIdSet.size(); i++) {
+                records.add(new Record(new Object[]{_dictionary.getInternal(dictIdIterator.next())}));
+            }
         }
 
         return new DistinctTable(dataSchema, records);
