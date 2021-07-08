@@ -23,7 +23,6 @@ import cloud.localstack.docker.annotation.LocalstackDockerAnnotationProcessor;
 import cloud.localstack.docker.annotation.LocalstackDockerConfiguration;
 import cloud.localstack.docker.annotation.LocalstackDockerProperties;
 import cloud.localstack.docker.command.Command;
-import cloud.localstack.docker.exception.LocalstackDockerException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeType;
 import com.google.common.base.Function;
@@ -39,6 +38,7 @@ import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -63,6 +63,7 @@ import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
+import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -108,9 +109,20 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
 
   List<String> h2FieldNameAndTypes = new ArrayList<>();
 
+  private boolean skipTestNoDockerInstalled = false;
+
   @BeforeClass
   public void setUp()
       throws Exception {
+    try {
+      DockerInfoCommand dockerInfoCommand = new DockerInfoCommand();
+      dockerInfoCommand.execute();
+    } catch (IllegalStateException e) {
+      skipTestNoDockerInstalled = true;
+      LOGGER.warn("Skipping test! Docker is not found running", e);
+      throw new SkipException(e.getMessage());
+    }
+
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
     // Start the Pinot cluster
@@ -206,18 +218,10 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
 
   public void startKinesis()
       throws Exception {
-    try {
-      final LocalstackDockerConfiguration dockerConfig = PROCESSOR.process(this.getClass());
-      localstackDocker.startup(dockerConfig);
-    } catch (LocalstackDockerException e) {
-      StopAllLocalstackDockerCommand stopAllLocalstackDockerCommand = new StopAllLocalstackDockerCommand();
-      stopAllLocalstackDockerCommand.execute();
-
-      final LocalstackDockerConfiguration dockerConfig = PROCESSOR.process(this.getClass());
-      //Restart localstack docker after killing all the existing localstack docker containers.
-      //If it fails at this step, the test is terminated.
-      localstackDocker.startup(dockerConfig);
-    }
+    final LocalstackDockerConfiguration dockerConfig = PROCESSOR.process(this.getClass());
+    StopAllLocalstackDockerCommand stopAllLocalstackDockerCommand = new StopAllLocalstackDockerCommand();
+    stopAllLocalstackDockerCommand.execute();
+    localstackDocker.startup(dockerConfig);
 
     kinesisClient = KinesisClient.builder().httpClient(new ApacheSdkHttpService().createHttpClientBuilder()
         .buildWithDefaults(
@@ -438,6 +442,10 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
   @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
+    if (skipTestNoDockerInstalled) {
+      return;
+    }
+
     dropRealtimeTable(getTableName());
     stopServer();
     stopBroker();
@@ -458,6 +466,17 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
         for (String containerId : containerList) {
           dockerExe.execute(Arrays.asList("stop", containerId));
         }
+      }
+    }
+  }
+
+  public static class DockerInfoCommand extends Command {
+
+    public void execute() {
+      String dockerInfo = dockerExe.execute(Collections.singletonList("info"));
+
+      if (dockerInfo.toLowerCase().contains("error")) {
+        throw new IllegalStateException("Docker daemon is not running!");
       }
     }
   }
