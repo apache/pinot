@@ -245,12 +245,22 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       // String columns
       //@formatter:off
       List<String> queries = Arrays
-          .asList("SELECT DISTINCT(stringColumn) FROM testTable", "SELECT DISTINCT(rawStringColumn) FROM testTable");
+          .asList("SELECT DISTINCT(stringColumn) FROM testTable ORDER BY stringColumn");
       //@formatter:on
       Set<Integer> expectedValues = new HashSet<>();
-      for (int i = 0; i < 10; i++) {
-        expectedValues.add(i);
-      }
+
+      expectedValues.add(0);
+      expectedValues.add(16);
+      expectedValues.add(17);
+      expectedValues.add(1);
+      expectedValues.add(10);
+      expectedValues.add(11);
+      expectedValues.add(12);
+      expectedValues.add(13);
+      expectedValues.add(14);
+      expectedValues.add(15);
+
+
       for (String query : queries) {
         DistinctTable pqlDistinctTable = getDistinctTableInnerSegment(query, true);
         DistinctTable pqlDistinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(pqlDistinctTable.toBytes()));
@@ -266,8 +276,38 @@ public class DistinctQueriesTest extends BaseQueriesTest {
             assertTrue(values[0] instanceof String);
             actualValues.add(Integer.parseInt((String) values[0]));
           }
-          //TODO: atri
-          System.out.println("QUERY IS" + " " + query);
+          assertEquals(actualValues, expectedValues);
+        }
+      }
+    }
+    {
+      // Raw String column
+      //@formatter:off
+      List<String> queries = Arrays
+              .asList("SELECT DISTINCT(rawStringColumn) FROM testTable");
+      //@formatter:on
+      Set<Integer> expectedValues = new HashSet<>();
+
+      for (int i = 0; i < 10; i++) {
+        expectedValues.add(i);
+      }
+
+
+      for (String query : queries) {
+        DistinctTable pqlDistinctTable = getDistinctTableInnerSegment(query, true);
+        DistinctTable pqlDistinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(pqlDistinctTable.toBytes()));
+        DistinctTable sqlDistinctTable = getDistinctTableInnerSegment(query, false);
+        DistinctTable sqlDistinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(sqlDistinctTable.toBytes()));
+        for (DistinctTable distinctTable : Arrays
+                .asList(pqlDistinctTable, pqlDistinctTable2, sqlDistinctTable, sqlDistinctTable2)) {
+          assertEquals(distinctTable.size(), 10);
+          Set<Integer> actualValues = new HashSet<>();
+          for (Record record : distinctTable.getRecords()) {
+            Object[] values = record.getValues();
+            assertEquals(values.length, 1);
+            assertTrue(values[0] instanceof String);
+            actualValues.add(Integer.parseInt((String) values[0]));
+          }
           assertEquals(actualValues, expectedValues);
         }
       }
@@ -338,7 +378,6 @@ public class DistinctQueriesTest extends BaseQueriesTest {
             assertTrue(values[0] instanceof Number);
             actualValues.add(((Number) values[0]).intValue());
           }
-          System.out.println("QUERY IS " + query);
           assertEquals(actualValues, expectedValues);
         }
       }

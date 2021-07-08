@@ -277,6 +277,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
     // If we have gotten here, it must have been verified that there is only on aggregation function in the context
     // and it is a DistinctAggregationFunction
+
     DistinctAggregationFunction distinctAggregationFunction = (DistinctAggregationFunction) aggregationFunctions[0];
     List<ExpressionContext> expressions = distinctAggregationFunction.getInputExpressions();
 

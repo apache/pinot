@@ -6,6 +6,7 @@ import it.unimi.dsi.fastutil.ints.IntPriorityQueue;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -76,12 +77,14 @@ public class DictionaryBasedDistinctOperator extends DistinctOperator {
 
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
             if (!_hasOrderBy) {
+                _dictIdSet.add(dictId);
+
                 if (_dictIdSet.size() >= limit) {
                     break;
                 }
-
-                _dictIdSet.add(dictId);
             } else {
+                // We already ascertained that the dictionary is sorted, hence we can use IDs instead of actual values
+                // to determine order
                 if (!_dictIdSet.contains(dictId)) {
                     if (_dictIdSet.size() < limit) {
                         _dictIdSet.add(dictId);
