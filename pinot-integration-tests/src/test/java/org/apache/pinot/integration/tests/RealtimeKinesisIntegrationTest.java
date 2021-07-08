@@ -219,14 +219,10 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
 
   public void startKinesis()
       throws Exception {
-    try {
-      final LocalstackDockerConfiguration dockerConfig = PROCESSOR.process(this.getClass());
-      StopAllLocalstackDockerCommand stopAllLocalstackDockerCommand = new StopAllLocalstackDockerCommand();
-      stopAllLocalstackDockerCommand.execute();
-      localstackDocker.startup(dockerConfig);
-    } catch (LocalstackDockerException e) {
-      LOGGER.error("Cannot start Localstack Kinesis container", e);
-    }
+    final LocalstackDockerConfiguration dockerConfig = PROCESSOR.process(this.getClass());
+    StopAllLocalstackDockerCommand stopAllLocalstackDockerCommand = new StopAllLocalstackDockerCommand();
+    stopAllLocalstackDockerCommand.execute();
+    localstackDocker.startup(dockerConfig);
 
     kinesisClient = KinesisClient.builder().httpClient(new ApacheSdkHttpService().createHttpClientBuilder()
         .buildWithDefaults(
