@@ -27,6 +27,7 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -51,6 +52,7 @@ import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -208,7 +210,8 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
   @ApiOperation(value = "Lists all tables in cluster", notes = "Lists all tables in cluster")
-  public String listTableConfigs(@ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
+  public String listTableData(@ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "asc|desc") @QueryParam("sortByTime") @DefaultValue("none") String sortOrderByTime) {
     try {
       List<String> tableNames;
       TableType tableType = null;
@@ -218,15 +221,36 @@ public class PinotTableRestletResource {
 
       if (tableType == null) {
         tableNames = _pinotHelixResourceManager.getAllRawTables();
+      } else if (tableType == TableType.REALTIME) {
+        tableNames = _pinotHelixResourceManager.getAllRealtimeTables();
       } else {
-        if (tableType == TableType.REALTIME) {
-          tableNames = _pinotHelixResourceManager.getAllRealtimeTables();
-        } else {
-          tableNames = _pinotHelixResourceManager.getAllOfflineTables();
-        }
+        tableNames = _pinotHelixResourceManager.getAllOfflineTables();
       }
 
-      Collections.sort(tableNames);
+      if (sortOrderByTime == "none") {
+        // Sort table names alphabetically
+        Collections.sort(tableNames);
+      } else {
+        // Sort table names based on (1) Create Time (2) Last Modified Time
+        TableType finalTableType = tableType;
+        Collections.sort(tableNames, (Comparator<String>) (o1, o2) -> {
+          TableConfig t1, t2;
+          if (finalTableType == TableType.REALTIME) {
+            t1 = _pinotHelixResourceManager.getRealtimeTableConfig(o1);
+            t2 = _pinotHelixResourceManager.getRealtimeTableConfig(o2);
+          } else {
+            t1 = _pinotHelixResourceManager.getOfflineTableConfig(o1);
+            t2 = _pinotHelixResourceManager.getOfflineTableConfig(o2);
+          }
+
+          ZNRecord z1 = TableConfigUtils.toZNRecord(t1);
+          ZNRecord z2 = TableConfigUtils.toZNRecord(t2);
+          if (z1.getCreationTime() != z2.getCreationTime()) {
+            return (int) (z1.getCreationTime() - z2.getCreationTime());
+          }
+          return (int) (z1.getModifiedTime() - z2.getModifiedTime());
+        });
+      }
       return JsonUtils.newObjectNode().set("tables", JsonUtils.objectToJsonNode(tableNames)).toString();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
