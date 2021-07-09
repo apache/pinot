@@ -18,11 +18,8 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
@@ -50,7 +47,6 @@ public class DictionaryBasedDistinctOperator extends DistinctOperator {
     private final Dictionary _dictionary;
     private final int _numTotalDocs;
     private final TransformOperator _transformOperator;
-    private IntSet _dictIdSet;
 
     private boolean _hasOrderBy;
     private boolean _isAscending;
@@ -64,7 +60,6 @@ public class DictionaryBasedDistinctOperator extends DistinctOperator {
         _dictionary = dictionary;
         _numTotalDocs = numTotalDocs;
         _transformOperator = transformOperator;
-        _dictIdSet = new IntOpenHashSet();
 
         List<OrderByExpressionContext> orderByExpressionContexts = _distinctAggregationFunction.getOrderByExpressions();
 
@@ -78,49 +73,6 @@ public class DictionaryBasedDistinctOperator extends DistinctOperator {
 
     @Override
     protected IntermediateResultsBlock getNextBlock() {
-        int limit = _distinctAggregationFunction.getLimit();
-
-        assert _distinctAggregationFunction.getType() == AggregationFunctionType.DISTINCT;
-
-        int actualLimit = Math.min(limit, _dictionary.length());
-
-        // If ORDER BY is not present, we read the first limit values from the dictionary and return.
-        // If ORDER BY is present and the dictionary is sorted, then we read the first/last limit values
-        // from the dictionary. If not sorted, then we read the entire dictionary and return it.
-        if (!_hasOrderBy) {
-            for (int i = 0; i < actualLimit; i++) {
-                _dictIdSet.add(i);
-
-                if (_dictIdSet.size() >= limit) {
-                    break;
-                }
-            }
-        } else {
-            if (_dictionary.isSorted()) {
-                if (_isAscending) {
-                    for (int i = 0; i < actualLimit; i++) {
-                        _dictIdSet.add(i);
-
-                        if (_dictIdSet.size() >= limit) {
-                            break;
-                        }
-                    }
-                } else {
-                    for (int i = _dictionary.length() - 1; i >= (_dictionary.length() - actualLimit); i--) {
-                        _dictIdSet.add(i);
-
-                        if (_dictIdSet.size() >= limit) {
-                            break;
-                        }
-                    }
-                }
-            } else {
-                for (int i = 0; i < _dictionary.length(); i++) {
-                    _dictIdSet.add(i);
-                }
-            }
-        }
-
         DistinctTable distinctTable = buildResult();
 
         return new IntermediateResultsBlock(new AggregationFunction[]{_distinctAggregationFunction},
@@ -140,16 +92,37 @@ public class DictionaryBasedDistinctOperator extends DistinctOperator {
 
         DataSchema dataSchema = new DataSchema(new String[]{expression.toString()},
                 new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.fromDataTypeSV(dataType)});
-        List<Record> records = new ArrayList<>(_dictIdSet.size());
-        Iterator<Integer> dictIdIterator = _dictIdSet.iterator();
+        List<Record> records;
 
-        if (!_dictionary.isSorted()) {
-            for (int i = 0; i < _dictionary.length(); i++) {
+        int limit = _distinctAggregationFunction.getLimit();
+        int actualLimit = Math.min(limit, _dictionary.length());
+
+        // If ORDER BY is not present, we read the first limit values from the dictionary and return.
+        // If ORDER BY is present and the dictionary is sorted, then we read the first/last limit values
+        // from the dictionary. If not sorted, then we read the entire dictionary and return it.
+        if (!_hasOrderBy) {
+            records = new ArrayList<>(actualLimit);
+
+            for (int i = 0; i < actualLimit; i++) {
                 records.add(new Record(new Object[]{_dictionary.getInternal(i)}));
             }
         } else {
-            for (int i = 0; i < _dictIdSet.size(); i++) {
-                records.add(new Record(new Object[]{_dictionary.getInternal(dictIdIterator.next())}));
+            if (_dictionary.isSorted()) {
+                records = new ArrayList<>(actualLimit);
+                if (_isAscending) {
+                    for (int i = 0; i < actualLimit; i++) {
+                        records.add(new Record(new Object[]{_dictionary.getInternal(i)}));
+                    }
+                } else {
+                    for (int i = _dictionary.length() - 1; i >= (_dictionary.length() - actualLimit); i--) {
+                        records.add(new Record(new Object[]{_dictionary.getInternal(i)}));
+                    }
+                }
+            } else {
+                records = new ArrayList<>(_dictionary.length());
+                for (int i = 0; i < _dictionary.length(); i++) {
+                    records.add(new Record(new Object[]{_dictionary.getInternal(i)}));
+                }
             }
         }
 
