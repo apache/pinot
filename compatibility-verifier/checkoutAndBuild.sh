@@ -41,20 +41,34 @@ function usage() {
 }
 
 # This function builds Pinot given a specific commit hash and target directory
-function checkoutAndBuild() {
-  commitHash=$1
-  targetDir=$2
+function checkOut() {
+  local commitHash=$1
+  local targetDir=$2
 
-  pushd "$targetDir" || exit 1
-  git init || exit 1
-  git remote add origin https://github.com/apache/incubator-pinot || exit 1
-  git pull origin master || exit 1
+  pushd "$targetDir"  1>&2 || exit 1
+  git init 1>&2 || exit 1
+  git remote add origin https://github.com/apache/incubator-pinot 1>&2 || exit 1
+  git pull origin master 1>&2 || exit 1
   # Pull the tag list so that we can check out by tag name
-  git fetch --tags || exit 1
-  git checkout $commitHash || exit 1
-  mvn install package -DskipTests -Pbin-dist -Djdk.version=8 ${PINOT_MAVEN_OPTS} || exit 1
-  popd || exit 1
-  exit 0
+  git fetch --tags 1>&2 || exit 1
+  git checkout $commitHash 1>&2 || exit 1
+
+  popd
+}
+
+function build() {
+  local outFile=$1
+  local buildTests=$2
+
+  mvn install package -DskipTests -Pbin-dist -D jdk.version=8 ${PINOT_MAVEN_OPTS} 1>${outFile} 2>&1
+  if [ $? -ne 0 ]; then exit 1; fi
+  mvn -pl pinot-tools package -DskipTests -Djdk.version=8 ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
+  if [ $? -ne 0 ]; then exit 1; fi
+  if [ $buildTests -eq 1 ]; then
+    mvn -pl pinot-integration-tests package -DskipTests -Djdk.version=8 ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
+    if [ $? -ne 0 ]; then exit 1; fi
+  fi
+
 }
 
 # get arguments
@@ -86,67 +100,145 @@ while [ "$1" != "" ]; do
   shift
 done
 
-if [ -z "$olderCommit" -a ! -z "$newerCommit" ]; then
-   echo "If old commit hash is not given, then new commit has should not be given either"
-   usage
-   exit 1
-fi
 
-if [ -z "$olderCommit" ]; then
-  # Newer commit must also be null, so take the previous commit as the older one.
-  olderCommit=`git log  --pretty=format:'%h' -n 2|tail -1`
-fi
-
+# Validate and create working directory; set up build path names
 if [ -z $workingDir ]; then
   echo "Working directory must be specified"
   usage
   exit 1
 fi
-
 if [ -d $workingDir ]; then
   echo "Directory ${workingDir} already exists. Use a new directory."
   usage
   exit 1
 fi
-
 mkdir -p ${workingDir}
 if [ $? -ne 0 ]; then
   echo "Could not create ${workingDir}"
   exit 1
 fi
 workingDir=$(absPath "$workingDir")
-
+cmdDir=$(absPath "$cmdDir")
+oldBuildOutFile="${workingDir}/oldBuild.out"
+oldTargetDir="$workingDir"/oldTargetDir
+newBuildOutFile="${workingDir}/newBuild.out"
 newTargetDir="$workingDir"/newTargetDir
+curBuildOutFile="${workingDir}/currentBuild.out"
+
+# Find value of olderCommit hash
+if [ -z "$olderCommit" -a ! -z "$newerCommit" ]; then
+   echo "If old commit hash is not given, then new commit should not be given either"
+   usage
+   exit 1
+fi
+if [ -z "$olderCommit" ]; then
+  # Newer commit must also be null, so take the previous commit as the older one.
+  olderCommit=`git log  --pretty=format:'%h' -n 2|tail -1`
+fi
+
+buildNewTarget=0
+
 if [ -z "$newerCommit" ]; then
-  echo "Compiling current tree as newer version"
-  (cd $cmdDir/.. && mvn install package -DskipTests -Pbin-dist -D jdk.version=8 ${PINOT_MAVEN_OPTS} && mvn -pl pinot-tools package -DskipTests -Djdk.version=8 ${PINOT_MAVEN_OPTS} && mvn -pl pinot-integration-tests package -DskipTests -Djdk.version=8 ${PINOT_MAVEN_OPTS})
-  if [ $? -ne 0 ]; then
-    echo Compile failed.
-    exit 1
-  fi
-  ln -s $(absPath "${cmdDir}/..") "${newTargetDir}"
+  echo "Assuming current tree as newer version"
+  ln -s "${cmdDir}/.." "${newTargetDir}"
 else
   if ! mkdir -p "$newTargetDir"; then
     echo "Failed to create target directory ${newTargetDir}"
     exit 1
   fi
-  echo "Building the new version ..."
-  checkoutAndBuild "$newerCommit" "$newTargetDir"
-  if [ $? -ne 0 ];then
-    echo Could not build new version at "${newerCommit}"
-    exit 1
-  fi
+  echo "Checking out new version at commit \"${newerCommit}\""
+  checkOut "$newerCommit" "$newTargetDir"
+  buildNewTarget=1
 fi
 
-oldTargetDir="$workingDir"/oldTargetDir
 if ! mkdir -p "$oldTargetDir"; then
   echo "Failed to create target directory ${oldTargetDir}"
   exit 1
 fi
-echo "Building the old version ... "
-checkoutAndBuild "$olderCommit" "$oldTargetDir"
-if [ $? -ne 0 ]; then
-  echo Could not build older version at "${olderCommit}"
-  exit 1
+
+echo "Checking out old version at commit \"${olderCommit}\""
+checkOut "$olderCommit" "$oldTargetDir"
+
+# Start builds in parallel.
+# We need to build current directory and old commit for sure.
+# In addition, if the newer version is not the current one,
+# we will need to build that as well.
+echo Starting build for compat checker at ${cmdDir}
+(cd ${cmdDir}/..; build ${curBuildOutFile} 1) &
+curBuildPid=$!
+echo Starting build for old version at ${oldTargetDir}
+(cd ${oldTargetDir}; build ${oldBuildOutFile} 0) &
+oldBuildPid=$!
+if [ ${buildNewTarget} -eq 1 ]; then
+  echo Starting build for new version at ${newTargetDir}
+  (cd ${newTargetDir}; build ${newBuildOutFile} 0) &
+  newBuildPid=$!
 fi
+
+echo Awaiting build complete for old commit
+while true ; do
+  printf "."
+  ps -p ${oldBuildPid} 1>/dev/null 2>&1
+  if [ $? -ne 0 ]; then
+    printf "\n"
+    wait ${oldBuildPid}
+    oldBuildStatus=$?
+    break
+  fi
+  sleep 5
+done
+
+echo Awaiting build complete for compat checker
+while true ; do
+  printf "."
+  ps -p ${curBuildPid} 1>/dev/null 2>&1
+  if [ $? -ne 0 ]; then
+    printf "\n"
+    wait ${curBuildPid}
+    curBuildStatus=$?
+    break
+  fi
+  sleep 5
+done
+
+if [ ${buildNewTarget} -eq 1 ]; then
+  echo Awaiting build complete for new commit
+  while true ; do
+    printf "."
+    ps -p ${newBuildPid} 1>/dev/null 2>&1
+    if [ $? -ne 0 ]; then
+      printf "\n"
+      wait ${newBuildPid}
+      newBuildStatus=$?
+      break
+    fi
+    sleep 5
+  done
+
+fi
+
+exitStatus=0
+
+if [ ${oldBuildStatus} -eq 0 ]; then
+  echo Old version build completed successfully
+else
+  echo Old version build failed. See ${oldBuildOutFile}
+  exitStatus=1
+fi
+
+if [ ${curBuildStatus} -eq 0 ]; then
+  echo Compat checker build completed successfully
+else
+  echo Compat checker build failed. See ${curBuildOutFile}
+fi
+
+if [ ${buildNewTarget} -eq 1 ]; then
+  if [ ${newBuildStatus} -eq 0 ]; then
+    echo New version build completed successfully
+  else
+    echo New version build failed. See ${newBuildOutFile}
+    exitStatus=1
+  fi
+fi
+
 exit 0
