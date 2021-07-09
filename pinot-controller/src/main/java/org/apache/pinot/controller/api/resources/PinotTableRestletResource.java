@@ -210,7 +210,7 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
   @ApiOperation(value = "Lists all tables in cluster", notes = "Lists all tables in cluster")
-  public String listTableData(@ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr,
+  public String listTables(@ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "name|creationTime|lastModifiedTime") @QueryParam("sortType") String sortType,
       @ApiParam(value = "true|false") @QueryParam("sortAsc") @DefaultValue("true") boolean sortAsc) {
     try {
@@ -227,16 +227,12 @@ public class PinotTableRestletResource {
       } else {
         tableNames = _pinotHelixResourceManager.getAllOfflineTables();
       }
-      if (sortType == null) {
-        return JsonUtils.newObjectNode().set("tables", JsonUtils.objectToJsonNode(tableNames)).toString();
-      }
 
-      if (sortType == "name") {
+      if (sortType == null || sortType.equalsIgnoreCase("name")) {
         // Sort table names alphabetically
         Collections.sort(tableNames, sortAsc ? null : Collections.reverseOrder());
       } else {
         // Sort table names based on (1) Create Time or (2) Last Modified Time
-        TableType finalTableType = tableType;
         HashMap<String, String> cache = new HashMap<>();
         Collections.sort(tableNames, (Comparator<String>) (o1, o2) -> {
           String d1 = getString(sortType, cache, o1);
@@ -266,7 +262,7 @@ public class PinotTableRestletResource {
 
     String timeStat;
     TableStats stat = _pinotHelixResourceManager.getTableStats(tableName);
-    if (sortType == "creationTime") {
+    if (sortType.equalsIgnoreCase("creationTime")) {
       timeStat = stat.getCreationTime();
     } else {
       timeStat = stat.getLastModifiedTime();
