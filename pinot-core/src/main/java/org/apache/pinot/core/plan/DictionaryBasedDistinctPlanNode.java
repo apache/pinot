@@ -29,36 +29,36 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
  * Execute a DISTINCT operation using dictionary based plan
  */
 public class DictionaryBasedDistinctPlanNode implements PlanNode {
-    private final IndexSegment _indexSegment;
-    private final DistinctAggregationFunction _distinctAggregationFunction;
-    private final Dictionary _dictionary;
-    private final TransformPlanNode _transformPlanNode;
+  private final IndexSegment _indexSegment;
+  private final DistinctAggregationFunction _distinctAggregationFunction;
+  private final Dictionary _dictionary;
+  private final TransformPlanNode _transformPlanNode;
 
-    /**
-     * Constructor for the class.
-     *
-     * @param indexSegment Segment to process
-     * @param queryContext Query context
-     */
-    public DictionaryBasedDistinctPlanNode(IndexSegment indexSegment, QueryContext queryContext, Dictionary dictionary) {
-        _indexSegment = indexSegment;
-        AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
+  /**
+   * Constructor for the class.
+   *
+   * @param indexSegment Segment to process
+   * @param queryContext Query context
+   */
+  public DictionaryBasedDistinctPlanNode(IndexSegment indexSegment, QueryContext queryContext, Dictionary dictionary) {
+    _indexSegment = indexSegment;
+    AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
 
-        assert aggregationFunctions != null && aggregationFunctions.length == 1
-                && aggregationFunctions[0] instanceof DistinctAggregationFunction;
+    assert aggregationFunctions != null && aggregationFunctions.length == 1
+        && aggregationFunctions[0] instanceof DistinctAggregationFunction;
 
-        _distinctAggregationFunction = (DistinctAggregationFunction) aggregationFunctions[0];
+    _distinctAggregationFunction = (DistinctAggregationFunction) aggregationFunctions[0];
 
-        _dictionary = dictionary;
+    _dictionary = dictionary;
 
-        _transformPlanNode =
-                new TransformPlanNode(_indexSegment, queryContext, _distinctAggregationFunction.getInputExpressions(),
-                        DocIdSetPlanNode.MAX_DOC_PER_CALL);
-    }
+    _transformPlanNode =
+        new TransformPlanNode(_indexSegment, queryContext, _distinctAggregationFunction.getInputExpressions(),
+            DocIdSetPlanNode.MAX_DOC_PER_CALL);
+  }
 
-    @Override
-    public DictionaryBasedDistinctOperator run() {
-        return new DictionaryBasedDistinctOperator(_indexSegment, _distinctAggregationFunction, _dictionary,
-                _indexSegment.getSegmentMetadata().getTotalDocs(), _transformPlanNode.run());
-    }
+  @Override
+  public DictionaryBasedDistinctOperator run() {
+    return new DictionaryBasedDistinctOperator(_indexSegment, _distinctAggregationFunction, _dictionary,
+        _indexSegment.getSegmentMetadata().getTotalDocs(), _transformPlanNode.run());
+  }
 }
