@@ -40,7 +40,8 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.data.table.Record;
-import org.apache.pinot.core.operator.query.DistinctOperator;
+import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -609,7 +610,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    * Helper method to get the DistinctTable result for one single segment for the given query.
    */
   private DistinctTable getDistinctTableInnerSegment(String query, boolean isPql) {
-    DistinctOperator distinctOperator = isPql ? getOperatorForPqlQuery(query) : getOperatorForSqlQuery(query);
+    BaseOperator<IntermediateResultsBlock> distinctOperator = isPql ? getOperatorForPqlQuery(query) : getOperatorForSqlQuery(query);
     List<Object> operatorResult = distinctOperator.nextBlock().getAggregationResult();
     assertNotNull(operatorResult);
     assertEquals(operatorResult.size(), 1);

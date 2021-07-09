@@ -32,7 +32,6 @@ public class DictionaryBasedDistinctPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
   private final DistinctAggregationFunction _distinctAggregationFunction;
   private final Dictionary _dictionary;
-  private final TransformPlanNode _transformPlanNode;
 
   /**
    * Constructor for the class.
@@ -50,15 +49,11 @@ public class DictionaryBasedDistinctPlanNode implements PlanNode {
     _distinctAggregationFunction = (DistinctAggregationFunction) aggregationFunctions[0];
 
     _dictionary = dictionary;
-
-    _transformPlanNode =
-        new TransformPlanNode(_indexSegment, queryContext, _distinctAggregationFunction.getInputExpressions(),
-            DocIdSetPlanNode.MAX_DOC_PER_CALL);
   }
 
   @Override
   public DictionaryBasedDistinctOperator run() {
     return new DictionaryBasedDistinctOperator(_indexSegment, _distinctAggregationFunction, _dictionary,
-        _indexSegment.getSegmentMetadata().getTotalDocs(), _transformPlanNode.run());
+        _indexSegment.getSegmentMetadata().getTotalDocs());
   }
 }

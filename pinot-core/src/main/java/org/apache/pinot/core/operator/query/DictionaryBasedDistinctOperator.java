@@ -25,9 +25,9 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctTable;
@@ -40,22 +40,22 @@ import org.apache.pinot.spi.data.FieldSpec;
 /**
  * Operator which executes DISTINCT operation based on dictionary
  */
-public class DictionaryBasedDistinctOperator extends DistinctOperator {
+public class DictionaryBasedDistinctOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "DictionaryBasedDistinctOperator";
 
   private final DistinctAggregationFunction _distinctAggregationFunction;
   private final Dictionary _dictionary;
   private final int _numTotalDocs;
+  private IndexSegment _indexSegment;
 
   private boolean _hasOrderBy;
   private boolean _isAscending;
 
   private int _dictLength;
+  private int _numDocsScanned;
 
   public DictionaryBasedDistinctOperator(IndexSegment indexSegment, DistinctAggregationFunction distinctAggregationFunction,
-      Dictionary dictionary, int numTotalDocs,
-      TransformOperator transformOperator) {
-    super(indexSegment, distinctAggregationFunction, transformOperator);
+      Dictionary dictionary, int numTotalDocs) {
 
     _distinctAggregationFunction = distinctAggregationFunction;
     _dictionary = dictionary;
@@ -71,6 +71,7 @@ public class DictionaryBasedDistinctOperator extends DistinctOperator {
     }
 
     _dictLength = _dictionary.length();
+    _indexSegment = indexSegment;
   }
 
   @Override
@@ -90,7 +91,7 @@ public class DictionaryBasedDistinctOperator extends DistinctOperator {
 
     List<ExpressionContext> expressions = _distinctAggregationFunction.getInputExpressions();
     ExpressionContext expression = expressions.get(0);
-    FieldSpec.DataType dataType = _dictionary.getValueType();
+    FieldSpec.DataType dataType = _indexSegment.getDataSource(expression.getIdentifier()).getDataSourceMetadata().getDataType();
 
     DataSchema dataSchema = new DataSchema(new String[]{expression.toString()},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.fromDataTypeSV(dataType)});
@@ -105,29 +106,35 @@ public class DictionaryBasedDistinctOperator extends DistinctOperator {
     if (!_hasOrderBy) {
       records = new ArrayList<>(actualLimit);
 
+      _numDocsScanned = actualLimit;
+
       for (int i = 0; i < actualLimit; i++) {
         records.add(new Record(new Object[]{_dictionary.getInternal(i)}));
       }
     } else {
-      DistinctTable distinctTable = new DistinctTable(dataSchema, _distinctAggregationFunction.getOrderByExpressions(), limit);
-
       if (_dictionary.isSorted()) {
+        records = new ArrayList<>(actualLimit);
         if (_isAscending) {
+          _numDocsScanned = actualLimit;
           for (int i = 0; i < actualLimit; i++) {
-            distinctTable.addWithOrderBy(new Record(new Object[]{_dictionary.getInternal(i)}));
+            records.add(new Record(new Object[]{_dictionary.getInternal(i)}));
           }
         } else {
+          _numDocsScanned = actualLimit;
           for (int i = _dictLength - 1; i >= (_dictLength - actualLimit); i--) {
-            distinctTable.addWithOrderBy(new Record(new Object[]{_dictionary.getInternal(i)}));
+            records.add(new Record(new Object[]{_dictionary.getInternal(i)}));
           }
         }
       } else {
+        DistinctTable distinctTable = new DistinctTable(dataSchema, _distinctAggregationFunction.getOrderByExpressions(), limit);
+
+        _numDocsScanned = _dictLength;
         for (int i = 0; i < _dictLength; i++) {
           distinctTable.addWithOrderBy(new Record(new Object[]{_dictionary.getInternal(i)}));
         }
-      }
 
-      return distinctTable;
+        return distinctTable;
+      }
     }
 
     return new DistinctTable(dataSchema, records);
@@ -141,6 +148,6 @@ public class DictionaryBasedDistinctOperator extends DistinctOperator {
   @Override
   public ExecutionStatistics getExecutionStatistics() {
     // NOTE: Set numDocsScanned to numTotalDocs for backward compatibility.
-    return new ExecutionStatistics(_numTotalDocs, 0, 0, _numTotalDocs);
+    return new ExecutionStatistics(_numDocsScanned, 0, _numDocsScanned, _numTotalDocs);
   }
 }
