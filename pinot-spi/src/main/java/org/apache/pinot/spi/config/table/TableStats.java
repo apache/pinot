@@ -27,11 +27,14 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 public class TableStats {
   public static final String CREATION_TIME_KEY = "creationTime";
+  public static final String LAST_MODIFIED_TIME_KEY = "lastModifiedTime";
 
   private String _creationTime;
+  private String _lastModifiedTime;
 
-  public TableStats(String creationTime) {
+  public TableStats(String creationTime, String lastModifiedTime) {
     _creationTime = creationTime;
+    _lastModifiedTime = lastModifiedTime;
   }
 
   @JsonProperty(CREATION_TIME_KEY)
@@ -41,5 +44,14 @@ public class TableStats {
 
   public void setCreationTime(String creationTime) {
     _creationTime = creationTime;
+  }
+
+  @JsonProperty(LAST_MODIFIED_TIME_KEY)
+  public String getLastModifiedTime() {
+    return _lastModifiedTime;
+  }
+
+  public void setLastModifiedTime(String lastModifiedTime) {
+    _lastModifiedTime = lastModifiedTime;
   }
 }

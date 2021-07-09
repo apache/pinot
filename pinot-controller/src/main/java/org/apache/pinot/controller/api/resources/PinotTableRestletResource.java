@@ -28,6 +28,7 @@ import io.swagger.annotations.ApiParam;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -210,7 +211,7 @@ public class PinotTableRestletResource {
   @Path("/tables")
   @ApiOperation(value = "Lists all tables in cluster", notes = "Lists all tables in cluster")
   public String listTableData(@ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "name|time") @QueryParam("sortType") @DefaultValue("name") String sortType,
+      @ApiParam(value = "name|creationTime|lastModifiedTime") @QueryParam("sortType") @DefaultValue("name") String sortType,
       @ApiParam(value = "true|false") @QueryParam("sortAsc") @DefaultValue("true") boolean sortAsc) {
     try {
       List<String> tableNames;
@@ -231,16 +232,12 @@ public class PinotTableRestletResource {
         // Sort table names alphabetically
         Collections.sort(tableNames, sortAsc ? null : Collections.reverseOrder());
       } else {
-        // Sort table names based on (1) Create Time
+        // Sort table names based on (1) Create Time or (2) Last Modified Time
         TableType finalTableType = tableType;
+        HashMap<String, String> cache = new HashMap<>();
         Collections.sort(tableNames, (Comparator<String>) (o1, o2) -> {
-          TableStats s1, s2;
-          s1 = _pinotHelixResourceManager.getTableStats(o1);
-          s2 = _pinotHelixResourceManager.getTableStats(o2);
-
-          String d1, d2;
-          d1 = s1.getCreationTime();
-          d2 = s2.getCreationTime();
+          String d1 = getString(sortType, cache, o1);
+          String d2 = getString(sortType, cache, o2);
 
           Integer delta = d1.compareTo(d2);
           return sortAsc ? delta : -delta;
@@ -250,6 +247,30 @@ public class PinotTableRestletResource {
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
+  }
+
+  /**
+   * Return the cached table stats for a given Table Name
+   * @param sortType
+   * @param cache
+   * @param tableName
+   * @return timeStat
+   */
+  private String getString(String sortType, HashMap<String, String> cache, String tableName) {
+    if (cache.containsKey(tableName)) {
+      return cache.get(tableName);
+    }
+
+    String timeStat;
+    TableStats stat = _pinotHelixResourceManager.getTableStats(tableName);
+    if (sortType == "creationTime") {
+      timeStat = stat.getCreationTime();
+    } else {
+      timeStat = stat.getLastModifiedTime();
+    }
+
+    cache.put(tableName, timeStat);
+    return timeStat;
   }
 
   private String listTableConfigs(String tableName, @Nullable String tableTypeStr) {
