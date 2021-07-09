@@ -247,12 +247,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       List<String> queries = Arrays
           .asList("SELECT DISTINCT(stringColumn) FROM testTable");
       //@formatter:on
-      Set<Integer> expectedValues = new HashSet<>();
-
-      for (int i = 0; i < 10; i++) {
-        expectedValues.add(i);
-      }
-
+      Set<Integer> expectedValues =
+          new HashSet<>(Arrays.asList(0, 16, 17, 1, 10, 11, 12, 13, 14, 15));
       for (String query : queries) {
         DistinctTable pqlDistinctTable = getDistinctTableInnerSegment(query, true);
         DistinctTable pqlDistinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(pqlDistinctTable.toBytes()));
@@ -273,24 +269,22 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       }
     }
     {
-      // Raw String column
+      // String columns
       //@formatter:off
       List<String> queries = Arrays
-              .asList("SELECT DISTINCT(rawStringColumn) FROM testTable");
+          .asList("SELECT DISTINCT(rawStringColumn) FROM testTable");
       //@formatter:on
       Set<Integer> expectedValues = new HashSet<>();
-
       for (int i = 0; i < 10; i++) {
         expectedValues.add(i);
       }
-
-
       for (String query : queries) {
         DistinctTable pqlDistinctTable = getDistinctTableInnerSegment(query, true);
         DistinctTable pqlDistinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(pqlDistinctTable.toBytes()));
         DistinctTable sqlDistinctTable = getDistinctTableInnerSegment(query, false);
         DistinctTable sqlDistinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(sqlDistinctTable.toBytes()));
-        for (DistinctTable distinctTable : Arrays.asList(pqlDistinctTable, pqlDistinctTable2, sqlDistinctTable, sqlDistinctTable2)) {
+        for (DistinctTable distinctTable : Arrays
+            .asList(pqlDistinctTable, pqlDistinctTable2, sqlDistinctTable, sqlDistinctTable2)) {
           assertEquals(distinctTable.size(), 10);
           Set<Integer> actualValues = new HashSet<>();
           for (Record record : distinctTable.getRecords()) {

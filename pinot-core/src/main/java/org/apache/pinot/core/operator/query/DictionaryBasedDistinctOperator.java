@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import it.unimi.dsi.fastutil.ints.IntHeapPriorityQueue;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import it.unimi.dsi.fastutil.ints.IntPriorityQueue;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,11 +27,9 @@ import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
@@ -42,8 +38,6 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
-
-import static org.apache.pinot.core.query.distinct.DistinctExecutor.MAX_INITIAL_CAPACITY;
 
 
 /**
@@ -58,9 +52,8 @@ public class DictionaryBasedDistinctOperator extends DistinctOperator {
     private final TransformOperator _transformOperator;
     private IntSet _dictIdSet;
 
-    private IntPriorityQueue _priorityQueue;
-
     private boolean _hasOrderBy;
+    private boolean _isAscending;
 
     public DictionaryBasedDistinctOperator(IndexSegment indexSegment, DistinctAggregationFunction distinctAggregationFunction,
                                            Dictionary dictionary, int numTotalDocs,
@@ -77,11 +70,8 @@ public class DictionaryBasedDistinctOperator extends DistinctOperator {
 
         if (orderByExpressionContexts != null) {
             OrderByExpressionContext orderByExpressionContext = orderByExpressionContexts.get(0);
-            int limit = _distinctAggregationFunction.getLimit();
-            int comparisonFactor = orderByExpressionContext.isAsc() ? -1 : 1;
 
-            _priorityQueue =
-                    new IntHeapPriorityQueue(Math.min(limit, MAX_INITIAL_CAPACITY), (i1, i2) -> (i1 - i2) * comparisonFactor);
+            _isAscending = orderByExpressionContext.isAsc();
             _hasOrderBy = true;
         }
     }
@@ -89,41 +79,44 @@ public class DictionaryBasedDistinctOperator extends DistinctOperator {
     @Override
     protected IntermediateResultsBlock getNextBlock() {
         int limit = _distinctAggregationFunction.getLimit();
-        ExpressionContext expression = _distinctAggregationFunction.getInputExpressions().get(0);
 
         assert _distinctAggregationFunction.getType() == AggregationFunctionType.DISTINCT;
 
-        TransformBlock transformBlock = _transformOperator.nextBlock();
-        BlockValSet blockValueSet = transformBlock.getBlockValueSet(expression);
-        int[] dictIds = blockValueSet.getDictionaryIdsSV();
-        int numDocs = transformBlock.getNumDocs();
+        int actualLimit = Math.min(limit, _dictionary.length());
 
-        if (_dictionary.isSorted()) {
-            if (!_hasOrderBy) {
-                for (int i = 0; i < numDocs; i++) {
-                    _dictIdSet.add(dictIds[i]);
+        // If ORDER BY is not present, we read the first limit values from the dictionary and return.
+        // If ORDER BY is present and the dictionary is sorted, then we read the first/last limit values
+        // from the dictionary. If not sorted, then we read the entire dictionary and return it.
+        if (!_hasOrderBy) {
+            for (int i = 0; i < actualLimit; i++) {
+                _dictIdSet.add(i);
 
-                    if (_dictIdSet.size() >= limit) {
-                        break;
+                if (_dictIdSet.size() >= limit) {
+                    break;
+                }
+            }
+        } else {
+            if (_dictionary.isSorted()) {
+                if (_isAscending) {
+                    for (int i = 0; i < actualLimit; i++) {
+                        _dictIdSet.add(i);
+
+                        if (_dictIdSet.size() >= limit) {
+                            break;
+                        }
+                    }
+                } else {
+                    for (int i = _dictionary.length() - 1; i >= (_dictionary.length() - actualLimit); i--) {
+                        _dictIdSet.add(i);
+
+                        if (_dictIdSet.size() >= limit) {
+                            break;
+                        }
                     }
                 }
             } else {
-                for (int i = 0; i < numDocs; i++) {
-                    int dictId = dictIds[i];
-                    if (!_dictIdSet.contains(dictId)) {
-                        if (_dictIdSet.size() < limit) {
-                            _dictIdSet.add(dictId);
-                            _priorityQueue.enqueue(dictId);
-                        } else {
-                            int firstDictId = _priorityQueue.firstInt();
-                            if (_priorityQueue.comparator().compare(dictId, firstDictId) > 0) {
-                                _dictIdSet.remove(firstDictId);
-                                _dictIdSet.add(dictId);
-                                _priorityQueue.dequeueInt();
-                                _priorityQueue.enqueue(dictId);
-                            }
-                        }
-                    }
+                for (int i = 0; i < _dictionary.length(); i++) {
+                    _dictIdSet.add(i);
                 }
             }
         }
