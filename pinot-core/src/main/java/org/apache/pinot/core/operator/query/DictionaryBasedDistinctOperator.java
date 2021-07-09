@@ -46,10 +46,11 @@ public class DictionaryBasedDistinctOperator extends DistinctOperator {
     private final DistinctAggregationFunction _distinctAggregationFunction;
     private final Dictionary _dictionary;
     private final int _numTotalDocs;
-    private final TransformOperator _transformOperator;
 
     private boolean _hasOrderBy;
     private boolean _isAscending;
+
+    private int _dictLength;
 
     public DictionaryBasedDistinctOperator(IndexSegment indexSegment, DistinctAggregationFunction distinctAggregationFunction,
                                            Dictionary dictionary, int numTotalDocs,
@@ -59,7 +60,6 @@ public class DictionaryBasedDistinctOperator extends DistinctOperator {
         _distinctAggregationFunction = distinctAggregationFunction;
         _dictionary = dictionary;
         _numTotalDocs = numTotalDocs;
-        _transformOperator = transformOperator;
 
         List<OrderByExpressionContext> orderByExpressionContexts = _distinctAggregationFunction.getOrderByExpressions();
 
@@ -69,6 +69,8 @@ public class DictionaryBasedDistinctOperator extends DistinctOperator {
             _isAscending = orderByExpressionContext.isAsc();
             _hasOrderBy = true;
         }
+
+        _dictLength = _dictionary.length();
     }
 
     @Override
@@ -88,14 +90,14 @@ public class DictionaryBasedDistinctOperator extends DistinctOperator {
 
         List<ExpressionContext> expressions = _distinctAggregationFunction.getInputExpressions();
         ExpressionContext expression = expressions.get(0);
-        FieldSpec.DataType dataType = _transformOperator.getResultMetadata(expression).getDataType();
+        FieldSpec.DataType dataType = _dictionary.getValueType();
 
         DataSchema dataSchema = new DataSchema(new String[]{expression.toString()},
                 new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.fromDataTypeSV(dataType)});
         List<Record> records;
 
         int limit = _distinctAggregationFunction.getLimit();
-        int actualLimit = Math.min(limit, _dictionary.length());
+        int actualLimit = Math.min(limit, _dictLength);
 
         // If ORDER BY is not present, we read the first limit values from the dictionary and return.
         // If ORDER BY is present and the dictionary is sorted, then we read the first/last limit values
@@ -107,26 +109,25 @@ public class DictionaryBasedDistinctOperator extends DistinctOperator {
                 records.add(new Record(new Object[]{_dictionary.getInternal(i)}));
             }
         } else {
+            DistinctTable distinctTable = new DistinctTable(dataSchema, _distinctAggregationFunction.getOrderByExpressions(), limit);
+
             if (_dictionary.isSorted()) {
-                records = new ArrayList<>(actualLimit);
                 if (_isAscending) {
                     for (int i = 0; i < actualLimit; i++) {
-                        records.add(new Record(new Object[]{_dictionary.getInternal(i)}));
+                        distinctTable.addWithOrderBy(new Record(new Object[]{_dictionary.getInternal(i)}));
                     }
                 } else {
-                    for (int i = _dictionary.length() - 1; i >= (_dictionary.length() - actualLimit); i--) {
-                        records.add(new Record(new Object[]{_dictionary.getInternal(i)}));
+                    for (int i = _dictLength - 1; i >= (_dictLength - actualLimit); i--) {
+                        distinctTable.addWithOrderBy(new Record(new Object[]{_dictionary.getInternal(i)}));
                     }
                 }
             } else {
-  DistinctTable distinctTable = new DistinctTable(dataSchema, _distinctAggregationFunction.getOrderByExpressions(), limit);
-  for (int i = 0; i < dictionarySize; i++) {
-    distinctTable.addWithOrderBy(new Record(new Object[]{_dictionary.getInternal(i)}));
-  }
-                for (int i = 0; i < _dictionary.length(); i++) {
-                    records.add(new Record(new Object[]{_dictionary.getInternal(i)}));
+                for (int i = 0; i < _dictLength; i++) {
+                    distinctTable.addWithOrderBy(new Record(new Object[]{_dictionary.getInternal(i)}));
                 }
             }
+
+            return distinctTable;
         }
 
         return new DistinctTable(dataSchema, records);
