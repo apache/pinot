@@ -211,7 +211,7 @@ public class PinotTableRestletResource {
   @Path("/tables")
   @ApiOperation(value = "Lists all tables in cluster", notes = "Lists all tables in cluster")
   public String listTableData(@ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "name|creationTime|lastModifiedTime") @QueryParam("sortType") @DefaultValue("name") String sortType,
+      @ApiParam(value = "name|creationTime|lastModifiedTime") @QueryParam("sortType") String sortType,
       @ApiParam(value = "true|false") @QueryParam("sortAsc") @DefaultValue("true") boolean sortAsc) {
     try {
       List<String> tableNames;
@@ -226,6 +226,9 @@ public class PinotTableRestletResource {
         tableNames = _pinotHelixResourceManager.getAllRealtimeTables();
       } else {
         tableNames = _pinotHelixResourceManager.getAllOfflineTables();
+      }
+      if (sortType == null) {
+        return JsonUtils.newObjectNode().set("tables", JsonUtils.objectToJsonNode(tableNames)).toString();
       }
 
       if (sortType == "name") {
