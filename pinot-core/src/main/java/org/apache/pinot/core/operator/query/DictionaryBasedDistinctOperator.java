@@ -119,7 +119,10 @@ public class DictionaryBasedDistinctOperator extends DistinctOperator {
                     }
                 }
             } else {
-                records = new ArrayList<>(_dictionary.length());
+  DistinctTable distinctTable = new DistinctTable(dataSchema, _distinctAggregationFunction.getOrderByExpressions(), limit);
+  for (int i = 0; i < dictionarySize; i++) {
+    distinctTable.addWithOrderBy(new Record(new Object[]{_dictionary.getInternal(i)}));
+  }
                 for (int i = 0; i < _dictionary.length(); i++) {
                     records.add(new Record(new Object[]{_dictionary.getInternal(i)}));
                 }
