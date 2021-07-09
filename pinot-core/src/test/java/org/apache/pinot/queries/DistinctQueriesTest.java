@@ -248,7 +248,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
           .asList("SELECT DISTINCT(stringColumn) FROM testTable");
       //@formatter:on
       Set<Integer> expectedValues =
-          new HashSet<>(Arrays.asList(0, 16, 17, 1, 10, 11, 12, 13, 14, 15));
+          new HashSet<>(Arrays.asList(0, 1, 10, 11, 12, 13, 14, 15, 16, 17));
       for (String query : queries) {
         DistinctTable pqlDistinctTable = getDistinctTableInnerSegment(query, true);
         DistinctTable pqlDistinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(pqlDistinctTable.toBytes()));
