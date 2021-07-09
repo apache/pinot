@@ -2799,7 +2799,7 @@ public class PinotHelixResourceManager {
     ZNRecord znRecord = ZKMetadataProvider.getZnRecord(_propertyStore, zkPath);
     String creationTime = SIMPLE_DATE_FORMAT.format(znRecord.getCreationTime());
     String lastModifiedTime = SIMPLE_DATE_FORMAT.format(znRecord.getModifiedTime());
-    return new TableStats(creationTime, lastModifiedTime);
+    return new TableStats(creationTime, lastModifiedTime, tableNameWithType);
   }
 
   /*

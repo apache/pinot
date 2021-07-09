@@ -31,10 +31,16 @@ public class TableStats {
 
   private String _creationTime;
   private String _lastModifiedTime;
+  private String _tableName;
 
-  public TableStats(String creationTime, String lastModifiedTime) {
+  public TableStats(String creationTime, String lastModifiedTime, String tableName) {
     _creationTime = creationTime;
     _lastModifiedTime = lastModifiedTime;
+    _tableName = tableName;
+  }
+
+  public String getTableName() {
+    return _tableName;
   }
 
   @JsonProperty(CREATION_TIME_KEY)
