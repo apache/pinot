@@ -33,10 +33,10 @@ public class TableStats {
   private String _lastModifiedTime;
   private String _tableName;
 
-  public TableStats(String creationTime, String lastModifiedTime, String tableName) {
+  public TableStats(String tableName, String creationTime, String lastModifiedTime) {
+    _tableName = tableName;
     _creationTime = creationTime;
     _lastModifiedTime = lastModifiedTime;
-    _tableName = tableName;
   }
 
   public String getTableName() {

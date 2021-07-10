@@ -26,9 +26,9 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -107,6 +107,8 @@ public class PinotTableRestletResource {
    *   Type here is type of the table, one of 'offline|realtime'.
    * {@inheritDoc}
    */
+
+  private static final String SORT_TYPE_INVALID = "sortType expects={name|creationTime|lastModifiedTime}, got %s";
 
   public static org.slf4j.Logger LOGGER = LoggerFactory.getLogger(PinotTableRestletResource.class);
 
@@ -211,7 +213,7 @@ public class PinotTableRestletResource {
   @Path("/tables")
   @ApiOperation(value = "Lists all tables in cluster", notes = "Lists all tables in cluster")
   public String listTables(@ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "name|creationTime|lastModifiedTime") @QueryParam("sortType") @DefaultValue("name") String sortType,
+      @ApiParam(value = "name|creationTime|lastModifiedTime") @QueryParam("sortType") String sortType,
       @ApiParam(value = "true|false") @QueryParam("sortAsc") @DefaultValue("true") boolean sortAsc) {
     try {
       List<String> tableNames;
@@ -220,12 +222,10 @@ public class PinotTableRestletResource {
         tableType = TableType.valueOf(tableTypeStr.toUpperCase());
       }
 
-      Boolean sortTypeValid = sortType.equalsIgnoreCase("name") || sortType.equalsIgnoreCase("creationTime") || sortType
-          .equalsIgnoreCase("lastModifiedTime");
-      if (!sortTypeValid) {
-        throw new IllegalArgumentException(
-            "sortType expects={name|creationTime|lastModifiedTime} " + "got " + sortType);
-      }
+      Boolean sortTypeValid =
+          sortType == null || sortType.equalsIgnoreCase("name") || sortType.equalsIgnoreCase("creationTime") || sortType
+              .equalsIgnoreCase("lastModifiedTime");
+      Preconditions.checkState(sortTypeValid, SORT_TYPE_INVALID, sortType);
 
       if (tableType == null) {
         tableNames = _pinotHelixResourceManager.getAllRawTables();
@@ -235,42 +235,33 @@ public class PinotTableRestletResource {
         tableNames = _pinotHelixResourceManager.getAllOfflineTables();
       }
 
-      HashMap<String, TableStats> MapStats = new HashMap<String, TableStats>();
-      for (String tableName : tableNames) {
-        MapStats.put(tableName, _pinotHelixResourceManager.getTableStats(tableName));
+      if (sortType == null || sortType.equalsIgnoreCase("name")) {
+        tableNames.sort(sortAsc ? null : Comparator.reverseOrder());
+      } else {
+        Integer sortFactor = sortAsc ? 1 : -1;
+        List<TableStats> tableStatsList = new ArrayList<TableStats>(tableNames.size());
+        for (String tableName : tableNames) {
+          tableStatsList.add(_pinotHelixResourceManager.getTableStats(tableName));
+        }
+
+        // Sort table names based on (1) Create Time or (2) Last Modified Time
+        Collections.sort(tableStatsList, (Comparator<TableStats>) (o1, o2) -> {
+          if (sortType.equalsIgnoreCase("creationTime")) {
+            return o1.getCreationTime().compareTo(o2.getCreationTime()) * sortFactor;
+          }
+          return o1.getLastModifiedTime().compareTo(o2.getLastModifiedTime()) * sortFactor;
+        });
+
+        // Reuse space allocated, copy the sorted order
+        for (int idx = 0; idx < tableStatsList.size(); idx++) {
+          tableNames.set(idx, tableStatsList.get(idx).getTableName());
+        }
       }
-
-      // Sort table names based on (1) Name, (2) Create Time or (3) Last Modified Time
-      Collections.sort(tableNames, (Comparator<String>) (o1, o2) -> {
-        String d1 = getString(sortType, MapStats, o1);
-        String d2 = getString(sortType, MapStats, o2);
-
-        Integer delta = d1.compareTo(d2);
-        return sortAsc ? delta : -delta;
-      });
 
       return JsonUtils.newObjectNode().set("tables", JsonUtils.objectToJsonNode(tableNames)).toString();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
-  }
-
-  /**
-   * Return the cached table stats for a given Table Name
-   * @param sortType
-   * @param MapStats
-   * @param tableName
-   * @return timeStat
-   */
-  private String getString(String sortType, HashMap<String, TableStats> MapStats, String tableName) {
-    TableStats stat = MapStats.get(tableName);
-    if (sortType.equalsIgnoreCase("creationTime")) {
-      return stat.getCreationTime();
-    }
-    if (sortType.equalsIgnoreCase("lastModifiedTime")) {
-      return stat.getLastModifiedTime();
-    }
-    return stat.getTableName();
   }
 
   private String listTableConfigs(String tableName, @Nullable String tableTypeStr) {
