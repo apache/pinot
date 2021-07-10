@@ -87,7 +87,8 @@ public class KinesisConnectionHandler {
             .httpClientBuilder(new ApacheSdkHttpService().createHttpClientBuilder());
       } else {
         kinesisClientBuilder =
-            KinesisClient.builder().region(Region.of(_region)).credentialsProvider(DefaultCredentialsProvider.create());
+            KinesisClient.builder().region(Region.of(_region)).credentialsProvider(DefaultCredentialsProvider.create())
+                .httpClientBuilder(new ApacheSdkHttpService().createHttpClientBuilder());
       }
 
       if (StringUtils.isNotBlank(_endpoint)) {
