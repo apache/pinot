@@ -32,7 +32,6 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
 
@@ -46,17 +45,16 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<IntermediateRe
   private final DistinctAggregationFunction _distinctAggregationFunction;
   private final Dictionary _dictionary;
   private final int _numTotalDocs;
-  private IndexSegment _indexSegment;
+  private final FieldSpec.DataType _dataType;
 
   private boolean _hasOrderBy;
   private boolean _isAscending;
-
-  private int _dictLength;
   private int _numDocsScanned;
 
-  public DictionaryBasedDistinctOperator(IndexSegment indexSegment, DistinctAggregationFunction distinctAggregationFunction,
+  public DictionaryBasedDistinctOperator(FieldSpec.DataType dataType, DistinctAggregationFunction distinctAggregationFunction,
       Dictionary dictionary, int numTotalDocs) {
 
+    _dataType = dataType;
     _distinctAggregationFunction = distinctAggregationFunction;
     _dictionary = dictionary;
     _numTotalDocs = numTotalDocs;
@@ -69,9 +67,6 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<IntermediateRe
       _isAscending = orderByExpressionContext.isAsc();
       _hasOrderBy = true;
     }
-
-    _dictLength = _dictionary.length();
-    _indexSegment = indexSegment;
   }
 
   @Override
@@ -91,14 +86,13 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<IntermediateRe
 
     List<ExpressionContext> expressions = _distinctAggregationFunction.getInputExpressions();
     ExpressionContext expression = expressions.get(0);
-    FieldSpec.DataType dataType = _indexSegment.getDataSource(expression.getIdentifier()).getDataSourceMetadata().getDataType();
-
     DataSchema dataSchema = new DataSchema(new String[]{expression.toString()},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.fromDataTypeSV(dataType)});
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.fromDataTypeSV(_dataType)});
+    int dictLength = _dictionary.length();
     List<Record> records;
 
     int limit = _distinctAggregationFunction.getLimit();
-    int actualLimit = Math.min(limit, _dictLength);
+    int actualLimit = Math.min(limit, dictLength);
 
     // If ORDER BY is not present, we read the first limit values from the dictionary and return.
     // If ORDER BY is present and the dictionary is sorted, then we read the first/last limit values
@@ -121,15 +115,15 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<IntermediateRe
           }
         } else {
           _numDocsScanned = actualLimit;
-          for (int i = _dictLength - 1; i >= (_dictLength - actualLimit); i--) {
+          for (int i = dictLength - 1; i >= (dictLength - actualLimit); i--) {
             records.add(new Record(new Object[]{_dictionary.getInternal(i)}));
           }
         }
       } else {
         DistinctTable distinctTable = new DistinctTable(dataSchema, _distinctAggregationFunction.getOrderByExpressions(), limit);
 
-        _numDocsScanned = _dictLength;
-        for (int i = 0; i < _dictLength; i++) {
+        _numDocsScanned = dictLength;
+        for (int i = 0; i < dictLength; i++) {
           distinctTable.addWithOrderBy(new Record(new Object[]{_dictionary.getInternal(i)}));
         }
 
