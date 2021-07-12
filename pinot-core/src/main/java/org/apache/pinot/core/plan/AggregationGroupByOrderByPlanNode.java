@@ -69,10 +69,9 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
     _queryContext = queryContext;
     _minSegmentTrimSize = minSegmentTrimSize;
     List<OrderByExpressionContext> orderByExpressionContexts = queryContext.getOrderByExpressions();
-    if (orderByExpressionContexts == null) {
-      _orderByExpressionContexts = new ArrayList<>();
-    } else {
-      _orderByExpressionContexts = orderByExpressionContexts;
+    _orderByExpressionContexts = new ArrayList<>();
+    if (orderByExpressionContexts != null) {
+      _orderByExpressionContexts.addAll(orderByExpressionContexts);
     }
 
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();
@@ -101,6 +100,8 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
 
     Set<ExpressionContext> expressionsToTransform =
         AggregationFunctionUtils.collectExpressionsToTransform(_aggregationFunctions, _groupByExpressions);
+    // Note that here we check if the optimization could be applied to the query based on the query info. Inside the
+    // operator there is another check based on the data layout and result meta data.
     _enableGroupByOpt = checkOrderByOptimization();
     if (_enableGroupByOpt) {
       // Add docIds
