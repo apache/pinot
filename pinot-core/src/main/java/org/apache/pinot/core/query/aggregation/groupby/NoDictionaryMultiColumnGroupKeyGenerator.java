@@ -342,6 +342,178 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
     return _groupKeyMap.size();
   }
 
+  @Override
+  public int getGroupKey(Object[] key) {
+    int[] keys = new int[_numGroupByExpressions];
+    for (int i = 0; i < _numGroupByExpressions; i++) {
+
+      if (_dictionaries[i] != null) {
+
+      } else {
+        ValueToIdMap onTheFlyDictionary = _onTheFlyDictionaries[i];
+        switch (_storedTypes[i]) {
+          case INT:
+            int intValue = (int)key[i];
+            keys[i] = onTheFlyDictionary.put(intValue);
+            break;
+          case LONG:
+            long longValue = (long)key[i];
+            keys[i] = onTheFlyDictionary.put(longValue);
+            break;
+          case FLOAT:
+            float floatValue = (float)key[i];
+            keys[i] = onTheFlyDictionary.put(floatValue);
+            break;
+          case DOUBLE:
+            double doubleValue = (double)key[i];
+            keys[i] = onTheFlyDictionary.put(doubleValue);
+            break;
+          case STRING:
+            String stringValue = (String)key[i];
+            keys[i] = onTheFlyDictionary.put(stringValue);
+            break;
+          case BYTES:
+            byte[] bytesValues = (byte[])key[i];
+            keys[i] = onTheFlyDictionary.put(new ByteArray(bytesValues));
+
+            break;
+          default:
+            throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _storedTypes[i]);
+        }
+      }
+    }
+    return getGroupIdForKey(new FixedIntArray(keys));
+  }
+
+  @Override
+  public void getGroupKeyArray(Object[] groupKeys, int[] outputKeys) {
+    int[][] keys = new int[_numGroupByExpressions][];
+    for (int i = 0; i < _numGroupByExpressions; i++) {
+      if (_dictionaries[i] == null) {
+        if (_isSingleValueExpressions[i]) {
+          int[] dictIds = blockValSet.getDictionaryIdsSV();
+          for (int j = 0; j < numDocs; j++) {
+            keys[j][i] = new int[]{dictIds[j]};
+          }
+        } else {
+          int[][] dictIds = blockValSet.getDictionaryIdsMV();
+          for (int j = 0; j < numDocs; j++) {
+            keys[j][i] = dictIds[j];
+          }
+        }
+      } else {
+        ValueToIdMap onTheFlyDictionary = _onTheFlyDictionaries[i];
+        if (_isSingleValueExpressions[i]) {
+          switch (_storedTypes[i]) {
+            case INT:
+              int[] intValues = blockValSet.getIntValuesSV();
+              for (int j = 0; j < numDocs; j++) {
+                keys[j][i] = new int[]{onTheFlyDictionary.put(intValues[j])};
+              }
+              break;
+            case LONG:
+              long[] longValues = blockValSet.getLongValuesSV();
+              for (int j = 0; j < numDocs; j++) {
+                keys[j][i] = new int[]{onTheFlyDictionary.put(longValues[j])};
+              }
+              break;
+            case FLOAT:
+              float[] floatValues = blockValSet.getFloatValuesSV();
+              for (int j = 0; j < numDocs; j++) {
+                keys[j][i] = new int[]{onTheFlyDictionary.put(floatValues[j])};
+              }
+              break;
+            case DOUBLE:
+              double[] doubleValues = blockValSet.getDoubleValuesSV();
+              for (int j = 0; j < numDocs; j++) {
+                keys[j][i] = new int[]{onTheFlyDictionary.put(doubleValues[j])};
+              }
+              break;
+            case STRING:
+              String[] stringValues = blockValSet.getStringValuesSV();
+              for (int j = 0; j < numDocs; j++) {
+                keys[j][i] = new int[]{onTheFlyDictionary.put(stringValues[j])};
+              }
+              break;
+            case BYTES:
+              byte[][] bytesValues = blockValSet.getBytesValuesSV();
+              for (int j = 0; j < numDocs; j++) {
+                keys[j][i] = new int[]{onTheFlyDictionary.put(new ByteArray(bytesValues[j]))};
+              }
+              break;
+            default:
+              throw new IllegalArgumentException(
+                  "Illegal data type for no-dictionary key generator: " + _storedTypes[i]);
+          }
+        } else {
+          switch (_storedTypes[i]) {
+            case INT:
+              int[][] intValues = blockValSet.getIntValuesMV();
+              for (int j = 0; j < numDocs; j++) {
+                int mvSize = intValues[j].length;
+                int[] mvKeys = new int[mvSize];
+                for (int k = 0; k < mvSize; k++) {
+                  mvKeys[k] = onTheFlyDictionary.put(intValues[j][k]);
+                }
+                keys[j][i] = mvKeys;
+              }
+              break;
+            case LONG:
+              long[][] longValues = blockValSet.getLongValuesMV();
+              for (int j = 0; j < numDocs; j++) {
+                int mvSize = longValues[j].length;
+                int[] mvKeys = new int[mvSize];
+                for (int k = 0; k < mvSize; k++) {
+                  mvKeys[k] = onTheFlyDictionary.put(longValues[j][k]);
+                }
+                keys[j][i] = mvKeys;
+              }
+              break;
+            case FLOAT:
+              float[][] floatValues = blockValSet.getFloatValuesMV();
+              for (int j = 0; j < numDocs; j++) {
+                int mvSize = floatValues[j].length;
+                int[] mvKeys = new int[mvSize];
+                for (int k = 0; k < mvSize; k++) {
+                  mvKeys[k] = onTheFlyDictionary.put(floatValues[j][k]);
+                }
+                keys[j][i] = mvKeys;
+              }
+              break;
+            case DOUBLE:
+              double[][] doubleValues = blockValSet.getDoubleValuesMV();
+              for (int j = 0; j < numDocs; j++) {
+                int mvSize = doubleValues[j].length;
+                int[] mvKeys = new int[mvSize];
+                for (int k = 0; k < mvSize; k++) {
+                  mvKeys[k] = onTheFlyDictionary.put(doubleValues[j][k]);
+                }
+                keys[j][i] = mvKeys;
+              }
+              break;
+            case STRING:
+              String[][] stringValues = blockValSet.getStringValuesMV();
+              for (int j = 0; j < numDocs; j++) {
+                int mvSize = stringValues[j].length;
+                int[] mvKeys = new int[mvSize];
+                for (int k = 0; k < mvSize; k++) {
+                  mvKeys[k] = onTheFlyDictionary.put(stringValues[j][k]);
+                }
+                keys[j][i] = mvKeys;
+              }
+              break;
+            default:
+              throw new IllegalArgumentException(
+                  "Illegal data type for no-dictionary key generator: " + _storedTypes[i]);
+          }
+        }
+      }
+    }
+    for (int i = 0; i < numDocs; i++) {
+      groupKeys[i] = getGroupIdsForKeys(keys[i]);
+    }
+  }
+
   /**
    * Iterator for {@link GroupKey}.
    */

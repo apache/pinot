@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.groupby;
 
 import java.util.Collection;
 import java.util.Map;
+import java.util.PriorityQueue;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.data.table.IntermediateRecord;
@@ -47,7 +48,10 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   // Thread local (reusable) array for multi-valued group keys
   private static final ThreadLocal<int[][]> THREAD_LOCAL_MV_GROUP_KEYS =
       ThreadLocal.withInitial(() -> new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][]);
+  private static final int ON_THE_FLY_TRIM_THRESHOLD = 100000;
 
+  private final TableResizer _tableResizer;
+  private final int _numGroupByExpressions;
   protected final AggregationFunction[] _aggregationFunctions;
   protected final GroupKeyGenerator _groupKeyGenerator;
   protected final GroupByResultHolder[] _groupByResultHolders;
@@ -76,6 +80,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       hasNoDictionaryGroupByExpression |= !transformResultMetadata.hasDictionary();
     }
     _hasMVGroupByExpression = hasMVGroupByExpression;
+    _numGroupByExpressions = groupByExpressions.length;
 
     // Initialize group key generator
     if (hasNoDictionaryGroupByExpression) {
@@ -123,10 +128,34 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     int capacityNeeded = _groupKeyGenerator.getCurrentGroupKeyUpperBound();
     int length = transformBlock.getNumDocs();
     int numAggregationFunctions = _aggregationFunctions.length;
+
     for (int i = 0; i < numAggregationFunctions; i++) {
       GroupByResultHolder groupByResultHolder = _groupByResultHolders[i];
       groupByResultHolder.ensureCapacity(capacityNeeded);
       aggregate(transformBlock, length, i);
+    }
+
+    // TODO: format
+    if (_groupByResultHolders[0].size() > ON_THE_FLY_TRIM_THRESHOLD) {
+      PriorityQueue<IntermediateRecord> pq = _tableResizer.trimInSegmentResults(_groupKeyGenerator.getGroupKeys(), _groupByResultHolders, _groupByResultHolders[0].size());
+      // TODO: Clear key map
+      _groupKeyGenerator.clearKeyHolder();
+      for (int i = 0; i < numAggregationFunctions; i++) {
+        GroupByResultHolder groupByResultHolder = _groupByResultHolders[i];
+        groupByResultHolder.clearResultHolder(capacityNeeded);
+      }
+      for (IntermediateRecord record: pq) {
+        int groupKey = _groupKeyGenerator.getGroupKey(record._key.getUnderLyingKey());
+        for (int i = 0; i < numAggregationFunctions; i++) {
+          Object value = record._record.getValues()[_numGroupByExpressions + i];
+          GroupByResultHolder groupByResultHolder = _groupByResultHolders[i];
+          if (groupByResultHolder.getType() == GroupByResultHolder.type.DOUBLE) {
+            groupByResultHolder.setValueForKey(groupKey, (double)value);
+          } else {
+            groupByResultHolder.setValueForKey(groupKey, value);
+          }
+        }
+      }
     }
   }
 

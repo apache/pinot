@@ -87,4 +87,19 @@ public class ObjectGroupByResultHolder implements GroupByResultHolder {
       _resultArray[groupKey] = newValue;
     }
   }
+
+  @Override
+  public int size() {
+    return _resultArray.length;
+  }
+
+  @Override
+  public void clearResultHolder(int size) {
+    _resultArray = new Object[size];
+  }
+
+  @Override
+  public type getType() {
+    return type.OBJECT;
+  }
 }

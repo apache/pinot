@@ -29,10 +29,13 @@ import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -203,6 +206,44 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   @Override
   public int getNumKeys() {
     return _groupKeyMap.size();
+  }
+
+  @Override
+  public void clearKeyHolder() {
+    _groupKeyMap.clear();
+    _numGroups = 0;
+  }
+
+  @Override
+  public int getGroupKey(Object[] key) {
+    Object singleColumnKey = key[0];
+    switch (_storedType) {
+      case INT:
+        int intValue = (int)singleColumnKey;
+        return getKeyForValue(intValue);
+      case LONG:
+        long longValue = (long)singleColumnKey;
+        return getKeyForValue(longValue);
+      case FLOAT:
+        float floatValue = (float)singleColumnKey;
+        return getKeyForValue(floatValue);
+      case DOUBLE:
+        double doubleValue = (double)singleColumnKey;
+        return  getKeyForValue(doubleValue);
+      case STRING:
+        String stringValue = (String)singleColumnKey;
+        return getKeyForValue(stringValue);
+      case BYTES:
+        byte[] byteValue = (byte[]) singleColumnKey;
+        return getKeyForValue(new ByteArray(byteValue));
+      default:
+        throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _storedType);
+    }
+  }
+
+  @Override
+  public void getGroupKeyArray(Object[] key, int[] groupId) {
+    throw new UnsupportedOperationException("Operation not supported");
   }
 
   private int getKeyForValue(int value) {

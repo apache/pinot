@@ -96,4 +96,19 @@ public class DoubleGroupByResultHolder implements GroupByResultHolder {
   public void setValueForKey(int groupKey, Object newValue) {
     throw new UnsupportedOperationException();
   }
+
+  @Override
+  public int size() {
+    return _resultArray.length;
+  }
+
+  @Override
+  public void clearResultHolder(int size) {
+    _resultArray = new double[size];
+  }
+
+  @Override
+  public type getType() {
+    return type.DOUBLE;
+  }
 }

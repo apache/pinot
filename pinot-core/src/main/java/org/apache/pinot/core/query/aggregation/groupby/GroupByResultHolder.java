@@ -22,7 +22,10 @@ package org.apache.pinot.core.query.aggregation.groupby;
  * Interface for ResultHolder to store results of GroupByAggregation.
  */
 public interface GroupByResultHolder {
-
+  enum type {
+    DOUBLE,
+    OBJECT
+  }
   /**
    * Stores the given value (of type double) for the given groupKey.
    *
@@ -67,4 +70,10 @@ public interface GroupByResultHolder {
    * @param capacity
    */
   void ensureCapacity(int capacity);
+
+  void clearResultHolder(int size);
+
+  int size();
+
+  type getType();
 }

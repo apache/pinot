@@ -82,6 +82,12 @@ public interface GroupKeyGenerator {
    */
   int getNumKeys();
 
+  void clearKeyHolder();
+
+  int getGroupKey(Object[] key);
+
+  void getGroupKeyArray(Object[] groupKeys, int[] keys);
+
   /**
    * This class encapsulates the integer group id and the group keys.
    */

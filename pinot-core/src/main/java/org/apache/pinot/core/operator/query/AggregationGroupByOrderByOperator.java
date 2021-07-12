@@ -114,8 +114,12 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
           new DefaultGroupByExecutor(_aggregationFunctions, _groupByExpressions, _maxInitialResultHolderCapacity,
               _numGroupsLimit, _transformOperator);
     }
+    int numBlocks = 0;
+    int numDocs = 0;
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
+      numBlocks++;
+      numDocs = transformBlock.getNumDocs();
       _numDocsScanned += transformBlock.getNumDocs();
       groupByExecutor.process(transformBlock);
     }
