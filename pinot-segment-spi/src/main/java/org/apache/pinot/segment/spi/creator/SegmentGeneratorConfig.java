@@ -84,6 +84,7 @@ public class SegmentGeneratorConfig implements Serializable {
   private String _outDir = null;
   private String _rawTableName = null;
   private String _segmentName = null;
+  private String _segmentNamePrefix = null;
   private String _segmentNamePostfix = null;
   private String _segmentTimeColumnName = null;
   private TimeUnit _segmentTimeUnit = null;
@@ -152,9 +153,8 @@ public class SegmentGeneratorConfig implements Serializable {
         this.setRawIndexCreationColumns(noDictionaryColumns);
 
         if (noDictionaryColumnMap != null) {
-          Map<String, ChunkCompressionType> serializedNoDictionaryColumnMap =
-              noDictionaryColumnMap.entrySet().stream().collect(Collectors
-                  .toMap(Map.Entry::getKey, e -> ChunkCompressionType.valueOf(e.getValue())));
+          Map<String, ChunkCompressionType> serializedNoDictionaryColumnMap = noDictionaryColumnMap.entrySet().stream()
+              .collect(Collectors.toMap(Map.Entry::getKey, e -> ChunkCompressionType.valueOf(e.getValue())));
           this.setRawIndexCompressionType(serializedNoDictionaryColumnMap);
         }
       }
@@ -267,10 +267,11 @@ public class SegmentGeneratorConfig implements Serializable {
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     if (fieldConfigList != null) {
       for (FieldConfig fieldConfig : fieldConfigList) {
-        if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW && fieldConfig.getCompressionCodec() != null) {
+        if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW
+            && fieldConfig.getCompressionCodec() != null) {
           _rawIndexCreationColumns.add(fieldConfig.getName());
-          _rawIndexCompressionType.put(fieldConfig.getName(),
-              ChunkCompressionType.valueOf(fieldConfig.getCompressionCodec().name()));
+          _rawIndexCompressionType
+              .put(fieldConfig.getName(), ChunkCompressionType.valueOf(fieldConfig.getCompressionCodec().name()));
         }
       }
     }
@@ -476,6 +477,14 @@ public class SegmentGeneratorConfig implements Serializable {
     _creatorVersion = creatorVersion;
   }
 
+  public String getSegmentNamePrefix() {
+    return _segmentNamePrefix;
+  }
+
+  public void setSegmentNamePrefix(String segmentNamePrefix) {
+    _segmentNamePrefix = segmentNamePrefix;
+  }
+
   public String getSegmentNamePostfix() {
     return _segmentNamePostfix;
   }
@@ -604,7 +613,11 @@ public class SegmentGeneratorConfig implements Serializable {
     if (_segmentName != null) {
       return new FixedSegmentNameGenerator(_segmentName);
     }
-    return new SimpleSegmentNameGenerator(_rawTableName, _segmentNamePostfix);
+    if (_segmentNamePrefix != null) {
+      return new SimpleSegmentNameGenerator(_segmentNamePrefix, _segmentNamePostfix);
+    } else {
+      return new SimpleSegmentNameGenerator(_rawTableName, _segmentNamePostfix);
+    }
   }
 
   public void setSegmentNameGenerator(SegmentNameGenerator segmentNameGenerator) {

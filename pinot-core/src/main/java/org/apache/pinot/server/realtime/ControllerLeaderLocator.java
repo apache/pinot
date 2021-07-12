@@ -21,9 +21,11 @@ package org.apache.pinot.server.realtime;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
+import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.pql.parsers.utils.Pair;
@@ -123,42 +125,47 @@ public class ControllerLeaderLocator {
    */
   private void refreshControllerLeaderMapFromLeadControllerResource() {
     try {
-      ExternalView leadControllerResourceExternalView = _helixManager.getClusterManagmentTool()
-          .getResourceExternalView(_helixManager.getClusterName(), Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+      HelixDataAccessor dataAccessor = _helixManager.getHelixDataAccessor();
+      PropertyKey.Builder keyBuilder = dataAccessor.keyBuilder();
+      ExternalView leadControllerResourceExternalView =
+          dataAccessor.getProperty(keyBuilder.externalView(Helix.LEAD_CONTROLLER_RESOURCE_NAME));
       if (leadControllerResourceExternalView == null) {
         LOGGER.error("External view of {} is null.", Helix.LEAD_CONTROLLER_RESOURCE_NAME);
         return;
       }
-      Set<String> partitionNames = leadControllerResourceExternalView.getPartitionSet();
-      if (partitionNames.size() != Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE) {
+      Map<String, Map<String, String>> partitionStateMap =
+          leadControllerResourceExternalView.getRecord().getMapFields();
+      if (partitionStateMap.size() != Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE) {
         LOGGER.error("The partition size of {} is not {}. Actual size: {}", Helix.LEAD_CONTROLLER_RESOURCE_NAME,
-            Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE, partitionNames.size());
+            Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE, partitionStateMap.size());
         return;
       }
-      for (String partitionName : partitionNames) {
-        int partitionId = LeadControllerUtils.extractPartitionId(partitionName);
-        Map<String, String> partitionStateMap = leadControllerResourceExternalView.getStateMap(partitionName);
-        boolean masterFound = false;
-        // Get master host from partition map. Return null if no master found.
-        for (Map.Entry<String, String> entry : partitionStateMap.entrySet()) {
-          if (MasterSlaveSMD.States.MASTER.name().equals(entry.getValue())) {
-            // Found the controller in master state.
-            // Converts participant id (with Prefix "Controller_") to controller id and assigns it as the leader,
-            // since realtime segment completion protocol doesn't need the prefix in controller instance id.
-            String participantInstanceId = entry.getKey();
-            String controllerInstanceId = LeadControllerUtils.extractControllerInstanceId(participantInstanceId);
-            Pair<String, Integer> leadControllerPair = convertToHostAndPortPair(controllerInstanceId);
-            masterFound = true;
-            _cachedControllerLeaderMap.put(partitionId, leadControllerPair);
+      for (Map.Entry<String, Map<String, String>> entry : partitionStateMap.entrySet()) {
+        String partitionName = entry.getKey();
+        Map<String, String> instanceStateMap = entry.getValue();
+        String masterInstanceId = null;
+        for (Map.Entry<String, String> instanceStateEntry : instanceStateMap.entrySet()) {
+          if (instanceStateEntry.getValue().equals(MasterSlaveSMD.States.MASTER.name())) {
+            masterInstanceId = instanceStateEntry.getKey();
+            break;
           }
         }
-        if (!masterFound) {
+        if (masterInstanceId == null) {
           // It's ok to log a warning since we can be in this state for some small time during the migration.
           // Otherwise, we are attempted to mark this as an error.
           LOGGER.warn("There is no controller in MASTER state for partition: {} in {}", partitionName,
               Helix.LEAD_CONTROLLER_RESOURCE_NAME);
           return;
         }
+        InstanceConfig instanceConfig = dataAccessor.getProperty(keyBuilder.instanceConfig(masterInstanceId));
+        if (instanceConfig == null) {
+          LOGGER.error("Failed to find instance config for MASTER controller: {}", masterInstanceId);
+          return;
+        }
+        int partitionId = LeadControllerUtils.extractPartitionId(partitionName);
+        Pair<String, Integer> hostnamePortPair =
+            new Pair<>(instanceConfig.getHostName(), Integer.parseInt(instanceConfig.getPort()));
+        _cachedControllerLeaderMap.put(partitionId, hostnamePortPair);
       }
       _cachedControllerLeaderValid = true;
       LOGGER.info("Refreshed controller leader map successfully.");
@@ -196,7 +203,7 @@ public class ControllerLeaderLocator {
   /**
    * Converts instance id to a pair of hostname and port.
    * @param instanceId instance id without any prefix, e.g. localhost_9000
-   * */
+   */
   private Pair<String, Integer> convertToHostAndPortPair(String instanceId) {
     // TODO: improve the exception handling.
     if (instanceId == null) {
@@ -204,7 +211,7 @@ public class ControllerLeaderLocator {
     }
     int index = instanceId.lastIndexOf('_');
     String leaderHost = instanceId.substring(0, index);
-    int leaderPort = Integer.valueOf(instanceId.substring(index + 1));
+    int leaderPort = Integer.parseInt(instanceId.substring(index + 1));
     return new Pair<>(leaderHost, leaderPort);
   }
 

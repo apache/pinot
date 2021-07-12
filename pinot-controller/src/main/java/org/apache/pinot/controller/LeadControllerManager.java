@@ -26,7 +26,6 @@ import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
-import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,20 +39,21 @@ public class LeadControllerManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(LeadControllerManager.class);
   private static final long CONTROLLER_LEADERSHIP_FETCH_INTERVAL_MS = 60_000L;
 
-  private final Set<Integer> _leadForPartitions;
-  private final String _instanceId;
+  private final String _helixControllerInstanceId;
   private final HelixManager _helixManager;
   private final ControllerMetrics _controllerMetrics;
+  private final Set<Integer> _leadForPartitions;
   private final Thread _controllerLeadershipFetchingThread;
 
   private volatile boolean _isLeadControllerResourceEnabled = false;
   private volatile boolean _amIHelixLeader = false;
   private volatile boolean _isShuttingDown = false;
 
-  public LeadControllerManager(HelixManager helixParticipantManager, ControllerMetrics controllerMetrics) {
-    _helixManager = helixParticipantManager;
+  public LeadControllerManager(String helixControllerInstanceId, HelixManager helixManager,
+      ControllerMetrics controllerMetrics) {
+    _helixControllerInstanceId = helixControllerInstanceId;
+    _helixManager = helixManager;
     _controllerMetrics = controllerMetrics;
-    _instanceId = helixParticipantManager.getInstanceName();
     _leadForPartitions = ConcurrentHashMap.newKeySet();
 
     // Create a thread to periodically fetch controller leadership as a work-around of Helix callback delay
@@ -144,9 +144,7 @@ public class LeadControllerManager {
         LOGGER.warn("Helix leader ZNode is missing");
         return false;
       }
-      // The instance name from Helix leader ZNode is without controller prefix.
-      // It is essential to convert to participant id for fair comparison.
-      return _instanceId.equals(Helix.PREFIX_OF_CONTROLLER_INSTANCE + helixLeaderInstanceId);
+      return _helixControllerInstanceId.equals(helixLeaderInstanceId);
     } catch (Exception e) {
       LOGGER.error("Exception when getting Helix leader", e);
       return false;

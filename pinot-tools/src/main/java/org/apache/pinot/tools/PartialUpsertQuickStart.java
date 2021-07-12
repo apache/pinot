@@ -57,7 +57,7 @@ public class PartialUpsertQuickStart {
     File tableConfigFile = new File(bootstrapTableDir, "meetupRsvp_realtime_table_config.json");
 
     ClassLoader classLoader = Quickstart.class.getClassLoader();
-    URL resource = classLoader.getResource("examples/stream/meetupRsvp/upsert_meetupRsvp_schema.json");
+    URL resource = classLoader.getResource("examples/stream/meetupRsvp/upsert_partial_meetupRsvp_schema.json");
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, schemaFile);
     resource =
@@ -101,17 +101,32 @@ public class PartialUpsertQuickStart {
     Thread.sleep(15000);
 
     printStatus(Color.YELLOW, "***** Upsert quickstart setup complete *****");
-    printStatus(Color.YELLOW, "***** The expected behavior for total number of documents per PK should be 1 *****");
-    printStatus(Color.YELLOW,
-        "***** The expected behavior for total number of rsvp_counts per PK should >=1 since it's incremented and updated. *****");
 
     // The expected behavior for total number of documents per PK should be 1.
     // The expected behavior for total number of rsvp_counts per PK should >=1 since it's incremented and updated.
+    // The expected behavior for nums of values in group_name fields should equals to rsvp_counts.
     String q1 =
         "select event_id, count(*), sum(rsvp_count) from meetupRsvp group by event_id order by sum(rsvp_count) desc limit 10";
     printStatus(Color.YELLOW, "Total number of documents, total number of rsvp_counts per event_id in the table");
+    printStatus(Color.YELLOW, "***** The expected behavior for total number of documents per PK should be 1 *****");
+    printStatus(Color.YELLOW,
+        "***** The expected behavior for total number of rsvp_counts per PK should >=1 since it's incremented and updated. *****");
+    printStatus(Color.YELLOW,
+        "***** The expected behavior for nums of values in group_name fields should equals to rsvp_counts. *****");
     printStatus(Color.CYAN, "Query : " + q1);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));
+    printStatus(Color.GREEN, "***************************************************");
+
+    // The expected behavior for nums of values in group_name fields should equals to rsvp_counts.
+    String q2 =
+        "select event_id, group_name, venue_name, rsvp_count from meetupRsvp where rsvp_count > 1 order by rsvp_count desc limit 10";
+    printStatus(Color.YELLOW, "Event_id, group_name, venue_name, rsvp_count per per event_id in the table");
+    printStatus(Color.YELLOW,
+        "***** Nums of values in group_name fields should less than or equals to rsvp_count. Duplicate records are not allowed. *****");
+    printStatus(Color.YELLOW,
+        "***** Nums of values in renue_name fields should equals to rsvp_count. Duplicates are allowed. *****");
+    printStatus(Color.CYAN, "Query : " + q2);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q2)));
     printStatus(Color.GREEN, "***************************************************");
 
     printStatus(Color.GREEN, "You can always go to http://localhost:9000 to play around in the query console");

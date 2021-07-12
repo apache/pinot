@@ -38,8 +38,7 @@ import static org.mockito.Mockito.when;
 
 
 public class LeadControllerManagerTest {
-  private static final String CONTROLLER_HOST = "localhost";
-  private static final int CONTROLLER_PORT = 18998;
+  private static final String HELIX_CONTROLLER_INSTANCE_ID = "localhost_18998";
 
   private HelixManager _helixManager;
   private ControllerMetrics _controllerMetrics;
@@ -61,9 +60,6 @@ public class LeadControllerManagerTest {
     _liveInstance = mock(LiveInstance.class);
     when(helixDataAccessor.getProperty(controllerLeader)).thenReturn(_liveInstance);
 
-    String instanceId = LeadControllerUtils.generateParticipantInstanceId(CONTROLLER_HOST, CONTROLLER_PORT);
-    when(_helixManager.getInstanceName()).thenReturn(instanceId);
-
     ConfigAccessor configAccessor = mock(ConfigAccessor.class);
     when(_helixManager.getConfigAccessor()).thenReturn(configAccessor);
     _resourceConfig = mock(ResourceConfig.class);
@@ -72,7 +68,8 @@ public class LeadControllerManagerTest {
 
   @Test
   public void testLeadControllerManager() {
-    LeadControllerManager leadControllerManager = new LeadControllerManager(_helixManager, _controllerMetrics);
+    LeadControllerManager leadControllerManager =
+        new LeadControllerManager(HELIX_CONTROLLER_INSTANCE_ID, _helixManager, _controllerMetrics);
     String tableName = "leadControllerTestTable";
     int expectedPartitionIndex = LeadControllerUtils.getPartitionIdForTable(tableName);
     String partitionName = LeadControllerUtils.generatePartitionName(expectedPartitionIndex);
@@ -108,7 +105,7 @@ public class LeadControllerManagerTest {
     leadControllerManager.addPartitionLeader(partitionName);
     Assert.assertFalse(leadControllerManager.isLeaderForTable(tableName));
 
-    // When the current controller becomes helix leader and resource is disabled, leadControllerManager should return false.
+    // When the current controller becomes helix leader and resource is disabled, leadControllerManager should return true.
     becomeHelixLeader(true);
     leadControllerManager.onHelixControllerChange();
     Assert.assertTrue(leadControllerManager.isLeaderForTable(tableName));
@@ -116,7 +113,7 @@ public class LeadControllerManagerTest {
 
   private void becomeHelixLeader(boolean becomeHelixLeader) {
     if (becomeHelixLeader) {
-      when(_liveInstance.getInstanceName()).thenReturn(CONTROLLER_HOST + "_" + CONTROLLER_PORT);
+      when(_liveInstance.getInstanceName()).thenReturn(HELIX_CONTROLLER_INSTANCE_ID);
     }
   }
 

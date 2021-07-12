@@ -41,7 +41,6 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.segment.spi.creator.SegmentVersion.v1;
 import static org.apache.pinot.segment.spi.creator.SegmentVersion.v2;
 import static org.apache.pinot.segment.spi.creator.SegmentVersion.v3;
-import static org.apache.pinot.segment.spi.creator.SegmentVersion.valueOf;
 
 
 public class SegmentLocalFSDirectory extends SegmentDirectory {
@@ -74,7 +73,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     Preconditions.checkNotNull(metadata);
 
     _indexDir = directoryFile;
-    _segmentDirectory = getSegmentPath(directoryFile, metadata.getSegmentVersion());
+    _segmentDirectory = getSegmentPath(directoryFile, metadata.getVersion());
     Preconditions.checkState(_segmentDirectory.exists(), "Segment directory: " + directoryFile + " must exist");
 
     _segmentLock = new SegmentLock();
@@ -206,10 +205,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
       return;
     }
 
-    String version = _segmentMetadata.getVersion();
-    SegmentVersion segmentVersion = valueOf(version);
-
-    switch (segmentVersion) {
+    switch (_segmentMetadata.getVersion()) {
       case v1:
       case v2:
         _columnIndexDirectory = new FilePerIndexDirectory(_segmentDirectory, _segmentMetadata, _readMode);

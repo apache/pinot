@@ -33,6 +33,8 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
+    <localstack-utils.version>0.2.11</localstack-utils.version>
+    <awaitility.version>3.0.0</awaitility.version>
   </properties>
   <build>
     <plugins>
@@ -233,6 +235,18 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-yammer</artifactId>
       <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>cloud.localstack</groupId>
+      <artifactId>localstack-utils</artifactId>
+      <version>${localstack-utils.version}</version>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.testng</groupId>

@@ -71,7 +71,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
 
     // check existing segment version
     SegmentMetadataImpl v2Metadata = new SegmentMetadataImpl(v2SegmentDirectory);
-    SegmentVersion oldVersion = SegmentVersion.valueOf(v2Metadata.getVersion());
+    SegmentVersion oldVersion = v2Metadata.getVersion();
     Preconditions.checkState(oldVersion != SegmentVersion.v3, "Segment {} is already in v3 format but at wrong path",
         v2Metadata.getName());
 

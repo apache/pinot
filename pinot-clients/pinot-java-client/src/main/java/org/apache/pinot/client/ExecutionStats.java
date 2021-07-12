@@ -29,7 +29,7 @@ import java.util.Map;
  * <p>Please note that objects of this class will hold a reference to the given JsonNode object
  * and that will only be released when the object is GC'ed.</p>
  */
-class ExecutionStats {
+public class ExecutionStats {
 
   private static final String NUM_SERVERS_QUERIED = "numServersQueried";
   private static final String NUM_SERVERS_RESPONDED = "numServersResponded";

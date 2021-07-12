@@ -35,6 +35,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONFIG_OF_CONTROLLER_METRICS_PREFIX;
+import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONFIG_OF_INSTANCE_ID;
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.DEFAULT_METRICS_PREFIX;
 
 
@@ -61,7 +62,6 @@ public class ControllerConf extends PinotConfiguration {
   public static final String HELIX_CLUSTER_NAME = "controller.helix.cluster.name";
   public static final String CLUSTER_TENANT_ISOLATION_ENABLE = "cluster.tenant.isolation.enable";
   public static final String CONSOLE_WEBAPP_ROOT_PATH = "controller.query.console";
-  public static final String EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT = "controller.upload.onlineToOfflineTimeout";
   public static final String CONTROLLER_MODE = "controller.mode";
   public static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY = "controller.resource.rebalance.strategy";
 
@@ -174,7 +174,6 @@ public class ControllerConf extends PinotConfiguration {
   // Defines the kind of storage and the underlying PinotFS implementation
   private static final String PINOT_FS_FACTORY_CLASS_LOCAL = "controller.storage.factory.class.file";
 
-  private static final long DEFAULT_EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT_MILLIS = 120_000L; // 2 minutes
   private static final int DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
   private static final int DEFAULT_DELETED_SEGMENTS_RETENTION_IN_DAYS = 7;
   private static final int DEFAULT_TABLE_MIN_REPLICAS = 1;
@@ -310,6 +309,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public String getControllerPort() {
     return getProperty(CONTROLLER_PORT);
+  }
+
+  public String getInstanceId() {
+    return getProperty(CONFIG_OF_INSTANCE_ID);
   }
 
   public List<String> getControllerAccessProtocols() {
@@ -536,14 +539,6 @@ public class ControllerConf extends PinotConfiguration {
         Integer.toString(segmentRelocatorFrequencyInSeconds));
   }
 
-  public long getExternalViewOnlineToOfflineTimeout() {
-    return getProperty(EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT, DEFAULT_EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT_MILLIS);
-  }
-
-  public void setExternalViewOnlineToOfflineTimeout(long timeout) {
-    setProperty(EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT, timeout);
-  }
-
   public boolean tenantIsolationEnabled() {
     return getProperty(CLUSTER_TENANT_ISOLATION_ENABLE, true);
   }
@@ -727,7 +722,8 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public List<String> getTableConfigTunerPackages() {
-    return Arrays.asList(getProperty(TABLE_CONFIG_TUNER_PACKAGES, DEFAULT_TABLE_CONFIG_TUNER_PACKAGES).split("\\s*,\\s*"));
+    return Arrays
+        .asList(getProperty(TABLE_CONFIG_TUNER_PACKAGES, DEFAULT_TABLE_CONFIG_TUNER_PACKAGES).split("\\s*,\\s*"));
   }
 
   private long convertPeriodToSeconds(String timeStr) {

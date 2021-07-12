@@ -18,10 +18,10 @@
 #
 
 apiVersion: v1
-appVersion: 0.2.1
+appVersion: 0.2.2-SNAPSHOT
 name: presto
 description: Presto is an open source distributed SQL query engine for running interactive analytic queries against data sources of all sizes ranging from gigabytes to petabytes.
-version: 0.2.1
+version: 0.2.2-SNAPSHOT
 keywords:
   - analytics
   - database

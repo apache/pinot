@@ -31,8 +31,8 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
-import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
@@ -60,7 +60,7 @@ public class SegmentMetadataFetcher {
   private static final String STAR_TREE_METRIC_AGGREGATIONS = "metric-aggregations";
   private static final String STAR_TREE_MAX_LEAF_RECORDS = "max-leaf-records";
   private static final String STAR_TREE_DIMENSION_COLUMNS_SKIPPED = "dimension-columns-skipped";
-  
+
 
   /**
    * This is a helper method that fetches the segment metadata for a given segment.
@@ -68,7 +68,7 @@ public class SegmentMetadataFetcher {
    */
   public static String getSegmentMetadata(SegmentDataManager segmentDataManager, List<String> columns)
       throws JsonProcessingException {
-    SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) segmentDataManager.getSegment().getSegmentMetadata();
+    SegmentMetadata segmentMetadata = segmentDataManager.getSegment().getSegmentMetadata();
     Set<String> columnSet;
     if (columns.size() == 1 && columns.get(0).equals("*")) {
       columnSet = null;

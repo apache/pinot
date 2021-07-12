@@ -32,6 +32,7 @@ import org.apache.pinot.core.plan.AggregationGroupByPlanNode;
 import org.apache.pinot.core.plan.AggregationPlanNode;
 import org.apache.pinot.core.plan.CombinePlanNode;
 import org.apache.pinot.core.plan.DictionaryBasedAggregationPlanNode;
+import org.apache.pinot.core.plan.DictionaryBasedDistinctPlanNode;
 import org.apache.pinot.core.plan.DistinctPlanNode;
 import org.apache.pinot.core.plan.GlobalPlanImplV0;
 import org.apache.pinot.core.plan.InstanceResponsePlanNode;
@@ -40,7 +41,9 @@ import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.plan.SelectionPlanNode;
 import org.apache.pinot.core.plan.StreamingSelectionPlanNode;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.config.QueryExecutorConfig;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
@@ -188,7 +191,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       return new SelectionPlanNode(indexSegment, queryContext);
     } else {
       assert QueryContextUtils.isDistinctQuery(queryContext);
-      return new DistinctPlanNode(indexSegment, queryContext);
+      return getDistinctPlanNode(indexSegment, queryContext);
     }
   }
 
@@ -263,5 +266,32 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       }
     }
     return true;
+  }
+
+  /**
+   * Returns dictionary based distinct plan node iff supported, else distinct plan node
+   */
+  private PlanNode getDistinctPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
+    AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
+
+    // If we have gotten here, it must have been verified that there is only on aggregation function in the context
+    // and it is a DistinctAggregationFunction
+
+    DistinctAggregationFunction distinctAggregationFunction = (DistinctAggregationFunction) aggregationFunctions[0];
+    List<ExpressionContext> expressions = distinctAggregationFunction.getInputExpressions();
+
+    if (expressions.size() == 1 && queryContext.getFilter() == null) {
+      ExpressionContext expression = expressions.get(0);
+
+      if (expression.getType() == ExpressionContext.Type.IDENTIFIER) {
+        String column = expression.getIdentifier();
+        Dictionary dictionary = indexSegment.getDataSource(column).getDictionary();
+        if (dictionary != null) {
+          return new DictionaryBasedDistinctPlanNode(indexSegment, queryContext, dictionary);
+        }
+      }
+    }
+
+    return new DistinctPlanNode(indexSegment, queryContext);
   }
 }

@@ -32,7 +32,7 @@ public class DefaultColumnHandlerFactory {
 
   public static DefaultColumnHandler getDefaultColumnHandler(File indexDir, SegmentMetadataImpl segmentMetadata,
       IndexLoadingConfig indexLoadingConfig, Schema schema, SegmentDirectory.Writer segmentWriter) {
-    if (SegmentVersion.valueOf(segmentMetadata.getVersion()) == SegmentVersion.v3) {
+    if (segmentMetadata.getVersion() == SegmentVersion.v3) {
       return new V3DefaultColumnHandler(indexDir, segmentMetadata, indexLoadingConfig, schema, segmentWriter);
     } else {
       return new V1DefaultColumnHandler(indexDir, segmentMetadata, indexLoadingConfig, schema, segmentWriter);

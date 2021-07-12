@@ -33,6 +33,8 @@ public class CommonConstants {
 
   public static final String KEY_OF_AUTH_TOKEN = "auth.token";
 
+  public static final String TABLE_NAME = "tableName";
+
   /**
    * The state of the consumer for a given segment
    */
@@ -58,6 +60,11 @@ public class CommonConstants {
     public static final String PREFIX_OF_BROKER_INSTANCE = "Broker_";
     public static final String PREFIX_OF_SERVER_INSTANCE = "Server_";
     public static final String PREFIX_OF_MINION_INSTANCE = "Minion_";
+
+    public static int CONTROLLER_INSTANCE_PREFIX_LENGTH = PREFIX_OF_CONTROLLER_INSTANCE.length();
+    public static int BROKER_INSTANCE_PREFIX_LENGTH = PREFIX_OF_BROKER_INSTANCE.length();
+    public static int SERVER_INSTANCE_PREFIX_LENGTH = PREFIX_OF_SERVER_INSTANCE.length();
+    public static int MINION_INSTANCE_PREFIX_LENGTH = PREFIX_OF_MINION_INSTANCE.length();
 
     public static final String BROKER_RESOURCE_INSTANCE = "brokerResource";
     public static final String LEAD_CONTROLLER_RESOURCE_NAME = "leadControllerResource";
@@ -405,6 +412,8 @@ public class CommonConstants {
     // but we keep this default for backward compatibility in case someone relies on this format
     // see Server or Broker class for correct prefix format you should use
     public static final String DEFAULT_METRICS_PREFIX = "pinot.controller.";
+
+    public static final String CONFIG_OF_INSTANCE_ID = "pinot.controller.instance.id";
   }
 
   public static class Minion {
