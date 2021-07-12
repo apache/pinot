@@ -70,6 +70,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.MinionInstancesCleanupTask;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
+import org.apache.pinot.controller.helix.core.minion.TaskMetricsEmitter;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
@@ -148,6 +149,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected LeadControllerManager _leadControllerManager;
   protected List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbackList;
   protected MinionInstancesCleanupTask _minionInstancesCleanupTask;
+  protected TaskMetricsEmitter _taskMetricsEmitter;
 
   @Override
   public void init(PinotConfiguration pinotConfiguration)
@@ -628,7 +630,10 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     periodicTasks.add(_segmentRelocator);
     _minionInstancesCleanupTask = new MinionInstancesCleanupTask(_helixResourceManager, _config, _controllerMetrics);
     periodicTasks.add(_minionInstancesCleanupTask);
-
+    _taskMetricsEmitter =
+        new TaskMetricsEmitter(_helixResourceManager, _helixTaskResourceManager, _leadControllerManager, _config,
+            _controllerMetrics);
+    periodicTasks.add(_taskMetricsEmitter);
     return periodicTasks;
   }
 
