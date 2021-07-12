@@ -132,7 +132,7 @@ public class TablesResource {
   @Path("/tables/{tableName}/metadata")
   @ApiOperation(value = "List metadata for all segments of a given table", notes = "List segments metadata of table hosted on this server")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"), @ApiResponse(code = 404, message = "Table not found")})
-  public String getTableSize(
+  public String getSegmentMetadata(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") @DefaultValue("") List<String> columns)
       throws WebApplicationException {
@@ -147,18 +147,20 @@ public class TablesResource {
       throw new WebApplicationException("Table: " + tableName + " is not found", Response.Status.NOT_FOUND);
     }
 
-    for (int i = 0; i < columns.size(); i++) {
+    List<String> decodedColumns = new ArrayList<>(columns.size());
+    for (String column : columns) {
       try {
-        columns.set(i, URLDecoder.decode(columns.get(i), StandardCharsets.UTF_8.name()));
+        decodedColumns.add(URLDecoder.decode(column, StandardCharsets.UTF_8.name()));
       } catch (UnsupportedEncodingException e) {
         throw new RuntimeException(e.getCause());
       }
     }
+
     Set<String> columnSet;
-    if (columns.size() == 1 && columns.get(0).equals("*")) {
+    if (decodedColumns.size() == 1 && decodedColumns.get(0).equals("*")) {
       columnSet = null;
     } else {
-      columnSet = new HashSet<>(columns);
+      columnSet = new HashSet<>(decodedColumns);
     }
 
     TableMetadataInfo tableMetadataInfo = new TableMetadataInfo();
@@ -205,9 +207,9 @@ public class TablesResource {
             }
             int columnCardinality = segmentMetadata.getColumnMetadataMap().get(column).getCardinality();
             tableMetadataInfo.columnLengthMap
-                .put(column, tableMetadataInfo.columnLengthMap.getOrDefault(column, 0) + columnLength);
+                .put(column, tableMetadataInfo.columnLengthMap.getOrDefault(column, 0.0) + columnLength);
             tableMetadataInfo.columnCardinalityMap
-                .put(column, tableMetadataInfo.columnCardinalityMap.getOrDefault(column, 0) + columnCardinality);
+                .put(column, tableMetadataInfo.columnCardinalityMap.getOrDefault(column, 0.0) + columnCardinality);
           }
         }
       }

@@ -27,7 +27,7 @@ import java.util.Map;
 import java.util.concurrent.Executor;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
-import org.apache.pinot.common.restlet.resources.AggregateTableMetadataInfo;
+import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -81,7 +81,8 @@ public class TableMetadataReader {
    * Currently supports only OFFLINE tables.
    * @return a map of segmentName to its metadata
    */
-  public JsonNode getAggregateTableMetadata(String tableNameWithType, List<String> columns, int numReplica, int timeoutMs)
+  public JsonNode getAggregateTableMetadata(String tableNameWithType, List<String> columns, int numReplica,
+      int timeoutMs)
       throws InvalidConfigException, IOException {
     final Map<String, List<String>> serverToSegments =
         _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
@@ -90,7 +91,7 @@ public class TableMetadataReader {
     ServerSegmentMetadataReader serverSegmentMetadataReader =
         new ServerSegmentMetadataReader(_executor, _connectionManager);
 
-    AggregateTableMetadataInfo aggregateTableMetadataInfo = serverSegmentMetadataReader
+    TableMetadataInfo aggregateTableMetadataInfo = serverSegmentMetadataReader
         .getAggregatedTableMetadataFromServer(tableNameWithType, endpoints, columns, numReplica, timeoutMs);
     return JsonUtils.objectToJsonNode(aggregateTableMetadataInfo);
   }

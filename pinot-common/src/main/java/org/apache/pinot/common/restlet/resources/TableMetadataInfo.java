@@ -23,12 +23,19 @@ import java.util.HashMap;
 import java.util.Map;
 
 
+/**
+ * Class to represent aggregated segment metadata for a table.
+ * - When return by server API, columnLengthMap/columnCardinalityMap is the total columnLength/columnCardinality across
+ *   all segments on that server.
+ * - When return by controller API, columnLengthMap/columnCardinalityMap is the average columnLength/columnCardinality
+ *   across all segments for the given table.
+ */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TableMetadataInfo {
   public String tableName = "";
   public long diskSizeInBytes = 0;
   public long numSegments = 0;
   public long numRows = 0;
-  public Map<String, Integer> columnLengthMap = new HashMap<>();
-  public Map<String, Integer> columnCardinalityMap = new HashMap<>();
+  public Map<String, Double> columnLengthMap = new HashMap<>();
+  public Map<String, Double> columnCardinalityMap = new HashMap<>();
 }

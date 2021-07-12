@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.pinot.common.restlet.resources.AggregateTableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -61,7 +60,7 @@ public class ServerSegmentMetadataReader {
    * - If table does not have replica groups, send requests to a minimal set of servers hosting all segments of the
    *   table.
    */
-  public AggregateTableMetadataInfo getAggregatedTableMetadataFromServer(String tableNameWithType,
+  public TableMetadataInfo getAggregatedTableMetadataFromServer(String tableNameWithType,
       BiMap<String, String> serverEndPoints, List<String> columns, int numReplica, int timeoutMs) {
     int numServers = serverEndPoints.size();
     LOGGER.info("Reading aggregated segment metadata from {} servers for table: {} with timeout: {}ms", numServers,
@@ -80,7 +79,7 @@ public class ServerSegmentMetadataReader {
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs);
 
-    AggregateTableMetadataInfo aggregateTableMetadataInfo = new AggregateTableMetadataInfo();
+    TableMetadataInfo aggregateTableMetadataInfo = new TableMetadataInfo();
     int totalNumSegments = 0;
     int failedParses = 0;
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
@@ -91,25 +90,25 @@ public class ServerSegmentMetadataReader {
         aggregateTableMetadataInfo.numRows += tableMetadataInfo.numRows;
         totalNumSegments += tableMetadataInfo.numSegments;
         tableMetadataInfo.columnLengthMap
-            .forEach((k, v) -> aggregateTableMetadataInfo.columnAvgLengthMap.merge(k, (double) v, Double::sum));
+            .forEach((k, v) -> aggregateTableMetadataInfo.columnLengthMap.merge(k, v, Double::sum));
         tableMetadataInfo.columnCardinalityMap
-            .forEach((k, v) -> aggregateTableMetadataInfo.columnAvgCardinalityMap.merge(k, (double) v, Double::sum));
+            .forEach((k, v) -> aggregateTableMetadataInfo.columnCardinalityMap.merge(k, v, Double::sum));
       } catch (IOException e) {
         failedParses++;
         LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
       }
     }
 
-    final int finalTotalNumSegments = totalNumSegments;
-    aggregateTableMetadataInfo.numSegments = finalTotalNumSegments;
-    aggregateTableMetadataInfo.columnAvgLengthMap.replaceAll((k, v) -> v * 1.0 / finalTotalNumSegments);
-    aggregateTableMetadataInfo.columnAvgCardinalityMap.replaceAll((k, v) -> v * 1.0 / finalTotalNumSegments);
+    aggregateTableMetadataInfo.numSegments = totalNumSegments;
+    aggregateTableMetadataInfo.columnLengthMap.replaceAll((k, v) -> v / aggregateTableMetadataInfo.numSegments);
+    aggregateTableMetadataInfo.columnCardinalityMap.replaceAll((k, v) -> v / aggregateTableMetadataInfo.numSegments);
 
-    // Since table segments may have multiple replicas, divide by numReplica to avoid double counting.
+    // Since table segments may have multiple replicas, divide diskSizeInBytes, numRows and numSegments by numReplica
+    // to avoid double counting, for columnAvgLengthMap and columnAvgCardinalityMap, dividing by numReplica is not
+    // needed since totalNumSegments already contains replicas.
     aggregateTableMetadataInfo.diskSizeInBytes /= numReplica;
+    aggregateTableMetadataInfo.numRows /= numReplica;
     aggregateTableMetadataInfo.numSegments /= numReplica;
-    aggregateTableMetadataInfo.columnAvgLengthMap.replaceAll((k, v) -> v / numReplica);
-    aggregateTableMetadataInfo.columnAvgCardinalityMap.replaceAll((k, v) -> v / numReplica);
 
     if (failedParses != 0) {
       LOGGER.warn("Failed to parse {} / {} aggregated segment metadata responses from servers.", failedParses,
