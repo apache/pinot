@@ -156,12 +156,15 @@ public class TablesResource {
       }
     }
 
-    Set<String> columnSet;
-    if (decodedColumns.size() == 1 && decodedColumns.get(0).equals("*")) {
-      columnSet = null;
-    } else {
-      columnSet = new HashSet<>(decodedColumns);
+    boolean allColumns = false;
+    // For robustness, loop over all columns, if any of the columns is "*", return metadata for all columns.
+    for (String column : decodedColumns) {
+      if (column.equals("*")) {
+        allColumns = true;
+        break;
+      }
     }
+    Set<String> columnSet = allColumns ? null : new HashSet<>(decodedColumns);
 
     TableMetadataInfo tableMetadataInfo = new TableMetadataInfo();
     tableMetadataInfo.tableName = tableDataManager.getTableName();
@@ -185,20 +188,19 @@ public class TablesResource {
             columnSet.retainAll(segmentMetadata.getAllColumns());
           }
           for (String column : columnSet) {
-
             ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataMap().get(column);
             int columnLength;
-            DataType dataType = columnMetadata.getDataType().getStoredType();
-            if (dataType.isFixedWidth()) {
+            DataType storedDataType = columnMetadata.getDataType().getStoredType();
+            if (storedDataType.isFixedWidth()) {
               // For type of fixed width: INT, LONG, FLOAT, DOUBLE, BOOLEAN (stored as INT), TIMESTAMP (stored as LONG),
               // set the columnLength as the fixed width.
-              columnLength = dataType.size();
+              columnLength = storedDataType.size();
             } else if (columnMetadata.hasDictionary()) {
-              // For type of variable width (String), if it's stored using dictionary encoding, set the columnLength as the max
+              // For type of variable width (String, Bytes), if it's stored using dictionary encoding, set the columnLength as the max
               // length in dictionary.
               columnLength = columnMetadata.getColumnMaxLength();
-            } else if (dataType == DataType.STRING) {
-              // For type of variable width (String), if it's stored using raw bytes, set the columnLength as the length
+            } else if (storedDataType == DataType.STRING || storedDataType == DataType.BYTES) {
+              // For type of variable width (String, Bytes), if it's stored using raw bytes, set the columnLength as the length
               // of the max value.
               columnLength = ((String) columnMetadata.getMaxValue()).getBytes(StandardCharsets.UTF_8).length;
             } else {
@@ -206,10 +208,8 @@ public class TablesResource {
               columnLength = FieldSpec.DEFAULT_MAX_LENGTH;
             }
             int columnCardinality = segmentMetadata.getColumnMetadataMap().get(column).getCardinality();
-            tableMetadataInfo.columnLengthMap
-                .put(column, tableMetadataInfo.columnLengthMap.getOrDefault(column, 0.0) + columnLength);
-            tableMetadataInfo.columnCardinalityMap
-                .put(column, tableMetadataInfo.columnCardinalityMap.getOrDefault(column, 0.0) + columnCardinality);
+            tableMetadataInfo.columnLengthMap.merge(column, (double) columnLength, Double::sum);
+            tableMetadataInfo.columnCardinalityMap.merge(column, (double) columnCardinality, Double::sum);
           }
         }
       }

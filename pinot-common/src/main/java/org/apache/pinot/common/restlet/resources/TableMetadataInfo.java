@@ -29,6 +29,8 @@ import java.util.Map;
  *   all segments on that server.
  * - When return by controller API, columnLengthMap/columnCardinalityMap is the average columnLength/columnCardinality
  *   across all segments for the given table.
+ * - For diskSizeInBytes/numSegments/numRows, both server API and controller API will return the total value across all
+ *   segments (if a segment has multiple replicas, only consider one replica).
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TableMetadataInfo {
