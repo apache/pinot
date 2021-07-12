@@ -1807,7 +1807,8 @@ public class PinotHelixResourceManager {
     Preconditions.checkState(externalView != null, "Could not find external view for table: %s", tableNameWithType);
     Set<String> instanceSet = idealState.getInstanceSet(segmentName);
     Preconditions
-        .checkState(CollectionUtils.isNotEmpty(instanceSet), "Could not find segment: %s in ideal state for table: %s");
+        .checkState(CollectionUtils.isNotEmpty(instanceSet), "Could not find segment: %s in ideal state for table: %s",
+            segmentName, tableNameWithType);
     Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
 
     // First, disable or reset the segment
