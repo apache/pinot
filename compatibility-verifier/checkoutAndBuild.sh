@@ -40,7 +40,8 @@ function usage() {
   exit 1
 }
 
-# This function builds Pinot given a specific commit hash and target directory
+# This function clines pinot code from the apache repo
+# given a specific commit hash and target directory
 function checkOut() {
   local commitHash=$1
   local targetDir=$2
@@ -56,6 +57,9 @@ function checkOut() {
   popd
 }
 
+# This function builds pinot code and tools necessary to run pinot-admin commands
+# Optionally, it also builds the integration test jars needed to run the pinot
+# compatibility tester
 function build() {
   local outFile=$1
   local buildTests=$2
@@ -160,21 +164,28 @@ echo "Checking out old version at commit \"${olderCommit}\""
 checkOut "$olderCommit" "$oldTargetDir"
 
 # Start builds in parallel.
-# We need to build current directory and old commit for sure.
-# In addition, if the newer version is not the current one,
-# we will need to build that as well.
+# First build the current tree. We need it so that we can
+# run the compatibiity tester.
 echo Starting build for compat checker at ${cmdDir}
 (cd ${cmdDir}/..; build ${curBuildOutFile} 1) &
 curBuildPid=$!
+
+# The old commit has been cloned in oldTargetDir, build it.
 echo Starting build for old version at ${oldTargetDir}
 (cd ${oldTargetDir}; build ${oldBuildOutFile} 0) &
 oldBuildPid=$!
+
+# In case the user specified the current tree as newer commit, then
+# We don't need to build newer commit tree (we have already built the
+# current tree above and linked newTargetDir). Otherwise, build the newTargetDir
 if [ ${buildNewTarget} -eq 1 ]; then
   echo Starting build for new version at ${newTargetDir}
   (cd ${newTargetDir}; build ${newBuildOutFile} 0) &
   newBuildPid=$!
 fi
 
+# We may have potentially started three builds above (at least two).
+# Wait for each of them to complete.
 echo Awaiting build complete for old commit
 while true ; do
   printf "."
@@ -214,7 +225,6 @@ if [ ${buildNewTarget} -eq 1 ]; then
     fi
     sleep 5
   done
-
 fi
 
 exitStatus=0
