@@ -96,13 +96,18 @@ public class MinionConstants {
      */
     public static final String BUFFER_TIME_PERIOD_KEY = "bufferTimePeriod";
 
-    // Window start and window end set by task generator
+    // Time handling config
     public static final String WINDOW_START_MS_KEY = "windowStartMs";
     public static final String WINDOW_END_MS_KEY = "windowEndMs";
-    // Segment processing related configs
-    public static final String TIME_COLUMN_TRANSFORM_FUNCTION_KEY = "timeColumnTransformFunction";
+    public static final String ROUND_BUCKET_TIME_PERIOD_KEY = "roundBucketTimePeriod";
+
+    // Merge config
+    public static final String MERGE_TYPE_KEY = "mergeType";
+    @Deprecated // Replaced by MERGE_TYPE_KEY
     public static final String COLLECTOR_TYPE_KEY = "collectorType";
     public static final String AGGREGATION_TYPE_KEY_SUFFIX = ".aggregationType";
+
+    // Segment config
     public static final String MAX_NUM_RECORDS_PER_SEGMENT_KEY = "maxNumRecordsPerSegment";
   }
 
@@ -112,5 +117,4 @@ public class MinionConstants {
     public static final String CONFIG_NUMBER_CONCURRENT_TASKS_PER_INSTANCE =
         "SegmentGenerationAndPushTask.numConcurrentTasksPerInstance";
   }
-
 }

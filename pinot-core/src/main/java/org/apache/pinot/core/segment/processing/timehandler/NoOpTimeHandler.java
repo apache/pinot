@@ -16,26 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.processing.partitioner;
+package org.apache.pinot.core.segment.processing.timehandler;
 
-import org.apache.pinot.segment.local.function.FunctionEvaluator;
-import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
- * Partitioner which evaluates a transform function using the row to get the partition value
+ * Time handler that does not modify the time value and always returns the default partition.
  */
-public class TransformFunctionPartitioner implements Partitioner {
+public class NoOpTimeHandler implements TimeHandler {
 
-  private final FunctionEvaluator _functionEvaluator;
-
-  public TransformFunctionPartitioner(String transformFunction) {
-    _functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
-  }
-
-  @Override
-  public String getPartition(GenericRow genericRow) {
-    return String.valueOf(_functionEvaluator.evaluate(genericRow));
+  public String handleTime(GenericRow row) {
+    return DEFAULT_PARTITION;
   }
 }

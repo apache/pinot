@@ -26,33 +26,31 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.core.common.MinionConstants.RealtimeToOfflineSegmentsTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
-import org.apache.pinot.core.segment.processing.filter.RecordFilterConfig;
-import org.apache.pinot.core.segment.processing.filter.RecordFilterFactory;
 import org.apache.pinot.core.segment.processing.framework.MergeType;
 import org.apache.pinot.core.segment.processing.framework.SegmentConfig;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorConfig;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorFramework;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
-import org.apache.pinot.core.segment.processing.transformer.RecordTransformerConfig;
+import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
+import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerConfig;
 import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.plugin.minion.tasks.BaseMultipleSegmentsConversionExecutor;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
-import org.apache.pinot.spi.data.DateTimeFormatSpec;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,13 +59,13 @@ import org.slf4j.LoggerFactory;
 /**
  * A task to convert segments from a REALTIME table to segments for its corresponding OFFLINE table.
  * The realtime segments could span across multiple time windows.
- * This task extracts data and creates segments for a configured time range.
- * The {@link SegmentProcessorFramework} is used for the segment conversion, which also does
- * 1. time window extraction using filter function
- * 2. time column rollup
- * 3. partitioning using table config's segmentPartitioningConfig
- * 4. aggregations and rollup
- * 5. data sorting
+ * This task extracts data and creates segments for a configured time window.
+ * The {@link SegmentProcessorFramework} is used for the segment conversion, which does the following steps
+ * 1. Filter records based on the time window
+ * 2. Round the time value in the records (optional)
+ * 3. Partition the records if partitioning is enabled in the table config
+ * 4. Merge records based on the merge type
+ * 5. Sort records if sorting is enabled in the table config
  *
  * Before beginning the task, the <code>watermarkMs</code> is checked in the minion task metadata ZNode,
  * located at MINION_TASK_METADATA/RealtimeToOfflineSegmentsTask/<tableNameWithType>
@@ -109,7 +107,7 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
 
     RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
         RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(realtimeToOfflineSegmentsTaskZNRecord);
-    long windowStartMs = Long.parseLong(configs.get(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY));
+    long windowStartMs = Long.parseLong(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY));
     Preconditions.checkState(realtimeToOfflineSegmentsTaskMetadata.getWatermarkMs() == windowStartMs,
         "watermarkMs in RealtimeToOfflineSegmentsTask metadata: %s does not match windowStartMs: %d in task configs for table: %s. "
             + "ZNode may have been modified by another task", realtimeToOfflineSegmentsTaskMetadata, windowStartMs,
@@ -132,67 +130,62 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
     TableConfig tableConfig = getTableConfig(offlineTableName);
     Schema schema = getSchema(offlineTableName);
-    Set<String> schemaColumns = schema.getPhysicalColumnNames();
     String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
     DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumn);
     Preconditions
         .checkState(dateTimeFieldSpec != null, "No valid spec found for time column: %s in schema for table: %s",
             timeColumn, offlineTableName);
-
-    long windowStartMs = Long.parseLong(configs.get(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY));
-    long windowEndMs = Long.parseLong(configs.get(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY));
-    _nextWatermark = windowEndMs;
-
-    String timeColumnTransformFunction =
-        configs.get(MinionConstants.RealtimeToOfflineSegmentsTask.TIME_COLUMN_TRANSFORM_FUNCTION_KEY);
-    // TODO: Rename the config key
-    String mergeTypeStr = configs.get(MinionConstants.RealtimeToOfflineSegmentsTask.COLLECTOR_TYPE_KEY);
-    Map<String, AggregationFunctionType> aggregationTypes = new HashMap<>();
-    for (Map.Entry<String, String> entry : configs.entrySet()) {
-      String key = entry.getKey();
-      if (key.endsWith(MinionConstants.RealtimeToOfflineSegmentsTask.AGGREGATION_TYPE_KEY_SUFFIX)) {
-        String column = key.split(MinionConstants.RealtimeToOfflineSegmentsTask.AGGREGATION_TYPE_KEY_SUFFIX)[0];
-        aggregationTypes.put(column, AggregationFunctionType.getAggregationFunctionType(entry.getValue()));
-      }
-    }
-    String numRecordsPerSegment =
-        configs.get(MinionConstants.RealtimeToOfflineSegmentsTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY);
-
     SegmentProcessorConfig.Builder segmentProcessorConfigBuilder =
         new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema);
-    if (mergeTypeStr != null) {
-      segmentProcessorConfigBuilder.setMergeType(MergeType.valueOf(mergeTypeStr.toUpperCase()));
-    }
 
-    // Time rollup using configured time transformation function
-    if (timeColumnTransformFunction != null) {
-      RecordTransformerConfig recordTransformerConfig =
-          getRecordTransformerConfigForTime(timeColumnTransformFunction, timeColumn);
-      segmentProcessorConfigBuilder.setRecordTransformerConfig(recordTransformerConfig);
-    }
+    long windowStartMs = Long.parseLong(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY));
+    long windowEndMs = Long.parseLong(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY));
+    _nextWatermark = windowEndMs;
 
-    // Filter function for extracting data between start and end time window
-    RecordFilterConfig recordFilterConfig =
-        getRecordFilterConfigForWindow(windowStartMs, windowEndMs, dateTimeFieldSpec, timeColumn);
-    segmentProcessorConfigBuilder.setRecordFilterConfig(recordFilterConfig);
+    // Time handler config
+    TimeHandlerConfig.Builder timeHandlerConfigBuilder =
+        new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setTimeRange(windowStartMs, windowEndMs);
+    String roundBucketTimePeriod = configs.get(RealtimeToOfflineSegmentsTask.ROUND_BUCKET_TIME_PERIOD_KEY);
+    if (roundBucketTimePeriod != null) {
+      timeHandlerConfigBuilder.setRoundBucketMs(TimeUtils.convertPeriodToMillis(roundBucketTimePeriod));
+    }
+    segmentProcessorConfigBuilder.setTimeHandlerConfig(timeHandlerConfigBuilder.build());
 
     // Partitioner config from tableConfig
-    if (tableConfig.getIndexingConfig().getSegmentPartitionConfig() != null) {
-      Map<String, ColumnPartitionConfig> columnPartitionMap =
-          tableConfig.getIndexingConfig().getSegmentPartitionConfig().getColumnPartitionMap();
-      PartitionerConfig partitionerConfig = getPartitionerConfig(columnPartitionMap, offlineTableName, schemaColumns);
+    SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
+    if (segmentPartitionConfig != null) {
+      PartitionerConfig partitionerConfig = getPartitionerConfig(segmentPartitionConfig, offlineTableName, schema);
       segmentProcessorConfigBuilder.setPartitionerConfigs(Lists.newArrayList(partitionerConfig));
     }
 
-    // Reducer config
+    // Merge type
+    String mergeType = configs.get(RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY);
+    // Handle deprecated key
+    if (mergeType == null) {
+      mergeType = configs.get(RealtimeToOfflineSegmentsTask.COLLECTOR_TYPE_KEY);
+    }
+    if (mergeType != null) {
+      segmentProcessorConfigBuilder.setMergeType(MergeType.valueOf(mergeType.toUpperCase()));
+    }
+
+    // Aggregation types
+    Map<String, AggregationFunctionType> aggregationTypes = new HashMap<>();
+    for (Map.Entry<String, String> entry : configs.entrySet()) {
+      String key = entry.getKey();
+      if (key.endsWith(RealtimeToOfflineSegmentsTask.AGGREGATION_TYPE_KEY_SUFFIX)) {
+        String column = key.split(RealtimeToOfflineSegmentsTask.AGGREGATION_TYPE_KEY_SUFFIX)[0];
+        aggregationTypes.put(column, AggregationFunctionType.getAggregationFunctionType(entry.getValue()));
+      }
+    }
     if (!aggregationTypes.isEmpty()) {
       segmentProcessorConfigBuilder.setAggregationTypes(aggregationTypes);
     }
 
     // Segment config
-    if (numRecordsPerSegment != null) {
-      SegmentConfig segmentConfig = getSegmentConfig(numRecordsPerSegment);
-      segmentProcessorConfigBuilder.setSegmentConfig(segmentConfig);
+    String maxNumRecordsPerSegment = configs.get(RealtimeToOfflineSegmentsTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY);
+    if (maxNumRecordsPerSegment != null) {
+      segmentProcessorConfigBuilder.setSegmentConfig(
+          new SegmentConfig.Builder().setMaxNumRecordsPerSegment(Integer.parseInt(maxNumRecordsPerSegment)).build());
     }
 
     SegmentProcessorConfig segmentProcessorConfig = segmentProcessorConfigBuilder.build();
@@ -247,83 +240,18 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
   }
 
   /**
-   * Construct a {@link RecordTransformerConfig} for time column transformation
+   * Construct a {@link PartitionerConfig} using {@link SegmentPartitionConfig} from the table config
    */
-  private RecordTransformerConfig getRecordTransformerConfigForTime(String timeColumnTransformFunction,
-      String timeColumn) {
-    Map<String, String> transformationsMap = new HashMap<>();
-    transformationsMap.put(timeColumn, timeColumnTransformFunction);
-    return new RecordTransformerConfig.Builder().setTransformFunctionsMap(transformationsMap).build();
-  }
-
-  /**
-   * Construct a {@link RecordFilterConfig} by setting a filter function on the time column, for extracting data between window start/end
-   */
-  private RecordFilterConfig getRecordFilterConfigForWindow(long windowStartMs, long windowEndMs,
-      DateTimeFieldSpec dateTimeFieldSpec, String timeColumn) {
-    DataType dataType = dateTimeFieldSpec.getDataType();
-    String filterFunction;
-    if (dataType == DataType.TIMESTAMP) {
-      // TIMESTAMP type stores millis since epoch values
-      filterFunction = getFilterFunctionLong(windowStartMs, windowEndMs, timeColumn);
-    } else {
-      DateTimeFormatSpec dateTimeFormatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
-      TimeUnit timeUnit = dateTimeFormatSpec.getColumnUnit();
-      DateTimeFieldSpec.TimeFormat timeFormat = dateTimeFormatSpec.getTimeFormat();
-      if (timeUnit == TimeUnit.MILLISECONDS && timeFormat == DateTimeFieldSpec.TimeFormat.EPOCH) {
-        // If time column is in EPOCH millis, use windowStart and windowEnd directly to filter
-        filterFunction = getFilterFunctionLong(windowStartMs, windowEndMs, timeColumn);
-      } else {
-        // Convert windowStart and windowEnd to time format of the data
-        String windowStart = dateTimeFormatSpec.fromMillisToFormat(windowStartMs);
-        String windowEnd = dateTimeFormatSpec.fromMillisToFormat(windowEndMs);
-        if (dataType.isNumeric()) {
-          filterFunction = getFilterFunctionLong(Long.parseLong(windowStart), Long.parseLong(windowEnd), timeColumn);
-        } else {
-          filterFunction = getFilterFunctionString(windowStart, windowEnd, timeColumn);
-        }
-      }
-    }
-    return new RecordFilterConfig.Builder().setRecordFilterType(RecordFilterFactory.RecordFilterType.FILTER_FUNCTION)
-        .setFilterFunction(filterFunction).build();
-  }
-
-  /**
-   * Construct a {@link PartitionerConfig} using {@link org.apache.pinot.spi.config.table.SegmentPartitionConfig} from the table config
-   */
-  private PartitionerConfig getPartitionerConfig(Map<String, ColumnPartitionConfig> columnPartitionMap,
-      String tableNameWithType, Set<String> schemaColumns) {
+  private PartitionerConfig getPartitionerConfig(SegmentPartitionConfig partitionConfig, String tableNameWithType,
+      Schema schema) {
+    Map<String, ColumnPartitionConfig> columnPartitionMap = partitionConfig.getColumnPartitionMap();
     Preconditions.checkState(columnPartitionMap.size() == 1,
         "Cannot partition using more than 1 ColumnPartitionConfig for table: %s", tableNameWithType);
-    String partitionColumn = columnPartitionMap.keySet().iterator().next();
-    Preconditions.checkState(schemaColumns.contains(partitionColumn),
-        "Partition column: %s is not a physical column in the schema", partitionColumn);
+    Map.Entry<String, ColumnPartitionConfig> entry = columnPartitionMap.entrySet().iterator().next();
+    String partitionColumn = entry.getKey();
+    Preconditions.checkState(schema.hasColumn(partitionColumn),
+        "Partition column: %s does not exist in the schema for table: %s", partitionColumn, tableNameWithType);
     return new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TABLE_PARTITION_CONFIG)
-        .setColumnName(partitionColumn).setColumnPartitionConfig(columnPartitionMap.get(partitionColumn)).build();
-  }
-
-  /**
-   * Construct a {@link SegmentConfig} using config values
-   */
-  private SegmentConfig getSegmentConfig(String numRecordsPerSegment) {
-    return new SegmentConfig.Builder().setMaxNumRecordsPerSegment(Integer.parseInt(numRecordsPerSegment)).build();
-  }
-
-  /**
-   * Construct a {@link org.apache.pinot.core.operator.transform.function.GroovyTransformFunction} string for extracting records between
-   * windowStart inclusive and windowEnd exclusive using the time column, where time column is a INT/LONG column
-   */
-  private String getFilterFunctionLong(long windowStart, long windowEnd, String timeColumn) {
-    return String
-        .format("Groovy({%s < %d || %s >= %d}, %s)", timeColumn, windowStart, timeColumn, windowEnd, timeColumn);
-  }
-
-  /**
-   * Construct a {@link org.apache.pinot.core.operator.transform.function.GroovyTransformFunction} string for extracting records between
-   * windowStart inclusive and windowEnd exclusive using the time column, where time column is a STRING column
-   */
-  private String getFilterFunctionString(String windowStart, String windowEnd, String timeColumn) {
-    return String.format("Groovy({%s < \"%s\" || %s >= \"%s\"}, %s)", timeColumn, windowStart, timeColumn, windowEnd,
-        timeColumn);
+        .setColumnName(partitionColumn).setColumnPartitionConfig(entry.getValue()).build();
   }
 }
