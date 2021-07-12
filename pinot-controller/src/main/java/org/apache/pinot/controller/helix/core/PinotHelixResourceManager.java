@@ -66,6 +66,7 @@ import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
+import org.apache.helix.model.ParticipantHistory;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
@@ -436,6 +437,35 @@ public class PinotHelixResourceManager {
           .failure("Unable to update instance: " + instanceIdToUpdate + " to tags: " + tags);
     }
     return PinotResourceManagerResponse.SUCCESS;
+  }
+
+  /**
+   * Validates whether an instance is offline for certain amount of time.
+   * Since ZNodes under "/LIVEINSTANCES" are ephemeral, if there is a ZK session expire (e.g. due to network issue),
+   * the ZNode under "/LIVEINSTANCES" will be deleted. Thus, such race condition can happen when this task is running.
+   * In order to double confirm the live status of an instance, the field "LAST_OFFLINE_TIME" in ZNode under
+   * "/INSTANCES/<instance_id>/HISTORY" needs to be checked. If the value is "-1", that means the instance is ONLINE;
+   * if the value is a timestamp, that means the instance starts to be OFFLINE since that time.
+   * @param instanceId instance id
+   * @param offlineTimeRangeMs the time range in milliseconds that it's valid for an instance to be offline
+   */
+  public boolean isInstanceOfflineFor(String instanceId, long offlineTimeRangeMs) {
+    // Check if the instance is included in /LIVEINSTANCES
+    if (_helixDataAccessor.getProperty(_keyBuilder.liveInstance(instanceId)) != null) {
+      return false;
+    }
+    ParticipantHistory participantHistory = _helixDataAccessor.getProperty(_keyBuilder.participantHistory(instanceId));
+    long lastOfflineTime = participantHistory.getLastOfflineTime();
+    // returns false if the last offline time is a negative number.
+    if (lastOfflineTime < 0) {
+      return false;
+    }
+    if (System.currentTimeMillis() - lastOfflineTime > offlineTimeRangeMs) {
+      LOGGER.info("Instance: {} has been offline for more than {}ms", instanceId, offlineTimeRangeMs);
+      return true;
+    }
+    // Still within the offline time range (e.g. due to zk session expire).
+    return false;
   }
 
   /**

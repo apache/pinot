@@ -628,7 +628,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _segmentRelocator = new SegmentRelocator(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
         _executorService);
     periodicTasks.add(_segmentRelocator);
-    _minionInstancesCleanupTask = new MinionInstancesCleanupTask(_helixResourceManager, _config, _controllerMetrics);
+    _minionInstancesCleanupTask = new MinionInstancesCleanupTask(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
     periodicTasks.add(_minionInstancesCleanupTask);
     _taskMetricsEmitter =
         new TaskMetricsEmitter(_helixResourceManager, _helixTaskResourceManager, _leadControllerManager, _config,
