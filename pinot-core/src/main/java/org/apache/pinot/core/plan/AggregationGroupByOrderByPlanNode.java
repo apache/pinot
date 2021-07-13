@@ -33,6 +33,8 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.plan.StarTreeTransformPlanNode;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -70,9 +72,12 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
     _minSegmentTrimSize = minSegmentTrimSize;
     List<OrderByExpressionContext> orderByExpressionContexts = queryContext.getOrderByExpressions();
     _orderByExpressionContexts = new ArrayList<>();
+
     if (orderByExpressionContexts != null) {
       _orderByExpressionContexts.addAll(orderByExpressionContexts);
     }
+
+    _enableGroupByOpt = checkOrderByOptimization();
 
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();
     if (starTrees != null && !StarTreeUtils.isStarTreeDisabled(queryContext)) {
@@ -87,7 +92,6 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
                 .isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, _groupByExpressions,
                     predicateEvaluatorsMap.keySet())) {
               _transformPlanNode = null;
-              _enableGroupByOpt = false;
               _starTreeTransformPlanNode =
                   new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, _groupByExpressions,
                       predicateEvaluatorsMap, queryContext.getDebugOptions());
@@ -98,11 +102,9 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
       }
     }
 
+
     Set<ExpressionContext> expressionsToTransform =
         AggregationFunctionUtils.collectExpressionsToTransform(_aggregationFunctions, _groupByExpressions);
-    // Note that here we check if the optimization could be applied to the query based on the query info. Inside the
-    // operator there is another check based on the data layout and result meta data.
-    _enableGroupByOpt = checkOrderByOptimization();
     if (_enableGroupByOpt) {
       // Add docIds
       expressionsToTransform.add(ExpressionContext.forIdentifier(CommonConstants.Segment.BuiltInVirtualColumn.DOCID));
@@ -131,24 +133,47 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
   }
 
   private boolean checkOrderByOptimization() {
+    // Check HAVING
     if (_queryContext.getHavingFilter() != null) {
       return false;
     }
     Set<ExpressionContext> orderByExpressionsSet = new HashSet<>();
-    // Filter out function expressions
+    // Check function expressions
+    for (OrderByExpressionContext orderByExpressionContext : _orderByExpressionContexts) {
+      orderByExpressionsSet.add(orderByExpressionContext.getExpression());
+    }
+    // Add group by expressions to order by expressions
+    for (ExpressionContext groupByExpression : _groupByExpressions) {
+      if (!orderByExpressionsSet.contains(groupByExpression)) {
+        _orderByExpressionContexts.add(new OrderByExpressionContext(groupByExpression, true));
+      }
+    }
+    boolean longOverflow = false;
+    long cardinalityProduct = 1L;
     for (OrderByExpressionContext orderByExpressionContext : _orderByExpressionContexts) {
       ExpressionContext expression = orderByExpressionContext.getExpression();
       if (expression.getType() == ExpressionContext.Type.FUNCTION) {
         return false;
       }
-      orderByExpressionsSet.add(expression);
-    }
-    // Add group by expressions to order by expressions
-    for (ExpressionContext groupByExpression: _groupByExpressions) {
-      if (!orderByExpressionsSet.contains(groupByExpression)) {
-        _orderByExpressionContexts.add(new OrderByExpressionContext(groupByExpression, true));
+      DataSource dataSource = _indexSegment.getDataSource(expression.getIdentifier());
+      // Check single value
+      if (!dataSource.getDataSourceMetadata().isSingleValue()) {
+        return false;
+      }
+      // Check cardinality threshold
+      Dictionary dictionary = dataSource.getDictionary();
+      if (dictionary != null) {
+        int cardinality = dictionary.length();
+        if (!longOverflow) {
+          if (cardinalityProduct > Long.MAX_VALUE / cardinality) {
+            longOverflow = true;
+          } else {
+            cardinalityProduct *= cardinality;
+          }
+        }
       }
     }
-    return true;
+    // Only apply optimization when cardinality is high
+    return (longOverflow || cardinalityProduct >= _queryContext.getLimit()) && cardinalityProduct >= 500000;
   }
 }

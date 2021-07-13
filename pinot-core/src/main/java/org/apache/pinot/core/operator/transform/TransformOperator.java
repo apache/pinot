@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.transform;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.avro.reflect.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
@@ -68,6 +69,15 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
   }
 
   /**
+   * Returns the data source of the provided column name.
+   *
+   * @return data source of the provided column name.
+   */
+  @Nullable
+  public DataSource getColumnProjected(String columnName) {
+    return _dataSourceMap.get(columnName);
+  }
+  /**
    * Returns the transform result metadata associated with the given expression.
    *
    * @param expression Expression
@@ -106,4 +116,5 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
   public ExecutionStatistics getExecutionStatistics() {
     return _projectionOperator.getExecutionStatistics();
   }
+
 }

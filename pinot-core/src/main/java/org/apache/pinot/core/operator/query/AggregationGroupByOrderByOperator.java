@@ -18,12 +18,10 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
@@ -143,6 +141,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
           new DefaultGroupByExecutor(_aggregationFunctions, _groupByExpressions, _maxInitialResultHolderCapacity,
               _numGroupsLimit, transformOperator);
     }
+    int numDocsScanned = _numDocsScanned;
     TransformBlock transformBlock;
     while ((transformBlock = transformOperator.nextBlock()) != null) {
       _numDocsScanned += transformBlock.getNumDocs();
@@ -199,61 +198,42 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     return _minSegmentTrimSize;
   }
 
-  private TransformOperator constructTransformOperator() {
-    List<TransformResultMetadata> orderByExpressionMetadataList = new ArrayList<>();
-    for (OrderByExpressionContext orderByExpressionContext : _orderByExpressionContexts) {
-      ExpressionContext expression = orderByExpressionContext.getExpression();
-      TransformResultMetadata orderByExpressionMetadata = _transformOperator.getResultMetadata(expression);
-      // Only handle single value column now
-      if (!orderByExpressionMetadata.isSingleValue()) {
-        return _transformOperator;
-      }
-      orderByExpressionMetadataList.add(orderByExpressionMetadata);
-    }
-    return constructNewTransformOperator(orderByExpressionMetadataList.toArray(new TransformResultMetadata[0]));
-  }
-
   /**
    * Two pass approach for orderBy on groupBy columns. Fetch the orderBy columns to rank the top results
    * whose docIds will be used to construct a new transform operator for aggregations.
    */
-  private TransformOperator constructNewTransformOperator(TransformResultMetadata[] orderByExpressionMetadata) {
+  private TransformOperator constructTransformOperator() {
     int numOrderByExpressions = _orderByExpressionContexts.length;
+    TransformResultMetadata[] orderByExpressionMetadata = new TransformResultMetadata[numOrderByExpressions];
     HashMap<Key, MutableRoaringBitmap> groupByKeyMap = new HashMap<>();
-    TransformBlock transformBlock;
-
     Dictionary[] dictionaries = new Dictionary[numOrderByExpressions];
     boolean[] hasDict = new boolean[numOrderByExpressions];
     int numNoDict = 0;
-    long cardinalityProduct = 1L;
-    boolean longOverflow = false;
+    TransformBlock transformBlock;
+
+    // Get metadata
+    for (int i = 0; i < _orderByExpressionContexts.length; i++) {
+      ExpressionContext expression = _orderByExpressionContexts[i].getExpression();
+      orderByExpressionMetadata[i] = _transformOperator.getResultMetadata(expression);
+    }
+
     // Get dictionaries and calculate cardinalities
     for (int i = 0; i < numOrderByExpressions; i++) {
       ExpressionContext expression = _orderByExpressionContexts[i].getExpression();
       hasDict[i] = orderByExpressionMetadata[i].hasDictionary();
       if (hasDict[i]) {
         dictionaries[i] = _transformOperator.getDictionary(expression);
-        int cardinality = dictionaries[i].length();
-        if (!longOverflow) {
-          if (cardinalityProduct > Long.MAX_VALUE / cardinality) {
-            longOverflow = true;
-          } else {
-            cardinalityProduct *= cardinality;
-          }
-        }
       }
       numNoDict += hasDict[i] ? 0 : 1;
     }
-    //TODO: Determine reasonable threshold
-    if (!longOverflow && cardinalityProduct < _limit || cardinalityProduct < 500000) {
-      return _transformOperator;
-    }
+
     BlockValSet[] blockValSets = new BlockValSet[numNoDict];
     PriorityQueue<Object[]> PQ = new PriorityQueue<>(_limit,
         getComparator(orderByExpressionMetadata, numOrderByExpressions, dictionaries, hasDict));
     int[][] dictionaryIds = new int[numOrderByExpressions - numNoDict][];
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
       int numDocsFetched = transformBlock.getNumDocs();
+      _numDocsScanned += numDocsFetched;
       int[] docIds = transformBlock.getBlockValueSet("$docId").getIntValuesSV();
       int dictionaryIdsIndex = 0;
       // For dictionary-based columns, we fetch the dictionary ids. Otherwise fetch the actual value
@@ -309,7 +289,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     }
     Map<String, DataSource> dataSourceMap = new HashMap<>();
     for (String column : columns) {
-      dataSourceMap.put(column, _indexSegment.getDataSource(column));
+      dataSourceMap.put(column, _transformOperator.getColumnProjected(column));
     }
     ProjectionOperator projectionOperator =
         new ProjectionOperator(dataSourceMap, new BitmapDocIdSetOperator(docIds, numDocs));
@@ -330,7 +310,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
 
     return (o1, o2) -> {
       for (int i = 0; i < numOrderByExpressions; i++) {
-        // TODO: Handle orderBy funcions
+        // TODO: Handle orderBy on funcions
         // TODO: Evaluate the performance of casting to Comparable and avoid the switch
         Object v1 = o1[i];
         Object v2 = o2[i];

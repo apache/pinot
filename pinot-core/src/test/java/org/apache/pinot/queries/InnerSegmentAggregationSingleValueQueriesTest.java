@@ -105,7 +105,7 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     AggregationGroupByOrderByOperator aggregationGroupByOrderByOperator = getOperatorForSqlQuery(query);
     IntermediateResultsBlock resultsBlock = aggregationGroupByOrderByOperator.nextBlock();
     QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationGroupByOrderByOperator.getExecutionStatistics(), 30000L, 0L, 180000L,
+        .testInnerSegmentExecutionStatistics(aggregationGroupByOrderByOperator.getExecutionStatistics(), 30000L, 0L, 150000L,
             30000L);
     QueriesTestUtils
         .testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(), "11270", 1L, 815409257L,
@@ -116,7 +116,7 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     aggregationGroupByOrderByOperator = getOperatorForSqlQuery(query);
     resultsBlock = aggregationGroupByOrderByOperator.nextBlock();
     QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationGroupByOrderByOperator.getExecutionStatistics(), 6129L, 84134L, 36774L,
+        .testInnerSegmentExecutionStatistics(aggregationGroupByOrderByOperator.getExecutionStatistics(), 6129L, 84134L, 30645,
             30000L);
     QueriesTestUtils
         .testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(), "242920", 3L, 4348938306L,
@@ -155,7 +155,7 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     AggregationGroupByOrderByOperator aggregationGroupByOrderByOperator = getOperatorForSqlQuery(query);
     IntermediateResultsBlock resultsBlock = aggregationGroupByOrderByOperator.nextBlock();
     QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationGroupByOrderByOperator.getExecutionStatistics(), 30000L, 0L, 240000,
+        .testInnerSegmentExecutionStatistics(aggregationGroupByOrderByOperator.getExecutionStatistics(), 30000L, 0L, 210000,
             30000L);
     QueriesTestUtils
         .testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(), "1813102948\0P\0HEuxNvH",
@@ -165,7 +165,7 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     aggregationGroupByOrderByOperator = getOperatorForSqlQuery(query);
     resultsBlock = aggregationGroupByOrderByOperator.nextBlock();
     QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationGroupByOrderByOperator.getExecutionStatistics(), 6129L, 84134L, 49032,
+        .testInnerSegmentExecutionStatistics(aggregationGroupByOrderByOperator.getExecutionStatistics(), 6129L, 84134L, 42903,
             30000L);
     QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
         "1176631727\0P\0KrNxpdycSiwoRohEiTIlLqDHnx", 1L, 716185211L, 489993380, 371110078, 487714191L, 1L);
@@ -203,7 +203,7 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     AggregationGroupByOrderByOperator aggregationGroupByOrderByOperator = getOperatorForSqlQuery(query);
     IntermediateResultsBlock resultsBlock = aggregationGroupByOrderByOperator.nextBlock();
     QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationGroupByOrderByOperator.getExecutionStatistics(), 30000L, 0L, 240000L,
+        .testInnerSegmentExecutionStatistics(aggregationGroupByOrderByOperator.getExecutionStatistics(), 60000L, 0L, 480000L,
             30000L);
     QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
         "484569489\00016200443\0001159557463\0P\0MaztCmmxxgguBUxPti", 2L, 969138978L, 995355481, 16200443, 2222394270L,
@@ -213,7 +213,7 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     aggregationGroupByOrderByOperator = getOperatorForSqlQuery(query);
     resultsBlock = aggregationGroupByOrderByOperator.nextBlock();
     QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationGroupByOrderByOperator.getExecutionStatistics(), 6129L, 84134L, 49032L,
+        .testInnerSegmentExecutionStatistics(aggregationGroupByOrderByOperator.getExecutionStatistics(), 12258L, 84134L, 98064L,
             30000L);
     QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
         "1318761745\000353175528\0001172307870\0P\0HEuxNvH", 2L, 2637523490L, 557154208, 353175528, 2427862396L, 2L);
@@ -252,7 +252,7 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     AggregationGroupByOrderByOperator aggregationGroupByOperator = getOperatorForSqlQuery(query);
     IntermediateResultsBlock resultsBlock = aggregationGroupByOperator.nextBlock();
     QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 30000L, 0L, 300000L,
+        .testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 60000L, 0L, 600000L,
             30000L);
     QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
         "1784773968\000204243323\000628170461\0001985159279\000296467636\0P\0HEuxNvH\000402773817\0002047180536", 1L,
@@ -262,7 +262,7 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     aggregationGroupByOperator = getOperatorForSqlQuery(query);
     resultsBlock = aggregationGroupByOperator.nextBlock();
     QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 6129L, 84134L, 61290L,
+        .testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 12258L, 84134L, 122580L,
             30000L);
     QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
         "1361199163\000178133991\000296467636\000788414092\0001719301234\0P\0MaztCmmxxgguBUxPti\0001284373442\000752388855",

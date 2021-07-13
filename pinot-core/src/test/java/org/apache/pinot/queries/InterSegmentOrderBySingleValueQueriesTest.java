@@ -173,7 +173,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
         new Object[]{"gFuH", 63202785888.0}, new Object[]{"o", 18105331533948.0}, new Object[]{"t", 16331923219264.0});
     dataSchema = new DataSchema(new String[]{"column11", "sum(column1)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
-    numEntriesScannedPostFilter = 360000;
+    numEntriesScannedPostFilter = 240000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
@@ -183,7 +183,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     Collections.reverse(results);
     dataSchema = new DataSchema(new String[]{"column11", "sum(column1)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
-    numEntriesScannedPostFilter = 360000;
+    numEntriesScannedPostFilter = 240000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
@@ -194,7 +194,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     results = results.subList(0, 3);
     dataSchema = new DataSchema(new String[]{"column11", "sum(column1)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
-    numEntriesScannedPostFilter = 360000;
+    numEntriesScannedPostFilter = 240000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
@@ -210,7 +210,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
         new Object[]{"P", "TTltMtFiRqUjvOG", 4462670055540.0}, new Object[]{"P", "XcBNHe", 120021767504.0});
     dataSchema = new DataSchema(new String[]{"column11", "column12", "sum(column1)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
-    numEntriesScannedPostFilter = 480000;
+    numEntriesScannedPostFilter = 360000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
@@ -225,7 +225,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     results.add(new Object[]{"gFuH", "HEuxNvH", 29872400856.0});
     dataSchema = new DataSchema(new String[]{"column11", "column12", "sum(column1)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
-    numEntriesScannedPostFilter = 480000;
+    numEntriesScannedPostFilter = 360000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
@@ -240,7 +240,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
         new Object[]{"P", "XcBNHe", 120021767504.0});
     dataSchema = new DataSchema(new String[]{"column11", "column12", "sum(column1)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
-    numEntriesScannedPostFilter = 480000;
+    numEntriesScannedPostFilter = 360000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
@@ -295,7 +295,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
         new Object[]{16331923219264.0, 1980174.0});
     dataSchema = new DataSchema(new String[]{"sum(column1)", "min(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
-    numEntriesScannedPostFilter = 480000;
+    numEntriesScannedPostFilter = 360000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
@@ -366,7 +366,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
             new Object[]{1555255521, 2900L}, new Object[]{1618904660, 2744L}, new Object[]{1670085862, 3388L});
     dataSchema = new DataSchema(new String[]{"column17", "count(*)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG});
-    numEntriesScannedPostFilter = 240000;
+    numEntriesScannedPostFilter = 120000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
@@ -396,7 +396,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
         new Object[]{"gFuH", 296467636.0}, new Object[]{"o", 296467636.0}, new Object[]{"t", 526245333.3900426});
     dataSchema = new DataSchema(new String[]{"column11", "avg(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
-    numEntriesScannedPostFilter = 360000;
+    numEntriesScannedPostFilter = 240000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
@@ -418,7 +418,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
         new Object[]{"oZgnrlDEtjjVpUoFLol", 4});
     dataSchema = new DataSchema(new String[]{"column12", "distinctcount(column11)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
-    numEntriesScannedPostFilter = 360000;
+    numEntriesScannedPostFilter = 240000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
@@ -484,7 +484,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     result1 = Lists.newArrayList(5935285005452.0, 88832999206836.0, 63202785888.0, 18105331533948.0, 16331923219264.0);
     results = new ArrayList<>();
     results.add(result1);
-    numEntriesScannedPostFilter = 360000;
+    numEntriesScannedPostFilter = 240000;
     data.add(
         new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 
@@ -496,7 +496,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     Collections.reverse(result1);
     results = new ArrayList<>();
     results.add(result1);
-    numEntriesScannedPostFilter = 360000;
+    numEntriesScannedPostFilter = 240000;
     data.add(
         new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 
@@ -510,7 +510,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     result1 = result1.subList(0, 3);
     results = new ArrayList<>();
     results.add(result1);
-    numEntriesScannedPostFilter = 360000;
+    numEntriesScannedPostFilter = 240000;
     data.add(
         new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 
@@ -524,7 +524,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
         21998672845052.0, 18069909216728.0, 27177029040008.0, 4462670055540.0, 120021767504.0);
     results = new ArrayList<>();
     results.add(result1);
-    numEntriesScannedPostFilter = 480000;
+    numEntriesScannedPostFilter = 360000;
     data.add(
         new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 
@@ -544,7 +544,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     result1.add(29872400856.0);
     results = new ArrayList<>();
     results.add(result1);
-    numEntriesScannedPostFilter = 480000;
+    numEntriesScannedPostFilter = 360000;
     data.add(
         new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 
@@ -558,7 +558,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
         8345501392852.0, 860077643636.0, 1574451324140.0, 6224665921376.0, 120021767504.0);
     results = new ArrayList<>();
     results.add(result1);
-    numEntriesScannedPostFilter = 480000;
+    numEntriesScannedPostFilter = 360000;
     data.add(
         new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 
@@ -613,7 +613,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     results = new ArrayList<>();
     results.add(result1);
     results.add(result2);
-    numEntriesScannedPostFilter = 480000;
+    numEntriesScannedPostFilter = 360000;
     data.add(
         new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 
@@ -654,7 +654,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
             3388L);
     results = new ArrayList<>();
     results.add(result1);
-    numEntriesScannedPostFilter = 240000;
+    numEntriesScannedPostFilter = 120000;
     data.add(
         new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 
@@ -685,7 +685,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     result1 = Lists.newArrayList(296467636.0, 909380310.3521485, 296467636.0, 296467636.0, 526245333.3900426);
     results = new ArrayList<>();
     results.add(result1);
-    numEntriesScannedPostFilter = 360000;
+    numEntriesScannedPostFilter = 240000;
     data.add(
         new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 
@@ -707,7 +707,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     result1 = Lists.newArrayList(5, 5, 5, 3, 2, 4, 3, 3, 4);
     results = new ArrayList<>();
     results.add(result1);
-    numEntriesScannedPostFilter = 360000;
+    numEntriesScannedPostFilter = 240000;
     data.add(
         new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 
