@@ -618,8 +618,12 @@ public class PinotLLCRealtimeSegmentManager {
         String newSegmentName =
             setupNewPartitionGroup(tableConfig, streamConfig, partitionGroupMetadata, getCurrentTimeMs(),
                 instancePartitions, numPartitionGroups, numReplicas, newPartitionGroupMetadataList, true);
-        updateInstanceStatesForNewConsumingSegment(instanceStatesMap, null, newSegmentName, segmentAssignment,
-            instancePartitionsMap);
+        try {
+          updateInstanceStatesForNewConsumingSegment(instanceStatesMap, null, newSegmentName, segmentAssignment,
+              instancePartitionsMap);
+        } catch (HelixHelper.PermanentUpdaterException e) {
+          LOGGER.warn("Caught exception while updating ideal state for new partition groups", e);
+        }
       }
     }
   }
