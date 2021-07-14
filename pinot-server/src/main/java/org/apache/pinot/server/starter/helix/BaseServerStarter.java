@@ -700,7 +700,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
    * @param instanceId Id of instance for which to set the system resource info
    * @param systemResourceMap Map containing system resource info
    */
-  private void setInstanceResourceInfo(HelixAdmin helixAdmin, String helixClusterName, String instanceId,
+  protected void setInstanceResourceInfo(HelixAdmin helixAdmin, String helixClusterName, String instanceId,
       Map<String, String> systemResourceMap) {
     InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(helixClusterName, instanceId);
     instanceConfig.getRecord().setMapField(Helix.Instance.SYSTEM_RESOURCE_INFO_KEY, systemResourceMap);
