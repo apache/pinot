@@ -21,6 +21,7 @@
 cmdName=`basename $0`
 cmdDir=`dirname $0`
 source ${cmdDir}/utils.inc
+MVN_CACHE_DIR="mvn-compat-cache"
 
 # get usage of the script
 function usage() {
@@ -60,20 +61,41 @@ function checkOut() {
 # This function builds pinot code and tools necessary to run pinot-admin commands
 # Optionally, it also builds the integration test jars needed to run the pinot
 # compatibility tester
+# It uses a different version for each build, since we build trees in parallel.
+# Building the same version on all trees in parallel causes unstable builds.
+# Using indpendent buildIds will cause maven cache to fill up, so we use a
+# dedicated maven cache for these builds, and remove the cache after build is
+# completed.
+# If buildId is less than 0, then the mvn version is not changed in pom files.
 function build() {
   local outFile=$1
   local buildTests=$2
+  local buildId=$3
+  local repoOption=""
+  local versionOption="-Djdk.version=8"
 
-  mvn install package -DskipTests -Pbin-dist -D jdk.version=8 ${PINOT_MAVEN_OPTS} 1>${outFile} 2>&1
-  if [ $? -ne 0 ]; then exit 1; fi
-  mvn -pl pinot-tools package -DskipTests -Djdk.version=8 ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
-  if [ $? -ne 0 ]; then exit 1; fi
-  if [ $buildTests -eq 1 ]; then
-    mvn -pl pinot-integration-tests package -DskipTests -Djdk.version=8 ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
-    if [ $? -ne 0 ]; then exit 1; fi
+  if [ ${buildId} -gt 0 ]; then
+    # Build it in a different env under different version so that maven cache does
+    # not collide
+    local pomVersion=$(grep -E "<version>(.*)-SNAPSHOT</version>" pom.xml | cut -d'>' -f2 | cut -d'<' -f1 | cut -d'-' -f1)
+    mvn versions:set -DnewVersion="${pomVersion}-compat-${buildId}" -q -B 1>${outFile} 2>&1
+    mvn versions:commit -q -B 1>${outFile} 2>&1
+    repoOption="-Dmaven.repo.local=${mvnCache}/${buildId}"
   fi
 
+  mvn install package -DskipTests -Pbin-dist ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>${outFile} 2>&1
+  if [ $? -ne 0 ]; then exit 1; fi
+  mvn -pl pinot-tools package -DskipTests ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
+  if [ $? -ne 0 ]; then exit 1; fi
+  if [ $buildTests -eq 1 ]; then
+    mvn -pl pinot-integration-tests package -DskipTests ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
+    if [ $? -ne 0 ]; then exit 1; fi
+  fi
 }
+
+#
+# Main
+#
 
 # get arguments
 # Args while-loop
@@ -128,6 +150,8 @@ oldTargetDir="$workingDir"/oldTargetDir
 newBuildOutFile="${workingDir}/newBuild.out"
 newTargetDir="$workingDir"/newTargetDir
 curBuildOutFile="${workingDir}/currentBuild.out"
+mvnCache=${workingDir}/${MVN_CACHE_DIR}
+mkdir -p ${mvnCache}
 
 # Find value of olderCommit hash
 if [ -z "$olderCommit" -a ! -z "$newerCommit" ]; then
@@ -166,21 +190,23 @@ checkOut "$olderCommit" "$oldTargetDir"
 # Start builds in parallel.
 # First build the current tree. We need it so that we can
 # run the compatibiity tester.
-echo Starting build for compat checker at ${cmdDir}
-(cd ${cmdDir}/..; build ${curBuildOutFile} 1) &
+echo Starting build for compat checker at ${cmdDir}, buildId none.
+(cd ${cmdDir}/..; build ${curBuildOutFile} 1 -1) &
 curBuildPid=$!
 
 # The old commit has been cloned in oldTargetDir, build it.
-echo Starting build for old version at ${oldTargetDir}
-(cd ${oldTargetDir}; build ${oldBuildOutFile} 0) &
+buildId=$(date +%s)
+echo Starting build for old version at ${oldTargetDir} buildId ${buildId}
+(cd ${oldTargetDir}; build ${oldBuildOutFile} 0 ${buildId}) &
 oldBuildPid=$!
 
 # In case the user specified the current tree as newer commit, then
 # We don't need to build newer commit tree (we have already built the
 # current tree above and linked newTargetDir). Otherwise, build the newTargetDir
 if [ ${buildNewTarget} -eq 1 ]; then
-  echo Starting build for new version at ${newTargetDir}
-  (cd ${newTargetDir}; build ${newBuildOutFile} 0) &
+  buildId=$((buildId+1))
+  echo Starting build for new version at ${newTargetDir} buildId ${buildId}
+  (cd ${newTargetDir}; build ${newBuildOutFile} 0 ${buildId}) &
   newBuildPid=$!
 fi
 
@@ -250,5 +276,7 @@ if [ ${buildNewTarget} -eq 1 ]; then
     exitStatus=1
   fi
 fi
+
+/bin/rm -r ${mvnCache}
 
 exit 0
