@@ -211,7 +211,7 @@ public class DataTableSerDeTest {
     Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
     Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
     verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
-    // DataTable V3 serialization logic will add an extra THREAD_CPU_TIME_NS KV pair into metadata
+    // DataTable V3 serialization logic will add an extra MetadataKey.THREAD_CPU_TIME_NS KV pair into metadata
     Assert.assertEquals(newDataTable.getMetadata().size(), 1);
     Assert.assertTrue(newDataTable.getMetadata().containsKey(MetadataKey.THREAD_CPU_TIME_NS.getName()));
 
@@ -233,6 +233,93 @@ public class DataTableSerDeTest {
       dataTableV3.getMetadata().put(key, EXPECTED_METADATA.get(key));
     }
     newDataTable = DataTableFactory.getDataTable(dataTableV3.toBytes()); // Broker deserialize data table bytes as V3
+    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
+    Assert.assertEquals(newDataTable.getNumberOfRows(), 0, 0);
+    newDataTable.getMetadata().remove(MetadataKey.THREAD_CPU_TIME_NS.getName());
+    Assert.assertEquals(newDataTable.getMetadata(), EXPECTED_METADATA);
+  }
+
+  @Test
+  public void testV3V4Compatibility()
+      throws IOException {
+    DataSchema.ColumnDataType[] columnDataTypes = DataSchema.ColumnDataType.values();
+    int numColumns = columnDataTypes.length;
+    String[] columnNames = new String[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      columnNames[i] = columnDataTypes[i].name();
+    }
+
+    DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
+
+    // Verify V4 broker can deserialize data table (has data, but has no metadata) send by V3 server
+    DataTableBuilder.setCurrentDataTableVersion(DataTableBuilder.VERSION_3);
+    DataTableBuilder dataTableBuilderV3WithDataOnly = new DataTableBuilder(dataSchema);
+    fillDataTableWithRandomData(dataTableBuilderV3WithDataOnly, columnDataTypes, numColumns);
+
+    DataTable dataTableV3 = dataTableBuilderV3WithDataOnly.build(); // create a V3 data table
+    DataTable newDataTable =
+        DataTableFactory.getDataTable(dataTableV3.toBytes()); // Broker deserialize data table bytes as V3
+    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
+    Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
+    verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
+    Assert.assertEquals(newDataTable.getMetadata().size(), 1);
+    Assert.assertTrue(newDataTable.getMetadata().containsKey(MetadataKey.THREAD_CPU_TIME_NS.getName()));
+
+    // Verify V4 broker can deserialize data table (has data and metadata) send by V3 server
+    for (String key : EXPECTED_METADATA.keySet()) {
+      dataTableV3.getMetadata().put(key, EXPECTED_METADATA.get(key));
+    }
+    newDataTable = DataTableFactory.getDataTable(dataTableV3.toBytes()); // Broker deserialize data table bytes as V3
+    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
+    Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
+    verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
+    newDataTable.getMetadata().remove(MetadataKey.THREAD_CPU_TIME_NS.getName());
+    Assert.assertEquals(newDataTable.getMetadata(), EXPECTED_METADATA);
+
+    // Verify V4 broker can deserialize data table (only has metadata) send by V3 server
+    DataTableBuilder dataTableBuilderV3WithMetadataDataOnly = new DataTableBuilder(dataSchema);
+    dataTableV3 = dataTableBuilderV3WithMetadataDataOnly.build(); // create a V3 data table
+    for (String key : EXPECTED_METADATA.keySet()) {
+      dataTableV3.getMetadata().put(key, EXPECTED_METADATA.get(key));
+    }
+    newDataTable = DataTableFactory.getDataTable(dataTableV3.toBytes()); // Broker deserialize data table bytes as V3
+    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
+    Assert.assertEquals(newDataTable.getNumberOfRows(), 0, 0);
+    newDataTable.getMetadata().remove(MetadataKey.THREAD_CPU_TIME_NS.getName());
+    Assert.assertEquals(newDataTable.getMetadata(), EXPECTED_METADATA);
+
+    // Verify V4 broker can deserialize (has data, but has no metadata) send by V3 server.
+    DataTableBuilder.setCurrentDataTableVersion(DataTableBuilder.VERSION_3);
+    DataTableBuilder dataTableBuilderV4WithDataOnly = new DataTableBuilder(dataSchema);
+    fillDataTableWithRandomData(dataTableBuilderV4WithDataOnly, columnDataTypes, numColumns);
+    DataTable dataTableV4 = dataTableBuilderV4WithDataOnly.build(); // create a V4 data table
+    // Deserialize data table bytes as V4
+    newDataTable = DataTableFactory.getDataTable(dataTableV4.toBytes());
+    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
+    Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
+    verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
+    // DataTable V4 serialization logic will add an extra MetadataKey.THREAD_CPU_TIME_NS KV pair into metadata
+    Assert.assertEquals(newDataTable.getMetadata().size(), 1);
+    Assert.assertTrue(newDataTable.getMetadata().containsKey(MetadataKey.THREAD_CPU_TIME_NS.getName()));
+
+    // Verify V4 broker can deserialize data table (has data and metadata) send by V4 server
+    for (String key : EXPECTED_METADATA.keySet()) {
+      dataTableV4.getMetadata().put(key, EXPECTED_METADATA.get(key));
+    }
+    newDataTable = DataTableFactory.getDataTable(dataTableV4.toBytes()); // Broker deserialize data table bytes as V4
+    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
+    Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
+    verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
+    newDataTable.getMetadata().remove(MetadataKey.THREAD_CPU_TIME_NS.getName());
+    Assert.assertEquals(newDataTable.getMetadata(), EXPECTED_METADATA);
+
+    // Verify V4 broker can deserialize data table (only has metadata) send by V4 server
+    DataTableBuilder dataTableBuilderV4WithMetadataDataOnly = new DataTableBuilder(dataSchema);
+    dataTableV4 = dataTableBuilderV4WithMetadataDataOnly.build(); // create a V4 data table
+    for (String key : EXPECTED_METADATA.keySet()) {
+      dataTableV4.getMetadata().put(key, EXPECTED_METADATA.get(key));
+    }
+    newDataTable = DataTableFactory.getDataTable(dataTableV4.toBytes()); // Broker deserialize data table bytes as V4
     Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
     Assert.assertEquals(newDataTable.getNumberOfRows(), 0, 0);
     newDataTable.getMetadata().remove(MetadataKey.THREAD_CPU_TIME_NS.getName());
@@ -287,7 +374,7 @@ public class DataTableSerDeTest {
 
     ByteBuffer byteBuffer = ByteBuffer.wrap(dataTable.toBytes());
     int version = byteBuffer.getInt();
-    Assert.assertEquals(version, DataTableBuilder.VERSION_3);
+    Assert.assertEquals(version, DataTableBuilder.VERSION_4);
     byteBuffer.getInt(); // numOfRows
     byteBuffer.getInt(); // numOfColumns
     byteBuffer.getInt(); // exceptionsStart
@@ -310,7 +397,7 @@ public class DataTableSerDeTest {
     try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(metadataBytes);
         DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream)) {
       int numEntries = dataInputStream.readInt();
-      // DataTable V3 serialization logic will add an extra THREAD_CPU_TIME_NS KV pair into metadata
+      // DataTable V3 serialization logic will add an extra MetadataKey.THREAD_CPU_TIME_NS KV pair into metadata
       Assert.assertEquals(numEntries, EXPECTED_METADATA.size() + 1);
       for (int i = 0; i < numEntries; i++) {
         int keyOrdinal = dataInputStream.readInt();
@@ -323,7 +410,7 @@ public class DataTableSerDeTest {
         } else if (key.getValueType() == DataTable.MetadataValueType.LONG) {
           byte[] actualBytes = new byte[Long.BYTES];
           dataInputStream.read(actualBytes);
-          // Ignore the THREAD_CPU_TIME_NS key since it's added during data serialization.
+          // Ignore the MetadataKey.THREAD_CPU_TIME_NS key since it's added during data serialization.
           if (key != MetadataKey.THREAD_CPU_TIME_NS) {
             Assert.assertEquals(actualBytes, Longs.toByteArray(Long.parseLong(EXPECTED_METADATA.get(key.getName()))));
           }

@@ -33,11 +33,12 @@ import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
- * Datatable V3 implementation.
- * The layout of serialized V3 datatable looks like:
+ * Datatable V4 implementation.
+ * The layout of serialized V4 datatable looks like:
  * 	+-----------------------------------------------+
  * 	| 13 integers of header:                        |
  * 	| VERSION                                       |
@@ -45,8 +46,8 @@ import org.apache.pinot.core.query.request.context.ThreadTimer;
  * 	| NUM_COLUMNS                                   |
  * 	| EXCEPTIONS SECTION START OFFSET               |
  * 	| EXCEPTIONS SECTION LENGTH                     |
- * 	| DICTIONARY_MAP SECTION START OFFSET           |
- * 	| DICTIONARY_MAP SECTION LENGTH                 |
+ * 	| DICTIONARY SECTION START OFFSET               |
+ * 	| DICTIONARY SECTION LENGTH                     |
  * 	| DATA_SCHEMA SECTION START OFFSET              |
  * 	| DATA_SCHEMA SECTION LENGTH                    |
  * 	| FIXED_SIZE_DATA SECTION START OFFSET          |
@@ -67,8 +68,13 @@ import org.apache.pinot.core.query.request.context.ThreadTimer;
  * 	| METADATA LENGTH                               |
  * 	| METADATA SECTION                              |
  * 	+-----------------------------------------------+
+ *
+ * The layout of V4 is exactly same as V3, but with some optimizations:
+ * 1. Fix float size: V3 allocate 8 bytes to store float, while only use 4 bytes. V4 allocate and use 4 bytes.
+ * 2. V3 use one dictionary for each columns to map String->Integer, while V4 use a common dictionary for all columns.
+ * 3. V4 store bytes as variable size data instead of String.
  */
-public class DataTableImplV3 extends BaseDataTable {
+public class DataTableImplV4 extends BaseDataTable {
   private static final int HEADER_SIZE = Integer.BYTES * 13;
   // _errCodeToExceptionMap stores exceptions as a map of errorCode->errorMessage
   private final Map<Integer, String> _errCodeToExceptionMap;
@@ -76,32 +82,32 @@ public class DataTableImplV3 extends BaseDataTable {
   /**
    * Construct data table with results. (Server side)
    */
-  public DataTableImplV3(int numRows, DataSchema dataSchema, Map<String, Map<Integer, String>> dictionaryMap,
-      byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
-    super(numRows, dataSchema, dictionaryMap, null, fixedSizeDataBytes, variableSizeDataBytes);
-    _rowSizeInBytes = DataTableUtils.computeColumnOffsets(dataSchema, _columnOffsets, DataTableBuilder.VERSION_3);
+  public DataTableImplV4(int numRows, DataSchema dataSchema, Map<Integer, String> dictionary, byte[] fixedSizeDataBytes,
+      byte[] variableSizeDataBytes) {
+    super(numRows, dataSchema, null, dictionary, fixedSizeDataBytes, variableSizeDataBytes);
     _errCodeToExceptionMap = new HashMap<>();
+    _rowSizeInBytes = DataTableUtils.computeColumnOffsets(dataSchema, _columnOffsets, DataTableBuilder.VERSION_4);
   }
 
   /**
    * Construct empty data table. (Server side)
    */
-  public DataTableImplV3() {
+  public DataTableImplV4() {
     _errCodeToExceptionMap = new HashMap<>();
   }
 
   /**
    * Construct data table from byte array. (broker side)
    */
-  public DataTableImplV3(ByteBuffer byteBuffer)
+  public DataTableImplV4(ByteBuffer byteBuffer)
       throws IOException {
     // Read header.
     _numRows = byteBuffer.getInt();
     _numColumns = byteBuffer.getInt();
     int exceptionsStart = byteBuffer.getInt();
     int exceptionsLength = byteBuffer.getInt();
-    int dictionaryMapStart = byteBuffer.getInt();
-    int dictionaryMapLength = byteBuffer.getInt();
+    int dictionaryStart = byteBuffer.getInt();
+    int dictionaryLength = byteBuffer.getInt();
     int dataSchemaStart = byteBuffer.getInt();
     int dataSchemaLength = byteBuffer.getInt();
     int fixedSizeDataStart = byteBuffer.getInt();
@@ -120,13 +126,13 @@ public class DataTableImplV3 extends BaseDataTable {
     }
 
     // Read dictionary.
-    if (dictionaryMapLength != 0) {
-      byte[] dictionaryMapBytes = new byte[dictionaryMapLength];
-      byteBuffer.position(dictionaryMapStart);
-      byteBuffer.get(dictionaryMapBytes);
-      _dictionaryMap = deserializeDictionaryMap(dictionaryMapBytes);
+    if (dictionaryLength != 0) {
+      byte[] dictionaryBytes = new byte[dictionaryLength];
+      byteBuffer.position(dictionaryStart);
+      byteBuffer.get(dictionaryBytes);
+      _dictionary = deserializeDictionary(dictionaryBytes);
     } else {
-      _dictionaryMap = null;
+      _dictionary = null;
     }
 
     // Read data schema.
@@ -136,7 +142,7 @@ public class DataTableImplV3 extends BaseDataTable {
       byteBuffer.get(schemaBytes);
       _dataSchema = DataSchema.fromBytes(schemaBytes);
       _columnOffsets = new int[_dataSchema.size()];
-      _rowSizeInBytes = DataTableUtils.computeColumnOffsets(_dataSchema, _columnOffsets, DataTableBuilder.VERSION_3);
+      _rowSizeInBytes = DataTableUtils.computeColumnOffsets(_dataSchema, _columnOffsets, DataTableBuilder.VERSION_4);
     } else {
       _dataSchema = null;
       _columnOffsets = null;
@@ -192,7 +198,7 @@ public class DataTableImplV3 extends BaseDataTable {
 
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
-    dataOutputStream.writeInt(DataTableBuilder.VERSION_3);
+    dataOutputStream.writeInt(DataTableBuilder.VERSION_4);
     dataOutputStream.writeInt(_numRows);
     dataOutputStream.writeInt(_numColumns);
     int dataOffset = HEADER_SIZE;
@@ -206,11 +212,11 @@ public class DataTableImplV3 extends BaseDataTable {
 
     // Write dictionary map section offset(START|SIZE).
     dataOutputStream.writeInt(dataOffset);
-    byte[] dictionaryMapBytes = null;
-    if (_dictionaryMap != null) {
-      dictionaryMapBytes = serializeDictionaryMap();
-      dataOutputStream.writeInt(dictionaryMapBytes.length);
-      dataOffset += dictionaryMapBytes.length;
+    byte[] dictionaryBytes = null;
+    if (_dictionary != null) {
+      dictionaryBytes = serializeDictionary();
+      dataOutputStream.writeInt(dictionaryBytes.length);
+      dataOffset += dictionaryBytes.length;
     } else {
       dataOutputStream.writeInt(0);
     }
@@ -247,8 +253,8 @@ public class DataTableImplV3 extends BaseDataTable {
     // Write exceptions bytes.
     dataOutputStream.write(exceptionsBytes);
     // Write dictionary map bytes.
-    if (dictionaryMapBytes != null) {
-      dataOutputStream.write(dictionaryMapBytes);
+    if (dictionaryBytes != null) {
+      dataOutputStream.write(dictionaryBytes);
     }
     // Write data schema bytes.
     if (dataSchemaBytes != null) {
@@ -290,7 +296,7 @@ public class DataTableImplV3 extends BaseDataTable {
    * - if the value type is long, encode it as: [enumKeyOrdinal, bigEndianRepresentationOfLongValue]
    *
    * Unlike V2, where numeric metadata values (int and long) in V3 are encoded in UTF-8 in the wire format,
-   * in V3 big endian representation is used.
+   * in V3/V4 big endian representation is used.
    */
   private byte[] serializeMetadata()
       throws IOException {
@@ -389,5 +395,30 @@ public class DataTableImplV3 extends BaseDataTable {
       }
       return exceptions;
     }
+  }
+
+  @Override
+  public String getString(int rowId, int colId) {
+    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
+    int dictId = _fixedSizeData.getInt();
+    return _dictionary.get(dictId);
+  }
+
+  @Override
+  public String[] getStringArray(int rowId, int colId) {
+    int length = positionCursorInVariableBuffer(rowId, colId);
+    String[] strings = new String[length];
+    for (int i = 0; i < length; i++) {
+      strings[i] = _dictionary.get(_variableSizeData.getInt());
+    }
+    return strings;
+  }
+
+  @Override
+  public ByteArray getBytes(int rowId, int colId) {
+    int size = positionCursorInVariableBuffer(rowId, colId);
+    byte[] bytes = new byte[size];
+    _variableSizeData.get(bytes, 0, size);
+    return new ByteArray(bytes);
   }
 }

@@ -71,20 +71,20 @@ import org.apache.pinot.spi.utils.ByteArray;
  *
  *
  */
-// TODO: potential optimizations:
-// TODO:   1. Fix float size.
-// TODO:   2. Use one dictionary for all columns (save space).
-// TODO:   3. Given a data schema, write all values one by one instead of using rowId and colId to position (save time).
-// TODO:   4. Store bytes as variable size data instead of String
 public class DataTableBuilder {
   public static final int VERSION_2 = 2;
   public static final int VERSION_3 = 3;
-  private static int _version = VERSION_3;
+  public static final int VERSION_4 = 4;
+  private static int _version = VERSION_4;
   private final DataSchema _dataSchema;
   private final int[] _columnOffsets;
   private final int _rowSizeInBytes;
+  // _dictionaryMap and _reverseDictionaryMap are used in V2 and V3, where each column use one dictionary to map String->Integer
   private final Map<String, Map<String, Integer>> _dictionaryMap = new HashMap<>();
   private final Map<String, Map<Integer, String>> _reverseDictionaryMap = new HashMap<>();
+  // _dictionary and _reverseDictionary are used in V4, where all columns use a common dictionary to map String->Integer
+  private final Map<String, Integer> _dictionary = new HashMap<>();
+  private final Map<Integer, String> _reverseDictionary = new HashMap<>();
   private final ByteArrayOutputStream _fixedSizeDataByteArrayOutputStream = new ByteArrayOutputStream();
   private final ByteArrayOutputStream _variableSizeDataByteArrayOutputStream = new ByteArrayOutputStream();
   private final DataOutputStream _variableSizeDataOutputStream =
@@ -96,15 +96,22 @@ public class DataTableBuilder {
   public DataTableBuilder(DataSchema dataSchema) {
     _dataSchema = dataSchema;
     _columnOffsets = new int[dataSchema.size()];
-    _rowSizeInBytes = DataTableUtils.computeColumnOffsets(dataSchema, _columnOffsets);
+    _rowSizeInBytes = DataTableUtils.computeColumnOffsets(dataSchema, _columnOffsets, _version);
   }
 
   public static DataTable getEmptyDataTable() {
-    return _version == VERSION_2 ? new DataTableImplV2() : new DataTableImplV3();
+    switch (_version) {
+      case VERSION_2:
+        return new DataTableImplV2();
+      case VERSION_3:
+        return new DataTableImplV3();
+      default:
+        return new DataTableImplV4();
+    }
   }
 
   public static void setCurrentDataTableVersion(int version) {
-    if (version != VERSION_2 && version != VERSION_3) {
+    if (version != VERSION_2 && version != VERSION_3 && version != VERSION_4) {
       throw new IllegalArgumentException("Unsupported version: " + version);
     }
     _version = version;
@@ -160,39 +167,46 @@ public class DataTableBuilder {
   }
 
   public void setColumn(int colId, String value) {
-    String columnName = _dataSchema.getColumnName(colId);
-    Map<String, Integer> dictionary = _dictionaryMap.get(columnName);
-    if (dictionary == null) {
-      dictionary = new HashMap<>();
-      _dictionaryMap.put(columnName, dictionary);
-      _reverseDictionaryMap.put(columnName, new HashMap<>());
-    }
+    if (_version == VERSION_2 || _version == VERSION_3) {
+      String columnName = _dataSchema.getColumnName(colId);
+      Map<String, Integer> dictionary = _dictionaryMap.get(columnName);
 
-    _currentRowDataByteBuffer.position(_columnOffsets[colId]);
-    Integer dictId = dictionary.get(value);
-    if (dictId == null) {
-      dictId = dictionary.size();
-      dictionary.put(value, dictId);
-      _reverseDictionaryMap.get(columnName).put(dictId, value);
+      if (dictionary == null) {
+        dictionary = new HashMap<>();
+        _dictionaryMap.put(columnName, dictionary);
+        _reverseDictionaryMap.put(columnName, new HashMap<>());
+      }
+      Integer dictId = dictionary.get(value);
+      if (dictId == null) {
+        dictId = dictionary.size();
+        dictionary.put(value, dictId);
+        _reverseDictionaryMap.get(columnName).put(dictId, value);
+      }
+
+      _currentRowDataByteBuffer.position(_columnOffsets[colId]);
+      _currentRowDataByteBuffer.putInt(dictId);
+    } else {
+      _dictionary.putIfAbsent(value, _dictionary.size());
+      Integer dictId = _dictionary.get(value);
+      _reverseDictionary.put(dictId, value);
+
+      _currentRowDataByteBuffer.position(_columnOffsets[colId]);
+      _currentRowDataByteBuffer.putInt(dictId);
     }
-    _currentRowDataByteBuffer.putInt(dictId);
   }
 
   public void setColumn(int colId, ByteArray value)
       throws IOException {
-    // NOTE: Use String to store bytes value in DataTable V2 for backward-compatibility
-    setColumn(colId, value.toHexString());
-
-    /*
-    TODO: Store bytes as variable size data instead of String. Make the change for the next version data table for
-          backward-compatibility
-
-    _currentRowDataByteBuffer.position(_columnOffsets[colId]);
-    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
-    byte[] bytes = value.getBytes();
-    _currentRowDataByteBuffer.putInt(bytes.length);
-    _variableSizeDataByteArrayOutputStream.write(bytes);
-     */
+    // NOTE: Use String to store bytes value in DataTable V2/V3 for backward-compatibility
+    if (_version == VERSION_2 || _version == VERSION_3) {
+      setColumn(colId, value.toHexString());
+    } else {
+      _currentRowDataByteBuffer.position(_columnOffsets[colId]);
+      _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+      byte[] bytes = value.getBytes();
+      _currentRowDataByteBuffer.putInt(bytes.length);
+      _variableSizeDataByteArrayOutputStream.write(bytes);
+    }
   }
 
   public void setColumn(int colId, Object value)
@@ -252,22 +266,31 @@ public class DataTableBuilder {
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     _currentRowDataByteBuffer.putInt(values.length);
 
-    String columnName = _dataSchema.getColumnName(colId);
-    Map<String, Integer> dictionary = _dictionaryMap.get(columnName);
-    if (dictionary == null) {
-      dictionary = new HashMap<>();
-      _dictionaryMap.put(columnName, dictionary);
-      _reverseDictionaryMap.put(columnName, new HashMap<>());
-    }
-
-    for (String value : values) {
-      Integer dictId = dictionary.get(value);
-      if (dictId == null) {
-        dictId = dictionary.size();
-        dictionary.put(value, dictId);
-        _reverseDictionaryMap.get(columnName).put(dictId, value);
+    if (_version == VERSION_2 || _version == VERSION_3) {
+      String columnName = _dataSchema.getColumnName(colId);
+      Map<String, Integer> dictionary = _dictionaryMap.get(columnName);
+      if (dictionary == null) {
+        dictionary = new HashMap<>();
+        _dictionaryMap.put(columnName, dictionary);
+        _reverseDictionaryMap.put(columnName, new HashMap<>());
       }
-      _variableSizeDataOutputStream.writeInt(dictId);
+
+      for (String value : values) {
+        Integer dictId = dictionary.get(value);
+        if (dictId == null) {
+          dictId = dictionary.size();
+          dictionary.put(value, dictId);
+          _reverseDictionaryMap.get(columnName).put(dictId, value);
+        }
+        _variableSizeDataOutputStream.writeInt(dictId);
+      }
+    } else {
+      for (String value : values) {
+        _dictionary.putIfAbsent(value, _dictionary.size());
+        Integer dictId = _dictionary.get(value);
+        _reverseDictionary.put(dictId, value);
+        _variableSizeDataOutputStream.writeInt(dictId);
+      }
     }
   }
 
@@ -277,9 +300,16 @@ public class DataTableBuilder {
   }
 
   public DataTable build() {
-    return _version == VERSION_2 ? new DataTableImplV2(_numRows, _dataSchema, _reverseDictionaryMap,
-        _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray())
-        : new DataTableImplV3(_numRows, _dataSchema, _reverseDictionaryMap,
+    switch (_version) {
+      case VERSION_2:
+        return new DataTableImplV2(_numRows, _dataSchema, _reverseDictionaryMap,
             _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray());
+      case VERSION_3:
+        return new DataTableImplV3(_numRows, _dataSchema, _reverseDictionaryMap,
+            _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray());
+      default:
+        return new DataTableImplV4(_numRows, _dataSchema, _reverseDictionary,
+            _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray());
+    }
   }
 }

@@ -44,7 +44,10 @@ public abstract class BaseDataTable implements DataTable {
   protected DataSchema _dataSchema;
   protected int[] _columnOffsets;
   protected int _rowSizeInBytes;
+  // _dictionaryMap is only used in V2/V3, where each column use one dictionary to map String->Integer
   protected Map<String, Map<Integer, String>> _dictionaryMap;
+  // _dictionary is only used in V4, where all columns use a common dictionary to map String->Integer
+  protected Map<Integer, String> _dictionary;
   protected byte[] _fixedSizeDataBytes;
   protected ByteBuffer _fixedSizeData;
   protected byte[] _variableSizeDataBytes;
@@ -52,13 +55,13 @@ public abstract class BaseDataTable implements DataTable {
   protected Map<String, String> _metadata;
 
   public BaseDataTable(int numRows, DataSchema dataSchema, Map<String, Map<Integer, String>> dictionaryMap,
-      byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
+      Map<Integer, String> dictionary, byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
     _numRows = numRows;
     _numColumns = dataSchema.size();
     _dataSchema = dataSchema;
     _columnOffsets = new int[_numColumns];
-    _rowSizeInBytes = DataTableUtils.computeColumnOffsets(dataSchema, _columnOffsets);
     _dictionaryMap = dictionaryMap;
+    _dictionary = dictionary;
     _fixedSizeDataBytes = fixedSizeDataBytes;
     _fixedSizeData = ByteBuffer.wrap(fixedSizeDataBytes);
     _variableSizeDataBytes = variableSizeDataBytes;
@@ -76,6 +79,7 @@ public abstract class BaseDataTable implements DataTable {
     _columnOffsets = null;
     _rowSizeInBytes = 0;
     _dictionaryMap = null;
+    _dictionary = null;
     _fixedSizeDataBytes = null;
     _fixedSizeData = null;
     _variableSizeDataBytes = null;
@@ -84,7 +88,8 @@ public abstract class BaseDataTable implements DataTable {
   }
 
   /**
-   * Helper method to serialize dictionary map.
+   * Helper method to serialize dictionary map. This method is only called in V2/V3, where each column use
+   * one dictionary to map String->Integer
    */
   protected byte[] serializeDictionaryMap()
       throws IOException {
@@ -112,7 +117,8 @@ public abstract class BaseDataTable implements DataTable {
   }
 
   /**
-   * Helper method to deserialize dictionary map.
+   * Helper method to deserialize dictionary map. This method is only called in V2/V3, where each column use
+   * one dictionary to map String->Integer
    */
   protected Map<String, Map<Integer, String>> deserializeDictionaryMap(byte[] bytes)
       throws IOException {
@@ -134,6 +140,43 @@ public abstract class BaseDataTable implements DataTable {
       }
 
       return dictionaryMap;
+    }
+  }
+
+  /**
+   * Helper method to serialize dictionary. This method is only used in V4, where all columns use a common dictionary
+   * to map String->Integer
+   */
+  protected byte[] serializeDictionary()
+      throws IOException {
+    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
+    dataOutputStream.writeInt(_dictionary.size());
+    for (Map.Entry<Integer, String> dictionaryEntry : _dictionary.entrySet()) {
+      dataOutputStream.writeInt(dictionaryEntry.getKey());
+      byte[] valueBytes = StringUtil.encodeUtf8(dictionaryEntry.getValue());
+      dataOutputStream.writeInt(valueBytes.length);
+      dataOutputStream.write(valueBytes);
+    }
+    return byteArrayOutputStream.toByteArray();
+  }
+
+  /**
+   * Helper method to deserialize dictionary. This method is only used in V4, where all columns use a common dictionary
+   * to map String->Integer
+   */
+  protected Map<Integer, String> deserializeDictionary(byte[] bytes)
+      throws IOException {
+    try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
+        DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream)) {
+      int dictionarySize = dataInputStream.readInt();
+      Map<Integer, String> dictionary = new HashMap<>(dictionarySize);
+      for (int j = 0; j < dictionarySize; j++) {
+        int key = dataInputStream.readInt();
+        String value = DataTableUtils.decodeString(dataInputStream);
+        dictionary.put(key, value);
+      }
+      return dictionary;
     }
   }
 
@@ -249,7 +292,7 @@ public abstract class BaseDataTable implements DataTable {
     return strings;
   }
 
-  private int positionCursorInVariableBuffer(int rowId, int colId) {
+  public int positionCursorInVariableBuffer(int rowId, int colId) {
     _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
     _variableSizeData.position(_fixedSizeData.getInt());
     return _fixedSizeData.getInt();

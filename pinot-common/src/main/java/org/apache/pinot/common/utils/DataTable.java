@@ -74,7 +74,7 @@ public interface DataTable {
     INT, LONG, STRING
   }
 
-  /* The MetadataKey is used in V3, where we present metadata as Map<MetadataKey, String>
+  /* The MetadataKey is used in V3/V4, where we present metadata as Map<MetadataKey, String>
    * ATTENTION:
    *  - Don't change existing keys.
    *  - Don't remove existing keys.

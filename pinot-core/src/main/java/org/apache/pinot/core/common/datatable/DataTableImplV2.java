@@ -48,7 +48,8 @@ public class DataTableImplV2 extends BaseDataTable {
    */
   public DataTableImplV2(int numRows, DataSchema dataSchema, Map<String, Map<Integer, String>> dictionaryMap,
       byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
-    super(numRows, dataSchema, dictionaryMap, fixedSizeDataBytes, variableSizeDataBytes);
+    super(numRows, dataSchema, dictionaryMap, null, fixedSizeDataBytes, variableSizeDataBytes);
+    _rowSizeInBytes = DataTableUtils.computeColumnOffsets(dataSchema, _columnOffsets, DataTableBuilder.VERSION_2);
   }
 
   /**
@@ -99,7 +100,7 @@ public class DataTableImplV2 extends BaseDataTable {
       byteBuffer.get(schemaBytes);
       _dataSchema = DataSchema.fromBytes(schemaBytes);
       _columnOffsets = new int[_dataSchema.size()];
-      _rowSizeInBytes = DataTableUtils.computeColumnOffsets(_dataSchema, _columnOffsets);
+      _rowSizeInBytes = DataTableUtils.computeColumnOffsets(_dataSchema, _columnOffsets, DataTableBuilder.VERSION_2);
     } else {
       _dataSchema = null;
       _columnOffsets = null;
