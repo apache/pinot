@@ -71,6 +71,11 @@ Please ensure your code is adequately documented. Some things to consider for do
 * Use logging levels correctly: set level to `debug` for verbose logs useful for only for debugging.
 * Do not log stack traces via `printStackTrace` method of the exception.
 
+#### Formatting
+* Ensure that the code you add is properly formatted as per the Pinot style-sheets.
+* Pinot's style-sheets can be found in ```incubator-pinot/config```.
+* For information on how to import the style-sheet into your IDE, refer [here](https://docs.pinot.apache.org/developers/developers-and-contributors/code-setup#intellij).
+
 #### Exceptions and Exception-Handling
 
 * Where possible, throw specific exceptions, preferably checked exceptions, so the callers can easily determine what the erroneous conditions that need to be handled are.
