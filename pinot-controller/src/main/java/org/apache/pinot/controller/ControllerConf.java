@@ -553,13 +553,18 @@ public class ControllerConf extends PinotConfiguration {
             ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_PERIOD,
             String.class))
         .map(period -> (int) convertPeriodToSeconds(period))
-        .orElseGet(() -> Optional.ofNullable(
-            getProperty(
-                ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS,
-                Integer.class))
-            .orElseGet(() -> getProperty(
+        .orElseGet(() -> {
+          Integer frequency = getProperty(
+              ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS,
+              Integer.class);
+          //fallback to the default value if frequency is not supplied
+          if (null == frequency) {
+            return getProperty(
                 ControllerPeriodicTasksConf.DEPRECATED_VALIDATION_MANAGER_FREQUENCY_IN_SECONDS,
-                ControllerPeriodicTasksConf.DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS)));
+                ControllerPeriodicTasksConf.DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS);
+          }
+          return frequency;
+        });
   }
 
   public void setRealtimeSegmentValidationFrequencyInSeconds(int validationFrequencyInSeconds) {
@@ -580,12 +585,18 @@ public class ControllerConf extends PinotConfiguration {
         getProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_PERIOD,
             String.class))
         .map(period -> (int) convertPeriodToSeconds(period))
-        .orElseGet(() -> Optional.ofNullable(
-            getProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS,
-                Integer.class))
-            .orElseGet(() -> getProperty(
+        .orElseGet(() -> {
+          Integer frequency = getProperty(
+              ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS,
+              Integer.class);
+          //fallback to the default value if frequency is not supplied
+          if (null == frequency) {
+            return getProperty(
                 ControllerPeriodicTasksConf.DEPRECATED_VALIDATION_MANAGER_FREQUENCY_IN_SECONDS,
-                ControllerPeriodicTasksConf.DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS)));
+                ControllerPeriodicTasksConf.DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS);
+          }
+          return frequency;
+        });
   }
 
   public void setBrokerResourceValidationFrequencyInSeconds(int validationFrequencyInSeconds) {
