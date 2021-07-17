@@ -26,7 +26,6 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.*;
 
-
 public class ControllerConfTest {
 
   private static final List<String> UNIT_CONFIGS =
@@ -76,7 +75,7 @@ public class ControllerConfTest {
    * When only unit configs are supplied, then the correct converted value is returned.
    */
   @Test
-  public void onlyUnitConfigsReturnsCorrectValue() {
+  public void suppliedUnitConfigsShouldReturnCorrectValues() {
     //setup
     Map<String, Object> controllerConfig = new HashMap<>();
     UNIT_CONFIGS.forEach(config -> controllerConfig.put(config, DURATION_IN_SECONDS));
@@ -89,7 +88,7 @@ public class ControllerConfTest {
    * When only period configs are supplied, then the correct converted value is returned.
    */
   @Test
-  public void onlyValidPeriodConfigsReturnsCorrectValue() {
+  public void suppliedPeriodConfigsShouldReturnCorrectValues() {
     //setup
     Map<String, Object> controllerConfig = new HashMap<>();
     PERIOD_CONFIGS.forEach(config -> controllerConfig.put(config, DURATION_IN_PERIOD_VALID));
@@ -102,7 +101,7 @@ public class ControllerConfTest {
    * When an invalid period config is specified, then an {@link IllegalArgumentException} is thrown
    */
   @Test(expectedExceptions = IllegalArgumentException.class)
-  public void invalidPeriodConfigsExceptionThrown() {
+  public void invalidPeriodConfigsExceptionShouldBeThrown() {
     //setup
     Map<String, Object> controllerConfig = new HashMap<>();
     PERIOD_CONFIGS.forEach(config -> controllerConfig.put(config, DURATION_IN_PERIOD_INVALID));
