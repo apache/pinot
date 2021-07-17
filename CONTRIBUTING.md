@@ -74,7 +74,7 @@ Please ensure your code is adequately documented. Some things to consider for do
 #### Code Formatting
 * Ensure that the code you add is properly formatted as per the Pinot style-sheets.
 * Pinot's style-sheets can be found in ```incubator-pinot/config```.
-* For information on how to import the style-sheet into your IDE, refer [here](https://docs.pinot.apache.org/developers/developers-and-contributors/code-setup#intellij).
+* For information on how to import the style-sheet into your IDE, refer [here](https://docs.pinot.apache.org/developers/developers-and-contributors/code-setup#setup-ide).
 
 #### Exceptions and Exception-Handling
 
