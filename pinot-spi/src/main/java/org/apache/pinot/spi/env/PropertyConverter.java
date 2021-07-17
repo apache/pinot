@@ -29,8 +29,6 @@ public abstract class PropertyConverter {
       return (T) Long.valueOf(value.toString());
     } else if (Double.class.equals(returnType)) {
       return (T) Double.valueOf(value.toString());
-    } else if(String.class.equals(returnType)) {
-      return (T) value.toString();
     } else {
       throw new IllegalArgumentException(returnType + " is not a supported type for conversion.");
     }

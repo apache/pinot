@@ -406,7 +406,7 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public int getSegmentCommitTimeoutSeconds() {
-    return Optional.ofNullable(getProperty(SEGMENT_COMMIT_TIMEOUT_PERIOD, String.class))
+    return Optional.ofNullable(getProperty(SEGMENT_COMMIT_TIMEOUT_PERIOD))
         .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(() -> getProperty(SEGMENT_COMMIT_TIMEOUT_SECONDS,
             SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds()));
   }
@@ -484,8 +484,7 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public int getRetentionControllerFrequencyInSeconds() {
-    return Optional
-        .ofNullable(getProperty(ControllerPeriodicTasksConf.RETENTION_MANAGER_FREQUENCY_PERIOD, String.class))
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.RETENTION_MANAGER_FREQUENCY_PERIOD))
         .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(
             () -> getProperty(ControllerPeriodicTasksConf.RETENTION_MANAGER_FREQUENCY_IN_SECONDS,
                 ControllerPeriodicTasksConf.DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS));
@@ -506,8 +505,8 @@ public class ControllerConf extends PinotConfiguration {
    * @return
    */
   public int getOfflineSegmentIntervalCheckerFrequencyInSeconds() {
-    return Optional.ofNullable(
-        getProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_PERIOD, String.class))
+    return Optional
+        .ofNullable(getProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_PERIOD))
         .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(
             () -> getProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS,
                 ControllerPeriodicTasksConf.DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS));
@@ -527,8 +526,7 @@ public class ControllerConf extends PinotConfiguration {
    * @return
    */
   public int getRealtimeSegmentValidationFrequencyInSeconds() {
-    return Optional
-        .ofNullable(getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_PERIOD, String.class))
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_PERIOD))
         .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(() -> {
           Integer frequency =
               getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS, Integer.class);
@@ -555,8 +553,7 @@ public class ControllerConf extends PinotConfiguration {
    * @return
    */
   public int getBrokerResourceValidationFrequencyInSeconds() {
-    return Optional
-        .ofNullable(getProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_PERIOD, String.class))
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_PERIOD))
         .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(() -> {
           Integer frequency =
               getProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS, Integer.class);
@@ -575,15 +572,14 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public long getBrokerResourceValidationInitialDelayInSeconds() {
-    return Optional.ofNullable(
-        getProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_INITIAL_DELAY_PERIOD, String.class))
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_INITIAL_DELAY_PERIOD))
         .map(this::convertPeriodToSeconds).orElseGet(
             () -> getProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_INITIAL_DELAY_IN_SECONDS,
                 getPeriodicTaskInitialDelayInSeconds()));
   }
 
   public int getStatusCheckerFrequencyInSeconds() {
-    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_FREQUENCY_PERIOD, String.class))
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_FREQUENCY_PERIOD))
         .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(
             () -> getProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_FREQUENCY_IN_SECONDS,
                 ControllerPeriodicTasksConf.DEFAULT_STATUS_CONTROLLER_FREQUENCY_IN_SECONDS));
@@ -595,8 +591,7 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public int getTaskMetricsEmitterFrequencyInSeconds() {
-    return Optional
-        .ofNullable(getProperty(ControllerPeriodicTasksConf.TASK_METRICS_EMITTER_FREQUENCY_PERIOD, String.class))
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.TASK_METRICS_EMITTER_FREQUENCY_PERIOD))
         .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(
             () -> getProperty(ControllerPeriodicTasksConf.TASK_METRICS_EMITTER_FREQUENCY_IN_SECONDS,
                 ControllerPeriodicTasksConf.DEFAULT_TASK_METRICS_EMITTER_FREQUENCY_IN_SECONDS));
@@ -608,8 +603,7 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public int getStatusCheckerWaitForPushTimeInSeconds() {
-    return Optional
-        .ofNullable(getProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_WAIT_FOR_PUSH_TIME_PERIOD, String.class))
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_WAIT_FOR_PUSH_TIME_PERIOD))
         .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(
             () -> getProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_WAIT_FOR_PUSH_TIME_IN_SECONDS,
                 ControllerPeriodicTasksConf.DEFAULT_STATUS_CONTROLLER_WAIT_FOR_PUSH_TIME_IN_SECONDS));
@@ -626,8 +620,7 @@ public class ControllerConf extends PinotConfiguration {
    * REALTIME_SEGMENT_RELOCATOR_FREQUENCY
    */
   public int getSegmentRelocatorFrequencyInSeconds() {
-    return Optional
-        .ofNullable(getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_FREQUENCY_PERIOD, String.class))
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_FREQUENCY_PERIOD))
         .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(() -> {
           Integer segmentRelocatorFreqSeconds =
               getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS, Integer.class);
@@ -662,7 +655,7 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public int getServerAdminRequestTimeoutSeconds() {
-    return Optional.ofNullable(getProperty(SERVER_ADMIN_REQUEST_TIMEOUT_PERIOD, String.class))
+    return Optional.ofNullable(getProperty(SERVER_ADMIN_REQUEST_TIMEOUT_PERIOD))
         .map(period -> (int) TimeUnit.SECONDS.convert(TimeUtils.convertPeriodToMillis(period), TimeUnit.MILLISECONDS))
         .orElseGet(
             () -> getProperty(SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS, DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS));
@@ -677,7 +670,7 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public int getTaskManagerFrequencyInSeconds() {
-    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.TASK_MANAGER_FREQUENCY_PERIOD, String.class))
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.TASK_MANAGER_FREQUENCY_PERIOD))
         .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(
             () -> getProperty(ControllerPeriodicTasksConf.TASK_MANAGER_FREQUENCY_IN_SECONDS,
                 ControllerPeriodicTasksConf.DEFAULT_TASK_MANAGER_FREQUENCY_IN_SECONDS));
@@ -688,8 +681,7 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public long getMinionInstancesCleanupTaskFrequencyInSeconds() {
-    return Optional.ofNullable(
-        getProperty(ControllerPeriodicTasksConf.MINION_INSTANCES_CLEANUP_TASK_FREQUENCY_PERIOD, String.class))
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.MINION_INSTANCES_CLEANUP_TASK_FREQUENCY_PERIOD))
         .map(this::convertPeriodToSeconds).orElseGet(
             () -> (long) getProperty(ControllerPeriodicTasksConf.MINION_INSTANCES_CLEANUP_TASK_FREQUENCY_IN_SECONDS,
                 ControllerPeriodicTasksConf.DEFAULT_MINION_INSTANCES_CLEANUP_TASK_FREQUENCY_IN_SECONDS));
@@ -702,7 +694,7 @@ public class ControllerConf extends PinotConfiguration {
 
   public long getMinionInstancesCleanupTaskInitialDelaySeconds() {
     return Optional
-        .ofNullable(getProperty(ControllerPeriodicTasksConf.MINION_INSTANCES_CLEANUP_TASK_INITIAL_DELAY_PERIOD, String.class))
+        .ofNullable(getProperty(ControllerPeriodicTasksConf.MINION_INSTANCES_CLEANUP_TASK_INITIAL_DELAY_PERIOD))
         .map(this::convertPeriodToSeconds).orElseGet(
             () -> getProperty(ControllerPeriodicTasksConf.MINION_INSTANCES_CLEANUP_TASK_INITIAL_DELAY_SECONDS,
                 ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds()));
@@ -715,10 +707,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public int getMinionInstancesCleanupTaskMinOfflineTimeBeforeDeletionInSeconds() {
     return Optional.ofNullable(
-        getProperty(ControllerPeriodicTasksConf.MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_PERIOD,
-            String.class)).map(period -> (int) convertPeriodToSeconds(period)).orElseGet(() -> getProperty(
-        ControllerPeriodicTasksConf.MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_SECONDS,
-        ControllerPeriodicTasksConf.DEFAULT_MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_IN_SECONDS));
+        getProperty(ControllerPeriodicTasksConf.MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_PERIOD))
+        .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(() -> getProperty(
+            ControllerPeriodicTasksConf.MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_SECONDS,
+            ControllerPeriodicTasksConf.DEFAULT_MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_IN_SECONDS));
   }
 
   public void setMinionInstancesCleanupTaskMinOfflineTimeBeforeDeletionInSeconds(int maxOfflineTimeRangeInSeconds) {
@@ -771,40 +763,37 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public int getSegmentLevelValidationIntervalInSeconds() {
-    return Optional
-        .ofNullable(getProperty(ControllerPeriodicTasksConf.SEGMENT_LEVEL_VALIDATION_INTERVAL_PERIOD, String.class))
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.SEGMENT_LEVEL_VALIDATION_INTERVAL_PERIOD))
         .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(
             () -> getProperty(ControllerPeriodicTasksConf.SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS,
                 ControllerPeriodicTasksConf.DEFAULT_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS));
   }
 
   public long getStatusCheckerInitialDelayInSeconds() {
-    return Optional
-        .ofNullable(getProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_INITIAL_DELAY_PERIOD, String.class))
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_INITIAL_DELAY_PERIOD))
         .map(this::convertPeriodToSeconds).orElseGet(
             () -> getProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS,
                 ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds()));
   }
 
   public long getRetentionManagerInitialDelayInSeconds() {
-    return Optional
-        .ofNullable(getProperty(ControllerPeriodicTasksConf.RETENTION_MANAGER_INITIAL_DELAY_PERIOD, String.class))
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.RETENTION_MANAGER_INITIAL_DELAY_PERIOD))
         .map(this::convertPeriodToSeconds).orElseGet(
             () -> getProperty(ControllerPeriodicTasksConf.RETENTION_MANAGER_INITIAL_DELAY_IN_SECONDS,
                 ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds()));
   }
 
   public long getOfflineSegmentIntervalCheckerInitialDelayInSeconds() {
-    return Optional.ofNullable(
-        getProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_INITIAL_DELAY_PERIOD, String.class))
+    return Optional
+        .ofNullable(getProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_INITIAL_DELAY_PERIOD))
         .map(this::convertPeriodToSeconds).orElseGet(
             () -> getProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_INITIAL_DELAY_IN_SECONDS,
                 ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds()));
   }
 
   public long getRealtimeSegmentValidationManagerInitialDelaySeconds() {
-    return Optional.ofNullable(
-        getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_INITIAL_DELAY_PERIOD, String.class))
+    return Optional
+        .ofNullable(getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_INITIAL_DELAY_PERIOD))
         .map(this::convertPeriodToSeconds).orElseGet(
             () -> getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_INITIAL_DELAY_IN_SECONDS,
                 getPeriodicTaskInitialDelayInSeconds()));
@@ -824,8 +813,7 @@ public class ControllerConf extends PinotConfiguration {
    * REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS
    */
   public long getSegmentRelocatorInitialDelayInSeconds() {
-    return Optional
-        .ofNullable(getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_INITIAL_DELAY_PERIOD, String.class))
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_INITIAL_DELAY_PERIOD))
         .map(period -> TimeUnit.SECONDS.convert(TimeUtils.convertPeriodToMillis(period), TimeUnit.MILLISECONDS))
         .orElseGet(() -> {
           Long segmentRelocatorInitialDelaySeconds =
