@@ -163,7 +163,7 @@ public class ControllerConf extends PinotConfiguration {
     @Deprecated
     public static final String STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS =
         "controller.statusChecker.initialDelayInSeconds";
-    public static final String STATUS_CHECKER_INITIAL_DELAY_PERIOD = "controller.statusChecker.initialDelayInPeriod";
+    public static final String STATUS_CHECKER_INITIAL_DELAY_PERIOD = "controller.statusChecker.initialDelayPeriod";
 
     @Deprecated
     public static final String RETENTION_MANAGER_INITIAL_DELAY_IN_SECONDS =
@@ -220,9 +220,7 @@ public class ControllerConf extends PinotConfiguration {
   private static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "controller.realtime.segment.commit.timeoutSeconds";
   private static final String SEGMENT_COMMIT_TIMEOUT_PERIOD = "controller.realtime.segment.commit.timeoutPeriod";
 
-  @Deprecated
   private static final String DELETED_SEGMENTS_RETENTION_IN_DAYS = "controller.deleted.segments.retentionInDays";
-  private static final String DELETED_SEGMENTS_RETENTION_PERIOD = "controller.deleted.segments.retentionPeriod";
 
   public static final String TABLE_MIN_REPLICAS = "table.minReplicas";
   public static final String ENABLE_SPLIT_COMMIT = "controller.enable.split.commit";
@@ -671,9 +669,7 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public int getDeletedSegmentsRetentionInDays() {
-    return Optional.ofNullable(getProperty(DELETED_SEGMENTS_RETENTION_PERIOD, String.class))
-        .map(period -> (int) convertPeriodToUnit(period, TimeUnit.DAYS))
-        .orElseGet(() -> getProperty(DELETED_SEGMENTS_RETENTION_IN_DAYS, DEFAULT_DELETED_SEGMENTS_RETENTION_IN_DAYS));
+    return getProperty(DELETED_SEGMENTS_RETENTION_IN_DAYS, DEFAULT_DELETED_SEGMENTS_RETENTION_IN_DAYS);
   }
 
   public void setDeletedSegmentsRetentionInDays(int retentionInDays) {
