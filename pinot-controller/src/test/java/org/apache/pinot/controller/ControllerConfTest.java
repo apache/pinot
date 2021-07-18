@@ -26,6 +26,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.*;
 
+
 public class ControllerConfTest {
 
   private static final List<String> UNIT_CONFIGS =
@@ -98,12 +99,14 @@ public class ControllerConfTest {
   }
 
   /**
-   * When an invalid period config is specified, then an {@link IllegalArgumentException} is thrown
+   * When valid unit config and invalid period config are specified, then an {@link IllegalArgumentException} is thrown (valid unit
+   * config does not override invalid period config)
    */
   @Test(expectedExceptions = IllegalArgumentException.class)
-  public void invalidPeriodConfigsExceptionShouldBeThrown() {
+  public void validUnitConfigInvalidPeriodConfigExceptionShouldBeThrown() {
     //setup
     Map<String, Object> controllerConfig = new HashMap<>();
+    UNIT_CONFIGS.forEach(config -> controllerConfig.put(config, DURATION_IN_SECONDS));
     PERIOD_CONFIGS.forEach(config -> controllerConfig.put(config, DURATION_IN_PERIOD_INVALID));
     ControllerConf conf = new ControllerConf(controllerConfig);
     //execution and assertion
