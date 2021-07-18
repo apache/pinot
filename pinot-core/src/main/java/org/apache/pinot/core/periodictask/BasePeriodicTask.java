@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.periodictask;
 
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 import javax.annotation.concurrent.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +38,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   protected final String _taskName;
   protected final long _intervalInSeconds;
   protected final long _initialDelayInSeconds;
+  protected final ReentrantLock _runLock;
 
   private volatile boolean _started;
   private volatile boolean _running;
@@ -44,6 +47,9 @@ public abstract class BasePeriodicTask implements PeriodicTask {
     _taskName = taskName;
     _intervalInSeconds = runFrequencyInSeconds;
     _initialDelayInSeconds = initialDelayInSeconds;
+
+    // Don't allow task to run more than once at any given time.
+    _runLock = new ReentrantLock();
   }
 
   @Override
@@ -87,13 +93,15 @@ public abstract class BasePeriodicTask implements PeriodicTask {
       LOGGER.warn("Task: {} is already started", _taskName);
       return;
     }
-    _started = true;
 
     try {
       setUpTask();
     } catch (Exception e) {
       LOGGER.error("Caught exception while setting up task: {}", _taskName, e);
     }
+
+    // task should "run" only after "start" has completely initialized state.
+    _started = true;
   }
 
   /**
@@ -111,22 +119,29 @@ public abstract class BasePeriodicTask implements PeriodicTask {
    */
   @Override
   public final void run() {
-    _running = true;
+    try {
+      // Don't allow more than one run at a time.
+      _runLock.lock();
+      _running = true;
 
-    if (_started) {
-      long startTime = System.currentTimeMillis();
-      LOGGER.info("Start running task: {}", _taskName);
-      try {
-        runTask();
-      } catch (Exception e) {
-        LOGGER.error("Caught exception while running task: {}", _taskName, e);
+      if (_started) {
+        long startTime = System.currentTimeMillis();
+        LOGGER.info("Start running task: {}", _taskName);
+        try {
+          runTask();
+        } catch (Exception e) {
+          LOGGER.error("Caught exception while running task: {}", _taskName, e);
+        }
+        LOGGER.info("Finish running task: {} in {}ms", _taskName, System.currentTimeMillis() - startTime);
+      } else {
+        LOGGER.warn("Task: {} is skipped because it is not started or already stopped", _taskName);
       }
-      LOGGER.info("Finish running task: {} in {}ms", _taskName, System.currentTimeMillis() - startTime);
-    } else {
-      LOGGER.warn("Task: {} is skipped because it is not started or already stopped", _taskName);
-    }
 
-    _running = false;
+      _running = false;
+    } finally {
+       _runLock.unlock();
+       _running = false;
+    }
   }
 
   /**
@@ -149,27 +164,16 @@ public abstract class BasePeriodicTask implements PeriodicTask {
     }
     _started = false;
 
-    if (_running) {
-      long startTimeMs = System.currentTimeMillis();
-      long remainingTimeMs = MAX_PERIODIC_TASK_STOP_TIME_MILLIS;
-      LOGGER.info("Task: {} is running, wait for at most {}ms for it to finish", _taskName, remainingTimeMs);
-      while (_running && remainingTimeMs > 0L) {
-        long sleepTimeMs = Long.min(remainingTimeMs, 1000L);
-        remainingTimeMs -= sleepTimeMs;
-        try {
-          Thread.sleep(sleepTimeMs);
-        } catch (InterruptedException e) {
-          LOGGER.error("Caught InterruptedException while waiting for task: {} to finish", _taskName);
-          Thread.currentThread().interrupt();
-          break;
-        }
-      }
-      long waitTimeMs = System.currentTimeMillis() - startTimeMs;
-      if (_running) {
-        LOGGER.warn("Task: {} is not finished in {}ms", waitTimeMs);
+    try {
+      if (!_runLock.tryLock(MAX_PERIODIC_TASK_STOP_TIME_MILLIS, TimeUnit.MILLISECONDS)) {
+        LOGGER.warn("Task: {} did not finish within timeout of {}ms", MAX_PERIODIC_TASK_STOP_TIME_MILLIS);
       } else {
-        LOGGER.info("Task: {} is finished in {}ms", waitTimeMs);
+        LOGGER.warn("Task: {} finished within timeout of {}ms", MAX_PERIODIC_TASK_STOP_TIME_MILLIS);
       }
+    } catch (InterruptedException ie) {
+      Thread.currentThread().interrupt();
+    } finally {
+      _runLock.unlock();
     }
 
     try {
