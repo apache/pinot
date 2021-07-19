@@ -24,11 +24,9 @@ import org.apache.helix.messaging.handling.MessageHandler;
 import org.apache.helix.messaging.handling.MessageHandlerFactory;
 import org.apache.helix.model.Message;
 import org.apache.pinot.common.messages.RunPeriodicTaskMessage;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sun.rmi.runtime.Log;
 
 
 /** Factory class for creating message handlers for incoming helix messages. */
