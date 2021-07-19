@@ -159,19 +159,25 @@ public class PinotConnectionMetaData extends AbstractBaseConnectionMetaData {
 
     String tableName = schemaResponse.getSchemaName();
     int ordinalPosition = 1;
-    for (JsonNode columns : schemaResponse.getDimensions()) {
-      appendColumnMeta(pinotMeta, tableName, ordinalPosition, columns);
-      ordinalPosition++;
+    if (schemaResponse.getDimensions() != null) {
+      for (JsonNode columns : schemaResponse.getDimensions()) {
+        appendColumnMeta(pinotMeta, tableName, ordinalPosition, columns);
+        ordinalPosition++;
+      }
     }
 
-    for (JsonNode columns : schemaResponse.getMetrics()) {
-      appendColumnMeta(pinotMeta, tableName, ordinalPosition, columns);
-      ordinalPosition++;
+    if (schemaResponse.getMetrics() != null) {
+      for (JsonNode columns : schemaResponse.getMetrics()) {
+        appendColumnMeta(pinotMeta, tableName, ordinalPosition, columns);
+        ordinalPosition++;
+      }
     }
 
-    for (JsonNode columns : schemaResponse.getDateTimeFieldSpecs()) {
-      appendColumnMeta(pinotMeta, tableName, ordinalPosition, columns);
-      ordinalPosition++;
+    if (schemaResponse.getDateTimeFieldSpecs() != null) {
+      for (JsonNode columns : schemaResponse.getDateTimeFieldSpecs()) {
+        appendColumnMeta(pinotMeta, tableName, ordinalPosition, columns);
+        ordinalPosition++;
+      }
     }
 
     JsonNode resultTable = OBJECT_MAPPER.valueToTree(pinotMeta);
