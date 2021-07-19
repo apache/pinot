@@ -22,23 +22,18 @@ import com.google.common.collect.Lists;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.IntStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.core.segment.processing.filter.RecordFilterConfig;
-import org.apache.pinot.core.segment.processing.filter.RecordFilterFactory;
-import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
-import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
-import org.apache.pinot.core.segment.processing.transformer.RecordTransformerConfig;
+import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
+import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerConfig;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -65,10 +60,8 @@ public class SegmentProcessorFrameworkTest {
 
   private File _baseDir;
   private File _emptyInputDir;
-  private File _singleDaySingleSegment;
-  private File _multipleDaysSingleSegment;
-  private File _singleDayMultipleSegments;
-  private File _multipleDaysMultipleSegments;
+  private File _singleSegment;
+  private File _multipleSegments;
   private File _multiValueSegments;
   private File _tarredSegments;
 
@@ -77,14 +70,7 @@ public class SegmentProcessorFrameworkTest {
   private Schema _schema;
   private Schema _schemaMV;
 
-  private final List<Object[]> _rawDataSingleDay = Lists
-      .newArrayList(new Object[]{"abc", 1000, 1597795200000L}, new Object[]{null, 2000, 1597795200000L},
-          new Object[]{"abc", null, 1597795200000L}, new Object[]{"abc", 4000, 1597795200000L},
-          new Object[]{"abc", 3000, 1597795200000L}, new Object[]{null, null, 1597795200000L},
-          new Object[]{"xyz", 4000, 1597795200000L}, new Object[]{null, 1000, 1597795200000L},
-          new Object[]{"abc", 7000, 1597795200000L}, new Object[]{"xyz", 6000, 1597795200000L});
-
-  private final List<Object[]> _rawDataMultipleDays = Lists
+  private final List<Object[]> _rawData = Lists
       .newArrayList(new Object[]{"abc", 1000, 1597719600000L}, new Object[]{null, 2000, 1597773600000L},
           new Object[]{"abc", null, 1597777200000L}, new Object[]{"abc", 4000, 1597795200000L},
           new Object[]{"abc", 3000, 1597802400000L}, new Object[]{null, null, 1597838400000L},
@@ -121,24 +107,14 @@ public class SegmentProcessorFrameworkTest {
     // create segments in many folders
     _emptyInputDir = new File(_baseDir, "empty_input");
     assertTrue(_emptyInputDir.mkdirs());
-    // 1. Single segment, single day
-    _singleDaySingleSegment = new File(_baseDir, "input_segments_single_day_single_segment");
-    createInputSegments(_singleDaySingleSegment, _rawDataSingleDay, 1, _schema);
-    // 2. Single segment, multiple days
-    _multipleDaysSingleSegment = new File(_baseDir, "input_segments_multiple_day_single_segment");
-    createInputSegments(_multipleDaysSingleSegment, _rawDataMultipleDays, 1, _schema);
-    // 3. Multiple segments, single day
-    _singleDayMultipleSegments = new File(_baseDir, "input_segments_single_day_multiple_segment");
-    createInputSegments(_singleDayMultipleSegments, _rawDataSingleDay, 3, _schema);
-    // 4. Multiple segments, multiple days
-    _multipleDaysMultipleSegments = new File(_baseDir, "input_segments_multiple_day_multiple_segment");
-    createInputSegments(_multipleDaysMultipleSegments, _rawDataMultipleDays, 3, _schema);
-    // 5. Multi value
+    _singleSegment = new File(_baseDir, "single_segment");
+    createInputSegments(_singleSegment, _rawData, 1, _schema);
+    _multipleSegments = new File(_baseDir, "multiple_segments");
+    createInputSegments(_multipleSegments, _rawData, 3, _schema);
     _multiValueSegments = new File(_baseDir, "multi_value_segment");
     createInputSegments(_multiValueSegments, _rawDataMultiValue, 1, _schemaMV);
-    // 6. tarred segments
     _tarredSegments = new File(_baseDir, "tarred_segment");
-    createInputSegments(_tarredSegments, _rawDataSingleDay, 3, _schema);
+    createInputSegments(_tarredSegments, _rawData, 3, _schema);
     File[] segmentDirs = _tarredSegments.listFiles();
     assertNotNull(segmentDirs);
     for (File segmentDir : segmentDirs) {
@@ -240,7 +216,7 @@ public class SegmentProcessorFrameworkTest {
 
     // non existent output dir
     try {
-      new SegmentProcessorFramework(_singleDaySingleSegment, config, nonExistent);
+      new SegmentProcessorFramework(_singleSegment, config, nonExistent);
       fail("Should fail for non existent output dir");
     } catch (IllegalStateException e) {
       // expected
@@ -248,7 +224,7 @@ public class SegmentProcessorFrameworkTest {
 
     // file used as output dir
     try {
-      new SegmentProcessorFramework(_singleDaySingleSegment, config, fileInput);
+      new SegmentProcessorFramework(_singleSegment, config, fileInput);
       fail("Should fail for file used as output dir");
     } catch (IllegalStateException e) {
       // expected
@@ -256,7 +232,7 @@ public class SegmentProcessorFrameworkTest {
 
     // output dir not empty
     try {
-      new SegmentProcessorFramework(fileInput, config, _singleDaySingleSegment);
+      new SegmentProcessorFramework(fileInput, config, _singleSegment);
       fail("Should fail for output dir not empty");
     } catch (IllegalStateException e) {
       // expected
@@ -273,23 +249,22 @@ public class SegmentProcessorFrameworkTest {
   }
 
   @Test
-  public void testSingleDaySingleSegment()
+  public void testSingleSegment()
       throws Exception {
-    File outputSegmentDir = new File(_baseDir, "output_directory_single_day_single_segment");
+    File outputSegmentDir = new File(_baseDir, "single_segment_output");
     FileUtils.forceMkdir(outputSegmentDir);
 
-    // default configs
+    // Default configs
     SegmentProcessorConfig config =
         new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).build();
-    SegmentProcessorFramework framework =
-        new SegmentProcessorFramework(_singleDaySingleSegment, config, outputSegmentDir);
+    SegmentProcessorFramework framework = new SegmentProcessorFramework(_singleSegment, config, outputSegmentDir);
     framework.processSegments();
     framework.cleanup();
     File[] files = outputSegmentDir.listFiles();
     assertNotNull(files);
     assertEquals(files.length, 1);
     ImmutableSegment segment = ImmutableSegmentLoader.load(files[0], ReadMode.mmap);
-    SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
+    SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
     assertEquals(segmentMetadata.getTotalDocs(), 10);
     ColumnMetadata campaignMetadata = segmentMetadata.getColumnMetadataFor("campaign");
     assertEquals(campaignMetadata.getCardinality(), 3);
@@ -300,30 +275,30 @@ public class SegmentProcessorFrameworkTest {
     assertEquals(clicksMetadata.getMinValue(), 1000);
     assertEquals(clicksMetadata.getMaxValue(), 7000);
     ColumnMetadata timeMetadata = segmentMetadata.getColumnMetadataFor("time");
-    assertEquals(timeMetadata.getCardinality(), 1);
-    assertEquals(timeMetadata.getMinValue(), 1597795200000L);
-    assertEquals(timeMetadata.getMaxValue(), 1597795200000L);
+    assertEquals(timeMetadata.getCardinality(), 10);
+    assertEquals(timeMetadata.getMinValue(), 1597719600000L);
+    assertEquals(timeMetadata.getMaxValue(), 1597892400000L);
     DataSource campaignDataSource = segment.getDataSource("campaign");
     assertNull(campaignDataSource.getNullValueVector());
     DataSource clicksDataSource = segment.getDataSource("clicks");
     assertNull(clicksDataSource.getNullValueVector());
     DataSource timeDataSource = segment.getDataSource("time");
     assertNull(timeDataSource.getNullValueVector());
+    assertEquals(segmentMetadata.getName(), "myTable_1597719600000_1597892400000_0");
     segment.destroy();
-    assertEquals(files[0].getName(), "myTable_1597795200000_1597795200000_0");
     FileUtils.cleanDirectory(outputSegmentDir);
 
-    // default configs - null value enabled
+    // Default configs - null value enabled
     config =
         new SegmentProcessorConfig.Builder().setTableConfig(_tableConfigNullValueEnabled).setSchema(_schema).build();
-    framework = new SegmentProcessorFramework(_singleDaySingleSegment, config, outputSegmentDir);
+    framework = new SegmentProcessorFramework(_singleSegment, config, outputSegmentDir);
     framework.processSegments();
     framework.cleanup();
     files = outputSegmentDir.listFiles();
     assertNotNull(files);
     assertEquals(files.length, 1);
     segment = ImmutableSegmentLoader.load(files[0], ReadMode.mmap);
-    segmentMetadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
+    segmentMetadata = segment.getSegmentMetadata();
     assertEquals(segmentMetadata.getTotalDocs(), 10);
     campaignMetadata = segmentMetadata.getColumnMetadataFor("campaign");
     assertEquals(campaignMetadata.getCardinality(), 3);
@@ -334,9 +309,9 @@ public class SegmentProcessorFrameworkTest {
     assertEquals(clicksMetadata.getMinValue(), 1000);
     assertEquals(clicksMetadata.getMaxValue(), 7000);
     timeMetadata = segmentMetadata.getColumnMetadataFor("time");
-    assertEquals(timeMetadata.getCardinality(), 1);
-    assertEquals(timeMetadata.getMinValue(), 1597795200000L);
-    assertEquals(timeMetadata.getMaxValue(), 1597795200000L);
+    assertEquals(timeMetadata.getCardinality(), 10);
+    assertEquals(timeMetadata.getMinValue(), 1597719600000L);
+    assertEquals(timeMetadata.getMaxValue(), 1597892400000L);
     campaignDataSource = segment.getDataSource("campaign");
     NullValueVectorReader campaignNullValueVector = campaignDataSource.getNullValueVector();
     assertNotNull(campaignNullValueVector);
@@ -349,15 +324,103 @@ public class SegmentProcessorFrameworkTest {
     NullValueVectorReader timeNullValueVector = timeDataSource.getNullValueVector();
     assertNotNull(timeNullValueVector);
     assertTrue(timeNullValueVector.getNullBitmap().isEmpty());
+    assertEquals(segmentMetadata.getName(), "myTable_1597719600000_1597892400000_0");
     segment.destroy();
     FileUtils.cleanDirectory(outputSegmentDir);
 
-    // partition - null value enabled
+    // Time filter
+    config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setTimeHandlerConfig(
+        new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setTimeRange(1597795200000L, 1597881600000L).build())
+        .build();
+    framework = new SegmentProcessorFramework(_singleSegment, config, outputSegmentDir);
+    framework.processSegments();
+    framework.cleanup();
+    files = outputSegmentDir.listFiles();
+    assertNotNull(files);
+    assertEquals(files.length, 1);
+    segmentMetadata = new SegmentMetadataImpl(files[0]);
+    assertEquals(segmentMetadata.getTotalDocs(), 5);
+    timeMetadata = segmentMetadata.getColumnMetadataFor("time");
+    assertEquals(timeMetadata.getCardinality(), 5);
+    assertEquals(timeMetadata.getMinValue(), 1597795200000L);
+    assertEquals(timeMetadata.getMaxValue(), 1597878000000L);
+    assertEquals(segmentMetadata.getName(), "myTable_1597795200000_1597878000000_0");
+    FileUtils.cleanDirectory(outputSegmentDir);
+
+    // Time filter - filtered everything
+    config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setTimeHandlerConfig(
+        new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setTimeRange(1597968000000L, 1598054400000L).build())
+        .build();
+    framework = new SegmentProcessorFramework(_singleSegment, config, outputSegmentDir);
+    framework.processSegments();
+    framework.cleanup();
+    files = outputSegmentDir.listFiles();
+    assertNotNull(files);
+    assertEquals(files.length, 0);
+    FileUtils.cleanDirectory(outputSegmentDir);
+
+    // Time round
+    config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema)
+        .setTimeHandlerConfig(new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setRoundBucketMs(86400000).build())
+        .build();
+    framework = new SegmentProcessorFramework(_singleSegment, config, outputSegmentDir);
+    framework.processSegments();
+    framework.cleanup();
+    files = outputSegmentDir.listFiles();
+    assertNotNull(files);
+    assertEquals(files.length, 1);
+    segmentMetadata = new SegmentMetadataImpl(files[0]);
+    assertEquals(segmentMetadata.getTotalDocs(), 10);
+    timeMetadata = segmentMetadata.getColumnMetadataFor("time");
+    assertEquals(timeMetadata.getCardinality(), 3);
+    assertEquals(timeMetadata.getMinValue(), 1597708800000L);
+    assertEquals(timeMetadata.getMaxValue(), 1597881600000L);
+    assertEquals(segmentMetadata.getName(), "myTable_1597708800000_1597881600000_0");
+    FileUtils.cleanDirectory(outputSegmentDir);
+
+    // Time partition
+    config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setTimeHandlerConfig(
+        new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setPartitionBucketMs(86400000).build()).build();
+    framework = new SegmentProcessorFramework(_singleSegment, config, outputSegmentDir);
+    framework.processSegments();
+    framework.cleanup();
+    files = outputSegmentDir.listFiles();
+    assertNotNull(files);
+    assertEquals(files.length, 3);
+    Arrays.sort(files);
+    // segment 0
+    segmentMetadata = new SegmentMetadataImpl(files[0]);
+    assertEquals(segmentMetadata.getTotalDocs(), 3);
+    timeMetadata = segmentMetadata.getColumnMetadataFor("time");
+    assertEquals(timeMetadata.getCardinality(), 3);
+    assertEquals(timeMetadata.getMinValue(), 1597719600000L);
+    assertEquals(timeMetadata.getMaxValue(), 1597777200000L);
+    assertEquals(segmentMetadata.getName(), "myTable_1597719600000_1597777200000_0");
+    // segment 1
+    segmentMetadata = new SegmentMetadataImpl(files[1]);
+    assertEquals(segmentMetadata.getTotalDocs(), 5);
+    timeMetadata = segmentMetadata.getColumnMetadataFor("time");
+    assertEquals(timeMetadata.getCardinality(), 5);
+    assertEquals(timeMetadata.getMinValue(), 1597795200000L);
+    assertEquals(timeMetadata.getMaxValue(), 1597878000000L);
+    assertEquals(segmentMetadata.getName(), "myTable_1597795200000_1597878000000_1");
+    // segment 2
+    segmentMetadata = new SegmentMetadataImpl(files[2]);
+    assertEquals(segmentMetadata.getTotalDocs(), 2);
+    timeMetadata = segmentMetadata.getColumnMetadataFor("time");
+    assertEquals(timeMetadata.getCardinality(), 2);
+    assertEquals(timeMetadata.getMinValue(), 1597881600000L);
+    assertEquals(timeMetadata.getMaxValue(), 1597892400000L);
+    assertEquals(segmentMetadata.getName(), "myTable_1597881600000_1597892400000_2");
+    FileUtils.cleanDirectory(outputSegmentDir);
+
+    // Time filter, round, partition, rollup - null value enabled
     config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfigNullValueEnabled).setSchema(_schema)
-        .setPartitionerConfigs(Lists.newArrayList(
-            new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.ROUND_ROBIN)
-                .setNumPartitions(2).build())).build();
-    framework = new SegmentProcessorFramework(_singleDaySingleSegment, config, outputSegmentDir);
+        .setTimeHandlerConfig(
+            new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setTimeRange(1597708800000L, 1597881600000L)
+                .setRoundBucketMs(86400000).setPartitionBucketMs(86400000).build()).setMergeType(MergeType.ROLLUP)
+        .build();
+    framework = new SegmentProcessorFramework(_singleSegment, config, outputSegmentDir);
     framework.processSegments();
     framework.cleanup();
     files = outputSegmentDir.listFiles();
@@ -366,271 +429,13 @@ public class SegmentProcessorFrameworkTest {
     Arrays.sort(files);
     // segment 0
     segment = ImmutableSegmentLoader.load(files[0], ReadMode.mmap);
-    assertEquals(segment.getSegmentMetadata().getTotalDocs(), 5);
-    campaignDataSource = segment.getDataSource("campaign");
-    campaignNullValueVector = campaignDataSource.getNullValueVector();
-    assertNotNull(campaignNullValueVector);
-    assertTrue(campaignNullValueVector.getNullBitmap().isEmpty());
-    clicksDataSource = segment.getDataSource("clicks");
-    clicksNullValueVector = clicksDataSource.getNullValueVector();
-    assertNotNull(clicksNullValueVector);
-    assertEquals(clicksNullValueVector.getNullBitmap().toArray(), new int[]{1});
-    segment.destroy();
-    // segment 1
-    segment = ImmutableSegmentLoader.load(files[1], ReadMode.mmap);
-    assertEquals(segment.getSegmentMetadata().getTotalDocs(), 5);
-    campaignDataSource = segment.getDataSource("campaign");
-    campaignNullValueVector = campaignDataSource.getNullValueVector();
-    assertNotNull(campaignNullValueVector);
-    assertEquals(campaignNullValueVector.getNullBitmap().toArray(), new int[]{0, 2, 3});
-    clicksDataSource = segment.getDataSource("clicks");
-    clicksNullValueVector = clicksDataSource.getNullValueVector();
-    assertNotNull(clicksNullValueVector);
-    assertEquals(clicksNullValueVector.getNullBitmap().toArray(), new int[]{2});
-    segment.destroy();
-    FileUtils.cleanDirectory(outputSegmentDir);
-
-    // record filtering
-    config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setRecordFilterConfig(
-        new RecordFilterConfig.Builder().setRecordFilterType(RecordFilterFactory.RecordFilterType.FILTER_FUNCTION)
-            .setFilterFunction("Groovy({campaign == \"abc\"}, campaign)").build()).build();
-    framework = new SegmentProcessorFramework(_singleDaySingleSegment, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 1);
-    assertEquals(new SegmentMetadataImpl(files[0]).getTotalDocs(), 5);
-    FileUtils.cleanDirectory(outputSegmentDir);
-
-    // filtered everything
-    config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setRecordFilterConfig(
-        new RecordFilterConfig.Builder().setRecordFilterType(RecordFilterFactory.RecordFilterType.FILTER_FUNCTION)
-            .setFilterFunction("Groovy({clicks > 0}, clicks)").build()).build();
-    framework = new SegmentProcessorFramework(_singleDaySingleSegment, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 0);
-    FileUtils.cleanDirectory(outputSegmentDir);
-
-    // record transformation - null value enabled
-    Map<String, String> recordTransformationMap = new HashMap<>();
-    recordTransformationMap.put("clicks", "times(clicks, 0)");
-    config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfigNullValueEnabled).setSchema(_schema)
-        .setRecordTransformerConfig(
-            new RecordTransformerConfig.Builder().setTransformFunctionsMap(recordTransformationMap).build()).build();
-    framework = new SegmentProcessorFramework(_singleDaySingleSegment, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 1);
-    segment = ImmutableSegmentLoader.load(files[0], ReadMode.mmap);
-    segmentMetadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
-    assertEquals(segmentMetadata.getTotalDocs(), 10);
-    clicksMetadata = segmentMetadata.getColumnMetadataFor("clicks");
-    assertEquals(clicksMetadata.getCardinality(), 1);
-    assertEquals(clicksMetadata.getMinValue(), 0);
-    assertEquals(clicksMetadata.getMaxValue(), 0);
-    clicksDataSource = segment.getDataSource("clicks");
-    clicksNullValueVector = clicksDataSource.getNullValueVector();
-    assertNotNull(clicksNullValueVector);
-    assertEquals(clicksNullValueVector.getNullBitmap().toArray(), new int[]{2, 5});
-    segment.destroy();
-    FileUtils.cleanDirectory(outputSegmentDir);
-
-    // rollup
-    config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema)
-        .setMergeType(MergeType.ROLLUP).build();
-    framework = new SegmentProcessorFramework(_singleDaySingleSegment, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 1);
-    segment = ImmutableSegmentLoader.load(files[0], ReadMode.mmap);
-    segmentMetadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
-    assertEquals(segmentMetadata.getTotalDocs(), 3);
-    campaignMetadata = segmentMetadata.getColumnMetadataFor("campaign");
-    assertEquals(campaignMetadata.getCardinality(), 3);
-    assertEquals(campaignMetadata.getMinValue(), "");
-    assertEquals(campaignMetadata.getMaxValue(), "xyz");
-    clicksMetadata = segmentMetadata.getColumnMetadataFor("clicks");
-    assertEquals(clicksMetadata.getCardinality(), 3);
-    assertEquals(clicksMetadata.getMinValue(), 4000);
-    assertEquals(clicksMetadata.getMaxValue(), 16000);
-    timeMetadata = segmentMetadata.getColumnMetadataFor("time");
-    assertEquals(timeMetadata.getCardinality(), 1);
-    assertEquals(timeMetadata.getMinValue(), 1597795200000L);
-    assertEquals(timeMetadata.getMaxValue(), 1597795200000L);
-    segment.destroy();
-    FileUtils.cleanDirectory(outputSegmentDir);
-
-    // rollup - null value enabled
-    config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfigNullValueEnabled).setSchema(_schema)
-        .setMergeType(MergeType.ROLLUP).build();
-    framework = new SegmentProcessorFramework(_singleDaySingleSegment, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 1);
-    segment = ImmutableSegmentLoader.load(files[0], ReadMode.mmap);
-    segmentMetadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
-    assertEquals(segmentMetadata.getTotalDocs(), 3);
-    campaignMetadata = segmentMetadata.getColumnMetadataFor("campaign");
-    assertEquals(campaignMetadata.getCardinality(), 3);
-    assertEquals(campaignMetadata.getMinValue(), "");
-    assertEquals(campaignMetadata.getMaxValue(), "xyz");
-    clicksMetadata = segmentMetadata.getColumnMetadataFor("clicks");
-    assertEquals(clicksMetadata.getCardinality(), 3);
-    assertEquals(clicksMetadata.getMinValue(), 3000);
-    assertEquals(clicksMetadata.getMaxValue(), 15000);
-    timeMetadata = segmentMetadata.getColumnMetadataFor("time");
-    assertEquals(timeMetadata.getCardinality(), 1);
-    assertEquals(timeMetadata.getMinValue(), 1597795200000L);
-    assertEquals(timeMetadata.getMaxValue(), 1597795200000L);
-    campaignDataSource = segment.getDataSource("campaign");
-    campaignNullValueVector = campaignDataSource.getNullValueVector();
-    assertNotNull(campaignNullValueVector);
-    assertEquals(campaignNullValueVector.getNullBitmap().toArray(), new int[]{0});
-    clicksDataSource = segment.getDataSource("clicks");
-    clicksNullValueVector = clicksDataSource.getNullValueVector();
-    assertNotNull(clicksNullValueVector);
-    assertTrue(clicksNullValueVector.getNullBitmap().isEmpty());
-    timeDataSource = segment.getDataSource("time");
-    timeNullValueVector = timeDataSource.getNullValueVector();
-    assertNotNull(timeNullValueVector);
-    assertTrue(timeNullValueVector.getNullBitmap().isEmpty());
-    segment.destroy();
-    FileUtils.cleanDirectory(outputSegmentDir);
-
-    // dedup
-    config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema)
-        .setMergeType(MergeType.DEDUP).build();
-    framework = new SegmentProcessorFramework(_singleDaySingleSegment, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 1);
-    assertEquals(new SegmentMetadataImpl(files[0]).getTotalDocs(), 8);
-    FileUtils.cleanDirectory(outputSegmentDir);
-
-    // segment config
-    config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setSegmentConfig(
-        new SegmentConfig.Builder().setMaxNumRecordsPerSegment(4).setSegmentNamePrefix("myPrefix").build()).build();
-    framework = new SegmentProcessorFramework(_singleDaySingleSegment, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 3);
-    Arrays.sort(files);
-    assertEquals(new SegmentMetadataImpl(files[0]).getTotalDocs(), 4);
-    assertEquals(new SegmentMetadataImpl(files[1]).getTotalDocs(), 4);
-    assertEquals(new SegmentMetadataImpl(files[2]).getTotalDocs(), 2);
-    assertEquals(files[0].getName(), "myPrefix_1597795200000_1597795200000_0");
-    assertEquals(files[1].getName(), "myPrefix_1597795200000_1597795200000_1");
-    assertEquals(files[2].getName(), "myPrefix_1597795200000_1597795200000_2");
-    FileUtils.cleanDirectory(outputSegmentDir);
-  }
-
-  @Test
-  public void testMultipleDaysSingleSegment()
-      throws Exception {
-    File outputSegmentDir = new File(_baseDir, "output_directory_multiple_days_single_segment");
-    FileUtils.forceMkdir(outputSegmentDir);
-
-    // default configs
-    SegmentProcessorConfig config =
-        new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).build();
-    SegmentProcessorFramework framework =
-        new SegmentProcessorFramework(_multipleDaysSingleSegment, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    File[] files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 1);
-    assertEquals(new SegmentMetadataImpl(files[0]).getTotalDocs(), 10);
-    FileUtils.cleanDirectory(outputSegmentDir);
-
-    // date partition
-    config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setPartitionerConfigs(
-        Lists.newArrayList(
-            new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE)
-                .setColumnName("time").build())).build();
-    framework = new SegmentProcessorFramework(_multipleDaysSingleSegment, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 10);
-    for (File file : files) {
-      assertEquals(new SegmentMetadataImpl(file).getTotalDocs(), 1);
-    }
-    FileUtils.cleanDirectory(outputSegmentDir);
-
-    // date partition - round
-    config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setPartitionerConfigs(
-        Lists.newArrayList(
-            new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
-                .setTransformFunction("round(\"time\", 86400000)").build())).build();
-    framework = new SegmentProcessorFramework(_multipleDaysSingleSegment, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 3);
-    Arrays.sort(files);
-    // segment 0
-    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(files[0]);
-    assertEquals(segmentMetadata.getTotalDocs(), 3);
-    ColumnMetadata timeMetadata = segmentMetadata.getColumnMetadataFor("time");
-    assertEquals(timeMetadata.getCardinality(), 3);
-    assertEquals(timeMetadata.getMinValue(), 1597719600000L);
-    assertEquals(timeMetadata.getMaxValue(), 1597777200000L);
-    // segment 1
-    segmentMetadata = new SegmentMetadataImpl(files[1]);
-    assertEquals(segmentMetadata.getTotalDocs(), 5);
-    timeMetadata = segmentMetadata.getColumnMetadataFor("time");
-    assertEquals(timeMetadata.getCardinality(), 5);
-    assertEquals(timeMetadata.getMinValue(), 1597795200000L);
-    assertEquals(timeMetadata.getMaxValue(), 1597878000000L);
-    // segment 2
-    segmentMetadata = new SegmentMetadataImpl(files[2]);
+    segmentMetadata = segment.getSegmentMetadata();
     assertEquals(segmentMetadata.getTotalDocs(), 2);
-    timeMetadata = segmentMetadata.getColumnMetadataFor("time");
-    assertEquals(timeMetadata.getCardinality(), 2);
-    assertEquals(timeMetadata.getMinValue(), 1597881600000L);
-    assertEquals(timeMetadata.getMaxValue(), 1597892400000L);
-    FileUtils.cleanDirectory(outputSegmentDir);
-
-    // round, date partition, rollup - null value enabled
-    config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfigNullValueEnabled).setSchema(_schema)
-        .setMergeType(MergeType.ROLLUP).setRecordTransformerConfig(new RecordTransformerConfig.Builder()
-            .setTransformFunctionsMap(Collections.singletonMap("time", "round(\"time\", 86400000)")).build())
-        .setPartitionerConfigs(Lists.newArrayList(
-            new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE)
-                .setColumnName("time").build())).build();
-    framework = new SegmentProcessorFramework(_multipleDaysSingleSegment, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 3);
-    Arrays.sort(files);
-    // segment 0
-    ImmutableSegment segment = ImmutableSegmentLoader.load(files[0], ReadMode.mmap);
-    segmentMetadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
-    assertEquals(segmentMetadata.getTotalDocs(), 2);
-    ColumnMetadata campaignMetadata = segmentMetadata.getColumnMetadataFor("campaign");
+    campaignMetadata = segmentMetadata.getColumnMetadataFor("campaign");
     assertEquals(campaignMetadata.getCardinality(), 2);
     assertEquals(campaignMetadata.getMinValue(), "");
     assertEquals(campaignMetadata.getMaxValue(), "abc");
-    ColumnMetadata clicksMetadata = segmentMetadata.getColumnMetadataFor("clicks");
+    clicksMetadata = segmentMetadata.getColumnMetadataFor("clicks");
     assertEquals(clicksMetadata.getCardinality(), 2);
     assertEquals(clicksMetadata.getMinValue(), 1000);
     assertEquals(clicksMetadata.getMaxValue(), 2000);
@@ -638,22 +443,23 @@ public class SegmentProcessorFrameworkTest {
     assertEquals(timeMetadata.getCardinality(), 1);
     assertEquals(timeMetadata.getMinValue(), 1597708800000L);
     assertEquals(timeMetadata.getMaxValue(), 1597708800000L);
-    DataSource campaignDataSource = segment.getDataSource("campaign");
-    NullValueVectorReader campaignNullValueVector = campaignDataSource.getNullValueVector();
+    campaignDataSource = segment.getDataSource("campaign");
+    campaignNullValueVector = campaignDataSource.getNullValueVector();
     assertNotNull(campaignNullValueVector);
     assertEquals(campaignNullValueVector.getNullBitmap().toArray(), new int[]{0});
-    DataSource clicksDataSource = segment.getDataSource("clicks");
-    NullValueVectorReader clicksNullValueVector = clicksDataSource.getNullValueVector();
+    clicksDataSource = segment.getDataSource("clicks");
+    clicksNullValueVector = clicksDataSource.getNullValueVector();
     assertNotNull(clicksNullValueVector);
     assertTrue(clicksNullValueVector.getNullBitmap().isEmpty());
-    DataSource timeDataSource = segment.getDataSource("time");
-    NullValueVectorReader timeNullValueVector = timeDataSource.getNullValueVector();
+    timeDataSource = segment.getDataSource("time");
+    timeNullValueVector = timeDataSource.getNullValueVector();
     assertNotNull(timeNullValueVector);
     assertTrue(timeNullValueVector.getNullBitmap().isEmpty());
+    assertEquals(segmentMetadata.getName(), "myTable_1597708800000_1597708800000_0");
     segment.destroy();
     // segment 1
     segment = ImmutableSegmentLoader.load(files[1], ReadMode.mmap);
-    segmentMetadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
+    segmentMetadata = segment.getSegmentMetadata();
     assertEquals(segmentMetadata.getTotalDocs(), 3);
     campaignMetadata = segmentMetadata.getColumnMetadataFor("campaign");
     assertEquals(campaignMetadata.getCardinality(), 3);
@@ -679,109 +485,87 @@ public class SegmentProcessorFrameworkTest {
     timeNullValueVector = timeDataSource.getNullValueVector();
     assertNotNull(timeNullValueVector);
     assertTrue(timeNullValueVector.getNullBitmap().isEmpty());
-    segment.destroy();
-    // segment 2
-    segment = ImmutableSegmentLoader.load(files[2], ReadMode.mmap);
-    segmentMetadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
-    assertEquals(segmentMetadata.getTotalDocs(), 2);
-    campaignMetadata = segmentMetadata.getColumnMetadataFor("campaign");
-    assertEquals(campaignMetadata.getCardinality(), 2);
-    assertEquals(campaignMetadata.getMinValue(), "abc");
-    assertEquals(campaignMetadata.getMaxValue(), "xyz");
-    clicksMetadata = segmentMetadata.getColumnMetadataFor("clicks");
-    assertEquals(clicksMetadata.getCardinality(), 2);
-    assertEquals(clicksMetadata.getMinValue(), 6000);
-    assertEquals(clicksMetadata.getMaxValue(), 7000);
-    timeMetadata = segmentMetadata.getColumnMetadataFor("time");
-    assertEquals(timeMetadata.getCardinality(), 1);
-    assertEquals(timeMetadata.getMinValue(), 1597881600000L);
-    assertEquals(timeMetadata.getMaxValue(), 1597881600000L);
-    timeDataSource = segment.getDataSource("campaign");
-    campaignNullValueVector = timeDataSource.getNullValueVector();
-    assertNotNull(campaignNullValueVector);
-    assertTrue(campaignNullValueVector.getNullBitmap().isEmpty());
-    clicksDataSource = segment.getDataSource("clicks");
-    clicksNullValueVector = clicksDataSource.getNullValueVector();
-    assertNotNull(clicksNullValueVector);
-    assertTrue(clicksNullValueVector.getNullBitmap().isEmpty());
-    timeDataSource = segment.getDataSource("time");
-    timeNullValueVector = timeDataSource.getNullValueVector();
-    assertNotNull(timeNullValueVector);
-    assertTrue(timeNullValueVector.getNullBitmap().isEmpty());
+    assertEquals(segmentMetadata.getName(), "myTable_1597795200000_1597795200000_1");
     segment.destroy();
     FileUtils.cleanDirectory(outputSegmentDir);
-  }
 
-  @Test
-  public void testSingleDayMultipleSegments()
-      throws Exception {
-    File outputSegmentDir = new File(_baseDir, "output_directory_single_day_multiple_segments");
-    FileUtils.forceMkdir(outputSegmentDir);
-
-    // default configs
-    SegmentProcessorConfig config =
-        new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).build();
-    SegmentProcessorFramework framework =
-        new SegmentProcessorFramework(_singleDayMultipleSegments, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    File[] files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 1);
-    assertEquals(new SegmentMetadataImpl(files[0]).getTotalDocs(), 10);
-    FileUtils.cleanDirectory(outputSegmentDir);
-
-    // rollup
+    // Time round, dedup
     config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema)
-        .setMergeType(MergeType.ROLLUP).build();
-    FileUtils.deleteQuietly(outputSegmentDir);
-    assertTrue(outputSegmentDir.mkdirs());
-    framework = new SegmentProcessorFramework(_singleDayMultipleSegments, config, outputSegmentDir);
+        .setTimeHandlerConfig(new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setRoundBucketMs(86400000).build())
+        .setMergeType(MergeType.DEDUP).build();
+    framework = new SegmentProcessorFramework(_singleSegment, config, outputSegmentDir);
     framework.processSegments();
     framework.cleanup();
     files = outputSegmentDir.listFiles();
     assertNotNull(files);
     assertEquals(files.length, 1);
-    assertEquals(new SegmentMetadataImpl(files[0]).getTotalDocs(), 3);
-    FileUtils.cleanDirectory(outputSegmentDir);
-  }
-
-  @Test
-  public void testMultipleDaysMultipleSegments()
-      throws Exception {
-    File outputSegmentDir = new File(_baseDir, "output_directory_multiple_days_multiple_segments");
-    FileUtils.forceMkdir(outputSegmentDir);
-
-    // default configs
-    SegmentProcessorConfig config =
-        new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).build();
-    SegmentProcessorFramework framework =
-        new SegmentProcessorFramework(_multipleDaysMultipleSegments, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    File[] files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 1);
-    assertEquals(new SegmentMetadataImpl(files[0]).getTotalDocs(), 10);
+    segmentMetadata = new SegmentMetadataImpl(files[0]);
+    assertEquals(segmentMetadata.getTotalDocs(), 8);
+    assertEquals(segmentMetadata.getName(), "myTable_1597708800000_1597881600000_0");
     FileUtils.cleanDirectory(outputSegmentDir);
 
-    // round, date partition, rollup
-    config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema)
-        .setMergeType(MergeType.ROLLUP).setRecordTransformerConfig(new RecordTransformerConfig.Builder()
-            .setTransformFunctionsMap(Collections.singletonMap("time", "round(\"time\", 86400000)")).build())
-        .setPartitionerConfigs(Lists.newArrayList(
-            new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE)
-                .setColumnName("time").build())).build();
-    framework = new SegmentProcessorFramework(_multipleDaysMultipleSegments, config, outputSegmentDir);
+    // Segment config
+    config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setSegmentConfig(
+        new SegmentConfig.Builder().setMaxNumRecordsPerSegment(4).setSegmentNamePrefix("myPrefix").build()).build();
+    framework = new SegmentProcessorFramework(_singleSegment, config, outputSegmentDir);
     framework.processSegments();
     framework.cleanup();
     files = outputSegmentDir.listFiles();
     assertNotNull(files);
     assertEquals(files.length, 3);
     Arrays.sort(files);
-    assertEquals(new SegmentMetadataImpl(files[0]).getTotalDocs(), 2);
-    assertEquals(new SegmentMetadataImpl(files[1]).getTotalDocs(), 3);
-    assertEquals(new SegmentMetadataImpl(files[2]).getTotalDocs(), 2);
+    segmentMetadata = new SegmentMetadataImpl(files[0]);
+    assertEquals(segmentMetadata.getTotalDocs(), 4);
+    assertEquals(segmentMetadata.getName(), "myPrefix_1597719600000_1597795200000_0");
+    segmentMetadata = new SegmentMetadataImpl(files[1]);
+    assertEquals(segmentMetadata.getTotalDocs(), 4);
+    assertEquals(segmentMetadata.getName(), "myPrefix_1597802400000_1597878000000_1");
+    segmentMetadata = new SegmentMetadataImpl(files[2]);
+    assertEquals(segmentMetadata.getTotalDocs(), 2);
+    assertEquals(segmentMetadata.getName(), "myPrefix_1597881600000_1597892400000_2");
+    FileUtils.cleanDirectory(outputSegmentDir);
+  }
+
+  @Test
+  public void testMultipleSegments()
+      throws Exception {
+    File outputSegmentDir = new File(_baseDir, "multiple_segments_output");
+    FileUtils.forceMkdir(outputSegmentDir);
+
+    // Default configs
+    SegmentProcessorConfig config =
+        new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).build();
+    SegmentProcessorFramework framework = new SegmentProcessorFramework(_multipleSegments, config, outputSegmentDir);
+    framework.processSegments();
+    framework.cleanup();
+    File[] files = outputSegmentDir.listFiles();
+    assertNotNull(files);
+    assertEquals(files.length, 1);
+    SegmentMetadata segmentMetadata = new SegmentMetadataImpl(files[0]);
+    assertEquals(segmentMetadata.getTotalDocs(), 10);
+    assertEquals(segmentMetadata.getName(), "myTable_1597719600000_1597892400000_0");
+    FileUtils.cleanDirectory(outputSegmentDir);
+
+    // Time round, partition, rollup
+    config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setTimeHandlerConfig(
+        new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setRoundBucketMs(86400000).setPartitionBucketMs(86400000)
+            .build()).setMergeType(MergeType.ROLLUP).build();
+    framework = new SegmentProcessorFramework(_multipleSegments, config, outputSegmentDir);
+    framework.processSegments();
+    framework.cleanup();
+    files = outputSegmentDir.listFiles();
+    assertNotNull(files);
+    assertEquals(files.length, 3);
+    Arrays.sort(files);
+    segmentMetadata = new SegmentMetadataImpl(files[0]);
+    assertEquals(segmentMetadata.getTotalDocs(), 2);
+    assertEquals(segmentMetadata.getName(), "myTable_1597708800000_1597708800000_0");
+    segmentMetadata = new SegmentMetadataImpl(files[1]);
+    assertEquals(segmentMetadata.getTotalDocs(), 3);
+    assertEquals(segmentMetadata.getName(), "myTable_1597795200000_1597795200000_1");
+    segmentMetadata = new SegmentMetadataImpl(files[2]);
+    assertEquals(segmentMetadata.getTotalDocs(), 2);
+    assertEquals(segmentMetadata.getName(), "myTable_1597881600000_1597881600000_2");
     FileUtils.cleanDirectory(outputSegmentDir);
   }
 
@@ -791,7 +575,7 @@ public class SegmentProcessorFrameworkTest {
     File outputSegmentDir = new File(_baseDir, "output_directory_multi_value");
     FileUtils.forceMkdir(outputSegmentDir);
 
-    // rollup - null value enabled
+    // Rollup - null value enabled
     SegmentProcessorConfig config =
         new SegmentProcessorConfig.Builder().setTableConfig(_tableConfigNullValueEnabled).setSchema(_schemaMV)
             .setMergeType(MergeType.ROLLUP).build();
@@ -828,10 +612,11 @@ public class SegmentProcessorFrameworkTest {
     NullValueVectorReader timeNullValueVector = timeDataSource.getNullValueVector();
     assertNotNull(timeNullValueVector);
     assertTrue(timeNullValueVector.getNullBitmap().isEmpty());
+    assertEquals(segmentMetadata.getName(), "myTable_1597795200000_1597795200000_0");
     segment.destroy();
     FileUtils.cleanDirectory(outputSegmentDir);
 
-    // dedup
+    // Dedup
     config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfigNullValueEnabled).setSchema(_schemaMV)
         .setMergeType(MergeType.DEDUP).build();
     framework = new SegmentProcessorFramework(_multiValueSegments, config, outputSegmentDir);
@@ -855,6 +640,7 @@ public class SegmentProcessorFrameworkTest {
     assertEquals(timeMetadata.getCardinality(), 1);
     assertEquals(timeMetadata.getMinValue(), 1597795200000L);
     assertEquals(timeMetadata.getMaxValue(), 1597795200000L);
+    assertEquals(segmentMetadata.getName(), "myTable_1597795200000_1597795200000_0");
     segment.destroy();
     FileUtils.cleanDirectory(outputSegmentDir);
   }
@@ -865,7 +651,7 @@ public class SegmentProcessorFrameworkTest {
     File outputSegmentDir = new File(_baseDir, "output_directory_tarred");
     FileUtils.forceMkdir(outputSegmentDir);
 
-    // default configs
+    // Default configs
     SegmentProcessorConfig config =
         new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).build();
     SegmentProcessorFramework framework = new SegmentProcessorFramework(_tarredSegments, config, outputSegmentDir);
@@ -874,7 +660,9 @@ public class SegmentProcessorFrameworkTest {
     File[] files = outputSegmentDir.listFiles();
     assertNotNull(files);
     assertEquals(files.length, 1);
-    assertEquals(new SegmentMetadataImpl(files[0]).getTotalDocs(), 10);
+    SegmentMetadata segmentMetadata = new SegmentMetadataImpl(files[0]);
+    assertEquals(segmentMetadata.getTotalDocs(), 10);
+    assertEquals(segmentMetadata.getName(), "myTable_1597719600000_1597892400000_0");
     FileUtils.cleanDirectory(outputSegmentDir);
   }
 

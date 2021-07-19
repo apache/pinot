@@ -18,24 +18,16 @@
  */
 package org.apache.pinot.core.segment.processing.partitioner;
 
-import org.apache.pinot.segment.local.function.FunctionEvaluator;
-import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
- * Partitioner which evaluates a transform function using the row to get the partition value
+ * Partitioner for GenericRow
  */
-public class TransformFunctionPartitioner implements Partitioner {
+public interface Partitioner {
 
-  private final FunctionEvaluator _functionEvaluator;
-
-  public TransformFunctionPartitioner(String transformFunction) {
-    _functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
-  }
-
-  @Override
-  public String getPartition(GenericRow genericRow) {
-    return String.valueOf(_functionEvaluator.evaluate(genericRow));
-  }
+  /**
+   * Computes a partition value for the given row
+   */
+  String getPartition(GenericRow genericRow);
 }
