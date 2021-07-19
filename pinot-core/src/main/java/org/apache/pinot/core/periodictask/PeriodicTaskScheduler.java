@@ -108,4 +108,15 @@ public class PeriodicTaskScheduler {
       _tasksWithValidInterval.parallelStream().forEach(PeriodicTask::stop);
     }
   }
+
+  /** @return true if task with given name exists; otherwise, false. */
+  public boolean hasTask(String taskName) {
+    for (PeriodicTask task : _tasksWithValidInterval) {
+      if (task.getTaskName().equals(taskName)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
 }

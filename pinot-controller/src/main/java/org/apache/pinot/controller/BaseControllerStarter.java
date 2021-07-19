@@ -407,6 +407,11 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _periodicTaskScheduler.init(controllerPeriodicTasks);
     _periodicTaskScheduler.start();
 
+    // Register message handler for incoming user-defined messages.
+    _helixParticipantManager.getMessagingService()
+        .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(),
+            new ControllerMessageHandlerFactory(_periodicTaskScheduler));
+
     String accessControlFactoryClass = _config.getAccessControlFactoryClass();
     LOGGER.info("Use class: {} as the AccessControlFactory", accessControlFactoryClass);
     final AccessControlFactory accessControlFactory;
@@ -439,6 +444,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(accessControlFactory).to(AccessControlFactory.class);
         bind(metadataEventNotifierFactory).to(MetadataEventNotifierFactory.class);
         bind(_leadControllerManager).to(LeadControllerManager.class);
+        bind(_periodicTaskScheduler).to(PeriodicTaskScheduler.class);
       }
     });
 
