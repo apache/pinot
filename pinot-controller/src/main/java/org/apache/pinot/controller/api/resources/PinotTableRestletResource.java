@@ -659,7 +659,7 @@ public class PinotTableRestletResource {
           Response.Status.NOT_IMPLEMENTED);
     }
     String tableNameWithType =
-        Utils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
     SegmentsValidationAndRetentionConfig segmentsConfig =
         tableConfig != null ? tableConfig.getValidationConfig() : null;

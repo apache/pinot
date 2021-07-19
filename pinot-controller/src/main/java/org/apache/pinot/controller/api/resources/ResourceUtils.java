@@ -28,7 +28,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.slf4j.Logger;
 
 
-public class Utils {
+public class ResourceUtils {
 
   public static List<String> getExistingTableNamesWithType(PinotHelixResourceManager pinotHelixResourceManager,
       String tableName, @Nullable TableType tableType, Logger logger) {
