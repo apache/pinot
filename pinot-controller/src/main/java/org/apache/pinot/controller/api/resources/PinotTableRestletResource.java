@@ -658,7 +658,8 @@ public class PinotTableRestletResource {
       throw new ControllerApplicationException(LOGGER, "Table type : " + tableTypeStr + " not yet supported.",
           Response.Status.NOT_IMPLEMENTED);
     }
-    String tableNameWithType = getExistingTableNamesWithType(tableName, tableType).get(0);
+    String tableNameWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
     SegmentsValidationAndRetentionConfig segmentsConfig =
         tableConfig != null ? tableConfig.getValidationConfig() : null;
@@ -675,16 +676,6 @@ public class PinotTableRestletResource {
           Response.Status.INTERNAL_SERVER_ERROR, ioe);
     }
     return segmentsMetadata;
-  }
-
-  private List<String> getExistingTableNamesWithType(String tableName, @Nullable TableType tableType) {
-    try {
-      return _pinotHelixResourceManager.getExistingTableNamesWithType(tableName, tableType);
-    } catch (TableNotFoundException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
-    } catch (IllegalArgumentException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.FORBIDDEN);
-    }
   }
 
   /**
