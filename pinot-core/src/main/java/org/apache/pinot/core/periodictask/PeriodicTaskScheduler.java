@@ -110,13 +110,46 @@ public class PeriodicTaskScheduler {
   }
 
   /** @return true if task with given name exists; otherwise, false. */
-  public boolean hasTask(String taskName) {
+  public boolean hasTask(String periodicTaskName) {
     for (PeriodicTask task : _tasksWithValidInterval) {
-      if (task.getTaskName().equals(taskName)) {
+      if (task.getTaskName().equals(periodicTaskName)) {
         return true;
       }
     }
 
     return false;
+  }
+
+  private PeriodicTask getPeriodicTask(String periodicTaskName) {
+    for (PeriodicTask task : _tasksWithValidInterval) {
+      if (task.getTaskName().equals(periodicTaskName)) {
+        return task;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Execute specified {@link PeriodicTask} immediately. If the task is already running, then wait for the running task
+   * to complete before executing the task again.
+   */
+  public void execute(String periodicTaskName) {
+    PeriodicTask periodicTask = getPeriodicTask(periodicTaskName);
+
+    if (periodicTask == null) {
+      throw new IllegalArgumentException("Unknown Periodic Task " + periodicTaskName);
+    }
+
+    _executorService.schedule(() -> {
+      try {
+        // To prevent thread conflict, this call will block if the same task is already running (see
+        // BasePeriodicTask.run method).
+        periodicTask.run();
+      } catch (Throwable t) {
+        // catch all errors to prevent subsequent executions from being silently suppressed
+        // Ref: https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ScheduledExecutorService.html#scheduleWithFixedDelay-java.lang.Runnable-long-long-java.util.concurrent.TimeUnit-
+        LOGGER.warn("Caught exception while attempting to execute named periodic task: {}", periodicTask.getTaskName(), t);
+      }
+    }, periodicTask.getInitialDelayInSeconds(), TimeUnit.SECONDS);
   }
 }

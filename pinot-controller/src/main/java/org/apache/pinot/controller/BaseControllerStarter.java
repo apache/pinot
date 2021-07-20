@@ -407,7 +407,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _periodicTaskScheduler.init(controllerPeriodicTasks);
     _periodicTaskScheduler.start();
 
-    // Register message handler for incoming user-defined messages.
+    // Register message handler for incoming user-defined helix messages.
     _helixParticipantManager.getMessagingService()
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(),
             new ControllerMessageHandlerFactory(_periodicTaskScheduler));

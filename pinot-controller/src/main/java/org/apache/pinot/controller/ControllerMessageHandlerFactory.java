@@ -42,12 +42,12 @@ public class ControllerMessageHandlerFactory implements MessageHandlerFactory {
   @Override
   public MessageHandler createHandler(Message message, NotificationContext notificationContext) {
     String messageType = message.getMsgSubType();
-    if (!messageType.equals(RunPeriodicTaskMessage.RUN_PERIODIC_TASK_MSG_SUB_TYPE)) {
-      LOGGER.error("Bad message type {} received by controller. ", messageType);
-      return null;
+    if (messageType.equals(RunPeriodicTaskMessage.RUN_PERIODIC_TASK_MSG_SUB_TYPE)) {
+      return new RunPeriodicTaskMessageHandler(new RunPeriodicTaskMessage(message), notificationContext, _periodicTaskScheduler);
     }
 
-    return new RunPeriodicTaskMessageHandler(new RunPeriodicTaskMessage(message), notificationContext);
+    LOGGER.error("Bad message type {} received by controller. ", messageType);
+    return null;
   }
 
   @Override
@@ -61,13 +61,19 @@ public class ControllerMessageHandlerFactory implements MessageHandlerFactory {
 
   /** Message handler for "Run Periodic Task" message. */
   private static class RunPeriodicTaskMessageHandler extends MessageHandler {
-    RunPeriodicTaskMessageHandler(Message message, NotificationContext context) {
+    private final String _periodicTaskName;
+    private final PeriodicTaskScheduler _periodicTaskScheduler;
+
+    RunPeriodicTaskMessageHandler(RunPeriodicTaskMessage message, NotificationContext context, PeriodicTaskScheduler periodicTaskScheduler) {
       super(message, context);
+      _periodicTaskName = message.getPeriodicTaskName();
+      _periodicTaskScheduler = periodicTaskScheduler;
     }
 
     @Override
     public HelixTaskResult handleMessage()
         throws InterruptedException {
+      _periodicTaskScheduler.execute(_periodicTaskName);
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       helixTaskResult.setSuccess(true);
       return helixTaskResult;

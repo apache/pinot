@@ -25,7 +25,10 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.model.Message;
 
 
-/** Helix message that is sent to all controllers from the controller that received API call to execute a periodic task. */
+/**
+ * Upon receiving this message, Controller will execute the specified PeriodicTask against the tables for which it is
+ * the lead controller. The message is sent whenever API call for executing a PeriodicTask is invoked.
+ */
 public class RunPeriodicTaskMessage extends Message {
   public static final String RUN_PERIODIC_TASK_MSG_SUB_TYPE = "PERIODIC_TASK";
   private static final String PERIODIC_TASK_NAME_KEY = "periodicTaskName";
@@ -43,5 +46,9 @@ public class RunPeriodicTaskMessage extends Message {
     String msgSubType = message.getMsgSubType();
     Preconditions.checkArgument(msgSubType.equals(RUN_PERIODIC_TASK_MSG_SUB_TYPE),
         "Invalid message sub type: " + msgSubType + " for RunPeriodicTaskMessage");
+  }
+
+  public String getPeriodicTaskName() {
+    return getRecord().getSimpleField(PERIODIC_TASK_NAME_KEY);
   }
 }
