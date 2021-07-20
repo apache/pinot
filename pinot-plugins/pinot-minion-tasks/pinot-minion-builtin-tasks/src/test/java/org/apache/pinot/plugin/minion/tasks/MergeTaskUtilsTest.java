@@ -27,6 +27,7 @@ import org.apache.pinot.core.segment.processing.framework.MergeType;
 import org.apache.pinot.core.segment.processing.framework.SegmentConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
+import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerConfig;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -46,9 +47,9 @@ public class MergeTaskUtilsTest {
   @Test
   public void testGetTimeHandlerConfig() {
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTimeColumnName("millisSinceEpoch").build();
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTimeColumnName("dateTime").build();
     Schema schema = new Schema.SchemaBuilder()
-        .addDateTime("millisSinceEpoch", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+        .addDateTime("dateTime", DataType.LONG, "1:SECONDS:SIMPLE_DATE_FORMAT:yyyyMMddHHmmss", "1:SECONDS").build();
     Map<String, String> taskConfig = new HashMap<>();
     long expectedWindowStartMs = 1625097600000L;
     long expectedWindowEndMs = 1625184000000L;
@@ -61,6 +62,7 @@ public class MergeTaskUtilsTest {
 
     TimeHandlerConfig timeHandlerConfig = MergeTaskUtils.getTimeHandlerConfig(tableConfig, schema, taskConfig);
     assertNotNull(timeHandlerConfig);
+    assertEquals(timeHandlerConfig.getType(), TimeHandler.Type.EPOCH);
     assertEquals(timeHandlerConfig.getStartTimeMs(), expectedWindowStartMs);
     assertEquals(timeHandlerConfig.getEndTimeMs(), expectedWindowEndMs);
     assertEquals(timeHandlerConfig.getRoundBucketMs(), expectedRoundBucketMs);
