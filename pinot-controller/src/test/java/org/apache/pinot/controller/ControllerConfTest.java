@@ -102,15 +102,14 @@ public class ControllerConfTest {
    * When valid unit config and invalid period config are specified, then an {@link IllegalArgumentException} is thrown (valid unit
    * config does not override invalid period config)
    */
-  @Test(expectedExceptions = IllegalArgumentException.class)
+  @Test
   public void validUnitConfigInvalidPeriodConfigExceptionShouldBeThrown() {
     //setup
     Map<String, Object> controllerConfig = new HashMap<>();
     UNIT_CONFIGS.forEach(config -> controllerConfig.put(config, DURATION_IN_SECONDS));
     PERIOD_CONFIGS.forEach(config -> controllerConfig.put(config, DURATION_IN_PERIOD_INVALID));
     ControllerConf conf = new ControllerConf(controllerConfig);
-    //execution and assertion
-    conf.getSegmentRelocatorInitialDelayInSeconds();
+    Assert.assertThrows(IllegalArgumentException.class, conf::getSegmentRelocatorInitialDelayInSeconds);
   }
 
   private void assertOnDurations(ControllerConf conf, int expectedDuration) {

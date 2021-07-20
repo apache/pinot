@@ -212,13 +212,9 @@ public class ControllerConf extends PinotConfiguration {
     private static final int DEFAULT_SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS = 60 * 60;
   }
 
-  @Deprecated
   private static final String SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = "server.request.timeoutSeconds";
-  private static final String SERVER_ADMIN_REQUEST_TIMEOUT_PERIOD = "server.request.timeoutPeriod";
 
-  @Deprecated
   private static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "controller.realtime.segment.commit.timeoutSeconds";
-  private static final String SEGMENT_COMMIT_TIMEOUT_PERIOD = "controller.realtime.segment.commit.timeoutPeriod";
 
   private static final String DELETED_SEGMENTS_RETENTION_IN_DAYS = "controller.deleted.segments.retentionInDays";
 
@@ -406,9 +402,8 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public int getSegmentCommitTimeoutSeconds() {
-    return Optional.ofNullable(getProperty(SEGMENT_COMMIT_TIMEOUT_PERIOD))
-        .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(() -> getProperty(SEGMENT_COMMIT_TIMEOUT_SECONDS,
-            SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds()));
+    return getProperty(SEGMENT_COMMIT_TIMEOUT_SECONDS,
+        SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds());
   }
 
   public boolean isUpdateSegmentStateModel() {
@@ -496,13 +491,14 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   /**
-   * Returns the config value for controller.offline.segment.interval.checker.frequencyInSeconds if
-   * it exists. If it doesn't exist, returns the segment level validation interval. This is done in
-   * order to retain the current behavior, wherein the offline validation tasks were done at segment
-   * level validation interval frequency The default value is the new
-   * DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS
+   * Returns <code>controller.offline.segment.interval.checker.frequencyPeriod</code>, or
+   * <code>controller.offline.segment.interval.checker.frequencyPeriod</code> or the segment level
+   * validation interval, in the order of decreasing preference from left to right. Falls-back to
+   * the next config only if the current config is missing. This is done in order to retain the
+   * current behavior, wherein the offline validation tasks were done at segment level validation
+   * interval frequency The default value is the new DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS
    *
-   * @return
+   * @return the supplied config in seconds
    */
   public int getOfflineSegmentIntervalCheckerFrequencyInSeconds() {
     return Optional
@@ -518,12 +514,13 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   /**
-   * Returns the config value for controller.realtime.segment.validation.frequencyInSeconds if it
-   * exists. If it doesn't exist, returns the validation controller frequency. This is done in order
-   * to retain the current behavior, wherein the realtime validation tasks were done at validation
-   * controller frequency The default value is the new DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS
+   * Returns <code>controller.realtime.segment.validation.frequencyPeriod</code> or
+   * <code>controller.realtime.segment.validation.frequencyInSeconds</code> or the validation
+   * controller frequency, in the order of decreasing preference from left to right. This is done in
+   * order to retain the current behavior, wherein the realtime validation tasks were done at
+   * validation controller frequency The default value is the new DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS
    *
-   * @return
+   * @return supplied config in seconds
    */
   public int getRealtimeSegmentValidationFrequencyInSeconds() {
     return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_PERIOD))
@@ -545,12 +542,13 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   /**
-   * Returns the config value for  controller.broker.resource.validation.frequencyInSeconds if it
-   * exists. If it doesn't exist, returns the validation controller frequency. This is done in order
+   * Return <code>controller.broker.resource.validation.frequencyPeriod</code> or
+   * <code>controller.broker.resource.validation.frequencyInSeconds</code> or the validation
+   * controller frequency in order of decreasing preference from left to righ. This is done in order
    * to retain the current behavior, wherein the broker resource validation tasks were done at
    * validation controller frequency The default value is the new DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS
    *
-   * @return
+   * @return the supplied config in seconds
    */
   public int getBrokerResourceValidationFrequencyInSeconds() {
     return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_PERIOD))
@@ -615,9 +613,10 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   /**
-   * RealtimeSegmentRelocator has been rebranded to SegmentRelocator. Check for
-   * SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS property, if not found, return
-   * REALTIME_SEGMENT_RELOCATOR_FREQUENCY
+   * RealtimeSegmentRelocator has been rebranded to SegmentRelocator. Returns
+   * <code>controller.segment.relocator.frequencyInSeconds</code> or <code>controller.segment.relocator.frequencyInSeconds</code>
+   * or REALTIME_SEGMENT_RELOCATOR_FREQUENCY, in the order of decreasing perference (left ->
+   * right).
    */
   public int getSegmentRelocatorFrequencyInSeconds() {
     return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_FREQUENCY_PERIOD))
@@ -655,10 +654,7 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public int getServerAdminRequestTimeoutSeconds() {
-    return Optional.ofNullable(getProperty(SERVER_ADMIN_REQUEST_TIMEOUT_PERIOD))
-        .map(period -> (int) TimeUnit.SECONDS.convert(TimeUtils.convertPeriodToMillis(period), TimeUnit.MILLISECONDS))
-        .orElseGet(
-            () -> getProperty(SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS, DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS));
+    return getProperty(SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS, DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS);
   }
 
   public int getDeletedSegmentsRetentionInDays() {
