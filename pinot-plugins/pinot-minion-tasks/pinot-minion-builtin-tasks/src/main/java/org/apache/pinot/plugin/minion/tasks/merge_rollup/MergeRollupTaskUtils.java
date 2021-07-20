@@ -18,100 +18,38 @@
  */
 package org.apache.pinot.plugin.minion.tasks.merge_rollup;
 
-import com.google.common.base.Preconditions;
-import java.util.HashMap;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.minion.Granularity;
-import org.apache.pinot.core.common.MinionConstants;
-import org.apache.pinot.core.segment.processing.framework.MergeType;
-import org.apache.pinot.pql.parsers.utils.Pair;
-import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.utils.TimeUtils;
+import java.util.TreeMap;
+import org.apache.pinot.core.common.MinionConstants.MergeTask;
 
 
 public class MergeRollupTaskUtils {
   //@formatter:off
-  private static final String[] validMergeProperties = {
-      MinionConstants.MergeRollupTask.MERGE_TYPE_KEY,
-      MinionConstants.MergeRollupTask.BUFFER_TIME,
-      MinionConstants.MergeRollupTask.MAX_NUM_RECORDS_PER_SEGMENT,
-      MinionConstants.MergeRollupTask.MAX_NUM_RECORDS_PER_TASK
-  };
-
-  private static final String[] validMergeType = {
-      MergeType.CONCAT.name(),
-      MergeType.ROLLUP.name()
+  private static final String[] VALID_CONFIG_KEYS = {
+      MergeTask.BUCKET_TIME_PERIOD_KEY,
+      MergeTask.BUFFER_TIME_PERIOD_KEY,
+      MergeTask.ROUND_BUCKET_TIME_PERIOD_KEY,
+      MergeTask.MERGE_TYPE_KEY,
+      MergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY,
+      MergeTask.MAX_NUM_RECORDS_PER_TASK_KEY
   };
   //@formatter:on
 
-  public static Map<String, AggregationFunctionType> getRollupAggregationTypes(Map<String, String> mergeRollupConfig) {
-    Map<String, AggregationFunctionType> aggregationTypes = new HashMap<>();
-    for (Map.Entry<String, String> entry : mergeRollupConfig.entrySet()) {
-      if (entry.getKey().startsWith(MinionConstants.MergeRollupTask.AGGREGATE_KEY_PREFIX)) {
-        aggregationTypes.put(getAggregateColumn(entry.getKey()),
-            AggregationFunctionType.getAggregationFunctionType(entry.getValue()));
+  /**
+   * Extracts a map from merge level to config from the task config.
+   * <p>The config for a specific level should have key of format "{level}.{configKey}" within the task config.
+   */
+  public static Map<String, Map<String, String>> getLevelToConfigMap(Map<String, String> taskConfig) {
+    Map<String, Map<String, String>> levelToConfigMap = new TreeMap<>();
+    for (Map.Entry<String, String> entry : taskConfig.entrySet()) {
+      String key = entry.getKey();
+      for (String configKey : VALID_CONFIG_KEYS) {
+        if (key.endsWith(configKey)) {
+          String level = key.substring(0, key.length() - configKey.length() - 1);
+          levelToConfigMap.computeIfAbsent(level, k -> new TreeMap<>()).put(configKey, entry.getValue());
+        }
       }
     }
-    return aggregationTypes;
-  }
-
-  public static Map<Granularity, MergeProperties> getAllMergeProperties(Map<String, String> mergeRollupConfig) {
-    Map<Granularity, Map<String, String>> mergePropertiesMap = new HashMap<>();
-    for (Map.Entry<String, String> entry : mergeRollupConfig.entrySet()) {
-      if (entry.getKey().startsWith(MinionConstants.MergeRollupTask.MERGE_KEY_PREFIX)) {
-        Pair<Granularity, String> pair = getGranularityAndPropertyPair(entry.getKey(), entry.getValue());
-        Granularity granularity = pair.getFirst();
-        String mergeProperty = pair.getSecond();
-        mergePropertiesMap.putIfAbsent(granularity, new HashMap<>());
-        mergePropertiesMap.get(granularity).put(mergeProperty, entry.getValue());
-      }
-    }
-
-    Map<Granularity, MergeProperties> allMergeProperties = new HashMap<>();
-    for (Map.Entry<Granularity, Map<String, String>> entry : mergePropertiesMap.entrySet()) {
-      Map<String, String> properties = entry.getValue();
-      MergeProperties mergeProperties =
-          new MergeProperties(properties.get(MinionConstants.MergeRollupTask.MERGE_TYPE_KEY).toUpperCase(),
-              TimeUtils.convertPeriodToMillis(properties.get(MinionConstants.MergeRollupTask.BUFFER_TIME)),
-              Long.parseLong(properties.get(MinionConstants.MergeRollupTask.MAX_NUM_RECORDS_PER_SEGMENT)),
-              Long.parseLong(properties.get(MinionConstants.MergeRollupTask.MAX_NUM_RECORDS_PER_TASK)));
-      allMergeProperties.put(entry.getKey(), mergeProperties);
-    }
-    return allMergeProperties;
-  }
-
-  private static String getAggregateColumn(String rollupAggregateConfigKey) {
-    return rollupAggregateConfigKey
-        .split(MinionConstants.MergeRollupTask.AGGREGATE_KEY_PREFIX + MinionConstants.DOT_SEPARATOR)[1];
-  }
-
-  private static Pair<Granularity, String> getGranularityAndPropertyPair(String mergePropertyConfigKey,
-      String mergePropertyConfigValue) {
-    String[] components = StringUtils.split(mergePropertyConfigKey, MinionConstants.DOT_SEPARATOR);
-    Preconditions.checkState(components.length == 3);
-    Preconditions.checkState(isValidMergeProperties(components[2]));
-    if (components[2].equals(MinionConstants.MergeRollupTask.MERGE_TYPE_KEY)) {
-      Preconditions.checkState(isValidMergeType(mergePropertyConfigValue));
-    }
-    return new Pair<>((Granularity.valueOf(components[1].toUpperCase())), components[2]);
-  }
-
-  private static boolean isValidMergeProperties(String property) {
-    for (String validProperty : validMergeProperties) {
-      if (property.equals(validProperty)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private static boolean isValidMergeType(String mergeType) {
-    for (String validMergeType : validMergeType) {
-      if (mergeType.toUpperCase().equals(validMergeType)) {
-        return true;
-      }
-    }
-    return false;
+    return levelToConfigMap;
   }
 }

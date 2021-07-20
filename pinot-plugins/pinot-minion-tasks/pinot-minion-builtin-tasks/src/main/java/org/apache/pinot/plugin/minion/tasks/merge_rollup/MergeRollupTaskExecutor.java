@@ -21,20 +21,19 @@ package org.apache.pinot.plugin.minion.tasks.merge_rollup;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.core.common.MinionConstants.MergeRollupTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
-import org.apache.pinot.core.segment.processing.framework.MergeType;
-import org.apache.pinot.core.segment.processing.framework.SegmentConfig;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorConfig;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorFramework;
 import org.apache.pinot.plugin.minion.tasks.BaseMultipleSegmentsConversionExecutor;
+import org.apache.pinot.plugin.minion.tasks.MergeTaskUtils;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
-import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
@@ -42,13 +41,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Task executor that provides merge and rollup service
- *
- * TODO:
- *   1. Add the support for roll-up
- *   2. Add the support for time split to provide backfill support for merged segments
- *   3. Add merge/rollup name prefixes for generated segments
- *   4. Add the support for realtime table
+ * Task executor that provides merge and rollup service.
  */
 public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(MergeRollupTaskExecutor.class);
@@ -64,27 +57,29 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
     LOGGER.info("Starting task: {} with configs: {}", taskType, configs);
     long startMillis = System.currentTimeMillis();
 
-    Preconditions.checkState(
-        MergeType.CONCAT.name().equalsIgnoreCase(configs.get(MinionConstants.MergeRollupTask.MERGE_TYPE_KEY)),
-        "Only 'CONCAT' mode is currently supported.");
-
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
     TableConfig tableConfig = getTableConfig(tableNameWithType);
     Schema schema = getSchema(tableNameWithType);
 
-    Map<String, AggregationFunctionType> aggregationTypes = MergeRollupTaskUtils.getRollupAggregationTypes(configs);
-    String numRecordsPerSegmentString = configs.get(MinionConstants.MergeRollupTask.MAX_NUM_RECORDS_PER_SEGMENT);
-
     SegmentProcessorConfig.Builder segmentProcessorConfigBuilder =
-        new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema)
-            .setMergeType(MergeType.CONCAT);
-    if (!aggregationTypes.isEmpty()) {
-      segmentProcessorConfigBuilder.setAggregationTypes(aggregationTypes);
-    }
-    if (numRecordsPerSegmentString != null) {
-      segmentProcessorConfigBuilder.setSegmentConfig(
-          new SegmentConfig.Builder().setMaxNumRecordsPerSegment(Integer.parseInt(numRecordsPerSegmentString)).build());
-    }
+        new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema);
+
+    // Time handler config
+    segmentProcessorConfigBuilder
+        .setTimeHandlerConfig(MergeTaskUtils.getTimeHandlerConfig(tableConfig, schema, configs));
+
+    // Partitioner config
+    segmentProcessorConfigBuilder
+        .setPartitionerConfigs(MergeTaskUtils.getPartitionerConfigs(tableConfig, schema, configs));
+
+    // Merge type
+    segmentProcessorConfigBuilder.setMergeType(MergeTaskUtils.getMergeType(configs));
+
+    // Aggregation types
+    segmentProcessorConfigBuilder.setAggregationTypes(MergeTaskUtils.getAggregationTypes(configs));
+
+    // Segment config
+    segmentProcessorConfigBuilder.setSegmentConfig(MergeTaskUtils.getSegmentConfig(configs));
 
     SegmentProcessorConfig segmentProcessorConfig = segmentProcessorConfigBuilder.build();
 
@@ -120,8 +115,10 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
   @Override
   protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier(PinotTaskConfig pinotTaskConfig,
       SegmentConversionResult segmentConversionResult) {
-    return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE, Collections
-        .singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE + MinionConstants.TASK_BUCKET_GRANULARITY_SUFFIX,
-            pinotTaskConfig.getConfigs().get(MinionConstants.MergeRollupTask.GRANULARITY_KEY).toUpperCase()));
+    Map<String, String> updateMap = new TreeMap<>();
+    updateMap.put(MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY,
+        pinotTaskConfig.getConfigs().get(MergeRollupTask.MERGE_LEVEL_KEY));
+    updateMap.put(MergeRollupTask.SEGMENT_ZK_METADATA_TIME_KEY, String.valueOf(System.currentTimeMillis()));
+    return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE, updateMap);
   }
 }

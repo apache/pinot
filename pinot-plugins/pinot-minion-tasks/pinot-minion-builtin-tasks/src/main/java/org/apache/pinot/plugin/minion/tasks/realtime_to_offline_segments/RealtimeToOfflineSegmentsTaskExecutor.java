@@ -19,11 +19,9 @@
 package org.apache.pinot.plugin.minion.tasks.realtime_to_offline_segments;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -34,23 +32,14 @@ import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.RealtimeToOfflineSegmentsTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.core.segment.processing.framework.MergeType;
-import org.apache.pinot.core.segment.processing.framework.SegmentConfig;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorConfig;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorFramework;
-import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
-import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
-import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
-import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerConfig;
 import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.plugin.minion.tasks.BaseMultipleSegmentsConversionExecutor;
+import org.apache.pinot.plugin.minion.tasks.MergeTaskUtils;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
-import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
-import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,7 +72,6 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
 
   private final MinionTaskZkMetadataManager _minionTaskZkMetadataManager;
   private int _expectedVersion = Integer.MIN_VALUE;
-  private long _nextWatermark;
 
   public RealtimeToOfflineSegmentsTaskExecutor(MinionTaskZkMetadataManager minionTaskZkMetadataManager) {
     _minionTaskZkMetadataManager = minionTaskZkMetadataManager;
@@ -130,63 +118,34 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
     TableConfig tableConfig = getTableConfig(offlineTableName);
     Schema schema = getSchema(offlineTableName);
-    String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
-    DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumn);
-    Preconditions
-        .checkState(dateTimeFieldSpec != null, "No valid spec found for time column: %s in schema for table: %s",
-            timeColumn, offlineTableName);
+
     SegmentProcessorConfig.Builder segmentProcessorConfigBuilder =
         new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema);
 
-    long windowStartMs = Long.parseLong(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY));
-    long windowEndMs = Long.parseLong(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY));
-    _nextWatermark = windowEndMs;
-
     // Time handler config
-    TimeHandlerConfig.Builder timeHandlerConfigBuilder =
-        new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setTimeRange(windowStartMs, windowEndMs);
-    String roundBucketTimePeriod = configs.get(RealtimeToOfflineSegmentsTask.ROUND_BUCKET_TIME_PERIOD_KEY);
-    if (roundBucketTimePeriod != null) {
-      timeHandlerConfigBuilder.setRoundBucketMs(TimeUtils.convertPeriodToMillis(roundBucketTimePeriod));
-    }
-    segmentProcessorConfigBuilder.setTimeHandlerConfig(timeHandlerConfigBuilder.build());
+    segmentProcessorConfigBuilder
+        .setTimeHandlerConfig(MergeTaskUtils.getTimeHandlerConfig(tableConfig, schema, configs));
 
-    // Partitioner config from tableConfig
-    SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
-    if (segmentPartitionConfig != null) {
-      PartitionerConfig partitionerConfig = getPartitionerConfig(segmentPartitionConfig, offlineTableName, schema);
-      segmentProcessorConfigBuilder.setPartitionerConfigs(Lists.newArrayList(partitionerConfig));
-    }
+    // Partitioner config
+    segmentProcessorConfigBuilder
+        .setPartitionerConfigs(MergeTaskUtils.getPartitionerConfigs(tableConfig, schema, configs));
 
     // Merge type
-    String mergeType = configs.get(RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY);
-    // Handle deprecated key
+    MergeType mergeType = MergeTaskUtils.getMergeType(configs);
+    // Handle legacy key
     if (mergeType == null) {
-      mergeType = configs.get(RealtimeToOfflineSegmentsTask.COLLECTOR_TYPE_KEY);
-    }
-    if (mergeType != null) {
-      segmentProcessorConfigBuilder.setMergeType(MergeType.valueOf(mergeType.toUpperCase()));
-    }
-
-    // Aggregation types
-    Map<String, AggregationFunctionType> aggregationTypes = new HashMap<>();
-    for (Map.Entry<String, String> entry : configs.entrySet()) {
-      String key = entry.getKey();
-      if (key.endsWith(RealtimeToOfflineSegmentsTask.AGGREGATION_TYPE_KEY_SUFFIX)) {
-        String column = key.split(RealtimeToOfflineSegmentsTask.AGGREGATION_TYPE_KEY_SUFFIX)[0];
-        aggregationTypes.put(column, AggregationFunctionType.getAggregationFunctionType(entry.getValue()));
+      String legacyMergeTypeStr = configs.get(RealtimeToOfflineSegmentsTask.COLLECTOR_TYPE_KEY);
+      if (legacyMergeTypeStr != null) {
+        mergeType = MergeType.valueOf(legacyMergeTypeStr.toUpperCase());
       }
     }
-    if (!aggregationTypes.isEmpty()) {
-      segmentProcessorConfigBuilder.setAggregationTypes(aggregationTypes);
-    }
+    segmentProcessorConfigBuilder.setMergeType(mergeType);
+
+    // Aggregation types
+    segmentProcessorConfigBuilder.setAggregationTypes(MergeTaskUtils.getAggregationTypes(configs));
 
     // Segment config
-    String maxNumRecordsPerSegment = configs.get(RealtimeToOfflineSegmentsTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY);
-    if (maxNumRecordsPerSegment != null) {
-      segmentProcessorConfigBuilder.setSegmentConfig(
-          new SegmentConfig.Builder().setMaxNumRecordsPerSegment(Integer.parseInt(maxNumRecordsPerSegment)).build());
-    }
+    segmentProcessorConfigBuilder.setSegmentConfig(MergeTaskUtils.getSegmentConfig(configs));
 
     SegmentProcessorConfig segmentProcessorConfig = segmentProcessorConfigBuilder.build();
 
@@ -226,9 +185,11 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
    */
   @Override
   public void postProcess(PinotTaskConfig pinotTaskConfig) {
-    String realtimeTableName = pinotTaskConfig.getConfigs().get(MinionConstants.TABLE_NAME_KEY);
+    Map<String, String> configs = pinotTaskConfig.getConfigs();
+    String realtimeTableName = configs.get(MinionConstants.TABLE_NAME_KEY);
+    long waterMarkMs = Long.parseLong(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY));
     RealtimeToOfflineSegmentsTaskMetadata newMinionMetadata =
-        new RealtimeToOfflineSegmentsTaskMetadata(realtimeTableName, _nextWatermark);
+        new RealtimeToOfflineSegmentsTaskMetadata(realtimeTableName, waterMarkMs);
     _minionTaskZkMetadataManager.setRealtimeToOfflineSegmentsTaskMetadata(newMinionMetadata, _expectedVersion);
   }
 
@@ -237,21 +198,5 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
       SegmentConversionResult segmentConversionResult) {
     return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE,
         Collections.emptyMap());
-  }
-
-  /**
-   * Construct a {@link PartitionerConfig} using {@link SegmentPartitionConfig} from the table config
-   */
-  private PartitionerConfig getPartitionerConfig(SegmentPartitionConfig partitionConfig, String tableNameWithType,
-      Schema schema) {
-    Map<String, ColumnPartitionConfig> columnPartitionMap = partitionConfig.getColumnPartitionMap();
-    Preconditions.checkState(columnPartitionMap.size() == 1,
-        "Cannot partition using more than 1 ColumnPartitionConfig for table: %s", tableNameWithType);
-    Map.Entry<String, ColumnPartitionConfig> entry = columnPartitionMap.entrySet().iterator().next();
-    String partitionColumn = entry.getKey();
-    Preconditions.checkState(schema.hasColumn(partitionColumn),
-        "Partition column: %s does not exist in the schema for table: %s", partitionColumn, tableNameWithType);
-    return new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TABLE_PARTITION_CONFIG)
-        .setColumnName(partitionColumn).setColumnPartitionConfig(entry.getValue()).build();
   }
 }
