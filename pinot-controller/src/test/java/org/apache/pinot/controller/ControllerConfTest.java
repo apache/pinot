@@ -41,7 +41,6 @@ public class ControllerConfTest {
           DEPRECATED_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS,
           DEPRECATED_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS, DEPRECATED_STATUS_CHECKER_FREQUENCY_IN_SECONDS,
           DEPRECATED_TASK_MANAGER_FREQUENCY_IN_SECONDS, DEPRECATED_MINION_INSTANCES_CLEANUP_TASK_FREQUENCY_IN_SECONDS,
-          DEPRECATED_MINION_INSTANCES_CLEANUP_TASK_INITIAL_DELAY_SECONDS,
           DEPRECATED_MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_SECONDS,
           DEPRECATED_TASK_METRICS_EMITTER_FREQUENCY_IN_SECONDS, DEPRECATED_SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS,
           DEPRECATED_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS,
@@ -52,7 +51,7 @@ public class ControllerConfTest {
       .asList(RETENTION_MANAGER_FREQUENCY_PERIOD, OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_PERIOD,
           REALTIME_SEGMENT_VALIDATION_FREQUENCY_PERIOD, BROKER_RESOURCE_VALIDATION_FREQUENCY_PERIOD,
           STATUS_CHECKER_FREQUENCY_PERIOD, TASK_MANAGER_FREQUENCY_PERIOD,
-          MINION_INSTANCES_CLEANUP_TASK_FREQUENCY_PERIOD, MINION_INSTANCES_CLEANUP_TASK_INITIAL_DELAY_PERIOD,
+          MINION_INSTANCES_CLEANUP_TASK_FREQUENCY_PERIOD,
           MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_PERIOD, TASK_METRICS_EMITTER_FREQUENCY_PERIOD,
           SEGMENT_RELOCATOR_FREQUENCY_PERIOD, SEGMENT_LEVEL_VALIDATION_INTERVAL_PERIOD,
           STATUS_CHECKER_WAIT_FOR_PUSH_TIME_PERIOD);
@@ -101,7 +100,6 @@ public class ControllerConfTest {
     //put some invalid new configs
     controllerConfig.put(RETENTION_MANAGER_FREQUENCY_PERIOD, getRandomString());
     ControllerConf conf = new ControllerConf(controllerConfig);
-    Assert.assertThrows(IllegalArgumentException.class, conf::getSegmentRelocatorInitialDelayInSeconds);
     Assert.assertThrows(IllegalArgumentException.class, conf::getRetentionControllerFrequencyInSeconds);
   }
 
@@ -151,41 +149,27 @@ public class ControllerConfTest {
   }
 
   private void assertOnDurations(ControllerConf conf, long expectedDuration) {
-    long segmentRelocatorInitialDelayInSeconds = conf.getSegmentRelocatorInitialDelayInSeconds();
-    long offlineSegmentIntervalCheckerInitialDelayInSeconds =
-        conf.getOfflineSegmentIntervalCheckerInitialDelayInSeconds();
-    long statusCheckerInitialDelayInSeconds = conf.getStatusCheckerInitialDelayInSeconds();
     int segmentLevelValidationIntervalInSeconds = conf.getSegmentLevelValidationIntervalInSeconds();
     int segmentRelocatorFrequencyInSeconds = conf.getSegmentRelocatorFrequencyInSeconds();
     int taskMetricsEmitterFrequencyInSeconds = conf.getTaskMetricsEmitterFrequencyInSeconds();
     int minionInstancesCleanupTaskMinOfflineTimeBeforeDeletionInSeconds =
         conf.getMinionInstancesCleanupTaskMinOfflineTimeBeforeDeletionInSeconds();
-    long minionInstancesCleanupTaskInitialDelaySeconds = conf.getMinionInstancesCleanupTaskInitialDelaySeconds();
     long minionInstancesCleanupTaskFrequencyInSeconds = conf.getMinionInstancesCleanupTaskFrequencyInSeconds();
     int taskManagerFrequencyInSeconds = conf.getTaskManagerFrequencyInSeconds();
     int statusCheckerFrequencyInSeconds = conf.getStatusCheckerFrequencyInSeconds();
-    long brokerResourceValidationInitialDelayInSeconds = conf.getBrokerResourceValidationInitialDelayInSeconds();
     int brokerResourceValidationFrequencyInSeconds = conf.getBrokerResourceValidationFrequencyInSeconds();
-    long realtimeSegmentValidationManagerInitialDelaySeconds =
-        conf.getRealtimeSegmentValidationManagerInitialDelaySeconds();
     int realtimeSegmentValidationFrequencyInSeconds = conf.getRealtimeSegmentValidationFrequencyInSeconds();
     int offlineSegmentIntervalCheckerFrequencyInSeconds = conf.getOfflineSegmentIntervalCheckerFrequencyInSeconds();
     int retentionControllerFrequencyInSeconds = conf.getRetentionControllerFrequencyInSeconds();
     //then
-    Assert.assertEquals(segmentRelocatorInitialDelayInSeconds, expectedDuration);
-    Assert.assertEquals(offlineSegmentIntervalCheckerInitialDelayInSeconds, expectedDuration);
-    Assert.assertEquals(statusCheckerInitialDelayInSeconds, expectedDuration);
     Assert.assertEquals(segmentLevelValidationIntervalInSeconds, expectedDuration);
     Assert.assertEquals(segmentRelocatorFrequencyInSeconds, expectedDuration);
     Assert.assertEquals(taskMetricsEmitterFrequencyInSeconds, expectedDuration);
     Assert.assertEquals(minionInstancesCleanupTaskMinOfflineTimeBeforeDeletionInSeconds, expectedDuration);
-    Assert.assertEquals(minionInstancesCleanupTaskInitialDelaySeconds, expectedDuration);
     Assert.assertEquals(minionInstancesCleanupTaskFrequencyInSeconds, expectedDuration);
     Assert.assertEquals(taskManagerFrequencyInSeconds, expectedDuration);
     Assert.assertEquals(statusCheckerFrequencyInSeconds, expectedDuration);
-    Assert.assertEquals(brokerResourceValidationInitialDelayInSeconds, expectedDuration);
     Assert.assertEquals(brokerResourceValidationFrequencyInSeconds, expectedDuration);
-    Assert.assertEquals(realtimeSegmentValidationManagerInitialDelaySeconds, expectedDuration);
     Assert.assertEquals(realtimeSegmentValidationFrequencyInSeconds, expectedDuration);
     Assert.assertEquals(offlineSegmentIntervalCheckerFrequencyInSeconds, expectedDuration);
     Assert.assertEquals(retentionControllerFrequencyInSeconds, expectedDuration);
