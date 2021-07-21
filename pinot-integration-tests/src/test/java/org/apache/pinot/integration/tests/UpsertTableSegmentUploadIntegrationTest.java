@@ -155,7 +155,7 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
         .put(ControllerConf.ControllerPeriodicTasksConf.DEPRECATED_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS, 1);
     controllerConfig.put(ControllerConf.ControllerPeriodicTasksConf.DEPRECATED_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS, 1);
     controllerConfig
-        .put(ControllerConf.ControllerPeriodicTasksConf.DEPRECATED_REALTIME_SEGMENT_VALIDATION_INITIAL_DELAY_IN_SECONDS, 1);
+        .put(ControllerConf.ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_INITIAL_DELAY_IN_SECONDS, 1);
     startController(controllerConfig);
   }
 
