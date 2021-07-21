@@ -20,6 +20,7 @@ package org.apache.pinot.core.geospatial.transform.function;
 
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
+import org.apache.pinot.segment.local.utils.H3Utils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
@@ -97,5 +98,16 @@ public class ScalarFunctions {
     Geometry geometry = GeometrySerializer.deserialize(bytes);
     GeometryUtils.setGeometry(geometry);
     return GeometrySerializer.serialize(geometry);
+  }
+
+  /**
+   * Gets the H3 hexagon address from the location
+   * @param latitude latitude of the location
+   * @param longitude longitude of the location
+   * @param resolution H3 index resolution
+   * @return the H3 index address
+   */
+  public static long getHexagonAddr(double latitude, double longitude, int resolution) {
+    return H3Utils.H3_CORE.geoToH3(latitude, longitude, resolution);
   }
 }

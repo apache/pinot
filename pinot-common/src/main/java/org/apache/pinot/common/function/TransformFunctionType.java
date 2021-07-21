@@ -87,7 +87,10 @@ public enum TransformFunctionType {
 
   // Geo relationship
   ST_CONTAINS("ST_Contains"),
-  ST_EQUALS("ST_Equals");
+  ST_EQUALS("ST_Equals"),
+
+  // Geo indexing
+  GET_HEXAGON_ADDR("get_hexagon_addr");
 
   private final String _name;
 

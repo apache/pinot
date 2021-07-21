@@ -54,6 +54,7 @@ import org.testng.Assert;
 
 public class GeoFunctionTest {
   protected static final String STRING_SV_COLUMN = "stringSV";
+  protected static final String LONG_SV_COLUMN = "longSV";
   protected static final String STRING_SV_COLUMN2 = "stringSV2";
   private static final String SEGMENT_NAME = "testSegment";
   private static final String INDEX_DIR_PATH = FileUtils.getTempDirectoryPath() + File.separator + SEGMENT_NAME;
@@ -80,6 +81,17 @@ public class GeoFunctionTest {
         new int[]{result ? 1 : 0}, Arrays
             .asList(new Column(STRING_SV_COLUMN, FieldSpec.DataType.STRING, new String[]{leftWkt}),
                 new Column(STRING_SV_COLUMN2, FieldSpec.DataType.STRING, new String[]{rightWkt})));
+  }
+
+  protected void assertLongFunction(String function, long[] expectedValues, List<Column> columns)
+      throws Exception {
+    assertFunction(function, expectedValues.length, columns,
+        (TransformFunction transformFunction, ProjectionBlock projectionBlock) -> {
+          long[] actualValues = transformFunction.transformToLongValuesSV(projectionBlock);
+          for (int i = 0; i < expectedValues.length; i++) {
+            Assert.assertEquals(actualValues[i], expectedValues[i]);
+          }
+        });
   }
 
   protected void assertIntFunction(String function, int[] expectedValues, List<Column> columns)
