@@ -51,7 +51,7 @@ public class ExecutionStats {
     this.brokerResponse = brokerResponse;
   }
 
-  static ExecutionStats fromJson(JsonNode json) {
+  public static ExecutionStats fromJson(JsonNode json) {
     return new ExecutionStats(json);
   }
 
