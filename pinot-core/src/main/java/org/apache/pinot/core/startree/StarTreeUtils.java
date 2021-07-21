@@ -102,8 +102,12 @@ public class StarTreeUtils {
           queue.addAll(filterNode.getChildren());
           break;
         case OR:
-          // Star-tree does not support OR filter
-          return null;
+          if (isOrClauseValidForStarTree(filter)) {
+            queue.addAll(filterNode.getChildren());
+            break;
+          } else {
+            return null;
+          }
         case PREDICATE:
           Predicate predicate = filterNode.getPredicate();
           ExpressionContext lhs = predicate.getLhs();
@@ -178,5 +182,52 @@ public class StarTreeUtils {
 
     // Check predicate columns
     return starTreeDimensions.containsAll(predicateColumns);
+  }
+
+  /**
+   * Evaluates a given filter to ascertain if the OR clause is valid for StarTree processing.
+   *
+   * StarTree supports OR predicates on a single dimension only (d1 < 10 OR d1 > 50).
+   */
+  private static boolean isOrClauseValidForStarTree(FilterContext filterContext) {
+    assert filterContext != null;
+
+    Set<String> seenLiterals = new HashSet<>();
+
+    isOrClauseValidForStarTreeInternal(filterContext, seenLiterals);
+
+    return seenLiterals.size() == 1;
+  }
+
+  /** Internal processor for the above evaluator */
+  private static void isOrClauseValidForStarTreeInternal(FilterContext filterContext, Set<String> seenLiterals) {
+    assert filterContext != null;
+
+    if (filterContext.getType() == FilterContext.Type.OR) {
+      List<FilterContext> childFilterContexts = filterContext.getChildren();
+
+      for (FilterContext childFilterContext : childFilterContexts) {
+        isOrClauseValidForStarTreeInternal(childFilterContext, seenLiterals);
+      }
+    } else if (filterContext.getType() == FilterContext.Type.PREDICATE) {
+      String literalValue = validateExpressionAndExtractLiteral(filterContext.getPredicate());
+
+      if (literalValue != null) {
+        seenLiterals.add(literalValue);
+      }
+    }
+  }
+
+  /** Checks if the given predicate has an expression which is of type identifier and returns its literal */
+  private static String validateExpressionAndExtractLiteral(Predicate predicate) {
+    assert predicate != null;
+
+    ExpressionContext expressionContext = predicate.getLhs();
+
+   if (expressionContext.getType() == ExpressionContext.Type.IDENTIFIER) {
+      return expressionContext.getIdentifier();
+    }
+
+    return null;
   }
 }

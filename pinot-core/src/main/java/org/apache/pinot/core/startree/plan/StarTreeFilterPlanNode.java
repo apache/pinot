@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.startree.operator.StarTreeFilterOperator;
@@ -33,17 +34,19 @@ public class StarTreeFilterPlanNode implements PlanNode {
   private final Map<String, List<PredicateEvaluator>> _predicateEvaluatorsMap;
   private final Set<String> _groupByColumns;
   private final Map<String, String> _debugOptions;
+  private final FilterContext.Type _filterContextType;
 
   public StarTreeFilterPlanNode(StarTreeV2 starTreeV2, Map<String, List<PredicateEvaluator>> predicateEvaluatorsMap,
-      @Nullable Set<String> groupByColumns, @Nullable Map<String, String> debugOptions) {
+      @Nullable Set<String> groupByColumns, @Nullable Map<String, String> debugOptions, FilterContext.Type filterContextType) {
     _starTreeV2 = starTreeV2;
     _predicateEvaluatorsMap = predicateEvaluatorsMap;
     _groupByColumns = groupByColumns;
     _debugOptions = debugOptions;
+    _filterContextType = filterContextType;
   }
 
   @Override
   public StarTreeFilterOperator run() {
-    return new StarTreeFilterOperator(_starTreeV2, _predicateEvaluatorsMap, _groupByColumns, _debugOptions);
+    return new StarTreeFilterOperator(_starTreeV2, _predicateEvaluatorsMap, _groupByColumns, _debugOptions, _filterContextType);
   }
 }

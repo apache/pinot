@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.core.operator.blocks.EmptyFilterBlock;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
@@ -124,13 +125,16 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   private final Set<String> _groupByColumns;
 
   private final Map<String, String> _debugOptions;
+  private final FilterContext.Type _filterContextType;
+
   boolean _resultEmpty = false;
 
   public StarTreeFilterOperator(StarTreeV2 starTreeV2, Map<String, List<PredicateEvaluator>> predicateEvaluatorsMap,
-      Set<String> groupByColumns, @Nullable Map<String, String> debugOptions) {
+      Set<String> groupByColumns, @Nullable Map<String, String> debugOptions, FilterContext.Type filterContextType) {
     _starTreeV2 = starTreeV2;
     _predicateEvaluatorsMap = predicateEvaluatorsMap;
     _debugOptions = debugOptions;
+    _filterContextType = filterContextType;
 
     if (groupByColumns != null) {
       _groupByColumns = new HashSet<>(groupByColumns);
@@ -190,6 +194,10 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
       }
     }
 
+    if (_filterContextType != null && _filterContextType == FilterContext.Type.OR) {
+      return FilterOperatorUtils.getOrFilterOperator(childFilterOperators, numDocs, _debugOptions);
+    }
+
     return FilterOperatorUtils.getAndFilterOperator(childFilterOperators, numDocs, _debugOptions);
   }
 
@@ -236,7 +244,11 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
 
             IntSet matchingDictIds = matchingDictIdsMap.get(nextDimension);
             if (matchingDictIds == null) {
-              matchingDictIds = getMatchingDictIds(_predicateEvaluatorsMap.get(nextDimension));
+              if (_filterContextType == FilterContext.Type.OR) {
+                matchingDictIds = getMatchingDictIdsForAllEvaluators(_predicateEvaluatorsMap.get(nextDimension));
+              } else {
+                matchingDictIds = getMatchingDictIds(_predicateEvaluatorsMap.get(nextDimension));
+              }
 
               // If no matching dictionary id found, directly return null
               if (matchingDictIds.isEmpty()) {
@@ -363,6 +375,29 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
         if (!predicateEvaluator.applySV(iterator.nextInt())) {
           iterator.remove();
         }
+      }
+    }
+
+    return matchingDictIds;
+  }
+
+  /**
+   * Gets matching dict IDs for all evaluators.
+   *
+   * This method returns all the docIDs that match given predicate evaluators. There is no filtering
+   * performed. This allows upstream processing to perform union of matching dictIDs if needed (for e.g
+   * for OR execution).
+   */
+  private IntSet getMatchingDictIdsForAllEvaluators(List<PredicateEvaluator> predicateEvaluators) {
+    IntSet matchingDictIds = new IntOpenHashSet();
+
+    // Add all predicate evaluators' matching dict IDs
+    int numPredicateEvaluators = predicateEvaluators.size();
+    for (int i = 0; i < numPredicateEvaluators; i++) {
+      PredicateEvaluator predicateEvaluator = predicateEvaluators.get(i);
+
+      for (int matchingDictId : predicateEvaluator.getMatchingDictIds()) {
+        matchingDictIds.add(matchingDictId);
       }
     }
 

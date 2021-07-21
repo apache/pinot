@@ -94,7 +94,9 @@ abstract class BaseStarTreeV2Test<R, A> {
   private static final String DIMENSION_D2 = "d2";
   private static final int DIMENSION_CARDINALITY = 100;
   private static final String METRIC = "m";
-  private static final String QUERY_FILTER = " WHERE d1 = 0 AND d2 < 10";
+  private static final String QUERY_FILTER_AND = " WHERE d1 = 0 AND d2 < 10";
+  // StarTree supports OR predicates only on a single dimension
+  private static final String QUERY_FILTER_OR = " WHERE d1 < 10 OR d1 > 50";
   private static final String QUERY_GROUP_BY = " GROUP BY d2";
 
   private ValueAggregator _valueAggregator;
@@ -170,9 +172,11 @@ abstract class BaseStarTreeV2Test<R, A> {
 
     String baseQuery = String.format("SELECT %s FROM %s", aggregation, TABLE_NAME);
     testQuery(baseQuery);
-    testQuery(baseQuery + QUERY_FILTER);
+    testQuery(baseQuery + QUERY_FILTER_AND);
+    testQuery(baseQuery + QUERY_FILTER_OR);
     testQuery(baseQuery + QUERY_GROUP_BY);
-    testQuery(baseQuery + QUERY_FILTER + QUERY_GROUP_BY);
+    testQuery(baseQuery + QUERY_FILTER_AND + QUERY_GROUP_BY);
+    testQuery(baseQuery + QUERY_FILTER_OR + QUERY_GROUP_BY);
   }
 
   @AfterClass
@@ -211,9 +215,10 @@ abstract class BaseStarTreeV2Test<R, A> {
         StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, filter);
     assertNotNull(predicateEvaluatorsMap);
 
+    FilterContext.Type type = filter != null ? filter.getType() : null;
     // Extract values with star-tree
     PlanNode starTreeFilterPlanNode =
-        new StarTreeFilterPlanNode(_starTreeV2, predicateEvaluatorsMap, groupByColumnSet, null);
+        new StarTreeFilterPlanNode(_starTreeV2, predicateEvaluatorsMap, groupByColumnSet, null, type);
     List<ForwardIndexReader> starTreeAggregationColumnReaders = new ArrayList<>(numAggregations);
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
       starTreeAggregationColumnReaders

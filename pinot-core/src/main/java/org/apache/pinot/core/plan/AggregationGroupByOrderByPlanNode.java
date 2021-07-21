@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -75,9 +76,12 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
                 .isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, _groupByExpressions,
                     predicateEvaluatorsMap.keySet())) {
               _transformPlanNode = null;
+
+              FilterContext.Type filterContextType = queryContext.getFilter() != null ? queryContext.getFilter().getType() : null;
+
               _starTreeTransformPlanNode =
                   new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, _groupByExpressions,
-                      predicateEvaluatorsMap, queryContext.getDebugOptions());
+                      predicateEvaluatorsMap, queryContext.getDebugOptions(), filterContextType);
               return;
             }
           }
