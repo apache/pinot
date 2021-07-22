@@ -27,7 +27,10 @@ import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.LiteralTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.locationtech.jts.geom.Geometry;
 
 
 /**
@@ -47,26 +50,41 @@ public class GetHexagonAddressFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    Preconditions
-        .checkArgument(arguments.size() == 3, "3 arguments are required for transform function: %s", getName());
-    TransformFunction transformFunction = arguments.get(0);
-    Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
-        "First argument must be single-valued for transform function: %s", getName());
-    Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType().getStoredType().isNumeric()
-        || transformFunction instanceof LiteralTransformFunction, "The first argument must be numeric");
-    _firstArgument = transformFunction;
-    transformFunction = arguments.get(1);
-    Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
-        "Second argument must be single-valued for transform function: %s", getName());
-    Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType().getStoredType().isNumeric()
-        || transformFunction instanceof LiteralTransformFunction, "The second argument must be numeric");
-    _secondArgument = transformFunction;
-    transformFunction = arguments.get(2);
-    Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
-        "Third argument must be single-valued for transform function: %s", getName());
-    Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType().getStoredType().isNumeric()
-        || transformFunction instanceof LiteralTransformFunction, "The third argument must be numeric");
-    _thirdArgument = transformFunction;
+    Preconditions.checkArgument(arguments.size() == 3 || arguments.size() == 2,
+        "Transform function %s requires 2 or 3 arguments", getName());
+    if (arguments.size() == 3) {
+      TransformFunction transformFunction = arguments.get(0);
+      Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
+          "First argument must be single-valued for transform function: %s", getName());
+      Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType().getStoredType().isNumeric()
+          || transformFunction instanceof LiteralTransformFunction, "The first argument must be numeric");
+      _firstArgument = transformFunction;
+      transformFunction = arguments.get(1);
+      Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
+          "Second argument must be single-valued for transform function: %s", getName());
+      Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType().getStoredType().isNumeric()
+          || transformFunction instanceof LiteralTransformFunction, "The second argument must be numeric");
+      _secondArgument = transformFunction;
+      transformFunction = arguments.get(2);
+      Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
+          "Third argument must be single-valued for transform function: %s", getName());
+      Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType().getStoredType().isNumeric()
+          || transformFunction instanceof LiteralTransformFunction, "The third argument must be numeric");
+      _thirdArgument = transformFunction;
+    } else {
+      TransformFunction transformFunction = arguments.get(0);
+      Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
+          "First argument must be single-valued for transform function: %s", getName());
+      Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BYTES,
+          "The first argument must be bytes");
+      _firstArgument = transformFunction;
+      transformFunction = arguments.get(1);
+      Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
+          "Second argument must be single-valued for transform function: %s", getName());
+      Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType().getStoredType().isNumeric()
+          || transformFunction instanceof LiteralTransformFunction, "The second argument must be numeric");
+      _secondArgument = transformFunction;
+    }
   }
 
   @Override
@@ -80,12 +98,23 @@ public class GetHexagonAddressFunction extends BaseTransformFunction {
       _results = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
 
-    double[] firstValues = _firstArgument.transformToDoubleValuesSV(projectionBlock);
-    double[] secondValues = _secondArgument.transformToDoubleValuesSV(projectionBlock);
-    int[] thirdValues = _thirdArgument.transformToIntValuesSV(projectionBlock);
-    for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      _results[i] = ScalarFunctions.getHexagonAddr(firstValues[i], secondValues[i], thirdValues[i]);
+    if (_thirdArgument == null) {
+      byte[][] geoValues = _firstArgument.transformToBytesValuesSV(projectionBlock);
+      int[] resValues = _secondArgument.transformToIntValuesSV(projectionBlock);
+      for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
+        Geometry geometry = GeometrySerializer.deserialize(geoValues[i]);
+        _results[i] =
+            ScalarFunctions.getHexagonAddr(geometry.getCoordinate().y, geometry.getCoordinate().x, resValues[i]);
+      }
+    } else {
+      double[] latValues = _firstArgument.transformToDoubleValuesSV(projectionBlock);
+      double[] lonValues = _secondArgument.transformToDoubleValuesSV(projectionBlock);
+      int[] resValues = _thirdArgument.transformToIntValuesSV(projectionBlock);
+      for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
+        _results[i] = ScalarFunctions.getHexagonAddr(latValues[i], lonValues[i], resValues[i]);
+      }
     }
+
     return _results;
   }
 }

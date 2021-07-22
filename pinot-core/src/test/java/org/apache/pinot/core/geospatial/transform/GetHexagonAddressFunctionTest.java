@@ -31,6 +31,10 @@ public class GetHexagonAddressFunctionTest extends GeoFunctionTest {
     assertValue("102,20,5", 599041711439609855L);
     assertValue("37.775,-122.419,6", 604189371209351167L);
     assertValue("39.904202,116.407394,6", 604356067480043519L);
+
+    assertValue("ST_point(20, 102),5", 599041711439609855L);
+    assertValue("ST_point(-122.419, 37.775),6", 604189371209351167L);
+    assertValue("ST_point(116.407394, 39.904202),6", 604356067480043519L);
   }
 
   private void assertValue(String args, long value)
