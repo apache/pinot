@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.hadoop.utils.preprocess;
+package org.apache.pinot.ingestion.utils;
 
 import java.util.Set;
 import org.apache.hadoop.io.DoubleWritable;

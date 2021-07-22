@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.hadoop.utils.preprocess;
+package org.apache.pinot.ingestion.utils.preprocess;
 
 import org.apache.hadoop.hive.serde2.io.DateWritable;
 import org.apache.hadoop.io.BooleanWritable;

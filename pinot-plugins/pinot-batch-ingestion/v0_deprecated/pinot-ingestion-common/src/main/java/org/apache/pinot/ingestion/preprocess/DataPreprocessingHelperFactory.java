@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.hadoop.job.preprocess;
+package org.apache.pinot.ingestion.preprocess;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import org.apache.hadoop.fs.Path;
-import org.apache.pinot.hadoop.utils.preprocess.DataFileUtils;
+import org.apache.pinot.ingestion.utils.preprocess.DataFileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
