@@ -39,17 +39,18 @@ import static org.apache.pinot.client.ExternalViewReader.REALTIME_SUFFIX;
  * Maintains a mapping between table name and list of brokers
  */
 public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
-  AtomicReference<Map<String, List<String>>> tableToBrokerListMapRef = new AtomicReference<Map<String, List<String>>>();
-  AtomicReference<List<String>> allBrokerListRef = new AtomicReference<List<String>>();
+  AtomicReference<Map<String, List<String>>> tableToBrokerListMapRef = new AtomicReference<>();
+  AtomicReference<List<String>> allBrokerListRef = new AtomicReference<>();
+  private final ZkClient _zkClient;
   private final Random _random = new Random();
-  private ExternalViewReader evReader;
+  private final ExternalViewReader _evReader;
 
   public DynamicBrokerSelector(String zkServers) {
-    ZkClient zkClient = getZkClient(zkServers);
-    zkClient.setZkSerializer(new BytesPushThroughSerializer());
-    zkClient.waitUntilConnected(60, TimeUnit.SECONDS);
-    zkClient.subscribeDataChanges(ExternalViewReader.BROKER_EXTERNAL_VIEW_PATH, this);
-    evReader = getEvReader(zkClient);
+    _zkClient = getZkClient(zkServers);
+    _zkClient.setZkSerializer(new BytesPushThroughSerializer());
+    _zkClient.waitUntilConnected(60, TimeUnit.SECONDS);
+    _zkClient.subscribeDataChanges(ExternalViewReader.BROKER_EXTERNAL_VIEW_PATH, this);
+    _evReader = getEvReader(_zkClient);
     refresh();
   }
 
@@ -62,7 +63,7 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
   }
 
   private void refresh() {
-    Map<String, List<String>> tableToBrokerListMap = evReader.getTableToBrokersMap();
+    Map<String, List<String>> tableToBrokerListMap = _evReader.getTableToBrokersMap();
     tableToBrokerListMapRef.set(tableToBrokerListMap);
     Set<String> brokerSet = new HashSet<>();
     for (List<String> brokerList : tableToBrokerListMap.values()) {
@@ -88,6 +89,11 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
       return list.get(_random.nextInt(list.size()));
     }
     return null;
+  }
+
+  @Override
+  public void close() {
+    _zkClient.close();
   }
 
   @Override
