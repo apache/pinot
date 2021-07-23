@@ -36,8 +36,8 @@ import org.locationtech.jts.geom.Geometry;
 /**
  *  A function that returns the H3 index address of a given geolocation.
  */
-public class GetHexagonAddressFunction extends BaseTransformFunction {
-  public static final String FUNCTION_NAME = "GET_HEXAGON_ADDR";
+public class GeoToH3Function extends BaseTransformFunction {
+  public static final String FUNCTION_NAME = "geoToH3";
   private TransformFunction _firstArgument;
   private TransformFunction _secondArgument;
   private TransformFunction _thirdArgument;
@@ -103,15 +103,14 @@ public class GetHexagonAddressFunction extends BaseTransformFunction {
       int[] resValues = _secondArgument.transformToIntValuesSV(projectionBlock);
       for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
         Geometry geometry = GeometrySerializer.deserialize(geoValues[i]);
-        _results[i] =
-            ScalarFunctions.getHexagonAddr(geometry.getCoordinate().y, geometry.getCoordinate().x, resValues[i]);
+        _results[i] = ScalarFunctions.geoToH3(geometry.getCoordinate().x, geometry.getCoordinate().y, resValues[i]);
       }
     } else {
-      double[] latValues = _firstArgument.transformToDoubleValuesSV(projectionBlock);
-      double[] lonValues = _secondArgument.transformToDoubleValuesSV(projectionBlock);
+      double[] lonValues = _firstArgument.transformToDoubleValuesSV(projectionBlock);
+      double[] latValues = _secondArgument.transformToDoubleValuesSV(projectionBlock);
       int[] resValues = _thirdArgument.transformToIntValuesSV(projectionBlock);
       for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-        _results[i] = ScalarFunctions.getHexagonAddr(latValues[i], lonValues[i], resValues[i]);
+        _results[i] = ScalarFunctions.geoToH3(lonValues[i], latValues[i], resValues[i]);
       }
     }
 

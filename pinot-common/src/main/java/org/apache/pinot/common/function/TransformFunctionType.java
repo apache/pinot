@@ -90,7 +90,7 @@ public enum TransformFunctionType {
   ST_EQUALS("ST_Equals"),
 
   // Geo indexing
-  GET_HEXAGON_ADDR("get_hexagon_addr");
+  geoToH3("geoToH3");
 
   private final String _name;
 

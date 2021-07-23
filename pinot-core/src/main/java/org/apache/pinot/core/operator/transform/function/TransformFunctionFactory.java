@@ -29,7 +29,7 @@ import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
-import org.apache.pinot.core.geospatial.transform.function.GetHexagonAddressFunction;
+import org.apache.pinot.core.geospatial.transform.function.GeoToH3Function;
 import org.apache.pinot.core.geospatial.transform.function.StAreaFunction;
 import org.apache.pinot.core.geospatial.transform.function.StAsBinaryFunction;
 import org.apache.pinot.core.geospatial.transform.function.StAsTextFunction;
@@ -139,7 +139,7 @@ public class TransformFunctionFactory {
           put(canonicalize(TransformFunctionType.ST_EQUALS.getName().toLowerCase()), StEqualsFunction.class);
 
           // geo indexing
-          put(canonicalize(TransformFunctionType.GET_HEXAGON_ADDR.getName().toLowerCase()), GetHexagonAddressFunction.class);
+          put(canonicalize(TransformFunctionType.geoToH3.getName().toLowerCase()), GeoToH3Function.class);
         }
       };
 

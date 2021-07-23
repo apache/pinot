@@ -107,7 +107,8 @@ public class ScalarFunctions {
    * @param resolution H3 index resolution
    * @return the H3 index address
    */
-  public static long getHexagonAddr(double latitude, double longitude, int resolution) {
+  @ScalarFunction
+  public static long geoToH3(double longitude, double latitude, int resolution) {
     return H3Utils.H3_CORE.geoToH3(latitude, longitude, resolution);
   }
 }
