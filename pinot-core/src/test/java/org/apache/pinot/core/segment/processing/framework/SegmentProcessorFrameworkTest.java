@@ -20,17 +20,17 @@ package org.apache.pinot.core.segment.processing.framework;
 
 import com.google.common.collect.Lists;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.stream.IntStream;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerConfig;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -50,20 +50,21 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 /**
  * End-to-end tests for SegmentProcessorFramework
  */
 public class SegmentProcessorFrameworkTest {
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "SegmentProcessorFrameworkTest");
 
-  private File _baseDir;
-  private File _emptyInputDir;
-  private File _singleSegment;
-  private File _multipleSegments;
-  private File _multiValueSegments;
-  private File _tarredSegments;
+  private List<RecordReader> _singleSegment;
+  private List<RecordReader> _multipleSegments;
+  private List<RecordReader> _multiValueSegments;
 
   private TableConfig _tableConfig;
   private TableConfig _tableConfigNullValueEnabled;
@@ -85,6 +86,9 @@ public class SegmentProcessorFrameworkTest {
   @BeforeClass
   public void setup()
       throws Exception {
+    FileUtils.deleteQuietly(TEMP_DIR);
+    FileUtils.forceMkdir(TEMP_DIR);
+
     _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTimeColumnName("time").build();
     _tableConfigNullValueEnabled =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTimeColumnName("time")
@@ -100,31 +104,14 @@ public class SegmentProcessorFrameworkTest {
             .addMetric("clicks", DataType.INT, 1000)
             .addDateTime("time", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
 
-    _baseDir = new File(FileUtils.getTempDirectory(), "segment_processor_framework_test_" + System.currentTimeMillis());
-    FileUtils.deleteQuietly(_baseDir);
-    assertTrue(_baseDir.mkdirs());
-
     // create segments in many folders
-    _emptyInputDir = new File(_baseDir, "empty_input");
-    assertTrue(_emptyInputDir.mkdirs());
-    _singleSegment = new File(_baseDir, "single_segment");
-    createInputSegments(_singleSegment, _rawData, 1, _schema);
-    _multipleSegments = new File(_baseDir, "multiple_segments");
-    createInputSegments(_multipleSegments, _rawData, 3, _schema);
-    _multiValueSegments = new File(_baseDir, "multi_value_segment");
-    createInputSegments(_multiValueSegments, _rawDataMultiValue, 1, _schemaMV);
-    _tarredSegments = new File(_baseDir, "tarred_segment");
-    createInputSegments(_tarredSegments, _rawData, 3, _schema);
-    File[] segmentDirs = _tarredSegments.listFiles();
-    assertNotNull(segmentDirs);
-    for (File segmentDir : segmentDirs) {
-      TarGzCompressionUtils.createTarGzFile(segmentDir,
-          new File(_tarredSegments, segmentDir.getName() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION));
-      FileUtils.deleteQuietly(segmentDir);
-    }
+    _singleSegment = createInputSegments(new File(TEMP_DIR, "single_segment"), _rawData, 1, _schema);
+    _multipleSegments = createInputSegments(new File(TEMP_DIR, "multiple_segments"), _rawData, 3, _schema);
+    _multiValueSegments =
+        createInputSegments(new File(TEMP_DIR, "multi_value_segment"), _rawDataMultiValue, 1, _schemaMV);
   }
 
-  private void createInputSegments(File inputDir, List<Object[]> rawData, int numSegments, Schema schema)
+  private List<RecordReader> createInputSegments(File inputDir, List<Object[]> rawData, int numSegments, Schema schema)
       throws Exception {
     assertTrue(inputDir.mkdirs());
 
@@ -145,6 +132,7 @@ public class SegmentProcessorFrameworkTest {
       dataLists.add(dataList);
     }
 
+    List<RecordReader> segmentRecordReaders = new ArrayList<>(dataLists.size());
     int idx = 0;
     for (List<GenericRow> inputRows : dataLists) {
       RecordReader recordReader = new GenericRowRecordReader(inputRows);
@@ -155,11 +143,11 @@ public class SegmentProcessorFrameworkTest {
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       driver.init(segmentGeneratorConfig, recordReader);
       driver.build();
+      PinotSegmentRecordReader segmentRecordReader = new PinotSegmentRecordReader();
+      segmentRecordReader.init(driver.getOutputDirectory(), null, null, true);
+      segmentRecordReaders.add(segmentRecordReader);
     }
-
-    File[] files = inputDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, numSegments);
+    return segmentRecordReaders;
   }
 
   private GenericRow getGenericRow(Object[] rawRow) {
@@ -170,100 +158,26 @@ public class SegmentProcessorFrameworkTest {
     return row;
   }
 
-  @Test
-  public void testBadInputFolders()
-      throws Exception {
-    SegmentProcessorConfig config;
-
-    try {
-      new SegmentProcessorConfig.Builder().setSchema(_schema).build();
-      fail("Should fail for missing tableConfig");
-    } catch (IllegalStateException e) {
-      // expected
-    }
-
-    try {
-      new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).build();
-      fail("Should fail for missing schema");
-    } catch (IllegalStateException e) {
-      // expected
-    }
-
-    config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).build();
-
-    File outputSegmentDir = new File(_baseDir, "output_directory_bad_input_folders");
-    FileUtils.deleteQuietly(outputSegmentDir);
-    assertTrue(outputSegmentDir.mkdirs());
-
-    // non-existent input dir
-    File nonExistent = new File(_baseDir, "non_existent");
-    try {
-      new SegmentProcessorFramework(nonExistent, config, outputSegmentDir);
-      fail("Should fail for non existent input dir");
-    } catch (IllegalStateException e) {
-      // expected
-    }
-
-    // file used as input dir
-    File fileInput = new File(_baseDir, "file.txt");
-    assertTrue(fileInput.createNewFile());
-    try {
-      new SegmentProcessorFramework(fileInput, config, outputSegmentDir);
-      fail("Should fail for file used as input dir");
-    } catch (IllegalStateException e) {
-      // expected
-    }
-
-    // non existent output dir
-    try {
-      new SegmentProcessorFramework(_singleSegment, config, nonExistent);
-      fail("Should fail for non existent output dir");
-    } catch (IllegalStateException e) {
-      // expected
-    }
-
-    // file used as output dir
-    try {
-      new SegmentProcessorFramework(_singleSegment, config, fileInput);
-      fail("Should fail for file used as output dir");
-    } catch (IllegalStateException e) {
-      // expected
-    }
-
-    // output dir not empty
-    try {
-      new SegmentProcessorFramework(fileInput, config, _singleSegment);
-      fail("Should fail for output dir not empty");
-    } catch (IllegalStateException e) {
-      // expected
-    }
-
-    // empty input dir
-    SegmentProcessorFramework framework = new SegmentProcessorFramework(_emptyInputDir, config, outputSegmentDir);
-    try {
-      framework.processSegments();
-      fail("Should fail for empty input");
-    } catch (Exception e) {
-      framework.cleanup();
+  private void rewindRecordReaders(List<RecordReader> recordReaders)
+      throws IOException {
+    for (RecordReader recordReader : recordReaders) {
+      recordReader.rewind();
     }
   }
 
   @Test
   public void testSingleSegment()
       throws Exception {
-    File outputSegmentDir = new File(_baseDir, "single_segment_output");
-    FileUtils.forceMkdir(outputSegmentDir);
+    File workingDir = new File(TEMP_DIR, "single_segment_output");
+    FileUtils.forceMkdir(workingDir);
 
     // Default configs
     SegmentProcessorConfig config =
         new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).build();
-    SegmentProcessorFramework framework = new SegmentProcessorFramework(_singleSegment, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    File[] files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 1);
-    ImmutableSegment segment = ImmutableSegmentLoader.load(files[0], ReadMode.mmap);
+    SegmentProcessorFramework framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
+    List<File> outputSegments = framework.process();
+    assertEquals(outputSegments.size(), 1);
+    ImmutableSegment segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
     SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
     assertEquals(segmentMetadata.getTotalDocs(), 10);
     ColumnMetadata campaignMetadata = segmentMetadata.getColumnMetadataFor("campaign");
@@ -286,18 +200,16 @@ public class SegmentProcessorFrameworkTest {
     assertNull(timeDataSource.getNullValueVector());
     assertEquals(segmentMetadata.getName(), "myTable_1597719600000_1597892400000_0");
     segment.destroy();
-    FileUtils.cleanDirectory(outputSegmentDir);
+    FileUtils.cleanDirectory(workingDir);
+    rewindRecordReaders(_singleSegment);
 
     // Default configs - null value enabled
     config =
         new SegmentProcessorConfig.Builder().setTableConfig(_tableConfigNullValueEnabled).setSchema(_schema).build();
-    framework = new SegmentProcessorFramework(_singleSegment, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 1);
-    segment = ImmutableSegmentLoader.load(files[0], ReadMode.mmap);
+    framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
+    outputSegments = framework.process();
+    assertEquals(outputSegments.size(), 1);
+    segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
     segmentMetadata = segment.getSegmentMetadata();
     assertEquals(segmentMetadata.getTotalDocs(), 10);
     campaignMetadata = segmentMetadata.getColumnMetadataFor("campaign");
@@ -326,70 +238,62 @@ public class SegmentProcessorFrameworkTest {
     assertTrue(timeNullValueVector.getNullBitmap().isEmpty());
     assertEquals(segmentMetadata.getName(), "myTable_1597719600000_1597892400000_0");
     segment.destroy();
-    FileUtils.cleanDirectory(outputSegmentDir);
+    FileUtils.cleanDirectory(workingDir);
+    rewindRecordReaders(_singleSegment);
 
     // Time filter
     config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setTimeHandlerConfig(
         new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setTimeRange(1597795200000L, 1597881600000L).build())
         .build();
-    framework = new SegmentProcessorFramework(_singleSegment, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 1);
-    segmentMetadata = new SegmentMetadataImpl(files[0]);
+    framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
+    outputSegments = framework.process();
+    assertEquals(outputSegments.size(), 1);
+    segmentMetadata = new SegmentMetadataImpl(outputSegments.get(0));
     assertEquals(segmentMetadata.getTotalDocs(), 5);
     timeMetadata = segmentMetadata.getColumnMetadataFor("time");
     assertEquals(timeMetadata.getCardinality(), 5);
     assertEquals(timeMetadata.getMinValue(), 1597795200000L);
     assertEquals(timeMetadata.getMaxValue(), 1597878000000L);
     assertEquals(segmentMetadata.getName(), "myTable_1597795200000_1597878000000_0");
-    FileUtils.cleanDirectory(outputSegmentDir);
+    FileUtils.cleanDirectory(workingDir);
+    rewindRecordReaders(_singleSegment);
 
     // Time filter - filtered everything
     config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setTimeHandlerConfig(
         new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setTimeRange(1597968000000L, 1598054400000L).build())
         .build();
-    framework = new SegmentProcessorFramework(_singleSegment, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 0);
-    FileUtils.cleanDirectory(outputSegmentDir);
+    framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
+    outputSegments = framework.process();
+    assertTrue(outputSegments.isEmpty());
+    FileUtils.cleanDirectory(workingDir);
+    rewindRecordReaders(_singleSegment);
 
     // Time round
     config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema)
         .setTimeHandlerConfig(new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setRoundBucketMs(86400000).build())
         .build();
-    framework = new SegmentProcessorFramework(_singleSegment, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 1);
-    segmentMetadata = new SegmentMetadataImpl(files[0]);
+    framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
+    outputSegments = framework.process();
+    assertEquals(outputSegments.size(), 1);
+    segmentMetadata = new SegmentMetadataImpl(outputSegments.get(0));
     assertEquals(segmentMetadata.getTotalDocs(), 10);
     timeMetadata = segmentMetadata.getColumnMetadataFor("time");
     assertEquals(timeMetadata.getCardinality(), 3);
     assertEquals(timeMetadata.getMinValue(), 1597708800000L);
     assertEquals(timeMetadata.getMaxValue(), 1597881600000L);
     assertEquals(segmentMetadata.getName(), "myTable_1597708800000_1597881600000_0");
-    FileUtils.cleanDirectory(outputSegmentDir);
+    FileUtils.cleanDirectory(workingDir);
+    rewindRecordReaders(_singleSegment);
 
     // Time partition
     config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setTimeHandlerConfig(
         new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setPartitionBucketMs(86400000).build()).build();
-    framework = new SegmentProcessorFramework(_singleSegment, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 3);
-    Arrays.sort(files);
+    framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
+    outputSegments = framework.process();
+    assertEquals(outputSegments.size(), 3);
+    outputSegments.sort(null);
     // segment 0
-    segmentMetadata = new SegmentMetadataImpl(files[0]);
+    segmentMetadata = new SegmentMetadataImpl(outputSegments.get(0));
     assertEquals(segmentMetadata.getTotalDocs(), 3);
     timeMetadata = segmentMetadata.getColumnMetadataFor("time");
     assertEquals(timeMetadata.getCardinality(), 3);
@@ -397,7 +301,7 @@ public class SegmentProcessorFrameworkTest {
     assertEquals(timeMetadata.getMaxValue(), 1597777200000L);
     assertEquals(segmentMetadata.getName(), "myTable_1597719600000_1597777200000_0");
     // segment 1
-    segmentMetadata = new SegmentMetadataImpl(files[1]);
+    segmentMetadata = new SegmentMetadataImpl(outputSegments.get(1));
     assertEquals(segmentMetadata.getTotalDocs(), 5);
     timeMetadata = segmentMetadata.getColumnMetadataFor("time");
     assertEquals(timeMetadata.getCardinality(), 5);
@@ -405,14 +309,15 @@ public class SegmentProcessorFrameworkTest {
     assertEquals(timeMetadata.getMaxValue(), 1597878000000L);
     assertEquals(segmentMetadata.getName(), "myTable_1597795200000_1597878000000_1");
     // segment 2
-    segmentMetadata = new SegmentMetadataImpl(files[2]);
+    segmentMetadata = new SegmentMetadataImpl(outputSegments.get(2));
     assertEquals(segmentMetadata.getTotalDocs(), 2);
     timeMetadata = segmentMetadata.getColumnMetadataFor("time");
     assertEquals(timeMetadata.getCardinality(), 2);
     assertEquals(timeMetadata.getMinValue(), 1597881600000L);
     assertEquals(timeMetadata.getMaxValue(), 1597892400000L);
     assertEquals(segmentMetadata.getName(), "myTable_1597881600000_1597892400000_2");
-    FileUtils.cleanDirectory(outputSegmentDir);
+    FileUtils.cleanDirectory(workingDir);
+    rewindRecordReaders(_singleSegment);
 
     // Time filter, round, partition, rollup - null value enabled
     config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfigNullValueEnabled).setSchema(_schema)
@@ -420,15 +325,12 @@ public class SegmentProcessorFrameworkTest {
             new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setTimeRange(1597708800000L, 1597881600000L)
                 .setRoundBucketMs(86400000).setPartitionBucketMs(86400000).build()).setMergeType(MergeType.ROLLUP)
         .build();
-    framework = new SegmentProcessorFramework(_singleSegment, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 2);
-    Arrays.sort(files);
+    framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
+    outputSegments = framework.process();
+    assertEquals(outputSegments.size(), 2);
+    outputSegments.sort(null);
     // segment 0
-    segment = ImmutableSegmentLoader.load(files[0], ReadMode.mmap);
+    segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
     segmentMetadata = segment.getSegmentMetadata();
     assertEquals(segmentMetadata.getTotalDocs(), 2);
     campaignMetadata = segmentMetadata.getColumnMetadataFor("campaign");
@@ -458,7 +360,7 @@ public class SegmentProcessorFrameworkTest {
     assertEquals(segmentMetadata.getName(), "myTable_1597708800000_1597708800000_0");
     segment.destroy();
     // segment 1
-    segment = ImmutableSegmentLoader.load(files[1], ReadMode.mmap);
+    segment = ImmutableSegmentLoader.load(outputSegments.get(1), ReadMode.mmap);
     segmentMetadata = segment.getSegmentMetadata();
     assertEquals(segmentMetadata.getTotalDocs(), 3);
     campaignMetadata = segmentMetadata.getColumnMetadataFor("campaign");
@@ -487,105 +389,95 @@ public class SegmentProcessorFrameworkTest {
     assertTrue(timeNullValueVector.getNullBitmap().isEmpty());
     assertEquals(segmentMetadata.getName(), "myTable_1597795200000_1597795200000_1");
     segment.destroy();
-    FileUtils.cleanDirectory(outputSegmentDir);
+    FileUtils.cleanDirectory(workingDir);
+    rewindRecordReaders(_singleSegment);
 
     // Time round, dedup
     config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema)
         .setTimeHandlerConfig(new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setRoundBucketMs(86400000).build())
         .setMergeType(MergeType.DEDUP).build();
-    framework = new SegmentProcessorFramework(_singleSegment, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 1);
-    segmentMetadata = new SegmentMetadataImpl(files[0]);
+    framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
+    outputSegments = framework.process();
+    assertEquals(outputSegments.size(), 1);
+    segmentMetadata = new SegmentMetadataImpl(outputSegments.get(0));
     assertEquals(segmentMetadata.getTotalDocs(), 8);
     assertEquals(segmentMetadata.getName(), "myTable_1597708800000_1597881600000_0");
-    FileUtils.cleanDirectory(outputSegmentDir);
+    FileUtils.cleanDirectory(workingDir);
+    rewindRecordReaders(_singleSegment);
 
     // Segment config
     config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setSegmentConfig(
         new SegmentConfig.Builder().setMaxNumRecordsPerSegment(4).setSegmentNamePrefix("myPrefix").build()).build();
-    framework = new SegmentProcessorFramework(_singleSegment, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 3);
-    Arrays.sort(files);
-    segmentMetadata = new SegmentMetadataImpl(files[0]);
+    framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
+    outputSegments = framework.process();
+    assertEquals(outputSegments.size(), 3);
+    outputSegments.sort(null);
+    segmentMetadata = new SegmentMetadataImpl(outputSegments.get(0));
     assertEquals(segmentMetadata.getTotalDocs(), 4);
     assertEquals(segmentMetadata.getName(), "myPrefix_1597719600000_1597795200000_0");
-    segmentMetadata = new SegmentMetadataImpl(files[1]);
+    segmentMetadata = new SegmentMetadataImpl(outputSegments.get(1));
     assertEquals(segmentMetadata.getTotalDocs(), 4);
     assertEquals(segmentMetadata.getName(), "myPrefix_1597802400000_1597878000000_1");
-    segmentMetadata = new SegmentMetadataImpl(files[2]);
+    segmentMetadata = new SegmentMetadataImpl(outputSegments.get(2));
     assertEquals(segmentMetadata.getTotalDocs(), 2);
     assertEquals(segmentMetadata.getName(), "myPrefix_1597881600000_1597892400000_2");
-    FileUtils.cleanDirectory(outputSegmentDir);
+    FileUtils.cleanDirectory(workingDir);
+    rewindRecordReaders(_singleSegment);
   }
 
   @Test
   public void testMultipleSegments()
       throws Exception {
-    File outputSegmentDir = new File(_baseDir, "multiple_segments_output");
-    FileUtils.forceMkdir(outputSegmentDir);
+    File workingDir = new File(TEMP_DIR, "multiple_segments_output");
+    FileUtils.forceMkdir(workingDir);
 
     // Default configs
     SegmentProcessorConfig config =
         new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).build();
-    SegmentProcessorFramework framework = new SegmentProcessorFramework(_multipleSegments, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    File[] files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 1);
-    SegmentMetadata segmentMetadata = new SegmentMetadataImpl(files[0]);
+    SegmentProcessorFramework framework = new SegmentProcessorFramework(_multipleSegments, config, workingDir);
+    List<File> outputSegments = framework.process();
+    assertEquals(outputSegments.size(), 1);
+    SegmentMetadata segmentMetadata = new SegmentMetadataImpl(outputSegments.get(0));
     assertEquals(segmentMetadata.getTotalDocs(), 10);
     assertEquals(segmentMetadata.getName(), "myTable_1597719600000_1597892400000_0");
-    FileUtils.cleanDirectory(outputSegmentDir);
+    FileUtils.cleanDirectory(workingDir);
+    rewindRecordReaders(_multipleSegments);
 
     // Time round, partition, rollup
     config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setTimeHandlerConfig(
         new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setRoundBucketMs(86400000).setPartitionBucketMs(86400000)
             .build()).setMergeType(MergeType.ROLLUP).build();
-    framework = new SegmentProcessorFramework(_multipleSegments, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 3);
-    Arrays.sort(files);
-    segmentMetadata = new SegmentMetadataImpl(files[0]);
+    framework = new SegmentProcessorFramework(_multipleSegments, config, workingDir);
+    outputSegments = framework.process();
+    assertEquals(outputSegments.size(), 3);
+    outputSegments.sort(null);
+    segmentMetadata = new SegmentMetadataImpl(outputSegments.get(0));
     assertEquals(segmentMetadata.getTotalDocs(), 2);
     assertEquals(segmentMetadata.getName(), "myTable_1597708800000_1597708800000_0");
-    segmentMetadata = new SegmentMetadataImpl(files[1]);
+    segmentMetadata = new SegmentMetadataImpl(outputSegments.get(1));
     assertEquals(segmentMetadata.getTotalDocs(), 3);
     assertEquals(segmentMetadata.getName(), "myTable_1597795200000_1597795200000_1");
-    segmentMetadata = new SegmentMetadataImpl(files[2]);
+    segmentMetadata = new SegmentMetadataImpl(outputSegments.get(2));
     assertEquals(segmentMetadata.getTotalDocs(), 2);
     assertEquals(segmentMetadata.getName(), "myTable_1597881600000_1597881600000_2");
-    FileUtils.cleanDirectory(outputSegmentDir);
+    FileUtils.cleanDirectory(workingDir);
+    rewindRecordReaders(_multipleSegments);
   }
 
   @Test
   public void testMultiValue()
       throws Exception {
-    File outputSegmentDir = new File(_baseDir, "output_directory_multi_value");
-    FileUtils.forceMkdir(outputSegmentDir);
+    File workingDir = new File(TEMP_DIR, "output_directory_multi_value");
+    FileUtils.forceMkdir(workingDir);
 
     // Rollup - null value enabled
     SegmentProcessorConfig config =
         new SegmentProcessorConfig.Builder().setTableConfig(_tableConfigNullValueEnabled).setSchema(_schemaMV)
             .setMergeType(MergeType.ROLLUP).build();
-    SegmentProcessorFramework framework = new SegmentProcessorFramework(_multiValueSegments, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    File[] files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 1);
-    ImmutableSegment segment = ImmutableSegmentLoader.load(files[0], ReadMode.mmap);
+    SegmentProcessorFramework framework = new SegmentProcessorFramework(_multiValueSegments, config, workingDir);
+    List<File> outputSegments = framework.process();
+    assertEquals(outputSegments.size(), 1);
+    ImmutableSegment segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
     SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
     assertEquals(segmentMetadata.getTotalDocs(), 2);
     ColumnMetadata campaignMetadata = segmentMetadata.getColumnMetadataFor("campaign");
@@ -614,18 +506,16 @@ public class SegmentProcessorFrameworkTest {
     assertTrue(timeNullValueVector.getNullBitmap().isEmpty());
     assertEquals(segmentMetadata.getName(), "myTable_1597795200000_1597795200000_0");
     segment.destroy();
-    FileUtils.cleanDirectory(outputSegmentDir);
+    FileUtils.cleanDirectory(workingDir);
+    rewindRecordReaders(_multiValueSegments);
 
     // Dedup
     config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfigNullValueEnabled).setSchema(_schemaMV)
         .setMergeType(MergeType.DEDUP).build();
-    framework = new SegmentProcessorFramework(_multiValueSegments, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 1);
-    segment = ImmutableSegmentLoader.load(files[0], ReadMode.mmap);
+    framework = new SegmentProcessorFramework(_multiValueSegments, config, workingDir);
+    outputSegments = framework.process();
+    assertEquals(outputSegments.size(), 1);
+    segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
     segmentMetadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
     assertEquals(segmentMetadata.getTotalDocs(), 2);
     campaignMetadata = segmentMetadata.getColumnMetadataFor("campaign");
@@ -642,32 +532,22 @@ public class SegmentProcessorFrameworkTest {
     assertEquals(timeMetadata.getMaxValue(), 1597795200000L);
     assertEquals(segmentMetadata.getName(), "myTable_1597795200000_1597795200000_0");
     segment.destroy();
-    FileUtils.cleanDirectory(outputSegmentDir);
-  }
-
-  @Test
-  public void testTarredSegments()
-      throws Exception {
-    File outputSegmentDir = new File(_baseDir, "output_directory_tarred");
-    FileUtils.forceMkdir(outputSegmentDir);
-
-    // Default configs
-    SegmentProcessorConfig config =
-        new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).build();
-    SegmentProcessorFramework framework = new SegmentProcessorFramework(_tarredSegments, config, outputSegmentDir);
-    framework.processSegments();
-    framework.cleanup();
-    File[] files = outputSegmentDir.listFiles();
-    assertNotNull(files);
-    assertEquals(files.length, 1);
-    SegmentMetadata segmentMetadata = new SegmentMetadataImpl(files[0]);
-    assertEquals(segmentMetadata.getTotalDocs(), 10);
-    assertEquals(segmentMetadata.getName(), "myTable_1597719600000_1597892400000_0");
-    FileUtils.cleanDirectory(outputSegmentDir);
+    FileUtils.cleanDirectory(workingDir);
+    rewindRecordReaders(_multiValueSegments);
   }
 
   @AfterClass
-  public void tearDown() {
-    FileUtils.deleteQuietly(_baseDir);
+  public void tearDown()
+      throws IOException {
+    for (RecordReader recordReader : _singleSegment) {
+      recordReader.close();
+    }
+    for (RecordReader recordReader : _multipleSegments) {
+      recordReader.close();
+    }
+    for (RecordReader recordReader : _multiValueSegments) {
+      recordReader.close();
+    }
+    FileUtils.deleteQuietly(TEMP_DIR);
   }
 }
