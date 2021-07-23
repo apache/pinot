@@ -120,8 +120,6 @@ public class StarTreeUtils {
                 .addPredicateEvaluator(getPredicateEvaluatorForPredicate(indexSegment, k)));
 
             predicateEvaluatorsMap.computeIfAbsent(column, k -> new ArrayList<>()).add(compositePredicate);
-
-            //queue.addAll(filterNode.getChildren());
             break;
           } else {
             return null;
