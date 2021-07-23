@@ -49,7 +49,7 @@ function checkOut() {
 
   pushd "$targetDir"  1>&2 || exit 1
   git init 1>&2 || exit 1
-  git remote add origin https://github.com/apache/incubator-pinot 1>&2 || exit 1
+  git remote add origin https://github.com/apache/pinot 1>&2 || exit 1
   git pull origin master 1>&2 || exit 1
   # Pull the tag list so that we can check out by tag name
   git fetch --tags 1>&2 || exit 1
