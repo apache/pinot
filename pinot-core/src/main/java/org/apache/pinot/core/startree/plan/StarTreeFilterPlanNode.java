@@ -22,20 +22,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.request.context.FilterContext;
-import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.plan.PlanNode;
-import org.apache.pinot.core.startree.PredicateEvaluatorsWithType;
+import org.apache.pinot.core.startree.CompositePredicate;
 import org.apache.pinot.core.startree.operator.StarTreeFilterOperator;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
 
 public class StarTreeFilterPlanNode implements PlanNode {
   private final StarTreeV2 _starTreeV2;
-  private final Map<String, List<PredicateEvaluatorsWithType>> _predicateEvaluatorsMap;
+  private final Map<String, List<CompositePredicate>> _predicateEvaluatorsMap;
   private final Set<String> _groupByColumns;
   private final Map<String, String> _debugOptions;
-  public StarTreeFilterPlanNode(StarTreeV2 starTreeV2, Map<String, List<PredicateEvaluatorsWithType>> predicateEvaluatorsMap,
+  public StarTreeFilterPlanNode(StarTreeV2 starTreeV2, Map<String, List<CompositePredicate>> predicateEvaluatorsMap,
       @Nullable Set<String> groupByColumns, @Nullable Map<String, String> debugOptions) {
     _starTreeV2 = starTreeV2;
     _predicateEvaluatorsMap = predicateEvaluatorsMap;

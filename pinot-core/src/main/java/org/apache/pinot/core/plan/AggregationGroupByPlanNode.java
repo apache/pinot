@@ -22,13 +22,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.FilterContext;
-import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.startree.PredicateEvaluatorsWithType;
+import org.apache.pinot.core.startree.CompositePredicate;
 import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.plan.StarTreeTransformPlanNode;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -66,7 +64,7 @@ public class AggregationGroupByPlanNode implements PlanNode {
       AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
           StarTreeUtils.extractAggregationFunctionPairs(_aggregationFunctions);
       if (aggregationFunctionColumnPairs != null) {
-        Map<String, List<PredicateEvaluatorsWithType>> predicateEvaluatorsMap =
+        Map<String, List<CompositePredicate>> predicateEvaluatorsMap =
             StarTreeUtils.extractPredicateEvaluatorsMap(indexSegment, queryContext.getFilter());
         if (predicateEvaluatorsMap != null) {
           for (StarTreeV2 starTreeV2 : starTrees) {

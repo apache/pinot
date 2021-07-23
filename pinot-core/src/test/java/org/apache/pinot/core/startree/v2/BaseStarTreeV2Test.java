@@ -33,13 +33,12 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.core.common.BlockDocIdIterator;
-import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.plan.FilterPlanNode;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
-import org.apache.pinot.core.startree.PredicateEvaluatorsWithType;
+import org.apache.pinot.core.startree.CompositePredicate;
 import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.plan.StarTreeFilterPlanNode;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
@@ -98,7 +97,8 @@ abstract class BaseStarTreeV2Test<R, A> {
   private static final String QUERY_FILTER_AND = " WHERE d1 = 0 AND d2 < 10";
   // StarTree supports OR predicates only on a single dimension
   private static final String QUERY_FILTER_OR = " WHERE d1 > 10 OR d1 < 50";
-  private static final String QUERY_FILTER_COMPLEX_OR = " WHERE d2 < 95 AND (d1 > 10 OR d1 < 50)";
+  private static final String QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS = " WHERE d2 < 95 AND (d1 > 10 OR d1 < 50)";
+  private static final String QUERY_FILTER_COMPLEX_OR_SINGLE_DIMENSION = " WHERE d1 = 95 AND (d1 > 90 OR d1 < 100)";
   private static final String QUERY_GROUP_BY = " GROUP BY d2";
 
   private ValueAggregator _valueAggregator;
@@ -173,14 +173,16 @@ abstract class BaseStarTreeV2Test<R, A> {
     }
 
     String baseQuery = String.format("SELECT %s FROM %s", aggregation, TABLE_NAME);
-    testQuery(baseQuery);
-    testQuery(baseQuery + QUERY_FILTER_AND);
-    testQuery(baseQuery + QUERY_FILTER_OR);
-    testQuery(baseQuery + QUERY_FILTER_COMPLEX_OR);
+    //testQuery(baseQuery);
+    //testQuery(baseQuery + QUERY_FILTER_AND);
+    //testQuery(baseQuery + QUERY_FILTER_OR);
+    testQuery(baseQuery + QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS);
+    testQuery(baseQuery + QUERY_FILTER_COMPLEX_OR_SINGLE_DIMENSION);
     testQuery(baseQuery + QUERY_GROUP_BY);
     testQuery(baseQuery + QUERY_FILTER_AND + QUERY_GROUP_BY);
     testQuery(baseQuery + QUERY_FILTER_OR + QUERY_GROUP_BY);
-    testQuery(baseQuery + QUERY_FILTER_COMPLEX_OR + QUERY_GROUP_BY);
+    testQuery(baseQuery + QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS + QUERY_GROUP_BY);
+    testQuery(baseQuery + QUERY_FILTER_COMPLEX_OR_SINGLE_DIMENSION + QUERY_GROUP_BY);
   }
 
   @AfterClass
@@ -215,7 +217,7 @@ abstract class BaseStarTreeV2Test<R, A> {
 
     // Filter
     FilterContext filter = queryContext.getFilter();
-    Map<String, List<PredicateEvaluatorsWithType>> predicateEvaluatorsMap =
+    Map<String, List<CompositePredicate>> predicateEvaluatorsMap =
         StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, filter);
     assertNotNull(predicateEvaluatorsMap);
 

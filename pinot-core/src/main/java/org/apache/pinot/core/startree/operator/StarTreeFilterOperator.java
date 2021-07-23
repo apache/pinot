@@ -41,7 +41,7 @@ import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
 import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import org.apache.pinot.core.startree.PredicateEvaluatorsWithType;
+import org.apache.pinot.core.startree.CompositePredicate;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.startree.StarTree;
 import org.apache.pinot.segment.spi.index.startree.StarTreeNode;
@@ -121,7 +121,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   // Star-tree
   private final StarTreeV2 _starTreeV2;
   // Map from column to predicate evaluators
-  private final Map<String, List<PredicateEvaluatorsWithType>> _predicateEvaluatorsMap;
+  private final Map<String, List<CompositePredicate>> _predicateEvaluatorsMap;
   // Set of group-by columns
   private final Set<String> _groupByColumns;
 
@@ -129,7 +129,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
 
   boolean _resultEmpty = false;
 
-  public StarTreeFilterOperator(StarTreeV2 starTreeV2, Map<String, List<PredicateEvaluatorsWithType>> predicateEvaluatorsMap,
+  public StarTreeFilterOperator(StarTreeV2 starTreeV2, Map<String, List<CompositePredicate>> predicateEvaluatorsMap,
       Set<String> groupByColumns, @Nullable Map<String, String> debugOptions) {
     _starTreeV2 = starTreeV2;
     _predicateEvaluatorsMap = predicateEvaluatorsMap;
@@ -186,10 +186,10 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
 
     // Add remaining predicates
     for (String remainingPredicateColumn : starTreeResult._remainingPredicateColumns) {
-      List<PredicateEvaluatorsWithType> predicateEvaluators = _predicateEvaluatorsMap.get(remainingPredicateColumn);
+      List<CompositePredicate> predicateEvaluators = _predicateEvaluatorsMap.get(remainingPredicateColumn);
       DataSource dataSource = _starTreeV2.getDataSource(remainingPredicateColumn);
-      for (PredicateEvaluatorsWithType predicateEvaluatorsWithType : predicateEvaluators) {
-        for (PredicateEvaluator predicateEvaluator :predicateEvaluatorsWithType.getPredicateEvaluators()) {
+      for (CompositePredicate compositePredicate : predicateEvaluators) {
+        for (PredicateEvaluator predicateEvaluator : compositePredicate.getPredicateEvaluators()) {
           childFilterOperators.add(FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs));
         }
       }
@@ -241,9 +241,9 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
 
             IntSet matchingDictIds = matchingDictIdsMap.get(nextDimension);
             if (matchingDictIds == null) {
-              List<PredicateEvaluatorsWithType> predicateEvaluatorsWithTypeList = _predicateEvaluatorsMap.get(nextDimension);
+              List<CompositePredicate> compositePredicateList = _predicateEvaluatorsMap.get(nextDimension);
 
-              matchingDictIds = getMatchingDictIds(predicateEvaluatorsWithTypeList);
+              matchingDictIds = getMatchingDictIds(compositePredicateList);
 
               // If no matching dictionary id found, directly return null
               if (matchingDictIds.isEmpty()) {
@@ -325,8 +325,8 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
    *   </li>
    * </ul>
    */
-  private IntSet getMatchingDictIdsForAnd(PredicateEvaluatorsWithType predicateEvaluatorsWithType) {
-    List<PredicateEvaluator> predicateEvaluators = predicateEvaluatorsWithType.getPredicateEvaluators();
+  private IntSet getMatchingDictIdsForAnd(CompositePredicate compositePredicate) {
+    List<PredicateEvaluator> predicateEvaluators = compositePredicate.getPredicateEvaluators();
 
     // Sort the predicate evaluators so that we process less dictionary ids
     predicateEvaluators.sort(new Comparator<PredicateEvaluator>() {
@@ -385,8 +385,8 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
    * performed. This allows upstream processing to perform union of matching dictIDs if needed (for e.g
    * for OR execution).
    */
-  private IntSet getMatchingDictIdsForAllEvaluators(PredicateEvaluatorsWithType predicateEvaluatorsWithType) {
-    List<PredicateEvaluator> predicateEvaluators = predicateEvaluatorsWithType.getPredicateEvaluators();
+  private IntSet getMatchingDictIdsForAllEvaluators(CompositePredicate compositePredicate) {
+    List<PredicateEvaluator> predicateEvaluators = compositePredicate.getPredicateEvaluators();
     IntSet matchingDictIds = new IntOpenHashSet();
 
     // Add all predicate evaluators' matching dict IDs
@@ -410,20 +410,18 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
    * Intersect all partial results and build the final result.
    *
    * Note that this method implicitly ANDs all composite predicates together.
-   * @param predicateEvaluatorsWithTypeList
-   * @return List of IntSet, one for each composite predicate.
    */
-  private IntSet getMatchingDictIds(List<PredicateEvaluatorsWithType> predicateEvaluatorsWithTypeList) {
+  private IntSet getMatchingDictIds(List<CompositePredicate> compositePredicateList) {
     List<IntSet> matchingDictIdsList = new ArrayList<>();
     IntSet matchingDictIds = new IntOpenHashSet();
 
-    for (PredicateEvaluatorsWithType predicateEvaluatorsWithType : predicateEvaluatorsWithTypeList) {
+    for (CompositePredicate compositePredicate : compositePredicateList) {
       IntSet predicateResult;
 
-      if (predicateEvaluatorsWithType.getFilterContextType() == FilterContext.Type.OR) {
-        predicateResult = getMatchingDictIdsForAllEvaluators(predicateEvaluatorsWithType);
+      if (compositePredicate.getFilterContextType() == FilterContext.Type.OR) {
+        predicateResult = getMatchingDictIdsForAllEvaluators(compositePredicate);
       } else {
-        predicateResult = getMatchingDictIdsForAnd(predicateEvaluatorsWithType);
+        predicateResult = getMatchingDictIdsForAnd(compositePredicate);
       }
 
       matchingDictIdsList.add(predicateResult);
@@ -435,7 +433,11 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
 
     matchingDictIds.addAll(firstMatchingDocIdSet);
 
-    for (IntSet intSet : matchingDictIdsList) {
+    int length = matchingDictIdsList.size();
+
+    for (int i = 1; i < length; i++) {
+      IntSet intSet = matchingDictIdsList.get(i);
+
       // We don't need to apply other predicate evaluators if all matching dictionary ids have already been removed
       if (matchingDictIds.isEmpty()) {
         return matchingDictIds;

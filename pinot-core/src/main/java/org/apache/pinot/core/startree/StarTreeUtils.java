@@ -85,15 +85,19 @@ public class StarTreeUtils {
   /**
    * Extracts a map from the column to a list of {@link PredicateEvaluator}s for it. Returns {@code null} if the filter
    * cannot be solved by the star-tree.
+   *
+   * A predicate can be simple (d1 > 10) or composite (d1 > 10 AND d2 < 50) or multi levelled (d1 > 50 AND (d2 > 10 OR d2 < 35)
+   * This method represents a list of CompositePredicates per dimension. For each dimension, all CompositePredicates in the
+   * list are implicitly ANDed together. Any OR predicates are nested within a CompositePredicate.
    */
   @Nullable
-  public static Map<String, List<PredicateEvaluatorsWithType>> extractPredicateEvaluatorsMap(IndexSegment indexSegment,
+  public static Map<String, List<CompositePredicate>> extractPredicateEvaluatorsMap(IndexSegment indexSegment,
       @Nullable FilterContext filter) {
     if (filter == null) {
       return Collections.emptyMap();
     }
 
-    Map<String, List<PredicateEvaluatorsWithType>> predicateEvaluatorsMap = new HashMap<>();
+    Map<String, List<CompositePredicate>> predicateEvaluatorsMap = new HashMap<>();
     Queue<FilterContext> queue = new LinkedList<>();
     queue.add(filter);
     FilterContext filterNode;
@@ -109,12 +113,13 @@ public class StarTreeUtils {
             assert result.getRight() != null;
             String column = result.getRight();
 
-            PredicateEvaluatorsWithType predicateEvaluatorsWithType = new PredicateEvaluatorsWithType(
+            CompositePredicate compositePredicate = new CompositePredicate(
                 FilterContext.Type.OR);
 
-            filterNode.getChildren().forEach(k -> predicateEvaluatorsWithType.addPredicateEvaluator(getPredicateEvaluatorForPredicate(indexSegment, k)));
+            filterNode.getChildren().forEach(k -> compositePredicate
+                .addPredicateEvaluator(getPredicateEvaluatorForPredicate(indexSegment, k)));
 
-            predicateEvaluatorsMap.computeIfAbsent(column, k -> new ArrayList<>()).add(predicateEvaluatorsWithType);
+            predicateEvaluatorsMap.computeIfAbsent(column, k -> new ArrayList<>()).add(compositePredicate);
 
             //queue.addAll(filterNode.getChildren());
             break;
@@ -133,11 +138,11 @@ public class StarTreeUtils {
           PredicateEvaluator predicateEvaluator = getPredicateEvaluatorForPredicate(indexSegment, filterNode);
 
           if (predicateEvaluator != null && !predicateEvaluator.isAlwaysTrue()) {
-            PredicateEvaluatorsWithType predicateEvaluatorsWithType = new PredicateEvaluatorsWithType(
+            CompositePredicate compositePredicate = new CompositePredicate(
                 FilterContext.Type.PREDICATE);
 
-            predicateEvaluatorsWithType.addPredicateEvaluator(predicateEvaluator);
-            predicateEvaluatorsMap.computeIfAbsent(column, k -> new ArrayList<>()).add(predicateEvaluatorsWithType);
+            compositePredicate.addPredicateEvaluator(predicateEvaluator);
+            predicateEvaluatorsMap.computeIfAbsent(column, k -> new ArrayList<>()).add(compositePredicate);
           }
           break;
         default:
@@ -215,7 +220,7 @@ public class StarTreeUtils {
         isOrClauseValidForStarTreeInternal(childFilterContext, seenLiterals);
       }
     } else if (filterContext.getType() == FilterContext.Type.PREDICATE) {
-      String literalValue = validateExpressionAndExtractLiteral(filterContext.getPredicate());
+      String literalValue = validateExpressionAndExtractIdentifier(filterContext.getPredicate());
 
       if (literalValue != null) {
         seenLiterals.add(literalValue);
@@ -227,15 +232,15 @@ public class StarTreeUtils {
     return true;
   }
 
-  /** Checks if the given predicate has an expression which is of type identifier and returns its literal */
-  private static String validateExpressionAndExtractLiteral(Predicate predicate) {
+  /** Checks if the given predicate has an expression which is of type identifier and returns it */
+  private static String validateExpressionAndExtractIdentifier(Predicate predicate) {
     assert predicate != null;
 
     ExpressionContext expressionContext = predicate.getLhs();
 
    if (expressionContext.getType() == ExpressionContext.Type.IDENTIFIER) {
       return expressionContext.getIdentifier();
-    }
+   }
 
     return null;
   }
