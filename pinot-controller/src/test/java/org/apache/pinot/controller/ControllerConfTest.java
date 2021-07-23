@@ -60,7 +60,7 @@ public class ControllerConfTest {
 
   /**
    * When config contains: 1. Both deprecated config and the corresponding new config. 2. All new
-   * configurations are valid. 3. Some deprecated configurations are invalid. then new configs
+   * configurations are valid. 3. Some deprecated configurations are invalid, then new configs
    * override deprecated configs (invalid deprecated configs do not throw exceptions when
    * corresponding valid new configs are supplied as well)
    */
@@ -78,12 +78,13 @@ public class ControllerConfTest {
     NEW_CONFIGS.forEach(config -> controllerConfig.put(config, period));
     ControllerConf conf = new ControllerConf(controllerConfig);
     //execution and assertion
-    assertOnDurations(conf, TimeUnit.SECONDS.convert(TimeUtils.convertPeriodToMillis(period), TimeUnit.MILLISECONDS));
+    assertOnDurations(conf, TimeUnit.SECONDS.convert(TimeUtils.convertPeriodToMillis(period), TimeUnit.MILLISECONDS),
+        controllerConfig);
   }
 
   /**
    * When config contains: 1. Both deprecated config and the corresponding new config. 2. All
-   * deprecated configurations are valid. 3. Some new configurations are invalid. then exceptions
+   * deprecated configurations are valid. 3. Some new configurations are invalid, then exceptions
    * are thrown when invalid new configurations are read (there is no fall-back to the corresponding
    * valid deprecated configuration). For all valid new configurations, they override the
    * corresponding deprecated configuration.
@@ -119,7 +120,7 @@ public class ControllerConfTest {
     NEW_CONFIGS.forEach(config -> Assert.assertFalse(controllerConfig.containsKey(config)));
     ControllerConf conf = new ControllerConf(controllerConfig);
     //execution and assertion
-    assertOnDurations(conf, durationInSeconds);
+    assertOnDurations(conf, durationInSeconds, controllerConfig);
   }
 
   /**
@@ -136,7 +137,8 @@ public class ControllerConfTest {
     DEPRECATED_CONFIGS.forEach(config -> Assert.assertFalse(controllerConfig.containsKey(config)));
     ControllerConf conf = new ControllerConf(controllerConfig);
     //execution and assertion
-    assertOnDurations(conf, TimeUnit.SECONDS.convert(TimeUtils.convertPeriodToMillis(period), TimeUnit.MILLISECONDS));
+    assertOnDurations(conf, TimeUnit.SECONDS.convert(TimeUtils.convertPeriodToMillis(period), TimeUnit.MILLISECONDS),
+        controllerConfig);
   }
 
   @Test
@@ -148,7 +150,7 @@ public class ControllerConfTest {
     Assert.assertEquals(taskManagerFrequencyInSeconds, -1);
   }
 
-  private void assertOnDurations(ControllerConf conf, long expectedDuration) {
+  private void assertOnDurations(ControllerConf conf, long expectedDuration, Map<String, Object> controllerConfig) {
     int segmentLevelValidationIntervalInSeconds = conf.getSegmentLevelValidationIntervalInSeconds();
     int segmentRelocatorFrequencyInSeconds = conf.getSegmentRelocatorFrequencyInSeconds();
     int taskMetricsEmitterFrequencyInSeconds = conf.getTaskMetricsEmitterFrequencyInSeconds();
@@ -162,17 +164,19 @@ public class ControllerConfTest {
     int offlineSegmentIntervalCheckerFrequencyInSeconds = conf.getOfflineSegmentIntervalCheckerFrequencyInSeconds();
     int retentionControllerFrequencyInSeconds = conf.getRetentionControllerFrequencyInSeconds();
     //then
-    Assert.assertEquals(segmentLevelValidationIntervalInSeconds, expectedDuration);
-    Assert.assertEquals(segmentRelocatorFrequencyInSeconds, expectedDuration);
-    Assert.assertEquals(taskMetricsEmitterFrequencyInSeconds, expectedDuration);
-    Assert.assertEquals(minionInstancesCleanupTaskMinOfflineTimeBeforeDeletionInSeconds, expectedDuration);
-    Assert.assertEquals(minionInstancesCleanupTaskFrequencyInSeconds, expectedDuration);
-    Assert.assertEquals(taskManagerFrequencyInSeconds, expectedDuration);
-    Assert.assertEquals(statusCheckerFrequencyInSeconds, expectedDuration);
-    Assert.assertEquals(brokerResourceValidationFrequencyInSeconds, expectedDuration);
-    Assert.assertEquals(realtimeSegmentValidationFrequencyInSeconds, expectedDuration);
-    Assert.assertEquals(offlineSegmentIntervalCheckerFrequencyInSeconds, expectedDuration);
-    Assert.assertEquals(retentionControllerFrequencyInSeconds, expectedDuration);
+    String confAsString = controllerConfig.toString();
+    Assert.assertEquals(segmentLevelValidationIntervalInSeconds, expectedDuration, confAsString);
+    Assert.assertEquals(segmentRelocatorFrequencyInSeconds, expectedDuration, confAsString);
+    Assert.assertEquals(taskMetricsEmitterFrequencyInSeconds, expectedDuration, confAsString);
+    Assert
+        .assertEquals(minionInstancesCleanupTaskMinOfflineTimeBeforeDeletionInSeconds, expectedDuration, confAsString);
+    Assert.assertEquals(minionInstancesCleanupTaskFrequencyInSeconds, expectedDuration, confAsString);
+    Assert.assertEquals(taskManagerFrequencyInSeconds, expectedDuration, confAsString);
+    Assert.assertEquals(statusCheckerFrequencyInSeconds, expectedDuration, confAsString);
+    Assert.assertEquals(brokerResourceValidationFrequencyInSeconds, expectedDuration, confAsString);
+    Assert.assertEquals(realtimeSegmentValidationFrequencyInSeconds, expectedDuration, confAsString);
+    Assert.assertEquals(offlineSegmentIntervalCheckerFrequencyInSeconds, expectedDuration, confAsString);
+    Assert.assertEquals(retentionControllerFrequencyInSeconds, expectedDuration, confAsString);
   }
 
   private int getRandomDurationInSeconds() {

@@ -81,10 +81,6 @@ public class ControllerConf extends PinotConfiguration {
     public static final String DEPRECATED_RETENTION_MANAGER_FREQUENCY_IN_SECONDS =
         "controller.retention.frequencyInSeconds";
     public static final String RETENTION_MANAGER_FREQUENCY_PERIOD = "controller.retention.frequencyPeriod";
-    @Deprecated
-    // The ValidationManager has been split up into 3 separate tasks, each having their own frequency config settings
-    public static final String DEPRECATED_VALIDATION_MANAGER_FREQUENCY_IN_SECONDS =
-        "controller.validation.frequencyInSeconds";
     // Deprecated as of 0.8.0
     @Deprecated
     public static final String DEPRECATED_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS =
@@ -502,8 +498,8 @@ public class ControllerConf extends PinotConfiguration {
 
   /**
    * Returns <code>controller.realtime.segment.validation.frequencyPeriod</code> or
-   * <code>controller.realtime.segment.validation.frequencyInSeconds</code> or the validation
-   * controller frequency, in the order of decreasing preference from left to right. This is done in
+   * <code>controller.realtime.segment.validation.frequencyInSeconds</code> or the default realtime segment
+   * validation frequncy, in the order of decreasing preference from left to right. This is done in
    * order to retain the current behavior, wherein the realtime validation tasks were done at
    * validation controller frequency The default value is the new DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS
    *
@@ -511,17 +507,9 @@ public class ControllerConf extends PinotConfiguration {
    */
   public int getRealtimeSegmentValidationFrequencyInSeconds() {
     return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_PERIOD))
-        .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(() -> {
-          Integer frequency =
-              getProperty(ControllerPeriodicTasksConf.DEPRECATED_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS,
-                  Integer.class);
-          //fallback to the default value if frequency is not supplied
-          if (null == frequency) {
-            return getProperty(ControllerPeriodicTasksConf.DEPRECATED_VALIDATION_MANAGER_FREQUENCY_IN_SECONDS,
-                ControllerPeriodicTasksConf.DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS);
-          }
-          return frequency;
-        });
+        .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(
+            () -> getProperty(ControllerPeriodicTasksConf.DEPRECATED_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS,
+                ControllerPeriodicTasksConf.DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS));
   }
 
   public void setRealtimeSegmentValidationFrequencyInSeconds(int validationFrequencyInSeconds) {
@@ -531,8 +519,8 @@ public class ControllerConf extends PinotConfiguration {
 
   /**
    * Return <code>controller.broker.resource.validation.frequencyPeriod</code> or
-   * <code>controller.broker.resource.validation.frequencyInSeconds</code> or the validation
-   * controller frequency in order of decreasing preference from left to righ. This is done in order
+   * <code>controller.broker.resource.validation.frequencyInSeconds</code> or the default broker resource validation
+   * frequency, in order of decreasing preference from left to righ. This is done in order
    * to retain the current behavior, wherein the broker resource validation tasks were done at
    * validation controller frequency The default value is the new DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS
    *
@@ -540,17 +528,9 @@ public class ControllerConf extends PinotConfiguration {
    */
   public int getBrokerResourceValidationFrequencyInSeconds() {
     return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_PERIOD))
-        .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(() -> {
-          Integer frequency =
-              getProperty(ControllerPeriodicTasksConf.DEPRECATED_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS,
-                  Integer.class);
-          //fallback to the default value if frequency is not supplied
-          if (null == frequency) {
-            return getProperty(ControllerPeriodicTasksConf.DEPRECATED_VALIDATION_MANAGER_FREQUENCY_IN_SECONDS,
-                ControllerPeriodicTasksConf.DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS);
-          }
-          return frequency;
-        });
+        .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(
+            () -> getProperty(ControllerPeriodicTasksConf.DEPRECATED_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS,
+                ControllerPeriodicTasksConf.DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS));
   }
 
   public void setBrokerResourceValidationFrequencyInSeconds(int validationFrequencyInSeconds) {
