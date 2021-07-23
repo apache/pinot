@@ -144,10 +144,18 @@ public class ControllerConfTest {
   @Test
   public void shouldBeAbleToDisableUsingNewConfig() {
     Map<String, Object> controllerConfig = new HashMap<>();
-    controllerConfig.put(TASK_MANAGER_FREQUENCY_PERIOD, "-1");
     ControllerConf conf = new ControllerConf(controllerConfig);
-    int taskManagerFrequencyInSeconds = conf.getTaskManagerFrequencyInSeconds();
-    Assert.assertEquals(taskManagerFrequencyInSeconds, -1);
+    Assert.assertEquals(conf.getTaskManagerFrequencyInSeconds(), -1);
+
+    controllerConfig = new HashMap<>();
+    controllerConfig.put(TASK_MANAGER_FREQUENCY_PERIOD, "0s");
+    conf = new ControllerConf(controllerConfig);
+    Assert.assertEquals(conf.getTaskManagerFrequencyInSeconds(), 0);
+
+    controllerConfig = new HashMap<>();
+    controllerConfig.put(TASK_MANAGER_FREQUENCY_PERIOD, "-1s");
+    conf = new ControllerConf(controllerConfig);
+    Assert.assertEquals(conf.getTaskManagerFrequencyInSeconds(), -1);
   }
 
   private void assertOnDurations(ControllerConf conf, long expectedDuration, Map<String, Object> controllerConfig) {
