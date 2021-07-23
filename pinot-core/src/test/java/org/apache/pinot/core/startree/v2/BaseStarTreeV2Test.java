@@ -173,9 +173,9 @@ abstract class BaseStarTreeV2Test<R, A> {
     }
 
     String baseQuery = String.format("SELECT %s FROM %s", aggregation, TABLE_NAME);
-    //testQuery(baseQuery);
-    //testQuery(baseQuery + QUERY_FILTER_AND);
-    //testQuery(baseQuery + QUERY_FILTER_OR);
+    testQuery(baseQuery);
+    testQuery(baseQuery + QUERY_FILTER_AND);
+    testQuery(baseQuery + QUERY_FILTER_OR);
     testQuery(baseQuery + QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS);
     testQuery(baseQuery + QUERY_FILTER_COMPLEX_OR_SINGLE_DIMENSION);
     testQuery(baseQuery + QUERY_GROUP_BY);

@@ -75,7 +75,6 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
                 .isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, _groupByExpressions,
                     predicateEvaluatorsMap.keySet())) {
               _transformPlanNode = null;
-
               _starTreeTransformPlanNode =
                   new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, _groupByExpressions,
                       predicateEvaluatorsMap, queryContext.getDebugOptions());
