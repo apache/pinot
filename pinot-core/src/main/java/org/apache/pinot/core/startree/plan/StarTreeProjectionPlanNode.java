@@ -27,6 +27,7 @@ import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.plan.PlanNode;
+import org.apache.pinot.core.startree.PredicateEvaluatorsWithType;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
@@ -36,14 +37,14 @@ public class StarTreeProjectionPlanNode implements PlanNode {
   private final StarTreeDocIdSetPlanNode _starTreeDocIdSetPlanNode;
 
   public StarTreeProjectionPlanNode(StarTreeV2 starTreeV2, Set<String> projectionColumns,
-      Map<String, List<PredicateEvaluator>> predicateEvaluatorsMap, @Nullable Set<String> groupByColumns,
-      @Nullable Map<String, String> debugOptions, FilterContext.Type filterContextType) {
+      Map<String, List<PredicateEvaluatorsWithType>> predicateEvaluatorsMap, @Nullable Set<String> groupByColumns,
+      @Nullable Map<String, String> debugOptions) {
     _dataSourceMap = new HashMap<>();
     for (String projectionColumn : projectionColumns) {
       _dataSourceMap.put(projectionColumn, starTreeV2.getDataSource(projectionColumn));
     }
     _starTreeDocIdSetPlanNode =
-        new StarTreeDocIdSetPlanNode(starTreeV2, predicateEvaluatorsMap, groupByColumns, debugOptions, filterContextType);
+        new StarTreeDocIdSetPlanNode(starTreeV2, predicateEvaluatorsMap, groupByColumns, debugOptions);
   }
 
   @Override

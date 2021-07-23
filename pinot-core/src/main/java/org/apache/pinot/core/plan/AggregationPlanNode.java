@@ -28,6 +28,7 @@ import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.startree.PredicateEvaluatorsWithType;
 import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.plan.StarTreeTransformPlanNode;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -56,7 +57,7 @@ public class AggregationPlanNode implements PlanNode {
       AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
           StarTreeUtils.extractAggregationFunctionPairs(_aggregationFunctions);
       if (aggregationFunctionColumnPairs != null) {
-        Map<String, List<PredicateEvaluator>> predicateEvaluatorsMap =
+        Map<String, List<PredicateEvaluatorsWithType>> predicateEvaluatorsMap =
             StarTreeUtils.extractPredicateEvaluatorsMap(indexSegment, queryContext.getFilter());
         if (predicateEvaluatorsMap != null) {
           for (StarTreeV2 starTreeV2 : starTrees) {
@@ -64,11 +65,9 @@ public class AggregationPlanNode implements PlanNode {
                 predicateEvaluatorsMap.keySet())) {
               _transformPlanNode = null;
 
-              FilterContext.Type filterContextType = queryContext.getFilter() != null ? queryContext.getFilter().getType() : null;
-
               _starTreeTransformPlanNode =
                   new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, null,
-                      predicateEvaluatorsMap, queryContext.getDebugOptions(), filterContextType);
+                      predicateEvaluatorsMap, queryContext.getDebugOptions());
               return;
             }
           }

@@ -39,6 +39,7 @@ import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.core.startree.PredicateEvaluatorsWithType;
 import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.plan.StarTreeFilterPlanNode;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
@@ -96,7 +97,8 @@ abstract class BaseStarTreeV2Test<R, A> {
   private static final String METRIC = "m";
   private static final String QUERY_FILTER_AND = " WHERE d1 = 0 AND d2 < 10";
   // StarTree supports OR predicates only on a single dimension
-  private static final String QUERY_FILTER_OR = " WHERE d1 < 10 OR d1 > 50";
+  private static final String QUERY_FILTER_OR = " WHERE d1 > 10 OR d1 < 50";
+  private static final String QUERY_FILTER_COMPLEX_OR = " WHERE d2 < 95 AND (d1 > 10 OR d1 < 50)";
   private static final String QUERY_GROUP_BY = " GROUP BY d2";
 
   private ValueAggregator _valueAggregator;
@@ -174,9 +176,11 @@ abstract class BaseStarTreeV2Test<R, A> {
     testQuery(baseQuery);
     testQuery(baseQuery + QUERY_FILTER_AND);
     testQuery(baseQuery + QUERY_FILTER_OR);
+    testQuery(baseQuery + QUERY_FILTER_COMPLEX_OR);
     testQuery(baseQuery + QUERY_GROUP_BY);
     testQuery(baseQuery + QUERY_FILTER_AND + QUERY_GROUP_BY);
     testQuery(baseQuery + QUERY_FILTER_OR + QUERY_GROUP_BY);
+    testQuery(baseQuery + QUERY_FILTER_COMPLEX_OR + QUERY_GROUP_BY);
   }
 
   @AfterClass
@@ -211,14 +215,13 @@ abstract class BaseStarTreeV2Test<R, A> {
 
     // Filter
     FilterContext filter = queryContext.getFilter();
-    Map<String, List<PredicateEvaluator>> predicateEvaluatorsMap =
+    Map<String, List<PredicateEvaluatorsWithType>> predicateEvaluatorsMap =
         StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, filter);
     assertNotNull(predicateEvaluatorsMap);
 
-    FilterContext.Type type = filter != null ? filter.getType() : null;
     // Extract values with star-tree
     PlanNode starTreeFilterPlanNode =
-        new StarTreeFilterPlanNode(_starTreeV2, predicateEvaluatorsMap, groupByColumnSet, null, type);
+        new StarTreeFilterPlanNode(_starTreeV2, predicateEvaluatorsMap, groupByColumnSet, null);
     List<ForwardIndexReader> starTreeAggregationColumnReaders = new ArrayList<>(numAggregations);
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
       starTreeAggregationColumnReaders
