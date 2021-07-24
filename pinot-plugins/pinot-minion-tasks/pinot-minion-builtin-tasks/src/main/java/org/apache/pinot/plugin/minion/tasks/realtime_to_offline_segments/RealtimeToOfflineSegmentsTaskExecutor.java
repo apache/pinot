@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
@@ -38,8 +37,10 @@ import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.plugin.minion.tasks.BaseMultipleSegmentsConversionExecutor;
 import org.apache.pinot.plugin.minion.tasks.MergeTaskUtils;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,8 +68,6 @@ import org.slf4j.LoggerFactory;
  */
 public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsConversionExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeToOfflineSegmentsTaskExecutor.class);
-  private static final String INPUT_SEGMENTS_DIR = "input_segments";
-  private static final String OUTPUT_SEGMENTS_DIR = "output_segments";
 
   private final MinionTaskZkMetadataManager _minionTaskZkMetadataManager;
   private int _expectedVersion = Integer.MIN_VALUE;
@@ -105,7 +104,7 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
   }
 
   @Override
-  protected List<SegmentConversionResult> convert(PinotTaskConfig pinotTaskConfig, List<File> originalIndexDirs,
+  protected List<SegmentConversionResult> convert(PinotTaskConfig pinotTaskConfig, List<File> segmentDirs,
       File workingDir)
       throws Exception {
     String taskType = pinotTaskConfig.getTaskType();
@@ -149,30 +148,28 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
 
     SegmentProcessorConfig segmentProcessorConfig = segmentProcessorConfigBuilder.build();
 
-    File inputSegmentsDir = new File(workingDir, INPUT_SEGMENTS_DIR);
-    Preconditions.checkState(inputSegmentsDir.mkdirs(), "Failed to create input directory: %s for task: %s",
-        inputSegmentsDir.getAbsolutePath(), taskType);
-    for (File indexDir : originalIndexDirs) {
-      FileUtils.copyDirectoryToDirectory(indexDir, inputSegmentsDir);
+    List<RecordReader> recordReaders = new ArrayList<>(segmentDirs.size());
+    for (File segmentDir : segmentDirs) {
+      PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader();
+      // NOTE: Do not fill null field with default value to be consistent with other record readers
+      recordReader.init(segmentDir, null, null, true);
+      recordReaders.add(recordReader);
     }
-    File outputSegmentsDir = new File(workingDir, OUTPUT_SEGMENTS_DIR);
-    Preconditions.checkState(outputSegmentsDir.mkdirs(), "Failed to create output directory: %s for task: %s",
-        outputSegmentsDir.getAbsolutePath(), taskType);
-
-    SegmentProcessorFramework segmentProcessorFramework =
-        new SegmentProcessorFramework(inputSegmentsDir, segmentProcessorConfig, outputSegmentsDir);
+    List<File> outputSegmentDirs;
     try {
-      segmentProcessorFramework.processSegments();
+      outputSegmentDirs = new SegmentProcessorFramework(recordReaders, segmentProcessorConfig, workingDir).process();
     } finally {
-      segmentProcessorFramework.cleanup();
+      for (RecordReader recordReader : recordReaders) {
+        recordReader.close();
+      }
     }
 
     long endMillis = System.currentTimeMillis();
     LOGGER.info("Finished task: {} with configs: {}. Total time: {}ms", taskType, configs, (endMillis - startMillis));
     List<SegmentConversionResult> results = new ArrayList<>();
-    for (File file : outputSegmentsDir.listFiles()) {
-      String outputSegmentName = file.getName();
-      results.add(new SegmentConversionResult.Builder().setFile(file).setSegmentName(outputSegmentName)
+    for (File outputSegmentDir : outputSegmentDirs) {
+      String outputSegmentName = outputSegmentDir.getName();
+      results.add(new SegmentConversionResult.Builder().setFile(outputSegmentDir).setSegmentName(outputSegmentName)
           .setTableNameWithType(offlineTableName).build());
     }
     return results;

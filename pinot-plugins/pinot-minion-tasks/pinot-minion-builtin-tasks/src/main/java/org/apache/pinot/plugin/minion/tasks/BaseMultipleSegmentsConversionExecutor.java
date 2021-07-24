@@ -61,12 +61,12 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
    * Converts the segment based on the given {@link PinotTaskConfig}.
    *
    * @param pinotTaskConfig Task config
-   * @param originalIndexDir Index directory for the original segment
+   * @param segmentDirs Index directories for the original segments
    * @param workingDir Working directory for the converted segment
    * @return a list of segment conversion result
    * @throws Exception
    */
-  protected abstract List<SegmentConversionResult> convert(PinotTaskConfig pinotTaskConfig, List<File> originalIndexDir,
+  protected abstract List<SegmentConversionResult> convert(PinotTaskConfig pinotTaskConfig, List<File> segmentDirs,
       File workingDir)
       throws Exception;
 
@@ -106,7 +106,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     String crypterName = getTableConfig(tableNameWithType).getValidationConfig().getCrypterClassName();
 
     try {
-      List<File> inputSegmentFiles = new ArrayList<>();
+      List<File> inputSegmentDirs = new ArrayList<>();
       for (int i = 0; i < downloadURLs.length; i++) {
         // Download the segment file
         File tarredSegmentFile = new File(tempDataDir, "tarredSegmentFile_" + i);
@@ -116,13 +116,23 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         // Un-tar the segment file
         File segmentDir = new File(tempDataDir, "segmentDir_" + i);
         File indexDir = TarGzCompressionUtils.untar(tarredSegmentFile, segmentDir).get(0);
-        inputSegmentFiles.add(indexDir);
+        inputSegmentDirs.add(indexDir);
+        if (!FileUtils.deleteQuietly(tarredSegmentFile)) {
+          LOGGER.warn("Failed to delete tarred input segment: {}", tarredSegmentFile.getAbsolutePath());
+        }
       }
 
       // Convert the segments
       File workingDir = new File(tempDataDir, "workingDir");
       Preconditions.checkState(workingDir.mkdir());
-      List<SegmentConversionResult> segmentConversionResults = convert(pinotTaskConfig, inputSegmentFiles, workingDir);
+      List<SegmentConversionResult> segmentConversionResults = convert(pinotTaskConfig, inputSegmentDirs, workingDir);
+
+      // Delete the input segments
+      for (File inputSegmentDir : inputSegmentDirs) {
+        if (!FileUtils.deleteQuietly(inputSegmentDir)) {
+          LOGGER.warn("Failed to delete input segment: {}", inputSegmentDir.getAbsolutePath());
+        }
+      }
 
       // Create a directory for converted tarred segment files
       File convertedTarredSegmentDir = new File(tempDataDir, "convertedTarredSegmentDir");
@@ -132,11 +142,14 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       List<File> tarredSegmentFiles = new ArrayList<>(numOutputSegments);
       for (SegmentConversionResult segmentConversionResult : segmentConversionResults) {
         // Tar the converted segment
-        File convertedIndexDir = segmentConversionResult.getFile();
+        File convertedSegmentDir = segmentConversionResult.getFile();
         File convertedSegmentTarFile = new File(convertedTarredSegmentDir,
             segmentConversionResult.getSegmentName() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-        TarGzCompressionUtils.createTarGzFile(convertedIndexDir, convertedSegmentTarFile);
+        TarGzCompressionUtils.createTarGzFile(convertedSegmentDir, convertedSegmentTarFile);
         tarredSegmentFiles.add(convertedSegmentTarFile);
+        if (!FileUtils.deleteQuietly(convertedSegmentDir)) {
+          LOGGER.warn("Failed to delete converted segment: {}", convertedSegmentDir.getAbsolutePath());
+        }
       }
 
       // Check whether the task get cancelled before uploading the segment
@@ -153,8 +166,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
             Arrays.stream(inputSegmentNames.split(",")).map(String::trim).collect(Collectors.toList());
         List<String> segmentsTo =
             segmentConversionResults.stream().map(SegmentConversionResult::getSegmentName).collect(Collectors.toList());
-        lineageEntryId = SegmentConversionUtils
-            .startSegmentReplace(tableNameWithType, uploadURL, new StartReplaceSegmentsRequest(segmentsFrom, segmentsTo));
+        lineageEntryId = SegmentConversionUtils.startSegmentReplace(tableNameWithType, uploadURL,
+            new StartReplaceSegmentsRequest(segmentsFrom, segmentsTo));
       }
 
       // Upload the tarred segments
@@ -184,6 +197,9 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         SegmentConversionUtils
             .uploadSegment(configs, FileUploadDownloadClient.makeAuthHeader(authToken), parameters, tableNameWithType,
                 resultSegmentName, uploadURL, convertedTarredSegmentFile);
+        if (!FileUtils.deleteQuietly(convertedTarredSegmentFile)) {
+          LOGGER.warn("Failed to delete tarred converted segment: {}", convertedTarredSegmentFile.getAbsolutePath());
+        }
       }
 
       // Update the segment lineage to indicate that the segment replacement is done.
