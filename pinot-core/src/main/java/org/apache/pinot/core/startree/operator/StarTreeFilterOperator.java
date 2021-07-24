@@ -41,7 +41,7 @@ import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
 import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import org.apache.pinot.core.startree.CompositePredicate;
+import org.apache.pinot.core.startree.CompositePredicateEvaluator;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.startree.StarTree;
 import org.apache.pinot.segment.spi.index.startree.StarTreeNode;
@@ -121,7 +121,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   // Star-tree
   private final StarTreeV2 _starTreeV2;
   // Map from column to predicate evaluators
-  private final Map<String, List<CompositePredicate>> _predicateEvaluatorsMap;
+  private final Map<String, List<CompositePredicateEvaluator>> _predicateEvaluatorsMap;
   // Set of group-by columns
   private final Set<String> _groupByColumns;
 
@@ -129,7 +129,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
 
   boolean _resultEmpty = false;
 
-  public StarTreeFilterOperator(StarTreeV2 starTreeV2, Map<String, List<CompositePredicate>> predicateEvaluatorsMap,
+  public StarTreeFilterOperator(StarTreeV2 starTreeV2, Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap,
       Set<String> groupByColumns, @Nullable Map<String, String> debugOptions) {
     _starTreeV2 = starTreeV2;
     _predicateEvaluatorsMap = predicateEvaluatorsMap;
@@ -186,11 +186,19 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
 
     // Add remaining predicates
     for (String remainingPredicateColumn : starTreeResult._remainingPredicateColumns) {
-      List<CompositePredicate> predicateEvaluators = _predicateEvaluatorsMap.get(remainingPredicateColumn);
+      List<CompositePredicateEvaluator> predicateEvaluators = _predicateEvaluatorsMap.get(remainingPredicateColumn);
       DataSource dataSource = _starTreeV2.getDataSource(remainingPredicateColumn);
-      for (CompositePredicate compositePredicate : predicateEvaluators) {
-        for (PredicateEvaluator predicateEvaluator : compositePredicate.getPredicateEvaluators()) {
-          childFilterOperators.add(FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs));
+      for (CompositePredicateEvaluator compositePredicateEvaluator : predicateEvaluators) {
+        List<BaseFilterOperator> currentChildOperators = new ArrayList<>();
+        for (PredicateEvaluator predicateEvaluator : compositePredicateEvaluator.getPredicateEvaluators()) {
+          currentChildOperators.add(FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs));
+        }
+
+        // Add a child operator based on the composite predicate relationship type
+        if (compositePredicateEvaluator.getFilterContextType() == FilterContext.Type.OR) {
+          childFilterOperators.add(FilterOperatorUtils.getOrFilterOperator(currentChildOperators, numDocs, _debugOptions));
+        } else {
+          childFilterOperators.add(FilterOperatorUtils.getAndFilterOperator(currentChildOperators, numDocs, _debugOptions));
         }
       }
     }
@@ -241,9 +249,9 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
 
             IntSet matchingDictIds = matchingDictIdsMap.get(nextDimension);
             if (matchingDictIds == null) {
-              List<CompositePredicate> compositePredicateList = _predicateEvaluatorsMap.get(nextDimension);
+              List<CompositePredicateEvaluator> compositePredicateEvaluatorList = _predicateEvaluatorsMap.get(nextDimension);
 
-              matchingDictIds = getMatchingDictIds(compositePredicateList);
+              matchingDictIds = getMatchingDictIds(compositePredicateEvaluatorList);
 
               // If no matching dictionary id found, directly return null
               if (matchingDictIds.isEmpty()) {
@@ -325,8 +333,8 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
    *   </li>
    * </ul>
    */
-  private IntSet getMatchingDictIdsForAnd(CompositePredicate compositePredicate) {
-    List<PredicateEvaluator> predicateEvaluators = compositePredicate.getPredicateEvaluators();
+  private IntSet getMatchingDictIdsForAnd(CompositePredicateEvaluator compositePredicateEvaluator) {
+    List<PredicateEvaluator> predicateEvaluators = compositePredicateEvaluator.getPredicateEvaluators();
 
     // Sort the predicate evaluators so that we process less dictionary ids
     predicateEvaluators.sort(new Comparator<PredicateEvaluator>() {
@@ -385,8 +393,8 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
    * performed. This allows upstream processing to perform union of matching dictIDs if needed (for e.g
    * for OR execution).
    */
-  private IntSet getMatchingDictIdsForAllEvaluators(CompositePredicate compositePredicate) {
-    List<PredicateEvaluator> predicateEvaluators = compositePredicate.getPredicateEvaluators();
+  private IntSet getMatchingDictIdsForAllEvaluators(CompositePredicateEvaluator compositePredicateEvaluator) {
+    List<PredicateEvaluator> predicateEvaluators = compositePredicateEvaluator.getPredicateEvaluators();
     IntSet matchingDictIds = new IntOpenHashSet();
 
     // Add all predicate evaluators' matching dict IDs
@@ -411,17 +419,17 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
    *
    * Note that this method implicitly ANDs all composite predicates together.
    */
-  private IntSet getMatchingDictIds(List<CompositePredicate> compositePredicateList) {
+  private IntSet getMatchingDictIds(List<CompositePredicateEvaluator> compositePredicateEvaluatorList) {
     List<IntSet> matchingDictIdsList = new ArrayList<>();
     IntSet matchingDictIds = new IntOpenHashSet();
 
-    for (CompositePredicate compositePredicate : compositePredicateList) {
+    for (CompositePredicateEvaluator compositePredicateEvaluator : compositePredicateEvaluatorList) {
       IntSet predicateResult;
 
-      if (compositePredicate.getFilterContextType() == FilterContext.Type.OR) {
-        predicateResult = getMatchingDictIdsForAllEvaluators(compositePredicate);
+      if (compositePredicateEvaluator.getFilterContextType() == FilterContext.Type.OR) {
+        predicateResult = getMatchingDictIdsForAllEvaluators(compositePredicateEvaluator);
       } else {
-        predicateResult = getMatchingDictIdsForAnd(compositePredicate);
+        predicateResult = getMatchingDictIdsForAnd(compositePredicateEvaluator);
       }
 
       matchingDictIdsList.add(predicateResult);

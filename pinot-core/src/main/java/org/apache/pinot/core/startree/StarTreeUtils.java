@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
@@ -91,13 +90,13 @@ public class StarTreeUtils {
    * list are implicitly ANDed together. Any OR predicates are nested within a CompositePredicate.
    */
   @Nullable
-  public static Map<String, List<CompositePredicate>> extractPredicateEvaluatorsMap(IndexSegment indexSegment,
+  public static Map<String, List<CompositePredicateEvaluator>> extractPredicateEvaluatorsMap(IndexSegment indexSegment,
       @Nullable FilterContext filter) {
     if (filter == null) {
       return Collections.emptyMap();
     }
 
-    Map<String, List<CompositePredicate>> predicateEvaluatorsMap = new HashMap<>();
+    Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap = new HashMap<>();
     Queue<FilterContext> queue = new LinkedList<>();
     queue.add(filter);
     FilterContext filterNode;
@@ -107,23 +106,20 @@ public class StarTreeUtils {
           queue.addAll(filterNode.getChildren());
           break;
         case OR:
-          Pair<Boolean, String> result = isOrClauseValidForStarTree(filterNode);
+          String column = isOrClauseValidForStarTree(filterNode);
 
-          if (result.getLeft()) {
-            assert result.getRight() != null;
-            String column = result.getRight();
-
-            CompositePredicate compositePredicate = new CompositePredicate(
+          if (column != null) {
+            CompositePredicateEvaluator compositePredicateEvaluator = new CompositePredicateEvaluator(
                 FilterContext.Type.OR);
 
-            filterNode.getChildren().forEach(k -> compositePredicate
+            filterNode.getChildren().forEach(k -> compositePredicateEvaluator
                 .addPredicateEvaluator(getPredicateEvaluatorForPredicate(indexSegment, k)));
 
-            predicateEvaluatorsMap.computeIfAbsent(column, k -> new ArrayList<>()).add(compositePredicate);
-            break;
+            predicateEvaluatorsMap.computeIfAbsent(column, k -> new ArrayList<>()).add(compositePredicateEvaluator);
           } else {
             return null;
           }
+          break;
         case PREDICATE:
           Predicate predicate = filterNode.getPredicate();
           ExpressionContext lhs = predicate.getLhs();
@@ -131,16 +127,20 @@ public class StarTreeUtils {
             // Star-tree does not support non-identifier expression
             return null;
           }
-          String column = lhs.getIdentifier();
+          column = lhs.getIdentifier();
 
           PredicateEvaluator predicateEvaluator = getPredicateEvaluatorForPredicate(indexSegment, filterNode);
 
+          if (predicateEvaluator == null) {
+            return null;
+          }
+
           if (predicateEvaluator != null && !predicateEvaluator.isAlwaysTrue()) {
-            CompositePredicate compositePredicate = new CompositePredicate(
+            CompositePredicateEvaluator compositePredicateEvaluator = new CompositePredicateEvaluator(
                 FilterContext.Type.PREDICATE);
 
-            compositePredicate.addPredicateEvaluator(predicateEvaluator);
-            predicateEvaluatorsMap.computeIfAbsent(column, k -> new ArrayList<>()).add(compositePredicate);
+            compositePredicateEvaluator.addPredicateEvaluator(predicateEvaluator);
+            predicateEvaluatorsMap.computeIfAbsent(column, k -> new ArrayList<>()).add(compositePredicateEvaluator);
           }
           break;
         default:
@@ -190,21 +190,20 @@ public class StarTreeUtils {
    *
    * StarTree supports OR predicates on a single dimension only (d1 < 10 OR d1 > 50).
    *
-   * @return Pair of the result and the single literal on which the predicate is based. If the
-   * predicate is not valid for execution on StarTree, literal value will be null
+   * @return The single literal on which the predicate is based if true, null otherwise
    */
-  private static Pair<Boolean, String> isOrClauseValidForStarTree(FilterContext filterContext) {
+  private static String isOrClauseValidForStarTree(FilterContext filterContext) {
     assert filterContext != null;
 
-    Set<String> seenLiterals = new HashSet<>();
+    Set<String> seenIdentifiers = new HashSet<>();
 
-    if (!isOrClauseValidForStarTreeInternal(filterContext, seenLiterals)) {
-      return Pair.of(false, null);
+    if (!isOrClauseValidForStarTreeInternal(filterContext, seenIdentifiers)) {
+      return null;
     }
 
-    boolean result = seenLiterals.size() == 1;
+    boolean result = seenIdentifiers.size() == 1;
 
-    return Pair.of(result, result ? seenLiterals.iterator().next() : null);
+    return result ? seenIdentifiers.iterator().next() : null;
   }
 
   /** Internal processor for the above evaluator */
@@ -215,7 +214,9 @@ public class StarTreeUtils {
       List<FilterContext> childFilterContexts = filterContext.getChildren();
 
       for (FilterContext childFilterContext : childFilterContexts) {
-        isOrClauseValidForStarTreeInternal(childFilterContext, seenLiterals);
+        if (!isOrClauseValidForStarTreeInternal(childFilterContext, seenLiterals)) {
+          return false;
+        }
       }
     } else if (filterContext.getType() == FilterContext.Type.PREDICATE) {
       String literalValue = validateExpressionAndExtractIdentifier(filterContext.getPredicate());

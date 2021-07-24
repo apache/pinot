@@ -38,7 +38,7 @@ import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
-import org.apache.pinot.core.startree.CompositePredicate;
+import org.apache.pinot.core.startree.CompositePredicateEvaluator;
 import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.plan.StarTreeFilterPlanNode;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
@@ -223,7 +223,7 @@ abstract class BaseStarTreeV2Test<R, A> {
 
     // Filter
     FilterContext filter = queryContext.getFilter();
-    Map<String, List<CompositePredicate>> predicateEvaluatorsMap =
+    Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
         StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, filter);
     assertNotNull(predicateEvaluatorsMap);
 

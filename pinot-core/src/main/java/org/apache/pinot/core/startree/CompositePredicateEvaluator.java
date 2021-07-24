@@ -27,15 +27,18 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 /**
  * Represents a composite predicate.
  *
- * A composite predicate represents a set of predicates conjoined by a given relation.
+ * A composite predicate evaluator represents a set of predicates conjoined by a given relation.
  * Consider the given predicate: (d1 > 10 OR d1 < 50). A composite predicate will represent
  * two predicates -- d1 > 10 and d1 < 50 and represent that they are related by the operator OR.
  */
-public class CompositePredicate {
+public class CompositePredicateEvaluator {
+  // Since top level predicates are implicitly ANDed together, we only expect OR or PREDICATE type here
   private final FilterContext.Type _filterContextType;
   private final List<PredicateEvaluator> _predicateEvaluators;
 
-  public CompositePredicate(FilterContext.Type filterContextType) {
+  public CompositePredicateEvaluator(FilterContext.Type filterContextType) {
+    assert filterContextType == FilterContext.Type.OR || filterContextType == FilterContext.Type.PREDICATE;
+
     _filterContextType = filterContextType;
 
     _predicateEvaluators = new ArrayList<>();

@@ -25,14 +25,14 @@ import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.plan.PlanNode;
-import org.apache.pinot.core.startree.CompositePredicate;
+import org.apache.pinot.core.startree.CompositePredicateEvaluator;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
 
 public class StarTreeDocIdSetPlanNode implements PlanNode {
   private final StarTreeFilterPlanNode _starTreeFilterPlanNode;
 
-  public StarTreeDocIdSetPlanNode(StarTreeV2 starTreeV2, Map<String, List<CompositePredicate>> predicateEvaluatorsMap,
+  public StarTreeDocIdSetPlanNode(StarTreeV2 starTreeV2, Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap,
       @Nullable Set<String> groupByColumns, @Nullable Map<String, String> debugOptions) {
     _starTreeFilterPlanNode =
         new StarTreeFilterPlanNode(starTreeV2, predicateEvaluatorsMap, groupByColumns, debugOptions);
