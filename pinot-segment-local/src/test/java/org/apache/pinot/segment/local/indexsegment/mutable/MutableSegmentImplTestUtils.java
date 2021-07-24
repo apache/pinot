@@ -70,7 +70,8 @@ public class MutableSegmentImplTestUtils {
             .setRealtimeSegmentZKMetadata(new RealtimeSegmentZKMetadata())
             .setMemoryManager(new DirectMemoryManager(SEGMENT_NAME)).setStatsHistory(statsHistory)
             .setAggregateMetrics(aggregateMetrics).setNullHandlingEnabled(nullHandlingEnabled).setUpsertMode(upsertMode)
-            .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager).build();
+            .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
+            .setUpsertComparisonColumn(upsertConfig.getComparisonColumn()).build();
     return new MutableSegmentImpl(realtimeSegmentConfig, null);
   }
 }

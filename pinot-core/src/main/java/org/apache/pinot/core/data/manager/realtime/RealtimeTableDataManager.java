@@ -115,7 +115,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private UpsertConfig.Mode _upsertMode;
   private TableUpsertMetadataManager _tableUpsertMetadataManager;
   private List<String> _primaryKeyColumns;
-  private String _timeColumnName;
+  private String _upsertComparisonColumn;
 
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
     _segmentBuildSemaphore = segmentBuildSemaphore;
@@ -174,7 +174,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       _primaryKeyColumns = schema.getPrimaryKeyColumns();
       Preconditions.checkState(!CollectionUtils.isEmpty(_primaryKeyColumns),
           "Primary key columns must be configured for upsert");
-      _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+      String comparisonColumn = upsertConfig.getComparisonColumn();
+      _upsertComparisonColumn =
+          comparisonColumn != null ? comparisonColumn : tableConfig.getValidationConfig().getTimeColumnName();
     }
 
     if (consumerDir.exists()) {
@@ -381,7 +383,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     for (String primaryKeyColumn : _primaryKeyColumns) {
       columnToReaderMap.put(primaryKeyColumn, new PinotSegmentColumnReader(immutableSegment, primaryKeyColumn));
     }
-    columnToReaderMap.put(_timeColumnName, new PinotSegmentColumnReader(immutableSegment, _timeColumnName));
+    columnToReaderMap
+        .put(_upsertComparisonColumn, new PinotSegmentColumnReader(immutableSegment, _upsertComparisonColumn));
     int numTotalDocs = immutableSegment.getSegmentMetadata().getTotalDocs();
     int numPrimaryKeyColumns = _primaryKeyColumns.size();
     Iterator<PartitionUpsertMetadataManager.RecordInfo> recordInfoIterator =
@@ -404,7 +407,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
               values[i] = value;
             }
             PrimaryKey primaryKey = new PrimaryKey(values);
-            Object timeValue = columnToReaderMap.get(_timeColumnName).getValue(_docId);
+            Object timeValue = columnToReaderMap.get(_upsertComparisonColumn).getValue(_docId);
             Preconditions.checkArgument(timeValue instanceof Comparable, "time column shall be comparable");
             long timestamp = IngestionUtils.extractTimeValue((Comparable) timeValue);
             return new PartitionUpsertMetadataManager.RecordInfo(primaryKey, _docId++, timestamp);

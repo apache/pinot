@@ -41,9 +41,9 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class MutableSegmentImplUpsertTest {
-  private static final String SCHEMA_FILE_PATH = "data/test_upsert_schema.json";
-  private static final String DATA_FILE_PATH = "data/test_upsert_data.json";
+public class MutableSegmentImplUpsertComparisonColTest {
+  private static final String SCHEMA_FILE_PATH = "data/test_upsert_comparison_col_schema.json";
+  private static final String DATA_FILE_PATH = "data/test_upsert_comparison_col_data.json";
   private static CompositeTransformer _recordTransformer;
   private static Schema _schema;
   private static TableConfig _tableConfig;
@@ -57,7 +57,7 @@ public class MutableSegmentImplUpsertTest {
     URL dataResourceUrl = this.getClass().getClassLoader().getResource(DATA_FILE_PATH);
     _schema = Schema.fromFile(new File(schemaResourceUrl.getFile()));
     _tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, null)).build();
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, "offset")).build();
     _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
     File jsonFile = new File(dataResourceUrl.getFile());
     _partitionUpsertMetadataManager =
@@ -65,7 +65,7 @@ public class MutableSegmentImplUpsertTest {
             .getOrCreatePartitionManager(0);
     _mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
-            false, true, new UpsertConfig(UpsertConfig.Mode.FULL, null, null), "secondsSinceEpoch",
+            false, true, new UpsertConfig(UpsertConfig.Mode.FULL, null, "offset"), "secondsSinceEpoch",
             _partitionUpsertMetadataManager);
     GenericRow reuse = new GenericRow();
     try (RecordReader recordReader = RecordReaderFactory
@@ -82,6 +82,7 @@ public class MutableSegmentImplUpsertTest {
   @Test
   public void testUpsertIngestion() {
     ImmutableRoaringBitmap bitmap = _mutableSegmentImpl.getValidDocIds().getMutableRoaringBitmap();
+    // note offset column is used for determining sequence but not time column
     Assert.assertFalse(bitmap.contains(0));
     Assert.assertTrue(bitmap.contains(1));
     Assert.assertTrue(bitmap.contains(2));

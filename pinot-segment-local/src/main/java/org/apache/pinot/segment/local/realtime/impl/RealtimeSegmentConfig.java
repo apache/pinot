@@ -57,6 +57,7 @@ public class RealtimeSegmentConfig {
   private final boolean _aggregateMetrics;
   private final boolean _nullHandlingEnabled;
   private final UpsertConfig.Mode _upsertMode;
+  private final String _upsertComparisonColumn;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final String _consumerDir;
 
@@ -68,7 +69,8 @@ public class RealtimeSegmentConfig {
       RealtimeSegmentZKMetadata realtimeSegmentZKMetadata, boolean offHeap, PinotDataBufferMemoryManager memoryManager,
       RealtimeSegmentStatsHistory statsHistory, String partitionColumn, PartitionFunction partitionFunction,
       int partitionId, boolean aggregateMetrics, boolean nullHandlingEnabled, String consumerDir,
-      UpsertConfig.Mode upsertMode, PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
+      UpsertConfig.Mode upsertMode, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
+      String upsertComparisonColumn) {
     _tableNameWithType = tableNameWithType;
     _segmentName = segmentName;
     _streamName = streamName;
@@ -94,6 +96,7 @@ public class RealtimeSegmentConfig {
     _nullHandlingEnabled = nullHandlingEnabled;
     _consumerDir = consumerDir;
     _upsertMode = upsertMode != null ? upsertMode : UpsertConfig.Mode.NONE;
+    _upsertComparisonColumn = upsertComparisonColumn;
     _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
   }
 
@@ -202,6 +205,10 @@ public class RealtimeSegmentConfig {
     return _upsertMode;
   }
 
+  public String getUpsertComparisonColumn() {
+    return _upsertComparisonColumn;
+  }
+
   public PartitionUpsertMetadataManager getPartitionUpsertMetadataManager() {
     return _partitionUpsertMetadataManager;
   }
@@ -233,6 +240,7 @@ public class RealtimeSegmentConfig {
     private String _consumerDir;
     private UpsertConfig.Mode _upsertMode;
     private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
+    private String _upsertComparisonColumn;
 
     public Builder() {
     }
@@ -375,12 +383,17 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
+    public Builder setUpsertComparisonColumn(String upsertComparisonColumn) {
+      _upsertComparisonColumn = upsertComparisonColumn;
+      return this;
+    }
+
     public RealtimeSegmentConfig build() {
       return new RealtimeSegmentConfig(_tableNameWithType, _segmentName, _streamName, _schema, _timeColumnName,
           _capacity, _avgNumMultiValues, _noDictionaryColumns, _varLengthDictionaryColumns, _invertedIndexColumns,
           _textIndexColumns, _fstIndexColumns, _jsonIndexColumns, _h3IndexConfigs, _realtimeSegmentZKMetadata, _offHeap,
           _memoryManager, _statsHistory, _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics,
-          _nullHandlingEnabled, _consumerDir, _upsertMode, _partitionUpsertMetadataManager);
+          _nullHandlingEnabled, _consumerDir, _upsertMode, _partitionUpsertMetadataManager, _upsertComparisonColumn);
     }
   }
 }
