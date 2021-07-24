@@ -90,7 +90,7 @@ public enum TransformFunctionType {
   ST_EQUALS("ST_Equals"),
 
   // Geo indexing
-  geoToH3("geoToH3");
+  GEOTOH3("geoToH3");
 
   private final String _name;
 

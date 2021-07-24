@@ -139,7 +139,7 @@ public class TransformFunctionFactory {
           put(canonicalize(TransformFunctionType.ST_EQUALS.getName().toLowerCase()), StEqualsFunction.class);
 
           // geo indexing
-          put(canonicalize(TransformFunctionType.geoToH3.getName().toLowerCase()), GeoToH3Function.class);
+          put(canonicalize(TransformFunctionType.GEOTOH3.getName().toLowerCase()), GeoToH3Function.class);
         }
       };
 
