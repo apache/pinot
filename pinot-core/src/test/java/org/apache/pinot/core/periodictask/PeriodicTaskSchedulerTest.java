@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -103,5 +104,77 @@ public class PeriodicTaskSchedulerTest {
     assertEquals(numTimesStartCalled.get(), numTasks);
     assertEquals(numTimesRunCalled.get(), numTasks * 2);
     assertEquals(numTimesStopCalled.get(), numTasks);
+  }
+
+
+  /** Test that {@link PeriodicTaskScheduler} does not run the same task more than once at any time. */
+  @Test
+  public void testConcurrentExecutionOfSameTask() throws Exception {
+    // Count how many tasks were run.
+    final AtomicInteger counter = new AtomicInteger();
+
+    // Count how many attempts were made to run task
+    final AtomicInteger attempts = new AtomicInteger();
+
+
+    // Create periodic task.
+    PeriodicTask task = new BasePeriodicTask("TestTask", 1L, 0L) {
+      private volatile boolean isRunning = false;
+      @Override
+      protected void runTask() {
+        try {
+          if (isRunning) {
+            Assert.fail("More than one thread attempting to execute task at the same time.");
+          }
+          isRunning = true;
+          counter.incrementAndGet();
+          Thread.sleep(250);
+        } catch (InterruptedException ie) {
+          Thread.currentThread().interrupt();
+        } finally {
+          isRunning = false;
+        }
+      }
+    };
+
+    // Start scheduler with periodic task.
+    List<PeriodicTask> periodicTasks = new ArrayList<>();
+    periodicTasks.add(task);
+
+    PeriodicTaskScheduler taskScheduler = new PeriodicTaskScheduler();
+    taskScheduler.init(periodicTasks);
+    taskScheduler.start();
+
+    // Create multiple "execute" threads that try to run the same task that is already being run by scheduler
+    // on a periodic basis.
+    final int threadCount = 20;
+    Thread[] threads = new Thread[threadCount];
+    for (int i = 0; i < threads.length; i++) {
+      threads[i] = new Thread(() -> {
+          attempts.incrementAndGet();
+          taskScheduler.execute("TestTask");
+      });
+
+      threads[i].start();
+      try {
+        threads[i].join();
+      } catch (InterruptedException ie) {
+        Thread.currentThread().interrupt();
+      }
+    }
+
+    //  Run for 3 seconds to let as many "execute" threads finish as possible.
+    Thread.sleep(3000);
+
+    // Wait for scheduler to stop preset periodic task from running.
+    taskScheduler.stop();
+    Thread.sleep(500);
+
+    // Confirm that all the "execute" threads ran.
+    Assert.assertEquals(attempts.get(), threadCount);
+
+    // Confirm that only some of the "execute" threads could run their task (because concurrent execution is not
+    // allowed and we ran out of time before other threads could acquire lock).
+    Assert.assertTrue(attempts.get() > counter.get());
   }
 }

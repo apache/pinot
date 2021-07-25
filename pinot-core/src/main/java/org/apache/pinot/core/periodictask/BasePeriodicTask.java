@@ -47,8 +47,6 @@ public abstract class BasePeriodicTask implements PeriodicTask {
     _taskName = taskName;
     _intervalInSeconds = runFrequencyInSeconds;
     _initialDelayInSeconds = initialDelayInSeconds;
-
-    // Don't allow task to run more than once at any given time.
     _runLock = new ReentrantLock();
   }
 
@@ -100,7 +98,8 @@ public abstract class BasePeriodicTask implements PeriodicTask {
       LOGGER.error("Caught exception while setting up task: {}", _taskName, e);
     }
 
-    // task should "run" only after "start" has completely initialized state.
+    // mark _started as true only after state has completely initialized, so that run method doesn't end up seeing
+    // partially initialized state.
     _started = true;
   }
 
@@ -120,7 +119,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   @Override
   public final void run() {
     try {
-      // Don't allow more than one run at a time.
+      // Don't allow a task to run more than once at a time.
       _runLock.lock();
       _running = true;
 
@@ -165,6 +164,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
     _started = false;
 
     try {
+      // check if task is done running, or wait for the task to get done, by trying to acquire runLock.
       if (!_runLock.tryLock(MAX_PERIODIC_TASK_STOP_TIME_MILLIS, TimeUnit.MILLISECONDS)) {
         LOGGER.warn("Task: {} did not finish within timeout of {}ms", MAX_PERIODIC_TASK_STOP_TIME_MILLIS);
       } else {

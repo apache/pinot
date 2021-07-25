@@ -130,8 +130,8 @@ public class PeriodicTaskScheduler {
   }
 
   /**
-   * Execute specified {@link PeriodicTask} immediately. If the task is already running, then wait for the running task
-   * to complete before executing the task again.
+   * Execute specified {@link PeriodicTask} immediately. If the task is already running, wait for the running task
+   * to finish before executing the task again.
    */
   public void execute(String periodicTaskName) {
     PeriodicTask periodicTask = getPeriodicTask(periodicTaskName);
@@ -150,6 +150,6 @@ public class PeriodicTaskScheduler {
         // Ref: https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ScheduledExecutorService.html#scheduleWithFixedDelay-java.lang.Runnable-long-long-java.util.concurrent.TimeUnit-
         LOGGER.warn("Caught exception while attempting to execute named periodic task: {}", periodicTask.getTaskName(), t);
       }
-    }, periodicTask.getInitialDelayInSeconds(), TimeUnit.SECONDS);
+    }, 0, TimeUnit.SECONDS);
   }
 }
