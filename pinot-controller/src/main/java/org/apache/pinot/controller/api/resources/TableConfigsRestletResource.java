@@ -171,8 +171,11 @@ public class TableConfigsRestletResource {
         }
         IndexingConfig indexingConfig = realtimeTableConfig.getIndexingConfig();
         if (indexingConfig != null){
-          Map<String, String> obfuscatedStreamConfig = indexingConfig.obfuscateStreamConfigs();
-          indexingConfig.setStreamConfigs(obfuscatedStreamConfig);
+          Map <String, String> streamConfig = indexingConfig.getStreamConfigs();
+          if (streamConfig != null) {
+            Map<String, String> obfuscatedStreamConfig = indexingConfig.obfuscateStreamConfigs();
+            indexingConfig.setStreamConfigs(obfuscatedStreamConfig);
+          }
         }
         realtimeTableConfig.setIndexingConfig(indexingConfig);
       }

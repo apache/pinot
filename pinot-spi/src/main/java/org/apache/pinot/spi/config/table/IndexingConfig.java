@@ -145,9 +145,9 @@ public class IndexingConfig extends BaseJsonConfig {
 
   @Nullable
   public Map<String, String> obfuscateStreamConfigs() {
-    _streamConfigs.put("region", "helloworld");
-    _streamConfigs.put("accessKey", "helloworld");
-    _streamConfigs.put("secretKey", "helloworld");
+    _streamConfigs.put("region", "*****");
+    _streamConfigs.put("accessKey", "*****");
+    _streamConfigs.put("secretKey", "*****");
 
     return _streamConfigs;
   }
