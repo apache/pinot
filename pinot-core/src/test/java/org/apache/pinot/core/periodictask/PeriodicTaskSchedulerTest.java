@@ -173,8 +173,11 @@ public class PeriodicTaskSchedulerTest {
     // Confirm that all the "execute" threads ran.
     Assert.assertEquals(attempts.get(), threadCount);
 
-    // Confirm that only some of the "execute" threads could run their task (because concurrent execution is not
-    // allowed and we ran out of time before other threads could acquire lock).
+    // Confirm that only some of the "execute" threads could run their task.
+    Assert.assertTrue(counter.get() > 0);
+
+    // A named task can exuecte only once at any given time hence it won't be possible for all threads to execute the
+    // same task in the available time.
     Assert.assertTrue(attempts.get() > counter.get());
   }
 }
