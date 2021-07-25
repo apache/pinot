@@ -135,7 +135,7 @@ public class PeriodicTaskScheduler {
    */
   public void execute(String periodicTaskName) {
     PeriodicTask periodicTask = getPeriodicTask(periodicTaskName);
-
+    LOGGER.info("Immediately executing periodic task {}", periodicTaskName);
     if (periodicTask == null) {
       throw new IllegalArgumentException("Unknown Periodic Task " + periodicTaskName);
     }

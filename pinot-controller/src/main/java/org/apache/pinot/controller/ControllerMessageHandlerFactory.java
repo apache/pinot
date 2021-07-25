@@ -73,6 +73,7 @@ public class ControllerMessageHandlerFactory implements MessageHandlerFactory {
     @Override
     public HelixTaskResult handleMessage()
         throws InterruptedException {
+      LOGGER.info("Handle RunPeriodicTaskMessage by executing task {}", _periodicTaskName);
       _periodicTaskScheduler.execute(_periodicTaskName);
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       helixTaskResult.setSuccess(true);
