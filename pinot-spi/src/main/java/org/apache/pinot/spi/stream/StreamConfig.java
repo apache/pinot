@@ -79,9 +79,18 @@ public class StreamConfig {
   private final Map<String, String> _streamConfigMap = new HashMap<>();
 
   /**
-   * Initializes a StreamConfig using the map of stream configs from the table config
+   * Initializes a StreamConfig using the map of stream configs from the table config,
+   * with secrets not obfuscated
    */
   public StreamConfig(String tableNameWithType, Map<String, String> streamConfigMap) {
+    this(tableNameWithType, streamConfigMap, false);
+  }
+
+  /**
+   * Initializes a StreamConfig using the map of stream configs from the table config,
+   * with secrets obfuscated
+   */
+  public StreamConfig(String tableNameWithType, Map<String, String> streamConfigMap, boolean obfuscateConfig) {
     _type = streamConfigMap.get(StreamConfigProperties.STREAM_TYPE);
     Preconditions.checkNotNull(_type, "Stream type cannot be null");
 
@@ -180,6 +189,12 @@ public class StreamConfig {
 
     String groupIdKey = StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.GROUP_ID);
     _groupId = streamConfigMap.get(groupIdKey);
+
+    if (obfuscateConfig){
+      streamConfigMap.put(StreamConfigProperties.AWS_REGION, "*****");
+      streamConfigMap.put(StreamConfigProperties.AWS_ACCESS_KEY, "*****");
+      streamConfigMap.put(StreamConfigProperties.AWS_SECRET_KEY, "*****");
+    }
 
     _streamConfigMap.putAll(streamConfigMap);
   }
