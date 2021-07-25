@@ -58,11 +58,14 @@ import org.apache.pinot.controller.tuner.TableConfigTunerUtils;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.TableConfigs;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
+import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.glassfish.grizzly.http.server.Request;
@@ -133,21 +136,46 @@ public class TableConfigsRestletResource {
       TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName);
       TableConfig realtimeTableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
 
-      IngestionConfig ingestionConfig = offlineTableConfig.getIngestionConfig();
-      if (ingestionConfig != null) {
-        BatchIngestionConfig batchIngestionConfig = ingestionConfig.getBatchIngestionConfig();
-        if (batchIngestionConfig != null) {
-          List<Map<String, String>> offlineBatchConfigMaps = batchIngestionConfig.getBatchConfigMaps();
-          List<Map<String, String>> batchConfigs = new ArrayList<>();
-          for(Map<String, String> batchConfigMap : offlineBatchConfigMaps){
-            BatchConfig batchObfuscatedConfig = new BatchConfig(tableName, batchConfigMap, true);
-            batchConfigs.add(batchObfuscatedConfig.getBatchConfigMap());
+      if (offlineTableConfig != null) {
+        IngestionConfig ingestionConfig = offlineTableConfig.getIngestionConfig();
+        if (ingestionConfig != null) {
+          BatchIngestionConfig batchIngestionConfig = ingestionConfig.getBatchIngestionConfig();
+          if (batchIngestionConfig != null) {
+            List<Map<String, String>> offlineBatchConfigMaps = batchIngestionConfig.getBatchConfigMaps();
+            List<Map<String, String>> batchConfigs = new ArrayList<>();
+            for (Map<String, String> batchConfigMap : offlineBatchConfigMaps) {
+              BatchConfig batchObfuscatedConfig = new BatchConfig(tableName, batchConfigMap, true);
+              batchConfigs.add(batchObfuscatedConfig.getBatchConfigMap());
+            }
+            batchIngestionConfig.setBatchConfigMaps(batchConfigs);
           }
-          batchIngestionConfig.setBatchConfigMaps(batchConfigs);
+          ingestionConfig.setBatchIngestionConfig(batchIngestionConfig);
         }
-        ingestionConfig.setBatchIngestionConfig(batchIngestionConfig);
+        offlineTableConfig.setIngestionConfig(ingestionConfig);
       }
-      offlineTableConfig.setIngestionConfig(ingestionConfig);
+
+      if (realtimeTableConfig != null) {
+        IngestionConfig ingestionConfig = realtimeTableConfig.getIngestionConfig();
+        if (ingestionConfig != null) {
+          StreamIngestionConfig streamIngestionConfig = ingestionConfig.getStreamIngestionConfig();
+          if (streamIngestionConfig != null) {
+            List<Map<String, String>> streamConfigMaps = streamIngestionConfig.getStreamConfigMaps();
+            List<Map<String, String>> streamConfigs = new ArrayList<>();
+            for (Map<String, String> streamConfigMap : streamConfigMaps) {
+              StreamConfig streamObfuscatedConfig = new StreamConfig(tableName, streamConfigMap, true);
+              streamConfigs.add(streamObfuscatedConfig.getStreamConfigsMap());
+            }
+            streamIngestionConfig.setStreamConfigMaps(streamConfigMaps);
+          }
+          ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
+        }
+        IndexingConfig indexingConfig = realtimeTableConfig.getIndexingConfig();
+        if (indexingConfig != null){
+          Map<String, String> obfuscatedStreamConfig = indexingConfig.obfuscateStreamConfigs();
+          indexingConfig.setStreamConfigs(obfuscatedStreamConfig);
+        }
+        realtimeTableConfig.setIndexingConfig(indexingConfig);
+      }
 
       TableConfigs config = new TableConfigs(tableName, schema, offlineTableConfig, realtimeTableConfig);
       return config.toJsonString();
