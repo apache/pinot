@@ -26,6 +26,7 @@ import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.json.JsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import com.jayway.jsonpath.spi.mapper.MappingProvider;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -48,7 +49,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class JsonFunctions {
   static {
     Configuration.setDefaults(new Configuration.Defaults() {
-      private final JsonProvider jsonProvider = new JacksonJsonProvider();
+      private final JsonProvider jsonProvider = new ArrayAwareJacksonJsonProvider();
       private final MappingProvider mappingProvider = new JacksonMappingProvider();
 
       @Override
@@ -109,10 +110,17 @@ public class JsonFunctions {
     if (object instanceof String) {
       return convertObjectToArray(JsonPath.read((String) object, jsonPath));
     }
-    if (object instanceof Object[]) {
-      return convertObjectToArray(JsonPath.read(JsonUtils.objectToString(object), jsonPath));
-    }
     return convertObjectToArray(JsonPath.read(object, jsonPath));
+  }
+
+  @ScalarFunction
+  public static Object[] jsonPathArrayDefaultEmpty(Object object, String jsonPath)
+      throws JsonProcessingException {
+    try {
+      return jsonPathArray(object, jsonPath);
+    } catch (Exception e) {
+      return new Object[]{};
+    }
   }
 
   private static Object[] convertObjectToArray(Object arrayObject) {
@@ -197,6 +205,49 @@ public class JsonFunctions {
       return jsonPathDouble(object, jsonPath);
     } catch (Exception e) {
       return defaultValue;
+    }
+  }
+
+  static class ArrayAwareJacksonJsonProvider extends JacksonJsonProvider {
+    @Override
+    public boolean isArray(Object obj) {
+      return (obj instanceof List) || (obj instanceof Object[]);
+    }
+
+    @Override
+    public Object getArrayIndex(Object obj, int idx) {
+      if (obj instanceof Object[]) {
+        return ((Object[]) obj)[idx];
+      }
+      return super.getArrayIndex(obj, idx);
+    }
+
+    @Override
+    public void setArrayIndex(Object obj, int index, Object newValue) {
+      if (obj instanceof Object[]) {
+        if (index < ((Object[]) obj).length) {
+          ((Object[]) obj)[index] = newValue;
+          return;
+        }
+        throw new UnsupportedOperationException("List is required to grow the capacity");
+      }
+      super.setArrayIndex(obj, index, newValue);
+    }
+
+    @Override
+    public int length(Object obj) {
+      if (obj instanceof Object[]) {
+        return ((Object[]) obj).length;
+      }
+      return super.length(obj);
+    }
+
+    @Override
+    public Iterable<?> toIterable(Object obj) {
+      if (obj instanceof Object[]) {
+        return Arrays.asList((Object[]) obj);
+      }
+      return super.toIterable(obj);
     }
   }
 }
