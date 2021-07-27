@@ -33,8 +33,10 @@ public class StarTreeFilterPlanNode implements PlanNode {
   private final Map<String, List<CompositePredicateEvaluator>> _predicateEvaluatorsMap;
   private final Set<String> _groupByColumns;
   private final Map<String, String> _debugOptions;
-  public StarTreeFilterPlanNode(StarTreeV2 starTreeV2, Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap,
-      @Nullable Set<String> groupByColumns, @Nullable Map<String, String> debugOptions) {
+
+  public StarTreeFilterPlanNode(StarTreeV2 starTreeV2,
+      Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap, @Nullable Set<String> groupByColumns,
+      @Nullable Map<String, String> debugOptions) {
     _starTreeV2 = starTreeV2;
     _predicateEvaluatorsMap = predicateEvaluatorsMap;
     _groupByColumns = groupByColumns;

@@ -18,43 +18,40 @@
  */
 package org.apache.pinot.core.startree;
 
-import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 
 
 /**
  * Represents a composite predicate.
  *
- * A composite predicate evaluator represents a set of predicates conjoined by a given relation.
- * Consider the given predicate: (d1 > 10 OR d1 < 50). A composite predicate will represent
- * two predicates -- d1 > 10 and d1 < 50 and represent that they are related by the operator OR.
+ * A composite predicate evaluator represents a single predicate evaluator or multiple predicate evaluators conjoined
+ * with OR.
+ * Consider the given predicate: (d1 > 10 OR d1 < 50). A composite predicate will represent two predicates -- (d1 > 10)
+ * and (d1 < 50) and represent that they are related by the operator OR.
  */
 public class CompositePredicateEvaluator {
-  // Since top level predicates are implicitly ANDed together, we only expect OR or PREDICATE type here
-  private final FilterContext.Type _filterContextType;
   private final List<PredicateEvaluator> _predicateEvaluators;
 
-  public CompositePredicateEvaluator(FilterContext.Type filterContextType) {
-    assert filterContextType == FilterContext.Type.OR || filterContextType == FilterContext.Type.PREDICATE;
-
-    _filterContextType = filterContextType;
-
-    _predicateEvaluators = new ArrayList<>();
-  }
-
-  public void addPredicateEvaluator(PredicateEvaluator predicateEvaluator) {
-    assert predicateEvaluator != null;
-
-    _predicateEvaluators.add(predicateEvaluator);
+  public CompositePredicateEvaluator(List<PredicateEvaluator> predicateEvaluators) {
+    assert !predicateEvaluators.isEmpty();
+    _predicateEvaluators = predicateEvaluators;
   }
 
   public List<PredicateEvaluator> getPredicateEvaluators() {
     return _predicateEvaluators;
   }
 
-  public FilterContext.Type getFilterContextType() {
-    return _filterContextType;
+  /**
+   * Applies a dictionary id to the composite predicate evaluator. Returns {@code true} if the dictionary id matches any
+   * predicate evaluator, {@code false} otherwise.
+   */
+  public boolean apply(int dictId) {
+    for (PredicateEvaluator predicateEvaluator : _predicateEvaluators) {
+      if (predicateEvaluator.applySV(dictId)) {
+        return true;
+      }
+    }
+    return false;
   }
 }

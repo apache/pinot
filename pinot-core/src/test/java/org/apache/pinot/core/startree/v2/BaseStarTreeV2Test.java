@@ -98,8 +98,10 @@ abstract class BaseStarTreeV2Test<R, A> {
   // StarTree supports OR predicates only on a single dimension
   private static final String QUERY_FILTER_OR = " WHERE d1 > 10 OR d1 < 50";
   private static final String QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS = " WHERE d2 < 95 AND (d1 > 10 OR d1 < 50)";
-  private static final String QUERY_FILTER_COMPLEX_AND_MULTIPLE_DIMENSIONS_THREE_PREDICATES = " WHERE d2 < 95 AND d2 > 25 AND (d1 > 10 OR d1 < 50)";
-  private static final String QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS_THREE_PREDICATES = " WHERE (d2 > 95 OR d2 < 25) AND (d1 > 10 OR d1 < 50)";
+  private static final String QUERY_FILTER_COMPLEX_AND_MULTIPLE_DIMENSIONS_THREE_PREDICATES =
+      " WHERE d2 < 95 AND d2 > 25 AND (d1 > 10 OR d1 < 50)";
+  private static final String QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS_THREE_PREDICATES =
+      " WHERE (d2 > 95 OR d2 < 25) AND (d1 > 10 OR d1 < 50)";
   private static final String QUERY_FILTER_COMPLEX_OR_SINGLE_DIMENSION = " WHERE d1 = 95 AND (d1 > 90 OR d1 < 100)";
   private static final String QUERY_GROUP_BY = " GROUP BY d2";
 
