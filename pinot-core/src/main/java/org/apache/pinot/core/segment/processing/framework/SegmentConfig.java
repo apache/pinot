@@ -30,7 +30,7 @@ import javax.annotation.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SegmentConfig {
-  private static final int DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT = 5_000_000;
+  public static final int DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT = 5_000_000;
 
   private final int _maxNumRecordsPerSegment;
   private final String _segmentNamePrefix;

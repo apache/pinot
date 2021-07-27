@@ -100,10 +100,20 @@ public class TarGzCompressionUtils {
    */
   public static List<File> untar(File inputFile, File outputDir)
       throws IOException {
+    try (InputStream fileIn = Files.newInputStream(inputFile.toPath())) {
+      return untar(fileIn, outputDir);
+    }
+  }
+
+  /**
+   * Un-tars an inputstream of a tar.gz file into a directory, returns all the untarred files/directories.
+   * <p>For security reason, the untarred files must reside in the output directory.
+   */
+  public static List<File> untar(InputStream inputStream, File outputDir)
+      throws IOException {
     String outputDirCanonicalPath = outputDir.getCanonicalPath();
     List<File> untarredFiles = new ArrayList<>();
-    try (InputStream fileIn = Files.newInputStream(inputFile.toPath());
-        InputStream bufferedIn = new BufferedInputStream(fileIn);
+    try (InputStream bufferedIn = new BufferedInputStream(inputStream);
         InputStream gzipIn = new GzipCompressorInputStream(bufferedIn);
         ArchiveInputStream tarGzIn = new TarArchiveInputStream(gzipIn)) {
       ArchiveEntry entry;

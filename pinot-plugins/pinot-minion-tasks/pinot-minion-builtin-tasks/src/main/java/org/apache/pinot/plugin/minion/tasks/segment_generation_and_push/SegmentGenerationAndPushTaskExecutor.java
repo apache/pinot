@@ -110,31 +110,37 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     SegmentGenerationAndPushResult.Builder resultBuilder = new SegmentGenerationAndPushResult.Builder();
     File localTempDir = new File(new File(MinionContext.getInstance().getDataDir(), "SegmentGenerationAndPushResult"),
         "tmp-" + UUID.randomUUID());
-
     try {
-      // Generate Pinot Segment
       SegmentGenerationTaskSpec taskSpec = generateTaskSpec(taskConfigs, localTempDir);
-      SegmentGenerationTaskRunner taskRunner = new SegmentGenerationTaskRunner(taskSpec);
-      String segmentName = taskRunner.run();
-
-      // Tar segment directory to compress file
-      File localSegmentTarFile = tarSegmentDir(taskSpec, segmentName);
-
-      //move segment to output PinotFS
-      URI outputSegmentTarURI = moveSegmentToOutputPinotFS(taskConfigs, localSegmentTarFile);
-      LOGGER.info("Moved generated segment from [{}] to location: [{}]", localSegmentTarFile, outputSegmentTarURI);
-
-      resultBuilder.setSegmentName(segmentName);
-      // Segment push task
-      // TODO: Make this use SegmentUploader
-      pushSegment(taskSpec.getTableConfig().getTableName(), taskConfigs, outputSegmentTarURI);
-      resultBuilder.setSucceed(true);
+      return generateAndPushSegment(taskSpec, resultBuilder, taskConfigs);
     } catch (Exception e) {
       throw new RuntimeException("Failed to execute SegmentGenerationAndPushTask", e);
     } finally {
       // Cleanup output dir
       FileUtils.deleteQuietly(localTempDir);
     }
+  }
+
+  private SegmentGenerationAndPushResult generateAndPushSegment(SegmentGenerationTaskSpec taskSpec,
+      SegmentGenerationAndPushResult.Builder resultBuilder,
+      Map<String, String> taskConfigs) throws Exception {
+    // Generate Pinot Segment
+    SegmentGenerationTaskRunner taskRunner = new SegmentGenerationTaskRunner(taskSpec);
+    String segmentName = taskRunner.run();
+
+    // Tar segment directory to compress file
+    File localSegmentTarFile = tarSegmentDir(taskSpec, segmentName);
+
+    //move segment to output PinotFS
+    URI outputSegmentTarURI = moveSegmentToOutputPinotFS(taskConfigs, localSegmentTarFile);
+    LOGGER.info("Moved generated segment from [{}] to location: [{}]", localSegmentTarFile, outputSegmentTarURI);
+
+    resultBuilder.setSegmentName(segmentName);
+    // Segment push task
+    // TODO: Make this use SegmentUploader
+    pushSegment(taskSpec.getTableConfig().getTableName(), taskConfigs, outputSegmentTarURI);
+    resultBuilder.setSucceed(true);
+
     return resultBuilder.build();
   }
 
@@ -242,7 +248,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     return localSegmentTarFile;
   }
 
-  private SegmentGenerationTaskSpec generateTaskSpec(Map<String, String> taskConfigs, File localTempDir)
+  protected SegmentGenerationTaskSpec generateTaskSpec(Map<String, String> taskConfigs, File localTempDir)
       throws Exception {
     SegmentGenerationTaskSpec taskSpec = new SegmentGenerationTaskSpec();
     URI inputFileURI = URI.create(taskConfigs.get(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY));

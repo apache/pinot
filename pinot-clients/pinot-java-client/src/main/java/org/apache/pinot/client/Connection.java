@@ -182,6 +182,7 @@ public class Connection {
   public void close()
       throws PinotClientException {
     _transport.close();
+    _brokerSelector.close();
   }
 
   private static class ResultSetGroupFuture implements Future<ResultSetGroup> {
