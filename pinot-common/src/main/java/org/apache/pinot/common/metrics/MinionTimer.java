@@ -16,24 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.minion.metrics;
+package org.apache.pinot.common.metrics;
 
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.metrics.AbstractMetrics;
 
 
-public enum MinionQueryPhase implements AbstractMetrics.QueryPhase {
-  TASK_EXECUTION,
-  TASK_QUEUEING;
+public enum MinionTimer implements AbstractMetrics.Timer {
+  ;
 
-  private final String _queryPhaseName;
+  private final String _timerName;
+  private final boolean _global;
 
-  MinionQueryPhase() {
-    _queryPhaseName = Utils.toCamelCase(name().toLowerCase());
+  MinionTimer(boolean global) {
+    _timerName = Utils.toCamelCase(name().toLowerCase());
+    _global = global;
   }
 
   @Override
-  public String getQueryPhaseName() {
-    return _queryPhaseName;
+  public String getTimerName() {
+    return _timerName;
+  }
+
+  @Override
+  public boolean isGlobal() {
+    return _global;
   }
 }

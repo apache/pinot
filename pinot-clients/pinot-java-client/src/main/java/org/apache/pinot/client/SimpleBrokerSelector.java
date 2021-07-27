@@ -39,4 +39,8 @@ public class SimpleBrokerSelector implements BrokerSelector {
   public String selectBroker(String table) {
     return _brokerList.get(_random.nextInt(_brokerList.size()));
   }
+
+  @Override
+  public void close() {
+  }
 }

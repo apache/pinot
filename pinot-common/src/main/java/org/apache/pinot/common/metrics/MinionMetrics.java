@@ -16,35 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.minion.tasks.merge_rollup;
+package org.apache.pinot.common.metrics;
 
-public class MergeProperties {
-  private final String _mergeType;
-  private final long _bufferTimeMs;
-  private final long _maxNumRecordsPerSegment;
-  private final long _maxNumRecordsPerTask;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.apache.pinot.spi.utils.CommonConstants;
 
-  public MergeProperties(String mergeType, long bufferTimeMs, long maxNumRecordsPerSegment,
-      long maxNumRecordsPerTask) {
-    _mergeType = mergeType;
-    _bufferTimeMs = bufferTimeMs;
-    _maxNumRecordsPerSegment = maxNumRecordsPerSegment;
-    _maxNumRecordsPerTask = maxNumRecordsPerTask;
+
+public class MinionMetrics extends AbstractMetrics<MinionQueryPhase, MinionMeter, MinionGauge, MinionTimer> {
+
+  public MinionMetrics(PinotMetricsRegistry metricsRegistry) {
+    this(CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX, metricsRegistry);
   }
 
-  public String getMergeType() {
-    return _mergeType;
+  public MinionMetrics(String prefix, PinotMetricsRegistry metricsRegistry) {
+    super(prefix, metricsRegistry, MinionMetrics.class);
   }
 
-  public long getBufferTimeMs() {
-    return _bufferTimeMs;
+  @Override
+  protected MinionQueryPhase[] getQueryPhases() {
+    return MinionQueryPhase.values();
   }
 
-  public long getMaxNumRecordsPerSegment() {
-    return _maxNumRecordsPerSegment;
+  @Override
+  protected MinionMeter[] getMeters() {
+    return MinionMeter.values();
   }
 
-  public long getMaxNumRecordsPerTask() {
-    return _maxNumRecordsPerTask;
+  @Override
+  protected MinionGauge[] getGauges() {
+    return MinionGauge.values();
   }
 }

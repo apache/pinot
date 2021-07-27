@@ -326,8 +326,8 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     // Segment Processor configs
     taskConfigsMap = new HashMap<>();
     taskConfigs = new HashMap<>();
-    taskConfigs.put(RealtimeToOfflineSegmentsTask.TIME_COLUMN_TRANSFORM_FUNCTION_KEY, "foo");
-    taskConfigs.put(RealtimeToOfflineSegmentsTask.COLLECTOR_TYPE_KEY, "rollup");
+    taskConfigs.put(RealtimeToOfflineSegmentsTask.ROUND_BUCKET_TIME_PERIOD_KEY, "1h");
+    taskConfigs.put(RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY, "rollup");
     taskConfigs.put("m1" + RealtimeToOfflineSegmentsTask.AGGREGATION_TYPE_KEY_SUFFIX, "MAX");
     taskConfigsMap.put(RealtimeToOfflineSegmentsTask.TASK_TYPE, taskConfigs);
     realtimeTableConfig = getRealtimeTableConfig(taskConfigsMap);
@@ -343,8 +343,8 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     assertEquals(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY),
         "1590019200000"); // 05-21-2020T00:00:00
     assertEquals(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY), "1590105600000"); // 05-22-2020T00:00:00
-    assertEquals(configs.get(RealtimeToOfflineSegmentsTask.TIME_COLUMN_TRANSFORM_FUNCTION_KEY), "foo");
-    assertEquals(configs.get(RealtimeToOfflineSegmentsTask.COLLECTOR_TYPE_KEY), "rollup");
+    assertEquals(configs.get(RealtimeToOfflineSegmentsTask.ROUND_BUCKET_TIME_PERIOD_KEY), "1h");
+    assertEquals(configs.get(RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY), "rollup");
     assertEquals(configs.get("m1" + RealtimeToOfflineSegmentsTask.AGGREGATION_TYPE_KEY_SUFFIX), "MAX");
   }
 

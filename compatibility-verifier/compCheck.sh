@@ -45,6 +45,24 @@ logCount=1
 cmdName=`basename $0`
 source `dirname $0`/utils.inc
 
+function cleanupControllerDirs() {
+  local dirName=$(grep -F controller.data.dir ${CONTROLLER_CONF} | awk '{print $3}')
+  if [ ! -z "$dirName" ]; then
+    ${RM} -rf ${dirName}
+  fi
+}
+
+function cleanupServerDirs() {
+  local dirName=$(grep -F pinot.server.instance.dataDir ${SERVER_CONF} | awk '{print $3}')
+  if [ ! -z "$dirName" ]; then
+    ${RM} -rf ${dirName}
+  fi
+  dirName=$(grep -F pinot.server.instance.segmentTarDir ${SERVER_CONF} | awk '{print $3}')
+  if [ ! -z "$dirName" ]; then
+    ${RM} -rf ${dirName}
+  fi
+}
+
 # get usage of the script
 function usage() {
   echo "Usage: $cmdName -w <workingDir> -t <testSuiteDir> [-k]"
@@ -294,6 +312,9 @@ COMPAT_TESTER_PATH="pinot-integration-tests/target/pinot-integration-tests-pkg/b
 BROKER_CONF=${testSuiteDir}/config/BrokerConfig.properties
 CONTROLLER_CONF=${testSuiteDir}/config/ControllerConfig.properties
 SERVER_CONF=${testSuiteDir}/config/ServerConfig.properties
+
+cleanupControllerDirs
+cleanupServerDirs
 
 BROKER_QUERY_PORT=8099
 ZK_PORT=2181

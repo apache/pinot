@@ -16,38 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.minion.metrics;
+package org.apache.pinot.core.segment.processing.timehandler;
 
-import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.metrics.AbstractMetrics;
+import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-public enum MinionGauge implements AbstractMetrics.Gauge {
-  NUMBER_OF_TASKS("tasks", true),
-  ;
+/**
+ * Time handler that does not modify the time value and always returns the default partition.
+ */
+public class NoOpTimeHandler implements TimeHandler {
 
-  private final String _gaugeName;
-  private final String _unit;
-  private final boolean _global;
-
-  MinionGauge(String unit, boolean global) {
-    _gaugeName = Utils.toCamelCase(name().toLowerCase());
-    _unit = unit;
-    _global = global;
-  }
-
-  @Override
-  public String getGaugeName() {
-    return _gaugeName;
-  }
-
-  @Override
-  public String getUnit() {
-    return _unit;
-  }
-
-  @Override
-  public boolean isGlobal() {
-    return _global;
+  public String handleTime(GenericRow row) {
+    return DEFAULT_PARTITION;
   }
 }

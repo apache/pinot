@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.partition;
+package org.apache.pinot.core.segment.processing.partitioner;
 
 import org.apache.pinot.spi.data.readers.GenericRow;
 

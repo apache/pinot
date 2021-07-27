@@ -101,12 +101,12 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     TableConfig tableConfigEpochHours =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_EPOCH_HOURS).setTimeColumnName(T_TRX)
             .setSortedColumn(D1).setIngestionConfig(
-            new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig(T_TRX, "toEpochHours(t)")), null)).build();
+            new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig(T_TRX, "toEpochHours(t)")),
+                null)).build();
     TableConfig tableConfigSDF =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_SDF).setTimeColumnName(T_TRX)
-            .setSortedColumn(D1).setIngestionConfig(
-            new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig(T_TRX, "toDateTime(t, 'yyyyMMddHH')")), null))
-            .build();
+            .setSortedColumn(D1).setIngestionConfig(new IngestionConfig(null, null, null,
+            Lists.newArrayList(new TransformConfig(T_TRX, "toDateTime(t, 'yyyyMMddHH')")), null)).build();
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING)
             .addMetric(M1, FieldSpec.DataType.INT)
@@ -187,7 +187,8 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     ZkHelixPropertyStore<ZNRecord> helixPropertyStore = Mockito.mock(ZkHelixPropertyStore.class);
     Mockito.when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME, null, AccessOption.PERSISTENT))
         .thenReturn(TableConfigUtils.toZNRecord(tableConfig));
-    Mockito.when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME_WITH_PARTITIONING, null, AccessOption.PERSISTENT))
+    Mockito
+        .when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME_WITH_PARTITIONING, null, AccessOption.PERSISTENT))
         .thenReturn(TableConfigUtils.toZNRecord(tableConfigWithPartitioning));
     Mockito.when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME_WITH_SORTED_COL, null, AccessOption.PERSISTENT))
         .thenReturn(TableConfigUtils.toZNRecord(tableConfigWithSortedCol));
@@ -246,7 +247,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     configs.put(MinionConstants.TABLE_NAME_KEY, TABLE_NAME);
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, "1600473600000");
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY, "1600560000000");
-    configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.COLLECTOR_TYPE_KEY, "rollup");
+    configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY, "rollup");
     PinotTaskConfig pinotTaskConfig =
         new PinotTaskConfig(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, configs);
 
@@ -274,8 +275,8 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     configs.put(MinionConstants.TABLE_NAME_KEY, TABLE_NAME);
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, "1600473600000");
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY, "1600560000000");
-    configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.COLLECTOR_TYPE_KEY, "rollup");
-    configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.TIME_COLUMN_TRANSFORM_FUNCTION_KEY, "round(t, 86400000)");
+    configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.ROUND_BUCKET_TIME_PERIOD_KEY, "1d");
+    configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY, "rollup");
     PinotTaskConfig pinotTaskConfig =
         new PinotTaskConfig(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, configs);
 
@@ -303,8 +304,8 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     configs.put(MinionConstants.TABLE_NAME_KEY, TABLE_NAME);
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, "1600473600000");
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY, "1600560000000");
-    configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.TIME_COLUMN_TRANSFORM_FUNCTION_KEY, "round(t, 86400000)");
-    configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.COLLECTOR_TYPE_KEY, "rollup");
+    configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.ROUND_BUCKET_TIME_PERIOD_KEY, "1d");
+    configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY, "rollup");
     configs.put(M1 + MinionConstants.RealtimeToOfflineSegmentsTask.AGGREGATION_TYPE_KEY_SUFFIX, "max");
     PinotTaskConfig pinotTaskConfig =
         new PinotTaskConfig(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, configs);
@@ -368,7 +369,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     configs.put(MinionConstants.TABLE_NAME_KEY, TABLE_NAME_WITH_SORTED_COL);
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, "1600473600000");
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY, "1600560000000");
-    configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.COLLECTOR_TYPE_KEY, "rollup");
+    configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY, "rollup");
     PinotTaskConfig pinotTaskConfig =
         new PinotTaskConfig(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, configs);
 
@@ -396,7 +397,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     configs.put(MinionConstants.TABLE_NAME_KEY, TABLE_NAME_EPOCH_HOURS);
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, "1600473600000");
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY, "1600560000000");
-    configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.COLLECTOR_TYPE_KEY, "rollup");
+    configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY, "rollup");
     PinotTaskConfig pinotTaskConfig =
         new PinotTaskConfig(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, configs);
 
@@ -425,7 +426,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     configs.put(MinionConstants.TABLE_NAME_KEY, TABLE_NAME_SDF);
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, "1600473600000");
     configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY, "1600560000000");
-    configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.COLLECTOR_TYPE_KEY, "rollup");
+    configs.put(MinionConstants.RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY, "rollup");
     PinotTaskConfig pinotTaskConfig =
         new PinotTaskConfig(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, configs);
 
