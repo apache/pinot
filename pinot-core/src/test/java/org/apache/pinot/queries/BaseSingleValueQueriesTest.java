@@ -69,7 +69,7 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "SingleValueQueriesTest");
 
   // Hard-coded query filter.
-  private static final String QUERY_FILTER =
+  static final String QUERY_FILTER =
       " WHERE column1 > 100000000" + " AND column3 BETWEEN 20000000 AND 1000000000" + " AND column5 = 'gFuH'"
           + " AND (column6 < 500000000 OR column11 NOT IN ('t', 'P'))" + " AND daysSinceEpoch = 126164076";
 

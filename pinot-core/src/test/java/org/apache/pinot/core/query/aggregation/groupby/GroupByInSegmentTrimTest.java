@@ -73,7 +73,7 @@ public class GroupByInSegmentTrimTest {
 
   private static final String METRIC_PREFIX = "metric_";
   private static final int NUM_ROWS = 1000;
-  private static final int NUM_COLUMN = 2;
+  private static final int NUM_COLUMN = 3;
   private static final int MAX_INITIAL_RESULT_HOLDER_CAPACITY = 10_000;
   private static final int NUM_GROUPS_LIMIT = 100_000;
   private static IndexSegment _indexSegment;
@@ -81,171 +81,39 @@ public class GroupByInSegmentTrimTest {
   private static double[][] _inputData;
   private static Map<Double, Double> _resultMap;
 
-  /**
-   * Initializations prior to the test:
-   * - Build a segment with metric columns (that will be aggregated and grouped) containing
-   *  randomly generated data.
-   *
-   * @throws Exception
-   */
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    _resultMap = new HashMap<>();
-    // Current Schema: Columns: metrics_0(double), metrics_1(double)
-    _inputData = new double[NUM_COLUMN][NUM_ROWS];
-    _columns = new String[NUM_COLUMN];
-    setupSegment();
-  }
+  @DataProvider
+  public static Object[][] groupByQueryDataProvider() {
+    List<Object[]> data = new ArrayList<>();
+    ArrayList<Pair<Double, Double>> expectedResult = computeExpectedResult(true);
+    // Testcase1: limit 100
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0, metric_1, metric_2 limit 100");
+    int trimSize = 1000;
+    int expectedSize = 100;
+    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
 
-  /**
-   * Test the GroupBy OrderBy query and compute the expected results to match
-   */
-  @Test(dataProvider = "QueryDataProvider")
-  void TestGroupByOrderByOperator(int trimSize, List<Pair<Double, Double>> expectedResult, QueryContext queryContext) {
-    // Create a query plan
-    AggregationGroupByOrderByPlanNode aggregationGroupByOrderByPlanNode =
-        new AggregationGroupByOrderByPlanNode(_indexSegment, queryContext, MAX_INITIAL_RESULT_HOLDER_CAPACITY,
-            NUM_GROUPS_LIMIT, trimSize);
+    // Testcase2: low limit
+    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0, metric_1, metric_2 limit 10");
+    trimSize = 1000;
+    expectedSize = 10;
+    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
 
-    // Get the query executor
-    AggregationGroupByOrderByOperator aggregationGroupByOrderByOperator = aggregationGroupByOrderByPlanNode.run();
+    // Testcase3: high limit + low trim size
+    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0, metric_1, metric_2 limit 100");
+    trimSize = 10;
+    // Only 100 results
+    expectedSize = queryContext.getLimit();
+    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
 
-    // Extract the execution result
-    IntermediateResultsBlock resultsBlock = aggregationGroupByOrderByOperator.nextBlock();
-    ArrayList<Pair<Double, Double>> extractedResult = extractTestResult(resultsBlock);
-
-    assertEquals(extractedResult, expectedResult);
-  }
-
-  /**
-   * Helper method to setup the index segment on which to perform aggregation tests.
-   * - Generates a segment with {@link #NUM_COLUMN} and {@link #NUM_ROWS}
-   * - Random 'double' data filled in the metric columns. The data is also populated
-   *   into the _inputData[], so it can be used to test the results.
-   *
-   * @throws Exception
-   */
-  private void setupSegment()
-      throws Exception {
-    if (INDEX_DIR.exists()) {
-      FileUtils.deleteQuietly(INDEX_DIR);
-    }
-
-    // Segment Config
-    SegmentGeneratorConfig config =
-        new SegmentGeneratorConfig(new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build(),
-            buildSchema());
-    config.setSegmentName(SEGMENT_NAME);
-    config.setOutDir(INDEX_DIR.getAbsolutePath());
-
-    // Fill the data table
-    List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
-    int baseValue = 10;
-    for (int i = 0; i < NUM_ROWS; i++) {
-      GenericRow genericRow = new GenericRow();
-
-      for (int j = 0; j < _columns.length; j++) {
-        String metricName = _columns[j];
-        double value = baseValue + i + j;
-        _inputData[j][i] = value;
-        genericRow.putValue(metricName, value);
-      }
-      // Compute the max result and insert into a grouped map
-      computeMaxResult(_inputData[0][i], _inputData[1][i]);
-      rows.add(genericRow);
-      baseValue += 10;
-    }
-
-    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, new GenericRowRecordReader(rows));
-    driver.build();
-
-    _indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, driver.getSegmentName()), ReadMode.heap);
-  }
-
-  /**
-   * Helper method to build schema for the segment on which aggregation tests will be run.
-   *
-   * @return table schema
-   */
-  private Schema buildSchema() {
-    Schema schema = new Schema();
-
-    for (int i = 0; i < NUM_COLUMN; i++) {
-      String metricName = METRIC_PREFIX + i;
-      MetricFieldSpec metricFieldSpec = new MetricFieldSpec(metricName, FieldSpec.DataType.DOUBLE);
-      schema.addField(metricFieldSpec);
-      _columns[i] = metricName;
-    }
-    return schema;
-  }
-
-  /**
-   * Helper method to compute the aggregation result grouped by the key
-   *
-   */
-  private void computeMaxResult(Double key, Double result) {
-    if (_resultMap.get(key) == null || _resultMap.get(key) < result) {
-      _resultMap.put(key, result);
-    }
-  }
-
-  /**
-   * Helper method to extract the result from IntermediateResultsBlock
-   *
-   * @return A list of expected results
-   */
-  private ArrayList<Pair<Double, Double>> extractTestResult(IntermediateResultsBlock resultsBlock) {
-    AggregationGroupByResult result = resultsBlock.getAggregationGroupByResult();
-    if (result != null) {
-      // No trim
-      return extractAggregationResult(result);
-    } else {
-      // In case of trim
-      return extractIntermediateResult(resultsBlock.getIntermediateRecords());
-    }
-  }
-
-  /**
-   * Helper method to extract the result from AggregationGroupByResult
-   *
-   * @return A list of expected results
-   */
-  private ArrayList<Pair<Double, Double>> extractAggregationResult(AggregationGroupByResult aggregationGroupByResult) {
-    ArrayList<Pair<Double, Double>> result = new ArrayList<>();
-    Iterator<GroupKeyGenerator.GroupKey> iterator = aggregationGroupByResult.getGroupKeyIterator();
-    int i = 0;
-    while (iterator.hasNext()) {
-      GroupKeyGenerator.GroupKey groupKey = iterator.next();
-      Double key = (Double) groupKey._keys[0];
-      Double value = (Double) aggregationGroupByResult.getResultForGroupId(i, groupKey._groupId);
-      result.add(new Pair<>(key, value));
-    }
-    result.sort((o1, o2) -> (int) (o2.getSecond() - o1.getSecond()));
-    return result;
-  }
-
-  /**
-   * Helper method to extract the result from Collection<IntermediateRecord>
-   *
-   * @return A list of expected results
-   */
-  private ArrayList<Pair<Double, Double>> extractIntermediateResult(Collection<IntermediateRecord> intermediateRecord) {
-    ArrayList<Pair<Double, Double>> result = new ArrayList<>();
-    PriorityQueue<IntermediateRecord> resultPQ = new PriorityQueue<>(intermediateRecord);
-    while (!resultPQ.isEmpty()) {
-      IntermediateRecord head = resultPQ.poll();
-      result.add(new Pair<>((Double) head._record.getValues()[0], (Double) head._record.getValues()[1]));
-    }
-    Collections.reverse(result);
-    return result;
+    return data.toArray(new Object[data.size()][]);
   }
 
   @DataProvider
-  public static Object[][] QueryDataProvider() {
+  public static Object[][] groupByOrderByQueryDataProvider() {
     List<Object[]> data = new ArrayList<>();
-    ArrayList<Pair<Double, Double>> expectedResult = computeExpectedResult();
+    ArrayList<Pair<Double, Double>> expectedResult = computeExpectedResult(false);
     // Testcase1: low limit + high trim size
     QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
         "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 1");
@@ -285,14 +153,227 @@ public class GroupByInSegmentTrimTest {
   /**
    * Helper method to compute the expected result
    *
+   * @param sortOnFirst the sorting strategy
    * @return A list of expected results
    */
-  private static ArrayList<Pair<Double, Double>> computeExpectedResult() {
+  private static ArrayList<Pair<Double, Double>> computeExpectedResult(boolean sortOnFirst) {
     ArrayList<Pair<Double, Double>> result = new ArrayList<>();
     for (Map.Entry<Double, Double> entry : _resultMap.entrySet()) {
       result.add(new Pair<>(entry.getKey(), entry.getValue()));
     }
+    if (sortOnFirst) {
+      // Sort on first column and ASC
+      result.sort((o1, o2) -> (int) (o1.getFirst() - o2.getFirst()));
+    } else {
+      // Sort on second column and DESC
+      result.sort((o1, o2) -> (int) (o2.getSecond() - o1.getSecond()));
+    }
+    return result;
+  }
+
+  /**
+   * Initializations prior to the test:
+   * - Build a segment with metric columns (that will be aggregated and grouped) containing
+   *  randomly generated data.
+   *
+   * @throws Exception
+   */
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    _resultMap = new HashMap<>();
+    // Current Schema: Columns: metrics_0(double), metrics_1(double)
+    _inputData = new double[NUM_COLUMN][NUM_ROWS];
+    _columns = new String[NUM_COLUMN];
+    setupSegment();
+  }
+
+  /**
+   * Test the GroupBy OrderBy query and compute the expected results to match
+   */
+  @Test(dataProvider = "groupByOrderByQueryDataProvider")
+  void testGroupByOrderByOperator(int trimSize, List<Pair<Double, Double>> expectedResult, QueryContext queryContext) {
+    // Create a query plan
+    AggregationGroupByOrderByPlanNode aggregationGroupByOrderByPlanNode =
+        new AggregationGroupByOrderByPlanNode(_indexSegment, queryContext, MAX_INITIAL_RESULT_HOLDER_CAPACITY,
+            NUM_GROUPS_LIMIT, trimSize);
+
+    // Get the query executor
+    AggregationGroupByOrderByOperator aggregationGroupByOrderByOperator = aggregationGroupByOrderByPlanNode.run();
+
+    // Extract the execution result
+    IntermediateResultsBlock resultsBlock = aggregationGroupByOrderByOperator.nextBlock();
+    ArrayList<Pair<Double, Double>> extractedResult = extractTestResult(resultsBlock, true);
+
+    assertEquals(extractedResult, expectedResult);
+  }
+
+  /**
+   * Test the GroupBy query and compute the expected results to match
+   */
+  @Test(dataProvider = "groupByQueryDataProvider")
+  void testGroupByOperator(int trimSize, List<Pair<Double, Double>> expectedResult, QueryContext queryContext) {
+    // Create a query plan
+    AggregationGroupByOrderByPlanNode aggregationGroupByOrderByPlanNode =
+        new AggregationGroupByOrderByPlanNode(_indexSegment, queryContext, MAX_INITIAL_RESULT_HOLDER_CAPACITY,
+            NUM_GROUPS_LIMIT, trimSize);
+
+    // Get the query executor
+    AggregationGroupByOrderByOperator aggregationGroupByOrderByOperator = aggregationGroupByOrderByPlanNode.run();
+
+    // Extract the execution result
+    IntermediateResultsBlock resultsBlock = aggregationGroupByOrderByOperator.nextBlock();
+    ArrayList<Pair<Double, Double>> extractedResult = extractTestResult(resultsBlock, false);
+
+    assertEquals(extractedResult, expectedResult);
+  }
+
+  /**
+   * Helper method to setup the index segment on which to perform aggregation tests.
+   * - Generates a segment with {@link #NUM_COLUMN} and {@link #NUM_ROWS}
+   * - Random 'double' data filled in the metric columns. The data is also populated
+   *   into the _inputData[], so it can be used to test the results.
+   *
+   * @throws Exception
+   */
+  private void setupSegment()
+      throws Exception {
+    if (INDEX_DIR.exists()) {
+      FileUtils.deleteQuietly(INDEX_DIR);
+    }
+
+    // Segment Config
+    SegmentGeneratorConfig config =
+        new SegmentGeneratorConfig(new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build(),
+            buildSchema());
+    config.setSegmentName(SEGMENT_NAME);
+    config.setOutDir(INDEX_DIR.getAbsolutePath());
+
+    // Fill the data table
+    List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
+    int baseValue = 10;
+    for (int i = 0; i < NUM_ROWS; i++) {
+      GenericRow genericRow = new GenericRow();
+
+      for (int j = 0; j < _columns.length; j++) {
+        String metricName = _columns[j];
+        double value = baseValue + i + j;
+        _inputData[j][i] = value;
+        genericRow.putValue(metricName, value);
+      }
+      // Compute the max result and insert into a grouped map
+      Double key = _inputData[0][i];
+      Double value = _inputData[1][i];
+      computeMaxResult(key, value);
+      rows.add(genericRow);
+      baseValue += 10;
+    }
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config, new GenericRowRecordReader(rows));
+    driver.build();
+
+    _indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, driver.getSegmentName()), ReadMode.heap);
+  }
+
+  /**
+   * Helper method to build schema for the segment on which aggregation tests will be run.
+   *
+   * @return table schema
+   */
+  private Schema buildSchema() {
+    Schema schema = new Schema();
+
+    for (int i = 0; i < NUM_COLUMN; i++) {
+      String metricName = METRIC_PREFIX + i;
+      MetricFieldSpec metricFieldSpec = new MetricFieldSpec(metricName, FieldSpec.DataType.DOUBLE);
+      schema.addField(metricFieldSpec);
+      _columns[i] = metricName;
+    }
+    return schema;
+  }
+
+  /**
+   * Helper method to compute the aggregation result grouped by the key
+   *
+   */
+  private void computeMaxResult(Double key, Double value) {
+    if (_resultMap.get(key) == null || _resultMap.get(key) < value) {
+      _resultMap.put(key, value);
+    }
+  }
+
+  /**
+   * Helper method to extract the result from IntermediateResultsBlock
+   *
+   * @return A list of expected results
+   */
+  private ArrayList<Pair<Double, Double>> extractTestResult(IntermediateResultsBlock resultsBlock, boolean orderBy) {
+    AggregationGroupByResult result = resultsBlock.getAggregationGroupByResult();
+    if (!orderBy) {
+      assert result != null;
+      return extractNoOrderByAggregationResult(result);
+    }
+    if (result != null) {
+      // No trim
+      return extractAggregationResult(result);
+    } else {
+      // In case of trim
+      return extractIntermediateResult(resultsBlock.getIntermediateRecords());
+    }
+  }
+
+  /**
+   * Helper method to extract the result from AggregationGroupByResult
+   *
+   * @return A list of expected results
+   */
+  private ArrayList<Pair<Double, Double>> extractAggregationResult(AggregationGroupByResult aggregationGroupByResult) {
+    ArrayList<Pair<Double, Double>> result = new ArrayList<>();
+    Iterator<GroupKeyGenerator.GroupKey> iterator = aggregationGroupByResult.getGroupKeyIterator();
+    int i = 0;
+    while (iterator.hasNext()) {
+      GroupKeyGenerator.GroupKey groupKey = iterator.next();
+      Double key = (Double) groupKey._keys[0];
+      Double value = (Double) aggregationGroupByResult.getResultForGroupId(i, groupKey._groupId);
+      result.add(new Pair<>(key, value));
+    }
     result.sort((o1, o2) -> (int) (o2.getSecond() - o1.getSecond()));
+    return result;
+  }
+
+  /**
+   * Helper method to extract the result from AggregationGroupByResult
+   *
+   * @return A list of expected results
+   */
+  private ArrayList<Pair<Double, Double>> extractNoOrderByAggregationResult(
+      AggregationGroupByResult aggregationGroupByResult) {
+    ArrayList<Pair<Double, Double>> result = new ArrayList<>();
+    Iterator<GroupKeyGenerator.GroupKey> iterator = aggregationGroupByResult.getGroupKeyIterator();
+    int i = 0;
+    while (iterator.hasNext()) {
+      GroupKeyGenerator.GroupKey groupKey = iterator.next();
+      Double key = (Double) groupKey._keys[0];
+      Double value = (Double) aggregationGroupByResult.getResultForGroupId(i, groupKey._groupId);
+      result.add(new Pair<>(key, value));
+    }
+    result.sort((o1, o2) -> (int) (o1.getSecond() - o2.getSecond()));
+    return result;
+  }
+
+  /**
+   * Helper method to extract the result from Collection<IntermediateRecord>
+   *
+   * @return A list of expected results
+   */
+  private ArrayList<Pair<Double, Double>> extractIntermediateResult(Collection<IntermediateRecord> intermediateRecord) {
+    ArrayList<Pair<Double, Double>> result = new ArrayList<>();
+    PriorityQueue<IntermediateRecord> resultPQ = new PriorityQueue<>(intermediateRecord);
+    while (!resultPQ.isEmpty()) {
+      IntermediateRecord head = resultPQ.poll();
+      result.add(new Pair<>((Double) head._record.getValues()[0], (Double) head._record.getValues()[1]));
+    }
+    Collections.reverse(result);
     return result;
   }
 }
