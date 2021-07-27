@@ -78,6 +78,7 @@ predicate:
   | isClause                              # IsPredicate
   | regexpLikeClause                      # RegexpLikePredicate
   | textMatchClause                       # TextMatchPredicate
+  | likeClause                            # TextMatchPredicate
   | jsonMatchClause                       # JsonMatchPredicate
   ;
 
@@ -99,6 +100,9 @@ regexpLikeClause:
 
 textMatchClause:
   TEXT_MATCH '(' expression ',' literal ')';
+
+likeClause:
+  expression LIKE  literal;
 
 jsonMatchClause:
   JSON_MATCH '(' expression ',' literal ')';
@@ -145,6 +149,7 @@ SELECT: S E L E C T;
 TOP: T O P;
 WHERE: W H E R E;
 OPTION: O P T I O N;
+LIKE: L I K E;
 
 
 WHITESPACE: [ \t\n]+ -> skip;

@@ -253,6 +253,9 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         "SELECT INT_COL, QUERY_LOG_TEXT_COL FROM MyTable WHERE TEXT_MATCH(QUERY_LOG_TEXT_COL, '\"SELECT dimensionCol2\"') LIMIT 50000";
     testTextSearchSelectQueryHelper(query, 11787, false, null);
 
+    query = "SELECT INT_COL, QUERY_LOG_TEXT_COL FROM MyTable WHERE QUERY_LOG_TEXT_COL LIKE '\"SELECT dimensionCol2\"' LIMIT 50000";
+    testTextSearchSelectQueryHelper(query, 11787, false, null);
+
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(QUERY_LOG_TEXT_COL, '\"SELECT dimensionCol2\"')";
     testTextSearchAggregationQueryHelper(query, 11787);
 
@@ -264,7 +267,14 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         "SELECT INT_COL, QUERY_LOG_TEXT_COL FROM MyTable WHERE TEXT_MATCH(QUERY_LOG_TEXT_COL, '\"SELECT count\"') LIMIT 50000";
     testTextSearchSelectQueryHelper(query, 12363, false, null);
 
+    query =
+        "SELECT INT_COL, QUERY_LOG_TEXT_COL FROM MyTable WHERE QUERY_LOG_TEXT_COL LIKE '\"SELECT count\"' LIMIT 50000";
+    testTextSearchSelectQueryHelper(query, 12363, false, null);
+
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(QUERY_LOG_TEXT_COL, '\"SELECT count\"')";
+    testTextSearchAggregationQueryHelper(query, 12363);
+
+    query = "SELECT COUNT(*) FROM MyTable WHERE QUERY_LOG_TEXT_COL LIKE '\"SELECT count\"'";
     testTextSearchAggregationQueryHelper(query, 12363);
 
     // TEST 3: phrase query
@@ -273,6 +283,10 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // to the output of grep since the resultset size is small.
     query =
         "SELECT INT_COL, QUERY_LOG_TEXT_COL FROM MyTable WHERE TEXT_MATCH(QUERY_LOG_TEXT_COL, '\"GROUP BY\"') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query, 26, true, null);
+
+    query =
+        "SELECT INT_COL, QUERY_LOG_TEXT_COL FROM MyTable WHERE QUERY_LOG_TEXT_COL LIKE '\"GROUP BY\"' LIMIT 50000";
     testTextSearchSelectQueryHelper(query, 26, true, null);
 
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(QUERY_LOG_TEXT_COL, '\"GROUP BY\"')";
