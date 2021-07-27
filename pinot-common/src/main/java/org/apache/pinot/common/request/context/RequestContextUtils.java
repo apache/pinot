@@ -229,6 +229,7 @@ public class RequestContextUtils {
       case REGEXP_LIKE:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new RegexpLikePredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+      case LIKE:
       case TEXT_MATCH:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new TextMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));

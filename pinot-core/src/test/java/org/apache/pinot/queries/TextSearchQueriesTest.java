@@ -313,7 +313,14 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"Distributed systems\"') LIMIT 50000";
     testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
 
+    query =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE SKILLS_TEXT_COL LIKE '\"Distributed systems\"' LIMIT 50000";
+    testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
+
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"distributed systems\"') LIMIT 50000";
+    testTextSearchAggregationQueryHelper(query, expected.size());
+
+    query = "SELECT COUNT(*) FROM MyTable WHERE SKILLS_TEXT_COL LIKE '\"distributed systems\"' LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
     // TEST 5: phrase query
@@ -329,7 +336,14 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"query processing\"') LIMIT 50000";
     testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
 
+    query =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE SKILLS_TEXT_COL LIKE '\"query processing\"' LIMIT 50000";
+    testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
+
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"query processing\"') LIMIT 50000";
+    testTextSearchAggregationQueryHelper(query, expected.size());
+
+    query = "SELECT COUNT(*) FROM MyTable WHERE SKILLS_TEXT_COL LIKE '\"query processing\"' LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
     // TEST 6: phrase query
@@ -1396,7 +1410,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
   private void testTextSearchSelectQueryHelper(String query, int expectedResultSize, boolean compareGrepOutput,
       List<Serializable[]> expectedResults)
       throws Exception {
-    SelectionOnlyOperator operator = getOperatorForPqlQuery(query);
+    SelectionOnlyOperator operator = getOperatorForSqlQuery(query);
     IntermediateResultsBlock operatorResult = operator.nextBlock();
     List<Object[]> resultset = (List<Object[]>) operatorResult.getSelectionResult();
     Assert.assertNotNull(resultset);
