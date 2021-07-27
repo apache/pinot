@@ -41,6 +41,7 @@ public class InputFileSegmentNameGeneratorTest {
   public void testWithHDFSPath() {
     SegmentNameGenerator segmentNameGenerator = new InputFileSegmentNameGenerator(".+/(.+)\\.csv", "${filePathPattern:\\1}");
     assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null, "hdfs:///my/path/to/segmentname.csv"), "segmentname");
+    assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null, "hdfs:/server:9000//my/path/to/segmentname.csv"), "segmentname");
   }
 
   @Test

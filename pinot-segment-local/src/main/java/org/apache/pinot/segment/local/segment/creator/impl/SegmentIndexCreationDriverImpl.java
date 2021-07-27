@@ -77,6 +77,7 @@ import org.slf4j.LoggerFactory;
  * Implementation of an index segment creator.
  */
 // TODO: Check resource leaks
+@SuppressWarnings("serial")
 public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDriver {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentIndexCreationDriverImpl.class);
 
@@ -264,7 +265,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     if (timeColumnStatistics != null) {
       if (totalDocs > 0) {
         segmentName = config.getSegmentNameGenerator()
-            .generateSegmentName(sequenceId, timeColumnStatistics.getMinValue(), timeColumnStatistics.getMaxValue());
+            .generateSegmentName(sequenceId, timeColumnStatistics.getMinValue(), timeColumnStatistics.getMaxValue(), config.getInputFilePath());
       } else {
         // When totalDoc is 0, check whether 'failOnEmptySegment' option is true. If so, directly fail the segment creation.
         Preconditions.checkArgument(!config.isFailOnEmptySegment(),
@@ -272,10 +273,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
                 .isFailOnEmptySegment());
         // Generate a unique name for a segment with no rows
         long now = System.currentTimeMillis();
-        segmentName = config.getSegmentNameGenerator().generateSegmentName(sequenceId, now, now);
+        segmentName = config.getSegmentNameGenerator().generateSegmentName(sequenceId, now, now, config.getInputFilePath());
       }
     } else {
-      segmentName = config.getSegmentNameGenerator().generateSegmentName(sequenceId, null, null);
+      segmentName = config.getSegmentNameGenerator().generateSegmentName(sequenceId, null, null, config.getInputFilePath());
     }
 
     try {

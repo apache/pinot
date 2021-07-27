@@ -26,6 +26,7 @@ import java.util.Map;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.name.FixedSegmentNameGenerator;
+import org.apache.pinot.segment.spi.creator.name.InputFileSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
@@ -48,6 +49,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
   public static final String FIXED_SEGMENT_NAME_GENERATOR = "fixed";
   public static final String SIMPLE_SEGMENT_NAME_GENERATOR = "simple";
   public static final String NORMALIZED_DATE_SEGMENT_NAME_GENERATOR = "normalizedDate";
+  public static final String INPUT_FILE_SEGMENT_NAME_GENERATOR = "inputFile";
 
   // For FixedSegmentNameGenerator
   public static final String SEGMENT_NAME = "segment.name";
@@ -59,6 +61,10 @@ public class SegmentGenerationTaskRunner implements Serializable {
   public static final String SEGMENT_NAME_PREFIX = "segment.name.prefix";
   public static final String EXCLUDE_SEQUENCE_ID = "exclude.sequence.id";
 
+  // For InputFileSegmentNameGenerator
+  public static final String FILE_PATH_PATTERN = "file.path.pattern";
+  public static final String SEGMENT_NAME_TEMPLATE = "segment.name.template";
+  
   // Assign sequence ids to input files based at each local directory level
   @Deprecated
   public static final String DEPRECATED_USE_LOCAL_DIRECTORY_SEQUENCE_ID = "local.directory.sequence.id";
@@ -149,6 +155,9 @@ public class SegmentGenerationTaskRunner implements Serializable {
             Boolean.parseBoolean(segmentNameGeneratorConfigs.get(EXCLUDE_SEQUENCE_ID)),
             IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig),
             IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig), dateTimeFormatSpec);
+      case INPUT_FILE_SEGMENT_NAME_GENERATOR:
+        return new InputFileSegmentNameGenerator(segmentNameGeneratorConfigs.get(FILE_PATH_PATTERN),
+            segmentNameGeneratorConfigs.get(SEGMENT_NAME_TEMPLATE));
       default:
         throw new UnsupportedOperationException("Unsupported segment name generator type: " + segmentNameGeneratorType);
     }
