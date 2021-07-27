@@ -35,10 +35,12 @@ import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.groupby.DictionaryBasedGroupKeyGenerator;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.postaggregation.PostAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -55,6 +57,10 @@ public class TableResizer {
   private final int _numOrderByExpressions;
   private final OrderByValueExtractor[] _orderByValueExtractors;
   private final Comparator<IntermediateRecord> _intermediateRecordComparator;
+  private final Comparator<DictIdRecord> _dictIdComparator;
+  private final OrderByExpressionContext[] _orderByExpressions;
+  private final int[] _orderByIndexArray;
+  private final Dictionary[] _dictionaries;
 
   public TableResizer(DataSchema dataSchema, QueryContext queryContext) {
     _dataSchema = dataSchema;
@@ -77,17 +83,93 @@ public class TableResizer {
 
     List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
     assert orderByExpressions != null;
+    _orderByExpressions = orderByExpressions.toArray(new OrderByExpressionContext[0]);
     _numOrderByExpressions = orderByExpressions.size();
     _orderByValueExtractors = new OrderByValueExtractor[_numOrderByExpressions];
     Comparator[] comparators = new Comparator[_numOrderByExpressions];
+    _orderByIndexArray = null;
+    _dictIdComparator = null;
+    _dictionaries = null;
     for (int i = 0; i < _numOrderByExpressions; i++) {
       OrderByExpressionContext orderByExpression = orderByExpressions.get(i);
-      _orderByValueExtractors[i] = getOrderByValueExtractor(orderByExpression.getExpression());
-      comparators[i] = orderByExpression.isAsc() ? Comparator.naturalOrder() : Comparator.reverseOrder();
+      ExpressionContext expressionContext = orderByExpression.getExpression();
+      _orderByValueExtractors[i] = getOrderByValueExtractor(expressionContext);
+      if (orderByExpression.isAsc()) {
+        comparators[i] = Comparator.naturalOrder();
+      } else {
+        comparators[i] = Comparator.reverseOrder();
+      }
     }
     _intermediateRecordComparator = (o1, o2) -> {
       for (int i = 0; i < _numOrderByExpressions; i++) {
         int result = comparators[i].compare(o1._values[i], o2._values[i]);
+        if (result != 0) {
+          return result;
+        }
+      }
+      return 0;
+    };
+  }
+
+  public TableResizer(DataSchema dataSchema, QueryContext queryContext, Dictionary[] dictionaries) {
+    _dataSchema = dataSchema;
+
+    // NOTE: The data schema will always have group-by expressions in the front, followed by aggregation functions of
+    //       the same order as in the query context. This is handled in AggregationGroupByOrderByOperator.
+
+    List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
+    assert groupByExpressions != null;
+    _numGroupByExpressions = groupByExpressions.size();
+    _groupByExpressionIndexMap = new HashMap<>();
+    for (int i = 0; i < _numGroupByExpressions; i++) {
+      _groupByExpressionIndexMap.put(groupByExpressions.get(i), i);
+    }
+
+    _aggregationFunctions = queryContext.getAggregationFunctions();
+    assert _aggregationFunctions != null;
+    _aggregationFunctionIndexMap = queryContext.getAggregationFunctionIndexMap();
+    assert _aggregationFunctionIndexMap != null;
+
+    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+    assert orderByExpressions != null;
+    _orderByExpressions = orderByExpressions.toArray(new OrderByExpressionContext[0]);
+    _numOrderByExpressions = orderByExpressions.size();
+    _orderByValueExtractors = new OrderByValueExtractor[_numOrderByExpressions];
+    Comparator[] comparators = new Comparator[_numOrderByExpressions];
+    _orderByIndexArray = new int[_numOrderByExpressions];
+    _dictionaries = new Dictionary[_numOrderByExpressions];
+
+    for (int i = 0; i < _numOrderByExpressions; i++) {
+      OrderByExpressionContext orderByExpression = orderByExpressions.get(i);
+      ExpressionContext expressionContext = orderByExpression.getExpression();
+      _orderByValueExtractors[i] = getOrderByValueExtractor(expressionContext);
+      if (orderByExpression.isAsc()) {
+        comparators[i] = Comparator.naturalOrder();
+      } else {
+        comparators[i] = Comparator.reverseOrder();
+      }
+      // Use an int array to map
+      FunctionContext functionContext = expressionContext.getFunction();
+      if (functionContext != null && functionContext.getType() == FunctionContext.Type.AGGREGATION) {
+        _orderByIndexArray[i] = -1 * _aggregationFunctionIndexMap.get(functionContext) - 1;
+      } else {
+        _orderByIndexArray[i] = _groupByExpressionIndexMap.get(expressionContext);
+      }
+      _dictionaries[i] = _orderByIndexArray[i] >= 0 ? dictionaries[_orderByIndexArray[i]] : null;
+    }
+
+    _intermediateRecordComparator = null;
+
+    _dictIdComparator = (o1, o2) -> {
+      for (int i = 0; i < _numOrderByExpressions; i++) {
+        int result;
+        int index = _orderByIndexArray[i];
+        if (index >= 0) {
+          result = _dictionaries[i].compare(o1._dictId[index], o2._dictId[index]);
+        } else {
+          index = -1 * (index + 1);
+          result = comparators[i].compare(o1._values[index], o2._values[index]);
+        }
         if (result != 0) {
           return result;
         }
@@ -132,6 +214,20 @@ public class TableResizer {
       intermediateRecordValues[i] = _orderByValueExtractors[i].extract(record);
     }
     return new IntermediateRecord(key, intermediateRecordValues, record);
+  }
+
+  // TODO: Optimize here
+  private DictIdRecord getDictIdRecord(Key keys, int[] dictIds, long rawKey, Record record) {
+    Comparable[] intermediateRecordValues = new Comparable[_numOrderByExpressions];
+    for (int i = 0; i < _numOrderByExpressions; i++) {
+      int index = _orderByIndexArray[i];
+      if (index >= 0) {
+        intermediateRecordValues[i] = dictIds[index];
+      } else {
+        intermediateRecordValues[i] = _orderByValueExtractors[i].extract(record);
+      }
+    }
+    return new DictIdRecord(keys, dictIds, rawKey, intermediateRecordValues, record);
   }
 
   /**
@@ -245,6 +341,44 @@ public class TableResizer {
       } else {
         IntermediateRecord peek = priorityQueue.peek();
         if (comparator.compare(peek, intermediateRecord) < 0) {
+          priorityQueue.poll();
+          priorityQueue.offer(intermediateRecord);
+        }
+      }
+    }
+    return priorityQueue;
+  }
+
+  /**
+   * Trims the aggregation results using a priority queue and returns the priority queue.
+   * This method is to be called from individual segment if the intermediate results need to be trimmed.
+   */
+  public PriorityQueue<DictIdRecord> trimInSegmentDictResults(DictionaryBasedGroupKeyGenerator dictKeyGenerator,
+      GroupByResultHolder[] _groupByResultHolders, int trimSize) {
+    int numAggregationFunctions = _aggregationFunctions.length;
+    int numColumns = numAggregationFunctions + _numGroupByExpressions;
+
+    //TODO: Verify post-agg case
+    PriorityQueue<DictIdRecord> priorityQueue = new PriorityQueue<>(trimSize, _dictIdComparator.reversed());
+    Iterator<GroupKeyGenerator.GroupDictId> groupKeyIterator = dictKeyGenerator.getGroupDictIds();
+    while (groupKeyIterator.hasNext()) {
+      // Iterate over keys
+      GroupKeyGenerator.GroupDictId groupKey = groupKeyIterator.next();
+      int[] dictIds = groupKey._dictIds;
+      long rawKey = groupKey._rawKey;
+      Object[] values = new Object[numColumns];
+      int groupId = groupKey._groupId;
+      for (int i = 0; i < numAggregationFunctions; i++) {
+        values[i + _numGroupByExpressions] =
+            _aggregationFunctions[i].extractGroupByResult(_groupByResultHolders[i], groupId);
+      }
+      // {key, intermediate_record, record}
+      DictIdRecord intermediateRecord = getDictIdRecord(null, dictIds, rawKey, new Record(values));
+      if (priorityQueue.size() < trimSize) {
+        priorityQueue.offer(intermediateRecord);
+      } else {
+        DictIdRecord peek = priorityQueue.peek();
+        if (_dictIdComparator.compare(peek, intermediateRecord) > 0) {
           priorityQueue.poll();
           priorityQueue.offer(intermediateRecord);
         }

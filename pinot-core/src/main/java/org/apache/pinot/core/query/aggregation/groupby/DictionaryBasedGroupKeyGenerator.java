@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.data.table.DictIdRecord;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -93,6 +94,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
   private final int _globalGroupIdUpperBound;
   private final RawKeyHolder _rawKeyHolder;
+  private final Object2IntOpenHashMap<ExpressionContext> _expressionToIndexMap;
+  // TODO: Remove this flag
+  boolean onePassFlag = true;
 
   public DictionaryBasedGroupKeyGenerator(TransformOperator transformOperator, ExpressionContext[] groupByExpressions,
       int numGroupsLimit, int arrayBasedThreshold) {
@@ -106,12 +110,15 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     _dictionaries = new Dictionary[_numGroupByExpressions];
     _singleValueDictIds = new int[_numGroupByExpressions][];
     _multiValueDictIds = new int[_numGroupByExpressions][][];
+    _expressionToIndexMap = new Object2IntOpenHashMap<>();
+    _expressionToIndexMap.defaultReturnValue(INVALID_ID);
 
     long cardinalityProduct = 1L;
     boolean longOverflow = false;
     for (int i = 0; i < _numGroupByExpressions; i++) {
       ExpressionContext groupByExpression = groupByExpressions[i];
       _dictionaries[i] = transformOperator.getDictionary(groupByExpression);
+      _expressionToIndexMap.put(groupByExpression, i);
       int cardinality = _dictionaries[i].length();
       _cardinalities[i] = cardinality;
       if (!longOverflow) {
@@ -124,6 +131,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
       _isSingleValueColumn[i] = transformOperator.getResultMetadata(groupByExpression).isSingleValue();
     }
+
     // TODO: Clear the holder after processing the query instead of before
     if (longOverflow) {
       // ArrayMapBasedHolder
@@ -209,6 +217,20 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   @Override
   public int getNumKeys() { return _rawKeyHolder.getNumKeys(); }
 
+  public Iterator<GroupDictId> getGroupDictIds () { return _rawKeyHolder.getGroupDictId(); }
+
+  public Object2IntOpenHashMap<ExpressionContext> getExpressionToIndexMap() { return _expressionToIndexMap; }
+
+  public Dictionary[] getDictionaries() {
+    return _dictionaries;
+  }
+
+  @Override
+  public void clearKeyHolder() { _rawKeyHolder.clearKeyHolder(); }
+
+  @Override
+  public int getGroupId(DictIdRecord dictIdRecord) { return _rawKeyHolder.getGroupId(dictIdRecord);}
+
   private interface RawKeyHolder {
 
     /**
@@ -234,6 +256,12 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
      */
     int getGroupIdUpperBound();
 
+    Iterator<GroupDictId> getGroupDictId();
+
+    void clearKeyHolder();
+
+    int getGroupId(DictIdRecord dictIdRecord);
+
     /**
      * Returns an iterator of {@link GroupKey}. Use this interface to iterate through all the group keys.
      */
@@ -248,7 +276,6 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
      * Returns current number of unique keys
      */
     int getNumKeys();
-
   }
 
   private class ArrayBasedHolder implements RawKeyHolder {
@@ -290,6 +317,22 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     public int getGroupIdUpperBound() {
       return _globalGroupIdUpperBound;
     }
+
+    @Override
+    public Iterator<GroupDictId> getGroupDictId() {
+      throw new UnsupportedOperationException("Should not trigger trim if ArrayBasedKeyHolder is used");
+    }
+
+    @Override
+    public void clearKeyHolder() {
+      throw new UnsupportedOperationException("Should not trigger trim if ArrayBasedKeyHolder is used");
+    }
+
+    @Override
+    public int getGroupId(DictIdRecord dictIdRecord) {
+      throw new UnsupportedOperationException("Should not trigger trim if ArrayBasedKeyHolder is used");
+    }
+
 
     @Override
     public Iterator<GroupKey> getGroupKeys() {
@@ -388,6 +431,47 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     @Override
     public int getGroupIdUpperBound() {
       return _groupIdMap.size();
+    }
+
+    @Override
+    public void clearKeyHolder() {
+      _groupIdMap.clearAndTrim();
+    }
+
+    @Override
+    public int getGroupId(DictIdRecord dictIdRecord) {
+      return _groupIdMap.getGroupId((int)dictIdRecord._rawKey, _globalGroupIdUpperBound);
+    }
+
+    @Override
+    public Iterator<GroupDictId> getGroupDictId () {
+      return new Iterator<GroupDictId>() {
+        private final Iterator<IntGroupIdMap.Entry> _iterator = _groupIdMap.iterator();
+        private final GroupDictId _groupDictId = new GroupDictId();
+        @Override
+        public boolean hasNext() {
+          return _iterator.hasNext();
+        }
+
+        @Override
+        public GroupDictId next() {
+          IntGroupIdMap.Entry entry = _iterator.next();
+          _groupDictId._groupId = entry._groupId;
+          _groupDictId._dictIds = getDictIds(entry._rawKey);
+          _groupDictId._rawKey = entry._rawKey;
+          return _groupDictId;
+        }
+      };
+    }
+
+    private int[] getDictIds(int rawKey) {
+      int[] dictIds = new int[_numGroupByExpressions];
+      for (int i = 0; i < _numGroupByExpressions; i++) {
+        int cardinality = _cardinalities[i];
+        dictIds[i] = rawKey % cardinality;
+        rawKey /= cardinality;
+      }
+      return dictIds;
     }
 
     @Override
@@ -563,14 +647,14 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       }
       return groupKeyBuilder.toString();
     }
+
+
   }
 
   private class LongMapBasedHolder implements RawKeyHolder {
     private final Long2IntOpenHashMap _groupIdMap;
 
-    public LongMapBasedHolder(Long2IntOpenHashMap groupIdMap) {
-      _groupIdMap = groupIdMap;
-    }
+    public LongMapBasedHolder(Long2IntOpenHashMap groupIdMap) { _groupIdMap = groupIdMap; }
 
     @Override
     public void processSingleValue(int numDocs, int[] outGroupIds) {
@@ -608,6 +692,48 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     @Override
     public int getGroupIdUpperBound() {
       return _groupIdMap.size();
+    }
+
+    @Override
+    public void clearKeyHolder() {
+      _groupIdMap.clear();
+    }
+
+    @Override
+    public int getGroupId(DictIdRecord dictIdRecord) {
+      return getGroupId(dictIdRecord._rawKey);
+    }
+
+    @Override
+    public Iterator<GroupDictId> getGroupDictId () {
+      return new Iterator<GroupDictId>() {
+        private final ObjectIterator<Long2IntMap.Entry> _iterator =
+            _groupIdMap.long2IntEntrySet().fastIterator();
+        private final GroupDictId _groupDictId = new GroupDictId();
+        @Override
+        public boolean hasNext() {
+          return _iterator.hasNext();
+        }
+
+        @Override
+        public GroupDictId next() {
+          Long2IntMap.Entry entry = _iterator.next();
+          _groupDictId._groupId = entry.getIntValue();
+          _groupDictId._dictIds = getDictIds(entry.getLongKey());
+          _groupDictId._rawKey = entry.getLongKey();
+          return _groupDictId;
+        }
+      };
+    }
+
+    private int[] getDictIds(long rawKey) {
+      int[] dictIds = new int[_numGroupByExpressions];
+      for (int i = 0; i < _numGroupByExpressions; i++) {
+        int cardinality = _cardinalities[i];
+        dictIds[i] = (int) (rawKey % cardinality);
+        rawKey /= cardinality;
+      }
+      return dictIds;
     }
 
     @Override
@@ -810,8 +936,39 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     @Override
+    public int getGroupId(DictIdRecord dictIdRecord) {
+      return getGroupId(new IntArray(dictIdRecord._dictId));
+    }
+
+    @Override
+    public void clearKeyHolder() {
+      _groupIdMap.clear();
+    }
+
+    @Override
     public int getGroupIdUpperBound() {
       return _groupIdMap.size();
+    }
+
+    @Override
+    public Iterator<GroupDictId> getGroupDictId () {
+      return new Iterator<GroupDictId>() {
+        private final ObjectIterator<Object2IntMap.Entry<IntArray>> _iterator =
+            _groupIdMap.object2IntEntrySet().fastIterator();
+        private final GroupDictId _groupDictId = new GroupDictId();
+        @Override
+        public boolean hasNext() {
+          return _iterator.hasNext();
+        }
+
+        @Override
+        public GroupDictId next() {
+          Object2IntMap.Entry<IntArray> entry = _iterator.next();
+          _groupDictId._groupId = entry.getIntValue();
+          _groupDictId._dictIds = entry.getKey()._elements;
+          return _groupDictId;
+        }
+      };
     }
 
     @Override
@@ -1132,7 +1289,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
    */
   @VisibleForTesting
   @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
-  static class IntArray {
+  public static class IntArray {
     public int[] _elements;
 
     public IntArray(int[] elements) {
@@ -1163,4 +1320,5 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       return true;
     }
   }
+
 }

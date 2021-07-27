@@ -43,7 +43,7 @@ public class Key {
     _values = values;
   }
 
-  public Object[] getUnderLyingKey() {
+  public Object[] getKey() {
     return _values;
   }
   // NOTE: Not check class for performance concern

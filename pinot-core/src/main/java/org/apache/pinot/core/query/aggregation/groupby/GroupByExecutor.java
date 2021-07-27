@@ -22,6 +22,7 @@ import java.util.Collection;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
 
 /**
@@ -57,5 +58,5 @@ public interface GroupByExecutor {
    * <p>Should be called after all transform blocks has been processed.
    *
    */
-  Collection<IntermediateRecord> trimGroupByResult(int trimSize, TableResizer tableResizer);
+  Collection<IntermediateRecord> trimGroupByResult(int trimSize);
 }

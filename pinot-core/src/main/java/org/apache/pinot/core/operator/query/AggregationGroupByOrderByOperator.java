@@ -36,6 +36,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
 import static org.apache.pinot.core.util.GroupByUtils.getTableCapacity;
 
@@ -58,6 +59,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
   private final boolean _useStarTree;
   private final DataSchema _dataSchema;
   private final QueryContext _queryContext;
+  private final TableResizer _tableResizer;
 
   private int _numDocsScanned = 0;
 
@@ -99,20 +101,31 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     }
 
     _dataSchema = new DataSchema(columnNames, columnDataTypes);
+    if (_queryContext.getOrderByExpressions() == null) {
+      _tableResizer = null;
+    } else {
+      Dictionary[] dictionaries = new Dictionary[numGroupByExpressions];
+      for (int i = 0; i < numGroupByExpressions; i++) {
+        dictionaries[i] = transformOperator.getDictionary(groupByExpressions[i]);
+      }
+      _tableResizer = new TableResizer(_dataSchema, _queryContext, dictionaries);
+    }
   }
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
     // Perform aggregation group-by on all the blocks
     GroupByExecutor groupByExecutor;
+    // TODO: Change how we construct tableResizer
+    // TODO: Handle no orderBy case
     if (_useStarTree) {
       groupByExecutor =
           new StarTreeGroupByExecutor(_aggregationFunctions, _groupByExpressions, _maxInitialResultHolderCapacity,
-              _numGroupsLimit, _transformOperator);
+              _numGroupsLimit, _transformOperator, _tableResizer, false);
     } else {
       groupByExecutor =
           new DefaultGroupByExecutor(_aggregationFunctions, _groupByExpressions, _maxInitialResultHolderCapacity,
-              _numGroupsLimit, _transformOperator);
+              _numGroupsLimit, _transformOperator,  _tableResizer, false);
     }
     int numBlocks = 0;
     int numDocs = 0;
@@ -136,8 +149,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
       return new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
     }
     // Trim
-    TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
-    Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
+    Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize);
     return new IntermediateResultsBlock(_aggregationFunctions, intermediateRecords, _dataSchema);
   }
 

@@ -29,15 +29,15 @@ import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
-import org.apache.commons.lang.ArrayUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.data.table.DictIdRecord;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
@@ -215,8 +215,8 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   }
 
   @Override
-  public int getGroupKey(Object[] key) {
-    Object singleColumnKey = key[0];
+  public int getGroupId(DictIdRecord intermediateRecord) {
+    Object singleColumnKey = intermediateRecord._key.getKey()[0];
     switch (_storedType) {
       case INT:
         int intValue = (int)singleColumnKey;
@@ -241,11 +241,18 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     }
   }
 
-  @Override
-  public void getGroupKeyArray(Object[] key, int[] groupId) {
-    throw new UnsupportedOperationException("Operation not supported");
-  }
+//  @Override
+//  public void getGroupKeyArray(Object[] key, int[] groupId) {
+//    throw new UnsupportedOperationException("Operation not supported");
+//  }  @Override
+//  public void getGroupKeyArray(Object[] key, int[] groupId) {
+//    throw new UnsupportedOperationException("Operation not supported");
+//  }
 
+  @Override
+  public Dictionary[] getDictionaries() {
+    return null;
+  }
   private int getKeyForValue(int value) {
     Int2IntMap map = (Int2IntMap) _groupKeyMap;
     int groupId = map.get(value);

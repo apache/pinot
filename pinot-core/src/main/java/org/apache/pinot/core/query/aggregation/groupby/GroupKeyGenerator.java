@@ -19,8 +19,12 @@
 package org.apache.pinot.core.query.aggregation.groupby;
 
 import java.util.Iterator;
+import org.apache.avro.reflect.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.core.data.table.DictIdRecord;
+import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
 
 /**
@@ -84,9 +88,16 @@ public interface GroupKeyGenerator {
 
   void clearKeyHolder();
 
-  int getGroupKey(Object[] key);
+  int getGroupId(DictIdRecord intermediateRecord);
 
-  void getGroupKeyArray(Object[] groupKeys, int[] keys);
+  Dictionary[] getDictionaries();
+
+  class GroupDictId {
+    public int _groupId;
+    public long _rawKey;
+    public int[] _dictIds;
+    public Object[] _keys;
+  }
 
   /**
    * This class encapsulates the integer group id and the group keys.

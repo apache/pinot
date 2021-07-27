@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.PriorityQueue;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.data.table.DictIdRecord;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
@@ -49,15 +50,17 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   private static final ThreadLocal<int[][]> THREAD_LOCAL_MV_GROUP_KEYS =
       ThreadLocal.withInitial(() -> new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][]);
   private static final int ON_THE_FLY_TRIM_THRESHOLD = 100000;
-
-  private final TableResizer _tableResizer;
-  private final int _numGroupByExpressions;
+  private static final int ON_THE_FLY_TRIM_SIZE = 5000;
   protected final AggregationFunction[] _aggregationFunctions;
   protected final GroupKeyGenerator _groupKeyGenerator;
   protected final GroupByResultHolder[] _groupByResultHolders;
   protected final boolean _hasMVGroupByExpression;
   protected final int[] _svGroupKeys;
   protected final int[][] _mvGroupKeys;
+  private final boolean _onTheFlyTrimFlag;
+  private final boolean _hasNoDictionaryGroupByExpression;
+  private final int _numGroupByExpressions;
+  private final TableResizer _tableResizer;
 
   /**
    * Constructor for the class.
@@ -69,7 +72,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
    * @param transformOperator Transform operator
    */
   public DefaultGroupByExecutor(AggregationFunction[] aggregationFunctions, ExpressionContext[] groupByExpressions,
-      int maxInitialResultHolderCapacity, int numGroupsLimit, TransformOperator transformOperator) {
+      int maxInitialResultHolderCapacity, int numGroupsLimit, TransformOperator transformOperator, TableResizer tableResizer, boolean PQLQueryMode) {
     _aggregationFunctions = aggregationFunctions;
 
     boolean hasMVGroupByExpression = false;
@@ -81,7 +84,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     }
     _hasMVGroupByExpression = hasMVGroupByExpression;
     _numGroupByExpressions = groupByExpressions.length;
-
+    _hasNoDictionaryGroupByExpression = hasNoDictionaryGroupByExpression;
     // Initialize group key generator
     if (hasNoDictionaryGroupByExpression) {
       if (groupByExpressions.length == 1) {
@@ -95,6 +98,8 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       _groupKeyGenerator = new DictionaryBasedGroupKeyGenerator(transformOperator, groupByExpressions, numGroupsLimit,
           maxInitialResultHolderCapacity);
     }
+    _onTheFlyTrimFlag = !PQLQueryMode;
+    _tableResizer = tableResizer;
 
     // Initialize result holders
     int maxNumResults = _groupKeyGenerator.getGlobalGroupKeyUpperBound();
@@ -136,23 +141,31 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     }
 
     // TODO: format
-    if (_groupByResultHolders[0].size() > ON_THE_FLY_TRIM_THRESHOLD) {
-      PriorityQueue<IntermediateRecord> pq = _tableResizer.trimInSegmentResults(_groupKeyGenerator.getGroupKeys(), _groupByResultHolders, _groupByResultHolders[0].size());
+    int numKeys = _groupKeyGenerator.getNumKeys();
+    if (_onTheFlyTrimFlag && _groupKeyGenerator.getNumKeys() > ON_THE_FLY_TRIM_THRESHOLD) {
+      PriorityQueue<DictIdRecord> pq;
+//      if (_hasNoDictionaryGroupByExpression) {
+//        pq = _tableResizer._(_groupKeyGenerator.getGroupKeys(), _groupByResultHolders, ON_THE_FLY_TRIM_SIZE);
+//      } else {
+        pq = _tableResizer
+            .trimInSegmentDictResults((DictionaryBasedGroupKeyGenerator) _groupKeyGenerator, _groupByResultHolders, ON_THE_FLY_TRIM_SIZE);
+//      }
       // TODO: Clear key map
       _groupKeyGenerator.clearKeyHolder();
       for (int i = 0; i < numAggregationFunctions; i++) {
         GroupByResultHolder groupByResultHolder = _groupByResultHolders[i];
         groupByResultHolder.clearResultHolder(capacityNeeded);
       }
-      for (IntermediateRecord record: pq) {
-        int groupKey = _groupKeyGenerator.getGroupKey(record._key.getUnderLyingKey());
+      for (DictIdRecord record: pq) {
+        int groupId = _groupKeyGenerator.getGroupId(record);
         for (int i = 0; i < numAggregationFunctions; i++) {
+          // TODO: Fix aggregation value mapping
           Object value = record._record.getValues()[_numGroupByExpressions + i];
           GroupByResultHolder groupByResultHolder = _groupByResultHolders[i];
           if (groupByResultHolder.getType() == GroupByResultHolder.type.DOUBLE) {
-            groupByResultHolder.setValueForKey(groupKey, (double)value);
+            groupByResultHolder.setValueForKey(groupId, ((Number)value).doubleValue());
           } else {
-            groupByResultHolder.setValueForKey(groupKey, value);
+            groupByResultHolder.setValueForKey(groupId, value);
           }
         }
       }
@@ -183,7 +196,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   }
 
   @Override
-  public Collection<IntermediateRecord> trimGroupByResult(int trimSize, TableResizer tableResizer) {
-    return tableResizer.trimInSegmentResults(_groupKeyGenerator.getGroupKeys(), _groupByResultHolders, trimSize);
+  public Collection<IntermediateRecord> trimGroupByResult(int trimSize) {
+    return _tableResizer.trimInSegmentResults(_groupKeyGenerator.getGroupKeys(), _groupByResultHolders, trimSize);
   }
 }

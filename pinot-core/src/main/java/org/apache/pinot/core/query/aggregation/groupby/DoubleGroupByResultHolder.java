@@ -104,7 +104,9 @@ public class DoubleGroupByResultHolder implements GroupByResultHolder {
 
   @Override
   public void clearResultHolder(int size) {
+
     _resultArray = new double[size];
+    _resultHolderCapacity = size;
   }
 
   @Override

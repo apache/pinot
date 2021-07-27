@@ -141,7 +141,7 @@ public class GroupByInSegmentTrimTest {
 
     // Fill the data table
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
-    int baseValue = 10;
+    int baseValue = 0;
     for (int i = 0; i < NUM_ROWS; i++) {
       GenericRow genericRow = new GenericRow();
 
@@ -154,7 +154,7 @@ public class GroupByInSegmentTrimTest {
       // Compute the max result and insert into a grouped map
       computeMaxResult(_inputData[0][i], _inputData[1][i]);
       rows.add(genericRow);
-      baseValue += 10;
+      //baseValue += 10;
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
@@ -248,7 +248,7 @@ public class GroupByInSegmentTrimTest {
     ArrayList<Pair<Double, Double>> expectedResult = computeExpectedResult();
     // Testcase1: low limit + high trim size
     QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 1");
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY metric_0 DESC LIMIT 1");
     int trimSize = 100;
     int expectedSize = max(trimSize, 5 * queryContext.getLimit());
     data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
