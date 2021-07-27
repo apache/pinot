@@ -174,6 +174,7 @@ public class FilterPlanNode implements PlanNode {
           String column = lhs.getIdentifier();
           DataSource dataSource = _indexSegment.getDataSource(column);
           switch (predicate.getType()) {
+            case LIKE:
             case TEXT_MATCH:
               return new TextMatchFilterOperator(dataSource.getTextIndex(), ((TextMatchPredicate) predicate).getValue(),
                   _numDocs);

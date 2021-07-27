@@ -373,7 +373,11 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"Machine learning\"') LIMIT 50000";
     testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
 
-    query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"Machine learning\"') LIMIT 50000";
+    query =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE SKILLS_TEXT_COL LIKE '\"Machine learning\"' LIMIT 50000";
+    testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
+
+    query = "SELECT COUNT(*) FROM MyTable WHERE SKILLS_TEXT_COL LIKE '\"Machine learning\"' LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
     // TEST 7: composite phrase query using boolean operator AND
