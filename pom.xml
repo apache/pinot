@@ -1675,6 +1675,10 @@
             <exclude>**/node_modules/**</exclude>
             <exclude>**/dist/**</exclude>
             <exclude>**/src/main/resources/*.*rc</exclude>
+            
+            <!-- files from Eclipse -->
+            <exclude>**/maven-eclipse.xml</exclude>
+            <exclude>.externalToolBuilders/**</exclude>
           </excludes>
           <mapping>
             <java>JAVADOC_STYLE</java>
@@ -1767,6 +1771,8 @@
 
             <!-- IDE files -->
             <exclude>**/*.iml</exclude>
+            <exclude>**/maven-eclipse.xml</exclude>
+            <exclude>.externalToolBuilders/**</exclude>
 
             <!-- Docker and Kubernetes (not part of the distribution) -->
             <exclude>kubernetes/**</exclude>
