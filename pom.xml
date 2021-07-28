@@ -1355,10 +1355,10 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-javadoc-plugin</artifactId>
-          <version>2.10.1</version>
+          <version>3.2.0</version>
           <configuration>
             <!-- Remove this after fixing all javadoc warnings -->
-            <additionalparam>-Xdoclint:none</additionalparam>
+            <doclint>none</doclint>
           </configuration>
         </plugin>
         <plugin>
