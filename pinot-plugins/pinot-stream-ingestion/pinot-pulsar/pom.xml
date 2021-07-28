@@ -52,7 +52,7 @@
     <codehaus-annotations.version>1.17</codehaus-annotations.version>
     <javax.annotation-api.version>1.2</javax.annotation-api.version>
     <commons-collections.version>4.1</commons-collections.version>
-    <grpc-protobuf-lite.version>1.18.0</grpc-protobuf-lite.version>
+    <grpc-protobuf-lite.version>1.19.0</grpc-protobuf-lite.version>
     <swagger-annotations.version>1.5.21</swagger-annotations.version>
     <okio.version>1.6.0</okio.version>
   </properties>
@@ -178,6 +178,14 @@
         <exclusion>
           <groupId>io.grpc</groupId>
           <artifactId>grpc-protobuf-lite</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.opencensus</groupId>
+          <artifactId>opencensus-contrib-grpc-metrics</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.opencensus</groupId>
+          <artifactId>opencensus-api</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.apache.commons</groupId>
