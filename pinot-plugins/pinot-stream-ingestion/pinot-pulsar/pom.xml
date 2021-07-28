@@ -57,6 +57,16 @@
     <okio.version>1.6.0</okio.version>
   </properties>
 
+  <dependencyManagement>
+    <dependencies>
+	  <dependency>
+	    <groupId>io.netty</groupId>
+	    <artifactId>netty-codec-socks</artifactId>
+	    <version>${netty-io.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+  
   <dependencies>
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
