@@ -75,6 +75,8 @@ public interface GroupKeyGenerator {
    */
   Iterator<GroupKey> getGroupKeys();
 
+  Iterator<GroupDictId> getGroupDictId();
+
   /**
    * Returns an iterator of {@link StringGroupKey}. Use this interface to iterate through all the group keys.
    * TODO: Remove this interface after deprecating PQL.

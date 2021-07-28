@@ -288,6 +288,9 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   }
 
   @Override
+  public Iterator<GroupDictId> getGroupDictId() { return new GroupDictIdIterator(); }
+
+  @Override
   public Iterator<GroupKey> getGroupKeys() {
     return new GroupKeyIterator();
   }
@@ -346,43 +349,10 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
 
   @Override
   public int getGroupId(DictIdRecord intermediateRecord) {
-    Object[] key = intermediateRecord._key.getKey();
+    Object[] values = intermediateRecord._record.getValues();
     int[] dictKey = new int[_numGroupByExpressions];
     for (int i = 0; i < _numGroupByExpressions; i++) {
-      if (_dictionaries[i] == null) {
-        ValueToIdMap onTheFlyDictionary = _onTheFlyDictionaries[i];
-        switch (_storedTypes[i]) {
-          case INT:
-            int intValue = (int)key[i];
-            dictKey[i] = onTheFlyDictionary.put(intValue);
-            break;
-          case LONG:
-            long longValue = (long)key[i];
-            dictKey[i] = onTheFlyDictionary.put(longValue);
-            break;
-          case FLOAT:
-            float floatValue = (float)key[i];
-            dictKey[i] = onTheFlyDictionary.put(floatValue);
-            break;
-          case DOUBLE:
-            double doubleValue = (double)key[i];
-            dictKey[i] = onTheFlyDictionary.put(doubleValue);
-            break;
-          case STRING:
-            String stringValue = (String)key[i];
-            dictKey[i] = onTheFlyDictionary.put(stringValue);
-            break;
-          case BYTES:
-            byte[] bytesValues = (byte[])key[i];
-            dictKey[i] = onTheFlyDictionary.put(new ByteArray(bytesValues));
-
-            break;
-          default:
-            throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _storedTypes[i]);
-        }
-      } else {
-        dictKey[i] = (int)key[i];
-      }
+      dictKey[i] = (int)values[i];
     }
     return getGroupIdForKey(new FixedIntArray(dictKey));
   }
@@ -390,7 +360,6 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   public void clearKeyHolder() {
     _groupKeyMap.clear();
     _numGroups = 0;
-    // TODO: clear _onTheFlyDictionaries
   }
 
   @Override

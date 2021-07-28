@@ -144,12 +144,16 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     int numKeys = _groupKeyGenerator.getNumKeys();
     if (_onTheFlyTrimFlag && _groupKeyGenerator.getNumKeys() > ON_THE_FLY_TRIM_THRESHOLD) {
       PriorityQueue<DictIdRecord> pq;
-//      if (_hasNoDictionaryGroupByExpression) {
-//        pq = _tableResizer._(_groupKeyGenerator.getGroupKeys(), _groupByResultHolders, ON_THE_FLY_TRIM_SIZE);
-//      } else {
+      if (_hasNoDictionaryGroupByExpression) {
+        if (_numGroupByExpressions == 1) {
+          pq = _tableResizer.trimOnTheFlyNoDictSingleCol(_groupKeyGenerator, _groupByResultHolders, ON_THE_FLY_TRIM_SIZE);
+        } else {
+          pq = _tableResizer.trimOnTheFlyNoDictMultiCol(_groupKeyGenerator, _groupByResultHolders, ON_THE_FLY_TRIM_SIZE);
+        }
+      } else {
         pq = _tableResizer
             .trimInSegmentDictResults((DictionaryBasedGroupKeyGenerator) _groupKeyGenerator, _groupByResultHolders, ON_THE_FLY_TRIM_SIZE);
-//      }
+      }
       // TODO: Clear key map
       _groupKeyGenerator.clearKeyHolder();
       for (int i = 0; i < numAggregationFunctions; i++) {

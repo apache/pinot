@@ -217,7 +217,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   @Override
   public int getNumKeys() { return _rawKeyHolder.getNumKeys(); }
 
-  public Iterator<GroupDictId> getGroupDictIds () { return _rawKeyHolder.getGroupDictId(); }
+  public Iterator<GroupDictId> getGroupDictId () { return _rawKeyHolder.getGroupDictId(); }
 
   public Object2IntOpenHashMap<ExpressionContext> getExpressionToIndexMap() { return _expressionToIndexMap; }
 

@@ -216,7 +216,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
 
   @Override
   public int getGroupId(DictIdRecord intermediateRecord) {
-    Object singleColumnKey = intermediateRecord._key.getKey()[0];
+    Object singleColumnKey = intermediateRecord._record.getValues()[0];
     switch (_storedType) {
       case INT:
         int intValue = (int)singleColumnKey;
@@ -241,18 +241,15 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     }
   }
 
-//  @Override
-//  public void getGroupKeyArray(Object[] key, int[] groupId) {
-//    throw new UnsupportedOperationException("Operation not supported");
-//  }  @Override
-//  public void getGroupKeyArray(Object[] key, int[] groupId) {
-//    throw new UnsupportedOperationException("Operation not supported");
-//  }
+
+  @Override
+  public Iterator<GroupDictId> getGroupDictId() { return null; }
 
   @Override
   public Dictionary[] getDictionaries() {
     return null;
   }
+
   private int getKeyForValue(int value) {
     Int2IntMap map = (Int2IntMap) _groupKeyMap;
     int groupId = map.get(value);
