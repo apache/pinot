@@ -86,7 +86,8 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
   }
 
   @Override
-  public String generateSegmentName(int sequenceId, Object minTimeValue, Object maxTimeValue, String inputFilePath) {
+  public String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue,
+          @Nullable String inputFilePath) {
     Integer sequenceIdInSegmentName = !_excludeSequenceId && sequenceId >= 0 ? sequenceId : null;
 
     // Include time value for APPEND push type

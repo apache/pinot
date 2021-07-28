@@ -44,7 +44,8 @@ public class SimpleSegmentNameGenerator implements SegmentNameGenerator {
   }
 
   @Override
-  public String generateSegmentName(int sequenceId, Object minTimeValue, Object maxTimeValue, String inputFilePath) {
+  public String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue,
+          @Nullable String inputFilePath) {
     return JOINER
         .join(_segmentNamePrefix, minTimeValue, maxTimeValue, _segmentNamePostfix, sequenceId >= 0 ? sequenceId : null);
   }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.creator.name;
 
+import javax.annotation.Nullable;
 
 /**
  * Fixed segment name generator which always returns the fixed segment name.
@@ -31,7 +32,8 @@ public class FixedSegmentNameGenerator implements SegmentNameGenerator {
   }
 
   @Override
-  public String generateSegmentName(int sequenceId, Object minTimeValue, Object maxTimeValue, String inputFilePath) {
+  public String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue,
+          @Nullable String inputFilePath) {
     return _segmentName;
   }
 
