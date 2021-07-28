@@ -45,6 +45,15 @@ public class PinotDataTypeTest {
           (byte) 123), Character.toString((char) 123), Short.toString((short) 123), Integer.toString(
           123), Long.toString(123L), Float.toString(123f), Double.toString(123d), " 123"};
 
+  // To check cases where array for MV column contains values of mixing numeric types.
+  private static final PinotDataType[] SOURCE_ARRAY_TYPES =
+      {SHORT_ARRAY, INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY};
+  private static final Object[] SOURCE_ARRAY_VALUES =
+      {new Object[]{(short) 123, 4, 5L, 6f, 7d}, new Object[]{123, 4, 5L, 6f, 7d}, new Object[]{123L, 4, 5L, 6f, 7d}, new Object[]{123f, 4, 5L, 6f, 7d}, new Object[]{123d, 4, 5L, 6f, 7d},};
+  private static final PinotDataType[] DEST_ARRAY_TYPES = {INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY};
+  private static final Object[] EXPECTED_DEST_ARRAY_VALUES =
+      {new Object[]{123, 4, 5, 6, 7}, new Object[]{123L, 4L, 5L, 6L, 7L}, new Object[]{123f, 4f, 5f, 6f, 7f}, new Object[]{123d, 4d, 5d, 6d, 7d}};
+
   @Test
   public void testNumberConversion() {
     int numDestTypes = DEST_TYPES.length;
@@ -54,6 +63,20 @@ public class PinotDataTypeTest {
       int numSourceTypes = SOURCE_TYPES.length;
       for (int j = 0; j < numSourceTypes; j++) {
         Object actualDestValue = destType.convert(SOURCE_VALUES[j], SOURCE_TYPES[j]);
+        assertEquals(actualDestValue, expectedDestValue);
+      }
+    }
+  }
+
+  @Test
+  public void testNumberConversionWithMixTypes() {
+    int numDestTypes = DEST_ARRAY_TYPES.length;
+    for (int i = 0; i < numDestTypes; i++) {
+      PinotDataType destType = DEST_ARRAY_TYPES[i];
+      Object expectedDestValue = EXPECTED_DEST_ARRAY_VALUES[i];
+      int numSourceTypes = SOURCE_ARRAY_TYPES.length;
+      for (int j = 0; j < numSourceTypes; j++) {
+        Object actualDestValue = destType.convert(SOURCE_ARRAY_VALUES[j], SOURCE_ARRAY_TYPES[j]);
         assertEquals(actualDestValue, expectedDestValue);
       }
     }

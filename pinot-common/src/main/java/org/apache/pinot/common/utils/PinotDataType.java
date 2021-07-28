@@ -201,27 +201,27 @@ public enum PinotDataType {
   SHORT {
     @Override
     public int toInt(Object value) {
-      return ((Short) value).intValue();
+      return ((Number) value).intValue();
     }
 
     @Override
     public long toLong(Object value) {
-      return ((Short) value).longValue();
+      return ((Number) value).longValue();
     }
 
     @Override
     public float toFloat(Object value) {
-      return ((Short) value).floatValue();
+      return ((Number) value).floatValue();
     }
 
     @Override
     public double toDouble(Object value) {
-      return ((Short) value).doubleValue();
+      return ((Number) value).doubleValue();
     }
 
     @Override
     public boolean toBoolean(Object value) {
-      return (Short) value != 0;
+      return ((Number) value).doubleValue() != 0;
     }
 
     @Override
@@ -243,27 +243,27 @@ public enum PinotDataType {
   INTEGER {
     @Override
     public int toInt(Object value) {
-      return (Integer) value;
+      return ((Number) value).intValue();
     }
 
     @Override
     public long toLong(Object value) {
-      return ((Integer) value).longValue();
+      return ((Number) value).longValue();
     }
 
     @Override
     public float toFloat(Object value) {
-      return ((Integer) value).floatValue();
+      return ((Number) value).floatValue();
     }
 
     @Override
     public double toDouble(Object value) {
-      return ((Integer) value).doubleValue();
+      return ((Number) value).doubleValue();
     }
 
     @Override
     public boolean toBoolean(Object value) {
-      return (Integer) value != 0;
+      return ((Number) value).doubleValue() != 0;
     }
 
     @Override
@@ -290,27 +290,27 @@ public enum PinotDataType {
   LONG {
     @Override
     public int toInt(Object value) {
-      return ((Long) value).intValue();
+      return ((Number) value).intValue();
     }
 
     @Override
     public long toLong(Object value) {
-      return (Long) value;
+      return ((Number) value).longValue();
     }
 
     @Override
     public float toFloat(Object value) {
-      return ((Long) value).floatValue();
+      return ((Number) value).floatValue();
     }
 
     @Override
     public double toDouble(Object value) {
-      return ((Long) value).doubleValue();
+      return ((Number) value).doubleValue();
     }
 
     @Override
     public boolean toBoolean(Object value) {
-      return (Long) value != 0;
+      return ((Number) value).doubleValue() != 0;
     }
 
     @Override
@@ -337,27 +337,27 @@ public enum PinotDataType {
   FLOAT {
     @Override
     public int toInt(Object value) {
-      return ((Float) value).intValue();
+      return ((Number) value).intValue();
     }
 
     @Override
     public long toLong(Object value) {
-      return ((Float) value).longValue();
+      return ((Number) value).longValue();
     }
 
     @Override
     public float toFloat(Object value) {
-      return (Float) value;
+      return ((Number) value).floatValue();
     }
 
     @Override
     public double toDouble(Object value) {
-      return ((Float) value).doubleValue();
+      return ((Number) value).doubleValue();
     }
 
     @Override
     public boolean toBoolean(Object value) {
-      return (Float) value != 0;
+      return ((Number) value).doubleValue() != 0;
     }
 
     @Override
@@ -384,27 +384,27 @@ public enum PinotDataType {
   DOUBLE {
     @Override
     public int toInt(Object value) {
-      return ((Double) value).intValue();
+      return ((Number) value).intValue();
     }
 
     @Override
     public long toLong(Object value) {
-      return ((Double) value).longValue();
+      return ((Number) value).longValue();
     }
 
     @Override
     public float toFloat(Object value) {
-      return ((Double) value).floatValue();
+      return ((Number) value).floatValue();
     }
 
     @Override
     public double toDouble(Object value) {
-      return (Double) value;
+      return ((Number) value).doubleValue();
     }
 
     @Override
     public boolean toBoolean(Object value) {
-      return (Double) value != 0;
+      return ((Number) value).doubleValue() != 0;
     }
 
     @Override

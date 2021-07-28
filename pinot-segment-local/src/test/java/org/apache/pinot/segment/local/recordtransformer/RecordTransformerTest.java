@@ -159,6 +159,29 @@ public class RecordTransformerTest {
   }
 
   @Test
+  public void testDataTypeTransformerWithMixingTypesInMV() {
+    RecordTransformer transformer = new DataTypeTransformer(SCHEMA);
+    GenericRow record = getRecord();
+    record.putValue("mvInt", new Object[]{123L, 456.789f});
+    record.putValue("mvLong", new Object[]{123.456f, 789L});
+    record.putValue("mvFloat", new Object[]{123L, 456.789f});
+    record.putValue("mvDouble", new Object[]{123.0f, 789L});
+    record.putValue("mvString1", new Object[]{"123", 123L, 123f, 123.0d});
+    record.putValue("mvString2", new Object[]{123, 123L, 123f, "123.0"});
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record = transformer.transform(record);
+      assertNotNull(record);
+      assertEquals(record.getValue("mvInt"), new Object[]{123, 456});
+      assertEquals(record.getValue("mvLong"), new Object[]{123L, 789L});
+      assertEquals(record.getValue("mvFloat"), new Object[]{123f, 456.789f});
+      assertEquals(record.getValue("mvDouble"), new Object[]{123.0d, 789.0d});
+      // NOTE: We identify the array type by the first element, so data type conversion only applied to 'mvString2'
+      assertEquals(record.getValue("mvString1"), new Object[]{"123", 123L, 123f, 123.0d});
+      assertEquals(record.getValue("mvString2"), new Object[]{"123", "123", "123.0", "123.0"});
+    }
+  }
+
+  @Test
   public void testSanitationTransformer() {
     RecordTransformer transformer = new SanitizationTransformer(SCHEMA);
     GenericRow record = getRecord();
