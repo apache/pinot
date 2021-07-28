@@ -34,7 +34,6 @@ import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.data.table.DictIdRecord;
-import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -215,8 +214,8 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   }
 
   @Override
-  public int getGroupId(DictIdRecord intermediateRecord) {
-    Object singleColumnKey = intermediateRecord._record.getValues()[0];
+  public int getGroupId(DictIdRecord dictIdRecord) {
+    Object singleColumnKey = dictIdRecord._record.getValues()[0];
     switch (_storedType) {
       case INT:
         int intValue = (int)singleColumnKey;
@@ -241,9 +240,10 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     }
   }
 
-
   @Override
-  public Iterator<GroupDictId> getGroupDictId() { return null; }
+  public Iterator<GroupDictId> getGroupDictId() {
+    return null;
+  }
 
   @Override
   public Dictionary[] getDictionaries() {

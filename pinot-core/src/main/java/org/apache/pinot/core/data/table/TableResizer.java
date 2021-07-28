@@ -35,7 +35,6 @@ import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.groupby.DictionaryBasedGroupKeyGenerator;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.postaggregation.PostAggregationFunction;
@@ -157,7 +156,15 @@ public class TableResizer {
       _dictionaries[i] = _orderByIndexArray[i] >= 0 ? dictionaries[_orderByIndexArray[i]] : null;
     }
 
-    _intermediateRecordComparator = null;
+    _intermediateRecordComparator = (o1, o2) -> {
+      for (int i = 0; i < _numOrderByExpressions; i++) {
+        int result = comparators[i].compare(o1._values[i], o2._values[i]);
+        if (result != 0) {
+          return result;
+        }
+      }
+      return 0;
+    };
 
     _dictIdComparator = (o1, o2) -> {
       for (int i = 0; i < _numOrderByExpressions; i++) {
@@ -175,23 +182,6 @@ public class TableResizer {
       }
       return 0;
     };
-
-//    _dictIdComparator = (o1, o2) -> {
-//      for (int i = 0; i < _numOrderByExpressions; i++) {
-//        int result;
-//        int index = _orderByIndexArray[i];
-//        if (index >= 0) {
-//          result = _dictionaries[i].compare(o1._dictId[index], o2._dictId[index]);
-//        } else {
-//          index = -1 * (index + 1);
-//          result = comparators[i].compare(o1._values[index], o2._values[index]);
-//        }
-//        if (result != 0) {
-//          return result;
-//        }
-//      }
-//      return 0;
-//    };
   }
 
   /**
@@ -369,12 +359,11 @@ public class TableResizer {
    * Trims the aggregation results using a priority queue and returns the priority queue.
    * This method is to be called from individual segment if the intermediate results need to be trimmed.
    */
-  public PriorityQueue<DictIdRecord> trimInSegmentDictResults(DictionaryBasedGroupKeyGenerator dictKeyGenerator,
+  public PriorityQueue<DictIdRecord> trimDictCol(GroupKeyGenerator dictKeyGenerator,
       GroupByResultHolder[] _groupByResultHolders, int trimSize) {
     int numAggregationFunctions = _aggregationFunctions.length;
     int numColumns = numAggregationFunctions + _numGroupByExpressions;
 
-    //TODO: Verify post-agg case
     PriorityQueue<DictIdRecord> priorityQueue = new PriorityQueue<>(trimSize, _dictIdComparator.reversed());
     Iterator<GroupKeyGenerator.GroupDictId> groupKeyIterator = dictKeyGenerator.getGroupDictId();
     while (groupKeyIterator.hasNext()) {
@@ -388,83 +377,65 @@ public class TableResizer {
         values[i + _numGroupByExpressions] =
             _aggregationFunctions[i].extractGroupByResult(_groupByResultHolders[i], groupId);
       }
-      // {key, intermediate_record, record}
-      DictIdRecord intermediateRecord = getDictIdRecord(null, dictIds, rawKey, new Record(values));
-      if (priorityQueue.size() < trimSize) {
-        priorityQueue.offer(intermediateRecord);
-      } else {
-        DictIdRecord peek = priorityQueue.peek();
-        if (_dictIdComparator.compare(peek, intermediateRecord) > 0) {
-          priorityQueue.poll();
-          priorityQueue.offer(intermediateRecord);
-        }
-      }
+      DictIdRecord dictIdRecord = getDictIdRecord(null, dictIds, rawKey, new Record(values));
+      addToPQ(priorityQueue, dictIdRecord, trimSize);
     }
     return priorityQueue;
   }
 
-  public PriorityQueue<DictIdRecord> trimOnTheFlyNoDictMultiCol(GroupKeyGenerator noDictKeyGenerator,
+  public PriorityQueue<DictIdRecord> trimNoDictMultiCol(GroupKeyGenerator noDictKeyGenerator,
       GroupByResultHolder[] _groupByResultHolders, int trimSize) {
     int numAggregationFunctions = _aggregationFunctions.length;
-    int numColumns = numAggregationFunctions + _numGroupByExpressions;
-
     PriorityQueue<DictIdRecord> priorityQueue = new PriorityQueue<>(trimSize, _dictIdComparator.reversed());
     Iterator<GroupKeyGenerator.GroupDictId> groupKeyIterator = noDictKeyGenerator.getGroupDictId();
+
     while (groupKeyIterator.hasNext()) {
       // Iterate over keys
       GroupKeyGenerator.GroupDictId groupKey = groupKeyIterator.next();
       Object[] keys = groupKey._keys;
       int groupId = groupKey._groupId;
-      Object[] values = Arrays.copyOf(keys, numColumns);
+      Object[] values = Arrays.copyOf(keys, numAggregationFunctions + _numGroupByExpressions);
       for (int i = 0; i < numAggregationFunctions; i++) {
         values[i + _numGroupByExpressions] =
             _aggregationFunctions[i].extractGroupByResult(_groupByResultHolders[i], groupId);
       }
-      // {key, intermediate_record, record}
-      DictIdRecord intermediateRecord = getDictIdRecord(null, null, 0, new Record(values));
-      if (priorityQueue.size() < trimSize) {
-        priorityQueue.offer(intermediateRecord);
-      } else {
-        DictIdRecord peek = priorityQueue.peek();
-        if (_dictIdComparator.compare(peek, intermediateRecord) > 0) {
-          priorityQueue.poll();
-          priorityQueue.offer(intermediateRecord);
-        }
-      }
+      DictIdRecord dictIdRecord = getDictIdRecord(null, null, 0, new Record(values));
+      addToPQ(priorityQueue, dictIdRecord, trimSize);
     }
     return priorityQueue;
   }
 
-  public PriorityQueue<DictIdRecord> trimOnTheFlyNoDictSingleCol(GroupKeyGenerator noDictKeyGenerator,
+  public PriorityQueue<DictIdRecord> trimNoDictSingleCol(GroupKeyGenerator noDictKeyGenerator,
       GroupByResultHolder[] _groupByResultHolders, int trimSize) {
     int numAggregationFunctions = _aggregationFunctions.length;
-    int numColumns = numAggregationFunctions + _numGroupByExpressions;
-
     PriorityQueue<DictIdRecord> priorityQueue = new PriorityQueue<>(trimSize, _dictIdComparator.reversed());
-    Iterator<GroupKeyGenerator.GroupDictId> groupKeyIterator = noDictKeyGenerator.getGroupDictId();
+    Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = noDictKeyGenerator.getGroupKeys();
     while (groupKeyIterator.hasNext()) {
       // Iterate over keys
-      GroupKeyGenerator.GroupDictId groupKey = groupKeyIterator.next();
+      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
       Object[] keys = groupKey._keys;
+      Object[] values = Arrays.copyOf(keys, numAggregationFunctions + _numGroupByExpressions);
       int groupId = groupKey._groupId;
-      Object[] values = Arrays.copyOf(keys, numColumns);
       for (int i = 0; i < numAggregationFunctions; i++) {
         values[i + _numGroupByExpressions] =
             _aggregationFunctions[i].extractGroupByResult(_groupByResultHolders[i], groupId);
       }
-      // {key, intermediate_record, record}
-      DictIdRecord intermediateRecord = getDictIdRecord(null, null, 0, new Record(values));
-      if (priorityQueue.size() < trimSize) {
-        priorityQueue.offer(intermediateRecord);
-      } else {
-        DictIdRecord peek = priorityQueue.peek();
-        if (_dictIdComparator.compare(peek, intermediateRecord) > 0) {
-          priorityQueue.poll();
-          priorityQueue.offer(intermediateRecord);
-        }
-      }
+      DictIdRecord dictIdRecord = getDictIdRecord(null, null, 0, new Record(values));
+      addToPQ(priorityQueue, dictIdRecord, trimSize);
     }
     return priorityQueue;
+  }
+
+  private void addToPQ(PriorityQueue<DictIdRecord> priorityQueue, DictIdRecord dictIdRecord, int trimSize) {
+    if (priorityQueue.size() < trimSize) {
+      priorityQueue.offer(dictIdRecord);
+    } else {
+      DictIdRecord peek = priorityQueue.peek();
+      if (_dictIdComparator.compare(peek, dictIdRecord) > 0) {
+        priorityQueue.poll();
+        priorityQueue.offer(dictIdRecord);
+      }
+    }
   }
 
   /**
