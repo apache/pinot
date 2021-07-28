@@ -19,6 +19,7 @@
 package org.apache.pinot.common.function.scalar;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.annotations.VisibleForTesting;
 import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.Option;
@@ -114,12 +115,11 @@ public class JsonFunctions {
   }
 
   @ScalarFunction
-  public static Object[] jsonPathArrayDefaultEmpty(Object object, String jsonPath)
-      throws JsonProcessingException {
+  public static Object[] jsonPathArrayDefaultEmpty(Object object, String jsonPath) {
     try {
       return jsonPathArray(object, jsonPath);
     } catch (Exception e) {
-      return new Object[]{};
+      return new Object[0];
     }
   }
 
@@ -208,6 +208,7 @@ public class JsonFunctions {
     }
   }
 
+  @VisibleForTesting
   static class ArrayAwareJacksonJsonProvider extends JacksonJsonProvider {
     @Override
     public boolean isArray(Object obj) {
@@ -220,18 +221,6 @@ public class JsonFunctions {
         return ((Object[]) obj)[idx];
       }
       return super.getArrayIndex(obj, idx);
-    }
-
-    @Override
-    public void setArrayIndex(Object obj, int index, Object newValue) {
-      if (obj instanceof Object[]) {
-        if (index < ((Object[]) obj).length) {
-          ((Object[]) obj)[index] = newValue;
-          return;
-        }
-        throw new UnsupportedOperationException("List is required to grow the capacity");
-      }
-      super.setArrayIndex(obj, index, newValue);
     }
 
     @Override

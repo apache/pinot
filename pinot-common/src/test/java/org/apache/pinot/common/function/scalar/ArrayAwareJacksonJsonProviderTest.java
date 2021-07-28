@@ -87,47 +87,6 @@ public class ArrayAwareJacksonJsonProviderTest {
   }
 
   @Test
-  public void testSetArrayIndex() {
-    JsonFunctions.ArrayAwareJacksonJsonProvider jp = new JsonFunctions.ArrayAwareJacksonJsonProvider();
-    Object[] dataInAry = new Object[]{"123", "456"};
-    Object[] newDataInAry = new Object[]{"one", "two"};
-    for (int i = 0; i < dataInAry.length; i++) {
-      jp.setArrayIndex(dataInAry, i, newDataInAry[i]);
-    }
-    for (int i = 0; i < dataInAry.length; i++) {
-      assertEquals(jp.getArrayIndex(dataInAry, i), newDataInAry[i]);
-    }
-    try {
-      jp.setArrayIndex(dataInAry, dataInAry.length, "three");
-      fail();
-    } catch (UnsupportedOperationException e) {
-      assertEquals(e.getMessage(), "List is required to grow the capacity");
-    }
-
-    // Use ArrayList for a modifiable list.
-    List<Object> dataInList = new ArrayList<>(Arrays.asList("abc", "efg", "hij"));
-    List<Object> newDataInList = Arrays.asList("ABC", "EFG", "HIJ");
-    for (int i = 0; i < dataInList.size(); i++) {
-      jp.setArrayIndex(dataInList, i, newDataInList.get(i));
-    }
-    for (int i = 0; i < dataInList.size(); i++) {
-      assertEquals(jp.getArrayIndex(dataInList, i), newDataInList.get(i));
-    }
-    try {
-      jp.setArrayIndex(dataInList, dataInList.size(), "LMN");
-    } catch (Exception e) {
-      fail();
-    }
-
-    try {
-      jp.setArrayIndex(null, 0, null);
-      fail();
-    } catch (UnsupportedOperationException e) {
-      assertNull(e.getMessage());
-    }
-  }
-
-  @Test
   public void testToIterable() {
     JsonFunctions.ArrayAwareJacksonJsonProvider jp = new JsonFunctions.ArrayAwareJacksonJsonProvider();
 
