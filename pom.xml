@@ -1771,6 +1771,7 @@
             <!-- IDE files -->
             <exclude>**/*.iml</exclude>
             <exclude>**/maven-eclipse.xml</exclude>
+            <exclude>**/.settings/**</exclude>
             <exclude>.externalToolBuilders/**</exclude>
 
             <!-- Docker and Kubernetes (not part of the distribution) -->
