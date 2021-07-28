@@ -385,4 +385,18 @@ public final class IngestionUtils {
     }
     return null;
   }
+
+  public static Comparable extractTimeValueIfPossible(Comparable time) {
+    if (time != null) {
+      if (time instanceof Number) {
+        return ((Number) time).longValue();
+      } else {
+        String stringValue = time.toString();
+        if (StringUtils.isNumeric(stringValue)) {
+          return Long.parseLong(stringValue);
+        }
+      }
+    }
+    return null;
+  }
 }

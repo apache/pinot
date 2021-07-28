@@ -514,7 +514,7 @@ public class MutableSegmentImpl implements MutableSegment {
     Object timeValue = row.getValue(_upsertComparisonColumn);
     Preconditions.checkArgument(timeValue instanceof Comparable,
         String.format("column %s shall be comparable", _upsertComparisonColumn));
-    long timestamp = IngestionUtils.extractTimeValue((Comparable) timeValue);
+    Comparable timestamp = IngestionUtils.extractTimeValueIfPossible((Comparable) timeValue);
     return _partitionUpsertMetadataManager
         .updateRecord(this, new PartitionUpsertMetadataManager.RecordInfo(primaryKey, docId, timestamp), row);
   }

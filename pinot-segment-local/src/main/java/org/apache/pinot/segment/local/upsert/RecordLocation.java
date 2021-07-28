@@ -27,9 +27,9 @@ import org.apache.pinot.segment.spi.IndexSegment;
 public class RecordLocation {
   private final IndexSegment _segment;
   private final int _docId;
-  private final long _timestamp;
+  private final Comparable _timestamp;
 
-  public RecordLocation(IndexSegment indexSegment, int docId, long timestamp) {
+  public RecordLocation(IndexSegment indexSegment, int docId, Comparable timestamp) {
     _segment = indexSegment;
     _docId = docId;
     _timestamp = timestamp;
@@ -43,7 +43,7 @@ public class RecordLocation {
     return _docId;
   }
 
-  public long getTimestamp() {
+  public Comparable getTimestamp() {
     return _timestamp;
   }
 }
