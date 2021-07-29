@@ -293,7 +293,7 @@ public class TableConfig extends BaseJsonConfig {
   @JsonIgnore
   @Nullable
   public String getUpsertComparisonColumn() {
-    return _upsertConfig.getComparisonColumn();
+    return _upsertConfig == null ? null : _upsertConfig.getComparisonColumn();
   }
 
   @JsonProperty(TUNER_CONFIG)
