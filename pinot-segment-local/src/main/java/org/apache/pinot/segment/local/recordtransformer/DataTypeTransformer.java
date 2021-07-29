@@ -72,7 +72,7 @@ public class DataTypeTransformer implements RecordTransformer {
         if (value instanceof Object[]) {
           // Multi-value column
           Object[] values = (Object[]) value;
-          source = PinotDataType.getMultipleValueType(values[0].getClass());
+          source = PinotDataType.getMultiValueType(values[0].getClass());
         } else {
           // Single-value column
           source = PinotDataType.getSingleValueType(value.getClass());

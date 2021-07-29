@@ -586,8 +586,8 @@ public enum PinotDataType {
       try {
         return Base64.getDecoder().decode(value.toString());
       } catch (Exception e) {
-        throw new RuntimeException(
-            "Unable to convert JSON base64 encoded string value to BYTES. Input value: " + value, e);
+        throw new RuntimeException("Unable to convert JSON base64 encoded string value to BYTES. Input value: " + value,
+            e);
       }
     }
 
@@ -777,7 +777,7 @@ public enum PinotDataType {
 
   // Mapping Java class type to PinotDataType, for SV and MV value separately.
   // OBJECT and OBJECT_ARRAY are default type for unknown Java types.
-  private static final Map<Class<?>, PinotDataType> SINGLE_VALUE_TYPE_MAP = new HashMap<>() {{
+  private static final Map<Class<?>, PinotDataType> SINGLE_VALUE_TYPE_MAP = new HashMap<Class<?>, PinotDataType>() {{
     put(Boolean.class, BOOLEAN);
     put(Byte.class, BYTE);
     put(Character.class, CHARACTER);
@@ -791,7 +791,7 @@ public enum PinotDataType {
     put(byte[].class, BYTES);
   }};
 
-  private static final Map<Class<?>, PinotDataType> MULTI_VALUE_TYPE_MAP = new HashMap<>() {{
+  private static final Map<Class<?>, PinotDataType> MULTI_VALUE_TYPE_MAP = new HashMap<Class<?>, PinotDataType>() {{
     put(Byte.class, BYTE_ARRAY);
     put(Character.class, CHARACTER_ARRAY);
     put(Short.class, SHORT_ARRAY);
@@ -835,7 +835,6 @@ public enum PinotDataType {
     return getSingleValueType().toString(toObjectArray(value)[0]);
   }
 
-
   public String toJson(Object value) {
     if (value instanceof String) {
       try {
@@ -845,9 +844,10 @@ public enum PinotDataType {
       }
     } else {
       try {
-        return JsonUtils.objectToString(value).toString();
+        return JsonUtils.objectToString(value);
       } catch (Exception e) {
-        throw new RuntimeException("Unable to convert " + value.getClass().getCanonicalName() + " to JSON. Input value: " + value, e);
+        throw new RuntimeException(
+            "Unable to convert " + value.getClass().getCanonicalName() + " to JSON. Input value: " + value, e);
       }
     }
   }
@@ -1058,8 +1058,7 @@ public enum PinotDataType {
     return this.ordinal() <= OBJECT.ordinal();
   }
 
-  @VisibleForTesting
-  PinotDataType getSingleValueType() {
+  public PinotDataType getSingleValueType() {
     switch (this) {
       case BYTE_ARRAY:
         return BYTE;
@@ -1093,7 +1092,7 @@ public enum PinotDataType {
     return (pdt != null) ? pdt : OBJECT;
   }
 
-  public static PinotDataType getMultipleValueType(Class<?> cls) {
+  public static PinotDataType getMultiValueType(Class<?> cls) {
     PinotDataType pdt = MULTI_VALUE_TYPE_MAP.get(cls);
     return (pdt != null) ? pdt : OBJECT_ARRAY;
   }

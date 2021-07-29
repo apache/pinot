@@ -173,10 +173,10 @@ public class PinotDataTypeTest {
     testCases.put(String.class, STRING_ARRAY);
 
     for (Map.Entry<Class<?>, PinotDataType> tc : testCases.entrySet()) {
-      assertEquals(getMultipleValueType(tc.getKey()), tc.getValue());
+      assertEquals(getMultiValueType(tc.getKey()), tc.getValue());
     }
-    assertEquals(getMultipleValueType(Object.class), OBJECT_ARRAY);
-    assertEquals(getMultipleValueType(null), OBJECT_ARRAY);
+    assertEquals(getMultiValueType(Object.class), OBJECT_ARRAY);
+    assertEquals(getMultiValueType(null), OBJECT_ARRAY);
   }
 
   private static Object getGenericTestObject() {
