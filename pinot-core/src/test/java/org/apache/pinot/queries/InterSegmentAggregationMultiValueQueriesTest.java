@@ -520,6 +520,210 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
   }
 
   @Test
+  public void testPercentileRawEst50MV() {
+    String query = "SELECT PERCENTILERAWEST50MV(column6) FROM testTable";
+
+    Function<Serializable, String> quantileExtractor = value -> String.valueOf(
+        ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) value))
+            .getQuantile((double) 50 / 100.0));
+
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L, quantileExtractor,
+        new String[]{"2147483647"});
+
+    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
+    QueriesTestUtils
+        .testInterSegmentAggregationResult(brokerResponse, 62480L, 1101664L, 62480L, 400000L, quantileExtractor,
+            new String[]{"2147483647"});
+
+    brokerResponse = getBrokerResponseForPqlQuery(query + SV_GROUP_BY);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, quantileExtractor,
+        new String[]{"2147483647"});
+
+    brokerResponse = getBrokerResponseForPqlQuery(query + MV_GROUP_BY);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, quantileExtractor,
+        new String[]{"2147483647"});
+  }
+
+  @Test
+  public void testPercentileRawEst90MV() {
+    String query = "SELECT PERCENTILERAWEST90MV(column6) FROM testTable";
+
+    Function<Serializable, String> quantileExtractor = value -> String.valueOf(
+        ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) value))
+            .getQuantile((double) 90 / 100.0));
+
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L, quantileExtractor,
+        new String[]{"2147483647"});
+
+    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
+    QueriesTestUtils
+        .testInterSegmentAggregationResult(brokerResponse, 62480L, 1101664L, 62480L, 400000L, quantileExtractor,
+            new String[]{"2147483647"});
+
+    brokerResponse = getBrokerResponseForPqlQuery(query + SV_GROUP_BY);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, quantileExtractor,
+        new String[]{"2147483647"});
+
+    brokerResponse = getBrokerResponseForPqlQuery(query + MV_GROUP_BY);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, quantileExtractor,
+        new String[]{"2147483647"});
+  }
+
+  @Test
+  public void testPercentileRawEst95MV() {
+    String query = "SELECT PERCENTILERAWEST95MV(column6) FROM testTable";
+
+    Function<Serializable, String> quantileExtractor = value -> String.valueOf(
+        ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) value))
+            .getQuantile((double) 95 / 100.0));
+
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L, quantileExtractor,
+        new String[]{"2147483647"});
+
+    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
+    QueriesTestUtils
+        .testInterSegmentAggregationResult(brokerResponse, 62480L, 1101664L, 62480L, 400000L, quantileExtractor,
+            new String[]{"2147483647"});
+
+    brokerResponse = getBrokerResponseForPqlQuery(query + SV_GROUP_BY);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, quantileExtractor,
+        new String[]{"2147483647"});
+
+    brokerResponse = getBrokerResponseForPqlQuery(query + MV_GROUP_BY);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, quantileExtractor,
+        new String[]{"2147483647"});
+  }
+
+  @Test
+  public void testPercentileRawEst99MV() {
+    String query = "SELECT PERCENTILERAWEST99MV(column6) FROM testTable";
+
+    Function<Serializable, String> quantileExtractor = value -> String.valueOf(
+        ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) value))
+            .getQuantile((double) 99 / 100.0));
+
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L, quantileExtractor,
+        new String[]{"2147483647"});
+
+    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
+    QueriesTestUtils
+        .testInterSegmentAggregationResult(brokerResponse, 62480L, 1101664L, 62480L, 400000L, quantileExtractor,
+            new String[]{"2147483647"});
+
+    brokerResponse = getBrokerResponseForPqlQuery(query + SV_GROUP_BY);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, quantileExtractor,
+        new String[]{"2147483647"});
+
+    brokerResponse = getBrokerResponseForPqlQuery(query + MV_GROUP_BY);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, quantileExtractor,
+        new String[]{"2147483647"});
+  }
+
+  @Test
+  public void testPercentileRawTDigest50MV() {
+    String query = "SELECT PERCENTILERAWTDIGEST50MV(column6) FROM testTable";
+
+    Function<Serializable, String> quantileExtractor = value -> String.valueOf(
+        (long) ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) value))
+            .quantile((double) 50 / 100.0));
+
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
+    QueriesTestUtils
+        .testInterSegmentAggregationResult(brokerResponse, 62480L, 1101664L, 62480L, 400000L, quantileExtractor,
+            new String[]{"2147483647"});
+
+    brokerResponse = getBrokerResponseForPqlQuery(query + SV_GROUP_BY);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, quantileExtractor,
+        new String[]{"2147483647"});
+
+    brokerResponse = getBrokerResponseForPqlQuery(query + MV_GROUP_BY);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, quantileExtractor,
+        new String[]{"2147483647"});
+  }
+
+  @Test
+  public void testPercentileRawTDigest90MV() {
+    String query = "SELECT PERCENTILERAWTDIGEST90MV(column6) FROM testTable";
+
+    Function<Serializable, String> quantileExtractor = value -> String.valueOf(
+        (long) ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) value))
+            .quantile((double) 90 / 100.0));
+
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L, quantileExtractor,
+        new String[]{"2147483647"});
+
+    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
+    QueriesTestUtils
+        .testInterSegmentAggregationResult(brokerResponse, 62480L, 1101664L, 62480L, 400000L, quantileExtractor,
+            new String[]{"2147483647"});
+
+    brokerResponse = getBrokerResponseForPqlQuery(query + SV_GROUP_BY);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, quantileExtractor,
+        new String[]{"2147483647"});
+
+    brokerResponse = getBrokerResponseForPqlQuery(query + MV_GROUP_BY);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, quantileExtractor,
+        new String[]{"2147483647"});
+  }
+
+  @Test
+  public void testPercentileRawTDigest95MV() {
+    String query = "SELECT PERCENTILERAWTDIGEST95MV(column6) FROM testTable";
+
+    Function<Serializable, String> quantileExtractor = value -> String.valueOf(
+        (long) ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) value))
+            .quantile((double) 95 / 100.0));
+
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L, quantileExtractor,
+        new String[]{"2147483647"});
+
+    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
+    QueriesTestUtils
+        .testInterSegmentAggregationResult(brokerResponse, 62480L, 1101664L, 62480L, 400000L, quantileExtractor,
+            new String[]{"2147483647"});
+
+    brokerResponse = getBrokerResponseForPqlQuery(query + SV_GROUP_BY);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, quantileExtractor,
+        new String[]{"2147483647"});
+
+    brokerResponse = getBrokerResponseForPqlQuery(query + MV_GROUP_BY);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, quantileExtractor,
+        new String[]{"2147483647"});
+  }
+
+  @Test
+  public void testPercentileRawTDigest99MV() {
+    String query = "SELECT PERCENTILERAWTDIGEST99MV(column6) FROM testTable";
+
+    Function<Serializable, String> quantileExtractor = value -> String.valueOf(
+        (long) ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) value))
+            .quantile((double) 99 / 100.0));
+
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L, quantileExtractor,
+        new String[]{"2147483647"});
+
+    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
+    QueriesTestUtils
+        .testInterSegmentAggregationResult(brokerResponse, 62480L, 1101664L, 62480L, 400000L, quantileExtractor,
+            new String[]{"2147483647"});
+
+    brokerResponse = getBrokerResponseForPqlQuery(query + SV_GROUP_BY);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, quantileExtractor,
+        new String[]{"2147483647"});
+
+    brokerResponse = getBrokerResponseForPqlQuery(query + MV_GROUP_BY);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, quantileExtractor,
+        new String[]{"2147483647"});
+  }
+
+  @Test
   public void testNumGroupsLimit() {
     String query = "SELECT COUNT(*) FROM testTable GROUP BY column6";
 

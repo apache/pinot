@@ -43,6 +43,10 @@ public class AggregationFunctionTypeTest {
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeEsT50"), AggregationFunctionType.PERCENTILEEST);
     Assert
         .assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeTdIgEsT99"), AggregationFunctionType.PERCENTILETDIGEST);
+    Assert
+        .assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeRaWeSt90mV"), AggregationFunctionType.PERCENTILERAWESTMV);
+    Assert
+        .assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeRaWtDiGeSt95mV"), AggregationFunctionType.PERCENTILERAWTDIGESTMV);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("CoUnTMv"), AggregationFunctionType.COUNTMV);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("MiNmV"), AggregationFunctionType.MINMV);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("MaXmV"), AggregationFunctionType.MAXMV);
@@ -58,6 +62,10 @@ public class AggregationFunctionTypeTest {
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeEsT90mV"), AggregationFunctionType.PERCENTILEESTMV);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeTdIgEsT95mV"),
         AggregationFunctionType.PERCENTILETDIGESTMV);
+    Assert
+        .assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeRaWeSt50"), AggregationFunctionType.PERCENTILERAWEST);
+    Assert
+        .assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeRaWtDiGeSt99"), AggregationFunctionType.PERCENTILERAWTDIGEST);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)

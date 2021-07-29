@@ -92,12 +92,30 @@ public class AggregationFunctionColumnPairTest {
     Assert.assertEquals(fromColumnName, pair);
     Assert.assertEquals(fromColumnName.hashCode(), pair.hashCode());
 
+    pair = new AggregationFunctionColumnPair(AggregationFunctionType.PERCENTILERAWEST, COLUMN);
+    Assert.assertEquals(pair.getFunctionType(), AggregationFunctionType.PERCENTILERAWEST);
+    Assert.assertEquals(pair.getColumn(), COLUMN);
+    columnName = pair.toColumnName();
+    Assert.assertEquals(columnName, "percentileRawEst__column");
+    fromColumnName = AggregationFunctionColumnPair.fromColumnName("PERCENTILE_RAW_EST__column");
+    Assert.assertEquals(fromColumnName, pair);
+    Assert.assertEquals(fromColumnName.hashCode(), pair.hashCode());
+
     pair = new AggregationFunctionColumnPair(AggregationFunctionType.PERCENTILETDIGEST, COLUMN);
     Assert.assertEquals(pair.getFunctionType(), AggregationFunctionType.PERCENTILETDIGEST);
     Assert.assertEquals(pair.getColumn(), COLUMN);
     columnName = pair.toColumnName();
     Assert.assertEquals(columnName, "percentileTDigest__column");
     fromColumnName = AggregationFunctionColumnPair.fromColumnName("percentiletdigest__column");
+    Assert.assertEquals(fromColumnName, pair);
+    Assert.assertEquals(fromColumnName.hashCode(), pair.hashCode());
+
+    pair = new AggregationFunctionColumnPair(AggregationFunctionType.PERCENTILERAWTDIGEST, COLUMN);
+    Assert.assertEquals(pair.getFunctionType(), AggregationFunctionType.PERCENTILERAWTDIGEST);
+    Assert.assertEquals(pair.getColumn(), COLUMN);
+    columnName = pair.toColumnName();
+    Assert.assertEquals(columnName, "percentileRawTDigest__column");
+    fromColumnName = AggregationFunctionColumnPair.fromColumnName("percentilerawtdigest__column");
     Assert.assertEquals(fromColumnName, pair);
     Assert.assertEquals(fromColumnName.hashCode(), pair.hashCode());
   }
