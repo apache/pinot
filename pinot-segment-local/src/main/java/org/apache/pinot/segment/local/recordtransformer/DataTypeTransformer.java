@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -41,32 +40,6 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  */
 @SuppressWarnings("rawtypes")
 public class DataTypeTransformer implements RecordTransformer {
-  private static final Map<Class, PinotDataType> SINGLE_VALUE_TYPE_MAP = new HashMap<>();
-  private static final Map<Class, PinotDataType> MULTI_VALUE_TYPE_MAP = new HashMap<>();
-
-  static {
-    SINGLE_VALUE_TYPE_MAP.put(Boolean.class, PinotDataType.BOOLEAN);
-    SINGLE_VALUE_TYPE_MAP.put(Byte.class, PinotDataType.BYTE);
-    SINGLE_VALUE_TYPE_MAP.put(Character.class, PinotDataType.CHARACTER);
-    SINGLE_VALUE_TYPE_MAP.put(Short.class, PinotDataType.SHORT);
-    SINGLE_VALUE_TYPE_MAP.put(Integer.class, PinotDataType.INTEGER);
-    SINGLE_VALUE_TYPE_MAP.put(Long.class, PinotDataType.LONG);
-    SINGLE_VALUE_TYPE_MAP.put(Float.class, PinotDataType.FLOAT);
-    SINGLE_VALUE_TYPE_MAP.put(Double.class, PinotDataType.DOUBLE);
-    SINGLE_VALUE_TYPE_MAP.put(Timestamp.class, PinotDataType.TIMESTAMP);
-    SINGLE_VALUE_TYPE_MAP.put(String.class, PinotDataType.STRING);
-    SINGLE_VALUE_TYPE_MAP.put(byte[].class, PinotDataType.BYTES);
-
-    MULTI_VALUE_TYPE_MAP.put(Byte.class, PinotDataType.BYTE_ARRAY);
-    MULTI_VALUE_TYPE_MAP.put(Character.class, PinotDataType.CHARACTER_ARRAY);
-    MULTI_VALUE_TYPE_MAP.put(Short.class, PinotDataType.SHORT_ARRAY);
-    MULTI_VALUE_TYPE_MAP.put(Integer.class, PinotDataType.INTEGER_ARRAY);
-    MULTI_VALUE_TYPE_MAP.put(Long.class, PinotDataType.LONG_ARRAY);
-    MULTI_VALUE_TYPE_MAP.put(Float.class, PinotDataType.FLOAT_ARRAY);
-    MULTI_VALUE_TYPE_MAP.put(Double.class, PinotDataType.DOUBLE_ARRAY);
-    MULTI_VALUE_TYPE_MAP.put(String.class, PinotDataType.STRING_ARRAY);
-  }
-
   private final Map<String, PinotDataType> _dataTypes = new HashMap<>();
 
   public DataTypeTransformer(Schema schema) {
@@ -99,16 +72,10 @@ public class DataTypeTransformer implements RecordTransformer {
         if (value instanceof Object[]) {
           // Multi-value column
           Object[] values = (Object[]) value;
-          source = MULTI_VALUE_TYPE_MAP.get(values[0].getClass());
-          if (source == null) {
-            source = PinotDataType.OBJECT_ARRAY;
-          }
+          source = PinotDataType.getMultipleValueType(values[0].getClass());
         } else {
           // Single-value column
-          source = SINGLE_VALUE_TYPE_MAP.get(value.getClass());
-          if (source == null) {
-            source = PinotDataType.OBJECT;
-          }
+          source = PinotDataType.getSingleValueType(value.getClass());
         }
         if (source != dest) {
           value = dest.convert(value, source);

@@ -26,6 +26,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.utils.PinotDataType.*;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
@@ -130,6 +131,47 @@ public class PinotDataTypeTest {
     assertEquals(OBJECT.toString(new NumberObject("123")), "123");
     assertEquals(OBJECT.toJson(getGenericTestObject()), "{\"bytes\":\"AAE=\",\"map\":{\"key1\":\"value\",\"key2\":null,\"array\":[-5.4,4,\"2\"]},\"timestamp\":1620324238610}");
     assertEquals(OBJECT_ARRAY.getSingleValueType(), OBJECT);
+  }
+
+  @Test
+  public void testGetSingleValueType() {
+    Map<Class<?>, PinotDataType> testCases = new HashMap<>();
+    testCases.put(Boolean.class, BOOLEAN);
+    testCases.put(Byte.class, BYTE);
+    testCases.put(Character.class, CHARACTER);
+    testCases.put(Short.class, SHORT);
+    testCases.put(Integer.class, INTEGER);
+    testCases.put(Long.class, LONG);
+    testCases.put(Float.class, FLOAT);
+    testCases.put(Double.class, DOUBLE);
+    testCases.put(Timestamp.class, TIMESTAMP);
+    testCases.put(String.class, STRING);
+    testCases.put(byte[].class, BYTES);
+
+    for (Map.Entry<Class<?>, PinotDataType> tc : testCases.entrySet()) {
+      assertEquals(getSingleValueType(tc.getKey()), tc.getValue());
+    }
+    assertEquals(getSingleValueType(Object.class), OBJECT);
+    assertEquals(getSingleValueType(null), OBJECT);
+  }
+
+  @Test
+  public void testGetMultipleValueType() {
+    Map<Class<?>, PinotDataType> testCases = new HashMap<>();
+    testCases.put(Byte.class, BYTE_ARRAY);
+    testCases.put(Character.class, CHARACTER_ARRAY);
+    testCases.put(Short.class, SHORT_ARRAY);
+    testCases.put(Integer.class, INTEGER_ARRAY);
+    testCases.put(Long.class, LONG_ARRAY);
+    testCases.put(Float.class, FLOAT_ARRAY);
+    testCases.put(Double.class, DOUBLE_ARRAY);
+    testCases.put(String.class, STRING_ARRAY);
+
+    for (Map.Entry<Class<?>, PinotDataType> tc : testCases.entrySet()) {
+      assertEquals(getMultipleValueType(tc.getKey()), tc.getValue());
+    }
+    assertEquals(getMultipleValueType(Object.class), OBJECT_ARRAY);
+    assertEquals(getMultipleValueType(null), OBJECT_ARRAY);
   }
 
   private static Object getGenericTestObject() {

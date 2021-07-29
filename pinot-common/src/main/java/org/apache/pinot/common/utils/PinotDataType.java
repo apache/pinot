@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.sql.Timestamp;
 import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -772,6 +775,34 @@ public enum PinotDataType {
 
   OBJECT_ARRAY;
 
+  // Mapping Java class type to PinotDataType, for SV and MV value separately.
+  private static final Map<Class<?>, PinotDataType> SINGLE_VALUE_TYPE_MAP = new HashMap<>();
+  private static final Map<Class<?>, PinotDataType> MULTI_VALUE_TYPE_MAP = new HashMap<>();
+
+  static {
+    // PinotDataType.OBJECT and OBJECT_ARRAY are default type for all other Java types.
+    SINGLE_VALUE_TYPE_MAP.put(Boolean.class, BOOLEAN);
+    SINGLE_VALUE_TYPE_MAP.put(Byte.class, BYTE);
+    SINGLE_VALUE_TYPE_MAP.put(Character.class, CHARACTER);
+    SINGLE_VALUE_TYPE_MAP.put(Short.class, SHORT);
+    SINGLE_VALUE_TYPE_MAP.put(Integer.class, INTEGER);
+    SINGLE_VALUE_TYPE_MAP.put(Long.class, LONG);
+    SINGLE_VALUE_TYPE_MAP.put(Float.class, FLOAT);
+    SINGLE_VALUE_TYPE_MAP.put(Double.class, DOUBLE);
+    SINGLE_VALUE_TYPE_MAP.put(Timestamp.class, TIMESTAMP);
+    SINGLE_VALUE_TYPE_MAP.put(String.class, STRING);
+    SINGLE_VALUE_TYPE_MAP.put(byte[].class, BYTES);
+
+    MULTI_VALUE_TYPE_MAP.put(Byte.class, BYTE_ARRAY);
+    MULTI_VALUE_TYPE_MAP.put(Character.class, CHARACTER_ARRAY);
+    MULTI_VALUE_TYPE_MAP.put(Short.class, SHORT_ARRAY);
+    MULTI_VALUE_TYPE_MAP.put(Integer.class, INTEGER_ARRAY);
+    MULTI_VALUE_TYPE_MAP.put(Long.class, LONG_ARRAY);
+    MULTI_VALUE_TYPE_MAP.put(Float.class, FLOAT_ARRAY);
+    MULTI_VALUE_TYPE_MAP.put(Double.class, DOUBLE_ARRAY);
+    MULTI_VALUE_TYPE_MAP.put(String.class, STRING_ARRAY);
+  }
+
   /**
    * NOTE: override toInt(), toLong(), toFloat(), toDouble(), toBoolean(), toTimestamp(), toString(), and
    * toBytes() for single-value types.
@@ -1028,7 +1059,8 @@ public enum PinotDataType {
     return this.ordinal() <= OBJECT.ordinal();
   }
 
-  public PinotDataType getSingleValueType() {
+  @VisibleForTesting
+  PinotDataType getSingleValueType() {
     switch (this) {
       case BYTE_ARRAY:
         return BYTE;
@@ -1055,6 +1087,16 @@ public enum PinotDataType {
       default:
         throw new IllegalStateException("There is no single-value type for " + this);
     }
+  }
+
+  public static PinotDataType getSingleValueType(Class<?> cls) {
+    PinotDataType pdt = SINGLE_VALUE_TYPE_MAP.get(cls);
+    return (pdt != null) ? pdt : OBJECT;
+  }
+
+  public static PinotDataType getMultipleValueType(Class<?> cls) {
+    PinotDataType pdt = MULTI_VALUE_TYPE_MAP.get(cls);
+    return (pdt != null) ? pdt : OBJECT_ARRAY;
   }
 
   /**
