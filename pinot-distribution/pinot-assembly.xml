@@ -39,10 +39,6 @@
       <source>${pinot.root}/NOTICE-binary</source>
       <destName>NOTICE</destName>
     </file>
-    <!-- Include DISCLAIMER -->
-    <file>
-      <source>${pinot.root}/DISCLAIMER</source>
-    </file>
     <!-- Include Pinot All-in-one jar -->
     <file>
       <source>${pinot.root}/pinot-distribution/target/pinot-distribution-${project.version}-shaded.jar</source>

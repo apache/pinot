@@ -100,7 +100,7 @@ $ cd pinot
 $ mvn clean install -DskipTests -Pbin-dist
 
 # Run the Quick Demo
-$ cd pinot-distribution/target/apache-pinot-incubating-<version>-SNAPSHOT-bin/apache-pinot-incubating-<version>-SNAPSHOT-bin
+$ cd pinot-distribution/target/apache-pinot-<version>-SNAPSHOT-bin/apache-pinot-<version>-SNAPSHOT-bin
 $ bin/quick-start-batch.sh
 ```
 
