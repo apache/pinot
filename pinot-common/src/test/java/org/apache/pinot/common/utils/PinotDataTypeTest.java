@@ -26,6 +26,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.utils.PinotDataType.*;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
@@ -130,6 +131,11 @@ public class PinotDataTypeTest {
     assertEquals(OBJECT.toString(new NumberObject("123")), "123");
     assertEquals(OBJECT.toJson(getGenericTestObject()), "{\"bytes\":\"AAE=\",\"map\":{\"key1\":\"value\",\"key2\":null,\"array\":[-5.4,4,\"2\"]},\"timestamp\":1620324238610}");
     assertEquals(OBJECT_ARRAY.getSingleValueType(), OBJECT);
+    // Non-zero value is treated as true.
+    assertTrue(OBJECT.toBoolean(1.1d));
+    assertTrue(OBJECT.toBoolean(0.1d));
+    assertFalse(OBJECT.toBoolean(0d));
+    assertTrue(OBJECT.toBoolean(-0.1d));
   }
 
   @Test

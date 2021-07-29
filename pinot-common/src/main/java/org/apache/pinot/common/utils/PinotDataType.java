@@ -667,7 +667,7 @@ public enum PinotDataType {
 
     @Override
     public boolean toBoolean(Object value) {
-      return ((Number) value).intValue() > 0;
+      return ((Number) value).doubleValue() != 0;
     }
 
     @Override
@@ -776,32 +776,31 @@ public enum PinotDataType {
   OBJECT_ARRAY;
 
   // Mapping Java class type to PinotDataType, for SV and MV value separately.
-  private static final Map<Class<?>, PinotDataType> SINGLE_VALUE_TYPE_MAP = new HashMap<>();
-  private static final Map<Class<?>, PinotDataType> MULTI_VALUE_TYPE_MAP = new HashMap<>();
+  // OBJECT and OBJECT_ARRAY are default type for unknown Java types.
+  private static final Map<Class<?>, PinotDataType> SINGLE_VALUE_TYPE_MAP = new HashMap<>() {{
+    put(Boolean.class, BOOLEAN);
+    put(Byte.class, BYTE);
+    put(Character.class, CHARACTER);
+    put(Short.class, SHORT);
+    put(Integer.class, INTEGER);
+    put(Long.class, LONG);
+    put(Float.class, FLOAT);
+    put(Double.class, DOUBLE);
+    put(Timestamp.class, TIMESTAMP);
+    put(String.class, STRING);
+    put(byte[].class, BYTES);
+  }};
 
-  static {
-    // PinotDataType.OBJECT and OBJECT_ARRAY are default type for all other Java types.
-    SINGLE_VALUE_TYPE_MAP.put(Boolean.class, BOOLEAN);
-    SINGLE_VALUE_TYPE_MAP.put(Byte.class, BYTE);
-    SINGLE_VALUE_TYPE_MAP.put(Character.class, CHARACTER);
-    SINGLE_VALUE_TYPE_MAP.put(Short.class, SHORT);
-    SINGLE_VALUE_TYPE_MAP.put(Integer.class, INTEGER);
-    SINGLE_VALUE_TYPE_MAP.put(Long.class, LONG);
-    SINGLE_VALUE_TYPE_MAP.put(Float.class, FLOAT);
-    SINGLE_VALUE_TYPE_MAP.put(Double.class, DOUBLE);
-    SINGLE_VALUE_TYPE_MAP.put(Timestamp.class, TIMESTAMP);
-    SINGLE_VALUE_TYPE_MAP.put(String.class, STRING);
-    SINGLE_VALUE_TYPE_MAP.put(byte[].class, BYTES);
-
-    MULTI_VALUE_TYPE_MAP.put(Byte.class, BYTE_ARRAY);
-    MULTI_VALUE_TYPE_MAP.put(Character.class, CHARACTER_ARRAY);
-    MULTI_VALUE_TYPE_MAP.put(Short.class, SHORT_ARRAY);
-    MULTI_VALUE_TYPE_MAP.put(Integer.class, INTEGER_ARRAY);
-    MULTI_VALUE_TYPE_MAP.put(Long.class, LONG_ARRAY);
-    MULTI_VALUE_TYPE_MAP.put(Float.class, FLOAT_ARRAY);
-    MULTI_VALUE_TYPE_MAP.put(Double.class, DOUBLE_ARRAY);
-    MULTI_VALUE_TYPE_MAP.put(String.class, STRING_ARRAY);
-  }
+  private static final Map<Class<?>, PinotDataType> MULTI_VALUE_TYPE_MAP = new HashMap<>() {{
+    put(Byte.class, BYTE_ARRAY);
+    put(Character.class, CHARACTER_ARRAY);
+    put(Short.class, SHORT_ARRAY);
+    put(Integer.class, INTEGER_ARRAY);
+    put(Long.class, LONG_ARRAY);
+    put(Float.class, FLOAT_ARRAY);
+    put(Double.class, DOUBLE_ARRAY);
+    put(String.class, STRING_ARRAY);
+  }};
 
   /**
    * NOTE: override toInt(), toLong(), toFloat(), toDouble(), toBoolean(), toTimestamp(), toString(), and
