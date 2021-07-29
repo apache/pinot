@@ -132,7 +132,7 @@
     <antlr.version>4.6</antlr.version>
     <jsonpath.version>2.4.0</jsonpath.version>
     <quartz.version>2.3.2</quartz.version>
-    <calcite.version>1.19.0</calcite.version>
+    <calcite.version>1.26.0</calcite.version>
     <lucene.version>8.2.0</lucene.version>
     <reflections.version>0.9.9</reflections.version>
     <!-- commons-configuration, hadoop-common, hadoop-client use commons-lang -->
