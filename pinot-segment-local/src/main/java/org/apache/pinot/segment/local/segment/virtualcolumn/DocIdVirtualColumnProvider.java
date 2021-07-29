@@ -21,7 +21,7 @@ package org.apache.pinot.segment.local.segment.virtualcolumn;
 import java.io.IOException;
 import org.apache.pinot.segment.local.segment.index.column.BaseVirtualColumnProvider;
 import org.apache.pinot.segment.local.segment.index.readers.DocIdDictionary;
-import org.apache.pinot.segment.spi.index.metadata.ColumnMetadata;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
@@ -47,10 +47,9 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
   }
 
   @Override
-  public ColumnMetadata buildMetadata(VirtualColumnContext context) {
-    ColumnMetadata.Builder columnMetadataBuilder = super.getColumnMetadataBuilder(context);
-    columnMetadataBuilder.setCardinality(context.getTotalDocCount()).setHasDictionary(true).setHasInvertedIndex(true)
-        .setSingleValue(true).setIsSorted(true);
+  public ColumnMetadataImpl buildMetadata(VirtualColumnContext context) {
+    ColumnMetadataImpl.Builder columnMetadataBuilder = super.getColumnMetadataBuilder(context);
+    columnMetadataBuilder.setCardinality(context.getTotalDocCount()).setSorted(true).setHasDictionary(true);
     return columnMetadataBuilder.build();
   }
 

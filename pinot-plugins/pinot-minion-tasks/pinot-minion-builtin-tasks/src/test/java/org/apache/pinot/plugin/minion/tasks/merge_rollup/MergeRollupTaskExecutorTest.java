@@ -106,9 +106,8 @@ public class MergeRollupTaskExecutorTest {
       throws Exception {
     MergeRollupTaskExecutor mergeRollupTaskExecutor = new MergeRollupTaskExecutor();
     Map<String, String> configs = new HashMap<>();
-    configs.put(MinionConstants.MergeRollupTask.MERGE_TYPE_KEY, "CONCAT");
-    configs.put(MinionConstants.MergeRollupTask.GRANULARITY_KEY, "Daily");
     configs.put(MinionConstants.TABLE_NAME_KEY, "testTable_OFFLINE");
+    configs.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, "daily");
 
     PinotTaskConfig pinotTaskConfig = new PinotTaskConfig(MinionConstants.MergeRollupTask.TASK_TYPE, configs);
     List<SegmentConversionResult> conversionResults =

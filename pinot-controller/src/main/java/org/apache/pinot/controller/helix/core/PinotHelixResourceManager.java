@@ -66,6 +66,7 @@ import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
+import org.apache.helix.model.ParticipantHistory;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
@@ -142,7 +143,6 @@ import org.slf4j.LoggerFactory;
 
 public class PinotHelixResourceManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotHelixResourceManager.class);
-  private static final long DEFAULT_EXTERNAL_VIEW_UPDATE_RETRY_INTERVAL_MILLIS = 500L;
   private static final long CACHE_ENTRY_EXPIRE_TIME_HOURS = 6L;
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
   public static final String APPEND = "APPEND";
@@ -163,13 +163,11 @@ public class PinotHelixResourceManager {
   private final String _helixZkURL;
   private final String _helixClusterName;
   private final String _dataDir;
-  private final long _externalViewOnlineToOfflineTimeoutMillis;
   private final boolean _isSingleTenantCluster;
   private final boolean _enableBatchMessageMode;
   private final boolean _allowHLCTables;
 
   private HelixManager _helixZkManager;
-  private String _instanceId;
   private HelixAdmin _helixAdmin;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private HelixDataAccessor _helixDataAccessor;
@@ -179,12 +177,10 @@ public class PinotHelixResourceManager {
   private TableCache _tableCache;
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
-      long externalViewOnlineToOfflineTimeoutMillis, boolean isSingleTenantCluster, boolean enableBatchMessageMode,
-      boolean allowHLCTables) {
+      boolean isSingleTenantCluster, boolean enableBatchMessageMode, boolean allowHLCTables) {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;
     _dataDir = dataDir;
-    _externalViewOnlineToOfflineTimeoutMillis = externalViewOnlineToOfflineTimeoutMillis;
     _isSingleTenantCluster = isSingleTenantCluster;
     _enableBatchMessageMode = enableBatchMessageMode;
     _allowHLCTables = allowHLCTables;
@@ -198,7 +194,7 @@ public class PinotHelixResourceManager {
                 // Backward-compatible with legacy hostname of format 'Server_<hostname>'
                 String hostname = instanceConfig.getHostName();
                 if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
-                  hostname = hostname.substring(Helix.PREFIX_OF_SERVER_INSTANCE.length());
+                  hostname = hostname.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
                 }
 
                 String protocol = CommonConstants.HTTP_PROTOCOL;
@@ -228,8 +224,8 @@ public class PinotHelixResourceManager {
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
     this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(), controllerConf.getDataDir(),
-        controllerConf.getExternalViewOnlineToOfflineTimeout(), controllerConf.tenantIsolationEnabled(),
-        controllerConf.getEnableBatchMessageMode(), controllerConf.getHLCTablesAllowed());
+        controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
+        controllerConf.getHLCTablesAllowed());
   }
 
   /**
@@ -240,14 +236,10 @@ public class PinotHelixResourceManager {
    */
   public synchronized void start(HelixManager helixZkManager) {
     _helixZkManager = helixZkManager;
-    _instanceId = _helixZkManager.getInstanceName();
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
     _propertyStore = _helixZkManager.getHelixPropertyStore();
     _helixDataAccessor = _helixZkManager.getHelixDataAccessor();
     _keyBuilder = _helixDataAccessor.keyBuilder();
-
-    // Add instance group tag for controller
-    addInstanceGroupTagIfNeeded();
     _segmentDeletionManager = new SegmentDeletionManager(_dataDir, _helixAdmin, _helixClusterName, _propertyStore);
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
 
@@ -320,20 +312,6 @@ public class PinotHelixResourceManager {
    */
   public ZkHelixPropertyStore<ZNRecord> getPropertyStore() {
     return _propertyStore;
-  }
-
-  /**
-   * Add instance group tag for controller so that pinot controller can be assigned to lead controller resource.
-   */
-  private void addInstanceGroupTagIfNeeded() {
-    InstanceConfig instanceConfig = getHelixInstanceConfig(_instanceId);
-    // The instanceConfig can be null when connecting as a participant while running from PerfBenchmarkRunner
-    if (instanceConfig != null && !instanceConfig.containsTag(Helix.CONTROLLER_INSTANCE)) {
-      LOGGER.info("Controller: {} doesn't contain group tag: {}. Adding one.", _instanceId, Helix.CONTROLLER_INSTANCE);
-      instanceConfig.addTag(Helix.CONTROLLER_INSTANCE);
-      HelixDataAccessor accessor = _helixZkManager.getHelixDataAccessor();
-      accessor.setProperty(accessor.keyBuilder().instanceConfig(_instanceId), instanceConfig);
-    }
   }
 
   /**
@@ -459,6 +437,35 @@ public class PinotHelixResourceManager {
           .failure("Unable to update instance: " + instanceIdToUpdate + " to tags: " + tags);
     }
     return PinotResourceManagerResponse.SUCCESS;
+  }
+
+  /**
+   * Validates whether an instance is offline for certain amount of time.
+   * Since ZNodes under "/LIVEINSTANCES" are ephemeral, if there is a ZK session expire (e.g. due to network issue),
+   * the ZNode under "/LIVEINSTANCES" will be deleted. Thus, such race condition can happen when this task is running.
+   * In order to double confirm the live status of an instance, the field "LAST_OFFLINE_TIME" in ZNode under
+   * "/INSTANCES/<instance_id>/HISTORY" needs to be checked. If the value is "-1", that means the instance is ONLINE;
+   * if the value is a timestamp, that means the instance starts to be OFFLINE since that time.
+   * @param instanceId instance id
+   * @param offlineTimeRangeMs the time range in milliseconds that it's valid for an instance to be offline
+   */
+  public boolean isInstanceOfflineFor(String instanceId, long offlineTimeRangeMs) {
+    // Check if the instance is included in /LIVEINSTANCES
+    if (_helixDataAccessor.getProperty(_keyBuilder.liveInstance(instanceId)) != null) {
+      return false;
+    }
+    ParticipantHistory participantHistory = _helixDataAccessor.getProperty(_keyBuilder.participantHistory(instanceId));
+    long lastOfflineTime = participantHistory.getLastOfflineTime();
+    // returns false if the last offline time is a negative number.
+    if (lastOfflineTime < 0) {
+      return false;
+    }
+    if (System.currentTimeMillis() - lastOfflineTime > offlineTimeRangeMs) {
+      LOGGER.info("Instance: {} has been offline for more than {}ms", instanceId, offlineTimeRangeMs);
+      return true;
+    }
+    // Still within the offline time range (e.g. due to zk session expire).
+    return false;
   }
 
   /**
@@ -1830,7 +1837,8 @@ public class PinotHelixResourceManager {
     Preconditions.checkState(externalView != null, "Could not find external view for table: %s", tableNameWithType);
     Set<String> instanceSet = idealState.getInstanceSet(segmentName);
     Preconditions
-        .checkState(CollectionUtils.isNotEmpty(instanceSet), "Could not find segment: %s in ideal state for table: %s");
+        .checkState(CollectionUtils.isNotEmpty(instanceSet), "Could not find segment: %s in ideal state for table: %s",
+            segmentName, tableNameWithType);
     Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
 
     // First, disable or reset the segment
@@ -2788,8 +2796,9 @@ public class PinotHelixResourceManager {
 
   public TableStats getTableStats(String tableNameWithType) {
     String zkPath = ZKMetadataProvider.constructPropertyStorePathForResourceConfig(tableNameWithType);
-    ZNRecord znRecord = ZKMetadataProvider.getZnRecord(_propertyStore, zkPath);
-    String creationTime = SIMPLE_DATE_FORMAT.format(znRecord.getCreationTime());
+    Stat stat = _propertyStore.getStat(zkPath, AccessOption.PERSISTENT);
+    Preconditions.checkState(stat != null, "Failed to read ZK stats for table: %s", tableNameWithType);
+    String creationTime = SIMPLE_DATE_FORMAT.format(stat.getCtime());
     return new TableStats(creationTime);
   }
 

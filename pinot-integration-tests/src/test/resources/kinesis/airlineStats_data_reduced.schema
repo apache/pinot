@@ -1,0 +1,32 @@
+{
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "INT",
+      "singleValueField": true,
+      "name": "Quarter"
+    },
+    {
+      "dataType": "STRING",
+      "singleValueField": true,
+      "name": "Origin"
+    },
+    {
+      "dataType": "STRING",
+      "singleValueField": true,
+      "name": "Destination"
+    },
+    {
+      "dataType": "INT",
+      "singleValueField": true,
+      "name": "FlightNum"
+    }
+  ],
+  "timeFieldSpec": {
+    "incomingGranularitySpec": {
+      "timeType": "DAYS",
+      "dataType": "INT",
+      "name": "DaysSinceEpoch"
+    }
+  },
+  "schemaName": "mytable"
+}

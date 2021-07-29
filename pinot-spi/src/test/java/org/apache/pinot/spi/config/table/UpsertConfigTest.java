@@ -29,7 +29,7 @@ public class UpsertConfigTest {
 
   @Test
   public void testUpsertConfig() {
-    UpsertConfig upsertConfig1 = new UpsertConfig(UpsertConfig.Mode.FULL);
+    UpsertConfig upsertConfig1 = new UpsertConfig(UpsertConfig.Mode.FULL, null);
     assertEquals(upsertConfig1.getMode(), UpsertConfig.Mode.FULL);
 
     Map<String, UpsertConfig.Strategy> partialUpsertStratgies = new HashMap<>();

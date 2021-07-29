@@ -207,7 +207,7 @@ public class PinotQueryResource {
     String hostName = instanceConfig.getHostName();
     // Backward-compatible with legacy hostname of format 'Broker_<hostname>'
     if (hostName.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)) {
-      hostName = hostName.substring(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE.length());
+      hostName = hostName.substring(CommonConstants.Helix.BROKER_INSTANCE_PREFIX_LENGTH);
     }
 
     String protocol = _controllerConf.getControllerBrokerProtocol();

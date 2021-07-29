@@ -204,10 +204,10 @@ public class GenericRow implements Serializable {
   }
 
   /**
-   * Marks a field as {@code non-null}.
+   * Marks a field as {@code non-null} and returns whether the field was marked as {@code null}.
    */
-  public void removeNullValueField(String fieldName) {
-    _nullValueFields.remove(fieldName);
+  public boolean removeNullValueField(String fieldName) {
+    return _nullValueFields.remove(fieldName);
   }
 
   /**

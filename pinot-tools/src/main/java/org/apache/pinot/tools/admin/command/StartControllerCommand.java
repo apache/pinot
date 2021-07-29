@@ -142,9 +142,10 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
       throws Exception {
     try {
       LOGGER.info("Executing command: " + toString());
+      Map<String, Object> controllerConf = getControllerConf();
       StartServiceManagerCommand startServiceManagerCommand =
           new StartServiceManagerCommand().setZkAddress(_zkAddress).setClusterName(_clusterName).setPort(-1)
-              .setBootstrapServices(new String[0]).addBootstrapService(ServiceRole.CONTROLLER, getControllerConf());
+              .setBootstrapServices(new String[0]).addBootstrapService(ServiceRole.CONTROLLER, controllerConf);
       startServiceManagerCommand.execute();
       String pidFile = ".pinotAdminController-" + System.currentTimeMillis() + ".pid";
       savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
@@ -161,6 +162,10 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
     Map<String, Object> properties = new HashMap<>();
     if (_configFileName != null) {
       properties.putAll(PinotConfigUtils.generateControllerConf(_configFileName));
+      // Override the zkAddress and clusterName to ensure ServiceManager is connecting to the right Zookeeper and Cluster.
+      // Configs existence is already verified.
+      _zkAddress = properties.get(ControllerConf.ZK_STR).toString();
+      _clusterName = properties.get(ControllerConf.HELIX_CLUSTER_NAME).toString();
     } else {
       if (_controllerHost == null) {
         _controllerHost = NetUtils.getHostAddress();

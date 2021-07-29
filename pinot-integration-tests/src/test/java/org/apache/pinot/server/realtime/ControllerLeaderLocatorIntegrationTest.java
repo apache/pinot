@@ -21,7 +21,6 @@ package org.apache.pinot.server.realtime;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
@@ -29,6 +28,7 @@ import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.pql.parsers.utils.Pair;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants.Controller;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -68,6 +68,8 @@ public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
     validateResultSet(controllerLeaderLocator, resultSet, 1, "Failed to get only one pair of controller");
 
     Map<String, Object> properties = getDefaultControllerConfiguration();
+    // Use custom instance id
+    properties.put(Controller.CONFIG_OF_INSTANCE_ID, "Controller_myInstance");
     ControllerStarter secondControllerStarter = new ControllerStarter();
     secondControllerStarter.init(new PinotConfiguration(properties));
     secondControllerStarter.start();
@@ -90,12 +92,12 @@ public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
         controllerLeaderLocator.getCurrentTimeMs() + 2 * controllerLeaderLocator.getMinInvalidateIntervalMs());
     controllerLeaderLocator.invalidateCachedControllerLeader();
 
-    // Randomly pick a table name to get a controller leader, and this leader should be the same as the helix leader.
-    Pair<String, Integer> pair = controllerLeaderLocator.getControllerLeader(
-        _partitionToTableMap.get(new Random().nextInt(Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE)));
-
-    Assert.assertEquals(pair.getFirst(), ControllerTest.LOCAL_HOST);
-    Assert.assertEquals((int) pair.getSecond(), getControllerPort());
+    // All tables should have Helix leader as the controller leader
+    for (int i = 0; i < Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE; i++) {
+      Pair<String, Integer> hostnamePortPair = controllerLeaderLocator.getControllerLeader(_partitionToTableMap.get(i));
+      Assert.assertEquals(hostnamePortPair.getFirst(), ControllerTest.LOCAL_HOST);
+      Assert.assertEquals((int) hostnamePortPair.getSecond(), getControllerPort());
+    }
 
     // Stop the second controller.
     secondControllerStarter.stop();

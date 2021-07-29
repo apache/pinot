@@ -18,16 +18,15 @@
  */
 package org.apache.pinot.server.realtime;
 
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
+import java.util.TreeMap;
 import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
 import org.apache.helix.model.ResourceConfig;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
@@ -217,7 +216,7 @@ public class ControllerLeaderLocatorTest {
 
     // Create Controller Leader Locator
     FakeControllerLeaderLocator.create(helixManager);
-    ControllerLeaderLocator controllerLeaderLocator = FakeControllerLeaderLocator.getInstance();
+    FakeControllerLeaderLocator controllerLeaderLocator = FakeControllerLeaderLocator.getInstance();
     Pair<String, Integer> expectedLeaderLocation = new Pair<>(leaderHost, leaderPort);
 
     // Before enabling lead controller resource config, the helix leader should be used.
@@ -227,8 +226,7 @@ public class ControllerLeaderLocatorTest {
         expectedLeaderLocation.getSecond());
 
     // Mock the behavior that 40 seconds have passed.
-    ((FakeControllerLeaderLocator) controllerLeaderLocator)
-        .setCurrentTimeMs(controllerLeaderLocator.getCurrentTimeMs() + 40_000L);
+    controllerLeaderLocator.setCurrentTimeMs(controllerLeaderLocator.getCurrentTimeMs() + 40_000L);
     controllerLeaderLocator.invalidateCachedControllerLeader();
 
     // After enabling lead controller resource config, the leader in lead controller resource should be used.
@@ -237,22 +235,30 @@ public class ControllerLeaderLocatorTest {
     // External view is null, should return null.
     Assert.assertNull(controllerLeaderLocator.getControllerLeader(testTable));
 
-    ExternalView externalView = mock(ExternalView.class);
-    when(helixAdmin.getResourceExternalView(anyString(), anyString())).thenReturn(externalView);
-    Set<String> partitionSet = new HashSet<>();
-    when(externalView.getPartitionSet()).thenReturn(partitionSet);
-    Map<String, String> partitionStateMap = new HashMap<>();
-    when(externalView.getStateMap(anyString())).thenReturn(partitionStateMap);
+    ExternalView externalView = new ExternalView(CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+    PropertyKey externalViewPropertyKey = mock(PropertyKey.class);
+    when(keyBuilder.externalView(CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME))
+        .thenReturn(externalViewPropertyKey);
+    when(helixDataAccessor.getProperty(externalViewPropertyKey)).thenReturn(externalView);
 
     // External view is empty, should return null.
     Assert.assertNull(controllerLeaderLocator.getControllerLeader(testTable));
 
+    // Use custom instance id
+    String participantInstanceId = "Controller_myInstance";
+    InstanceConfig instanceConfig = new InstanceConfig(participantInstanceId);
+    instanceConfig.setHostName(leaderHost);
+    instanceConfig.setPort(Integer.toString(leaderPort));
+    PropertyKey instanceConfigPropertyKey = mock(PropertyKey.class);
+    when(keyBuilder.instanceConfig(participantInstanceId)).thenReturn(instanceConfigPropertyKey);
+    when(helixDataAccessor.getProperty(instanceConfigPropertyKey)).thenReturn(instanceConfig);
+
     // Adding one host as master, should return the correct host-port pair.
-    partitionSet.add(LeadControllerUtils.generatePartitionName(LeadControllerUtils.getPartitionIdForTable(testTable)));
+    Map<String, String> instanceStateMap = new TreeMap<>();
+    instanceStateMap.put(participantInstanceId, "MASTER");
     for (int i = 0; i < CommonConstants.Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE; i++) {
-      partitionSet.add(LeadControllerUtils.generatePartitionName(i));
+      externalView.setStateMap(LeadControllerUtils.generatePartitionName(i), instanceStateMap);
     }
-    partitionStateMap.put(LeadControllerUtils.generateParticipantInstanceId(leaderHost, leaderPort), "MASTER");
 
     Assert.assertEquals(controllerLeaderLocator.getControllerLeader(testTable).getFirst(),
         expectedLeaderLocation.getFirst());
@@ -260,14 +266,13 @@ public class ControllerLeaderLocatorTest {
         expectedLeaderLocation.getSecond());
 
     // The participant host is in offline state, should return null.
-    partitionStateMap.put(LeadControllerUtils.generateParticipantInstanceId(leaderHost, leaderPort), "OFFLINE");
+    instanceStateMap.put(participantInstanceId, "OFFLINE");
 
     // The leader is still valid since the leader is just updated within 30 seconds.
     Assert.assertNotNull(controllerLeaderLocator.getControllerLeader(testTable));
 
     // Mock the behavior that 40 seconds have passed.
-    ((FakeControllerLeaderLocator) controllerLeaderLocator)
-        .setCurrentTimeMs(controllerLeaderLocator.getCurrentTimeMs() + 40_000L);
+    controllerLeaderLocator.setCurrentTimeMs(controllerLeaderLocator.getCurrentTimeMs() + 40_000L);
     controllerLeaderLocator.invalidateCachedControllerLeader();
 
     // No controller in MASTER state, should return null.

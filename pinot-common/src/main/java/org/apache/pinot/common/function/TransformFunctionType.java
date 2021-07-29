@@ -87,7 +87,10 @@ public enum TransformFunctionType {
 
   // Geo relationship
   ST_CONTAINS("ST_Contains"),
-  ST_EQUALS("ST_Equals");
+  ST_EQUALS("ST_Equals"),
+
+  // Geo indexing
+  GEOTOH3("geoToH3");
 
   private final String _name;
 

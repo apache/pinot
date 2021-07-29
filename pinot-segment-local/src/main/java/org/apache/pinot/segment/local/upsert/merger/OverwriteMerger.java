@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.segment.local.upsert.merger;
 
+/**
+ * Merges 2 records and returns the merged record.
+ * Overwrite the existing value for the given field. Then return the merged record.
+ */
 public class OverwriteMerger implements PartialUpsertMerger {
   OverwriteMerger() {
   }

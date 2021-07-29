@@ -171,9 +171,7 @@ public class MutableSegmentImpl implements MutableSegment {
     final RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = config.getRealtimeSegmentZKMetadata();
     _segmentMetadata =
         new SegmentMetadataImpl(realtimeSegmentZKMetadata.getTableName(), realtimeSegmentZKMetadata.getSegmentName(),
-            realtimeSegmentZKMetadata.getCreationTime(), realtimeSegmentZKMetadata.getStartTime(),
-            realtimeSegmentZKMetadata.getEndTime(), realtimeSegmentZKMetadata.getTimeUnit(),
-            realtimeSegmentZKMetadata.getTotalDocs(), realtimeSegmentZKMetadata.getCrc(), _schema) {
+            _schema, realtimeSegmentZKMetadata.getCreationTime()) {
           @Override
           public int getTotalDocs() {
             return _numDocsIndexed;
@@ -875,8 +873,6 @@ public class MutableSegmentImpl implements MutableSegment {
         _logger.error("Failed to close the record id map. Continuing with error.", e);
       }
     }
-
-    _segmentMetadata.close();
 
     // NOTE: Close the memory manager as the last step. It will release all the PinotDataBuffers allocated.
     try {

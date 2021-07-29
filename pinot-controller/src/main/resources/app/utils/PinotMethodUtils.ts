@@ -70,6 +70,7 @@ import {
 } from '../requests';
 import { baseApi } from './axios-config';
 import Utils from './Utils';
+const JSONbig = require('json-bigint')({'storeAsString': true})
 
 // This method is used to display tenants listing on cluster manager home page
 // API: /tenants
@@ -219,6 +220,7 @@ const getAsObject = (str: SQLResult) => {
 // Expected Output: {columns: [], records: []}
 const getQueryResults = (params, url, checkedOptions) => {
   return getQueryResult(params, url).then(({ data }) => {
+    data = JSONbig.parse(data);
     let queryResponse = null;
 
     queryResponse = getAsObject(data);

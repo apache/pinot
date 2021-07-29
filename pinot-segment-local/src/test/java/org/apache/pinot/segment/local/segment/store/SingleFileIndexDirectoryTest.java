@@ -67,7 +67,7 @@ public class SingleFileIndexDirectoryTest {
 
   void writeMetadata() {
     SegmentMetadataImpl meta = Mockito.mock(SegmentMetadataImpl.class);
-    Mockito.when(meta.getVersion()).thenReturn(SegmentVersion.v3.toString());
+    Mockito.when(meta.getVersion()).thenReturn(SegmentVersion.v3);
     segmentMetadata = meta;
   }
 

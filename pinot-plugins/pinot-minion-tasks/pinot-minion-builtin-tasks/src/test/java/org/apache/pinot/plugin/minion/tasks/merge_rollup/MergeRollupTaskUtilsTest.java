@@ -20,64 +20,44 @@ package org.apache.pinot.plugin.minion.tasks.merge_rollup;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.common.minion.Granularity;
-import org.apache.pinot.core.segment.processing.collector.CollectorFactory;
-import org.apache.pinot.core.segment.processing.collector.ValueAggregatorFactory;
-import org.testng.Assert;
-import org.testng.annotations.BeforeClass;
+import org.apache.pinot.core.common.MinionConstants.MergeTask;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 
 
 public class MergeRollupTaskUtilsTest {
-  private final String METRIC_COLUMN_A = "metricColA";
-  private final String METRIC_COLUMN_B = "metricColB";
-  private Map<String, String> _mergeRollupTaskConfig;
-
-  @BeforeClass
-  public void setUp() {
-    Map<String, String> mergeRollupTaskConfig = new HashMap<>();
-    mergeRollupTaskConfig.put("aggregate.metricColA", "sum");
-    mergeRollupTaskConfig.put("aggregate.metricColB", "max");
-    mergeRollupTaskConfig.put("merge.daily.mergeType", "concat");
-    mergeRollupTaskConfig.put("merge.daily.bufferTime", "2d");
-    mergeRollupTaskConfig.put("merge.daily.maxNumRecordsPerSegment", "1000000");
-    mergeRollupTaskConfig.put("merge.daily.maxNumRecordsPerTask", "5000000");
-    mergeRollupTaskConfig.put("merge.monthly.mergeType", "rollup");
-    mergeRollupTaskConfig.put("merge.monthly.bufferTime", "30d");
-    mergeRollupTaskConfig.put("merge.monthly.maxNumRecordsPerSegment", "2000000");
-    mergeRollupTaskConfig.put("merge.monthly.maxNumRecordsPerTask", "5000000");
-    _mergeRollupTaskConfig = mergeRollupTaskConfig;
-  }
 
   @Test
-  public void testGetRollupAggregationTypeMap() {
-    Map<String, ValueAggregatorFactory.ValueAggregatorType> rollupAggregationTypeMap =
-        MergeRollupTaskUtils.getRollupAggregationTypeMap(_mergeRollupTaskConfig);
-    Assert.assertEquals(rollupAggregationTypeMap.size(), 2);
-    Assert.assertTrue(rollupAggregationTypeMap.containsKey(METRIC_COLUMN_A));
-    Assert.assertTrue(rollupAggregationTypeMap.containsKey(METRIC_COLUMN_B));
-    Assert.assertEquals(rollupAggregationTypeMap.get(METRIC_COLUMN_A), ValueAggregatorFactory.ValueAggregatorType.SUM);
-    Assert.assertEquals(rollupAggregationTypeMap.get(METRIC_COLUMN_B), ValueAggregatorFactory.ValueAggregatorType.MAX);
-  }
+  public void testGetLevelToConfigMap() {
+    Map<String, String> taskConfig = new HashMap<>();
+    taskConfig.put("daily.bucketTimePeriod", "1d");
+    taskConfig.put("daily.bufferTimePeriod", "3d");
+    taskConfig.put("daily.maxNumRecordsPerSegment", "1000000");
+    taskConfig.put("monthly.bucketTimePeriod", "30d");
+    taskConfig.put("monthly.bufferTimePeriod", "10d");
+    taskConfig.put("monthly.roundBucketTimePeriod", "7d");
+    taskConfig.put("monthly.mergeType", "rollup");
+    taskConfig.put("monthly.maxNumRecordsPerTask", "5000000");
 
-  @Test
-  public void testGetAllMergeProperties() {
-    Map<Granularity, MergeProperties> allMergeProperties =
-        MergeRollupTaskUtils.getAllMergeProperties(_mergeRollupTaskConfig);
-    Assert.assertEquals(allMergeProperties.size(), 2);
-    Assert.assertTrue(allMergeProperties.containsKey(Granularity.DAILY));
-    Assert.assertTrue(allMergeProperties.containsKey(Granularity.MONTHLY));
+    Map<String, Map<String, String>> levelToConfigMap = MergeRollupTaskUtils.getLevelToConfigMap(taskConfig);
+    assertEquals(levelToConfigMap.size(), 2);
 
-    MergeProperties dailyProperty = allMergeProperties.get(Granularity.DAILY);
-    Assert.assertEquals(dailyProperty.getMergeType(), CollectorFactory.CollectorType.CONCAT.name());
-    Assert.assertEquals(dailyProperty.getBufferTimeMs(), 172800000L);
-    Assert.assertEquals(dailyProperty.getMaxNumRecordsPerSegment(), 1000000L);
-    Assert.assertEquals(dailyProperty.getMaxNumRecordsPerTask(), 5000000L);
+    Map<String, String> dailyConfig = levelToConfigMap.get("daily");
+    assertNotNull(dailyConfig);
+    assertEquals(dailyConfig.size(), 3);
+    assertEquals(dailyConfig.get(MergeTask.BUCKET_TIME_PERIOD_KEY), "1d");
+    assertEquals(dailyConfig.get(MergeTask.BUFFER_TIME_PERIOD_KEY), "3d");
+    assertEquals(dailyConfig.get(MergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY), "1000000");
 
-    MergeProperties monthlyProperty = allMergeProperties.get(Granularity.MONTHLY);
-    Assert.assertEquals(monthlyProperty.getMergeType(), CollectorFactory.CollectorType.ROLLUP.name());
-    Assert.assertEquals(monthlyProperty.getBufferTimeMs(), 2592000000L);
-    Assert.assertEquals(monthlyProperty.getMaxNumRecordsPerSegment(), 2000000L);
-    Assert.assertEquals(monthlyProperty.getMaxNumRecordsPerTask(), 5000000L);
+    Map<String, String> monthlyConfig = levelToConfigMap.get("monthly");
+    assertNotNull(monthlyConfig);
+    assertEquals(monthlyConfig.size(), 5);
+    assertEquals(monthlyConfig.get(MergeTask.BUCKET_TIME_PERIOD_KEY), "30d");
+    assertEquals(monthlyConfig.get(MergeTask.BUFFER_TIME_PERIOD_KEY), "10d");
+    assertEquals(monthlyConfig.get(MergeTask.ROUND_BUCKET_TIME_PERIOD_KEY), "7d");
+    assertEquals(monthlyConfig.get(MergeTask.MERGE_TYPE_KEY), "rollup");
+    assertEquals(monthlyConfig.get(MergeTask.MAX_NUM_RECORDS_PER_TASK_KEY), "5000000");
   }
 }

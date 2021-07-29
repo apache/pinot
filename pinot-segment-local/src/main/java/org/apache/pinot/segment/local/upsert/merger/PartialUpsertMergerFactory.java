@@ -25,15 +25,21 @@ public class PartialUpsertMergerFactory {
   private PartialUpsertMergerFactory() {
   }
 
-  private static final OverwriteMerger OVERWRITE_MERGER = new OverwriteMerger();
+  private static final AppendMerger APPEND_MERGER = new AppendMerger();
   private static final IncrementMerger INCREMENT_MERGER = new IncrementMerger();
+  private static final OverwriteMerger OVERWRITE_MERGER = new OverwriteMerger();
+  private static final UnionMerger UNION_MERGER = new UnionMerger();
 
   public static PartialUpsertMerger getMerger(UpsertConfig.Strategy strategy) {
     switch (strategy) {
-      case OVERWRITE:
-        return OVERWRITE_MERGER;
+      case APPEND:
+        return APPEND_MERGER;
       case INCREMENT:
         return INCREMENT_MERGER;
+      case OVERWRITE:
+        return OVERWRITE_MERGER;
+      case UNION:
+        return UNION_MERGER;
       default:
         throw new IllegalStateException("Unsupported partial upsert strategy: " + strategy);
     }
