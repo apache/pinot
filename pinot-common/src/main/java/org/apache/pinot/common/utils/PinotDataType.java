@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.utils;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.sql.Timestamp;
 import java.util.Base64;
 import java.util.HashMap;
