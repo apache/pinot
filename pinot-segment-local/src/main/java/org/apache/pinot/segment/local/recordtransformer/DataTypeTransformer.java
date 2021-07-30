@@ -77,9 +77,17 @@ public class DataTypeTransformer implements RecordTransformer {
           // Single-value column
           source = PinotDataType.getSingleValueType(value.getClass());
         }
-        if (source != dest) {
-          value = dest.convert(value, source);
-        }
+        // Skipping conversion when srcType!=destType is speculative, and can be unsafe when
+        // the array for MV column contains values of mixing types. Mixing types can lead
+        // to ClassCastException during conversion, often aborting data ingestion jobs.
+        //
+        // So now, calling convert() unconditionally for safety. Perf impact is negligible:
+        // 1. for SV column, when srcType=destType, the conversion is simply pass through.
+        // 2. for MV column, when srcType=destType, the conversion is simply pass through
+        // if the source type is not Object[] (but sth like Integer[], Double[]). For Object[],
+        // the conversion loops through values in the array like before, but can catch the
+        // ClassCastException if it happens and continue the conversion now.
+        value = dest.convert(value, source);
         value = dest.toInternal(value);
 
         record.putValue(column, value);
