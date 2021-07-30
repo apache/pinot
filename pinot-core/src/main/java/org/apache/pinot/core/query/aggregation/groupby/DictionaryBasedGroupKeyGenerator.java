@@ -231,6 +231,11 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   @Override
   public int getGroupId(DictIdRecord dictIdRecord) { return _rawKeyHolder.getGroupId(dictIdRecord);}
 
+  @Override
+  public Type getType() {
+    return _rawKeyHolder.getType();
+  }
+
   private interface RawKeyHolder {
 
     /**
@@ -276,6 +281,8 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
      * Returns current number of unique keys
      */
     int getNumKeys();
+
+    Type getType();
   }
 
   private class ArrayBasedHolder implements RawKeyHolder {
@@ -396,6 +403,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     public int getNumKeys() {
       return _numKeys;
     }
+
+    @Override
+    public Type getType() { return Type.DictArray; }
   }
 
   private class IntMapBasedHolder implements RawKeyHolder {
@@ -530,6 +540,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     public int getNumKeys() {
       return _groupIdMap.size();
     }
+
+    @Override
+    public Type getType() { return Type.DictIntMap; }
   }
 
   /**
@@ -608,6 +621,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     return rawKeys;
+
   }
 
   /**
@@ -791,6 +805,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     public int getNumKeys() {
       return _groupIdMap.size();
     }
+
+    @Override
+    public Type getType() { return Type.DictLongMap; }
   }
 
   /**
@@ -1029,6 +1046,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     public int getNumKeys() {
       return _groupIdMap.size();
     }
+
+    @Override
+    public Type getType() { return Type.DictArrayMap; }
   }
 
   /**

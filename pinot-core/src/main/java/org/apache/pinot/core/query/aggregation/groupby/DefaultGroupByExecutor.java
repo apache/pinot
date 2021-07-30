@@ -32,6 +32,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.util.QueryOptions;
 
 
 /**
@@ -49,18 +50,20 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   // Thread local (reusable) array for multi-valued group keys
   private static final ThreadLocal<int[][]> THREAD_LOCAL_MV_GROUP_KEYS =
       ThreadLocal.withInitial(() -> new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][]);
-  private static final int ON_THE_FLY_TRIM_THRESHOLD = 100000;
-  private static final int ON_THE_FLY_TRIM_SIZE = 5000;
+  protected static final int ON_THE_FLY_TRIM_THRESHOLD = 100000;
+  protected static final int ON_THE_FLY_TRIM_SIZE = 5000;
   protected final AggregationFunction[] _aggregationFunctions;
   protected final GroupKeyGenerator _groupKeyGenerator;
   protected final GroupByResultHolder[] _groupByResultHolders;
   protected final boolean _hasMVGroupByExpression;
   protected final int[] _svGroupKeys;
   protected final int[][] _mvGroupKeys;
-  private final boolean _onTheFlyTrimFlag;
-  private final boolean _hasNoDictionaryGroupByExpression;
-  private final int _numGroupByExpressions;
-  private final TableResizer _tableResizer;
+  protected final boolean _onTheFlyTrimFlag;
+  protected final boolean _hasNoDictionaryGroupByExpression;
+  protected final int _numGroupByExpressions;
+  protected final TableResizer _tableResizer;
+  protected final int _onTheFlyTrimSize;
+  protected final int _onTheFlyTrimThreshold;
 
   /**
    * Constructor for the class.
@@ -72,7 +75,8 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
    * @param transformOperator Transform operator
    */
   public DefaultGroupByExecutor(AggregationFunction[] aggregationFunctions, ExpressionContext[] groupByExpressions,
-      int maxInitialResultHolderCapacity, int numGroupsLimit, TransformOperator transformOperator, TableResizer tableResizer, boolean PQLQueryMode) {
+      int maxInitialResultHolderCapacity, int numGroupsLimit, TransformOperator transformOperator,
+      TableResizer tableResizer, Map<String, String> queryOptions, boolean PQLQueryMode) {
     _aggregationFunctions = aggregationFunctions;
 
     boolean hasMVGroupByExpression = false;
@@ -100,6 +104,17 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     }
     _onTheFlyTrimFlag = !PQLQueryMode;
     _tableResizer = tableResizer;
+    // TODO: Add more checks here
+    int trimSize = QueryOptions.getTrimSize(queryOptions);
+    int threshold = QueryOptions.getTrimThreshold(queryOptions);
+    if (_onTheFlyTrimFlag) {
+      _onTheFlyTrimSize = trimSize > 0 ? trimSize : ON_THE_FLY_TRIM_SIZE;
+      _onTheFlyTrimThreshold = threshold > 0 ? threshold : ON_THE_FLY_TRIM_THRESHOLD;
+    } else {
+      _onTheFlyTrimSize = -1;
+      _onTheFlyTrimThreshold = -1;
+    }
+
 
     // Initialize result holders
     int maxNumResults = _groupKeyGenerator.getGlobalGroupKeyUpperBound();
@@ -140,18 +155,17 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       aggregate(transformBlock, length, i);
     }
 
-    // TODO: format
-    int numKeys = _groupKeyGenerator.getNumKeys();
-    if (_onTheFlyTrimFlag && _groupKeyGenerator.getNumKeys() > ON_THE_FLY_TRIM_THRESHOLD) {
+    if (_onTheFlyTrimFlag && _groupKeyGenerator.getNumKeys() > _onTheFlyTrimThreshold
+        && _groupKeyGenerator.getType() != GroupKeyGenerator.Type.DictArray) {
       PriorityQueue<DictIdRecord> pq;
       if (_hasNoDictionaryGroupByExpression) {
         if (_numGroupByExpressions == 1) {
-          pq = _tableResizer.trimNoDictSingleCol(_groupKeyGenerator, _groupByResultHolders, ON_THE_FLY_TRIM_SIZE);
+          pq = _tableResizer.trimNoDictSingleCol(_groupKeyGenerator, _groupByResultHolders, _onTheFlyTrimSize);
         } else {
-          pq = _tableResizer.trimNoDictMultiCol(_groupKeyGenerator, _groupByResultHolders, ON_THE_FLY_TRIM_SIZE);
+          pq = _tableResizer.trimNoDictMultiCol(_groupKeyGenerator, _groupByResultHolders, _onTheFlyTrimSize);
         }
       } else {
-        pq = _tableResizer.trimDictCol(_groupKeyGenerator, _groupByResultHolders, ON_THE_FLY_TRIM_SIZE);
+        pq = _tableResizer.trimDictCol(_groupKeyGenerator, _groupByResultHolders, _onTheFlyTrimSize);
       }
 
       _groupKeyGenerator.clearKeyHolder();
@@ -159,14 +173,13 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
         GroupByResultHolder groupByResultHolder = _groupByResultHolders[i];
         groupByResultHolder.clearResultHolder(capacityNeeded);
       }
-      for (DictIdRecord record: pq) {
+      for (DictIdRecord record : pq) {
         int groupId = _groupKeyGenerator.getGroupId(record);
         for (int i = 0; i < numAggregationFunctions; i++) {
-          // TODO: Fix aggregation value mapping
           Object value = record._record.getValues()[_numGroupByExpressions + i];
           GroupByResultHolder groupByResultHolder = _groupByResultHolders[i];
           if (groupByResultHolder.getType() == GroupByResultHolder.type.DOUBLE) {
-            groupByResultHolder.setValueForKey(groupId, ((Number)value).doubleValue());
+            groupByResultHolder.setValueForKey(groupId, ((Number) value).doubleValue());
           } else {
             groupByResultHolder.setValueForKey(groupId, value);
           }

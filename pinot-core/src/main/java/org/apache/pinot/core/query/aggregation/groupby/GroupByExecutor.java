@@ -20,9 +20,7 @@ package org.apache.pinot.core.query.aggregation.groupby;
 
 import java.util.Collection;
 import org.apache.pinot.core.data.table.IntermediateRecord;
-import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
-import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
 
 /**

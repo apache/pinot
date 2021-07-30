@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.data.table;
 
-import javax.annotation.Nullable;
 
 
 /**

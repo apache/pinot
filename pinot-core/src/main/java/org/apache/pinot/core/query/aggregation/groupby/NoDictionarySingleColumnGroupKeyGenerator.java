@@ -589,4 +589,8 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
       throw new UnsupportedOperationException();
     }
   }
+  @Override
+  public Type getType() {
+    return Type.noDictSingle;
+  }
 }

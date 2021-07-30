@@ -35,6 +35,8 @@ public class QueryOptions {
   private final boolean _skipUpsert;
   private final boolean _enableSegmentTrim;
   private final int _minSegmentTrimSize;
+  private final int _onTheFlyTrimThreshold;
+  private final int _onTheFlyTrimSize;
 
   public QueryOptions(@Nullable Map<String, String> queryOptions) {
     if (queryOptions != null) {
@@ -45,6 +47,8 @@ public class QueryOptions {
       _skipUpsert = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.SKIP_UPSERT));
       _enableSegmentTrim = isEnableSegmentTrim(queryOptions);
       _minSegmentTrimSize = getMinSegmentTrimSize(queryOptions);
+      _onTheFlyTrimThreshold = getTrimThreshold(queryOptions);
+      _onTheFlyTrimSize = getTrimSize(queryOptions);
     } else {
       _timeoutMs = null;
       _groupByModeSQL = false;
@@ -53,6 +57,8 @@ public class QueryOptions {
       _skipUpsert = false;
       _enableSegmentTrim = false;
       _minSegmentTrimSize = -1;
+      _onTheFlyTrimThreshold = -1;
+      _onTheFlyTrimSize = -1;
     }
   }
 
@@ -88,6 +94,16 @@ public class QueryOptions {
   }
 
   @Nullable
+  public Integer getOnTheFlyTrimSize() {
+    return _onTheFlyTrimSize;
+  }
+
+  @Nullable
+  public Integer getOnTheFlyTrimThreshold() {
+    return _onTheFlyTrimThreshold;
+  }
+
+  @Nullable
   public static Long getTimeoutMs(Map<String, String> queryOptions) {
     String timeoutMsString = queryOptions.get(Request.QueryOptionKey.TIMEOUT_MS);
     if (timeoutMsString != null) {
@@ -107,6 +123,22 @@ public class QueryOptions {
     String minSegmentTrimSize = queryOptions.get(Request.QueryOptionKey.MIN_SEGMENT_TRIM_SIZE);
     if (minSegmentTrimSize != null) {
       return Integer.parseInt(minSegmentTrimSize);
+    }
+    return -1;
+  }
+
+  public static int getTrimThreshold(Map<String, String> queryOptions) {
+    String onTheFlyTrimThreshold = queryOptions.get(Request.QueryOptionKey.ON_THE_FLY_TRIM_THRESHOLD);
+    if (onTheFlyTrimThreshold != null) {
+      return Integer.parseInt(onTheFlyTrimThreshold);
+    }
+    return -1;
+  }
+
+  public static int getTrimSize(Map<String, String> queryOptions) {
+    String onTheFlyTrimSize = queryOptions.get(Request.QueryOptionKey.ON_THE_FLY_TRIM_SIZE);
+    if (onTheFlyTrimSize != null) {
+      return Integer.parseInt(onTheFlyTrimSize);
     }
     return -1;
   }

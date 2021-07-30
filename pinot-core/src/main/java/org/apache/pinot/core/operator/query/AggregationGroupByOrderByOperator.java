@@ -116,16 +116,15 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
   protected IntermediateResultsBlock getNextBlock() {
     // Perform aggregation group-by on all the blocks
     GroupByExecutor groupByExecutor;
-    // TODO: Change how we construct tableResizer
     // TODO: Handle no orderBy case
     if (_useStarTree) {
       groupByExecutor =
           new StarTreeGroupByExecutor(_aggregationFunctions, _groupByExpressions, _maxInitialResultHolderCapacity,
-              _numGroupsLimit, _transformOperator, _tableResizer, false);
+              _numGroupsLimit, _transformOperator, _tableResizer, _queryContext.getQueryOptions(), false);
     } else {
       groupByExecutor =
           new DefaultGroupByExecutor(_aggregationFunctions, _groupByExpressions, _maxInitialResultHolderCapacity,
-              _numGroupsLimit, _transformOperator,  _tableResizer, false);
+              _numGroupsLimit, _transformOperator,  _tableResizer, _queryContext.getQueryOptions(), false);
     }
     int numBlocks = 0;
     int numDocs = 0;

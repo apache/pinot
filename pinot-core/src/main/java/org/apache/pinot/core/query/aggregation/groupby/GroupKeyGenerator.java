@@ -19,10 +19,8 @@
 package org.apache.pinot.core.query.aggregation.groupby;
 
 import java.util.Iterator;
-import org.apache.avro.reflect.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.core.data.table.DictIdRecord;
-import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
@@ -94,6 +92,12 @@ public interface GroupKeyGenerator {
 
   Dictionary[] getDictionaries();
 
+  enum Type {
+    noDictSingle, NoDictMulti, DictArray, DictIntMap, DictLongMap, DictArrayMap
+  }
+
+  Type getType();
+
   class GroupDictId {
     public int _groupId;
     public long _rawKey;
@@ -127,4 +131,5 @@ public interface GroupKeyGenerator {
       return StringUtils.splitPreserveAllTokens(_stringKey, GroupKeyGenerator.DELIMITER);
     }
   }
+
 }

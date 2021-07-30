@@ -118,6 +118,22 @@ public class GroupByInSegmentTrimTest {
     assertEquals(extractedResult, expectedResult);
   }
 
+  @Test(dataProvider = "QueryDataProviderForOnTheFlyTrim")
+  void TestTrimOnTheFly(int trimSize, List<Pair<Double, Double>> expectedResult, QueryContext queryContext) {
+    // Create a query plan
+    AggregationGroupByOrderByPlanNode aggregationGroupByOrderByPlanNode =
+        new AggregationGroupByOrderByPlanNode(_indexSegment, queryContext, MAX_INITIAL_RESULT_HOLDER_CAPACITY,
+            NUM_GROUPS_LIMIT, trimSize);
+
+    // Get the query executor
+    AggregationGroupByOrderByOperator aggregationGroupByOrderByOperator = aggregationGroupByOrderByPlanNode.run();
+
+    // Extract the execution result
+    IntermediateResultsBlock resultsBlock = aggregationGroupByOrderByOperator.nextBlock();
+    ArrayList<Pair<Double, Double>> extractedResult = extractTestResult(resultsBlock);
+
+    assertEquals(extractedResult, expectedResult);
+  }
   /**
    * Helper method to setup the index segment on which to perform aggregation tests.
    * - Generates a segment with {@link #NUM_COLUMN} and {@link #NUM_ROWS}
@@ -278,6 +294,46 @@ public class GroupByInSegmentTrimTest {
     trimSize = 0;
     expectedSize = 1000;
     data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
+
+    return data.toArray(new Object[data.size()][]);
+  }
+
+  @DataProvider
+  public static Object[][] QueryDataProviderForOnTheFlyTrim() {
+    List<Object[]> data = new ArrayList<>();
+    ArrayList<Pair<Double, Double>> expectedResult = computeExpectedResult();
+    // Testcase1: low limit + high trim size
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY metric_0 DESC LIMIT 1 OPTION(onTheFlyTrimSize=100, onTheFlyTrimThreshold=200)");
+    int trimSize = 0;
+    int expectedSize = 100;
+    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
+    // Testcase2: high limit + low trim size
+//    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+//        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50");
+//    trimSize = 10;
+//    expectedSize = max(trimSize, 5 * queryContext.getLimit());
+//    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
+//    // Testcase3: high limit + high trim size (No trim)
+//    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+//        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 500");
+//    trimSize = 1000;
+//    expectedSize = 1000;
+//    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
+//
+//    // Testcase4: low limit + low server trim size + query option size
+//    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+//        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50 OPTION(minSegmentTrimSize=1000)");
+//    trimSize = 0;
+//    expectedSize = 1000;
+//    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
+//
+//    // Testcase5: low limit + low server trim size + query option enable
+//    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+//        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50 OPTION(enableSegmentTrim=true)");
+//    trimSize = 0;
+//    expectedSize = 1000;
+//    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
 
     return data.toArray(new Object[data.size()][]);
   }
