@@ -150,8 +150,10 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("mvDouble"), new Object[]{123d});
       assertEquals(record.getValue("svStringWithNullCharacters"), "1\0002\0003");
       assertEquals(record.getValue("svStringWithLengthLimit"), "123");
-      // NOTE: We identify the array type by the first element, so data type conversion only applied to 'mvString2'
-      assertEquals(record.getValue("mvString1"), new Object[]{"123", 123, 123L, 123f, 123.0});
+      // NOTE: We used to speculate the array type by the first element, but has changed
+      // to convert type for values in array based on their real value, making the logic
+      // safe to handle array of values with mixing types.
+      assertEquals(record.getValue("mvString1"), new Object[]{"123", "123", "123", "123.0", "123.0"});
       assertEquals(record.getValue("mvString2"), new Object[]{"123", "123", "123.0", "123.0", "123"});
       assertNull(record.getValue("$virtual"));
       assertTrue(record.getNullValueFields().isEmpty());
