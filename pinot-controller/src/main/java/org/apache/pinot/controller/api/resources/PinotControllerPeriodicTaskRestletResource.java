@@ -55,7 +55,7 @@ public class PinotControllerPeriodicTaskRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/run")
-  @ApiOperation(value = "Run Controller Periodic Task.")
+  @ApiOperation(value = "Run controller periodic task against the specified table. If no table name is specified, task will run against all tables.")
   public boolean runPeriodicTask(
       @ApiParam(value = "Periodic Task Name", required = true) @QueryParam("taskname") String periodicTaskName,
       @ApiParam(value = "Table Name", required = false) @QueryParam("tablename") String tableName) {

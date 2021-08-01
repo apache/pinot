@@ -34,6 +34,10 @@ public class RunPeriodicTaskMessage extends Message {
   private static final String PERIODIC_TASK_NAME_KEY = "periodicTaskName";
   private static final String TABLE_NAME_KEY = "tableName";
 
+  /**
+   * @param periodicTaskName Name of the task that will be run.
+   * @param tableName Table name against which task will run.
+   */
   public RunPeriodicTaskMessage(@Nonnull String periodicTaskName, String tableName) {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
     setMsgSubType(RUN_PERIODIC_TASK_MSG_SUB_TYPE);

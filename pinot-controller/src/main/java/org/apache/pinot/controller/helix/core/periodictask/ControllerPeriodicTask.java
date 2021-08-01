@@ -61,14 +61,11 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
     try {
       // Process the tables that are managed by this controller
       List<String> tablesToProcess = new ArrayList<>();
-      if (filter == null) {
-        for (String tableNameWithType : _pinotHelixResourceManager.getAllTables()) {
-          if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {
-            tablesToProcess.add(tableNameWithType);
-          }
+      for (String tableNameWithType : _pinotHelixResourceManager.getAllTables()) {
+        if (_leadControllerManager.isLeaderForTable(tableNameWithType) && (filter == null || tableNameWithType
+            .equalsIgnoreCase(filter))) {
+          tablesToProcess.add(tableNameWithType);
         }
-      } else {
-        tablesToProcess.add(filter);
       }
       processTables(tablesToProcess);
     } catch (Exception e) {
