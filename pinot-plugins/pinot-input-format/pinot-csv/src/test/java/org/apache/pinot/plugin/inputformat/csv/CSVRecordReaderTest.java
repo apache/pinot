@@ -32,6 +32,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
 public class CSVRecordReaderTest extends AbstractRecordReaderTest {
@@ -102,5 +103,18 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
       }
     }
     Assert.assertFalse(recordReader.hasNext());
+  }
+
+  @Test
+  public void whenConfiguredHeaderDoesNotContainConfiguredDelimiterThenExceptionShouldBeThrown() {
+    //setup
+    CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
+    csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
+    csvRecordReaderConfig.setHeader("col1;col2;col3;col4;col5;col6;col7;col8;col9;col10");
+    csvRecordReaderConfig.setDelimiter(',');
+    CSVRecordReader csvRecordReader = new CSVRecordReader();
+    //execution and assertion
+    Assert.assertThrows(IllegalArgumentException.class,
+        () -> csvRecordReader.init(_dataFile, _sourceFields, csvRecordReaderConfig));
   }
 }
