@@ -87,7 +87,7 @@ public class CSVRecordReader implements RecordReader {
       } else {
         //we assume that the record delimiter also delimits the header
         if (delimiterNotPresentInHeader(delimiter, csvHeader)) {
-          throw new IllegalArgumentException("Supplied header does not contain the supplied delimiter");
+          throw new IllegalArgumentException("Supplied header does not contain the configured delimiter");
         }
         format = format.withHeader(StringUtils.split(csvHeader, delimiter));
       }
