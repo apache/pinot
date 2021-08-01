@@ -89,8 +89,7 @@ public class CSVRecordReader implements RecordReader {
         if (delimiterNotPresentInHeader(delimiter, csvHeader)) {
           throw new IllegalArgumentException("Supplied header does not contain the supplied delimiter");
         }
-        String[] columns = StringUtils.split(csvHeader, delimiter);
-        format = format.withHeader(columns);
+        format = format.withHeader(StringUtils.split(csvHeader, delimiter));
       }
       Character commentMarker = config.getCommentMarker();
       format = format.withCommentMarker(commentMarker);
