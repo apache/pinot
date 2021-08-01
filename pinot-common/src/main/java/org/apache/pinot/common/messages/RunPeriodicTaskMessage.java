@@ -32,13 +32,15 @@ import org.apache.helix.model.Message;
 public class RunPeriodicTaskMessage extends Message {
   public static final String RUN_PERIODIC_TASK_MSG_SUB_TYPE = "PERIODIC_TASK";
   private static final String PERIODIC_TASK_NAME_KEY = "periodicTaskName";
+  private static final String TABLE_NAME_KEY = "tableName";
 
-  public RunPeriodicTaskMessage(@Nonnull String periodicTaskName) {
+  public RunPeriodicTaskMessage(@Nonnull String periodicTaskName, String tableName) {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
     setMsgSubType(RUN_PERIODIC_TASK_MSG_SUB_TYPE);
     setExecutionTimeout(-1);
     ZNRecord znRecord = getRecord();
     znRecord.setSimpleField(PERIODIC_TASK_NAME_KEY, periodicTaskName);
+    znRecord.setSimpleField(TABLE_NAME_KEY, tableName);
   }
 
   public RunPeriodicTaskMessage(Message message) {
@@ -50,5 +52,9 @@ public class RunPeriodicTaskMessage extends Message {
 
   public String getPeriodicTaskName() {
     return getRecord().getSimpleField(PERIODIC_TASK_NAME_KEY);
+  }
+
+  public String getTableName() {
+    return getRecord().getSimpleField(TABLE_NAME_KEY);
   }
 }

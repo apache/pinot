@@ -52,8 +52,11 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
     _leadControllerManager = leadControllerManager;
   }
 
+  /**
+   * @param filter Currently not used, but can be used to specify how this task should be run.
+   */
   @Override
-  protected final void runTask() {
+  protected final void runTask(String filter) {
     // Make it so that only one controller returns the metric for all the tasks.
     if (!_leadControllerManager.isLeaderForTable(TASK_NAME)) {
       return;

@@ -46,7 +46,7 @@ public class PeriodicTaskSchedulerTest {
       }
 
       @Override
-      protected void runTask() {
+      protected void runTask(String filter) {
         runCalled.set(true);
       }
 
@@ -84,7 +84,7 @@ public class PeriodicTaskSchedulerTest {
         }
 
         @Override
-        protected void runTask() {
+        protected void runTask(String filter) {
           numTimesRunCalled.getAndIncrement();
         }
 
@@ -121,7 +121,7 @@ public class PeriodicTaskSchedulerTest {
     PeriodicTask task = new BasePeriodicTask("TestTask", 1L, 0L) {
       private volatile boolean isRunning = false;
       @Override
-      protected void runTask() {
+      protected void runTask(String filter) {
         try {
           if (isRunning) {
             Assert.fail("More than one thread attempting to execute task at the same time.");
@@ -152,7 +152,7 @@ public class PeriodicTaskSchedulerTest {
     for (int i = 0; i < threads.length; i++) {
       threads[i] = new Thread(() -> {
           attempts.incrementAndGet();
-          taskScheduler.execute("TestTask");
+          taskScheduler.execute("TestTask", null);
       });
 
       threads[i].start();

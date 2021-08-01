@@ -57,7 +57,8 @@ public class PinotControllerPeriodicTaskRestletResource {
   @Path("/run")
   @ApiOperation(value = "Run Controller Periodic Task.")
   public boolean runPeriodicTask(
-      @ApiParam(value = "Periodic Task Name", required = true) @QueryParam("name") String periodicTaskName) {
+      @ApiParam(value = "Periodic Task Name", required = true) @QueryParam("taskname") String periodicTaskName,
+      @ApiParam(value = "Table Name", required = false) @QueryParam("tablename") String tableName) {
     if (!_periodicTaskScheduler.hasTask(periodicTaskName)) {
       throw new WebApplicationException("Periodic task '" + periodicTaskName + "' not found.",
           Response.Status.NOT_FOUND);
@@ -72,7 +73,7 @@ public class PinotControllerPeriodicTaskRestletResource {
     recipientCriteria.setSessionSpecific(true);
     recipientCriteria.setResource(CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
     recipientCriteria.setSelfExcluded(false);
-    RunPeriodicTaskMessage runPeriodicTaskMessage = new RunPeriodicTaskMessage(periodicTaskName);
+    RunPeriodicTaskMessage runPeriodicTaskMessage = new RunPeriodicTaskMessage(periodicTaskName, tableName);
 
     ClusterMessagingService clusterMessagingService =
         _pinotHelixResourceManager.getHelixZkManager().getMessagingService();

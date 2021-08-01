@@ -133,7 +133,7 @@ public class PeriodicTaskScheduler {
    * Execute specified {@link PeriodicTask} immediately. If the task is already running, wait for the running task
    * to finish before executing the task again.
    */
-  public void execute(String periodicTaskName) {
+  public void execute(String periodicTaskName, String tableName) {
     PeriodicTask periodicTask = getPeriodicTask(periodicTaskName);
     LOGGER.info("Immediately executing periodic task {}", periodicTaskName);
     if (periodicTask == null) {

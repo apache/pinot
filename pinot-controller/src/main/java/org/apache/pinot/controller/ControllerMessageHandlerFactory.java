@@ -62,11 +62,13 @@ public class ControllerMessageHandlerFactory implements MessageHandlerFactory {
   /** Message handler for "Run Periodic Task" message. */
   private static class RunPeriodicTaskMessageHandler extends MessageHandler {
     private final String _periodicTaskName;
+    private final String _tableName;
     private final PeriodicTaskScheduler _periodicTaskScheduler;
 
     RunPeriodicTaskMessageHandler(RunPeriodicTaskMessage message, NotificationContext context, PeriodicTaskScheduler periodicTaskScheduler) {
       super(message, context);
       _periodicTaskName = message.getPeriodicTaskName();
+      _tableName = message.getTableName();
       _periodicTaskScheduler = periodicTaskScheduler;
     }
 
@@ -74,7 +76,7 @@ public class ControllerMessageHandlerFactory implements MessageHandlerFactory {
     public HelixTaskResult handleMessage()
         throws InterruptedException {
       LOGGER.info("Handle RunPeriodicTaskMessage by executing task {}", _periodicTaskName);
-      _periodicTaskScheduler.execute(_periodicTaskName);
+      _periodicTaskScheduler.execute(_periodicTaskName, _tableName);
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       helixTaskResult.setSuccess(true);
       return helixTaskResult;

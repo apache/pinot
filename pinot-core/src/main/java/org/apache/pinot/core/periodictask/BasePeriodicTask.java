@@ -43,11 +43,14 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   private volatile boolean _started;
   private volatile boolean _running;
 
+  private String _tableName;
+
   public BasePeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds) {
     _taskName = taskName;
     _intervalInSeconds = runFrequencyInSeconds;
     _initialDelayInSeconds = initialDelayInSeconds;
     _runLock = new ReentrantLock();
+    _tableName = null;
   }
 
   @Override
@@ -127,7 +130,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
         long startTime = System.currentTimeMillis();
         LOGGER.info("Start running task: {}", _taskName);
         try {
-          runTask();
+          runTask(_tableName);
         } catch (Exception e) {
           LOGGER.error("Caught exception while running task: {}", _taskName, e);
         }
@@ -143,11 +146,24 @@ public abstract class BasePeriodicTask implements PeriodicTask {
     }
   }
 
+  @Override
+  public void run(String tableName) {
+    try {
+      _runLock.lock();
+      _tableName = tableName;
+      run();
+    } finally {
+      _tableName = null;
+      _runLock.unlock();
+    }
+  }
+
   /**
    * Executes the task. This method should early terminate if {@code started} flag is set to false by {@link #stop()}
    * during execution.
+   * @param filter An implementation specific string that may dictate how the task will be run. null by default.
    */
-  protected abstract void runTask();
+  protected abstract void runTask(String filter);
 
   /**
    * {@inheritDoc}

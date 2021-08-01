@@ -44,8 +44,11 @@ public class MinionInstancesCleanupTask extends BasePeriodicTask {
     _controllerMetrics = controllerMetrics;
   }
 
+  /**
+   * @param filter Currently not used, but can be used to specify how this task should be run.
+   */
   @Override
-  protected void runTask() {
+  protected void runTask(String filter) {
     List<String> offlineInstances = new ArrayList<>(_pinotHelixResourceManager.getAllInstances());
     offlineInstances.removeAll(_pinotHelixResourceManager.getOnlineInstanceList());
     for (String offlineInstance : offlineInstances) {
