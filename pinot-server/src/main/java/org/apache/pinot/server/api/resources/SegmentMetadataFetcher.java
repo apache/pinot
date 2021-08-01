@@ -133,7 +133,7 @@ public class SegmentMetadataFetcher {
         indexStatus.put(NULL_VALUE_VECTOR_READER, INDEX_AVAILABLE);
       }
 
-      if (Objects.isNull(columnIndexContainer.getNullValueVector())) {
+      if (Objects.isNull(columnIndexContainer.getRangeIndex())) {
         indexStatus.put(RANGE_INDEX, INDEX_NOT_AVAILABLE);
       } else {
         indexStatus.put(RANGE_INDEX, INDEX_AVAILABLE);

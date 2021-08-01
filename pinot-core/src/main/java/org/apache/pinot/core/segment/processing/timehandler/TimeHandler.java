@@ -16,18 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.partition;
+package org.apache.pinot.core.segment.processing.timehandler;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
- * Partitioner for GenericRow
+ * Handler for time values within the records:
+ * - Filter records based on the start/end time range
+ * - Round time values
+ * - Partition records based on time values
  */
-public interface Partitioner {
+public interface TimeHandler {
+  enum Type {
+    NO_OP, EPOCH
+    // TODO: Support DATE_TIME handler which rounds and partitions time on calendar date boundary with timezone support
+  }
+
+  String DEFAULT_PARTITION = "0";
 
   /**
-   * Computes a partition value for the given row
+   * Filters/rounds the time value for the given row and returns the time partition, or {@code null} if the row is
+   * filtered out. The time value is modified in-place.
    */
-  String getPartition(GenericRow genericRow);
+  @Nullable
+  String handleTime(GenericRow row);
 }

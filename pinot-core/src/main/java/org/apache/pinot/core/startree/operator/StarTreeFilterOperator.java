@@ -40,6 +40,7 @@ import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
 import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.core.startree.CompositePredicateEvaluator;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.startree.StarTree;
 import org.apache.pinot.segment.spi.index.startree.StarTreeNode;
@@ -53,7 +54,8 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * <p>High-level algorithm:
  * <ul>
  *   <li>
- *     Traverse the filter tree and generate a map from column to a list of {@link PredicateEvaluator}s applied to it
+ *     Traverse the filter tree and generate a map from column to a list of {@link CompositePredicateEvaluator}s applied
+ *     to it
  *   </li>
  *   <li>
  *     Traverse the star tree index, try to match as many predicates as possible, add the matching documents into a
@@ -75,7 +77,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  *     </ul>
  *   </li>
  *   <li>
- *     For each remaining predicate columns, use the list of {@link PredicateEvaluator}s to generate separate
+ *     For each remaining predicate columns, use the list of {@link CompositePredicateEvaluator}s to generate separate
  *     {@link BaseFilterOperator}s for it
  *   </li>
  *   <li>Conjoin all {@link BaseFilterOperator}s with AND if we have multiple of them</li>
@@ -119,15 +121,17 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   // Star-tree
   private final StarTreeV2 _starTreeV2;
   // Map from column to predicate evaluators
-  private final Map<String, List<PredicateEvaluator>> _predicateEvaluatorsMap;
+  private final Map<String, List<CompositePredicateEvaluator>> _predicateEvaluatorsMap;
   // Set of group-by columns
   private final Set<String> _groupByColumns;
 
   private final Map<String, String> _debugOptions;
+
   boolean _resultEmpty = false;
 
-  public StarTreeFilterOperator(StarTreeV2 starTreeV2, Map<String, List<PredicateEvaluator>> predicateEvaluatorsMap,
-      Set<String> groupByColumns, @Nullable Map<String, String> debugOptions) {
+  public StarTreeFilterOperator(StarTreeV2 starTreeV2,
+      Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap, Set<String> groupByColumns,
+      @Nullable Map<String, String> debugOptions) {
     _starTreeV2 = starTreeV2;
     _predicateEvaluatorsMap = predicateEvaluatorsMap;
     _debugOptions = debugOptions;
@@ -183,10 +187,26 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
 
     // Add remaining predicates
     for (String remainingPredicateColumn : starTreeResult._remainingPredicateColumns) {
-      List<PredicateEvaluator> predicateEvaluators = _predicateEvaluatorsMap.get(remainingPredicateColumn);
+      List<CompositePredicateEvaluator> compositePredicateEvaluators =
+          _predicateEvaluatorsMap.get(remainingPredicateColumn);
       DataSource dataSource = _starTreeV2.getDataSource(remainingPredicateColumn);
-      for (PredicateEvaluator predicateEvaluator : predicateEvaluators) {
-        childFilterOperators.add(FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs));
+      for (CompositePredicateEvaluator compositePredicateEvaluator : compositePredicateEvaluators) {
+        List<PredicateEvaluator> predicateEvaluators = compositePredicateEvaluator.getPredicateEvaluators();
+        int numPredicateEvaluators = predicateEvaluators.size();
+        if (numPredicateEvaluators == 1) {
+          // Single predicate evaluator
+          childFilterOperators
+              .add(FilterOperatorUtils.getLeafFilterOperator(predicateEvaluators.get(0), dataSource, numDocs));
+        } else {
+          // Predicate evaluators conjoined with OR
+          List<BaseFilterOperator> orChildFilterOperators = new ArrayList<>(numPredicateEvaluators);
+          for (PredicateEvaluator childPredicateEvaluator : predicateEvaluators) {
+            orChildFilterOperators
+                .add(FilterOperatorUtils.getLeafFilterOperator(childPredicateEvaluator, dataSource, numDocs));
+          }
+          childFilterOperators
+              .add(FilterOperatorUtils.getOrFilterOperator(orChildFilterOperators, numDocs, _debugOptions));
+        }
       }
     }
 
@@ -306,66 +326,87 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   }
 
   /**
-   * Helper method to get a set of matching dictionary ids from a list of predicate evaluators conjoined with AND.
+   * Helper method to get a set of matching dictionary ids from a list of composite predicate evaluators conjoined with
+   * AND.
+   * <p>When there are multiple composite predicate evaluators:
    * <ul>
    *   <li>
-   *     We sort all predicate evaluators with priority: EQ > IN > RANGE > NOT_IN/NEQ > REGEXP_LIKE so that we process
-   *     less dictionary ids.
+   *     We sort all composite predicate evaluators with priority: EQ > IN > RANGE > NOT_IN/NEQ > REGEXP_LIKE > multiple
+   *     predicate evaluators conjoined with OR so that we process less dictionary ids.
    *   </li>
    *   <li>
-   *     For the first predicate evaluator, we get all the matching dictionary ids, then apply them to other predicate
-   *     evaluators to get the final set of matching dictionary ids.
+   *     For the first composite predicate evaluator, we get all the matching dictionary ids, then apply them to other
+   *     composite predicate evaluators to get the final set of matching dictionary ids.
    *   </li>
    * </ul>
    */
-  private IntSet getMatchingDictIds(List<PredicateEvaluator> predicateEvaluators) {
+  private IntSet getMatchingDictIds(List<CompositePredicateEvaluator> compositePredicateEvaluators) {
+    int numCompositePredicateEvaluators = compositePredicateEvaluators.size();
+    if (numCompositePredicateEvaluators == 1) {
+      return getMatchingDictIds(compositePredicateEvaluators.get(0));
+    }
+
     // Sort the predicate evaluators so that we process less dictionary ids
-    predicateEvaluators.sort(new Comparator<PredicateEvaluator>() {
+    compositePredicateEvaluators.sort(new Comparator<CompositePredicateEvaluator>() {
       @Override
-      public int compare(PredicateEvaluator o1, PredicateEvaluator o2) {
+      public int compare(CompositePredicateEvaluator o1, CompositePredicateEvaluator o2) {
         return getPriority(o1) - getPriority(o2);
       }
 
-      int getPriority(PredicateEvaluator predicateEvaluator) {
-        switch (predicateEvaluator.getPredicateType()) {
-          case EQ:
-            return 1;
-          case IN:
-            return 2;
-          case RANGE:
-            return 3;
-          case NOT_EQ:
-          case NOT_IN:
-            return 4;
-          default:
-            throw new UnsupportedOperationException();
+      int getPriority(CompositePredicateEvaluator compositePredicateEvaluator) {
+        List<PredicateEvaluator> predicateEvaluators = compositePredicateEvaluator.getPredicateEvaluators();
+        if (predicateEvaluators.size() == 1) {
+          switch (predicateEvaluators.get(0).getPredicateType()) {
+            case EQ:
+              return 1;
+            case IN:
+              return 2;
+            case RANGE:
+              return 3;
+            case NOT_EQ:
+            case NOT_IN:
+              return 4;
+            default:
+              throw new UnsupportedOperationException();
+          }
+        } else {
+          // Process OR at last
+          return 5;
         }
       }
     });
 
     // Initialize matching dictionary ids with the first predicate evaluator
-    IntSet matchingDictIds = new IntOpenHashSet();
-    PredicateEvaluator firstPredicateEvaluator = predicateEvaluators.get(0);
-    for (int matchingDictId : firstPredicateEvaluator.getMatchingDictIds()) {
-      matchingDictIds.add(matchingDictId);
-    }
+    IntSet matchingDictIds = getMatchingDictIds(compositePredicateEvaluators.get(0));
 
     // Process other predicate evaluators
-    int numPredicateEvaluators = predicateEvaluators.size();
-    for (int i = 1; i < numPredicateEvaluators; i++) {
+    for (int i = 1; i < numCompositePredicateEvaluators; i++) {
       // We don't need to apply other predicate evaluators if all matching dictionary ids have already been removed
       if (matchingDictIds.isEmpty()) {
         return matchingDictIds;
       }
-      PredicateEvaluator predicateEvaluator = predicateEvaluators.get(i);
+      CompositePredicateEvaluator compositePredicateEvaluator = compositePredicateEvaluators.get(i);
       IntIterator iterator = matchingDictIds.iterator();
       while (iterator.hasNext()) {
-        if (!predicateEvaluator.applySV(iterator.nextInt())) {
+        if (!compositePredicateEvaluator.apply(iterator.nextInt())) {
           iterator.remove();
         }
       }
     }
 
+    return matchingDictIds;
+  }
+
+  /**
+   * Returns the matching dictionary ids for the given composite predicate evaluator.
+   */
+  private IntSet getMatchingDictIds(CompositePredicateEvaluator compositePredicateEvaluator) {
+    IntSet matchingDictIds = new IntOpenHashSet();
+    for (PredicateEvaluator predicateEvaluator : compositePredicateEvaluator.getPredicateEvaluators()) {
+      for (int matchingDictId : predicateEvaluator.getMatchingDictIds()) {
+        matchingDictIds.add(matchingDictId);
+      }
+    }
     return matchingDictIds;
   }
 }

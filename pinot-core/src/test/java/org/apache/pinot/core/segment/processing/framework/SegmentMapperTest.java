@@ -26,16 +26,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.segment.processing.filter.RecordFilterConfig;
-import org.apache.pinot.core.segment.processing.filter.RecordFilterFactory;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileReader;
 import org.apache.pinot.core.segment.processing.mapper.SegmentMapper;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
-import org.apache.pinot.core.segment.processing.transformer.RecordTransformerConfig;
+import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
+import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerConfig;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
@@ -183,58 +181,46 @@ public class SegmentMapperTest {
 
     List<Object[]> inputs = new ArrayList<>();
 
-    // default configs
-    SegmentProcessorConfig config =
+    // Default configs
+    SegmentProcessorConfig config0 =
         new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).build();
-    Map<String, List<Object[]>> expectedRecords = new HashMap<>();
-    expectedRecords.put("0", outputData);
-    inputs.add(new Object[]{config, expectedRecords});
+    Map<String, List<Object[]>> expectedRecords0 = Collections.singletonMap("0", outputData);
+    inputs.add(new Object[]{config0, expectedRecords0});
 
-    // round robin partitioner
+    // Round-robin partitioner
     SegmentProcessorConfig config1 =
         new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setPartitionerConfigs(
             Collections.singletonList(
                 new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.ROUND_ROBIN)
                     .setNumPartitions(3).build())).build();
     Map<String, List<Object[]>> expectedRecords1 = new HashMap<>();
-    IntStream.range(0, 3).forEach(i -> expectedRecords1.put(String.valueOf(i), new ArrayList<>()));
     for (int i = 0; i < outputData.size(); i++) {
-      expectedRecords1.get(String.valueOf(i % 3)).add(outputData.get(i));
+      expectedRecords1.computeIfAbsent("0_" + (i % 3), k -> new ArrayList<>()).add(outputData.get(i));
     }
     inputs.add(new Object[]{config1, expectedRecords1});
 
-    // partition by timeValue
+    // Partition by campaign
     SegmentProcessorConfig config2 =
         new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setPartitionerConfigs(
             Collections.singletonList(
                 new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE)
-                    .setColumnName("timeValue").build())).build();
+                    .setColumnName("campaign").build())).build();
     Map<String, List<Object[]>> expectedRecords2 =
-        outputData.stream().collect(Collectors.groupingBy(r -> String.valueOf(r[2]), Collectors.toList()));
+        outputData.stream().collect(Collectors.groupingBy(r -> "0_" + r[0], Collectors.toList()));
     inputs.add(new Object[]{config2, expectedRecords2});
 
-    // partition by campaign
+    // Transform function partition
     SegmentProcessorConfig config3 =
-        new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setPartitionerConfigs(
-            Collections.singletonList(
-                new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE)
-                    .setColumnName("campaign").build())).build();
-    Map<String, List<Object[]>> expectedRecords3 =
-        outputData.stream().collect(Collectors.groupingBy(r -> String.valueOf(r[0]), Collectors.toList()));
-    inputs.add(new Object[]{config3, expectedRecords3});
-
-    // transform function partition
-    SegmentProcessorConfig config4 =
         new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setPartitionerConfigs(
             Collections.singletonList(new PartitionerConfig.Builder()
                 .setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
                 .setTransformFunction("toEpochDays(timeValue)").build())).build();
-    Map<String, List<Object[]>> expectedRecords4 = outputData.stream()
-        .collect(Collectors.groupingBy(r -> String.valueOf(((long) r[2]) / 86400000), Collectors.toList()));
-    inputs.add(new Object[]{config4, expectedRecords4});
+    Map<String, List<Object[]>> expectedRecords3 =
+        outputData.stream().collect(Collectors.groupingBy(r -> "0_" + ((long) r[2] / 86400000), Collectors.toList()));
+    inputs.add(new Object[]{config3, expectedRecords3});
 
-    // partition by column and then table column partition config
-    SegmentProcessorConfig config5 =
+    // Partition by column and then table column partition config
+    SegmentProcessorConfig config4 =
         new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setPartitionerConfigs(
             Arrays.asList(
                 new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE)
@@ -242,79 +228,51 @@ public class SegmentMapperTest {
                     .setPartitionerType(PartitionerFactory.PartitionerType.TABLE_PARTITION_CONFIG)
                     .setColumnName("clicks").setColumnPartitionConfig(new ColumnPartitionConfig("Modulo", 3)).build()))
             .build();
-    Map<String, List<Object[]>> expectedRecords5 = new HashMap<>();
+    Map<String, List<Object[]>> expectedRecords4 = new HashMap<>();
     for (Object[] record : outputData) {
-      String partition = record[0] + "_" + (int) record[1] % 3;
-      List<Object[]> objects = expectedRecords5.computeIfAbsent(partition, k -> new ArrayList<>());
+      String partition = "0_" + record[0] + "_" + ((int) record[1] % 3);
+      List<Object[]> objects = expectedRecords4.computeIfAbsent(partition, k -> new ArrayList<>());
       objects.add(record);
     }
-    inputs.add(new Object[]{config5, expectedRecords5});
+    inputs.add(new Object[]{config4, expectedRecords4});
 
-    // filter function which filters out nothing
-    SegmentProcessorConfig config6 =
-        new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setRecordFilterConfig(
-            new RecordFilterConfig.Builder().setRecordFilterType(RecordFilterFactory.RecordFilterType.FILTER_FUNCTION)
-                .setFilterFunction("Groovy({campaign == \"foo\"}, campaign)").build()).build();
-    Map<String, List<Object[]>> expectedRecords6 = new HashMap<>();
-    expectedRecords6.put("0", outputData);
-    inputs.add(new Object[]{config6, expectedRecords6});
-
-    // filter function which filters out everything
-    SegmentProcessorConfig config7 =
-        new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setRecordFilterConfig(
-            new RecordFilterConfig.Builder().setRecordFilterType(RecordFilterFactory.RecordFilterType.FILTER_FUNCTION)
-                .setFilterFunction("Groovy({timeValue > 0}, timeValue)").build()).build();
-    Map<String, List<Object[]>> expectedRecords7 = new HashMap<>();
-    inputs.add(new Object[]{config7, expectedRecords7});
-
-    // filter function which filters out certain times
-    SegmentProcessorConfig config8 =
-        new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setRecordFilterConfig(
-            new RecordFilterConfig.Builder().setRecordFilterType(RecordFilterFactory.RecordFilterType.FILTER_FUNCTION)
-                .setFilterFunction("Groovy({timeValue < 1597795200000L || timeValue >= 1597881600000L}, timeValue)")
-                .build()).build();
-    Map<String, List<Object[]>> expectedRecords8 =
+    // Time handling - filter out certain times
+    SegmentProcessorConfig config5 =
+        new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setTimeHandlerConfig(
+            new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setTimeRange(1597795200000L, 1597881600000L).build())
+            .build();
+    Map<String, List<Object[]>> expectedRecords5 =
         outputData.stream().filter(r -> ((long) r[2]) >= 1597795200000L && ((long) r[2]) < 1597881600000L)
             .collect(Collectors.groupingBy(r -> "0", Collectors.toList()));
-    inputs.add(new Object[]{config8, expectedRecords8});
+    inputs.add(new Object[]{config5, expectedRecords5});
 
-    // record transformation - round timeValue to nearest day
-    Map<String, String> transformFunctionMap = new HashMap<>();
-    transformFunctionMap.put("timeValue", "round(timeValue, 86400000)");
-    RecordTransformerConfig transformerConfig =
-        new RecordTransformerConfig.Builder().setTransformFunctionsMap(transformFunctionMap).build();
-    SegmentProcessorConfig config9 =
-        new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema)
-            .setRecordTransformerConfig(transformerConfig).build();
-    List<Object[]> transformedData = new ArrayList<>();
-    outputData.forEach(r -> transformedData.add(new Object[]{r[0], r[1], (((long) r[2]) / 86400000) * 86400000}));
-    Map<String, List<Object[]>> expectedRecords9 = new HashMap<>();
-    expectedRecords9.put("0", transformedData);
-    inputs.add(new Object[]{config9, expectedRecords9});
+    // Time handling - round time to nearest day
+    SegmentProcessorConfig config6 =
+        new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setTimeHandlerConfig(
+            new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setRoundBucketMs(86400000).build()).build();
+    Map<String, List<Object[]>> expectedRecords6 =
+        outputData.stream().map(r -> new Object[]{r[0], r[1], (((long) r[2]) / 86400000) * 86400000})
+            .collect(Collectors.groupingBy(r -> "0", Collectors.toList()));
+    inputs.add(new Object[]{config6, expectedRecords6});
 
-    // record transformation - round timeValue to nearest day, partition on timeValue
-    SegmentProcessorConfig config10 =
-        new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema)
-            .setRecordTransformerConfig(transformerConfig).setPartitionerConfigs(Collections.singletonList(
-            new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE)
-                .setColumnName("timeValue").build())).build();
-    Map<String, List<Object[]>> expectedRecords10 =
-        transformedData.stream().collect(Collectors.groupingBy(r -> String.valueOf(r[2]), Collectors.toList()));
-    inputs.add(new Object[]{config10, expectedRecords10});
+    // Time handling - partition time by day
+    SegmentProcessorConfig config7 =
+        new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setTimeHandlerConfig(
+            new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setPartitionBucketMs(86400000).build()).build();
+    Map<String, List<Object[]>> expectedRecords7 = outputData.stream()
+        .collect(Collectors.groupingBy(r -> Long.toString(((long) r[2]) / 86400000), Collectors.toList()));
+    inputs.add(new Object[]{config7, expectedRecords7});
 
-    // record transformation - round timeValue to nearest day, partition on timeValue, filter out timeValues
-    SegmentProcessorConfig config11 =
-        new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema)
-            .setRecordTransformerConfig(transformerConfig).setRecordFilterConfig(
-            new RecordFilterConfig.Builder().setRecordFilterType(RecordFilterFactory.RecordFilterType.FILTER_FUNCTION)
-                .setFilterFunction("Groovy({timeValue < 1597795200000L|| timeValue >= 1597881600000}, timeValue)")
-                .build()).setPartitionerConfigs(Collections.singletonList(
-            new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE)
-                .setColumnName("timeValue").build())).build();
-    Map<String, List<Object[]>> expectedRecords11 =
-        transformedData.stream().filter(r -> ((long) r[2]) == 1597795200000L)
-            .collect(Collectors.groupingBy(r -> "1597795200000", Collectors.toList()));
-    inputs.add(new Object[]{config11, expectedRecords11});
+    // Time handling - filter out certain times, round time to nearest hour, partition by day
+    SegmentProcessorConfig config8 =
+        new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setTimeHandlerConfig(
+            new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setTimeRange(1597795200000L, 1597881600000L)
+                .setRoundBucketMs(3600000).setPartitionBucketMs(86400000).build()).build();
+    Map<String, List<Object[]>> expectedRecords9 =
+        outputData.stream().filter(r -> ((long) r[2]) >= 1597795200000L && ((long) r[2]) < 1597881600000L)
+            .map(r -> new Object[]{r[0], r[1], (((long) r[2]) / 3600000) * 3600000})
+            .collect(Collectors.groupingBy(r -> Long.toString(((long) r[2]) / 86400000), Collectors.toList()));
+    inputs.add(new Object[]{config8, expectedRecords9});
 
     return inputs.toArray(new Object[0][]);
   }

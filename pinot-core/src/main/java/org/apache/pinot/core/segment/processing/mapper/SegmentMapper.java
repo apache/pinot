@@ -29,19 +29,16 @@ import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.core.segment.processing.filter.RecordFilter;
-import org.apache.pinot.core.segment.processing.filter.RecordFilterFactory;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorConfig;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
+import org.apache.pinot.core.segment.processing.partitioner.Partitioner;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
-import org.apache.pinot.core.segment.processing.transformer.RecordTransformer;
-import org.apache.pinot.core.segment.processing.transformer.RecordTransformerFactory;
+import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
+import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerFactory;
 import org.apache.pinot.core.segment.processing.utils.SegmentProcessorUtils;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
-import org.apache.pinot.segment.local.recordtransformer.DataTypeTransformer;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
-import org.apache.pinot.segment.spi.partition.Partitioner;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -69,13 +66,8 @@ public class SegmentMapper {
   private final boolean _includeNullFields;
   private final int _numSortFields;
 
-  // TODO: Merge the following transformers into one. Currently we need an extra DataTypeTransformer in the end in case
-  //       _recordTransformer changes the data type.
-  private final CompositeTransformer _defaultRecordTransformer;
-  private final RecordFilter _recordFilter;
-  private final RecordTransformer _recordTransformer;
-  private final DataTypeTransformer _dataTypeTransformer;
-
+  private final CompositeTransformer _recordTransformer;
+  private final TimeHandler _timeHandler;
   private final Partitioner[] _partitioners;
   private final String[] _partitionsBuffer;
   // NOTE: Use TreeMap so that the order is deterministic
@@ -92,20 +84,18 @@ public class SegmentMapper {
     _fieldSpecs = pair.getLeft();
     _numSortFields = pair.getRight();
     _includeNullFields = tableConfig.getIndexingConfig().isNullHandlingEnabled();
-    _defaultRecordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
-    _recordFilter = RecordFilterFactory.getRecordFilter(processorConfig.getRecordFilterConfig());
-    _recordTransformer = RecordTransformerFactory.getRecordTransformer(processorConfig.getRecordTransformerConfig());
-    _dataTypeTransformer = new DataTypeTransformer(schema);
+    _recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
+    _timeHandler = TimeHandlerFactory.getTimeHandler(processorConfig);
     List<PartitionerConfig> partitionerConfigs = processorConfig.getPartitionerConfigs();
     int numPartitioners = partitionerConfigs.size();
     _partitioners = new Partitioner[numPartitioners];
-    _partitionsBuffer = new String[numPartitioners];
     for (int i = 0; i < numPartitioners; i++) {
       _partitioners[i] = PartitionerFactory.getPartitioner(partitionerConfigs.get(i));
     }
-    LOGGER.info(
-        "Initialized mapper with {} record readers, output dir: {}, recordTransformer: {}, recordFilter: {}, partitioners: {}",
-        _recordReaders.size(), _mapperOutputDir, _recordTransformer.getClass(), _recordFilter.getClass(),
+    // Time partition + partition from partitioners
+    _partitionsBuffer = new String[numPartitioners + 1];
+    LOGGER.info("Initialized mapper with {} record readers, output dir: {}, timeHandler: {}, partitioners: {}",
+        _recordReaders.size(), _mapperOutputDir, _timeHandler.getClass(),
         Arrays.stream(_partitioners).map(p -> p.getClass().toString()).collect(Collectors.joining(",")));
   }
 
@@ -125,16 +115,14 @@ public class SegmentMapper {
         if (reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
           //noinspection unchecked
           for (GenericRow row : (Collection<GenericRow>) reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
-            GenericRow transformedRow = _defaultRecordTransformer.transform(row);
-            if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow) && !_recordFilter
-                .filter(transformedRow)) {
+            GenericRow transformedRow = _recordTransformer.transform(row);
+            if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
               writeRecord(transformedRow);
             }
           }
         } else {
-          GenericRow transformedRow = _defaultRecordTransformer.transform(reuse);
-          if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow) && !_recordFilter
-              .filter(transformedRow)) {
+          GenericRow transformedRow = _recordTransformer.transform(reuse);
+          if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
             writeRecord(transformedRow);
           }
         }
@@ -152,13 +140,17 @@ public class SegmentMapper {
 
   private void writeRecord(GenericRow row)
       throws IOException {
-    // Record transformation
-    row = _dataTypeTransformer.transform(_recordTransformer.transformRecord(row));
+    String timePartition = _timeHandler.handleTime(row);
+    if (timePartition == null) {
+      // Record not in the valid time range
+      return;
+    }
+    _partitionsBuffer[0] = timePartition;
 
     // Partitioning
     int numPartitioners = _partitioners.length;
     for (int i = 0; i < numPartitioners; i++) {
-      _partitionsBuffer[i] = _partitioners[i].getPartition(row);
+      _partitionsBuffer[i + 1] = _partitioners[i].getPartition(row);
     }
     String partition = StringUtil.join("_", _partitionsBuffer);
 

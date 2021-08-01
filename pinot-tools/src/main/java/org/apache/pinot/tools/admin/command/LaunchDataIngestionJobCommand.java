@@ -20,6 +20,7 @@ package org.apache.pinot.tools.admin.command;
 
 import java.util.Arrays;
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.core.util.TlsUtils;
 import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
@@ -49,6 +50,12 @@ public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand impl
   private List<String> _values;
   @Option(name = "-propertyFile", required = false, metaVar = "<template context file>", usage = "A property file contains context values to set the job spec template")
   private String _propertyFile;
+  @Option(name = "-user", required = false, metaVar = "<String>", usage = "Username for basic auth.")
+  private String _user;
+  @Option(name = "-password", required = false, metaVar = "<String>", usage = "Password for basic auth.")
+  private String _password;
+  @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
+  private String _authToken;
 
   public static void main(String[] args) {
     PluginManager.get().init();
@@ -126,6 +133,10 @@ public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand impl
     if (tlsSpec != null) {
       TlsUtils.installDefaultSSLSocketFactory(tlsSpec.getKeyStorePath(), tlsSpec.getKeyStorePassword(),
           tlsSpec.getTrustStorePath(), tlsSpec.getTrustStorePassword());
+    }
+
+    if (StringUtils.isBlank(spec.getAuthToken())) {
+      spec.setAuthToken(makeAuthToken(_authToken, _user, _password));
     }
 
     try {
