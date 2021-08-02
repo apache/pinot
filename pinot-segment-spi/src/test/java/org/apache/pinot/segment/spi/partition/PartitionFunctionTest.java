@@ -91,6 +91,9 @@ public class PartitionFunctionTest {
    */
   @Test
   public void testMurmurPartitioner() {
+    MurmurPartitionFunction func = new MurmurPartitionFunction(100);
+    Assert.assertEquals(func, new MurmurPartitionFunction(100));
+    Assert.assertNotEquals(func, new MurmurPartitionFunction(200));
     long seed = System.currentTimeMillis();
     Random random = new Random(seed);
 

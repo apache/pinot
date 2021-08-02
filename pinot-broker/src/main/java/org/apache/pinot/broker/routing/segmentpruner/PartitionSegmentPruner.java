@@ -19,9 +19,11 @@
 package org.apache.pinot.broker.routing.segmentpruner;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
@@ -61,6 +63,7 @@ public class PartitionSegmentPruner implements SegmentPruner {
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final String _segmentZKMetadataPathPrefix;
   private final Map<String, PartitionInfo> _partitionInfoMap = new ConcurrentHashMap<>();
+  private final Map<PartitionInfo, Set<String>> _partitionInfoSegments = new ConcurrentHashMap<>();
 
   public PartitionSegmentPruner(String tableNameWithType, String partitionColumn,
       ZkHelixPropertyStore<ZNRecord> propertyStore) {
@@ -88,8 +91,16 @@ public class PartitionSegmentPruner implements SegmentPruner {
         _partitionInfoMap.put(segment, partitionInfo);
       }
     }
+    rebuildReverseMap();
   }
 
+  private void rebuildReverseMap() {
+    _partitionInfoSegments.clear();
+    _partitionInfoMap.forEach((segmentName, partitionInfo) -> {
+      Set<String> segments = _partitionInfoSegments.computeIfAbsent(partitionInfo, (info) -> new HashSet<>());
+      segments.add(segmentName);
+    });
+  }
   /**
    * NOTE: Returns {@code null} when the ZNRecord is missing (could be transient Helix issue). Returns
    *       {@link #INVALID_PARTITION_INFO} when the segment does not have valid partition metadata in its ZK metadata,
@@ -140,6 +151,7 @@ public class PartitionSegmentPruner implements SegmentPruner {
           _propertyStore.get(_segmentZKMetadataPathPrefix + k, null, AccessOption.PERSISTENT)));
     }
     _partitionInfoMap.keySet().retainAll(onlineSegments);
+    rebuildReverseMap();
   }
 
   @Override
@@ -151,6 +163,7 @@ public class PartitionSegmentPruner implements SegmentPruner {
     } else {
       _partitionInfoMap.remove(segment);
     }
+    rebuildReverseMap();
   }
 
   @Override
@@ -163,48 +176,44 @@ public class PartitionSegmentPruner implements SegmentPruner {
       if (filterExpression == null) {
         return segments;
       }
-      Set<String> selectedSegments = new HashSet<>();
-      for (String segment : segments) {
-        PartitionInfo partitionInfo = _partitionInfoMap.get(segment);
-        if (partitionInfo == null || partitionInfo == INVALID_PARTITION_INFO || isPartitionMatch(filterExpression,
-            partitionInfo)) {
-          selectedSegments.add(segment);
-        }
-      }
-      return selectedSegments;
+      return pruneSegments((partitionInfo, cachedPartitionFunction) -> isPartitionMatch(filterExpression,
+        partitionInfo, cachedPartitionFunction));
     } else {
       // PQL
       FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
       if (filterQueryTree == null) {
         return segments;
       }
-      Set<String> selectedSegments = new HashSet<>();
-      for (String segment : segments) {
-        PartitionInfo partitionInfo = _partitionInfoMap.get(segment);
-        if (partitionInfo == null || partitionInfo == INVALID_PARTITION_INFO || isPartitionMatch(filterQueryTree,
-            partitionInfo)) {
-          selectedSegments.add(segment);
-        }
-      }
-      return selectedSegments;
+      return pruneSegments((partitionInfo, cachedPartitionFunction) -> isPartitionMatch(filterQueryTree, partitionInfo, cachedPartitionFunction));
     }
   }
 
-  private boolean isPartitionMatch(Expression filterExpression, PartitionInfo partitionInfo) {
+  private Set<String> pruneSegments(java.util.function.BiFunction<PartitionInfo, CachedPartitionFunction,  Boolean> partitionMatchLambda) {
+    Set<String> selectedSegments = new HashSet<>();
+    CachedPartitionFunction cachedPartitionFunction = new CachedPartitionFunction();
+    for (PartitionInfo partitionInfo : _partitionInfoSegments.keySet()) {
+      if (partitionMatchLambda.apply(partitionInfo, cachedPartitionFunction)) {
+        selectedSegments.addAll(_partitionInfoSegments.get(partitionInfo));
+      }
+    }
+    return selectedSegments;
+  }
+
+  private boolean isPartitionMatch(Expression filterExpression, PartitionInfo partitionInfo, CachedPartitionFunction cachedPartitionFunction) {
     Function function = filterExpression.getFunctionCall();
     FilterKind filterKind = FilterKind.valueOf(function.getOperator());
     List<Expression> operands = function.getOperands();
     switch (filterKind) {
       case AND:
         for (Expression child : operands) {
-          if (!isPartitionMatch(child, partitionInfo)) {
+          if (!isPartitionMatch(child, partitionInfo, cachedPartitionFunction)) {
             return false;
           }
         }
         return true;
       case OR:
         for (Expression child : operands) {
-          if (isPartitionMatch(child, partitionInfo)) {
+          if (isPartitionMatch(child, partitionInfo, cachedPartitionFunction)) {
             return true;
           }
         }
@@ -213,7 +222,7 @@ public class PartitionSegmentPruner implements SegmentPruner {
         Identifier identifier = operands.get(0).getIdentifier();
         if (identifier != null && identifier.getName().equals(_partitionColumn)) {
           return partitionInfo._partitions.contains(
-              partitionInfo._partitionFunction.getPartition(operands.get(1).getLiteral().getFieldValue().toString()));
+            cachedPartitionFunction.getPartition(partitionInfo._partitionFunction, operands.get(1).getLiteral().getFieldValue().toString()));
         } else {
           return true;
         }
@@ -223,8 +232,8 @@ public class PartitionSegmentPruner implements SegmentPruner {
         if (identifier != null && identifier.getName().equals(_partitionColumn)) {
           int numOperands = operands.size();
           for (int i = 1; i < numOperands; i++) {
-            if (partitionInfo._partitions.contains(partitionInfo._partitionFunction
-                .getPartition(operands.get(i).getLiteral().getFieldValue().toString()))) {
+            if (partitionInfo._partitions.contains(cachedPartitionFunction.getPartition(partitionInfo._partitionFunction,
+              operands.get(i).getLiteral().getFieldValue().toString()))) {
               return true;
             }
           }
@@ -239,18 +248,18 @@ public class PartitionSegmentPruner implements SegmentPruner {
   }
 
   @Deprecated
-  private boolean isPartitionMatch(FilterQueryTree filterQueryTree, PartitionInfo partitionInfo) {
+  private boolean isPartitionMatch(FilterQueryTree filterQueryTree, PartitionInfo partitionInfo, CachedPartitionFunction cachedPartitionFunction) {
     switch (filterQueryTree.getOperator()) {
       case AND:
         for (FilterQueryTree child : filterQueryTree.getChildren()) {
-          if (!isPartitionMatch(child, partitionInfo)) {
+          if (!isPartitionMatch(child, partitionInfo, cachedPartitionFunction)) {
             return false;
           }
         }
         return true;
       case OR:
         for (FilterQueryTree child : filterQueryTree.getChildren()) {
-          if (isPartitionMatch(child, partitionInfo)) {
+          if (isPartitionMatch(child, partitionInfo, cachedPartitionFunction)) {
             return true;
           }
         }
@@ -259,7 +268,7 @@ public class PartitionSegmentPruner implements SegmentPruner {
       case IN:
         if (filterQueryTree.getColumn().equals(_partitionColumn)) {
           for (String value : filterQueryTree.getValue()) {
-            if (partitionInfo._partitions.contains(partitionInfo._partitionFunction.getPartition(value))) {
+            if (partitionInfo._partitions.contains(cachedPartitionFunction.getPartition(partitionInfo._partitionFunction, value))) {
               return true;
             }
           }
@@ -277,6 +286,38 @@ public class PartitionSegmentPruner implements SegmentPruner {
     PartitionInfo(PartitionFunction partitionFunction, Set<Integer> partitions) {
       _partitionFunction = partitionFunction;
       _partitions = partitions;
+    }
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      PartitionInfo that = (PartitionInfo) o;
+      return Objects.equals(_partitionFunction, that._partitionFunction) &&
+        Objects.equals(_partitions, that._partitions);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(_partitionFunction, _partitions);
+    }
+  }
+
+  /**
+   * This class is created to speed up partition number calls. Sometimes with lots of segments (like 40k+)
+   * Computing partition values may be CPU intensive, caching the computation result may help
+   */
+  private static class CachedPartitionFunction {
+    final Map<PartitionFunction, Map<String, Integer>> cache = new HashMap<>();
+
+    public int getPartition(PartitionFunction func, String value) {
+      if (!cache.containsKey(func)) {
+        cache.put(func, new HashMap<>());
+      }
+      Map<String, Integer> valueToPartition = cache.get(func);
+      if (!valueToPartition.containsKey(value)) {
+        valueToPartition.put(value, func.getPartition(value));
+      }
+      return valueToPartition.get(value);
     }
   }
 }

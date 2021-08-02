@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.routing.segmentselector;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -41,7 +42,7 @@ public class OfflineSegmentSelector implements SegmentSelector {
     // TODO: for new added segments, before all replicas are up, consider not selecting them to avoid causing
     //       hotspot servers
 
-    _segments = Collections.unmodifiableSet(onlineSegments);
+    _segments = Collections.unmodifiableSet(new HashSet<>(onlineSegments));
   }
 
   @Override
