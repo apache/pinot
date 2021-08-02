@@ -193,8 +193,4 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
       throw new RuntimeException("Failed to use PinotSegmentRecordReader to read immutable segment");
     }
   }
-
-  public Map<String, ColumnIndexContainer> getIndexContainerMap() {
-    return _indexContainerMap;
-  }
 }
