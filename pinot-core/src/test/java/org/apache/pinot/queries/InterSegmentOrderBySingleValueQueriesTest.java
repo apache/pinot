@@ -80,7 +80,11 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
   public void testGroupByOrderByMVSegmentTrimSQLResults(String query, List<Object[]> expectedResults,
       long expectedNumDocsScanned, long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter,
       long expectedNumTotalDocs, DataSchema expectedDataSchema) {
-    InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2(1);
+    InstancePlanMakerImplV2 planMaker =
+        new InstancePlanMakerImplV2(InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY,
+            InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, 1,
+            InstancePlanMakerImplV2.DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE,
+            InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD);
     BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query, planMaker);
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, expectedNumDocsScanned, expectedNumEntriesScannedInFilter,
