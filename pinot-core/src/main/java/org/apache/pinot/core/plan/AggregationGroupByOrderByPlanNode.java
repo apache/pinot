@@ -29,6 +29,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.CompositePredicateEvaluator;
 import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.plan.StarTreeTransformPlanNode;
+import org.apache.pinot.core.util.QueryOptions;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
@@ -43,7 +44,7 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
   private final int _maxInitialResultHolderCapacity;
   private final int _numGroupsLimit;
-  private final int _minSegmentTrimSize;
+  private final int _minGroupTrimSize;
   private final AggregationFunction[] _aggregationFunctions;
   private final ExpressionContext[] _groupByExpressions;
   private final TransformPlanNode _transformPlanNode;
@@ -51,17 +52,23 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
   private final QueryContext _queryContext;
 
   public AggregationGroupByOrderByPlanNode(IndexSegment indexSegment, QueryContext queryContext,
-      int maxInitialResultHolderCapacity, int numGroupsLimit, int minSegmentTrimSize) {
+      int maxInitialResultHolderCapacity, int numGroupsLimit, int minGroupTrimSize) {
     _indexSegment = indexSegment;
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
+    Map<String, String> queryOptions = queryContext.getQueryOptions();
+    if (queryOptions != null) {
+      Integer minSegmentGroupTrimSize = QueryOptions.getMinSegmentGroupTrimSize(queryOptions);
+      _minGroupTrimSize = minSegmentGroupTrimSize != null ? minSegmentGroupTrimSize : minGroupTrimSize;
+    } else {
+      _minGroupTrimSize = minGroupTrimSize;
+    }
     _aggregationFunctions = queryContext.getAggregationFunctions();
     assert _aggregationFunctions != null;
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     assert groupByExpressions != null;
     _groupByExpressions = groupByExpressions.toArray(new ExpressionContext[0]);
     _queryContext = queryContext;
-    _minSegmentTrimSize = minSegmentTrimSize;
 
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();
     if (starTrees != null && !StarTreeUtils.isStarTreeDisabled(queryContext)) {
@@ -99,12 +106,12 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
     if (_transformPlanNode != null) {
       // Do not use star-tree
       return new AggregationGroupByOrderByOperator(_aggregationFunctions, _groupByExpressions,
-          _maxInitialResultHolderCapacity, _numGroupsLimit, _minSegmentTrimSize, _transformPlanNode.run(), numTotalDocs,
+          _maxInitialResultHolderCapacity, _numGroupsLimit, _minGroupTrimSize, _transformPlanNode.run(), numTotalDocs,
           _queryContext, false);
     } else {
       // Use star-tree
       return new AggregationGroupByOrderByOperator(_aggregationFunctions, _groupByExpressions,
-          _maxInitialResultHolderCapacity, _numGroupsLimit, _minSegmentTrimSize, _starTreeTransformPlanNode.run(),
+          _maxInitialResultHolderCapacity, _numGroupsLimit, _minGroupTrimSize, _starTreeTransformPlanNode.run(),
           numTotalDocs, _queryContext, true);
     }
   }
