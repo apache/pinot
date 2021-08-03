@@ -567,8 +567,7 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
       ExpectedQueryResult expectedQueryResultsWithFilter, ExpectedQueryResult expectedQueryResultsWithGroupBy,
       ExpectedQueryResult expectedQueryResultsWithGroupByAndFilter, Function<Serializable, String> responseMapper) {
 
-    String query = String
-        .format("SELECT %s(column1) FROM testTable", aggregateFunction);
+    String query = String.format("SELECT %s(column1) FROM testTable", aggregateFunction);
 
     queryAndTestAggregationResult(query, expectedQueryResultsBasic, responseMapper);
 
@@ -576,8 +575,7 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
 
     queryAndTestAggregationResult(query + SV_GROUP_BY, expectedQueryResultsWithGroupBy, responseMapper);
 
-    queryAndTestAggregationResult(query + MV_GROUP_BY, expectedQueryResultsWithGroupByAndFilter,
-        responseMapper);
+    queryAndTestAggregationResult(query + MV_GROUP_BY, expectedQueryResultsWithGroupByAndFilter, responseMapper);
   }
 
   private void queryAndTestAggregationResult(String query, ExpectedQueryResult expectedQueryResults,

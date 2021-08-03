@@ -484,8 +484,9 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
         expectedQueryResultsWithGroupBy, expectedQueryResultsWithGroupByAndFilter);
   }
 
-  private void testPercentileRawTDigestAggregationFunction(int percentile, ExpectedQueryResult expectedQueryResultsBasic,
-      ExpectedQueryResult expectedQueryResultsWithFilter, ExpectedQueryResult expectedQueryResultsWithGroupBy,
+  private void testPercentileRawTDigestAggregationFunction(int percentile,
+      ExpectedQueryResult expectedQueryResultsBasic, ExpectedQueryResult expectedQueryResultsWithFilter,
+      ExpectedQueryResult expectedQueryResultsWithGroupBy,
       ExpectedQueryResult expectedQueryResultsWithGroupByAndFilter) {
 
     Function<Serializable, String> quantileExtractor = value -> String.valueOf(
@@ -502,8 +503,8 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
       ExpectedQueryResult expectedQueryResultsWithFilter, ExpectedQueryResult expectedQueryResultsWithGroupBy,
       ExpectedQueryResult expectedQueryResultsWithGroupByAndFilter, Function<Serializable, String> responseMapper) {
 
-    String query = String
-        .format("SELECT %s(column1), %s(column3) FROM testTable", aggregateFunction, aggregateFunction);
+    String query =
+        String.format("SELECT %s(column1), %s(column3) FROM testTable", aggregateFunction, aggregateFunction);
 
     queryAndTestAggregationResult(query, expectedQueryResultsBasic, responseMapper);
 
@@ -540,20 +541,16 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   @Test
   public void testPercentileRawTDigest50() {
     ExpectedQueryResult expectedQueryResultsBasic =
-        new ExpectedQueryResult(120000L, 0L, 240000L, 120000L,
-            new String[]{"1109220454", "1081401755"});
+        new ExpectedQueryResult(120000L, 0L, 240000L, 120000L, new String[]{"1109220454", "1081401755"});
 
     ExpectedQueryResult expectedQueryResultsWithFilter =
-        new ExpectedQueryResult(24516L, 336536L, 49032L, 120000L,
-            new String[]{"1137346728", "505077949"});
+        new ExpectedQueryResult(24516L, 336536L, 49032L, 120000L, new String[]{"1137346728", "505077949"});
 
     ExpectedQueryResult expectedQueryResultsWithGroupBy =
-        new ExpectedQueryResult(120000L, 0L, 360000L, 120000L,
-            new String[]{"2142595699", "2141451242"});
+        new ExpectedQueryResult(120000L, 0L, 360000L, 120000L, new String[]{"2142595699", "2141451242"});
 
     ExpectedQueryResult expectedQueryResultsWithGroupByAndFilter =
-        new ExpectedQueryResult(24516L, 336536L, 73548L, 120000L,
-            new String[]{"2142595699", "999309554"});
+        new ExpectedQueryResult(24516L, 336536L, 73548L, 120000L, new String[]{"2142595699", "999309554"});
 
     testPercentileRawTDigestAggregationFunction(50, expectedQueryResultsBasic, expectedQueryResultsWithFilter,
         expectedQueryResultsWithGroupBy, expectedQueryResultsWithGroupByAndFilter);
@@ -562,20 +559,16 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   @Test
   public void testPercentileRawTDigest90() {
     ExpectedQueryResult expectedQueryResultsBasic =
-        new ExpectedQueryResult(120000L, 0L, 240000L, 120000L,
-            new String[]{"1941713336", "1936336416"});
+        new ExpectedQueryResult(120000L, 0L, 240000L, 120000L, new String[]{"1941713336", "1936336416"});
 
     ExpectedQueryResult expectedQueryResultsWithFilter =
-        new ExpectedQueryResult(24516L, 336536L, 49032L, 120000L,
-            new String[]{"1938150408", "898389305"});
+        new ExpectedQueryResult(24516L, 336536L, 49032L, 120000L, new String[]{"1938150408", "898389305"});
 
     ExpectedQueryResult expectedQueryResultsWithGroupBy =
-        new ExpectedQueryResult(120000L, 0L, 360000L, 120000L,
-            new String[]{"2142595699", "2141451242"});
+        new ExpectedQueryResult(120000L, 0L, 360000L, 120000L, new String[]{"2142595699", "2141451242"});
 
     ExpectedQueryResult expectedQueryResultsWithGroupByAndFilter =
-        new ExpectedQueryResult(24516L, 336536L, 73548L, 120000L,
-            new String[]{"2142595699", "999309554"});
+        new ExpectedQueryResult(24516L, 336536L, 73548L, 120000L, new String[]{"2142595699", "999309554"});
 
     testPercentileRawTDigestAggregationFunction(90, expectedQueryResultsBasic, expectedQueryResultsWithFilter,
         expectedQueryResultsWithGroupBy, expectedQueryResultsWithGroupByAndFilter);
@@ -584,44 +577,18 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   @Test
   public void testPercentileRawTDigest95() {
     ExpectedQueryResult expectedQueryResultsBasic =
-        new ExpectedQueryResult(120000L, 0L, 240000L, 120000L,
-            new String[]{"2072410559", "2041667404"});
+        new ExpectedQueryResult(120000L, 0L, 240000L, 120000L, new String[]{"2072410559", "2041667404"});
 
     ExpectedQueryResult expectedQueryResultsWithFilter =
-        new ExpectedQueryResult(24516L, 336536L, 49032L, 120000L,
-            new String[]{"2095657163", "947632936"});
+        new ExpectedQueryResult(24516L, 336536L, 49032L, 120000L, new String[]{"2095657163", "947632936"});
 
     ExpectedQueryResult expectedQueryResultsWithGroupBy =
-        new ExpectedQueryResult(120000L, 0L, 360000L, 120000L,
-            new String[]{"2142595699", "2141451242"});
+        new ExpectedQueryResult(120000L, 0L, 360000L, 120000L, new String[]{"2142595699", "2141451242"});
 
     ExpectedQueryResult expectedQueryResultsWithGroupByAndFilter =
-        new ExpectedQueryResult(24516L, 336536L, 73548L, 120000L,
-            new String[]{"2142595699", "999309554"});
+        new ExpectedQueryResult(24516L, 336536L, 73548L, 120000L, new String[]{"2142595699", "999309554"});
 
     testPercentileRawTDigestAggregationFunction(95, expectedQueryResultsBasic, expectedQueryResultsWithFilter,
-        expectedQueryResultsWithGroupBy, expectedQueryResultsWithGroupByAndFilter);
-  }
-
-  //@Test
-  public void testPercentileRawTDigest99() {
-    ExpectedQueryResult expectedQueryResultsBasic =
-        new ExpectedQueryResult(120000L, 0L, 240000L, 120000L,
-            new String[]{"2138379921", "2125225331"});
-
-    ExpectedQueryResult expectedQueryResultsWithFilter =
-        new ExpectedQueryResult(24516L, 336536L, 49032L, 120000L,
-            new String[]{"2145646629", "947632936"});
-
-    ExpectedQueryResult expectedQueryResultsWithGroupBy =
-        new ExpectedQueryResult(120000L, 0L, 360000L, 120000L,
-            new String[]{"2142595699", "2141451242"});
-
-    ExpectedQueryResult expectedQueryResultsWithGroupByAndFilter =
-        new ExpectedQueryResult(24516L, 336536L, 73548L, 120000L,
-            new String[]{"2142595699", "999309554"});
-
-    testPercentileRawTDigestAggregationFunction(99, expectedQueryResultsBasic, expectedQueryResultsWithFilter,
         expectedQueryResultsWithGroupBy, expectedQueryResultsWithGroupByAndFilter);
   }
 
