@@ -134,8 +134,8 @@
     <!-- End Include Pinot Input Format Plugins-->
     <!-- Start Include Pinot Minion Tasks Plugins-->
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-minion-tasks/pinot-minion-builtin-tasks/target/pinot-minion-builtin-tasks-${project.version}-shaded.jar</source>
-      <destName>plugins/pinot-minion-tasks/pinot-minion-builtin-tasks/pinot-minion-builtin-tasks-${project.version}-shaded.jar</destName>
+      <source>${pinot.root}/pinot-plugins/pinot-minion-tasks/pinot-minion-builtin-tasks/target/pinot-minion-builtin-tasks-${project.version}.jar</source>
+      <destName>plugins/pinot-minion-tasks/pinot-minion-builtin-tasks/pinot-minion-builtin-tasks-${project.version}.jar</destName>
     </file>
     <!-- End Include Pinot Minion Tasks Plugins-->
     <!-- Start Include Pinot Metrics Plugins-->
@@ -146,14 +146,14 @@
     <!-- End Include Pinot Metrics Plugins-->
     <!-- Start Include Pinot Segment Writer Plugins-->
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-segment-writer/pinot-segment-writer-file-based/target/pinot-segment-writer-file-based-${project.version}-shaded.jar</source>
-      <destName>plugins/pinot-segment-writer/pinot-segment-writer-file-based/pinot-segment-writer-file-based-${project.version}-shaded.jar</destName>
+      <source>${pinot.root}/pinot-plugins/pinot-segment-writer/pinot-segment-writer-file-based/target/pinot-segment-writer-file-based-${project.version}.jar</source>
+      <destName>plugins/pinot-segment-writer/pinot-segment-writer-file-based/pinot-segment-writer-file-based-${project.version}.jar</destName>
     </file>
     <!-- End Include Pinot Segment Writer Plugins-->
     <!-- Start Include Pinot Segment Uploader Plugins-->
     <file>
-      <source>${pinot.root}/pinot-plugins/pinot-segment-uploader/pinot-segment-uploader-default/target/pinot-segment-uploader-default-${project.version}-shaded.jar</source>
-      <destName>plugins/pinot-segment-uploader/pinot-segment-uploader-default/pinot-segment-uploader-default-${project.version}-shaded.jar</destName>
+      <source>${pinot.root}/pinot-plugins/pinot-segment-uploader/pinot-segment-uploader-default/target/pinot-segment-uploader-default-${project.version}.jar</source>
+      <destName>plugins/pinot-segment-uploader/pinot-segment-uploader-default/pinot-segment-uploader-default-${project.version}.jar</destName>
     </file>
     <!-- End Include Pinot Segment Uploader Plugins-->
     <!-- End Include Pinot Plugins-->
