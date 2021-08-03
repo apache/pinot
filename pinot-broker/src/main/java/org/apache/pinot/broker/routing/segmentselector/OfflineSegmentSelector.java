@@ -19,7 +19,6 @@
 package org.apache.pinot.broker.routing.segmentselector;
 
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Set;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
