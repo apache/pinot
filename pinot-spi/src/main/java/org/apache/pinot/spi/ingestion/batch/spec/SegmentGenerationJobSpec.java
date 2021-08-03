@@ -33,15 +33,9 @@ public class SegmentGenerationJobSpec implements Serializable {
    */
   private ExecutionFrameworkSpec _executionFrameworkSpec;
 
+
   /**
-   * Supported job types are:
-   *  'SegmentCreation'
-   *  'SegmentTarPush'
-   *  'SegmentUriPush'
-   *  'SegmentMetadataPush'
-   *  'SegmentCreationAndTarPush'
-   *  'SegmentCreationAndUriPush'
-   *  'SegmentCreationAndMetadataPush'
+   * Supported job types are {@link org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher.PinotIngestionJobType}
    */
   private String _jobType;
 
@@ -144,13 +138,8 @@ public class SegmentGenerationJobSpec implements Serializable {
   }
 
   /**
-   * Supported job types are:
-   *    'SegmentCreation'
-   *    'SegmentTarPush'
-   *    'SegmentUriPush'
-   *    'SegmentCreationAndTarPush'
-   *    'SegmentCreationAndUriPush'
-   * @param jobType
+   * Set the job type for the ingestion job.
+   * @param jobType Job type for the ingestion job.
    */
   public void setJobType(String jobType) {
     _jobType = jobType;

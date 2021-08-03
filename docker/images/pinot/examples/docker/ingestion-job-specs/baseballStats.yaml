@@ -33,12 +33,14 @@ executionFrameworkSpec:
   segmentUriPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.standalone.SegmentUriPushJobRunner'
 
 # jobType: Pinot ingestion job type.
-# Supported job types are:
+# Supported job types are defined in PinotIngestionJobType class.
 #   'SegmentCreation'
 #   'SegmentTarPush'
 #   'SegmentUriPush'
+#   'SegmentMetadataPush'
 #   'SegmentCreationAndTarPush'
 #   'SegmentCreationAndUriPush'
+#   'SegmentCreationAndMetadataPush'
 jobType: SegmentCreationAndTarPush
 
 # inputDirURI: Root directory of input data, expected to have scheme configured in PinotFS.
