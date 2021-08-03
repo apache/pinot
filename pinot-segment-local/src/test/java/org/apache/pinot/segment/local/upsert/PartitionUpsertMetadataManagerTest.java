@@ -136,7 +136,7 @@ public class PartitionUpsertMetadataManagerTest {
     assertNotNull(recordLocation);
     assertSame(recordLocation.getSegment(), segment);
     assertEquals(recordLocation.getDocId(), docId);
-    assertEquals(recordLocation.getTimestamp(), timestamp);
+    assertEquals(recordLocation.getComparisonValue(), timestamp);
   }
 
   @Test

@@ -407,10 +407,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
               values[i] = value;
             }
             PrimaryKey primaryKey = new PrimaryKey(values);
-            Object timeValue = columnToReaderMap.get(_upsertComparisonColumn).getValue(_docId);
-            Preconditions.checkArgument(timeValue instanceof Comparable, "time column shall be comparable");
-            Comparable timestamp = IngestionUtils.extractTimeValueIfPossible((Comparable) timeValue);
-            return new PartitionUpsertMetadataManager.RecordInfo(primaryKey, _docId++, timestamp);
+            Object upsertComparisonValue = columnToReaderMap.get(_upsertComparisonColumn).getValue(_docId);
+            Preconditions.checkArgument(upsertComparisonValue instanceof Comparable, "time column shall be comparable");
+            return new PartitionUpsertMetadataManager.RecordInfo(primaryKey, _docId++,
+                (Comparable) upsertComparisonValue);
           }
         };
     partitionUpsertMetadataManager.addSegment(immutableSegment, recordInfoIterator);

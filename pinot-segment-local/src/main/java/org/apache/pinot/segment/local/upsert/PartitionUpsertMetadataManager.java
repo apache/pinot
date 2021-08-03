@@ -102,10 +102,10 @@ public class PartitionUpsertMetadataManager {
           // will return records with incremental doc ids.
           IndexSegment currentSegment = currentRecordLocation.getSegment();
           if (segment == currentSegment) {
-            if (recordInfo._timestamp.compareTo(currentRecordLocation.getTimestamp()) >= 0) {
+            if (recordInfo._comparisonValue.compareTo(currentRecordLocation.getComparisonValue()) >= 0) {
               validDocIds.remove(currentRecordLocation.getDocId());
               validDocIds.add(recordInfo._docId);
-              return new RecordLocation(segment, recordInfo._docId, recordInfo._timestamp);
+              return new RecordLocation(segment, recordInfo._docId, recordInfo._comparisonValue);
             } else {
               return currentRecordLocation;
             }
@@ -118,9 +118,9 @@ public class PartitionUpsertMetadataManager {
           // segment because it has not been replaced yet.
           String currentSegmentName = currentSegment.getSegmentName();
           if (segmentName.equals(currentSegmentName)) {
-            if (recordInfo._timestamp.compareTo(currentRecordLocation.getTimestamp()) >= 0) {
+            if (recordInfo._comparisonValue.compareTo(currentRecordLocation.getComparisonValue()) >= 0) {
               validDocIds.add(recordInfo._docId);
-              return new RecordLocation(segment, recordInfo._docId, recordInfo._timestamp);
+              return new RecordLocation(segment, recordInfo._docId, recordInfo._comparisonValue);
             } else {
               return currentRecordLocation;
             }
@@ -129,8 +129,8 @@ public class PartitionUpsertMetadataManager {
           // The current record is in a different segment
           // Update the record location when getting a newer timestamp, or the timestamp is the same as the current
           // timestamp, but the segment has a larger sequence number (the segment is newer than the current segment).
-          if (recordInfo._timestamp.compareTo(currentRecordLocation.getTimestamp()) > 0 || (
-              recordInfo._timestamp == currentRecordLocation.getTimestamp() && LLCSegmentName
+          if (recordInfo._comparisonValue.compareTo(currentRecordLocation.getComparisonValue()) > 0 || (
+              recordInfo._comparisonValue == currentRecordLocation.getComparisonValue() && LLCSegmentName
                   .isLowLevelConsumerSegmentName(segmentName) && LLCSegmentName
                   .isLowLevelConsumerSegmentName(currentSegmentName)
                   && LLCSegmentName.getSequenceNumber(segmentName) > LLCSegmentName
@@ -138,14 +138,14 @@ public class PartitionUpsertMetadataManager {
             assert currentSegment.getValidDocIds() != null;
             currentSegment.getValidDocIds().remove(currentRecordLocation.getDocId());
             validDocIds.add(recordInfo._docId);
-            return new RecordLocation(segment, recordInfo._docId, recordInfo._timestamp);
+            return new RecordLocation(segment, recordInfo._docId, recordInfo._comparisonValue);
           } else {
             return currentRecordLocation;
           }
         } else {
           // New primary key
           validDocIds.add(recordInfo._docId);
-          return new RecordLocation(segment, recordInfo._docId, recordInfo._timestamp);
+          return new RecordLocation(segment, recordInfo._docId, recordInfo._comparisonValue);
         }
       });
     }
@@ -180,7 +180,7 @@ public class PartitionUpsertMetadataManager {
 
         // Update the record location when the new timestamp is greater than or equal to the current timestamp. Update
         // the record location when there is a tie to keep the newer record.
-        if (recordInfo._timestamp.compareTo(currentRecordLocation.getTimestamp()) >= 0) {
+        if (recordInfo._comparisonValue.compareTo(currentRecordLocation.getComparisonValue()) >= 0) {
           IndexSegment currentSegment = currentRecordLocation.getSegment();
           if (_partialUpsertHandler != null) {
             // Partial upsert
@@ -191,12 +191,12 @@ public class PartitionUpsertMetadataManager {
           currentSegment.getValidDocIds().remove(currentRecordLocation.getDocId());
           assert segment.getValidDocIds() != null;
           segment.getValidDocIds().add(recordInfo._docId);
-          return new RecordLocation(segment, recordInfo._docId, recordInfo._timestamp);
+          return new RecordLocation(segment, recordInfo._docId, recordInfo._comparisonValue);
         } else {
           if (_partialUpsertHandler != null) {
             LOGGER.warn(
                 "Got late event for partial upsert: {} (current timestamp: {}, record timestamp: {}), skipping updating the record",
-                record, currentRecordLocation.getTimestamp(), recordInfo._timestamp);
+                record, currentRecordLocation.getComparisonValue(), recordInfo._comparisonValue);
           }
           return currentRecordLocation;
         }
@@ -204,7 +204,7 @@ public class PartitionUpsertMetadataManager {
         // New primary key
         assert segment.getValidDocIds() != null;
         segment.getValidDocIds().add(recordInfo._docId);
-        return new RecordLocation(segment, recordInfo._docId, recordInfo._timestamp);
+        return new RecordLocation(segment, recordInfo._docId, recordInfo._comparisonValue);
       }
     });
     // Update metrics
@@ -239,12 +239,12 @@ public class PartitionUpsertMetadataManager {
   public static final class RecordInfo {
     private final PrimaryKey _primaryKey;
     private final int _docId;
-    private final Comparable _timestamp;
+    private final Comparable _comparisonValue;
 
-    public RecordInfo(PrimaryKey primaryKey, int docId, Comparable timestamp) {
+    public RecordInfo(PrimaryKey primaryKey, int docId, Comparable comparisonValue) {
       _primaryKey = primaryKey;
       _docId = docId;
-      _timestamp = timestamp;
+      _comparisonValue = comparisonValue;
     }
   }
 }

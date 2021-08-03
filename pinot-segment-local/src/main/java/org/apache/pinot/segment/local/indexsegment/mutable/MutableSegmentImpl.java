@@ -511,12 +511,11 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private GenericRow handleUpsert(GenericRow row, int docId) {
     PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
-    Object timeValue = row.getValue(_upsertComparisonColumn);
-    Preconditions.checkArgument(timeValue instanceof Comparable,
+    Object upsertComparisonValue = row.getValue(_upsertComparisonColumn);
+    Preconditions.checkArgument(upsertComparisonValue instanceof Comparable,
         String.format("column %s shall be comparable", _upsertComparisonColumn));
-    Comparable timestamp = IngestionUtils.extractTimeValueIfPossible((Comparable) timeValue);
-    return _partitionUpsertMetadataManager
-        .updateRecord(this, new PartitionUpsertMetadataManager.RecordInfo(primaryKey, docId, timestamp), row);
+    return _partitionUpsertMetadataManager.updateRecord(this,
+        new PartitionUpsertMetadataManager.RecordInfo(primaryKey, docId, (Comparable) upsertComparisonValue), row);
   }
 
   private void updateDictionary(GenericRow row) {

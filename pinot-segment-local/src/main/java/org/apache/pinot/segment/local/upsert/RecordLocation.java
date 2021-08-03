@@ -27,12 +27,13 @@ import org.apache.pinot.segment.spi.IndexSegment;
 public class RecordLocation {
   private final IndexSegment _segment;
   private final int _docId;
-  private final Comparable _timestamp;
+  /** value used to denote the order */
+  private final Comparable _comparisonValue;
 
   public RecordLocation(IndexSegment indexSegment, int docId, Comparable timestamp) {
     _segment = indexSegment;
     _docId = docId;
-    _timestamp = timestamp;
+    _comparisonValue = timestamp;
   }
 
   public IndexSegment getSegment() {
@@ -43,7 +44,7 @@ public class RecordLocation {
     return _docId;
   }
 
-  public Comparable getTimestamp() {
-    return _timestamp;
+  public Comparable getComparisonValue() {
+    return _comparisonValue;
   }
 }

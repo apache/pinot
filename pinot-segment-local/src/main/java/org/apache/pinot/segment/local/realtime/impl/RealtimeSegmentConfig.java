@@ -69,8 +69,8 @@ public class RealtimeSegmentConfig {
       RealtimeSegmentZKMetadata realtimeSegmentZKMetadata, boolean offHeap, PinotDataBufferMemoryManager memoryManager,
       RealtimeSegmentStatsHistory statsHistory, String partitionColumn, PartitionFunction partitionFunction,
       int partitionId, boolean aggregateMetrics, boolean nullHandlingEnabled, String consumerDir,
-      UpsertConfig.Mode upsertMode, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
-      String upsertComparisonColumn) {
+      UpsertConfig.Mode upsertMode, String upsertComparisonColumn,
+      PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
     _tableNameWithType = tableNameWithType;
     _segmentName = segmentName;
     _streamName = streamName;
@@ -239,8 +239,8 @@ public class RealtimeSegmentConfig {
     private boolean _nullHandlingEnabled = false;
     private String _consumerDir;
     private UpsertConfig.Mode _upsertMode;
-    private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
     private String _upsertComparisonColumn;
+    private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
 
     public Builder() {
     }
@@ -378,13 +378,13 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
-    public Builder setPartitionUpsertMetadataManager(PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
-      _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
-      return this;
-    }
-
     public Builder setUpsertComparisonColumn(String upsertComparisonColumn) {
       _upsertComparisonColumn = upsertComparisonColumn;
+      return this;
+    }
+    
+    public Builder setPartitionUpsertMetadataManager(PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
+      _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
       return this;
     }
 
@@ -393,7 +393,7 @@ public class RealtimeSegmentConfig {
           _capacity, _avgNumMultiValues, _noDictionaryColumns, _varLengthDictionaryColumns, _invertedIndexColumns,
           _textIndexColumns, _fstIndexColumns, _jsonIndexColumns, _h3IndexConfigs, _realtimeSegmentZKMetadata, _offHeap,
           _memoryManager, _statsHistory, _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics,
-          _nullHandlingEnabled, _consumerDir, _upsertMode, _partitionUpsertMetadataManager, _upsertComparisonColumn);
+          _nullHandlingEnabled, _consumerDir, _upsertMode, _upsertComparisonColumn, _partitionUpsertMetadataManager);
     }
   }
 }
