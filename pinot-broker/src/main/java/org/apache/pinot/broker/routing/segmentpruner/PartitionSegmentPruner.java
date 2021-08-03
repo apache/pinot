@@ -21,6 +21,7 @@ package org.apache.pinot.broker.routing.segmentpruner;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -69,6 +71,7 @@ public class PartitionSegmentPruner implements SegmentPruner {
   private final String _segmentZKMetadataPathPrefix;
   private final Map<String, PartitionInfo> _partitionInfoMap = new ConcurrentHashMap<>();
   private final Map<PartitionInfo, Set<String>> _partitionInfoSegments = new ConcurrentHashMap<>();
+  private final Set<String> _allSegments = new TreeSet<>();
 
   public PartitionSegmentPruner(String tableNameWithType, String partitionColumn,
       ZkHelixPropertyStore<ZNRecord> propertyStore) {
@@ -101,7 +104,9 @@ public class PartitionSegmentPruner implements SegmentPruner {
 
   private void rebuildReverseMap() {
     _partitionInfoSegments.clear();
+    _allSegments.clear();
     _partitionInfoMap.forEach((segmentName, partitionInfo) -> {
+      _allSegments.add(segmentName);
       Set<String> segments = _partitionInfoSegments.computeIfAbsent(partitionInfo, (info) -> new HashSet<>());
       segments.add(segmentName);
     });
@@ -181,7 +186,7 @@ public class PartitionSegmentPruner implements SegmentPruner {
       if (filterExpression == null) {
         return segments;
       }
-      return pruneSegments((partitionInfo, cachedPartitionFunction) -> isPartitionMatch(filterExpression,
+      return pruneSegments(segments, (partitionInfo, cachedPartitionFunction) -> isPartitionMatch(filterExpression,
         partitionInfo, cachedPartitionFunction));
     } else {
       // PQL
@@ -189,16 +194,29 @@ public class PartitionSegmentPruner implements SegmentPruner {
       if (filterQueryTree == null) {
         return segments;
       }
-      return pruneSegments((partitionInfo, cachedPartitionFunction) -> isPartitionMatch(filterQueryTree, partitionInfo, cachedPartitionFunction));
+      return pruneSegments(segments, (partitionInfo, cachedPartitionFunction) -> isPartitionMatch(filterQueryTree, partitionInfo, cachedPartitionFunction));
     }
   }
 
-  private Set<String> pruneSegments(java.util.function.BiFunction<PartitionInfo, CachedPartitionFunction,  Boolean> partitionMatchLambda) {
+  private Set<String> pruneSegments(Set<String> segments, java.util.function.BiFunction<PartitionInfo, CachedPartitionFunction,  Boolean> partitionMatchLambda) {
+    // Some segments may not be refreshed/notified via Zookeeper yet, but broker may have found it
+    // in this case we need to include the new segments.
+    Sets.SetView<String> freshSegments = Sets.difference(segments, _allSegments);
+
     Set<String> selectedSegments = new HashSet<>();
     CachedPartitionFunction cachedPartitionFunction = new CachedPartitionFunction();
     for (PartitionInfo partitionInfo : _partitionInfoSegments.keySet()) {
-      if (partitionMatchLambda.apply(partitionInfo, cachedPartitionFunction)) {
+      if (partitionInfo == INVALID_PARTITION_INFO) { // segments without partitions not pruned if they are passed in
+        selectedSegments.addAll(Sets.intersection(_partitionInfoSegments.get(partitionInfo), segments));
+      } else if (partitionMatchLambda.apply(partitionInfo, cachedPartitionFunction)) {
         selectedSegments.addAll(_partitionInfoSegments.get(partitionInfo));
+      }
+    }
+    // New segments that are not in our externalView() notifications need to be pruned properly
+    for (String segment: freshSegments) {
+      PartitionInfo partitionInfo = _partitionInfoMap.get(segment);
+      if (partitionInfo == null || partitionInfo == INVALID_PARTITION_INFO || partitionMatchLambda.apply(partitionInfo, cachedPartitionFunction)) {
+        selectedSegments.add(segment);
       }
     }
     return selectedSegments;
@@ -310,13 +328,22 @@ public class PartitionSegmentPruner implements SegmentPruner {
   /**
    * This class is created to speed up partition number calls. Sometimes with lots of segments (like 40k+)
    * Computing partition values may be CPU intensive, caching the computation result may help
+   *
+   * For each partition function, we have one TTL Fixed Sized Cache that caches the computation results of all
+   * the inputs seen. For example, if PartitionFunction is Murmur5, and Murmur5.getPartition("my_segment_1") = 9,
+   * after first computation, the "my_segment_1" => 9 value mapping is stored in the cache.
+   * The next time we can skip the computation of Murmur5.getPartition("my_segment_1") and
+   * directly lookup and find that the partition of "my_segment_1" is 9.
+   *
+   * This is helpful in situations where we have very high QPS, and Brokers are trying to prune 40k+ segments
+   * over and over again, such mapping/lookup can save CPU resource.
    */
   private static class CachedPartitionFunction {
+    static final long DEFAULT_CACHE_ITEMS = 90_000L;
     final Map<PartitionFunction, LoadingCache<String, Integer>> cache = new HashMap<>();
-
     private LoadingCache<String, Integer> createCache(final PartitionFunction func) {
       return CacheBuilder.newBuilder()
-          .maximumSize(10000)
+          .maximumSize(DEFAULT_CACHE_ITEMS)
           .expireAfterWrite(10, TimeUnit.MINUTES)
           .build(
               new CacheLoader<String, Integer>() {
@@ -329,7 +356,7 @@ public class PartitionSegmentPruner implements SegmentPruner {
       if (!cache.containsKey(func)) {
         cache.put(func, createCache(func));
       }
-      LoadingCache<String, Integer> valueToPartition = cache.get(func);
+      LoadingCache<String, Integer> valueToPartition = cache.getOrDefault(func, createCache(func));
       try {
         return valueToPartition.get(partitionKey);
       } catch (ExecutionException ex) {

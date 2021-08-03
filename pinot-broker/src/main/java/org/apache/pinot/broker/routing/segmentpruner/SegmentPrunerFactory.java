@@ -84,7 +84,7 @@ public class SegmentPrunerFactory {
     }
     // EmptySegmentPruner tries to create a copy of all the lists, in some cases if the
     // segments has 10k+ items in it, it may waste a lot of CPU cycle for several empty segment.
-    // Moving it to the end may help some test cases.
+    // Moving it to the end may help some scenario in performance.
     segmentPruners.add(new EmptySegmentPruner(tableConfig, propertyStore));
     return segmentPruners;
   }

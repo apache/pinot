@@ -152,8 +152,8 @@ public class SegmentPrunerTest {
     columnPartitionConfigMap.put(PARTITION_COLUMN, new ColumnPartitionConfig("Modulo", 5));
     segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
     assertEquals(segmentPruners.size(), 2);
-    assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
-    assertTrue(segmentPruners.get(1) instanceof PartitionSegmentPruner);
+    assertTrue(segmentPruners.get(1) instanceof EmptySegmentPruner);
+    assertTrue(segmentPruners.get(0) instanceof PartitionSegmentPruner);
 
     // Do not allow multiple partition columns
     columnPartitionConfigMap.put("anotherPartitionColumn", new ColumnPartitionConfig("Modulo", 5));
@@ -172,15 +172,15 @@ public class SegmentPrunerTest {
         .thenReturn(SegmentPrunerFactory.LEGACY_PARTITION_AWARE_OFFLINE_ROUTING);
     segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
     assertEquals(segmentPruners.size(), 2);
-    assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
-    assertTrue(segmentPruners.get(1) instanceof PartitionSegmentPruner);
+    assertTrue(segmentPruners.get(1) instanceof EmptySegmentPruner);
+    assertTrue(segmentPruners.get(0) instanceof PartitionSegmentPruner);
     when(tableConfig.getTableType()).thenReturn(TableType.REALTIME);
     when(routingConfig.getRoutingTableBuilderName())
         .thenReturn(SegmentPrunerFactory.LEGACY_PARTITION_AWARE_REALTIME_ROUTING);
     segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
     assertEquals(segmentPruners.size(), 2);
-    assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
-    assertTrue(segmentPruners.get(1) instanceof PartitionSegmentPruner);
+    assertTrue(segmentPruners.get(1) instanceof EmptySegmentPruner);
+    assertTrue(segmentPruners.get(0) instanceof PartitionSegmentPruner);
   }
 
   @Test
@@ -219,8 +219,8 @@ public class SegmentPrunerTest {
     when(validationConfig.getTimeColumnName()).thenReturn(TIME_COLUMN);
     segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
     assertEquals(segmentPruners.size(), 2);
-    assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
-    assertTrue(segmentPruners.get(1) instanceof TimeSegmentPruner);
+    assertTrue(segmentPruners.get(1) instanceof EmptySegmentPruner);
+    assertTrue(segmentPruners.get(0) instanceof TimeSegmentPruner);
   }
 
   @DataProvider
