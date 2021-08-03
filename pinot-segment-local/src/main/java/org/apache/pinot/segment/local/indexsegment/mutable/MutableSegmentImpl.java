@@ -150,6 +150,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final Map<String, FieldSpec> _newlyAddedPhysicalColumnsFieldMap = new ConcurrentHashMap();
 
   private final UpsertConfig.Mode _upsertMode;
+  private final String _upsertComparisonColumn;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   // The valid doc ids are maintained locally instead of in the upsert metadata manager because:
   // 1. There is only one consuming segment per partition, the committed segments do not need to modify the valid doc
@@ -371,9 +372,12 @@ public class MutableSegmentImpl implements MutableSegment {
       Preconditions.checkState(!_aggregateMetrics, "Metrics aggregation and upsert cannot be enabled together");
       _partitionUpsertMetadataManager = config.getPartitionUpsertMetadataManager();
       _validDocIds = new ThreadSafeMutableRoaringBitmap();
+      String upsertComparisonColumn = config.getUpsertComparisonColumn();
+      _upsertComparisonColumn = upsertComparisonColumn != null ? upsertComparisonColumn : _timeColumnName;
     } else {
       _partitionUpsertMetadataManager = null;
       _validDocIds = null;
+      _upsertComparisonColumn = null;
     }
   }
 
@@ -507,11 +511,11 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private GenericRow handleUpsert(GenericRow row, int docId) {
     PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
-    Object timeValue = row.getValue(_timeColumnName);
-    Preconditions.checkArgument(timeValue instanceof Comparable, "time column shall be comparable");
-    long timestamp = IngestionUtils.extractTimeValue((Comparable) timeValue);
-    return _partitionUpsertMetadataManager
-        .updateRecord(this, new PartitionUpsertMetadataManager.RecordInfo(primaryKey, docId, timestamp), row);
+    Object upsertComparisonValue = row.getValue(_upsertComparisonColumn);
+    Preconditions.checkState(upsertComparisonValue instanceof Comparable,
+        "Upsert comparison column: %s must be comparable", _upsertComparisonColumn);
+    return _partitionUpsertMetadataManager.updateRecord(this,
+        new PartitionUpsertMetadataManager.RecordInfo(primaryKey, docId, (Comparable) upsertComparisonValue), row);
   }
 
   private void updateDictionary(GenericRow row) {
