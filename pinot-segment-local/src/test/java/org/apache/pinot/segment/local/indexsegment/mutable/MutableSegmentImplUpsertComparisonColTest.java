@@ -57,7 +57,7 @@ public class MutableSegmentImplUpsertComparisonColTest {
     URL dataResourceUrl = this.getClass().getClassLoader().getResource(DATA_FILE_PATH);
     _schema = Schema.fromFile(new File(schemaResourceUrl.getFile()));
     _tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, "offset")).build();
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, "offset", null)).build();
     _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
     File jsonFile = new File(dataResourceUrl.getFile());
     _partitionUpsertMetadataManager =
@@ -65,7 +65,7 @@ public class MutableSegmentImplUpsertComparisonColTest {
             .getOrCreatePartitionManager(0);
     _mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
-            false, true, new UpsertConfig(UpsertConfig.Mode.FULL, null, "offset"), "secondsSinceEpoch",
+            false, true, new UpsertConfig(UpsertConfig.Mode.FULL, null, "offset", null), "secondsSinceEpoch",
             _partitionUpsertMetadataManager);
     GenericRow reuse = new GenericRow();
     try (RecordReader recordReader = RecordReaderFactory

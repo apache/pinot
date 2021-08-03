@@ -29,7 +29,6 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,7 +68,7 @@ public class PartitionUpsertMetadataManager {
 
   // TODO(upsert): consider an off-heap KV store to persist this mapping to improve the recovery speed.
   @VisibleForTesting
-  final ConcurrentHashMap<PrimaryKey, RecordLocation> _primaryKeyToRecordLocationMap = new ConcurrentHashMap<>();
+  final ConcurrentHashMap<Object, RecordLocation> _primaryKeyToRecordLocationMap = new ConcurrentHashMap<>();
 
   // Reused for reading previous record during partial upsert
   private final GenericRow _reuse = new GenericRow();
@@ -239,11 +238,12 @@ public class PartitionUpsertMetadataManager {
   }
 
   public static final class RecordInfo {
-    private final PrimaryKey _primaryKey;
+    /** stores the primary key of the record or its hash value */
+    private final Object _primaryKey;
     private final int _docId;
     private final Comparable _comparisonValue;
 
-    public RecordInfo(PrimaryKey primaryKey, int docId, Comparable comparisonValue) {
+    public RecordInfo(Object primaryKey, int docId, Comparable comparisonValue) {
       _primaryKey = primaryKey;
       _docId = docId;
       _comparisonValue = comparisonValue;

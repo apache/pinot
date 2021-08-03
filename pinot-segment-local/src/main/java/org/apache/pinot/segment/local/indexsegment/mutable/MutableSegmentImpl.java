@@ -59,6 +59,7 @@ import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvide
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.utils.FixedIntArrayOffHeapIdMap;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
+import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.local.utils.IdMap;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.MutableSegment;
@@ -151,6 +152,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private final UpsertConfig.Mode _upsertMode;
   private final String _upsertComparisonColumn;
+  private final UpsertConfig.HashFunction _hashFunction;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   // The valid doc ids are maintained locally instead of in the upsert metadata manager because:
   // 1. There is only one consuming segment per partition, the committed segments do not need to modify the valid doc
@@ -374,10 +376,12 @@ public class MutableSegmentImpl implements MutableSegment {
       _validDocIds = new ThreadSafeMutableRoaringBitmap();
       String upsertComparisonColumn = config.getUpsertComparisonColumn();
       _upsertComparisonColumn = upsertComparisonColumn != null ? upsertComparisonColumn : _timeColumnName;
+      _hashFunction = config.getHashFunction();
     } else {
       _partitionUpsertMetadataManager = null;
       _validDocIds = null;
       _upsertComparisonColumn = null;
+      _hashFunction=null;
     }
   }
 
@@ -515,7 +519,8 @@ public class MutableSegmentImpl implements MutableSegment {
     Preconditions.checkState(upsertComparisonValue instanceof Comparable,
         "Upsert comparison column: %s must be comparable", _upsertComparisonColumn);
     return _partitionUpsertMetadataManager.updateRecord(this,
-        new PartitionUpsertMetadataManager.RecordInfo(primaryKey, docId, (Comparable) upsertComparisonValue), row);
+        new PartitionUpsertMetadataManager.RecordInfo(HashUtils.hashPrimaryKey(primaryKey, _hashFunction), docId,
+            (Comparable) upsertComparisonValue), row);
   }
 
   private void updateDictionary(GenericRow row) {

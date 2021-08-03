@@ -47,7 +47,7 @@ public class PartitionUpsertMetadataManagerTest {
   public void testAddSegment() {
     PartitionUpsertMetadataManager upsertMetadataManager =
         new PartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, mock(ServerMetrics.class), null);
-    Map<PrimaryKey, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
+    Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // Add the first segment
     List<PartitionUpsertMetadataManager.RecordInfo> recordInfoList1 = new ArrayList<>();
@@ -130,7 +130,7 @@ public class PartitionUpsertMetadataManagerTest {
     return new PrimaryKey(new Object[]{value});
   }
 
-  private static void checkRecordLocation(Map<PrimaryKey, RecordLocation> recordLocationMap, int keyValue,
+  private static void checkRecordLocation(Map<Object, RecordLocation> recordLocationMap, int keyValue,
       IndexSegment segment, int docId, int timestamp) {
     RecordLocation recordLocation = recordLocationMap.get(getPrimaryKey(keyValue));
     assertNotNull(recordLocation);
@@ -143,7 +143,7 @@ public class PartitionUpsertMetadataManagerTest {
   public void testUpdateRecord() {
     PartitionUpsertMetadataManager upsertMetadataManager =
         new PartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, mock(ServerMetrics.class), null);
-    Map<PrimaryKey, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
+    Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // Add the first segment
     // segment1: 0 -> {0, 100}, 1 -> {1, 120}, 2 -> {2, 100}
@@ -209,7 +209,7 @@ public class PartitionUpsertMetadataManagerTest {
   public void testRemoveSegment() {
     PartitionUpsertMetadataManager upsertMetadataManager =
         new PartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, mock(ServerMetrics.class), null);
-    Map<PrimaryKey, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
+    Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // Add 2 segments
     // segment1: 0 -> {0, 100}, 1 -> {1, 100}

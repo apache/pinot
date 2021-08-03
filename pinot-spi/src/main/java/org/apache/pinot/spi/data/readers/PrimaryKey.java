@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.data.readers;
 
 import java.util.Arrays;
+import org.apache.commons.lang.SerializationUtils;
 
 
 /**
@@ -33,6 +34,10 @@ public class PrimaryKey {
 
   public Object[] getValues() {
     return _values;
+  }
+
+  public byte[] asBytes() {
+    return SerializationUtils.serialize(_values);
   }
 
   @Override
