@@ -29,7 +29,10 @@ import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.BytesUtils;
 
-
+/**
+ * The {@code PercentileRawTDigestAggregationFunction} returns the serialized {@code TDigest} data structure of the
+ * {@code PercentileEstAggregationFunction}.
+ */
 public class PercentileRawTDigestAggregationFunction extends BaseSingleInputAggregationFunction<TDigest, String> {
   private final PercentileTDigestAggregationFunction _percentileRawTDigestAggregationFunction;
 
@@ -41,7 +44,7 @@ public class PercentileRawTDigestAggregationFunction extends BaseSingleInputAggr
     this(expressionContext, new PercentileTDigestAggregationFunction(expressionContext, percentile));
   }
 
-  PercentileRawTDigestAggregationFunction(ExpressionContext expression,
+  protected PercentileRawTDigestAggregationFunction(ExpressionContext expression,
       PercentileTDigestAggregationFunction percentileRawTDigestAggregationFunction) {
     super(expression);
     _percentileRawTDigestAggregationFunction = percentileRawTDigestAggregationFunction;
