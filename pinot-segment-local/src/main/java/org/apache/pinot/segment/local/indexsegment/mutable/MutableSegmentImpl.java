@@ -512,8 +512,8 @@ public class MutableSegmentImpl implements MutableSegment {
   private GenericRow handleUpsert(GenericRow row, int docId) {
     PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
     Object upsertComparisonValue = row.getValue(_upsertComparisonColumn);
-    Preconditions.checkArgument(upsertComparisonValue instanceof Comparable,
-        String.format("column %s shall be comparable", _upsertComparisonColumn));
+    Preconditions.checkState(upsertComparisonValue instanceof Comparable,
+        "Upsert comparison column: %s must be comparable", _upsertComparisonColumn);
     return _partitionUpsertMetadataManager.updateRecord(this,
         new PartitionUpsertMetadataManager.RecordInfo(primaryKey, docId, (Comparable) upsertComparisonValue), row);
   }

@@ -407,7 +407,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
             }
             PrimaryKey primaryKey = new PrimaryKey(values);
             Object upsertComparisonValue = columnToReaderMap.get(_upsertComparisonColumn).getValue(_docId);
-            Preconditions.checkArgument(upsertComparisonValue instanceof Comparable, "time column shall be comparable");
+            Preconditions.checkState(upsertComparisonValue instanceof Comparable,
+                "Upsert comparison column: %s must be comparable", _upsertComparisonColumn);
             return new PartitionUpsertMetadataManager.RecordInfo(primaryKey, _docId++,
                 (Comparable) upsertComparisonValue);
           }

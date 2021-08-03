@@ -30,10 +30,10 @@ public class RecordLocation {
   /** value used to denote the order */
   private final Comparable _comparisonValue;
 
-  public RecordLocation(IndexSegment indexSegment, int docId, Comparable timestamp) {
+  public RecordLocation(IndexSegment indexSegment, int docId, Comparable comparisonValue) {
     _segment = indexSegment;
     _docId = docId;
-    _comparisonValue = timestamp;
+    _comparisonValue = comparisonValue;
   }
 
   public IndexSegment getSegment() {

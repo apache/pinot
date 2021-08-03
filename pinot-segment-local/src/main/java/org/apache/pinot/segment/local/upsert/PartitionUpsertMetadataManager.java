@@ -36,10 +36,12 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Manages the upsert metadata per partition.
- * <p>For multiple records with the same timestamp, the manager will preserve the latest record based on the sequence
- * number of the segment. If 2 records with the same timestamp are in the same segment, the one with larger doc id will
- * be preserved. Note that for tables with sorted column, the records will be re-ordered when committing the segment,
- * and we will use the re-ordered doc ids instead of the ingestion order to decide which record to preserve.
+ * <p>For multiple records with the same comparison value (default to timestamp), the manager will preserve the latest
+ * record based on the sequence number of the segment. If 2 records with the same comparison value are in the same
+ * segment, the one with larger doc id will be preserved. Note that for tables with sorted column, the records will be
+ * re-ordered when committing the segment, and we will use the re-ordered doc ids instead of the ingestion order to
+ *  decide which record to preserve.
+ *
  * <p>There will be short term inconsistency when updating the upsert metadata, but should be consistent after the
  * operation is done:
  * <ul>
@@ -127,8 +129,8 @@ public class PartitionUpsertMetadataManager {
           }
 
           // The current record is in a different segment
-          // Update the record location when getting a newer timestamp, or the timestamp is the same as the current
-          // timestamp, but the segment has a larger sequence number (the segment is newer than the current segment).
+          // Update the record location when getting a newer comparison value, or the value is the same as the current
+          // value, but the segment has a larger sequence number (the segment is newer than the current segment).
           if (recordInfo._comparisonValue.compareTo(currentRecordLocation.getComparisonValue()) > 0 || (
               recordInfo._comparisonValue == currentRecordLocation.getComparisonValue() && LLCSegmentName
                   .isLowLevelConsumerSegmentName(segmentName) && LLCSegmentName
@@ -178,7 +180,7 @@ public class PartitionUpsertMetadataManager {
       if (currentRecordLocation != null) {
         // Existing primary key
 
-        // Update the record location when the new timestamp is greater than or equal to the current timestamp. Update
+        // Update the record location when the new comparison value is greater than or equal to the current value. Update
         // the record location when there is a tie to keep the newer record.
         if (recordInfo._comparisonValue.compareTo(currentRecordLocation.getComparisonValue()) >= 0) {
           IndexSegment currentSegment = currentRecordLocation.getSegment();
@@ -195,7 +197,7 @@ public class PartitionUpsertMetadataManager {
         } else {
           if (_partialUpsertHandler != null) {
             LOGGER.warn(
-                "Got late event for partial upsert: {} (current timestamp: {}, record timestamp: {}), skipping updating the record",
+                "Got late event for partial upsert: {} (current comparison value: {}, record comparison value: {}), skipping updating the record",
                 record, currentRecordLocation.getComparisonValue(), recordInfo._comparisonValue);
           }
           return currentRecordLocation;

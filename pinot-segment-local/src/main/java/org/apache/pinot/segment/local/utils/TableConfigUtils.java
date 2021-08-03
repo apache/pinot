@@ -319,7 +319,7 @@ public final class TableConfigUtils {
    *  - the primary key exists on the schema
    *  - strict replica-group is configured for routing type
    *  - consumer type must be low-level
-   *   - comparison column exists
+   *  - comparison column exists
    */
   @VisibleForTesting
   static void validateUpsertConfig(TableConfig tableConfig, Schema schema) {
