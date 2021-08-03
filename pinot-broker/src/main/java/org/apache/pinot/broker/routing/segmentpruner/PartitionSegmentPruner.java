@@ -26,7 +26,13 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
@@ -307,17 +313,29 @@ public class PartitionSegmentPruner implements SegmentPruner {
    * Computing partition values may be CPU intensive, caching the computation result may help
    */
   private static class CachedPartitionFunction {
-    final Map<PartitionFunction, Map<String, Integer>> cache = new HashMap<>();
+    final Map<PartitionFunction, LoadingCache<String, Integer>> cache = new HashMap<>();
 
-    public int getPartition(PartitionFunction func, String value) {
+    private LoadingCache<String, Integer> createCache(final PartitionFunction func) {
+      return CacheBuilder.newBuilder()
+          .maximumSize(10000)
+          .expireAfterWrite(10, TimeUnit.MINUTES)
+          .build(
+              new CacheLoader<String, Integer>() {
+                public Integer load(String partitionKey) throws Exception {
+                  return func.getPartition(partitionKey);
+                }
+              });
+    }
+    public int getPartition(final PartitionFunction func, String partitionKey) {
       if (!cache.containsKey(func)) {
-        cache.put(func, new HashMap<>());
+        cache.put(func, createCache(func));
       }
-      Map<String, Integer> valueToPartition = cache.get(func);
-      if (!valueToPartition.containsKey(value)) {
-        valueToPartition.put(value, func.getPartition(value));
+      LoadingCache<String, Integer> valueToPartition = cache.get(func);
+      try {
+        return valueToPartition.get(partitionKey);
+      } catch (ExecutionException ex) {
+        return func.getPartition(partitionKey);
       }
-      return valueToPartition.get(value);
     }
   }
 }

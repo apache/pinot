@@ -42,7 +42,7 @@ public class OfflineSegmentSelector implements SegmentSelector {
     // TODO: for new added segments, before all replicas are up, consider not selecting them to avoid causing
     //       hotspot servers
 
-    _segments = Collections.unmodifiableSet(new HashSet<>(onlineSegments));
+    _segments = Collections.unmodifiableSet(onlineSegments);
   }
 
   @Override
