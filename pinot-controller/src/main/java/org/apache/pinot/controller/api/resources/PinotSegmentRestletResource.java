@@ -362,7 +362,7 @@ public class PinotSegmentRestletResource {
     if (tableType != TableType.OFFLINE) {
       throw new ControllerApplicationException(LOGGER, String
           .format("Unable to refresh segment: %s of table: %s of type: %s. OFFLINE table is expected", segmentName,
-              tableName, tableType), Status.BAD_REQUEST);
+              tableName, tableType), Status.FORBIDDEN);
     }
     String tableNameWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);

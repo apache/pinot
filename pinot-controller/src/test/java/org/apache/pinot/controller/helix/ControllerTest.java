@@ -575,6 +575,10 @@ public abstract class ControllerTest {
     sendPostRequest(_controllerRequestURLBuilder.forTableRefresh(tableName, forceDownload), null);
   }
 
+  protected void refreshOfflineTable(String tableName, String segmentName, boolean forceDownload) throws IOException {
+    sendPostRequest(_controllerRequestURLBuilder.forTableRefresh(tableName, segmentName, forceDownload), null);
+  }
+
   protected void reloadRealtimeTable(String tableName) throws IOException {
     sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, TableType.REALTIME.name()), null);
   }

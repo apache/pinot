@@ -189,6 +189,13 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "segments", tableName, query);
   }
 
+  public String forTableRefresh(String tableName, String segmentName, boolean forceDownload)
+      throws UnsupportedEncodingException {
+    String query = "refresh?forceDownload=" + forceDownload;
+    String segName = URLEncoder.encode(segmentName, StandardCharsets.UTF_8.toString());
+    return StringUtil.join("/", _baseUrl, "segments", tableName, segName, query);
+  }
+
   public String forTableSize(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "size");
   }
