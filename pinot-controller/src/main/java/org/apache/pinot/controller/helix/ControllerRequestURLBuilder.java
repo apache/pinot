@@ -184,6 +184,15 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "segments", query);
   }
 
+  public String forTableRefresh(String tableName, boolean forceDownload) {
+    String query = "refresh?forceDownload=" + forceDownload;
+    return StringUtil.join("/", _baseUrl, "segments", tableName, query);
+  }
+
+  public String forTableSize(String tableName) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "size");
+  }
+
   public String forTableUpdateIndexingConfigs(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "indexingConfigs");
   }
@@ -211,6 +220,7 @@ public class ControllerRequestURLBuilder {
     }
     return url;
   }
+
   public String forTableSchemaGet(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "schema");
   }

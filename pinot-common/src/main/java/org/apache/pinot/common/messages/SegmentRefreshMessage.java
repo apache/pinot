@@ -40,12 +40,22 @@ public class SegmentRefreshMessage extends Message {
 
   private static final String TABLE_NAME_KEY = "tableName";
   private static final String SEGMENT_NAME_KEY = "segmentName";
+  private static final String FORCE_DOWNLOAD_KEY = "forceDownload";
 
   /**
    * Constructor for the sender.
    */
   public SegmentRefreshMessage(String tableNameWithType, String segmentName) {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
+    init(tableNameWithType, segmentName, false);
+  }
+
+  public SegmentRefreshMessage(String tableNameWithType, String segmentName, boolean forceDownload) {
+    super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
+    init(tableNameWithType, segmentName, forceDownload);
+  }
+
+  private void init(String tableNameWithType, String segmentName, boolean forceDownload) {
     setMsgSubType(REFRESH_SEGMENT_MSG_SUB_TYPE);
     // Give it infinite time to process the message, as long as session is alive
     setExecutionTimeout(-1);
@@ -55,6 +65,7 @@ public class SegmentRefreshMessage extends Message {
     ZNRecord znRecord = getRecord();
     znRecord.setSimpleField(TABLE_NAME_KEY, tableNameWithType);
     znRecord.setSimpleField(SEGMENT_NAME_KEY, segmentName);
+    znRecord.setBooleanField(FORCE_DOWNLOAD_KEY, forceDownload);
   }
 
   /**
@@ -76,5 +87,9 @@ public class SegmentRefreshMessage extends Message {
 
   public String getSegmentName() {
     return getRecord().getSimpleField(SEGMENT_NAME_KEY);
+  }
+
+  public boolean getForceDownload() {
+    return getRecord().getBooleanField(FORCE_DOWNLOAD_KEY, false);
   }
 }

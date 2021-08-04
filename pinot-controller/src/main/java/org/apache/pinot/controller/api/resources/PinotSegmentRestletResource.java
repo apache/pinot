@@ -248,7 +248,8 @@ public class PinotSegmentRestletResource {
   public Map<String, String> getSegmentToCrcMap(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
     String offlineTableName =
-        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, TableType.OFFLINE, LOGGER).get(0);
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, TableType.OFFLINE, LOGGER)
+            .get(0);
     return _pinotHelixResourceManager.getSegmentsCrcForTable(offlineTableName);
   }
 
@@ -345,6 +346,33 @@ public class PinotSegmentRestletResource {
     }
 
     return getSegmentMetadataDeprecated1(tableName, segmentName, tableTypeStr);
+  }
+
+  @POST
+  @Path("segments/{tableName}/{segmentName}/refresh")
+  @Authenticate(AccessType.UPDATE)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Refresh a segment", notes = "Refresh a segment")
+  public SuccessResponse refreshSegment(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
+      @ApiParam(value = "Whether to force servers to download segment") @QueryParam("forceDownload") @DefaultValue("false") boolean forceDownload) {
+    segmentName = URIUtils.decode(segmentName);
+    TableType tableType = SegmentName.isRealtimeSegmentName(segmentName) ? TableType.REALTIME : TableType.OFFLINE;
+    if (tableType != TableType.OFFLINE) {
+      throw new ControllerApplicationException(LOGGER, String
+          .format("Unable to refresh segment: %s of table: %s of type: %s. OFFLINE table is expected", segmentName,
+              tableName, tableType), Status.BAD_REQUEST);
+    }
+    String tableNameWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
+    int numMessagesSent = _pinotHelixResourceManager.refreshSegment(tableNameWithType, segmentName, forceDownload);
+    if (numMessagesSent > 0) {
+      return new SuccessResponse("Sent " + numMessagesSent + " refresh messages");
+    } else {
+      throw new ControllerApplicationException(LOGGER,
+          "Failed to find segment: " + segmentName + " in table: " + tableName, Status.NOT_FOUND);
+    }
   }
 
   @POST
@@ -481,6 +509,26 @@ public class PinotSegmentRestletResource {
       numMessagesSentPerTable.put(tableNameWithType, _pinotHelixResourceManager.reloadAllSegments(tableNameWithType));
     }
     return new SuccessResponse("Sent " + numMessagesSentPerTable + " reload messages");
+  }
+
+  @POST
+  @Path("segments/{tableName}/refresh")
+  @Authenticate(AccessType.UPDATE)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Refresh all segments", notes = "Refresh all segments")
+  public SuccessResponse refreshAllSegment(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Whether to force servers to download segment") @QueryParam("forceDownload") @DefaultValue("false") boolean forceDownload) {
+    String tableNameWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, TableType.OFFLINE, LOGGER)
+            .get(0);
+    int numMessagesSent = _pinotHelixResourceManager.refreshAllSegments(tableNameWithType, forceDownload);
+    if (numMessagesSent > 0) {
+      return new SuccessResponse("Sent " + numMessagesSent + " refresh messages");
+    } else {
+      throw new ControllerApplicationException(LOGGER, "Failed to find any segments in table: " + tableName,
+          Status.NOT_FOUND);
+    }
   }
 
   @Deprecated

@@ -106,9 +106,12 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
   }
 
   private class SegmentRefreshMessageHandler extends DefaultMessageHandler {
+    private final boolean _forceDownload;
+
     SegmentRefreshMessageHandler(SegmentRefreshMessage refreshMessage, ServerMetrics metrics,
         NotificationContext context) {
       super(refreshMessage, metrics, context);
+      _forceDownload = refreshMessage.getForceDownload();
     }
 
     @Override
@@ -117,9 +120,16 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       HelixTaskResult result = new HelixTaskResult();
       _logger.info("Handling message: {}", _message);
       try {
-        acquireSema(_segmentName, LOGGER);
-        // The number of retry times depends on the retry count in Constants.
-        _fetcherAndLoader.addOrReplaceOfflineSegment(_tableNameWithType, _segmentName);
+        if (_segmentName.equals("")) {
+          acquireSema("ALL", _logger);
+          // NOTE: the method aborts if any segment refresh encounters an unhandled exception
+          // can lead to inconsistent state across segments
+          _fetcherAndLoader.addOrReplaceAllOfflineSegments(_tableNameWithType, _forceDownload);
+        } else {
+          acquireSema(_segmentName, _logger);
+          // The number of retry times depends on the retry count in Constants.
+          _fetcherAndLoader.addOrReplaceOfflineSegment(_tableNameWithType, _segmentName, _forceDownload);
+        }
         result.setSuccess(true);
       } catch (Exception e) {
         _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REFRESH_FAILURES, 1);

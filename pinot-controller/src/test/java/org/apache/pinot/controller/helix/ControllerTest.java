@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -77,6 +78,7 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -560,8 +562,17 @@ public abstract class ControllerTest {
         _controllerRequestURLBuilder.forSegmentDeleteAllAPI(tableName, tableType.toString()));
   }
 
+  protected long getTableSize(String tableName) throws IOException {
+    JsonNode response = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forTableSize(tableName)));
+    return Long.parseLong(response.get("reportedSizeInBytes").asText());
+  }
+
   protected void reloadOfflineTable(String tableName) throws IOException {
     sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, TableType.OFFLINE.name()), null);
+  }
+
+  protected void refreshOfflineTable(String tableName, boolean forceDownload) throws IOException {
+    sendPostRequest(_controllerRequestURLBuilder.forTableRefresh(tableName, forceDownload), null);
   }
 
   protected void reloadRealtimeTable(String tableName) throws IOException {
