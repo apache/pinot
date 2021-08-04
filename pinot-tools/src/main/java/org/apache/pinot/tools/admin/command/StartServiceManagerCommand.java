@@ -182,7 +182,7 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
       if (!startBootstrapServices()) {
         return false;
       }
-
+      Runtime.getRuntime().addShutdownHook(new Thread(() -> _pinotServiceManager.stopAll()));
       String pidFile = ".pinotAdminService-" + System.currentTimeMillis() + ".pid";
       savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
       return true;
