@@ -33,15 +33,7 @@ import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.geospatial.transform.function.StContainsFunction;
 import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
-import org.apache.pinot.core.operator.filter.BaseFilterOperator;
-import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
-import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
-import org.apache.pinot.core.operator.filter.ExpressionFilterOperator;
-import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
-import org.apache.pinot.core.operator.filter.H3IndexFilterOperator;
-import org.apache.pinot.core.operator.filter.JsonMatchFilterOperator;
-import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
-import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
+import org.apache.pinot.core.operator.filter.*;
 import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
@@ -167,7 +159,11 @@ public class FilterPlanNode implements PlanNode {
         ExpressionContext lhs = predicate.getLhs();
         if (lhs.getType() == ExpressionContext.Type.FUNCTION) {
           if (canApplyH3Index(predicate, lhs.getFunction())) {
-            return new H3IndexFilterOperator(_indexSegment, predicate, _numDocs);
+            if (lhs.getFunction().getFunctionName().equalsIgnoreCase(StDistanceFunction.FUNCTION_NAME)) {
+              return new H3IndexFilterOperator(_indexSegment, predicate, _numDocs);
+            } else if (lhs.getFunction().getFunctionName().equalsIgnoreCase(StContainsFunction.FUNCTION_NAME)) {
+              return new H3InclusionIndexFilterOperator(_indexSegment, predicate, _numDocs);
+            }
           }
           // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (IS_NULL,
           //       IS_NOT_NULL, TEXT_MATCH)
