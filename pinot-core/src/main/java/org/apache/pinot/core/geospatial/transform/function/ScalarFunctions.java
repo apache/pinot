@@ -40,6 +40,7 @@ import org.locationtech.jts.io.WKTWriter;
  */
 public class ScalarFunctions {
 
+  // from https://h3geo.org/docs/core-library/restable
   private static final ImmutableMap<Double, Integer> RESOLUTIONS = ImmutableMap.<Double, Integer>builder()
           .put(1107.712591000, 0)
           .put(418.676005500, 1)

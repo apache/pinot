@@ -62,26 +62,18 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
     List<ExpressionContext> arguments = predicate.getLhs().getFunction().getArguments();
     Coordinate coordinate;
     if (arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER) {
-      // look up arg0's h3 indices
       _h3IndexReader = segment.getDataSource(arguments.get(0).getIdentifier()).getH3Index();
-      // arg1 is the literal
       coordinate = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(1).getLiteral())).getCoordinate();
     } else {
-      // look up arg1's h3 indices
       _h3IndexReader = segment.getDataSource(arguments.get(1).getIdentifier()).getH3Index();
-      // arg0 is the literal
       coordinate = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(0).getLiteral())).getCoordinate();
     }
-    // must be some h3 index
     assert _h3IndexReader != null;
 
-    // look up lowest resolution hexagon for the provided coordinate
     int resolution = _h3IndexReader.getH3IndexResolution().getLowestResolution();
     _h3Id = H3Utils.H3_CORE.geoToH3(coordinate.y, coordinate.x, resolution);
-    // get hexagon edge length in meters for that resolution
     _edgeLength = H3Utils.H3_CORE.edgeLength(resolution, LengthUnit.m);
 
-    // approach as range, set unbounded bounds to nan
     RangePredicate rangePredicate = (RangePredicate) predicate;
     if (!rangePredicate.getLowerBound().equals(RangePredicate.UNBOUNDED)) {
       _lowerBound = Double.parseDouble(rangePredicate.getLowerBound());
@@ -97,14 +89,12 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
 
   @Override
   protected FilterBlock getNextBlock() {
-    // verify the bounds are valid
     if (_upperBound < 0 || _lowerBound > _upperBound) {
       // Invalid upper bound, return an empty block
       return new FilterBlock(EmptyDocIdSet.getInstance());
     }
 
     try {
-      // verify the bounds are valid
       if (Double.isNaN(_lowerBound) || _lowerBound < 0) {
         // No lower bound
 
