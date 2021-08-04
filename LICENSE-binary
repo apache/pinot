@@ -249,7 +249,7 @@ com.uber:h3:3.0.3
 com.yammer.metrics:metrics-core:2.2.0
 com.zaxxer:HikariCP-java7:2.4.13
 commons-cli:commons-cli:1.2
-commons-codec:commons-codec:1.6
+commons-codec:commons-codec:1.15
 commons-collections:commons-collections:3.2.1
 commons-configuration:commons-configuration:1.1
 commons-httpclient:commons-httpclient:3.1
