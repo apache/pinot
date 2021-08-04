@@ -75,24 +75,24 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
     // must be some h3 index
     assert _h3IndexReader != null;
 
-      // look up lowest resolution hexagon for the provided coordinate
-      int resolution = _h3IndexReader.getH3IndexResolution().getLowestResolution();
-      _h3Id = H3Utils.H3_CORE.geoToH3(coordinate.y, coordinate.x, resolution);
-      // get hexagon edge length in meters for that resolution
-      _edgeLength = H3Utils.H3_CORE.edgeLength(resolution, LengthUnit.m);
+    // look up lowest resolution hexagon for the provided coordinate
+    int resolution = _h3IndexReader.getH3IndexResolution().getLowestResolution();
+    _h3Id = H3Utils.H3_CORE.geoToH3(coordinate.y, coordinate.x, resolution);
+    // get hexagon edge length in meters for that resolution
+    _edgeLength = H3Utils.H3_CORE.edgeLength(resolution, LengthUnit.m);
 
-      // approach as range, set unbounded bounds to nan
-      RangePredicate rangePredicate = (RangePredicate) predicate;
-      if (!rangePredicate.getLowerBound().equals(RangePredicate.UNBOUNDED)) {
-        _lowerBound = Double.parseDouble(rangePredicate.getLowerBound());
-      } else {
-        _lowerBound = Double.NaN;
-      }
-      if (!rangePredicate.getUpperBound().equals(RangePredicate.UNBOUNDED)) {
-        _upperBound = Double.parseDouble(rangePredicate.getUpperBound());
-      } else {
-        _upperBound = Double.NaN;
-      }
+    // approach as range, set unbounded bounds to nan
+    RangePredicate rangePredicate = (RangePredicate) predicate;
+    if (!rangePredicate.getLowerBound().equals(RangePredicate.UNBOUNDED)) {
+      _lowerBound = Double.parseDouble(rangePredicate.getLowerBound());
+    } else {
+      _lowerBound = Double.NaN;
+    }
+    if (!rangePredicate.getUpperBound().equals(RangePredicate.UNBOUNDED)) {
+      _upperBound = Double.parseDouble(rangePredicate.getUpperBound());
+    } else {
+      _upperBound = Double.NaN;
+    }
   }
 
   @Override
