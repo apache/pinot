@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.utils;
 import com.google.common.hash.Hashing;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 public class HashUtils {
@@ -40,9 +41,9 @@ public class HashUtils {
       case NONE:
         return primaryKey;
       case MD5:
-        return HashUtils.hashMD5(primaryKey.asBytes());
+        return new ByteArray(HashUtils.hashMD5(primaryKey.asBytes()));
       case MURMUR3:
-        return HashUtils.hashMurmur3(primaryKey.asBytes());
+        return new ByteArray(HashUtils.hashMurmur3(primaryKey.asBytes()));
       default:
         throw new IllegalArgumentException(String.format("Unrecognized hash function %s", hashFunction));
     }
