@@ -20,7 +20,10 @@ package org.apache.pinot.core.operator.filter;
 
 import com.google.common.base.Preconditions;
 import com.uber.h3core.LengthUnit;
-import java.util.*;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
@@ -69,7 +72,6 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
       coordinate = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(0).getLiteral())).getCoordinate();
     }
     assert _h3IndexReader != null;
-
     int resolution = _h3IndexReader.getH3IndexResolution().getLowestResolution();
     _h3Id = H3Utils.H3_CORE.geoToH3(coordinate.y, coordinate.x, resolution);
     _edgeLength = H3Utils.H3_CORE.edgeLength(resolution, LengthUnit.m);
