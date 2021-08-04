@@ -83,9 +83,6 @@ public class StContainsFunction extends BaseTransformFunction {
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
       Geometry firstGeometry = GeometrySerializer.deserialize(firstValues[i]);
       Geometry secondGeometry = GeometrySerializer.deserialize(secondValues[i]);
-      if (GeometryUtils.isGeography(firstGeometry) || GeometryUtils.isGeography(secondGeometry)) {
-        throw new RuntimeException(String.format("%s is available for Geometry objects only", FUNCTION_NAME));
-      }
       _results[i] = firstGeometry.contains(secondGeometry) ? 1 : 0;
     }
     return _results;

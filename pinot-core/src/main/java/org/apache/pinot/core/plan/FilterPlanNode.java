@@ -31,6 +31,7 @@ import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
+import org.apache.pinot.core.geospatial.transform.function.StContainsFunction;
 import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
@@ -106,12 +107,13 @@ public class FilterPlanNode implements PlanNode {
     if (predicate.getType() != Predicate.Type.RANGE) {
       return false;
     }
-    if (!function.getFunctionName().equalsIgnoreCase(StDistanceFunction.FUNCTION_NAME)) {
+    if (!(function.getFunctionName().equalsIgnoreCase(StDistanceFunction.FUNCTION_NAME) ||
+            function.getFunctionName().equalsIgnoreCase(StContainsFunction.FUNCTION_NAME))) {
       return false;
     }
     List<ExpressionContext> arguments = function.getArguments();
     if (arguments.size() != 2) {
-      throw new BadQueryRequestException("Expect 2 arguments for function: " + StDistanceFunction.FUNCTION_NAME);
+      throw new BadQueryRequestException("Expect 2 arguments for function: " + function.getFunctionName());
     }
     // TODO: handle nested geography/geometry conversion functions
     String columnName = null;
