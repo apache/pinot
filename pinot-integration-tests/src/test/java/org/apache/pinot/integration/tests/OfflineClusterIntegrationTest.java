@@ -432,7 +432,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     long tableSizeNoIndex = getTableSize(getTableName());
 
-    // Update table config to remove all inverted index, but "DivActualElapsedTime"
+    // Update table config to remove all inverted index.
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setInvertedIndexColumns(Collections.emptyList());
     updateTableConfig(tableConfig);
