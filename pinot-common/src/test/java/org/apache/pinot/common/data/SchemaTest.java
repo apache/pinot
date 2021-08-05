@@ -393,4 +393,52 @@ public class SchemaTest {
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
     Assert.assertTrue(schema6.isBackwardCompatibleWith(oldSchema));
   }
+
+  @Test
+  public void testStringToBooleanSchemaBackwardCompatibility() {
+    Schema oldSchema = new Schema.SchemaBuilder().addSingleValueDimension("svInt", FieldSpec.DataType.INT)
+        .addSingleValueDimension("svString", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("svStringWithDefault", FieldSpec.DataType.STRING, "false").build();
+
+    // INT to BOOLEAN - incompatible
+    Schema newSchema = new Schema.SchemaBuilder().addSingleValueDimension("svInt", FieldSpec.DataType.BOOLEAN)
+        .addSingleValueDimension("svString", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("svStringWithDefault", FieldSpec.DataType.STRING, "false").build();
+    newSchema.updateBooleanFieldsIfNeeded(oldSchema);
+    Assert.assertFalse(newSchema.isBackwardCompatibleWith(oldSchema));
+
+    // STRING to BOOLEAN - compatible
+    newSchema = new Schema.SchemaBuilder().addSingleValueDimension("svInt", FieldSpec.DataType.INT)
+        .addSingleValueDimension("svString", FieldSpec.DataType.BOOLEAN)
+        .addSingleValueDimension("svStringWithDefault", FieldSpec.DataType.STRING, "false").build();
+    newSchema.updateBooleanFieldsIfNeeded(oldSchema);
+    Assert.assertTrue(newSchema.isBackwardCompatibleWith(oldSchema));
+    Assert.assertEquals(newSchema, oldSchema);
+
+    // STRING with default to BOOLEAN with default - compatible
+    newSchema = new Schema.SchemaBuilder().addSingleValueDimension("svInt", FieldSpec.DataType.INT)
+        .addSingleValueDimension("svString", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("svStringWithDefault", FieldSpec.DataType.BOOLEAN, "false").build();
+    newSchema.updateBooleanFieldsIfNeeded(oldSchema);
+    Assert.assertTrue(newSchema.isBackwardCompatibleWith(oldSchema));
+    Assert.assertEquals(newSchema, oldSchema);
+
+    // STRING with default to BOOLEAN without default - incompatible
+    newSchema = new Schema.SchemaBuilder().addSingleValueDimension("svInt", FieldSpec.DataType.INT)
+        .addSingleValueDimension("svString", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("svStringWithDefault", FieldSpec.DataType.BOOLEAN).build();
+    newSchema.updateBooleanFieldsIfNeeded(oldSchema);
+    Assert.assertFalse(newSchema.isBackwardCompatibleWith(oldSchema));
+
+    // New added BOOLEAN - compatible
+    newSchema = new Schema.SchemaBuilder().addSingleValueDimension("svInt", FieldSpec.DataType.INT)
+        .addSingleValueDimension("svString", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("svStringWithDefault", FieldSpec.DataType.STRING, "false")
+        .addSingleValueDimension("svBoolean", FieldSpec.DataType.BOOLEAN)
+        .addSingleValueDimension("svBooleanWithDefault", FieldSpec.DataType.BOOLEAN, true).build();
+    newSchema.updateBooleanFieldsIfNeeded(oldSchema);
+    Assert.assertTrue(newSchema.isBackwardCompatibleWith(oldSchema));
+    Assert.assertEquals(newSchema.getFieldSpecFor("svBoolean").getDataType(), FieldSpec.DataType.BOOLEAN);
+    Assert.assertEquals(newSchema.getFieldSpecFor("svBooleanWithDefault").getDataType(), FieldSpec.DataType.BOOLEAN);
+  }
 }
