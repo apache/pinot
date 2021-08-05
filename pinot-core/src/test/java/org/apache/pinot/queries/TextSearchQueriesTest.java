@@ -1211,6 +1211,10 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     testTextSearchSelectQueryHelper(query, 9, false, null);
 
     query =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE SKILLS_TEXT_COL LIKE '%Apa%' LIMIT 50000";
+    testTextSearchSelectQueryHelper(query, 6, false, null);
+
+    query =
         "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE SKILLS_TEXT_COL LIKE 'Machine learning' AND SKILLS_TEXT_COL LIKE 'gpu' LIMIT 50000";
     testTextSearchSelectQueryHelper(query, 2, false, null);
   }
