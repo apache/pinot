@@ -25,9 +25,29 @@ java -version
 ifconfig
 netstat -i
 
-# Only run integration tests if needed
+# The overhead of building repo is about 12 min.
+mvn install -DskipTests -T 1C
+
 if [ "$RUN_INTEGRATION_TESTS" != false ]; then
-  mvn test -B -P github-actions,integration-tests-only && exit 0 || exit 1
+  # Integration Tests
+  if [ "$RUN_TEST_SET" == "1" ]; then
+    mvn test -B -pl 'pinot-integration-tests' -Dtest='R*Test,B*Test' -P github-actions,integration-tests-only && exit 0 || exit 1
+  fi
+  if [ "$RUN_TEST_SET" == "2" ]; then
+    mvn test -B -pl 'pinot-integration-tests' -Dtest='C*Test,M*Test' -P github-actions,integration-tests-only && exit 0 || exit 1
+  fi
+  if [ "$RUN_TEST_SET" == "3" ]; then
+    mvn test -B -pl 'pinot-integration-tests' -Dtest='A*Test,L*Test,S*Test' -P github-actions,integration-tests-only && exit 0 || exit 1
+  fi
+  if [ "$RUN_TEST_SET" == "4" ]; then
+    mvn test -B -pl 'pinot-integration-tests' -Dtest='!A*Test,!B*Test,!C*Test,!L*Test,!M*Test,!R*Test,!S*Test' -P github-actions,integration-tests-only && exit 0 || exit 1
+  fi
 else
-  mvn test -B -P github-actions,no-integration-tests && exit 0 || exit 1
+  # Unit Tests
+  if [ "$RUN_TEST_SET" == "1" ]; then
+    mvn test -B -pl 'pinot-controller'  -pl 'pinot-broker'  -pl 'pinot-server'  -pl 'pinot-segment-local'  -P github-actions,no-integration-tests && exit 0 || exit 1
+  fi
+  if [ "$RUN_TEST_SET" == "2" ]; then
+    mvn test -B -pl '!pinot-controller' -pl '!pinot-broker' -pl '!pinot-server' -pl '!pinot-segment-local' -P github-actions,no-integration-tests && exit 0 || exit 1
+  fi
 fi
