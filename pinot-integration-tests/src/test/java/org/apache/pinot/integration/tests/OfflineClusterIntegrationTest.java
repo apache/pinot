@@ -359,8 +359,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     final long tableSizeWithNewIndex = getTableSize(getTableName());
     assertTrue(tableSizeWithNewIndex > tableSizeWithDefaultIndex);
 
-    ///// Below is about table reloading and refreshing to remove indices /////
-
     // Update table config to remove all inverted index.
     tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setInvertedIndexColumns(Collections.emptyList());
@@ -381,74 +379,36 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     final long tableSizeAfterReload = getTableSize(getTableName());
     assertEquals(tableSizeAfterReload, tableSizeWithNewIndex);
 
-    // Refresh table w/o forcing download doesn't clean indices either.
-    // Because local and remote CRCs match, server doesn't download segment
-    // to replace the existing one.
-    refreshOfflineTable(getTableName(), false);
-    AtomicLong tableSizeAfterRefreshNoForce = new AtomicLong(0);
-    try {
-      TestUtils.waitForCondition(aVoid -> {
-        try {
-          JsonNode queryResponse3 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
-          assertEquals(queryResponse3.get("totalDocs").asLong(), numTotalDocs);
-          tableSizeAfterRefreshNoForce.set(getTableSize(getTableName()));
-          // This condition should never happen, so time out in the end.
-          return tableSizeAfterRefreshNoForce.longValue() < tableSizeWithNewIndex;
-        } catch (Exception e) {
-          throw new RuntimeException(e);
-        }
-      }, 3_000L, "Error is expected");
-      fail();
-    } catch (AssertionError e) {
-      assertEquals(tableSizeAfterRefreshNoForce.longValue(), tableSizeWithNewIndex);
-    }
-
-    // Refresh a single segment and force to download the segment,
+    // Reload a single segment and force to download the segment,
     // and we can expect disk usage drops a bit.
     OfflineSegmentZKMetadata segmentZKMetadata = _helixResourceManager.getOfflineSegmentMetadata(getTableName()).get(0);
     String segmentName = segmentZKMetadata.getSegmentName();
-    refreshOfflineTable(getTableName(), segmentName, true);
-    AtomicLong tableSizeAfterRefreshSegment = new AtomicLong(0);
+    reloadOfflineSegment(getTableName(), segmentName, true);
+    AtomicLong tableSizeAfterDownloadSegment = new AtomicLong(0);
     TestUtils.waitForCondition(aVoid -> {
       try {
         JsonNode queryResponse3 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
         assertEquals(queryResponse3.get("totalDocs").asLong(), numTotalDocs);
-        tableSizeAfterRefreshSegment.set(getTableSize(getTableName()));
-        return tableSizeAfterRefreshSegment.longValue() < tableSizeWithNewIndex;
+        tableSizeAfterDownloadSegment.set(getTableSize(getTableName()));
+        return tableSizeAfterDownloadSegment.longValue() < tableSizeWithNewIndex;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to clean up obsolete indices");
 
-    // Refresh whole table and we can expect disk usage drops further.
-    refreshOfflineTable(getTableName(), true);
-    AtomicLong tableSizeAfterRefreshTable = new AtomicLong(0);
+    // Reload whole table and we can expect disk usage drops further.
+    reloadOfflineTable(getTableName(), true);
+    AtomicLong tableSizeAfterDownloadTable = new AtomicLong(0);
     TestUtils.waitForCondition(aVoid -> {
       try {
         JsonNode queryResponse3 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
         assertEquals(queryResponse3.get("totalDocs").asLong(), numTotalDocs);
-        tableSizeAfterRefreshTable.set(getTableSize(getTableName()));
-        return tableSizeAfterRefreshTable.longValue() < tableSizeAfterRefreshSegment.longValue();
+        tableSizeAfterDownloadTable.set(getTableSize(getTableName()));
+        return tableSizeAfterDownloadTable.longValue() < tableSizeAfterDownloadSegment.longValue();
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to clean up obsolete indices");
-  }
-
-  @Test
-  public void testRefreshRealtimeTableForbidden() {
-    try {
-      refreshOfflineTable("foo_REALTIME", true);
-      fail();
-    } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Server returned HTTP response code: 403"));
-    }
-    try {
-      refreshOfflineTable("foo", "seg__0__100", true);
-      fail();
-    } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Server returned HTTP response code: 403"));
-    }
   }
 
   @Test

@@ -72,13 +72,13 @@ public class SegmentFetcherAndLoader {
     PinotCrypterFactory.init(pinotCrypterConfig);
   }
 
-  public void addOrReplaceAllOfflineSegments(String tableNameWithType, boolean forceDownload) {
-    LOGGER.info("Refreshing all segments in table: {}", tableNameWithType);
+  public void replaceAllOfflineSegments(String tableNameWithType) {
+    LOGGER.info("Replacing all segments in table: {}", tableNameWithType);
     List<SegmentMetadata> segMds = _instanceDataManager.getAllSegmentsMetadata(tableNameWithType);
     for (SegmentMetadata segMd : segMds) {
-      addOrReplaceOfflineSegment(tableNameWithType, segMd.getName(), forceDownload);
+      addOrReplaceOfflineSegment(tableNameWithType, segMd.getName(), true);
     }
-    LOGGER.info("Refreshed all segments in table: {}", tableNameWithType);
+    LOGGER.info("Replaced all segments in table: {}", tableNameWithType);
   }
 
   public void addOrReplaceOfflineSegment(String tableNameWithType, String segmentName) {
@@ -89,8 +89,7 @@ public class SegmentFetcherAndLoader {
    * Add a new segment or replace an existing segment for offline table. The method checks
    * the local segment CRC with the one set in ZK by controller. If both equal, the method
    * simply loads the local segment, otherwise it downloads the new segment then load. When
-   * forceDownload is set to true, the server always downloads and replaces the local segment
-   * before building index and loading it into memory.
+   * forceDownload is set to true, the server always downloads the segment.
    */
   public void addOrReplaceOfflineSegment(String tableNameWithType, String segmentName, boolean forceDownload) {
     OfflineSegmentZKMetadata newSegmentZKMetadata = ZKMetadataProvider
@@ -164,7 +163,7 @@ public class SegmentFetcherAndLoader {
       // that we have is different from that in zookeeper.
       if (forceDownload || isNewSegmentMetadata(tableNameWithType, newSegmentZKMetadata, localSegmentMetadata)) {
         if (forceDownload) {
-          LOGGER.info("Being forced to load segment {} of table {} from controller.", segmentName, tableNameWithType);
+          LOGGER.info("Force to download segment {} of table {} from controller.", segmentName, tableNameWithType);
         } else if (localSegmentMetadata == null) {
           LOGGER.info("Loading new segment {} of table {} from controller", segmentName, tableNameWithType);
         } else {

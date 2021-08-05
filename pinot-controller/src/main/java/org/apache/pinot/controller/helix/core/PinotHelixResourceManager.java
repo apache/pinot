@@ -1092,7 +1092,7 @@ public class PinotHelixResourceManager {
       LOGGER.info("Reloading tables with name: {}", schemaName);
       List<String> tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
       for (String tableNameWithType : tableNamesWithType) {
-        reloadAllSegments(tableNameWithType);
+        reloadAllSegments(tableNameWithType, false);
       }
     }
   }
@@ -1753,17 +1753,6 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineTableName, segmentMetadata);
   }
 
-  /**
-   * Set segment metadata in ZK, and require servers and brokers to refresh segment for an offline table.
-   * SegmentRefreshMessage is sent to servers and brokers for them to check out the new metadata in ZK and
-   * act accordingly.
-   *
-   * @param offlineTableName name of the OFFLINE table, for which the segment is to be refreshed
-   * @param segmentMetadata metadata extracted from the newly uploaded segment
-   * @param offlineSegmentZKMetadata existing segment metadata from Zookeeper
-   * @param downloadUrl where to download the new segment, like from deep store
-   * @param crypter crypterClassName as set in TableConfig
-   */
   public void refreshSegment(String offlineTableName, SegmentMetadata segmentMetadata,
       OfflineSegmentZKMetadata offlineSegmentZKMetadata, String downloadUrl, @Nullable String crypter) {
     String segmentName = segmentMetadata.getName();
@@ -1787,74 +1776,20 @@ public class PinotHelixResourceManager {
     sendSegmentRefreshMessage(offlineTableName, segmentName, true, true);
   }
 
-  /**
-   * Refreshes segment on servers for an offline table. This method assumes the segment metadata has been set in ZK,
-   * and segment can be retrieved via the downloadUri set in the metadata. Flag forceDownload can be set to force
-   * servers to download segment, rebuild index and load it in memory even if local CRC equals with the one in ZK.
-   *
-   * @param offlineTableName name of the OFFLINE table, for which the segment is to be refreshed
-   * @param segmentName the segment to be refreshed
-   * @param forceDownload if set to true, server is required to download the segment, regardless of CRC
-   * @return number of segmentRefreshMessages sent out
-   */
-  public int refreshSegment(String offlineTableName, String segmentName, boolean forceDownload) {
-    LOGGER.info("Sending refresh message for segment: {} in table: {} with force download: {}", segmentName,
-        offlineTableName, forceDownload);
+  public int reloadAllSegments(String tableNameWithType, boolean forceDownload) {
+    LOGGER.info("Sending reload message for table: {} with forceDownload: {}", tableNameWithType, forceDownload);
 
-    // Send segment refresh message to servers
-    Criteria recipientCriteria = new Criteria();
-    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-    recipientCriteria.setInstanceName("%");
-    recipientCriteria.setSessionSpecific(true);
-    recipientCriteria.setResource(offlineTableName);
-    recipientCriteria.setPartition(segmentName);
-
-    // Send message with no callback and infinite timeout on the recipient
-    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
-    SegmentRefreshMessage segmentRefreshMessage =
-        new SegmentRefreshMessage(offlineTableName, segmentName, forceDownload);
-    int numMessagesSent = messagingService.send(recipientCriteria, segmentRefreshMessage, null, -1);
-    if (numMessagesSent > 0) {
-      LOGGER.info("Sent {} segment refresh messages to servers for segment: {} of table: {}", numMessagesSent,
-          segmentName, offlineTableName);
-    } else {
-      LOGGER.warn("No segment refresh message sent to servers for segment: {} of table: {}", segmentName,
-          offlineTableName);
+    if (forceDownload) {
+      TableType tt = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+      Preconditions.checkArgument(tt == TableType.OFFLINE, "OFFLINE table is required to force segment download");
     }
-    return numMessagesSent;
-  }
-
-  public int refreshAllSegments(String offlineTableName, boolean forceDownload) {
-    LOGGER.info("Sending refresh message for table: {} with force download: {}", offlineTableName, forceDownload);
-
-    // Send segment refresh message to servers
-    Criteria recipientCriteria = new Criteria();
-    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-    recipientCriteria.setInstanceName("%");
-    recipientCriteria.setSessionSpecific(true);
-    recipientCriteria.setResource(offlineTableName);
-
-    // Send message with no callback and infinite timeout on the recipient
-    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
-    SegmentRefreshMessage segmentRefreshMessage = new SegmentRefreshMessage(offlineTableName, null, forceDownload);
-    int numMessagesSent = messagingService.send(recipientCriteria, segmentRefreshMessage, null, -1);
-    if (numMessagesSent > 0) {
-      LOGGER.info("Sent {} segment refresh messages to servers for table: {}", numMessagesSent, offlineTableName);
-    } else {
-      LOGGER.warn("No segment refresh message sent to servers for table: {}", offlineTableName);
-    }
-    return numMessagesSent;
-  }
-
-  public int reloadAllSegments(String tableNameWithType) {
-    LOGGER.info("Sending reload message for table: {}", tableNameWithType);
 
     Criteria recipientCriteria = new Criteria();
     recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
     recipientCriteria.setInstanceName("%");
     recipientCriteria.setResource(tableNameWithType);
     recipientCriteria.setSessionSpecific(true);
-    SegmentReloadMessage segmentReloadMessage = new SegmentReloadMessage(tableNameWithType, null);
+    SegmentReloadMessage segmentReloadMessage = new SegmentReloadMessage(tableNameWithType, null, forceDownload);
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
 
     // Infinite timeout on the recipient
@@ -1869,8 +1804,14 @@ public class PinotHelixResourceManager {
     return numMessagesSent;
   }
 
-  public int reloadSegment(String tableNameWithType, String segmentName) {
-    LOGGER.info("Sending reload message for segment: {} in table: {}", segmentName, tableNameWithType);
+  public int reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload) {
+    LOGGER.info("Sending reload message for segment: {} in table: {} with forceDownload: {}", segmentName,
+        tableNameWithType, forceDownload);
+
+    if (forceDownload) {
+      TableType tt = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+      Preconditions.checkArgument(tt == TableType.OFFLINE, "OFFLINE table is required to force segment download");
+    }
 
     Criteria recipientCriteria = new Criteria();
     recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
@@ -1878,7 +1819,7 @@ public class PinotHelixResourceManager {
     recipientCriteria.setResource(tableNameWithType);
     recipientCriteria.setPartition(segmentName);
     recipientCriteria.setSessionSpecific(true);
-    SegmentReloadMessage segmentReloadMessage = new SegmentReloadMessage(tableNameWithType, segmentName);
+    SegmentReloadMessage segmentReloadMessage = new SegmentReloadMessage(tableNameWithType, segmentName, forceDownload);
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
 
     // Infinite timeout on the recipient

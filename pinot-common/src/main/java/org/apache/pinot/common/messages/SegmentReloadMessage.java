@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.Message;
 
 
@@ -32,7 +33,9 @@ import org.apache.helix.model.Message;
 public class SegmentReloadMessage extends Message {
   public static final String RELOAD_SEGMENT_MSG_SUB_TYPE = "RELOAD_SEGMENT";
 
-  public SegmentReloadMessage(@Nonnull String tableNameWithType, @Nullable String segmentName) {
+  private static final String FORCE_DOWNLOAD_KEY = "forceDownload";
+
+  public SegmentReloadMessage(@Nonnull String tableNameWithType, @Nullable String segmentName, boolean forceDownload) {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
     setResourceName(tableNameWithType);
     if (segmentName != null) {
@@ -41,6 +44,9 @@ public class SegmentReloadMessage extends Message {
     setMsgSubType(RELOAD_SEGMENT_MSG_SUB_TYPE);
     // Give it infinite time to process the message, as long as session is alive
     setExecutionTimeout(-1);
+
+    ZNRecord znRecord = getRecord();
+    znRecord.setBooleanField(FORCE_DOWNLOAD_KEY, forceDownload);
   }
 
   public SegmentReloadMessage(Message message) {
@@ -48,5 +54,9 @@ public class SegmentReloadMessage extends Message {
     String msgSubType = message.getMsgSubType();
     Preconditions.checkArgument(msgSubType.equals(RELOAD_SEGMENT_MSG_SUB_TYPE),
         "Invalid message sub type: " + msgSubType + " for SegmentReloadMessage");
+  }
+
+  public boolean getForceDownload() {
+    return getRecord().getBooleanField(FORCE_DOWNLOAD_KEY, false);
   }
 }

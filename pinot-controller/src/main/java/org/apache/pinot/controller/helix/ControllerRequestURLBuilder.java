@@ -29,6 +29,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 
 
@@ -179,19 +180,14 @@ public class ControllerRequestURLBuilder {
     return stringBuilder.toString();
   }
 
-  public String forTableReload(String tableName, String tableType) {
-    String query = "reload?type=" + tableType;
-    return StringUtil.join("/", _baseUrl, "tables", tableName, "segments", query);
-  }
-
-  public String forTableRefresh(String tableName, boolean forceDownload) {
-    String query = "refresh?forceDownload=" + forceDownload;
+  public String forTableReload(String tableName, TableType tableType, boolean forceDownload) {
+    String query = String.format("reload?forceDownload=%s&type=%s", forceDownload, tableType.name());
     return StringUtil.join("/", _baseUrl, "segments", tableName, query);
   }
 
-  public String forTableRefresh(String tableName, String segmentName, boolean forceDownload)
+  public String forSegmentReload(String tableName, String segmentName, boolean forceDownload)
       throws UnsupportedEncodingException {
-    String query = "refresh?forceDownload=" + forceDownload;
+    String query = "reload?forceDownload=" + forceDownload;
     String segName = URLEncoder.encode(segmentName, StandardCharsets.UTF_8.toString());
     return StringUtil.join("/", _baseUrl, "segments", tableName, segName, query);
   }

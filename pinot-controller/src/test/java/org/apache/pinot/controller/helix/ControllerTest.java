@@ -568,19 +568,19 @@ public abstract class ControllerTest {
   }
 
   protected void reloadOfflineTable(String tableName) throws IOException {
-    sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, TableType.OFFLINE.name()), null);
+    reloadOfflineTable(tableName, false);
   }
 
-  protected void refreshOfflineTable(String tableName, boolean forceDownload) throws IOException {
-    sendPostRequest(_controllerRequestURLBuilder.forTableRefresh(tableName, forceDownload), null);
+  protected void reloadOfflineTable(String tableName, boolean forceDownload) throws IOException {
+    sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, TableType.OFFLINE, forceDownload), null);
   }
 
-  protected void refreshOfflineTable(String tableName, String segmentName, boolean forceDownload) throws IOException {
-    sendPostRequest(_controllerRequestURLBuilder.forTableRefresh(tableName, segmentName, forceDownload), null);
+  protected void reloadOfflineSegment(String tableName, String segmentName, boolean forceDownload) throws IOException {
+    sendPostRequest(_controllerRequestURLBuilder.forSegmentReload(tableName, segmentName, forceDownload), null);
   }
 
   protected void reloadRealtimeTable(String tableName) throws IOException {
-    sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, TableType.REALTIME.name()), null);
+    sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, TableType.REALTIME, false), null);
   }
 
   protected String getBrokerTenantRequestPayload(String tenantName, int numBrokers) {
