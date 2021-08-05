@@ -28,6 +28,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
+import org.apache.pinot.common.request.context.predicate.LikePredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
@@ -175,6 +176,20 @@ public class FilterPlanNode implements PlanNode {
           DataSource dataSource = _indexSegment.getDataSource(column);
           switch (predicate.getType()) {
             case LIKE:
+              PredicateEvaluator evaluator;
+              if (dataSource.getFSTIndex() != null) {
+                evaluator = FSTBasedRegexpPredicateEvaluatorFactory
+                    .newFSTBasedEvaluator(dataSource.getFSTIndex(), dataSource.getDictionary(),
+                        ((LikePredicate) predicate).getValue());
+              } else if (dataSource instanceof MutableDataSource && ((MutableDataSource) dataSource).isFSTEnabled()) {
+                evaluator = FSTBasedRegexpPredicateEvaluatorFactory
+                    .newAutomatonBasedEvaluator(dataSource.getDictionary(),
+                        ((LikePredicate) predicate).getValue());
+              } else {
+                evaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
+                    dataSource.getDataSourceMetadata().getDataType());
+              }
+              return FilterOperatorUtils.getLeafFilterOperator(evaluator, dataSource, _numDocs);
             case TEXT_MATCH:
               return new TextMatchFilterOperator(dataSource.getTextIndex(), ((TextMatchPredicate) predicate).getValue(),
                   _numDocs);
@@ -187,7 +202,6 @@ public class FilterPlanNode implements PlanNode {
               //
               // Consuming segments: When FST is enabled, use AutomatonBasedEvaluator so that regexp matching logic is
               // similar to that of FSTBasedEvaluator, else use regular flow of getting predicate evaluator.
-              PredicateEvaluator evaluator;
               if (dataSource.getFSTIndex() != null) {
                 evaluator = FSTBasedRegexpPredicateEvaluatorFactory
                     .newFSTBasedEvaluator(dataSource.getFSTIndex(), dataSource.getDictionary(),

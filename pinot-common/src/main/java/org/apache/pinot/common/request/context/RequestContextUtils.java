@@ -21,6 +21,7 @@ package org.apache.pinot.common.request.context;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.apache.calcite.runtime.Like;
 import org.apache.pinot.common.function.FunctionDefinitionRegistry;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -31,6 +32,7 @@ import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.IsNotNullPredicate;
 import org.apache.pinot.common.request.context.predicate.IsNullPredicate;
 import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
+import org.apache.pinot.common.request.context.predicate.LikePredicate;
 import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
@@ -230,6 +232,8 @@ public class RequestContextUtils {
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new RegexpLikePredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
       case LIKE:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new LikePredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
       case TEXT_MATCH:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new TextMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));

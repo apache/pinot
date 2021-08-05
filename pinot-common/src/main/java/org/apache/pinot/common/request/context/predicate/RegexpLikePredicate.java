@@ -26,8 +26,8 @@ import org.apache.pinot.common.request.context.ExpressionContext;
  * Predicate for REGEXP_LIKE.
  */
 public class RegexpLikePredicate implements Predicate {
-  private final ExpressionContext _lhs;
-  private final String _value;
+  final ExpressionContext _lhs;
+  final String _value;
 
   public RegexpLikePredicate(ExpressionContext lhs, String value) {
     _lhs = lhs;

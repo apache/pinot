@@ -253,9 +253,6 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         "SELECT INT_COL, QUERY_LOG_TEXT_COL FROM MyTable WHERE TEXT_MATCH(QUERY_LOG_TEXT_COL, '\"SELECT dimensionCol2\"') LIMIT 50000";
     testTextSearchSelectQueryHelper(query, 11787, false, null);
 
-    query = "SELECT INT_COL, QUERY_LOG_TEXT_COL FROM MyTable WHERE QUERY_LOG_TEXT_COL LIKE '\"SELECT dimensionCol2\"' LIMIT 50000";
-    testTextSearchSelectQueryHelper(query, 11787, false, null);
-
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(QUERY_LOG_TEXT_COL, '\"SELECT dimensionCol2\"')";
     testTextSearchAggregationQueryHelper(query, 11787);
 
@@ -267,14 +264,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         "SELECT INT_COL, QUERY_LOG_TEXT_COL FROM MyTable WHERE TEXT_MATCH(QUERY_LOG_TEXT_COL, '\"SELECT count\"') LIMIT 50000";
     testTextSearchSelectQueryHelper(query, 12363, false, null);
 
-    query =
-        "SELECT INT_COL, QUERY_LOG_TEXT_COL FROM MyTable WHERE QUERY_LOG_TEXT_COL LIKE '\"SELECT count\"' LIMIT 50000";
-    testTextSearchSelectQueryHelper(query, 12363, false, null);
-
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(QUERY_LOG_TEXT_COL, '\"SELECT count\"')";
-    testTextSearchAggregationQueryHelper(query, 12363);
-
-    query = "SELECT COUNT(*) FROM MyTable WHERE QUERY_LOG_TEXT_COL LIKE '\"SELECT count\"'";
     testTextSearchAggregationQueryHelper(query, 12363);
 
     // TEST 3: phrase query
@@ -283,10 +273,6 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // to the output of grep since the resultset size is small.
     query =
         "SELECT INT_COL, QUERY_LOG_TEXT_COL FROM MyTable WHERE TEXT_MATCH(QUERY_LOG_TEXT_COL, '\"GROUP BY\"') LIMIT 50000";
-    testTextSearchSelectQueryHelper(query, 26, true, null);
-
-    query =
-        "SELECT INT_COL, QUERY_LOG_TEXT_COL FROM MyTable WHERE QUERY_LOG_TEXT_COL LIKE '\"GROUP BY\"' LIMIT 50000";
     testTextSearchSelectQueryHelper(query, 26, true, null);
 
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(QUERY_LOG_TEXT_COL, '\"GROUP BY\"')";
@@ -313,14 +299,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"Distributed systems\"') LIMIT 50000";
     testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
 
-    query =
-        "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE SKILLS_TEXT_COL LIKE '\"Distributed systems\"' LIMIT 50000";
-    testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
-
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"distributed systems\"') LIMIT 50000";
-    testTextSearchAggregationQueryHelper(query, expected.size());
-
-    query = "SELECT COUNT(*) FROM MyTable WHERE SKILLS_TEXT_COL LIKE '\"distributed systems\"' LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
     // TEST 5: phrase query
@@ -336,14 +315,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"query processing\"') LIMIT 50000";
     testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
 
-    query =
-        "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE SKILLS_TEXT_COL LIKE '\"query processing\"' LIMIT 50000";
-    testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
-
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"query processing\"') LIMIT 50000";
-    testTextSearchAggregationQueryHelper(query, expected.size());
-
-    query = "SELECT COUNT(*) FROM MyTable WHERE SKILLS_TEXT_COL LIKE '\"query processing\"' LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
     // TEST 6: phrase query
@@ -373,11 +345,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"Machine learning\"') LIMIT 50000";
     testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
 
-    query =
-        "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE SKILLS_TEXT_COL LIKE '\"Machine learning\"' LIMIT 50000";
-    testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
-
-    query = "SELECT COUNT(*) FROM MyTable WHERE SKILLS_TEXT_COL LIKE '\"Machine learning\"' LIMIT 50000";
+    query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"Machine learning\"') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
     // TEST 7: composite phrase query using boolean operator AND
@@ -1229,6 +1197,22 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(0, searcher4.getIndexReader().getRefCount());
     Assert.assertEquals(0, searcher5.getIndexReader().getRefCount());
     indexWriter.close();
+  }
+
+  @Test
+  public void testLikeOperator()
+      throws Exception {
+    String query =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE SKILLS_TEXT_COL LIKE 'C++' LIMIT 50000";
+    testTextSearchSelectQueryHelper(query, 9, false, null);
+
+    query =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE SKILLS_TEXT_COL LIKE 'C+%' LIMIT 50000";
+    testTextSearchSelectQueryHelper(query, 9, false, null);
+
+    query =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE SKILLS_TEXT_COL LIKE 'Machine learning' AND SKILLS_TEXT_COL LIKE 'gpu' LIMIT 50000";
+    testTextSearchSelectQueryHelper(query, 2, false, null);
   }
 
   /**
