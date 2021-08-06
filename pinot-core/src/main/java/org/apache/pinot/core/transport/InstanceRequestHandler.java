@@ -40,6 +40,7 @@ import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TCompactProtocol;
@@ -54,12 +55,16 @@ import org.slf4j.LoggerFactory;
 public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf> {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstanceRequestHandler.class);
 
-  // TODO: make it configurable
-  private static final int SLOW_QUERY_LATENCY_THRESHOLD_MS = 100;
+  private static long SLOW_QUERY_LATENCY_THRESHOLD_MS =
+      CommonConstants.Server.DEFAULT_SERVER_SLOW_QUERY_LATENCY_THRESHOLD_MS;
 
   private final TDeserializer _deserializer = new TDeserializer(new TCompactProtocol.Factory());
   private final QueryScheduler _queryScheduler;
   private final ServerMetrics _serverMetrics;
+
+  public static void setSlowQueryLatencyThreshold(long slowQueryLatencyThresholdMs) {
+    SLOW_QUERY_LATENCY_THRESHOLD_MS = slowQueryLatencyThresholdMs;
+  }
 
   public InstanceRequestHandler(QueryScheduler queryScheduler, ServerMetrics serverMetrics) {
     _queryScheduler = queryScheduler;
@@ -184,9 +189,9 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.NETTY_CONNECTION_SEND_RESPONSE_LATENCY,
           sendResponseLatencyMs, TimeUnit.MILLISECONDS);
 
-      int totalQueryTimeMs = (int) (sendResponseEndTimeMs - queryArrivalTimeMs);
+      long totalQueryTimeMs = sendResponseEndTimeMs - queryArrivalTimeMs;
       if (totalQueryTimeMs > SLOW_QUERY_LATENCY_THRESHOLD_MS) {
-        LOGGER.info(
+        LOGGER.warn(
             "Slow query: request handler processing time: {}, send response latency: {}, total time to handle request: {}",
             queryProcessingTimeMs, sendResponseLatencyMs, totalQueryTimeMs);
       }

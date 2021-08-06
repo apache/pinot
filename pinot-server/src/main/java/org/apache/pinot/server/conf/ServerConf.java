@@ -114,6 +114,11 @@ public class ServerConf {
     return _serverConf.subset(PINOT_QUERY_SCHEDULER_PREFIX);
   }
 
+  public long getSlowQueryLatencyThresholdMs() {
+    return _serverConf.getProperty(Server.CONFIG_OF_SERVER_SLOW_QUERY_LATENCY_THRESHOLD_MS,
+        Server.DEFAULT_SERVER_SLOW_QUERY_LATENCY_THRESHOLD_MS);
+  }
+
   /**
    * Returns a list of transform function names as defined in the config
    * @return List of transform functions

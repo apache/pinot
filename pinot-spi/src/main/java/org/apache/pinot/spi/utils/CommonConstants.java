@@ -190,6 +190,9 @@ public class CommonConstants {
     public static final double DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND = 10_000d;
     public static final String CONFIG_OF_BROKER_TIMEOUT_MS = "pinot.broker.timeoutMs";
     public static final long DEFAULT_BROKER_TIMEOUT_MS = 10_000L;
+    public static final String CONFIG_OF_BROKER_SLOW_QUERY_LATENCY_THRESHOLD_MS =
+        "pinot.broker.slow.query.latency.thresholdMs";
+    public static final long DEFAULT_BROKER_SLOW_QUERY_LATENCY_THRESHOLD_MS = 1000L;
     public static final String CONFIG_OF_BROKER_ID = "pinot.broker.id";
     public static final String CONFIG_OF_BROKER_HOSTNAME = "pinot.broker.hostname";
     // Configuration to consider the broker ServiceStatus as being STARTED if the percent of resources (tables) that
@@ -244,6 +247,9 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_EXECUTOR_TIMEOUT = "pinot.server.query.executor.timeout";
     public static final String CONFIG_OF_QUERY_EXECUTOR_CLASS = "pinot.server.query.executor.class";
     public static final String CONFIG_OF_REQUEST_HANDLER_FACTORY_CLASS = "pinot.server.requestHandlerFactory.class";
+    public static final String CONFIG_OF_SERVER_SLOW_QUERY_LATENCY_THRESHOLD_MS =
+        "pinot.server.slow.query.latency.thresholdMs";
+    public static final long DEFAULT_SERVER_SLOW_QUERY_LATENCY_THRESHOLD_MS = 100L;
     public static final String CONFIG_OF_NETTY_SERVER_ENABLED = "pinot.server.netty.enabled";
     public static final boolean DEFAULT_NETTY_SERVER_ENABLED = true;
     public static final String CONFIG_OF_NETTY_PORT = "pinot.server.netty.port";
