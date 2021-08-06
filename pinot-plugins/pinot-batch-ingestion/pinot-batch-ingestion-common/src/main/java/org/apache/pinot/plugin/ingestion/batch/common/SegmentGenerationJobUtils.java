@@ -21,7 +21,7 @@ package org.apache.pinot.plugin.ingestion.batch.common;
 import java.io.Serializable;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentNameGeneratorSpec;
 
-
+@SuppressWarnings("serial")
 public class SegmentGenerationJobUtils implements Serializable {
 
   /**
@@ -43,4 +43,5 @@ public class SegmentGenerationJobUtils implements Serializable {
     }
     return Boolean.parseBoolean(useGlobalDirectorySequenceId);
   }
+  
 }

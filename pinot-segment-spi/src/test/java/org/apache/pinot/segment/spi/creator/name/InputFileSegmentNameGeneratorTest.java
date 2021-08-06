@@ -18,36 +18,47 @@
  */
 package org.apache.pinot.segment.spi.creator.name;
 
+import java.net.URISyntaxException;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.fail;
+
 
 
 public class InputFileSegmentNameGeneratorTest {
   private static final int INVALID_SEQUENCE_ID = -1;
-  private static final int VALID_SEQUENCE_ID = 0;
 
   @Test
   public void testWithInvalidPath() {
-    SegmentNameGenerator segmentNameGenerator = new InputFileSegmentNameGenerator(".+/(.+)\\.csv", "${filePathPattern:\\1}");
-    assertEquals(segmentNameGenerator.toString(), "InputFileSegmentNameGenerator: filePathPattern=.+/(.+)\\.csv, segmentNameTemplate=${filePathPattern:\\1}");
-    assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null, null), "InvalidInputFilePath");
-    assertEquals(segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, null, null, null), "InvalidInputFilePath_0");
-    assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null, "/my/path/to/segmentname.tsv"), "my_path_to_segmentname_tsv");
-    assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null, "hdfs:///my/path/to/segmentname.tsv"), "my_path_to_segmentname_tsv");
+    validateName("/my/path/to/segmentname.tsv", "my_path_to_segmentname_tsv");
+    validateName("hdfs:///my/path/to/segmentname.tsv", "my_path_to_segmentname_tsv");
   }
 
   @Test
   public void testWithHDFSPath() {
-    SegmentNameGenerator segmentNameGenerator = new InputFileSegmentNameGenerator(".+/(.+)\\.csv", "${filePathPattern:\\1}");
-    assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null, "hdfs:///my/path/to/segmentname.csv"), "segmentname");
-    assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null, "hdfs:/server:9000//my/path/to/segmentname.csv"), "segmentname");
+    validateName("hdfs:///my/path/to/segmentname.csv", "segmentname");
+    validateName("hdfs:/server:9000//my/path/to/segmentname.csv", "segmentname");
   }
 
   @Test
   public void testWithFilePath() {
-    SegmentNameGenerator segmentNameGenerator = new InputFileSegmentNameGenerator(".+/(.+)\\.csv", "${filePathPattern:\\1}");
-    assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null, "hdfs:///my/path/to/segmentname.csv"), "segmentname");
+    validateName("file:///my/path/to/segmentname.csv", "segmentname");
   }
 
+  private void validateName(String inputFileUriAsStr, String segmentName) {
+    try {
+        String pattern = ".+/(.+)\\.csv";
+        String template = "${filePathPattern:\\1}";
+        SegmentNameGenerator segmentNameGenerator = new InputFileSegmentNameGenerator(pattern, template, inputFileUriAsStr);
+        assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null), segmentName);
+        
+        String msg = String.format(
+                "InputFileSegmentNameGenerator: filePathPattern=%s, segmentNameTemplate=%s, inputFileUri=%s, segmentName=%s",
+                pattern, template, inputFileUriAsStr, segmentName);
+        assertEquals(segmentNameGenerator.toString(), msg);
+    } catch (URISyntaxException e) {
+        fail("Exception thrown while creating URI for " + inputFileUriAsStr);
+    }
+  }
 }

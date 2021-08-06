@@ -32,8 +32,7 @@ public class FixedSegmentNameGenerator implements SegmentNameGenerator {
   }
 
   @Override
-  public String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue,
-          @Nullable String inputFilePath) {
+  public String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue) {
     return _segmentName;
   }
 

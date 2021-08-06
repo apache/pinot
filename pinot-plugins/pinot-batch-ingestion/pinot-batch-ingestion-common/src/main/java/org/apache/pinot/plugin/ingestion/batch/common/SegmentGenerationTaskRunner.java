@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.ingestion.batch.common;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.Serializable;
+import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -36,6 +37,7 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationTaskSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentNameGeneratorSpec;
 import org.apache.pinot.spi.plugin.PluginManager;
@@ -118,7 +120,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
     return segmentIndexCreationDriver.getSegmentName();
   }
 
-  private SegmentNameGenerator getSegmentNameGenerator() {
+  private SegmentNameGenerator getSegmentNameGenerator() throws URISyntaxException {
     TableConfig tableConfig = _taskSpec.getTableConfig();
     String tableName = tableConfig.getTableName();
 
@@ -156,8 +158,10 @@ public class SegmentGenerationTaskRunner implements Serializable {
             IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig),
             IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig), dateTimeFormatSpec);
       case INPUT_FILE_SEGMENT_NAME_GENERATOR:
+        String inputFileUri = _taskSpec.getCustomProperty(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY);
         return new InputFileSegmentNameGenerator(segmentNameGeneratorConfigs.get(FILE_PATH_PATTERN),
-            segmentNameGeneratorConfigs.get(SEGMENT_NAME_TEMPLATE));
+            segmentNameGeneratorConfigs.get(SEGMENT_NAME_TEMPLATE),
+            inputFileUri);
       default:
         throw new UnsupportedOperationException("Unsupported segment name generator type: " + segmentNameGeneratorType);
     }

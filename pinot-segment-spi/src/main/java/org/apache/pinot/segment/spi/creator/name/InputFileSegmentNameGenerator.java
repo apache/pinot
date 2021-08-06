@@ -22,9 +22,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
 import javax.annotation.Nullable;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,32 +42,19 @@ public class InputFileSegmentNameGenerator implements SegmentNameGenerator {
 
     private Pattern filePathPattern;
     private String segmentNameTemplate;
-
-    public InputFileSegmentNameGenerator(String filePathPattern, String segmentNameTemplate) {
+    private URI inputFileUri;
+    private String segmentName;
+    
+    public InputFileSegmentNameGenerator(String filePathPattern, String segmentNameTemplate,
+            String inputFileUri) throws URISyntaxException {
         this.filePathPattern = Pattern.compile(filePathPattern);
         this.segmentNameTemplate = segmentNameTemplate;
+        this.inputFileUri = new URI(inputFileUri);
+        this.segmentName = makeSegmentName();
     }
 
-    @Override
-    public String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue,
-            @Nullable String inputFilePath) {
-
-        if (inputFilePath == null) {
-            if (sequenceId >= 0) {
-                return String.format("InvalidInputFilePath_%d", sequenceId);
-            } else {
-                return "InvalidInputFilePath";
-            }
-        }
-
-        try {
-            URI inputFilePathUri = new URI(inputFilePath);
-            inputFilePath = inputFilePathUri.getPath();
-        } catch (URISyntaxException e) {
-            LOGGER.warn(String.format("Can't convert '%s' to URI", inputFilePath), e);
-            return safeConvertPathToFilename(inputFilePath);
-        }
-
+    private String makeSegmentName() {
+        String inputFilePath = inputFileUri.getPath();
         Matcher m = filePathPattern.matcher(inputFilePath);
         if (!m.matches()) {
             LOGGER.warn(String.format("No match for pattern '%s' in '%s'", filePathPattern,
@@ -84,6 +69,11 @@ public class InputFileSegmentNameGenerator implements SegmentNameGenerator {
 
         return segmentName;
     }
+    
+    @Override
+    public String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue) {
+        return segmentName;
+    }
 
     private String safeConvertPathToFilename(String inputFilePath) {
         // Strip of leading '/' characters
@@ -95,7 +85,7 @@ public class InputFileSegmentNameGenerator implements SegmentNameGenerator {
     @Override
     public String toString() {
         return String.format(
-                "InputFileSegmentNameGenerator: filePathPattern=%s, segmentNameTemplate=%s",
-                filePathPattern, segmentNameTemplate);
+                "InputFileSegmentNameGenerator: filePathPattern=%s, segmentNameTemplate=%s, inputFileUri=%s, segmentName=%s",
+                filePathPattern, segmentNameTemplate, inputFileUri, segmentName);
     }
 }

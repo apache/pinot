@@ -35,10 +35,8 @@ public interface SegmentNameGenerator extends Serializable {
    * @param sequenceId Segment sequence id (negative value means INVALID)
    * @param minTimeValue Minimum time value
    * @param maxTimeValue Maximum time value
-   * @param inputFilePath Full path to input file being used to generate the segment
    * @return Segment name generated
    */
-  String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue,
-          @Nullable String inputFilePath);
+  String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue);
 
 }

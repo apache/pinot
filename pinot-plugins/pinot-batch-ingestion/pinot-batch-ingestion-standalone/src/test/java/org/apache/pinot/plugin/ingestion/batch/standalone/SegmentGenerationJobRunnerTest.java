@@ -139,4 +139,5 @@ public class SegmentGenerationJobRunnerTest {
 
     // FUTURE - validate contents of file?
     }
+  
 }

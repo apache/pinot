@@ -254,7 +254,7 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
     NormalizedDateSegmentNameGenerator segmentNameGenerator =
         new NormalizedDateSegmentNameGenerator(tableName, null, false, pushType, pushFrequency, dateTimeFormatSpec);
 
-    return segmentNameGenerator.generateSegmentName(DEFAULT_SEQUENCE_ID, minStartTime, maxEndTime, null);
+    return segmentNameGenerator.generateSegmentName(DEFAULT_SEQUENCE_ID, minStartTime, maxEndTime);
   }
 
   private boolean isPinotSegment(File path) {
