@@ -1066,13 +1066,14 @@ public class PinotHelixResourceManager {
 
   public void updateSchema(Schema schema, boolean reload)
       throws SchemaNotFoundException, SchemaBackwardIncompatibleException, TableNotFoundException {
-    ZNRecord record = SchemaUtils.toZNRecord(schema);
     String schemaName = schema.getSchemaName();
     Schema oldSchema = ZKMetadataProvider.getSchema(_propertyStore, schemaName);
 
     if (oldSchema == null) {
       throw new SchemaNotFoundException(String.format("Schema %s did not exist.", schemaName));
     }
+
+    schema.updateBooleanFieldsIfNeeded(oldSchema);
 
     if (schema.equals(oldSchema)) {
       LOGGER.info("New schema is the same with the existing schema. Not updating schema " + schemaName);
@@ -1084,9 +1085,7 @@ public class PinotHelixResourceManager {
           String.format("New schema %s is not backward compatible with the current schema", schemaName));
     }
 
-    PinotHelixPropertyStoreZnRecordProvider propertyStoreHelper =
-        PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore);
-    propertyStoreHelper.set(schemaName, record);
+    ZKMetadataProvider.setSchema(_propertyStore, schema);
 
     if (reload) {
       LOGGER.info("Reloading tables with name: {}", schemaName);

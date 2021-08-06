@@ -48,7 +48,11 @@ public class InterSegmentOrderByMultiValueQueriesTest extends BaseMultiValueQuer
   @Test(dataProvider = "orderByDataProvider")
   public void testGroupByOrderByMVSegmentTrimSQLResults(String query, List<Object[]> expectedResults,
       long expectedNumEntriesScannedPostFilter, DataSchema expectedDataSchema) {
-    InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2(1);
+    InstancePlanMakerImplV2 planMaker =
+        new InstancePlanMakerImplV2(InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY,
+            InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, 1,
+            InstancePlanMakerImplV2.DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE,
+            InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD);
     BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query, planMaker);
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0, expectedNumEntriesScannedPostFilter, 400000L,

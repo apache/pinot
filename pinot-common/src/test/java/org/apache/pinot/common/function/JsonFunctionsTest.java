@@ -19,7 +19,9 @@
 package org.apache.pinot.common.function;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.jayway.jsonpath.PathNotFoundException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -28,6 +30,7 @@ import org.apache.pinot.common.function.scalar.JsonFunctions;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.fail;
 
 
 public class JsonFunctionsTest {
@@ -92,6 +95,81 @@ public class JsonFunctionsTest {
     assertEquals(JsonFunctions.jsonPathArray(jsonString, "$.subjects[*].grade"), new String[]{"A", "B"});
     assertEquals(JsonFunctions.jsonPathArray(jsonString, "$.subjects[*].homework_grades"),
         new Object[]{Arrays.asList(80, 85, 90, 95, 100), Arrays.asList(60, 65, 70, 85, 90)});
+  }
+
+  @Test
+  public void testJsonFunctionExtractingArrayWithMissingField()
+      throws JsonProcessingException {
+    String jsonString = "{\"name\": \"Pete\", \"age\": 24}";
+
+    try {
+      assertEquals(JsonFunctions.jsonPathArray(jsonString, "$.subjects[*].name"), new String[]{});
+      fail();
+    } catch (PathNotFoundException e) {
+      assertEquals(e.getMessage(), "Missing property in path $['subjects']");
+    }
+    assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(jsonString, "$.subjects[*].name"), new String[]{});
+    assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(jsonString, "$.subjects[*].grade"), new String[]{});
+    assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(jsonString, "$.subjects[*].homework_grades"), new Object[]{});
+
+    // jsonPathArrayDefaultEmpty should work fine with existing fields.
+    jsonString = "{\n" +
+        "    \"name\": \"Pete\",\n" +
+        "    \"age\": 24,\n" +
+        "    \"subjects\": [\n" +
+        "        {\n" +
+        "            \"name\": \"maths\",\n" +
+        "            \"homework_grades\": [80, 85, 90, 95, 100],\n" +
+        "            \"grade\": \"A\"\n" +
+        "        },\n" +
+        "        {\n" +
+        "            \"name\": \"english\",\n" +
+        "            \"homework_grades\": [60, 65, 70, 85, 90],\n" +
+        "            \"grade\": \"B\"\n" +
+        "        }\n" +
+        "    ]\n" +
+        "}";
+    assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(jsonString, "$.subjects[*].name"), new String[]{"maths", "english"});
+    assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(jsonString, "$.subjects[*].grade"), new String[]{"A", "B"});
+    assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(jsonString, "$.subjects[*].homework_grades"),
+        new Object[]{Arrays.asList(80, 85, 90, 95, 100), Arrays.asList(60, 65, 70, 85, 90)});
+  }
+
+  @Test
+  public void testJsonFunctionExtractingArrayWithObjectArray()
+      throws JsonProcessingException {
+    // ImmutableList works fine with JsonPath with default JacksonJsonProvider. But on ingestion
+    // path, JSONRecordExtractor converts all Collections in parsed JSON object to Object[].
+    // Object[] doesn't work with default JsonPath, where "$.commits[*].sha" would return empty,
+    // and "$.commits[1].sha" led to exception `Filter: [1]['sha'] can only be applied to arrays`.
+    // Those failure could be reproduced by using the default JacksonJsonProvider for JsonPath.
+    Map<String, Object> rawData = ImmutableMap.of("commits",
+        ImmutableList.of(ImmutableMap.of("sha", 123, "name", "k"), ImmutableMap.of("sha", 456, "name", "j")));
+    assertEquals(JsonFunctions.jsonPathArray(rawData, "$.commits[*].sha"), new Integer[]{123, 456});
+    assertEquals(JsonFunctions.jsonPathArray(rawData, "$.commits[1].sha"), new Integer[]{456});
+
+    // ArrayAwareJacksonJsonProvider should fix this issue.
+    rawData = ImmutableMap.of("commits",
+        new Object[]{ImmutableMap.of("sha", 123, "name", "k"), ImmutableMap.of("sha", 456, "name", "j")});
+    assertEquals(JsonFunctions.jsonPathArray(rawData, "$.commits[*].sha"), new Integer[]{123, 456});
+    assertEquals(JsonFunctions.jsonPathArray(rawData, "$.commits[1].sha"), new Integer[]{456});
+  }
+
+  @Test
+  public void testJsonFunctionExtractingArrayWithTopLevelObjectArray()
+      throws JsonProcessingException {
+    // JSON formatted string works fine with JsonPath, and we used to serialize Object[]
+    // to JSON formatted string for JsonPath to work.
+    String rawDataInStr = "[{\"sha\": 123, \"name\": \"k\"}, {\"sha\": 456, \"name\": \"j\"}]";
+    assertEquals(JsonFunctions.jsonPathArray(rawDataInStr, "$.[*].sha"), new Integer[]{123, 456});
+    assertEquals(JsonFunctions.jsonPathArray(rawDataInStr, "$.[1].sha"), new Integer[]{456});
+
+    // ArrayAwareJacksonJsonProvider can work with Array directly, thus no need to serialize
+    // Object[] any more.
+    Object[] rawDataInAry =
+        new Object[]{ImmutableMap.of("sha", 123, "name", "kk"), ImmutableMap.of("sha", 456, "name", "jj")};
+    assertEquals(JsonFunctions.jsonPathArray(rawDataInAry, "$.[*].sha"), new Integer[]{123, 456});
+    assertEquals(JsonFunctions.jsonPathArray(rawDataInAry, "$.[1].sha"), new Integer[]{456});
   }
 
   @Test

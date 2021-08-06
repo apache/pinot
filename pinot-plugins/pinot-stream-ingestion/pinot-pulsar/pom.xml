@@ -22,19 +22,20 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>pinot-stream-ingestion</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>0.8.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
-  <modelVersion>4.0.0</modelVersion>
 
+  <artifactId>pinot-pulsar</artifactId>
   <name>Pinot Pulsar</name>
   <url>https://pinot.apache.org/</url>
-  <artifactId>pinot-pulsar</artifactId>
 
   <properties>
+    <phase.prop>package</phase.prop>
     <pinot.root>${basedir}/../../..</pinot.root>
     <pulsar.version>2.7.2</pulsar.version>
     <jetty-server.version>9.4.39.v20210325</jetty-server.version>
@@ -52,7 +53,7 @@
     <codehaus-annotations.version>1.17</codehaus-annotations.version>
     <javax.annotation-api.version>1.2</javax.annotation-api.version>
     <commons-collections.version>4.1</commons-collections.version>
-    <grpc-protobuf-lite.version>1.18.0</grpc-protobuf-lite.version>
+    <grpc-protobuf-lite.version>1.19.0</grpc-protobuf-lite.version>
     <swagger-annotations.version>1.5.21</swagger-annotations.version>
     <okio.version>1.6.0</okio.version>
   </properties>
@@ -89,6 +90,14 @@
         <exclusion>
           <groupId>commons-codec</groupId>
           <artifactId>commons-codec</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.bouncycastle</groupId>
+          <artifactId>bcpkix-jdk15on</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.bouncycastle</groupId>
+          <artifactId>bcprov-ext-jdk15on</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -130,10 +139,6 @@
         <exclusion>
           <groupId>io.grpc</groupId>
           <artifactId>grpc-context</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.bouncycastle</groupId>
-          <artifactId>bcpkix-jdk15on</artifactId>
         </exclusion>
         <exclusion>
           <groupId>io.netty</groupId>
@@ -180,6 +185,14 @@
           <artifactId>grpc-protobuf-lite</artifactId>
         </exclusion>
         <exclusion>
+          <groupId>io.opencensus</groupId>
+          <artifactId>opencensus-contrib-grpc-metrics</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.opencensus</groupId>
+          <artifactId>opencensus-api</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>org.apache.commons</groupId>
           <artifactId>commons-collections4</artifactId>
         </exclusion>
@@ -212,12 +225,16 @@
           <artifactId>netty-transport-native-unix-common</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>org.bouncycastle</groupId>
-          <artifactId>bcprov-ext-jdk15on</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>jakarta.ws.rs</groupId>
           <artifactId>jakarta.ws.rs-api</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.bouncycastle</groupId>
+          <artifactId>bcpkix-jdk15on</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.bouncycastle</groupId>
+          <artifactId>bcprov-ext-jdk15on</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -265,11 +282,6 @@
       <groupId>io.grpc</groupId>
       <artifactId>grpc-context</artifactId>
       <version>${grpc-context.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.bouncycastle</groupId>
-      <artifactId>bcpkix-jdk15on</artifactId>
-      <version>${bouncycastle.version}</version>
     </dependency>
     <dependency>
       <groupId>io.netty</groupId>
@@ -358,7 +370,17 @@
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
-      <artifactId>bcprov-ext-jdk15on</artifactId>
+      <artifactId>bcpkix-jdk15to18</artifactId>
+      <version>${bouncycastle.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-ext-jdk15to18</artifactId>
+      <version>${bouncycastle.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-jdk15to18</artifactId>
       <version>${bouncycastle.version}</version>
     </dependency>
     <dependency>

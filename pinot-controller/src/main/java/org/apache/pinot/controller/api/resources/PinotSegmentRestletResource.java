@@ -598,10 +598,6 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns") @DefaultValue("") List<String> columns) {
     LOGGER.info("Received a request to fetch metadata for all segments for table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
-    if (tableType == TableType.REALTIME) {
-      throw new ControllerApplicationException(LOGGER, "Table type : " + tableTypeStr + " not yet supported.",
-          Status.NOT_IMPLEMENTED);
-    }
 
     String tableNameWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);

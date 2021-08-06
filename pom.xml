@@ -695,7 +695,7 @@
       <dependency>
         <groupId>commons-codec</groupId>
         <artifactId>commons-codec</artifactId>
-        <version>1.6</version>
+        <version>1.15</version>
       </dependency>
       <dependency>
         <groupId>com.thoughtworks.paranamer</groupId>
@@ -1355,10 +1355,10 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-javadoc-plugin</artifactId>
-          <version>2.10.1</version>
+          <version>3.2.0</version>
           <configuration>
             <!-- Remove this after fixing all javadoc warnings -->
-            <additionalparam>-Xdoclint:none</additionalparam>
+            <doclint>none</doclint>
           </configuration>
         </plugin>
         <plugin>
@@ -1666,7 +1666,6 @@
             <exclude>HEADER</exclude>
             <exclude>LICENSE*</exclude>
             <exclude>NOTICE*</exclude>
-            <exclude>DISCLAIMER</exclude>
 
             <!-- js, css files that are exact copies of the third-party works. In this case, the original header has to
             be kept. Please refer to 'Treatment of Third-party works' in https://www.apache.org/legal/src-headers.html
@@ -1816,7 +1815,7 @@
           </filters>
         </configuration>
       </plugin>
-      <!-- Include apache LICENSE, NOTICE, and DISCLAIMER files for jar resource bundle -->
+      <!-- Include apache LICENSE, NOTICE files for jar resource bundle -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-remote-resources-plugin</artifactId>
@@ -1828,11 +1827,10 @@
             </goals>
             <configuration>
               <properties>
-                <projectName>Apache Pinot (incubating)</projectName>
+                <projectName>Apache Pinot</projectName>
               </properties>
               <resourceBundles>
                 <resourceBundle>org.apache:apache-jar-resource-bundle:1.4</resourceBundle>
-                <resourceBundle>org.apache:apache-incubator-disclaimer-resource-bundle:1.1</resourceBundle>
               </resourceBundles>
             </configuration>
           </execution>
