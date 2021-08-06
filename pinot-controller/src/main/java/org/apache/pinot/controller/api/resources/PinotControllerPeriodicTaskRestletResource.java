@@ -87,7 +87,7 @@ public class PinotControllerPeriodicTaskRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/names")
-  @ApiOperation(value = "Get comma-delimited list of all available periodic tasks names.")
+  @ApiOperation(value = "Get comma-delimited list of all available periodic task names.")
   public ArrayList<String> getPeriodicTaskNames() {
     ArrayList<String> list = new ArrayList<>();
     list.add(org.apache.pinot.controller.validation.BrokerResourceValidationManager.class.getSimpleName());
