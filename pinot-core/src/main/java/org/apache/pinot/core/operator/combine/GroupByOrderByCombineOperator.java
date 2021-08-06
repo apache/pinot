@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -45,6 +46,7 @@ import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GroupByUtils;
+import org.apache.pinot.core.util.QueryOptions;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,12 +76,33 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
   private ConcurrentIndexedTable _indexedTable;
 
   public GroupByOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
-      ExecutorService executorService, long endTimeMs, int trimThreshold) {
+      ExecutorService executorService, long endTimeMs, int minTrimSize, int trimThreshold) {
     // GroupByOrderByCombineOperator use numOperators as numThreads
     super(operators, queryContext, executorService, endTimeMs, operators.size());
     _initLock = new ReentrantLock();
-    _trimSize = GroupByUtils.getTableCapacity(_queryContext);
-    _trimThreshold = trimThreshold;
+
+    Map<String, String> queryOptions = queryContext.getQueryOptions();
+    if (queryOptions != null) {
+      Integer minTrimSizeOption = QueryOptions.getMinServerGroupTrimSize(queryOptions);
+      if (minTrimSizeOption != null) {
+        minTrimSize = minTrimSizeOption;
+      }
+    }
+    if (minTrimSize > 0) {
+      int limit = queryContext.getLimit();
+      if (queryContext.getOrderByExpressions() != null || queryContext.getHavingFilter() != null) {
+        _trimSize = GroupByUtils.getTableCapacity(limit, minTrimSize);
+      } else {
+        // TODO: Keeping only 'LIMIT' groups can cause inaccurate result because the groups are randomly selected
+        //       without ordering. Consider ordering on group-by columns if no ordering is specified.
+        _trimSize = limit;
+      }
+      _trimThreshold = trimThreshold;
+    } else {
+      // Server trim is disabled
+      _trimSize = Integer.MAX_VALUE;
+      _trimThreshold = Integer.MAX_VALUE;
+    }
 
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
     assert aggregationFunctions != null;

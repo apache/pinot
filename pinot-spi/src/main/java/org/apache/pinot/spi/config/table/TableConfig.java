@@ -290,6 +290,12 @@ public class TableConfig extends BaseJsonConfig {
     return _upsertConfig == null ? UpsertConfig.Mode.NONE : _upsertConfig.getMode();
   }
 
+  @JsonIgnore
+  @Nullable
+  public String getUpsertComparisonColumn() {
+    return _upsertConfig == null ? null : _upsertConfig.getComparisonColumn();
+  }
+
   @JsonProperty(TUNER_CONFIG)
   public TunerConfig getTunerConfig() {
     return _tunerConfig;

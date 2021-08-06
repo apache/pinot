@@ -27,6 +27,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
+
 /** Class representing upsert configuration of a table. */
 public class UpsertConfig extends BaseJsonConfig {
 
@@ -45,9 +46,13 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Partial update strategies.")
   private final Map<String, Strategy> _partialUpsertStrategies;
 
+  @JsonPropertyDescription("Column for upsert comparison, default to time column")
+  private final String _comparisonColumn;
+
   @JsonCreator
   public UpsertConfig(@JsonProperty(value = "mode", required = true) Mode mode,
-      @JsonProperty("partialUpsertStrategies") @Nullable Map<String, Strategy> partialUpsertStrategies) {
+      @JsonProperty("partialUpsertStrategies") @Nullable Map<String, Strategy> partialUpsertStrategies,
+      @JsonProperty("comparisonColumn") @Nullable String comparisonColumn) {
     Preconditions.checkArgument(mode != null, "Upsert mode must be configured");
     _mode = mode;
 
@@ -56,6 +61,8 @@ public class UpsertConfig extends BaseJsonConfig {
     } else {
       _partialUpsertStrategies = null;
     }
+
+    _comparisonColumn = comparisonColumn;
   }
 
   public Mode getMode() {
@@ -65,5 +72,9 @@ public class UpsertConfig extends BaseJsonConfig {
   @Nullable
   public Map<String, Strategy> getPartialUpsertStrategies() {
     return _partialUpsertStrategies;
+  }
+
+  public String getComparisonColumn() {
+    return _comparisonColumn;
   }
 }

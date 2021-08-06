@@ -23,24 +23,23 @@ executionFrameworkSpec:
   # name: execution framework name
   name: 'spark'
 
-  # segmentGenerationJobRunnerClassName: class name implements org.apache.pinot.spi.batch.ingestion.runner.SegmentGenerationJobRunner interface.
+  # Class to use for segment generation and different push types.
   segmentGenerationJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.spark.SparkSegmentGenerationJobRunner'
-
-  # segmentTarPushJobRunnerClassName: class name implements org.apache.pinot.spi.batch.ingestion.runner.SegmentTarPushJobRunner interface.
   segmentTarPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.spark.SparkSegmentTarPushJobRunner'
-
-  # segmentUriPushJobRunnerClassName: class name implements org.apache.pinot.spi.batch.ingestion.runner.SegmentUriPushJobRunner interface.
   segmentUriPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.spark.SparkSegmentUriPushJobRunner'
+  segmentMetadataPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.spark.SparkSegmentMetadataPushJobRunner'
 
   extraConfigs:
 
 # jobType: Pinot ingestion job type.
-# Supported job types are:
+# Supported job types are defined in PinotIngestionJobType class.
 #   'SegmentCreation'
 #   'SegmentTarPush'
 #   'SegmentUriPush'
+#   'SegmentMetadataPush'
 #   'SegmentCreationAndTarPush'
 #   'SegmentCreationAndUriPush'
+#   'SegmentCreationAndMetadataPush'
 jobType: SegmentCreationAndTarPush
 
 # inputDirURI: Root directory of input data, expected to have scheme configured in PinotFS.
