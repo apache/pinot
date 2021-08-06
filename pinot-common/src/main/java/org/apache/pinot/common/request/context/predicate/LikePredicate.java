@@ -41,10 +41,14 @@ public class LikePredicate extends RegexpLikePredicate {
     return _lhs + "LIKE" + _value;
   }
 
+  /**
+   * Process an incoming LIKE string and make it regexp friendly
+   * @param value
+   * @return
+   */
   private static String processValue(String value) {
-    //String result = Pattern.quote(value);
-
     String result = escapeMetaCharacters(value);
+
     result = result.replace(".", "\\.");
     // ... escape any other potentially problematic characters here
     result = result.replace("?", ".");
