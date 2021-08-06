@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.fsa.builders;
 
+import com.carrotsearch.hppc.IntIntHashMap;
+import com.carrotsearch.hppc.IntStack;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
@@ -25,9 +27,6 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.EnumSet;
 import java.util.Set;
-
-import com.carrotsearch.hppc.IntIntHashMap;
-import com.carrotsearch.hppc.IntStack;
 import org.apache.pinot.fsa.FSA;
 import org.apache.pinot.fsa.FSA5;
 import org.apache.pinot.fsa.FSAFlags;

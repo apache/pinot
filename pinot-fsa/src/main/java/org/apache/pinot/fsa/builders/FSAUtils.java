@@ -18,13 +18,12 @@
  */
 package org.apache.pinot.fsa.builders;
 
+import com.carrotsearch.hppc.IntIntHashMap;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.util.BitSet;
 import java.util.TreeMap;
-
-import com.carrotsearch.hppc.IntIntHashMap;
 import org.apache.pinot.fsa.FSA;
 import org.apache.pinot.fsa.FSA5;
 import org.apache.pinot.fsa.FSAFlags;

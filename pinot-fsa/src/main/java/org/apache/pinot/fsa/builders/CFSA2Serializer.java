@@ -18,6 +18,12 @@
  */
 package org.apache.pinot.fsa.builders;
 
+import com.carrotsearch.hppc.BoundedProportionalArraySizingStrategy;
+import com.carrotsearch.hppc.IntArrayList;
+import com.carrotsearch.hppc.IntIntHashMap;
+import com.carrotsearch.hppc.IntStack;
+import com.carrotsearch.hppc.cursors.IntCursor;
+import com.carrotsearch.hppc.cursors.IntIntCursor;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.BitSet;
@@ -29,13 +35,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import com.carrotsearch.hppc.BoundedProportionalArraySizingStrategy;
-import com.carrotsearch.hppc.IntArrayList;
-import com.carrotsearch.hppc.IntIntHashMap;
-import com.carrotsearch.hppc.IntStack;
-import com.carrotsearch.hppc.cursors.IntCursor;
-import com.carrotsearch.hppc.cursors.IntIntCursor;
 import org.apache.pinot.fsa.CFSA2;
 import org.apache.pinot.fsa.FSA;
 import org.apache.pinot.fsa.FSAFlags;

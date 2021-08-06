@@ -18,9 +18,8 @@
  */
 package org.apache.pinot.fsa.builders;
 
-import java.util.BitSet;
-
 import com.carrotsearch.hppc.IntIntHashMap;
+import java.util.BitSet;
 import org.apache.pinot.fsa.FSA;
 import org.apache.pinot.fsa.FSA5;
 
