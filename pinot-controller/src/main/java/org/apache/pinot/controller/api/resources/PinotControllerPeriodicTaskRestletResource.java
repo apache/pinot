@@ -34,6 +34,8 @@ import org.apache.helix.Criteria;
 import org.apache.helix.InstanceType;
 import org.apache.pinot.common.messages.RunPeriodicTaskMessage;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.validation.BrokerResourceValidationManager;
+import org.apache.pinot.core.periodictask.BasePeriodicTask;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -81,5 +83,24 @@ public class PinotControllerPeriodicTaskRestletResource {
     int messageCount = clusterMessagingService.send(recipientCriteria, runPeriodicTaskMessage, null, -1);
     LOGGER.info("Periodic task execution message sent to {} controllers.", messageCount);
     return messageCount > 0;
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/names")
+  @ApiOperation(value = "Get comma-delimited list of all available periodic tasks names.")
+  public String getPeriodicTaskNames() {
+    StringBuffer list = new StringBuffer();
+    list.append(org.apache.pinot.controller.validation.BrokerResourceValidationManager.class.getName());
+    list.append(", ").append(org.apache.pinot.controller.validation.OfflineSegmentIntervalChecker.class.getName());
+    list.append(", ").append(org.apache.pinot.controller.validation.RealtimeSegmentValidationManager.class.getName());
+    list.append(", ").append(org.apache.pinot.controller.helix.SegmentStatusChecker.class.getName());
+    list.append(", ").append(org.apache.pinot.controller.helix.core.retention.RetentionManager.class.getName());
+    list.append(", ").append(org.apache.pinot.controller.helix.core.relocation.SegmentRelocator.class.getName());
+    list.append(", ").append(org.apache.pinot.controller.helix.core.minion.PinotTaskManager.class.getName());
+    list.append(", ").append(org.apache.pinot.controller.helix.core.minion.MinionInstancesCleanupTask.class.getName());
+    list.append(", ").append(org.apache.pinot.controller.helix.core.minion.TaskMetricsEmitter.class.getName());
+
+    return list.toString();
   }
 }
