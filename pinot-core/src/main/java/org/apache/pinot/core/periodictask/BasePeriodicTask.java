@@ -20,7 +20,9 @@ package org.apache.pinot.core.periodictask;
 
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import javax.validation.constraints.Null;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,14 +45,16 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   private volatile boolean _started;
   private volatile boolean _running;
 
-  private String _tableName;
+  // A string passed to tasks being run that dictates how the task will be run. null by default.
+  // TODO: to be finalized based on code review.
+  private String _filter;
 
   public BasePeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds) {
     _taskName = taskName;
     _intervalInSeconds = runFrequencyInSeconds;
     _initialDelayInSeconds = initialDelayInSeconds;
     _runLock = new ReentrantLock();
-    _tableName = null;
+    _filter = null;
   }
 
   @Override
@@ -130,7 +134,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
         long startTime = System.currentTimeMillis();
         LOGGER.info("Start running task: {}", _taskName);
         try {
-          runTask(_tableName);
+          runTask(_filter);
         } catch (Exception e) {
           LOGGER.error("Caught exception while running task: {}", _taskName, e);
         }
@@ -147,13 +151,13 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   }
 
   @Override
-  public void run(String tableName) {
+  public void run(@Nullable String filter) {
     try {
       _runLock.lock();
-      _tableName = tableName;
+      _filter = filter;
       run();
     } finally {
-      _tableName = null;
+      _filter = null;
       _runLock.unlock();
     }
   }
@@ -163,7 +167,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
    * during execution.
    * @param filter An implementation specific string that may dictate how the task will be run. null by default.
    */
-  protected abstract void runTask(String filter);
+  protected abstract void runTask(@Nullable String filter);
 
   /**
    * {@inheritDoc}

@@ -61,10 +61,9 @@ public interface PeriodicTask extends Runnable {
 
   /**
    * Execute the task once. This method will calls the {@link #run} method.
-   * @param tableName The name of table against which task will run. If no table name is set, then task will run against
-   *                  all tables.
+   * @param filter An implementation specific string that may dictate how the task will be run. null by default.
    */
-  void run(String tableName);
+  void run(String filter);
 
   /**
    * Stops the periodic task and performs necessary cleanups. Should be called after removing the periodic task from the

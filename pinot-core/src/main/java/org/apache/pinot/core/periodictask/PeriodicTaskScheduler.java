@@ -148,7 +148,7 @@ public class PeriodicTaskScheduler {
       try {
         // To prevent thread conflict, this call will block if the same task is already running (see
         // BasePeriodicTask.run method).
-        periodicTask.run();
+        periodicTask.run(tableName);
       } catch (Throwable t) {
         // catch all errors to prevent subsequent executions from being silently suppressed
         // Ref: https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ScheduledExecutorService.html#scheduleWithFixedDelay-java.lang.Runnable-long-long-java.util.concurrent.TimeUnit-
