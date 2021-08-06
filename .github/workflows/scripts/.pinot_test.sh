@@ -25,29 +25,23 @@ java -version
 ifconfig
 netstat -i
 
-# The overhead of building repo is about 12 min.
-mvn install -DskipTests -T 1C
-
 if [ "$RUN_INTEGRATION_TESTS" != false ]; then
   # Integration Tests
+  mvn install -DskipTests -am -B -pl 'pinot-integration-tests' -T 16
   if [ "$RUN_TEST_SET" == "1" ]; then
-    mvn test -B -pl 'pinot-integration-tests' -Dtest='R*Test,B*Test' -P github-actions,integration-tests-only && exit 0 || exit 1
+    mvn test -am -B -pl 'pinot-integration-tests' -Dtest='C*Test,L*Test,M*Test,R*Test,S*Test' -P github-actions,integration-tests-only && exit 0 || exit 1
   fi
   if [ "$RUN_TEST_SET" == "2" ]; then
-    mvn test -B -pl 'pinot-integration-tests' -Dtest='C*Test,M*Test' -P github-actions,integration-tests-only && exit 0 || exit 1
-  fi
-  if [ "$RUN_TEST_SET" == "3" ]; then
-    mvn test -B -pl 'pinot-integration-tests' -Dtest='A*Test,L*Test,S*Test' -P github-actions,integration-tests-only && exit 0 || exit 1
-  fi
-  if [ "$RUN_TEST_SET" == "4" ]; then
-    mvn test -B -pl 'pinot-integration-tests' -Dtest='!A*Test,!B*Test,!C*Test,!L*Test,!M*Test,!R*Test,!S*Test' -P github-actions,integration-tests-only && exit 0 || exit 1
+    mvn test -am -B -pl 'pinot-integration-tests' -Dtest='!C*Test,!L*Test,!M*Test,!R*Test,!S*Test' -P github-actions,integration-tests-only && exit 0 || exit 1
   fi
 else
   # Unit Tests
   if [ "$RUN_TEST_SET" == "1" ]; then
-    mvn test -B -pl 'pinot-controller'  -pl 'pinot-broker'  -pl 'pinot-server'  -pl 'pinot-segment-local'  -P github-actions,no-integration-tests && exit 0 || exit 1
+    mvn install -DskipTests -am -B -pl 'pinot-core,pinot-segment-local' -T 16
+    mvn test -am -B -pl 'pinot-spi,pinot-segment-spi,pinot-common,pinot-segment-local,pinot-core' -P github-actions,no-integration-tests && exit 0 || exit 1
   fi
   if [ "$RUN_TEST_SET" == "2" ]; then
-    mvn test -B -pl '!pinot-controller' -pl '!pinot-broker' -pl '!pinot-server' -pl '!pinot-segment-local' -P github-actions,no-integration-tests && exit 0 || exit 1
+    mvn install -DskipTests -T 16
+    mvn test -am -B -pl '!pinot-spi,!pinot-segment-spi,!pinot-common,!pinot-segment-local,!pinot-core' -P github-actions,no-integration-tests && exit 0 || exit 1
   fi
 fi

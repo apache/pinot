@@ -64,7 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        testset: [ 1, 2, 3, 4 ]
+        testset: [ 1, 2 ]
     name: Pinot Integration Test Set ${{ matrix.testset }}
     steps:
       - uses: actions/checkout@v2
