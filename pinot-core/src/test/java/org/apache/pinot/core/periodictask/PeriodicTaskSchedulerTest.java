@@ -152,7 +152,7 @@ public class PeriodicTaskSchedulerTest {
     for (int i = 0; i < threads.length; i++) {
       threads[i] = new Thread(() -> {
           attempts.incrementAndGet();
-          taskScheduler.execute("TestTask", null);
+          taskScheduler.scheduleNow("TestTask", null);
       });
 
       threads[i].start();

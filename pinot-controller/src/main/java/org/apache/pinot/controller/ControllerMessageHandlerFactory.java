@@ -32,6 +32,7 @@ import org.slf4j.LoggerFactory;
 /** Factory class for creating message handlers for incoming helix messages. */
 public class ControllerMessageHandlerFactory implements MessageHandlerFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerMessageHandlerFactory.class);
+  private static final String USER_DEFINED_MSG_STRING = Message.MessageType.USER_DEFINE_MSG.toString();
 
   private final PeriodicTaskScheduler _periodicTaskScheduler;
 
@@ -46,13 +47,13 @@ public class ControllerMessageHandlerFactory implements MessageHandlerFactory {
       return new RunPeriodicTaskMessageHandler(new RunPeriodicTaskMessage(message), notificationContext, _periodicTaskScheduler);
     }
 
-    LOGGER.error("Bad message type {} received by controller. ", messageType);
+    LOGGER.warn("Unknown message type {} received by controller. ", messageType);
     return null;
   }
 
   @Override
   public String getMessageType() {
-    return Message.MessageType.USER_DEFINE_MSG.toString();
+    return USER_DEFINED_MSG_STRING;
   }
 
   @Override
@@ -75,8 +76,8 @@ public class ControllerMessageHandlerFactory implements MessageHandlerFactory {
     @Override
     public HelixTaskResult handleMessage()
         throws InterruptedException {
-      LOGGER.info("Handle RunPeriodicTaskMessage by executing task {}", _periodicTaskName);
-      _periodicTaskScheduler.execute(_periodicTaskName, _tableName);
+      LOGGER.info("Handling RunPeriodicTaskMessage by executing task {}", _periodicTaskName);
+      _periodicTaskScheduler.scheduleNow(_periodicTaskName, _tableName);
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       helixTaskResult.setSuccess(true);
       return helixTaskResult;

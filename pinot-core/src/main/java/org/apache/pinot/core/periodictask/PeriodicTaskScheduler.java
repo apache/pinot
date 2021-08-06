@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -133,13 +134,16 @@ public class PeriodicTaskScheduler {
    * Execute specified {@link PeriodicTask} immediately. If the task is already running, wait for the running task
    * to finish before executing the task again.
    */
-  public void execute(String periodicTaskName, String tableName) {
+  public void scheduleNow(String periodicTaskName, @Nullable String tableName) {
+    // Each controller may have a slightly different list of periodic tasks if we add, remove, or rename periodic
+    // task. To avoid this situation, we check again (besides the check at controller API level) whether the
+    // periodic task exists.
     PeriodicTask periodicTask = getPeriodicTask(periodicTaskName);
-    LOGGER.info("Immediately executing periodic task {}", periodicTaskName);
     if (periodicTask == null) {
       throw new IllegalArgumentException("Unknown Periodic Task " + periodicTaskName);
     }
 
+    LOGGER.info("Immediately executing periodic task {}", periodicTaskName);
     _executorService.schedule(() -> {
       try {
         // To prevent thread conflict, this call will block if the same task is already running (see

@@ -64,7 +64,8 @@ public class PinotControllerPeriodicTaskRestletResource {
           Response.Status.NOT_FOUND);
     }
 
-    LOGGER.info("Sending periodic task execution message for {} to all controllers.", periodicTaskName);
+    LOGGER.info("Sending periodic task execution message to all controllers for running task {} against {}.",
+        periodicTaskName, tableName != null ? tableName + " table" : "all tables");
 
     // Create and send message to send to all controllers (including this one)
     Criteria recipientCriteria = new Criteria();

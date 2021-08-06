@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.messages;
 
-import com.google.common.base.Preconditions;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import org.apache.helix.ZNRecord;
@@ -50,8 +49,6 @@ public class RunPeriodicTaskMessage extends Message {
   public RunPeriodicTaskMessage(Message message) {
     super(message.getRecord());
     String msgSubType = message.getMsgSubType();
-    Preconditions.checkArgument(msgSubType.equals(RUN_PERIODIC_TASK_MSG_SUB_TYPE),
-        "Invalid message sub type: " + msgSubType + " for RunPeriodicTaskMessage");
   }
 
   public String getPeriodicTaskName() {
