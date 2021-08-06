@@ -34,8 +34,6 @@ import org.apache.helix.Criteria;
 import org.apache.helix.InstanceType;
 import org.apache.pinot.common.messages.RunPeriodicTaskMessage;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.validation.BrokerResourceValidationManager;
-import org.apache.pinot.core.periodictask.BasePeriodicTask;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
