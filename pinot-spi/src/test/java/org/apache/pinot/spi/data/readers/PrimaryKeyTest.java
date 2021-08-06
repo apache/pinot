@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.spi.data.readers;
 
+import org.apache.commons.lang.SerializationUtils;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -36,5 +38,14 @@ public class PrimaryKeyTest {
     right = new PrimaryKey(new Object[]{"222", 2});
     assertNotEquals(left, right);
     assertNotEquals(left.hashCode(), right.hashCode());
+  }
+
+  @Test
+  public void testSerialization() {
+    byte[] rawbytes = {0xa, 0x2, (byte) 0xff};
+    PrimaryKey pk = new PrimaryKey(new Object[]{"111", 2, new ByteArray(rawbytes)});
+    byte[] bytes = pk.asBytes();
+    PrimaryKey deserialized = new PrimaryKey((Object[]) SerializationUtils.deserialize(bytes));
+    assertEquals(deserialized, pk);
   }
 }
