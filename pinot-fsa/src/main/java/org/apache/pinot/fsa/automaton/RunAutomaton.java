@@ -44,6 +44,8 @@ public class RunAutomaton implements Serializable {
 	char[] points; // char interval start points
 	int[] classmap; // map from char number to class class
 
+	final int alphabetSize;
+
 	/** 
 	 * Sets alphabet table for optimal run performance. 
 	 */
@@ -128,16 +130,13 @@ public class RunAutomaton implements Serializable {
 		return SpecialOperations.findIndex(c, points);
 	}
 
-	@SuppressWarnings("unused")
-	private RunAutomaton() {}
-
 	/**
 	 * Constructs a new <code>RunAutomaton</code> from a deterministic
 	 * <code>Automaton</code>. Same as <code>RunAutomaton(a, true)</code>.
 	 * @param a an automaton
 	 */
-	public RunAutomaton(Automaton a) {
-		this(a, true);
+	public RunAutomaton(Automaton a, int alphabetSize) {
+		this(a, true, alphabetSize);
 	}
 
 	/**
@@ -182,7 +181,9 @@ public class RunAutomaton implements Serializable {
 	 * @param tableize if true, a transition table is created which makes the <code>run</code> 
 	 *                 method faster in return of a higher memory usage
 	 */
-	public RunAutomaton(Automaton a, boolean tableize) {
+	public RunAutomaton(Automaton a, boolean tableize, int alphabetSize) {
+		this.alphabetSize = alphabetSize;
+
 		a.determinize();
 		points = a.getStartPoints();
 		Set<State> states = a.getStates();
@@ -206,13 +207,43 @@ public class RunAutomaton implements Serializable {
 			setAlphabet();
 	}
 
+	/** Gets character class of given codepoint */
+	final int getCharClass(int c) {
+
+		// binary search
+		int a = 0;
+		int b = points.length;
+		while (b - a > 1) {
+			int d = (a + b) >>> 1;
+			if (points[d] > c) b = d;
+			else if (points[d] < c) a = d;
+			else return d;
+		}
+		return a;
+	}
+
 	/**
-	 * Returns the state obtained by reading the given char from the given
-	 * state. Returns -1 if not obtaining any such state. (If the original
-	 * <code>Automaton</code> had no dead states, -1 is returned here if and
-	 * only if a dead state is entered in an equivalent automaton with a total
+	 * Returns the state obtained by reading the given char from the given state. Returns -1 if not
+	 * obtaining any such state. (If the original <code>Automaton</code> had no dead states, -1 is
+	 * returned here if and only if a dead state is entered in an equivalent automaton with a total
 	 * transition function.)
 	 */
+	public final int step(int state, int c) {
+		assert c < alphabetSize;
+		if (c >= classmap.length) {
+			return transitions[state * points.length + getCharClass(c)];
+		} else {
+			return transitions[state * points.length + classmap[c]];
+		}
+	}
+
+		/**
+     * Returns the state obtained by reading the given char from the given
+     * state. Returns -1 if not obtaining any such state. (If the original
+     * <code>Automaton</code> had no dead states, -1 is returned here if and
+     * only if a dead state is entered in an equivalent automaton with a total
+     * transition function.)
+     */
 	public int step(int state, char c) {
 		if (classmap == null)
 			return transitions[state * points.length + getCharClass(c)];
