@@ -28,6 +28,7 @@ import org.apache.pinot.fsa.FSATraversal;
 import org.apache.pinot.fsa.automaton.Automaton;
 import org.apache.pinot.fsa.automaton.CharacterRunAutomaton;
 import org.apache.pinot.fsa.automaton.RegExp;
+import org.apache.pinot.fsa.automaton.RunAutomaton;
 import org.apache.pinot.fsa.automaton.State;
 import org.apache.pinot.fsa.automaton.Transition;
 import org.slf4j.Logger;
@@ -47,12 +48,15 @@ public class RegexpMatcher {
 
   private final String _regexQuery;
   private final FSA _fst;
-  private final Automaton _automaton;
+  private final RunAutomaton _automaton;
 
   public RegexpMatcher(String regexQuery, FSA fst) {
     _regexQuery = regexQuery;
     _fst = fst;
-    _automaton = (new RegExp(_regexQuery)).toAutomaton();
+
+    Automaton tempAutomaton = new RegExp(_regexQuery).toAutomaton();
+
+    _automaton = new RunAutomaton((tempAutomaton));
   }
 
   public static List<Long> regexMatch(String regexQuery, FSA fst)
@@ -89,12 +93,12 @@ public class RegexpMatcher {
     final List<Path<Long>> endNodes = new ArrayList<>();
     final FSATraversal matcher = new FSATraversal(_fst);
 
-    if (_automaton.getNumberOfStates() == 0) {
+    if (_automaton.getSize() == 0) {
       return Collections.emptyList();
     }
 
     // Automaton start state and FST start node is added to the queue.
-    queue.add(new Path<>(_fst.getFirstArc(_fst.getRootNode()), _automaton.getInitialState());
+    queue.add(new Path<>(_fst.getFirstArc(_fst.getRootNode()), _automaton.getInitialState(), IntsRefBuilder input);
 
 
     final FSA.Arc<Long> scratchArc = new FST.Arc<>();
@@ -155,11 +159,13 @@ public class RegexpMatcher {
     public final State state;
     public final int fstNodeArc;
     public final T output;
+    public final IntsRefBuilder input;
 
-    public Path(State state, int fstNodeArc, T output) {
+    public Path(State state, int fstNodeArc, T output, IntsRefBuilder input) {
       this.state = state;
       this.fstNodeArc = fstNodeArc;
       this.output = output;
+      this.input = input;
     }
   }
 }

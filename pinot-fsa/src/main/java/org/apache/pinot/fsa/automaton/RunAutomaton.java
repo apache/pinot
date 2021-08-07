@@ -44,8 +44,6 @@ public class RunAutomaton implements Serializable {
 	char[] points; // char interval start points
 	int[] classmap; // map from char number to class class
 
-	final int alphabetSize;
-
 	/** 
 	 * Sets alphabet table for optimal run performance. 
 	 */
@@ -135,8 +133,8 @@ public class RunAutomaton implements Serializable {
 	 * <code>Automaton</code>. Same as <code>RunAutomaton(a, true)</code>.
 	 * @param a an automaton
 	 */
-	public RunAutomaton(Automaton a, int alphabetSize) {
-		this(a, true, alphabetSize);
+	public RunAutomaton(Automaton a) {
+		this(a, true);
 	}
 
 	/**
@@ -181,9 +179,7 @@ public class RunAutomaton implements Serializable {
 	 * @param tableize if true, a transition table is created which makes the <code>run</code> 
 	 *                 method faster in return of a higher memory usage
 	 */
-	public RunAutomaton(Automaton a, boolean tableize, int alphabetSize) {
-		this.alphabetSize = alphabetSize;
-
+	public RunAutomaton(Automaton a, boolean tableize) {
 		a.determinize();
 		points = a.getStartPoints();
 		Set<State> states = a.getStates();
@@ -229,7 +225,6 @@ public class RunAutomaton implements Serializable {
 	 * transition function.)
 	 */
 	public final int step(int state, int c) {
-		assert c < alphabetSize;
 		if (c >= classmap.length) {
 			return transitions[state * points.length + getCharClass(c)];
 		} else {
