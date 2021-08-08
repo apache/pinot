@@ -82,6 +82,27 @@ jobs:
         run: |
           bash <(curl -s https://codecov.io/bash) -cF integration${{ matrix.testset }}
 
+  compatibility-verifier:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        test_suite: [ "compatibility-verifier/sample-test-suite" ]
+        old_commit: [ "release-0.7.1", "master" ]
+    name: Pinot Compatibility Regression Testing against ${{ matrix.old_commit }} on ${{ matrix.test_suite }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up JDK 1.8
+        uses: actions/setup-java@v1
+        with:
+          java-version: 1.8
+      - name: Pinot Compatibility Regression Testing
+        env:
+          OLD_COMMIT: ${{ matrix.old_commit }}
+          WORKING_DIR: /tmp/compatibility-verifier
+          TEST_SUITE: ${{ matrix.test_suite }}
+          MAVEN_OPTS: -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25 -Dmaven.wagon.http.retryHandler.count=3 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
+        run: .github/workflows/scripts/.pinot_compatibility_verifier.sh
+
   quickstarts:
     runs-on: ubuntu-latest
     strategy:
@@ -96,3 +117,4 @@ jobs:
           java-version: ${{ matrix.java }}
       - name: Quickstart on JDK ${{ matrix.java }}
         run: .github/workflows/scripts/.pinot_quickstart.sh
+
