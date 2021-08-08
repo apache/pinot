@@ -138,6 +138,5 @@ public class SegmentGenerationJobRunnerTest {
     Assert.assertTrue(newSegmentFile.length() > 0);
 
     // FUTURE - validate contents of file?
-    }
-  
+  }
 }

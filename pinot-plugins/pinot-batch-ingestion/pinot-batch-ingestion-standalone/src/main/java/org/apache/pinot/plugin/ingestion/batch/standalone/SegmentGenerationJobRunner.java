@@ -290,5 +290,4 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
       }
     });
   }
-
 }

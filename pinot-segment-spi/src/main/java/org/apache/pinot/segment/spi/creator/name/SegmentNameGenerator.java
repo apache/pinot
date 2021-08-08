@@ -38,5 +38,4 @@ public interface SegmentNameGenerator extends Serializable {
    * @return Segment name generated
    */
   String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue);
-
 }

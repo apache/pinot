@@ -48,17 +48,17 @@ public class InputFileSegmentNameGeneratorTest {
 
   private void validateName(String inputFileUriAsStr, String segmentName) {
     try {
-        String pattern = ".+/(.+)\\.csv";
-        String template = "${filePathPattern:\\1}";
-        SegmentNameGenerator segmentNameGenerator = new InputFileSegmentNameGenerator(pattern, template, inputFileUriAsStr);
-        assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null), segmentName);
-        
-        String msg = String.format(
-                "InputFileSegmentNameGenerator: filePathPattern=%s, segmentNameTemplate=%s, inputFileUri=%s, segmentName=%s",
-                pattern, template, inputFileUriAsStr, segmentName);
-        assertEquals(segmentNameGenerator.toString(), msg);
+      String pattern = ".+/(.+)\\.csv";
+      String template = "${filePathPattern:\\1}";
+      SegmentNameGenerator segmentNameGenerator = new InputFileSegmentNameGenerator(pattern, template, inputFileUriAsStr);
+      assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null), segmentName);
+
+      String msg = String.format(
+          "InputFileSegmentNameGenerator: filePathPattern=%s, segmentNameTemplate=%s, inputFileUri=%s, segmentName=%s",
+          pattern, template, inputFileUriAsStr, segmentName);
+      assertEquals(segmentNameGenerator.toString(), msg);
     } catch (URISyntaxException e) {
-        fail("Exception thrown while creating URI for " + inputFileUriAsStr);
+      fail("Exception thrown while creating URI for " + inputFileUriAsStr);
     }
   }
 }

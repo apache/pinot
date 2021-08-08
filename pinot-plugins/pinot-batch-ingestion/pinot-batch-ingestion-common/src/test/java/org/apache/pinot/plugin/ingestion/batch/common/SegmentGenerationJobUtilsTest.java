@@ -48,5 +48,4 @@ public class SegmentGenerationJobUtilsTest {
     spec.setConfigs(ImmutableMap.of("local.directory.sequence.id", "False"));
     Assert.assertTrue(SegmentGenerationJobUtils.useGlobalDirectorySequenceId(spec));
   }
-  
 }

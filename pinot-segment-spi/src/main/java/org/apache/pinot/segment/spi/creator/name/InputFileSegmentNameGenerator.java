@@ -27,65 +27,63 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Segment name generator that supports defining the segment name based on the input file name
- * and path, via a pattern (matched against the input file URI) and a template (currently only
- * supports ${filePathPattern:\N}, where N is the group match number from the regex).
+ * Segment name generator that supports defining the segment name based on the input file name and path, via a pattern
+ * (matched against the input file URI) and a template (currently only supports ${filePathPattern:\N}, where N is the
+ * group match number from the regex).
  *
  */
 @SuppressWarnings("serial")
 public class InputFileSegmentNameGenerator implements SegmentNameGenerator {
 
-    private static final Logger LOGGER = LoggerFactory
-            .getLogger(InputFileSegmentNameGenerator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(InputFileSegmentNameGenerator.class);
 
-    private static final String PARAMETER_TEMPLATE = "${filePathPattern:\\%d}";
+  private static final String PARAMETER_TEMPLATE = "${filePathPattern:\\%d}";
 
-    private Pattern filePathPattern;
-    private String segmentNameTemplate;
-    private URI inputFileUri;
-    private String segmentName;
-    
-    public InputFileSegmentNameGenerator(String filePathPattern, String segmentNameTemplate,
-            String inputFileUri) throws URISyntaxException {
-        this.filePathPattern = Pattern.compile(filePathPattern);
-        this.segmentNameTemplate = segmentNameTemplate;
-        this.inputFileUri = new URI(inputFileUri);
-        this.segmentName = makeSegmentName();
+  private Pattern _filePathPattern;
+  private String _segmentNameTemplate;
+  private URI _inputFileUri;
+  private String _segmentName;
+
+  public InputFileSegmentNameGenerator(String filePathPattern, String segmentNameTemplate,
+      String inputFileUri) throws URISyntaxException {
+    _filePathPattern = Pattern.compile(filePathPattern);
+    _segmentNameTemplate = segmentNameTemplate;
+    _inputFileUri = new URI(inputFileUri);
+    _segmentName = makeSegmentName();
+  }
+
+  private String makeSegmentName() {
+    String inputFilePath = _inputFileUri.getPath();
+    Matcher m = _filePathPattern.matcher(inputFilePath);
+    if (!m.matches()) {
+      LOGGER.warn(String.format("No match for pattern '%s' in '%s'", _filePathPattern, inputFilePath));
+      return safeConvertPathToFilename(inputFilePath);
     }
 
-    private String makeSegmentName() {
-        String inputFilePath = inputFileUri.getPath();
-        Matcher m = filePathPattern.matcher(inputFilePath);
-        if (!m.matches()) {
-            LOGGER.warn(String.format("No match for pattern '%s' in '%s'", filePathPattern,
-                    inputFilePath));
-            return safeConvertPathToFilename(inputFilePath);
-        }
-
-        String segmentName = segmentNameTemplate;
-        for (int i = 1; i <= m.groupCount(); i++) {
-            segmentName = segmentName.replace(String.format(PARAMETER_TEMPLATE, i), m.group(i));
-        }
-
-        return segmentName;
-    }
-    
-    @Override
-    public String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue) {
-        return segmentName;
+    String segmentName = _segmentNameTemplate;
+    for (int i = 1; i <= m.groupCount(); i++) {
+      segmentName = segmentName.replace(String.format(PARAMETER_TEMPLATE, i), m.group(i));
     }
 
-    private String safeConvertPathToFilename(String inputFilePath) {
-        // Strip of leading '/' characters
-        inputFilePath = inputFilePath.replaceFirst("^[/]+", "");
-        // Try to create a valid filename by removing any '/' or '.' chars with '_'
-        return inputFilePath.replaceAll("[/\\.]", "_");
-    }
+    return segmentName;
+  }
 
-    @Override
-    public String toString() {
-        return String.format(
-                "InputFileSegmentNameGenerator: filePathPattern=%s, segmentNameTemplate=%s, inputFileUri=%s, segmentName=%s",
-                filePathPattern, segmentNameTemplate, inputFileUri, segmentName);
-    }
+  @Override
+  public String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue) {
+    return _segmentName;
+  }
+
+  private String safeConvertPathToFilename(String inputFilePath) {
+    // Strip of leading '/' characters
+    inputFilePath = inputFilePath.replaceFirst("^[/]+", "");
+    // Try to create a valid filename by removing any '/' or '.' chars with '_'
+    return inputFilePath.replaceAll("[/\\.]", "_");
+  }
+
+  @Override
+  public String toString() {
+    return String.format(
+        "InputFileSegmentNameGenerator: filePathPattern=%s, segmentNameTemplate=%s, inputFileUri=%s, segmentName=%s",
+        _filePathPattern, _segmentNameTemplate, _inputFileUri, _segmentName);
+  }
 }

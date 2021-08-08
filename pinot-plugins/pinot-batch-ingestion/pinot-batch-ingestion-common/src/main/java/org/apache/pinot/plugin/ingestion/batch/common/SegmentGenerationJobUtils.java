@@ -43,5 +43,4 @@ public class SegmentGenerationJobUtils implements Serializable {
     }
     return Boolean.parseBoolean(useGlobalDirectorySequenceId);
   }
-  
 }
