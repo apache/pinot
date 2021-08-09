@@ -256,9 +256,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
         new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _helixClusterName,
             _instanceId, resourcesToMonitor, minResourcePercentForStartup));
     if (checkRealtime && foundConsuming) {
+      OffsetBasedConsumptionStatusChecker consumptionStatusChecker =
+          new OffsetBasedConsumptionStatusChecker(_serverInstance.getInstanceDataManager(), _helixAdmin, _helixClusterName,
+              _instanceId);
       serviceStatusCallbackListBuilder.add(
           new ServiceStatus.RealtimeConsumptionCatchupServiceStatusCallback(_helixManager, _helixClusterName,
-              _instanceId, realtimeConsumptionCatchupWaitMs));
+              _instanceId, realtimeConsumptionCatchupWaitMs,
+              consumptionStatusChecker::haveAllConsumingSegmentsReachedStreamLatestOffset));
     }
     LOGGER.info("Registering service status handler");
     ServiceStatus.setServiceStatusCallback(_instanceId,

@@ -72,6 +72,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.stream.MessageBatch;
+import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
@@ -762,9 +763,20 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return _lastLogTime;
   }
 
-  @VisibleForTesting
-  protected StreamPartitionMsgOffset getCurrentOffset() {
+  public StreamPartitionMsgOffset getCurrentOffset() {
     return _currentOffset;
+  }
+
+  public StreamPartitionMsgOffset fetchLatestStreamOffset() {
+    try (StreamMetadataProvider metadataProvider = _streamConsumerFactory
+        .createPartitionMetadataProvider(_clientId, _partitionGroupId)) {
+      return metadataProvider
+          .fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, /*maxWaitTimeMs=*/5000);
+    } catch (Exception e) {
+      segmentLogger.warn("Cannot fetch latest stream offset for clientId {} and partitionGroupId {}", _clientId,
+          _partitionGroupId);
+    }
+    return null;
   }
 
   @VisibleForTesting

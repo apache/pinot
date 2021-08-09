@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
@@ -204,28 +205,31 @@ public class ServiceStatus {
 
   /**
    * Service status callback that checks whether realtime consumption has caught up
-   * TODO: In this initial version, we are simply adding a configurable static wait time
-   * This can be made smarter:
-   * 1) Keep track of average consumption rate for table in server stats
-   * 2) Monitor consumption rate during startup, report GOOD when it stabilizes to average rate
-   * 3) Monitor consumption rate during startup, report GOOD if it is idle
+   * An offset based consumption status checker is being added in two phases. First phase adds the new status checker,
+   * but it doesn't apply its output. Instead it only logs its behavior. When the behavior is analysed and approved
+   * for different tables with different consumption rates, we can safely use the new status checker.
+   * (Another approach would be to define a new config and disable it by default. Since this feature is not urgent,
+   * we decided to not define yet another config and go with this two phase approach)
    */
   public static class RealtimeConsumptionCatchupServiceStatusCallback implements ServiceStatusCallback {
 
     private final long _endWaitTime;
     private final Status _serviceStatus = Status.STARTING;
+    private final Supplier<Boolean> _allConsumingSegmentsHaveReachedLatestOffset;
     String _statusDescription = STATUS_DESCRIPTION_INIT;
 
     /**
      * Realtime consumption catchup service which adds a static wait time for consuming segments to catchup
      */
     public RealtimeConsumptionCatchupServiceStatusCallback(HelixManager helixManager, String clusterName,
-        String instanceName, long realtimeConsumptionCatchupWaitMs) {
+        String instanceName, long realtimeConsumptionCatchupWaitMs,
+        Supplier<Boolean> allConsumingSegmentsHaveReachedLatestOffset) {
 
       // A consuming segment will actually be ready to serve queries after (time of creation of partition consumer) +
       // (configured max time to catchup)
       // We are approximating it to (time of server startup) + (configured max time to catch up)
       _endWaitTime = System.currentTimeMillis() + realtimeConsumptionCatchupWaitMs;
+      _allConsumingSegmentsHaveReachedLatestOffset = allConsumingSegmentsHaveReachedLatestOffset;
       LOGGER.info("Monitoring realtime consumption catchup. Will allow {} ms before marking status GOOD",
           realtimeConsumptionCatchupWaitMs);
     }
@@ -236,13 +240,21 @@ public class ServiceStatus {
         return _serviceStatus;
       }
       long now = System.currentTimeMillis();
-      if (now < _endWaitTime) {
-        _statusDescription =
-            String.format("Waiting for consuming segments to catchup, timeRemaining=%dms", _endWaitTime - now);
-        return Status.STARTING;
+      if (now >= _endWaitTime) {
+        _statusDescription = String.format("Consuming segments status GOOD since %dms", _endWaitTime);
+        return Status.GOOD;
       }
-      _statusDescription = String.format("Consuming segments status GOOD since %dms", _endWaitTime);
-      return Status.GOOD;
+      if (_allConsumingSegmentsHaveReachedLatestOffset.get()) {
+        // TODO: Once the performance of offset based consumption checker is validated:
+        //      - remove the log line
+        //      - uncomment the status & statusDescription lines
+        LOGGER.info("All consuming segments have reached their latest offsets!");
+//        _statusDescription = "Consuming segments status GOOD as all consuming segments have reached the latest offset";
+//        return Status.GOOD;
+      }
+      _statusDescription =
+          String.format("Waiting for consuming segments to catchup, timeRemaining=%dms", _endWaitTime - now);
+      return Status.STARTING;
     }
 
     @Override
