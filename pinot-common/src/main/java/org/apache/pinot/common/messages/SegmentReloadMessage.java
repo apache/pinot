@@ -56,7 +56,7 @@ public class SegmentReloadMessage extends Message {
         "Invalid message sub type: " + msgSubType + " for SegmentReloadMessage");
   }
 
-  public boolean getForceDownload() {
+  public boolean shouldForceDownload() {
     return getRecord().getBooleanField(FORCE_DOWNLOAD_KEY, false);
   }
 }

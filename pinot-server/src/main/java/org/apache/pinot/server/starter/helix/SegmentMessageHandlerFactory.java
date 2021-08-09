@@ -137,7 +137,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     SegmentReloadMessageHandler(SegmentReloadMessage segmentReloadMessage, ServerMetrics metrics,
         NotificationContext context) {
       super(segmentReloadMessage, metrics, context);
-      _forceDownload = segmentReloadMessage.getForceDownload();
+      _forceDownload = segmentReloadMessage.shouldForceDownload();
     }
 
     @Override

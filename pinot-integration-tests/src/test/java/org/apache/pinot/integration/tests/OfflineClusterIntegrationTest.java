@@ -356,7 +356,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       }
     }, 600_000L, "Failed to generate inverted index");
 
-    final long tableSizeWithNewIndex = getTableSize(getTableName());
+    long tableSizeWithNewIndex = getTableSize(getTableName());
     assertTrue(tableSizeWithNewIndex > tableSizeWithDefaultIndex);
 
     // Update table config to remove all inverted index.

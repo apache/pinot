@@ -1781,7 +1781,9 @@ public class PinotHelixResourceManager {
 
     if (forceDownload) {
       TableType tt = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-      Preconditions.checkArgument(tt == TableType.OFFLINE, "OFFLINE table is required to force segment download");
+      // TODO: support to force download immutable segments from RealTime table.
+      Preconditions.checkArgument(tt == TableType.OFFLINE,
+          "Table: %s is not an OFFLINE table, which is required to force to download segments", tableNameWithType);
     }
 
     Criteria recipientCriteria = new Criteria();
@@ -1810,7 +1812,10 @@ public class PinotHelixResourceManager {
 
     if (forceDownload) {
       TableType tt = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-      Preconditions.checkArgument(tt == TableType.OFFLINE, "OFFLINE table is required to force segment download");
+      // TODO: support to force download immutable segments from RealTime table.
+      Preconditions.checkArgument(tt == TableType.OFFLINE,
+          "Table: %s is not an OFFLINE table, which is required to force to download segment: %s", tableNameWithType,
+          segmentName);
     }
 
     Criteria recipientCriteria = new Criteria();
