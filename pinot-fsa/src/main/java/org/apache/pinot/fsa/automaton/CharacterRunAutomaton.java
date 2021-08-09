@@ -9,7 +9,7 @@ public class CharacterRunAutomaton extends RunAutomaton {
    * @param a Automaton to match
    */
   public CharacterRunAutomaton(Automaton a) {
-    super(a, Character.MAX_CODE_POINT + 1);
+    super(a, true);
   }
 
   public boolean run(String s) {

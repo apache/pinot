@@ -19,6 +19,7 @@
 package org.apache.pinot.fsa.builders;
 
 import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.fsa.FSA;
 import org.apache.pinot.fsa.FSAFlags;
@@ -77,15 +78,18 @@ final class ConstantArcSizeFSA extends FSA {
    */
   private final byte[] data;
 
+  private Map<Integer, Integer> outputSymbols;
+
   /**
    * @param data
    *          FSA data. There must be no trailing bytes after the last state.
    */
-  ConstantArcSizeFSA(byte[] data, int epsilon) {
+  ConstantArcSizeFSA(byte[] data, int epsilon, Map<Integer, Integer> outputSymbols) {
     assert epsilon == 0 : "Epsilon is not zero?";
 
     this.epsilon = epsilon;
     this.data = data;
+    this.outputSymbols = outputSymbols;
   }
 
   @Override
@@ -117,6 +121,16 @@ final class ConstantArcSizeFSA extends FSA {
   @Override
   public byte getArcLabel(int arc) {
     return data[arc + LABEL_OFFSET];
+  }
+
+  @Override
+  public Map<Integer, Integer> getOutputSymbols() {
+    return outputSymbols;
+  }
+
+  @Override
+  public int getOutputSymbol(int arc) {
+    return outputSymbols.get(arc);
   }
 
   /**

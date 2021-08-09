@@ -86,6 +86,8 @@ public final class FSABuilder {
 
   private byte[] serialized = new byte[0];
 
+  private Map<Integer, Integer> outputSymbols = new HashMap<>();
+
   /**
    * Number of bytes already taken in {@link #serialized}. Start from 1 to keep
    * 0 a sentinel value (for the hash set and final state).
@@ -133,7 +135,7 @@ public final class FSABuilder {
   private int hashSize = 0;
 
   /**
-   * Previous sequence added to the automaton in {@link #add(byte[], int, int)}.
+   * Previous sequence added to the automaton in {@link #add(byte[], int, int, int)}.
    * Used in assertions only.
    */
   private byte[] previous;
@@ -176,7 +178,7 @@ public final class FSABuilder {
    * @param start Starting offset (inclusive)
    * @param len Length of the input sequence (at least 1 byte).
    */
-  public void add(byte[] sequence, int start, int len) {
+  public void add(byte[] sequence, int start, int len, int outputSymbol) {
     assert serialized != null : "Automaton already built.";
     assert previous == null || len == 0 || compare(previous, 0, previousLength, sequence, start, len) <= 0 : "Input must be sorted: "
         + Arrays.toString(Arrays.copyOf(previous, previousLength))
@@ -205,6 +207,8 @@ public final class FSABuilder {
       serialized[p + ConstantArcSizeFSA.LABEL_OFFSET] = sequence[j++];
       setArcTarget(p, i == len ? ConstantArcSizeFSA.TERMINAL_STATE : activePath[i]);
 
+      outputSymbols.put(p, outputSymbol);
+
       nextArcOffset[i - 1] = p + ConstantArcSizeFSA.ARC_SIZE;
     }
 
@@ -219,7 +223,7 @@ public final class FSABuilder {
    * @return Finalizes the construction of the automaton and returns it.
    */
   public FSA complete() {
-    add(new byte[0], 0, 0);
+    add(new byte[0], 0, 0, -1);
 
     if (nextArcOffset[0] - activePath[0] == 0) {
       // An empty FSA.
@@ -240,7 +244,7 @@ public final class FSABuilder {
     info.put(InfoEntry.ESTIMATED_MEMORY_CONSUMPTION_MB, 
         (this.serialized.length + this.hashSet.length * 4) / (double) MB);
 
-    final FSA fsa = new ConstantArcSizeFSA(java.util.Arrays.copyOf(this.serialized, this.size), epsilon);
+    final FSA fsa = new ConstantArcSizeFSA(java.util.Arrays.copyOf(this.serialized, this.size), epsilon, outputSymbols);
     this.serialized = null;
     this.hashSet = null;
     return fsa;
@@ -253,11 +257,13 @@ public final class FSABuilder {
    * @param input Input sequences to build automaton from. 
    * @return Returns the automaton encoding all input sequences.
    */
-  public static FSA build(byte[][] input) {
+  public static FSA build(byte[][] input, int[] outputSymbols) {
     final FSABuilder builder = new FSABuilder();
 
+    int i = 0;
     for (byte[] chs : input) {
-      builder.add(chs, 0, chs.length);
+      builder.add(chs, 0, chs.length, i < outputSymbols.length ? outputSymbols[i] : -1);
+      ++i;
     }
 
     return builder.complete();
@@ -270,11 +276,14 @@ public final class FSABuilder {
    * @param input Input sequences to build automaton from. 
    * @return Returns the automaton encoding all input sequences.
    */
-  public static FSA build(Iterable<byte[]> input) {
+  public static FSA build(Iterable<byte[]> input, int[] outputSymbols) {
     final FSABuilder builder = new FSABuilder();
 
+    int i = 0;
+
     for (byte[] chs : input) {
-      builder.add(chs, 0, chs.length);
+      builder.add(chs, 0, chs.length, i < outputSymbols.length ? outputSymbols[i] : -1);
+      ++i;
     }
 
     return builder.complete();

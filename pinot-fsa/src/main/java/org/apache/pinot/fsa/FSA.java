@@ -24,8 +24,10 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.BitSet;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -75,6 +77,13 @@ public abstract class FSA implements Iterable<ByteBuffer> {
    * @return Return the label associated with a given <code>arc</code>.
    */
   public abstract byte getArcLabel(int arc);
+
+  /**
+   *
+   */
+  public abstract Map<Integer, Integer> getOutputSymbols();
+
+  public abstract int getOutputSymbol(int arc);
 
   /**
    * @param arc
@@ -284,6 +293,17 @@ public abstract class FSA implements Iterable<ByteBuffer> {
   }
 
   /**
+   * @param in The input stream.
+   * @param length Length of input to be read
+   * @return Reads remaining bytes upto length from an input stream and returns
+   * them as a byte array.
+   * @throws IOException Rethrown if an I/O exception occurs.
+   */
+  protected static final byte[] readRemaining(InputStream in, int length) throws IOException {
+    return in.readNBytes(length);
+  }
+
+  /**
    * @param in The input stream. 
    * @return Reads all remaining bytes from an input stream and returns
    * them as a byte array. 
@@ -297,6 +317,36 @@ public abstract class FSA implements Iterable<ByteBuffer> {
       baos.write(buffer, 0, len);
     }
     return baos.toByteArray();
+  }
+
+  /**
+   * Build a map from a serialized string
+   *
+   * @param inputString Serialized string
+   * @return
+   */
+  protected Map<Integer, Integer> buildMap(String inputString) {
+    Map<Integer, Integer> hashMap = new HashMap<>();
+
+    inputString = inputString.substring(1, inputString.length() - 1);
+
+    if (inputString.isEmpty()) {
+      return hashMap;
+    }
+
+    String pairs[] = inputString.split(",");
+
+    for (String pair : pairs) {
+
+      String keyVal[] = pair.split("=");
+
+      int key = Integer.parseInt(keyVal[0].trim());
+      int val = Integer.parseInt(keyVal[1].trim());
+
+      hashMap.put(key, val);
+    }
+
+    return hashMap;
   }
 
   /** Private recursion. */
@@ -316,6 +366,13 @@ public abstract class FSA implements Iterable<ByteBuffer> {
   }
 
   /**
+   * Wrapper for the main read function
+   */
+  public static FSA read(InputStream stream) throws IOException {
+    return read(stream, false);
+  }
+
+  /**
    * A factory for reading automata in any of the supported versions.
    * 
    * @param stream
@@ -326,12 +383,12 @@ public abstract class FSA implements Iterable<ByteBuffer> {
    *           If the input stream does not represent an automaton or is
    *           otherwise invalid.
    */
-  public static FSA read(InputStream stream) throws IOException {
+  public static FSA read(InputStream stream, boolean hasOutputSymbols) throws IOException {
     final FSAHeader header = FSAHeader.read(stream);
 
     switch (header.version) {
       case FSA5.VERSION:
-        return new FSA5(stream);
+        return new FSA5(stream, hasOutputSymbols);
       case CFSA.VERSION:
         return new CFSA(stream);
       case CFSA2.VERSION:
@@ -357,7 +414,7 @@ public abstract class FSA implements Iterable<ByteBuffer> {
    *           is not assignable to <code>clazz</code>.
    */
   public static <T extends FSA> T read(InputStream stream, Class<? extends T> clazz) throws IOException {
-    FSA fsa = read(stream);
+    FSA fsa = read(stream, false);
     if (!clazz.isInstance(fsa)) {
       throw new IOException(String.format(Locale.ROOT, "Expected FSA type %s, but read an incompatible type %s.",
           clazz.getName(), fsa.getClass().getName()));

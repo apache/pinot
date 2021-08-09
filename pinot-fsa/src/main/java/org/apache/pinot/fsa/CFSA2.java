@@ -22,6 +22,7 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.EnumSet;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -270,6 +271,16 @@ public final class CFSA2 extends FSA {
     } else {
       return arcs[arc + 1];
     }
+  }
+
+  @Override
+  public Map<Integer, Integer> getOutputSymbols() {
+    return null;
+  }
+
+  @Override
+  public int getOutputSymbol(int arc) {
+    return 0;
   }
 
   /**

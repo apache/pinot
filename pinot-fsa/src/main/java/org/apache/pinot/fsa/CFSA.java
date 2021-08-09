@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.Map;
 import java.util.Set;
 
 import static org.apache.pinot.fsa.FSAFlags.FLEXIBLE;
@@ -288,6 +289,16 @@ public final class CFSA extends FSA {
 		} else {
 			return arcs[arc + 1];
 		}
+	}
+
+	@Override
+	public Map<Integer, Integer> getOutputSymbols() {
+		return null;
+	}
+
+	@Override
+	public int getOutputSymbol(int arc) {
+		return 0;
 	}
 
 	/**

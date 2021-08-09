@@ -20,6 +20,7 @@ package org.apache.pinot.fsa.builders;
 
 import com.carrotsearch.hppc.IntIntHashMap;
 import com.carrotsearch.hppc.IntStack;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
@@ -176,6 +177,14 @@ public final class FSA5Serializer implements FSASerializer {
     os.write(fillerByte);
     os.write(annotationByte);
     os.write((nodeDataLength << 4) | gtl);
+
+    DataOutputStream dataOutputStream = new DataOutputStream(os);
+
+    byte[] outputSymbolsSerialized = fsa.getOutputSymbols().toString().getBytes();
+
+    dataOutputStream.writeInt(outputSymbolsSerialized.length);
+
+    os.write(outputSymbolsSerialized);
 
     /*
      * Emit the automaton.

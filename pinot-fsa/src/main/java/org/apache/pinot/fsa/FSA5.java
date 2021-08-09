@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.Map;
 import java.util.Set;
 
 import static org.apache.pinot.fsa.FSAFlags.FLEXIBLE;
@@ -133,6 +134,8 @@ public final class FSA5 extends FSA {
    */
   public final byte[] arcs;
 
+  public Map<Integer, Integer> outputSymbols;
+
   /**
    * The length of the node header structure (if the automaton was compiled with
    * <code>NUMBERS</code> option). Otherwise zero.
@@ -158,7 +161,7 @@ public final class FSA5 extends FSA {
   /**
    * Read and wrap a binary automaton in FSA version 5.
    */
-  FSA5(InputStream stream) throws IOException {
+  FSA5(InputStream stream, boolean hasOutputSymbols) throws IOException {
     DataInputStream in = new DataInputStream(stream);
 
     this.filler = in.readByte();
@@ -178,6 +181,17 @@ public final class FSA5 extends FSA {
 
     this.nodeDataLength = (hgtl >>> 4) & 0x0f;
     this.gtl = hgtl & 0x0f;
+
+    if (hasOutputSymbols) {
+      final int outputSymbolsLength = in.readInt();
+      byte[] outputSymbolsBuffer = readRemaining(in, outputSymbolsLength);
+
+      if (outputSymbolsBuffer.length > 0) {
+        String outputSymbolsSerialized = new String(outputSymbolsBuffer);
+
+        outputSymbols = buildMap(outputSymbolsSerialized);
+      }
+    }
 
     arcs = readRemaining(in);
   }
@@ -243,6 +257,16 @@ public final class FSA5 extends FSA {
   @Override
   public byte getArcLabel(int arc) {
     return arcs[arc];
+  }
+
+  @Override
+  public Map<Integer, Integer> getOutputSymbols() {
+    return outputSymbols;
+  }
+
+  @Override
+  public int getOutputSymbol(int arc) {
+    return outputSymbols.get(arc);
   }
 
   /**

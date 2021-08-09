@@ -46,7 +46,7 @@ public final class FSATraversalTest extends TestBase {
 
   @Before
   public void setUp() throws Exception {
-    fsa = FSA.read(this.getClass().getResourceAsStream("/resources/en_tst.dict"));
+    fsa = FSA.read(this.getClass().getResourceAsStream("/resources/en_tst.dict"), false);
   }
 
   @Test
@@ -57,7 +57,7 @@ public final class FSATraversalTest extends TestBase {
           "abc".getBytes(UTF_8),
           "ad".getBytes(UTF_8),
           "bcd".getBytes(UTF_8),
-          "bce".getBytes(UTF_8)));
+          "bce".getBytes(UTF_8)), new int[] {10, 11, 12, 13, 14, 15});
 
       FSATraversal fsaTraversal = new FSATraversal(fsa);
       assertEquals(EXACT_MATCH, fsaTraversal.match("a".getBytes(UTF_8)).kind);
@@ -107,7 +107,7 @@ public final class FSATraversalTest extends TestBase {
       { 'c' }, };
 
     Arrays.sort(input, FSABuilder.LEXICAL_ORDERING);
-    FSA s = FSABuilder.build(input);
+    FSA s = FSABuilder.build(input, new int[] {11, 12, 13, 14, 15, 16});
 
     final byte[] fsaData = 
         new FSA5Serializer().withNumbers()
@@ -168,7 +168,7 @@ public final class FSATraversalTest extends TestBase {
 
   @Test
   public void testMatch() throws IOException {
-    final FSA fsa = FSA.read(this.getClass().getResourceAsStream("/resources/abc.fsa"));
+    final FSA fsa = FSA.read(this.getClass().getResourceAsStream("/resources/abc.fsa"), false);
     final FSATraversal traversalHelper = new FSATraversal(fsa);
 
     MatchResult m = traversalHelper.match("ax".getBytes());
