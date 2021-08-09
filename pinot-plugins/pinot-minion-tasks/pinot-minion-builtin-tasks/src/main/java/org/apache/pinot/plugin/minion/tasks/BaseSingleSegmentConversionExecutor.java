@@ -115,9 +115,9 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
         LOGGER.warn("Failed to delete converted segment: {}", convertedSegmentDir.getAbsolutePath());
       }
 
-      // Delete the input segment
-      // NOTE: Delete the input segment after tarring the converted segment to avoid deleting the converted segment when
-      //       the conversion happens in-place
+      // Delete the input segment after tarring the converted segment to avoid deleting the converted segment when the
+      // conversion happens in-place (converted segment dir is the same as input segment dir). It could also happen when
+      // the conversion is not required, and the input segment dir is returned as the result.
       if (indexDir.exists() && !FileUtils.deleteQuietly(indexDir)) {
         LOGGER.warn("Failed to delete input segment: {}", indexDir.getAbsolutePath());
       }

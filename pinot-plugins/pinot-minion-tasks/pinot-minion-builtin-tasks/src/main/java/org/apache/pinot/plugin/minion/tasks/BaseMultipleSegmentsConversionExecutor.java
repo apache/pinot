@@ -145,9 +145,9 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         }
       }
 
-      // Delete the input segments
-      // NOTE: Delete the input segments after tarring the converted segments to avoid deleting the converted segment
-      //       when the conversion happens in-place
+      // Delete the input segment after tarring the converted segment to avoid deleting the converted segment when the
+      // conversion happens in-place (converted segment dir is the same as input segment dir). It could also happen when
+      // the conversion is not required, and the input segment dir is returned as the result.
       for (File inputSegmentDir : inputSegmentDirs) {
         if (inputSegmentDir.exists() && !FileUtils.deleteQuietly(inputSegmentDir)) {
           LOGGER.warn("Failed to delete input segment: {}", inputSegmentDir.getAbsolutePath());
