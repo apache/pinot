@@ -26,9 +26,13 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,6 +69,7 @@ public class PartitionUpsertMetadataManager {
   private final int _partitionId;
   private final ServerMetrics _serverMetrics;
   private final PartialUpsertHandler _partialUpsertHandler;
+  private final UpsertConfig.HashFunction _hashFunction;
 
   // TODO(upsert): consider an off-heap KV store to persist this mapping to improve the recovery speed.
   @VisibleForTesting
@@ -76,11 +81,12 @@ public class PartitionUpsertMetadataManager {
   private GenericRow _result;
 
   public PartitionUpsertMetadataManager(String tableNameWithType, int partitionId, ServerMetrics serverMetrics,
-      @Nullable PartialUpsertHandler partialUpsertHandler) {
+      @Nullable PartialUpsertHandler partialUpsertHandler, UpsertConfig.HashFunction hashFunction) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
     _serverMetrics = serverMetrics;
     _partialUpsertHandler = partialUpsertHandler;
+    _hashFunction = hashFunction;
   }
 
   /**
@@ -94,7 +100,8 @@ public class PartitionUpsertMetadataManager {
 
     while (recordInfoIterator.hasNext()) {
       RecordInfo recordInfo = recordInfoIterator.next();
-      _primaryKeyToRecordLocationMap.compute(recordInfo._primaryKey, (primaryKey, currentRecordLocation) -> {
+      _primaryKeyToRecordLocationMap
+          .compute(hashPrimaryKey(recordInfo._primaryKey, _hashFunction), (primaryKey, currentRecordLocation) -> {
         if (currentRecordLocation != null) {
           // Existing primary key
 
@@ -175,7 +182,8 @@ public class PartitionUpsertMetadataManager {
     }
 
     _result = record;
-    _primaryKeyToRecordLocationMap.compute(recordInfo._primaryKey, (primaryKey, currentRecordLocation) -> {
+    _primaryKeyToRecordLocationMap
+        .compute(hashPrimaryKey(recordInfo._primaryKey, _hashFunction), (primaryKey, currentRecordLocation) -> {
       if (currentRecordLocation != null) {
         // Existing primary key
 
@@ -237,13 +245,26 @@ public class PartitionUpsertMetadataManager {
         _primaryKeyToRecordLocationMap.size());
   }
 
+  protected static Object hashPrimaryKey(PrimaryKey primaryKey, UpsertConfig.HashFunction hashFunction) {
+    switch (hashFunction) {
+      case NONE:
+        return primaryKey;
+      case MD5:
+        return new ByteArray(HashUtils.hashMD5(primaryKey.asBytes()));
+      case MURMUR3:
+        return new ByteArray(HashUtils.hashMurmur3(primaryKey.asBytes()));
+      default:
+        throw new IllegalArgumentException(String.format("Unrecognized hash function %s", hashFunction));
+    }
+  }
+
   public static final class RecordInfo {
     /** stores the primary key of the record or its hash value */
-    private final Object _primaryKey;
+    private final PrimaryKey _primaryKey;
     private final int _docId;
     private final Comparable _comparisonValue;
 
-    public RecordInfo(Object primaryKey, int docId, Comparable comparisonValue) {
+    public RecordInfo(PrimaryKey primaryKey, int docId, Comparable comparisonValue) {
       _primaryKey = primaryKey;
       _docId = docId;
       _comparisonValue = comparisonValue;

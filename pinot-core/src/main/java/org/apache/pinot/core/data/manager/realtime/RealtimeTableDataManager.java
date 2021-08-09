@@ -62,7 +62,6 @@ import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvide
 import org.apache.pinot.segment.local.upsert.PartialUpsertHandler;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
-import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
@@ -116,7 +115,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private TableUpsertMetadataManager _tableUpsertMetadataManager;
   private List<String> _primaryKeyColumns;
   private String _upsertComparisonColumn;
-  private UpsertConfig.HashFunction _hashFunction;
 
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
     _segmentBuildSemaphore = segmentBuildSemaphore;
@@ -170,15 +168,15 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         partialUpsertHandler =
             new PartialUpsertHandler(_helixManager, _tableNameWithType, upsertConfig.getPartialUpsertStrategies());
       }
+      UpsertConfig.HashFunction hashFunction = upsertConfig.getHashFunction();
       _tableUpsertMetadataManager =
-          new TableUpsertMetadataManager(_tableNameWithType, _serverMetrics, partialUpsertHandler);
+          new TableUpsertMetadataManager(_tableNameWithType, _serverMetrics, partialUpsertHandler, hashFunction);
       _primaryKeyColumns = schema.getPrimaryKeyColumns();
       Preconditions.checkState(!CollectionUtils.isEmpty(_primaryKeyColumns),
           "Primary key columns must be configured for upsert");
       String comparisonColumn = upsertConfig.getComparisonColumn();
       _upsertComparisonColumn =
           comparisonColumn != null ? comparisonColumn : tableConfig.getValidationConfig().getTimeColumnName();
-      _hashFunction = upsertConfig.getHashFunction();
     }
 
     if (consumerDir.exists()) {
@@ -412,8 +410,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
             Object upsertComparisonValue = columnToReaderMap.get(_upsertComparisonColumn).getValue(_docId);
             Preconditions.checkState(upsertComparisonValue instanceof Comparable,
                 "Upsert comparison column: %s must be comparable", _upsertComparisonColumn);
-            return new PartitionUpsertMetadataManager.RecordInfo(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
-                _docId++, (Comparable) upsertComparisonValue);
+            return new PartitionUpsertMetadataManager.RecordInfo(primaryKey, _docId++,
+                (Comparable) upsertComparisonValue);
           }
         };
     partitionUpsertMetadataManager.addSegment(immutableSegment, recordInfoIterator);
