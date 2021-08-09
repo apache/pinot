@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.spi.data.readers;
 
-import org.apache.commons.lang.SerializationUtils;
+import org.apache.commons.lang3.SerializationUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.testng.annotations.Test;
 

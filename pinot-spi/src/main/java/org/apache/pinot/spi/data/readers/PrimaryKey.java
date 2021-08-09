@@ -19,7 +19,7 @@
 package org.apache.pinot.spi.data.readers;
 
 import java.util.Arrays;
-import org.apache.commons.lang.SerializationUtils;
+import org.apache.commons.lang3.SerializationUtils;
 
 
 /**
