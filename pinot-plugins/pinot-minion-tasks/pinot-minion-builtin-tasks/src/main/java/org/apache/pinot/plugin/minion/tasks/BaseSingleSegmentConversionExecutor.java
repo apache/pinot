@@ -106,11 +106,6 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
           "Converted segment name: %s does not match original segment name: %s",
           segmentConversionResult.getSegmentName(), segmentName);
 
-      // Delete the input segment
-      if (!FileUtils.deleteQuietly(indexDir)) {
-        LOGGER.warn("Failed to delete input segment: {}", indexDir.getAbsolutePath());
-      }
-
       // Tar the converted segment
       File convertedSegmentDir = segmentConversionResult.getFile();
       File convertedTarredSegmentFile =
@@ -118,6 +113,13 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       TarGzCompressionUtils.createTarGzFile(convertedSegmentDir, convertedTarredSegmentFile);
       if (!FileUtils.deleteQuietly(convertedSegmentDir)) {
         LOGGER.warn("Failed to delete converted segment: {}", convertedSegmentDir.getAbsolutePath());
+      }
+
+      // Delete the input segment
+      // NOTE: Delete the input segment after tarring the converted segment to avoid deleting the converted segment when
+      //       the conversion happens in-place
+      if (indexDir.exists() && !FileUtils.deleteQuietly(indexDir)) {
+        LOGGER.warn("Failed to delete input segment: {}", indexDir.getAbsolutePath());
       }
 
       // Check whether the task get cancelled before uploading the segment

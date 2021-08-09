@@ -127,13 +127,6 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       Preconditions.checkState(workingDir.mkdir());
       List<SegmentConversionResult> segmentConversionResults = convert(pinotTaskConfig, inputSegmentDirs, workingDir);
 
-      // Delete the input segments
-      for (File inputSegmentDir : inputSegmentDirs) {
-        if (!FileUtils.deleteQuietly(inputSegmentDir)) {
-          LOGGER.warn("Failed to delete input segment: {}", inputSegmentDir.getAbsolutePath());
-        }
-      }
-
       // Create a directory for converted tarred segment files
       File convertedTarredSegmentDir = new File(tempDataDir, "convertedTarredSegmentDir");
       Preconditions.checkState(convertedTarredSegmentDir.mkdir());
@@ -149,6 +142,15 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         tarredSegmentFiles.add(convertedSegmentTarFile);
         if (!FileUtils.deleteQuietly(convertedSegmentDir)) {
           LOGGER.warn("Failed to delete converted segment: {}", convertedSegmentDir.getAbsolutePath());
+        }
+      }
+
+      // Delete the input segments
+      // NOTE: Delete the input segments after tarring the converted segments to avoid deleting the converted segment
+      //       when the conversion happens in-place
+      for (File inputSegmentDir : inputSegmentDirs) {
+        if (inputSegmentDir.exists() && !FileUtils.deleteQuietly(inputSegmentDir)) {
+          LOGGER.warn("Failed to delete input segment: {}", inputSegmentDir.getAbsolutePath());
         }
       }
 
