@@ -18,15 +18,15 @@
  */
 package org.apache.pinot.queries;
 
-public class ExpectedQueryResult {
+public class ExpectedQueryResult<T> {
   private long numDocsScanned;
   private long numEntriesScannedInFilter;
   private long numEntriesScannedPostFilter;
   private long numTotalDocs;
-  private String[] results;
+  private T[] results;
 
   public ExpectedQueryResult(long numDocsScanned, long numEntriesScannedInFilter, long numEntriesScannedPostFilter,
-      long numTotalDocs, String[] results) {
+      long numTotalDocs, T[] results) {
     this.numDocsScanned = numDocsScanned;
     this.numEntriesScannedInFilter = numEntriesScannedInFilter;
     this.numEntriesScannedPostFilter = numEntriesScannedPostFilter;
@@ -50,7 +50,7 @@ public class ExpectedQueryResult {
     return numTotalDocs;
   }
 
-  public String[] getResults() {
+  public T[] getResults() {
     return results;
   }
 }

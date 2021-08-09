@@ -541,49 +541,51 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
 
   private void testPercentileEstAggregationResult(int percentile) {
 
-    Function<Serializable, String> quantileExtractor = value -> String.valueOf(
-        (long) ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) value))
-            .quantile((double) percentile / 100.0));
+    Function<Serializable, String> quantileExtractor = value -> String.valueOf(ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) value))
+        .getQuantile((double) percentile / 100.0));
 
-    ExpectedQueryResult expectedQueryResultsBasic =
-        new ExpectedQueryResult(400000L, 0L, 400000L, 400000L, new String[]{"2147483647"});
+    ExpectedQueryResult<Long> expectedQueryResultsBasic =
+        new ExpectedQueryResult<Long>(400000L, 0L, 400000L, 400000L, new Long[]{2147483647L});
 
-    ExpectedQueryResult expectedQueryResultsWithFilter =
-        new ExpectedQueryResult(62480L, 1101664L, 62480L, 400000L, new String[]{"2147483647"});
+    ExpectedQueryResult<Long> expectedQueryResultsWithFilter =
+        new ExpectedQueryResult<Long>(62480L, 1101664L, 62480L, 400000L, new Long[]{2147483647L});
 
-    ExpectedQueryResult expectedQueryResultsWithGroupBy =
-        new ExpectedQueryResult(400000L, 0L, 800000L, 400000L, new String[]{"2147483647"});
+    ExpectedQueryResult<Long> expectedQueryResultsWithSVGroupBy =
+        new ExpectedQueryResult<Long>(400000L, 0L, 800000L, 400000L, new Long[]{2147483647L});
 
-    ExpectedQueryResult expectedQueryResultsWithGroupByAndFilter =
-        new ExpectedQueryResult(400000L, 0L, 800000L, 400000L, new String[]{"2147483647"});
+    ExpectedQueryResult<Long> expectedQueryResultsWithMVGroupBy =
+        new ExpectedQueryResult<Long>(400000L, 0L, 800000L, 400000L, new Long[]{2147483647L});
 
     String aggregateFunction = String.format("PERCENTILERAWEST%dMV", percentile);
 
     testAggregationFunction(aggregateFunction, expectedQueryResultsBasic, expectedQueryResultsWithFilter,
-        expectedQueryResultsWithGroupBy, expectedQueryResultsWithGroupByAndFilter, quantileExtractor);
+        expectedQueryResultsWithSVGroupBy, expectedQueryResultsWithMVGroupBy, quantileExtractor);
   }
 
-  private void testAggregationFunction(String aggregateFunction, ExpectedQueryResult expectedQueryResultsBasic,
-      ExpectedQueryResult expectedQueryResultsWithFilter, ExpectedQueryResult expectedQueryResultsWithGroupBy,
-      ExpectedQueryResult expectedQueryResultsWithGroupByAndFilter, Function<Serializable, String> responseMapper) {
+  private void testAggregationFunction(String aggregateFunction, ExpectedQueryResult<Long> expectedQueryResultsBasic,
+      ExpectedQueryResult<Long> expectedQueryResultsWithFilter,
+      ExpectedQueryResult<Long> expectedQueryResultsWithSVGroupBy,
+      ExpectedQueryResult<Long> expectedQueryResultsWithMVGroupBy,
+      Function<Serializable, String> responseMapper) {
 
-    String query = String.format("SELECT %s(column1) FROM testTable", aggregateFunction);
+    String query = String.format("SELECT %s(column6) FROM testTable", aggregateFunction);
 
     queryAndTestAggregationResult(query, expectedQueryResultsBasic, responseMapper);
 
     queryAndTestAggregationResult(query + getFilter(), expectedQueryResultsWithFilter, responseMapper);
 
-    queryAndTestAggregationResult(query + SV_GROUP_BY, expectedQueryResultsWithGroupBy, responseMapper);
+    queryAndTestAggregationResult(query + SV_GROUP_BY, expectedQueryResultsWithSVGroupBy, responseMapper);
 
-    queryAndTestAggregationResult(query + MV_GROUP_BY, expectedQueryResultsWithGroupByAndFilter, responseMapper);
+    queryAndTestAggregationResult(query + MV_GROUP_BY, expectedQueryResultsWithMVGroupBy, responseMapper);
   }
 
-  private void queryAndTestAggregationResult(String query, ExpectedQueryResult expectedQueryResults,
+  private void queryAndTestAggregationResult(String query, ExpectedQueryResult<Long> expectedQueryResults,
       Function<Serializable, String> responseMapper) {
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, expectedQueryResults.getNumDocsScanned(),
-        expectedQueryResults.getNumEntriesScannedInFilter(), expectedQueryResults.getNumEntriesScannedPostFilter(),
-        expectedQueryResults.getNumTotalDocs(), responseMapper, expectedQueryResults.getResults());
+    QueriesTestUtils
+        .testInterSegmentApproximateAggregationResult(brokerResponse, expectedQueryResults.getNumDocsScanned(),
+            expectedQueryResults.getNumEntriesScannedInFilter(), expectedQueryResults.getNumEntriesScannedPostFilter(),
+            expectedQueryResults.getNumTotalDocs(), responseMapper, expectedQueryResults.getResults(), (short) 10);
   }
 
   @Test
@@ -612,22 +614,22 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         (long) ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) value))
             .quantile((double) percentile / 100.0));
 
-    ExpectedQueryResult expectedQueryResultsBasic =
-        new ExpectedQueryResult(400000L, 0L, 400000L, 400000L, new String[]{"2147483647"});
+    ExpectedQueryResult<Long> expectedQueryResultsBasic =
+        new ExpectedQueryResult<Long>(400000L, 0L, 400000L, 400000L, new Long[]{2147483647L});
 
-    ExpectedQueryResult expectedQueryResultsWithFilter =
-        new ExpectedQueryResult(62480L, 1101664L, 62480L, 400000L, new String[]{"2147483647"});
+    ExpectedQueryResult<Long> expectedQueryResultsWithFilter =
+        new ExpectedQueryResult<Long>(62480L, 1101664L, 62480L, 400000L, new Long[]{2147483647L});
 
-    ExpectedQueryResult expectedQueryResultsWithGroupBy =
-        new ExpectedQueryResult(400000L, 0L, 800000L, 400000L, new String[]{"2147483647"});
+    ExpectedQueryResult<Long> expectedQueryResultsWithSVGroupBy =
+        new ExpectedQueryResult<Long>(400000L, 0L, 800000L, 400000L, new Long[]{2147483647L});
 
-    ExpectedQueryResult expectedQueryResultsWithGroupByAndFilter =
-        new ExpectedQueryResult(400000L, 0L, 800000L, 400000L, new String[]{"2147483647"});
+    ExpectedQueryResult<Long> expectedQueryResultsWithMVGroupBy =
+        new ExpectedQueryResult<Long>(400000L, 0L, 800000L, 400000L, new Long[]{2147483647L});
 
-    String aggregateFunction = String.format("PERCENTILERAWEST%dMV", percentile);
+    String aggregateFunction = String.format("PERCENTILERAWTDIGEST%dMV", percentile);
 
     testAggregationFunction(aggregateFunction, expectedQueryResultsBasic, expectedQueryResultsWithFilter,
-        expectedQueryResultsWithGroupBy, expectedQueryResultsWithGroupByAndFilter, quantileExtractor);
+        expectedQueryResultsWithSVGroupBy, expectedQueryResultsWithMVGroupBy, quantileExtractor);
   }
 
   @Test
