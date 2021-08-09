@@ -83,6 +83,10 @@ public class GroovyFunctionEvaluatorTest {
     genericRow7.putValue("eventType", "CLICK");
     entries.add(new Object[]{"Groovy({eventType == 'IMPRESSION' ? 1: 0}, eventType)", Lists.newArrayList("eventType"), genericRow7, 0});
 
+    GenericRow genericRow8 = new GenericRow();
+    genericRow8.putValue("ssn", "123-45-6789");
+    entries.add(new Object[]{"Groovy({org.apache.commons.codec.digest.DigestUtils.sha256Hex(ssn)}, ssn)", Lists.newArrayList("ssn"), genericRow8, "01a54629efb952287e554eb23ef69c52097a75aecc0e3a93ca0855ab6d7a31a0"});
+
     return entries.toArray(new Object[entries.size()][]);
   }
 }

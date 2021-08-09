@@ -25,4 +25,9 @@ public interface BrokerSelector {
    * @return
    */
   String selectBroker(String table);
+
+  /**
+   * Close any resources
+   */
+  void close();
 }

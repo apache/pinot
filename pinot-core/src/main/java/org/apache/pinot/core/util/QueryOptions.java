@@ -33,32 +33,20 @@ public class QueryOptions {
   private final boolean _responseFormatSQL;
   private final boolean _preserveType;
   private final boolean _skipUpsert;
-  private final boolean _enableSegmentTrim;
-  private final int _minSegmentTrimSize;
-  private final int _onTheFlyTrimThreshold;
-  private final int _onTheFlyTrimSize;
 
   public QueryOptions(@Nullable Map<String, String> queryOptions) {
     if (queryOptions != null) {
       _timeoutMs = getTimeoutMs(queryOptions);
-      _groupByModeSQL = Request.SQL.equalsIgnoreCase(queryOptions.get(Request.QueryOptionKey.GROUP_BY_MODE));
+      _groupByModeSQL = isGroupByModeSQL(queryOptions);
       _responseFormatSQL = Request.SQL.equalsIgnoreCase(queryOptions.get(Request.QueryOptionKey.RESPONSE_FORMAT));
       _preserveType = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.PRESERVE_TYPE));
       _skipUpsert = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.SKIP_UPSERT));
-      _enableSegmentTrim = isEnableSegmentTrim(queryOptions);
-      _minSegmentTrimSize = getMinSegmentTrimSize(queryOptions);
-      _onTheFlyTrimThreshold = getTrimThreshold(queryOptions);
-      _onTheFlyTrimSize = getTrimSize(queryOptions);
     } else {
       _timeoutMs = null;
       _groupByModeSQL = false;
       _responseFormatSQL = false;
       _preserveType = false;
       _skipUpsert = false;
-      _enableSegmentTrim = false;
-      _minSegmentTrimSize = -1;
-      _onTheFlyTrimThreshold = -1;
-      _onTheFlyTrimSize = -1;
     }
   }
 
@@ -84,26 +72,6 @@ public class QueryOptions {
   }
 
   @Nullable
-  public Boolean isEnableSegmentTrim() {
-    return _enableSegmentTrim;
-  }
-
-  @Nullable
-  public Integer getMinSegmentTrimSize() {
-    return _minSegmentTrimSize;
-  }
-
-  @Nullable
-  public Integer getOnTheFlyTrimSize() {
-    return _onTheFlyTrimSize;
-  }
-
-  @Nullable
-  public Integer getOnTheFlyTrimThreshold() {
-    return _onTheFlyTrimThreshold;
-  }
-
-  @Nullable
   public static Long getTimeoutMs(Map<String, String> queryOptions) {
     String timeoutMsString = queryOptions.get(Request.QueryOptionKey.TIMEOUT_MS);
     if (timeoutMsString != null) {
@@ -115,31 +83,19 @@ public class QueryOptions {
     }
   }
 
-  public static boolean isEnableSegmentTrim(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.ENABLE_SEGMENT_TRIM));
+  public static boolean isGroupByModeSQL(Map<String, String> queryOptions) {
+    return Request.SQL.equalsIgnoreCase(queryOptions.get(Request.QueryOptionKey.GROUP_BY_MODE));
   }
 
-  public static int getMinSegmentTrimSize(Map<String, String> queryOptions) {
-    String minSegmentTrimSize = queryOptions.get(Request.QueryOptionKey.MIN_SEGMENT_TRIM_SIZE);
-    if (minSegmentTrimSize != null) {
-      return Integer.parseInt(minSegmentTrimSize);
-    }
-    return -1;
+  @Nullable
+  public static Integer getMinSegmentGroupTrimSize(Map<String, String> queryOptions) {
+    String minSegmentGroupTrimSizeString = queryOptions.get(Request.QueryOptionKey.MIN_SEGMENT_GROUP_TRIM_SIZE);
+    return minSegmentGroupTrimSizeString != null ? Integer.parseInt(minSegmentGroupTrimSizeString) : null;
   }
 
-  public static int getTrimThreshold(Map<String, String> queryOptions) {
-    String onTheFlyTrimThreshold = queryOptions.get(Request.QueryOptionKey.ON_THE_FLY_TRIM_THRESHOLD);
-    if (onTheFlyTrimThreshold != null) {
-      return Integer.parseInt(onTheFlyTrimThreshold);
-    }
-    return -1;
-  }
-
-  public static int getTrimSize(Map<String, String> queryOptions) {
-    String onTheFlyTrimSize = queryOptions.get(Request.QueryOptionKey.ON_THE_FLY_TRIM_SIZE);
-    if (onTheFlyTrimSize != null) {
-      return Integer.parseInt(onTheFlyTrimSize);
-    }
-    return -1;
+  @Nullable
+  public static Integer getMinServerGroupTrimSize(Map<String, String> queryOptions) {
+    String minServerGroupTrimSizeString = queryOptions.get(Request.QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE);
+    return minServerGroupTrimSizeString != null ? Integer.parseInt(minServerGroupTrimSizeString) : null;
   }
 }

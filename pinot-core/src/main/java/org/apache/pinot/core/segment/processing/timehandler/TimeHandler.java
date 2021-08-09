@@ -16,30 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.minion.metrics;
+package org.apache.pinot.core.segment.processing.timehandler;
 
-import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.metrics.AbstractMetrics;
+import javax.annotation.Nullable;
+import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-public enum MinionTimer implements AbstractMetrics.Timer {
-  ;
-
-  private final String _timerName;
-  private final boolean _global;
-
-  MinionTimer(boolean global) {
-    _timerName = Utils.toCamelCase(name().toLowerCase());
-    _global = global;
+/**
+ * Handler for time values within the records:
+ * - Filter records based on the start/end time range
+ * - Round time values
+ * - Partition records based on time values
+ */
+public interface TimeHandler {
+  enum Type {
+    NO_OP, EPOCH
+    // TODO: Support DATE_TIME handler which rounds and partitions time on calendar date boundary with timezone support
   }
 
-  @Override
-  public String getTimerName() {
-    return _timerName;
-  }
+  String DEFAULT_PARTITION = "0";
 
-  @Override
-  public boolean isGlobal() {
-    return _global;
-  }
+  /**
+   * Filters/rounds the time value for the given row and returns the time partition, or {@code null} if the row is
+   * filtered out. The time value is modified in-place.
+   */
+  @Nullable
+  String handleTime(GenericRow row);
 }

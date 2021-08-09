@@ -33,6 +33,8 @@ public class CommonConstants {
 
   public static final String KEY_OF_AUTH_TOKEN = "auth.token";
 
+  public static final String TABLE_NAME = "tableName";
+
   /**
    * The state of the consumer for a given segment
    */
@@ -223,8 +225,8 @@ public class CommonConstants {
         public static final String RESPONSE_FORMAT = "responseFormat";
         public static final String GROUP_BY_MODE = "groupByMode";
         public static final String SKIP_UPSERT = "skipUpsert";
-        public static final String ENABLE_SEGMENT_TRIM = "enableSegmentTrim";
-        public static final String MIN_SEGMENT_TRIM_SIZE = "minSegmentTrimSize";
+        public static final String MIN_SEGMENT_GROUP_TRIM_SIZE = "minSegmentGroupTrimSize";
+        public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
         public static final String ON_THE_FLY_TRIM_THRESHOLD = "onTheFlyTrimThreshold";
         public static final String ON_THE_FLY_TRIM_SIZE = "onTheFlyTrimSize";
       }

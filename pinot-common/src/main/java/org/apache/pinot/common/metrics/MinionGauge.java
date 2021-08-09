@@ -16,35 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.minion.metrics;
+package org.apache.pinot.common.metrics;
 
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.metrics.AbstractMetrics;
 
 
-public enum MinionMeter implements AbstractMetrics.Meter {
-  HEALTH_CHECK_GOOD_CALLS("healthChecks", true),
-  HEALTH_CHECK_BAD_CALLS("healthChecks", true),
+public enum MinionGauge implements AbstractMetrics.Gauge {
+  NUMBER_OF_TASKS("tasks", true),
+  ;
 
-  NUMBER_TASKS_EXECUTED("tasks", false),
-  NUMBER_TASKS_COMPLETED("tasks", false),
-  NUMBER_TASKS_CANCELLED("tasks", false),
-  NUMBER_TASKS_FAILED("tasks", false),
-  NUMBER_TASKS_FATAL_FAILED("tasks", false);
-
-  private final String _meterName;
+  private final String _gaugeName;
   private final String _unit;
   private final boolean _global;
 
-  MinionMeter(String unit, boolean global) {
-    _meterName = Utils.toCamelCase(name().toLowerCase());
+  MinionGauge(String unit, boolean global) {
+    _gaugeName = Utils.toCamelCase(name().toLowerCase());
     _unit = unit;
     _global = global;
   }
 
   @Override
-  public String getMeterName() {
-    return _meterName;
+  public String getGaugeName() {
+    return _gaugeName;
   }
 
   @Override

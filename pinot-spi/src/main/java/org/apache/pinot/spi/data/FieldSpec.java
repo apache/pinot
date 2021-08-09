@@ -43,7 +43,7 @@ import org.apache.pinot.spi.utils.TimestampUtils;
  */
 @SuppressWarnings("unused")
 public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
-  private static final int DEFAULT_MAX_LENGTH = 512;
+  public static final int DEFAULT_MAX_LENGTH = 512;
 
   public static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_INT = Integer.MIN_VALUE;
   public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_LONG = Long.MIN_VALUE;

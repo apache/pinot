@@ -122,6 +122,15 @@ public class PinotTaskRestletResource {
     return _pinotHelixTaskResourceManager.getTasks(taskType);
   }
 
+  @GET
+  @Path("/tasks/{taskType}/{tableNameWithType}/state")
+  @ApiOperation("List all tasks for the given task type")
+  public Map<String, TaskState> getTaskStatesByTable(
+      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
+      @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType") String tableNameWithType) {
+    return _pinotHelixTaskResourceManager.getTaskStatesByTable(taskType, tableNameWithType);
+  }
+
   @Deprecated
   @GET
   @Path("/tasks/tasks/{taskType}")

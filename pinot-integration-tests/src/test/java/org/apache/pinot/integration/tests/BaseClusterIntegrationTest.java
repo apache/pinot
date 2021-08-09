@@ -21,7 +21,7 @@ package org.apache.pinot.integration.tests;
 import com.google.common.base.Function;
 import java.io.File;
 import java.io.IOException;
-import java.net.URL;
+import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.util.ArrayList;
@@ -271,9 +271,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected Schema createSchema()
       throws IOException {
-    URL resourceUrl = BaseClusterIntegrationTest.class.getClassLoader().getResource(getSchemaFileName());
-    Assert.assertNotNull(resourceUrl);
-    return Schema.fromFile(new File(resourceUrl.getFile()));
+    InputStream inputStream =
+        BaseClusterIntegrationTest.class.getClassLoader().getResourceAsStream(getSchemaFileName());
+    Assert.assertNotNull(inputStream);
+    return Schema.fromInputSteam(inputStream);
   }
 
   /**
@@ -378,15 +379,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Murmur", numPartitions));
 
     return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName()).setSchemaName(getSchemaName())
-        .setTimeColumnName(getTimeColumnName())
-        .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
-        .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setLLC(useLlc())
-        .setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled())
+        .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
+        .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
+        .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
+        .setLLC(useLlc()).setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled())
         .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
         .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null)).build();
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, null)).build();
   }
 
   /**
@@ -457,9 +457,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected List<File> unpackAvroData(File outputDir)
       throws Exception {
-    URL resourceUrl = BaseClusterIntegrationTest.class.getClassLoader().getResource(getAvroTarFileName());
-    Assert.assertNotNull(resourceUrl);
-    return TarGzCompressionUtils.untar(new File(resourceUrl.getFile()), outputDir);
+    InputStream inputStream =
+        BaseClusterIntegrationTest.class.getClassLoader().getResourceAsStream(getAvroTarFileName());
+    Assert.assertNotNull(inputStream);
+    return TarGzCompressionUtils.untar(inputStream, outputDir);
   }
 
   /**
@@ -470,8 +471,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected void pushAvroIntoKafka(List<File> avroFiles)
       throws Exception {
 
-    ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles, "localhost:" + getKafkaPort(), getKafkaTopic(),
-        getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
+    ClusterIntegrationTestUtils
+        .pushAvroIntoKafka(avroFiles, "localhost:" + getKafkaPort(), getKafkaTopic(), getMaxNumKafkaMessagesPerBatch(),
+            getKafkaMessageHeader(), getPartitionColumn());
   }
 
   protected List<File> getAllAvroFiles()
@@ -511,8 +513,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected void startKafka(int port) {
     Properties kafkaConfig = KafkaStarterUtils.getDefaultKafkaConfiguration();
-    _kafkaStarters = KafkaStarterUtils.startServers(getNumKafkaBrokers(), port, getKafkaZKAddress(),
-        kafkaConfig);
+    _kafkaStarters = KafkaStarterUtils.startServers(getNumKafkaBrokers(), port, getKafkaZKAddress(), kafkaConfig);
     _kafkaStarters.get(0)
         .createTopic(getKafkaTopic(), KafkaStarterUtils.getTopicCreationProps(getNumKafkaPartitions()));
   }

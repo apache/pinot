@@ -16,35 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.minion.metrics;
+package org.apache.pinot.plugin.stream.pulsar;
 
-import org.apache.pinot.common.metrics.AbstractMetrics;
-import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 
 
-public class MinionMetrics extends AbstractMetrics<MinionQueryPhase, MinionMeter, MinionGauge, MinionTimer> {
+/**
+ * {@link StreamPartitionMsgOffsetFactory} implementation for Pulsar streams.
+ */
+public class MessageIdStreamOffsetFactory implements StreamPartitionMsgOffsetFactory {
+  private StreamConfig _streamConfig;
 
-  public MinionMetrics(PinotMetricsRegistry metricsRegistry) {
-    this(CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX, metricsRegistry);
-  }
-
-  public MinionMetrics(String prefix, PinotMetricsRegistry metricsRegistry) {
-    super(prefix, metricsRegistry, MinionMetrics.class);
+  @Override
+  public void init(StreamConfig streamConfig) {
+    _streamConfig = streamConfig;
   }
 
   @Override
-  protected MinionQueryPhase[] getQueryPhases() {
-    return MinionQueryPhase.values();
+  public StreamPartitionMsgOffset create(String offsetStr) {
+    return new MessageIdStreamOffset(offsetStr);
   }
 
   @Override
-  protected MinionMeter[] getMeters() {
-    return MinionMeter.values();
-  }
-
-  @Override
-  protected MinionGauge[] getGauges() {
-    return MinionGauge.values();
+  public StreamPartitionMsgOffset create(StreamPartitionMsgOffset other) {
+    MessageIdStreamOffset messageIdStreamOffset = (MessageIdStreamOffset) other;
+    return new MessageIdStreamOffset(messageIdStreamOffset.getMessageId());
   }
 }

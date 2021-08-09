@@ -18,14 +18,19 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import it.unimi.dsi.fastutil.Arrays;
+import it.unimi.dsi.fastutil.Swapper;
+import it.unimi.dsi.fastutil.ints.IntComparator;
 import java.io.IOException;
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -49,8 +54,13 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.helix.AccessOption;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -62,12 +72,15 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.recommender.RecommenderDriver;
 import org.apache.pinot.controller.tuner.TableConfigTunerUtils;
-import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
+import org.apache.pinot.controller.util.TableIngestionStatusHelper;
+import org.apache.pinot.controller.util.TableMetadataReader;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStats;
 import org.apache.pinot.spi.config.table.TableStatus;
@@ -75,6 +88,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.zookeeper.data.Stat;
 import org.glassfish.grizzly.http.server.Request;
 import org.slf4j.LoggerFactory;
 
@@ -105,6 +119,9 @@ public class PinotTableRestletResource {
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
+
+  @Inject
+  PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
 
   @Inject
   ControllerConf _controllerConf;
@@ -200,16 +217,25 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
   @ApiOperation(value = "Lists all tables in cluster", notes = "Lists all tables in cluster")
-  public String listTableConfigs(@ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
+  public String listTables(@ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "name|creationTime|lastModifiedTime") @QueryParam("sortType") String sortTypeStr,
+      @ApiParam(value = "true|false") @QueryParam("sortAsc") @DefaultValue("true") boolean sortAsc) {
     try {
       List<String> tableNames;
       TableType tableType = null;
       if (tableTypeStr != null) {
         tableType = TableType.valueOf(tableTypeStr.toUpperCase());
       }
+      SortType sortType = sortTypeStr != null ? SortType.valueOf(sortTypeStr.toUpperCase()) : SortType.NAME;
 
       if (tableType == null) {
-        tableNames = _pinotHelixResourceManager.getAllRawTables();
+        if (sortType == SortType.NAME) {
+          tableNames = _pinotHelixResourceManager.getAllRawTables();
+        } else {
+          // NOTE: Need to read actual table names (with type suffix) when not sorting on name because we need to read
+          //       the stats for the ZK records
+          tableNames = _pinotHelixResourceManager.getAllTables();
+        }
       } else {
         if (tableType == TableType.REALTIME) {
           tableNames = _pinotHelixResourceManager.getAllRealtimeTables();
@@ -218,11 +244,47 @@ public class PinotTableRestletResource {
         }
       }
 
-      Collections.sort(tableNames);
+      if (sortType == SortType.NAME) {
+        tableNames.sort(sortAsc ? null : Comparator.reverseOrder());
+      } else {
+        int sortFactor = sortAsc ? 1 : -1;
+        ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
+        int numTables = tableNames.size();
+        List<String> zkPaths = new ArrayList<>(numTables);
+        for (String tableNameWithType : tableNames) {
+          zkPaths.add(ZKMetadataProvider.constructPropertyStorePathForResourceConfig(tableNameWithType));
+        }
+        Stat[] stats = propertyStore.getStats(zkPaths, AccessOption.PERSISTENT);
+        for (int i = 0; i < numTables; i++) {
+          Preconditions.checkState(stats[i] != null, "Failed to read ZK stats for table: %s", tableNames.get(i));
+        }
+        IntComparator comparator;
+        if (sortType == SortType.CREATIONTIME) {
+          comparator = (i, j) -> Long.compare(stats[i].getCtime(), stats[j].getCtime()) * sortFactor;
+        } else {
+          assert sortType == SortType.LASTMODIFIEDTIME;
+          comparator = (i, j) -> Long.compare(stats[i].getMtime(), stats[j].getMtime()) * sortFactor;
+        }
+        Swapper swapper = (i, j) -> {
+          Stat tempStat = stats[i];
+          stats[i] = stats[j];
+          stats[j] = tempStat;
+
+          String tempTableName = tableNames.get(i);
+          tableNames.set(i, tableNames.get(j));
+          tableNames.set(j, tempTableName);
+        };
+        Arrays.quickSort(0, numTables, comparator, swapper);
+      }
+
       return JsonUtils.newObjectNode().set("tables", JsonUtils.objectToJsonNode(tableNames)).toString();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
+  }
+
+  private enum SortType {
+    NAME, CREATIONTIME, LASTMODIFIEDTIME
   }
 
   private String listTableConfigs(String tableName, @Nullable String tableTypeStr) {
@@ -257,8 +319,8 @@ public class PinotTableRestletResource {
   public String alterTableStateOrListTableConfig(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "enable|disable|drop") @QueryParam("state") String stateStr,
-      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr,
-      @Context HttpHeaders httpHeaders, @Context Request request) {
+      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr, @Context HttpHeaders httpHeaders,
+      @Context Request request) {
     try {
       if (stateStr == null) {
         return listTableConfigs(tableName, tableTypeStr);
@@ -606,17 +668,27 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
     try {
-      TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-      if (TableType.OFFLINE == tableType) {
-        // TODO: Support table status for offline table. Currently only supported for realtime.
-        throw new UnsupportedOperationException(
-            "Table status for OFFLINE table: " + tableName + " is currently unsupported");
+      TableType tableType = Constants.validateTableType(tableTypeStr);
+      if (tableType == null) {
+        throw new ControllerApplicationException(LOGGER, "Table type should either be realtime|offline",
+            Response.Status.BAD_REQUEST);
       }
-      String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
-      ConsumingSegmentInfoReader consumingSegmentInfoReader =
-          new ConsumingSegmentInfoReader(_executor, _connectionManager, _pinotHelixResourceManager);
-      TableStatus.IngestionStatus ingestionStatus = consumingSegmentInfoReader
-          .getIngestionStatus(tableNameWithType, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+      String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
+      if (!_pinotHelixResourceManager.hasTable(tableNameWithType)) {
+        throw new ControllerApplicationException(LOGGER,
+            "Specified table name: " + tableName + " of type: " + tableTypeStr + " does not exist.",
+            Response.Status.BAD_REQUEST);
+      }
+      TableStatus.IngestionStatus ingestionStatus = null;
+      if (TableType.OFFLINE == tableType) {
+        ingestionStatus = TableIngestionStatusHelper
+            .getOfflineTableIngestionStatus(tableNameWithType, _pinotHelixResourceManager,
+                _pinotHelixTaskResourceManager);
+      } else {
+        ingestionStatus = TableIngestionStatusHelper.getRealtimeTableIngestionStatus(tableNameWithType,
+            _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000, _executor, _connectionManager,
+            _pinotHelixResourceManager);
+      }
       TableStatus tableStatus = new TableStatus(ingestionStatus);
       return JsonUtils.objectToPrettyString(tableStatus);
     } catch (Exception e) {
@@ -624,5 +696,54 @@ public class PinotTableRestletResource {
           String.format("Failed to get status (ingestion status) for table %s. Reason: %s", tableName, e.getMessage()),
           Response.Status.INTERNAL_SERVER_ERROR, e);
     }
+  }
+
+  @GET
+  @Path("tables/{tableName}/metadata")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get the aggregate metadata of all segments for a table", notes = "Get the aggregate metadata of all segments for a table")
+  public String getTableAggregateMetadata(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns") @DefaultValue("") List<String> columns) {
+    LOGGER.info("Received a request to fetch aggregate metadata for a table {}", tableName);
+    TableType tableType = Constants.validateTableType(tableTypeStr);
+    if (tableType == TableType.REALTIME) {
+      throw new ControllerApplicationException(LOGGER, "Table type : " + tableTypeStr + " not yet supported.",
+          Response.Status.NOT_IMPLEMENTED);
+    }
+    String tableNameWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
+    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+    SegmentsValidationAndRetentionConfig segmentsConfig =
+        tableConfig != null ? tableConfig.getValidationConfig() : null;
+    int numReplica = segmentsConfig == null ? 1 : Integer.parseInt(segmentsConfig.getReplication());
+
+    String segmentsMetadata;
+    try {
+      JsonNode segmentsMetadataJson = getAggregateMetadataFromServer(tableNameWithType, columns, numReplica);
+      segmentsMetadata = JsonUtils.objectToPrettyString(segmentsMetadataJson);
+    } catch (InvalidConfigException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
+    } catch (IOException ioe) {
+      throw new ControllerApplicationException(LOGGER, "Error parsing Pinot server response: " + ioe.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR, ioe);
+    }
+    return segmentsMetadata;
+  }
+
+  /**
+   * This is a helper method to get the metadata for all segments for a given table name.
+   * @param tableNameWithType name of the table along with its type
+   * @param columns name of the columns
+   * @param numReplica num or replica for the table
+   * @return aggregated metadata of the table segments
+   */
+  private JsonNode getAggregateMetadataFromServer(String tableNameWithType, List<String> columns, int numReplica)
+      throws InvalidConfigException, IOException {
+    TableMetadataReader tableMetadataReader =
+        new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
+    return tableMetadataReader.getAggregateTableMetadata(tableNameWithType, columns, numReplica,
+        _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
   }
 }

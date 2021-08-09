@@ -131,12 +131,12 @@ public class PartitionUpsertMetadataManagerTest {
   }
 
   private static void checkRecordLocation(Map<PrimaryKey, RecordLocation> recordLocationMap, int keyValue,
-      IndexSegment segment, int docId, long timestamp) {
+      IndexSegment segment, int docId, int timestamp) {
     RecordLocation recordLocation = recordLocationMap.get(getPrimaryKey(keyValue));
     assertNotNull(recordLocation);
     assertSame(recordLocation.getSegment(), segment);
     assertEquals(recordLocation.getDocId(), docId);
-    assertEquals(recordLocation.getTimestamp(), timestamp);
+    assertEquals(recordLocation.getComparisonValue(), timestamp);
   }
 
   @Test

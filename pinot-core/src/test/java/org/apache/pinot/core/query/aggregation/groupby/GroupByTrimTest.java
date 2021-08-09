@@ -20,18 +20,20 @@ package org.apache.pinot.core.query.aggregation.groupby;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.PriorityQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.data.table.IntermediateRecord;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.combine.GroupByOrderByCombineOperator;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.plan.AggregationGroupByOrderByPlanNode;
+import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -44,14 +46,14 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.utils.Pair;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static java.lang.Math.max;
 import static org.testng.Assert.assertEquals;
 
 
@@ -67,19 +69,18 @@ import static org.testng.Assert.assertEquals;
  * Currently tests 'max' functions, and can be easily extended to
  * test other conditions such as GroupBy without OrderBy
  */
-public class GroupByInSegmentTrimTest {
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "GroupByInSegmentTrimTest");
-  private static final String SEGMENT_NAME = "TestGroupByInSegment";
-
+public class GroupByTrimTest {
+  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "GroupByTrimTest");
+  private static final String SEGMENT_NAME = "testSegment";
   private static final String METRIC_PREFIX = "metric_";
-  private static final int NUM_ROWS = 1000;
-  private static final int NUM_COLUMN = 2;
-  private static final int MAX_INITIAL_RESULT_HOLDER_CAPACITY = 10_000;
-  private static final int NUM_GROUPS_LIMIT = 100_000;
-  private static IndexSegment _indexSegment;
-  private static String[] _columns;
-  private static double[][] _inputData;
-  private static Map<Double, Double> _resultMap;
+  private static final int NUM_COLUMNS = 2;
+  private static final int NUM_ROWS = 10000;
+
+  private final ExecutorService _executorService = Executors.newCachedThreadPool();
+  private IndexSegment _indexSegment;
+  private String[] _columns;
+  private double[][] _inputData;
+  private Map<Double, Double> _resultMap;
 
   /**
    * Initializations prior to the test:
@@ -91,29 +92,43 @@ public class GroupByInSegmentTrimTest {
   @BeforeClass
   public void setUp()
       throws Exception {
+    FileUtils.deleteQuietly(INDEX_DIR);
     _resultMap = new HashMap<>();
     // Current Schema: Columns: metrics_0(double), metrics_1(double)
-    _inputData = new double[NUM_COLUMN][NUM_ROWS];
-    _columns = new String[NUM_COLUMN];
+    _inputData = new double[NUM_COLUMNS][NUM_ROWS];
+    _columns = new String[NUM_COLUMNS];
     setupSegment();
+  }
+
+  @AfterClass
+  public void tearDown() {
+    _indexSegment.destroy();
+    _executorService.shutdown();
+    FileUtils.deleteQuietly(INDEX_DIR);
   }
 
   /**
    * Test the GroupBy OrderBy query and compute the expected results to match
    */
-  @Test(dataProvider = "QueryDataProvider")
-  void TestGroupByOrderByOperator(int trimSize, List<Pair<Double, Double>> expectedResult, QueryContext queryContext) {
-    // Create a query plan
-    AggregationGroupByOrderByPlanNode aggregationGroupByOrderByPlanNode =
-        new AggregationGroupByOrderByPlanNode(_indexSegment, queryContext, MAX_INITIAL_RESULT_HOLDER_CAPACITY,
-            NUM_GROUPS_LIMIT, trimSize);
+  @Test(dataProvider = "groupByTrimTestDataProvider")
+  void testGroupByTrim(QueryContext queryContext, int minSegmentGroupTrimSize, int minServerGroupTrimSize,
+      List<Pair<Double, Double>> expectedResult)
+      throws Exception {
+    // Create a query operator
+    AggregationGroupByOrderByOperator groupByOperator =
+        new AggregationGroupByOrderByPlanNode(_indexSegment, queryContext,
+            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY,
+            InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, minSegmentGroupTrimSize).run();
+    GroupByOrderByCombineOperator combineOperator =
+        new GroupByOrderByCombineOperator(Collections.singletonList(groupByOperator), queryContext, _executorService,
+            System.currentTimeMillis() + CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS,
+            minServerGroupTrimSize, InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD);
 
-    // Get the query executor
-    AggregationGroupByOrderByOperator aggregationGroupByOrderByOperator = aggregationGroupByOrderByPlanNode.run();
+    // Execute the query
+    IntermediateResultsBlock resultsBlock = combineOperator.nextBlock();
 
     // Extract the execution result
-    IntermediateResultsBlock resultsBlock = aggregationGroupByOrderByOperator.nextBlock();
-    ArrayList<Pair<Double, Double>> extractedResult = extractTestResult(resultsBlock);
+    List<Pair<Double, Double>> extractedResult = extractTestResult(resultsBlock);
 
     assertEquals(extractedResult, expectedResult);
   }
@@ -136,7 +151,7 @@ public class GroupByInSegmentTrimTest {
   }
   /**
    * Helper method to setup the index segment on which to perform aggregation tests.
-   * - Generates a segment with {@link #NUM_COLUMN} and {@link #NUM_ROWS}
+   * - Generates a segment with {@link #NUM_COLUMNS} and {@link #NUM_ROWS}
    * - Random 'double' data filled in the metric columns. The data is also populated
    *   into the _inputData[], so it can be used to test the results.
    *
@@ -144,10 +159,6 @@ public class GroupByInSegmentTrimTest {
    */
   private void setupSegment()
       throws Exception {
-    if (INDEX_DIR.exists()) {
-      FileUtils.deleteQuietly(INDEX_DIR);
-    }
-
     // Segment Config
     SegmentGeneratorConfig config =
         new SegmentGeneratorConfig(new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build(),
@@ -157,20 +168,19 @@ public class GroupByInSegmentTrimTest {
 
     // Fill the data table
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
-    int baseValue = 0;
+    int baseValue = 10;
     for (int i = 0; i < NUM_ROWS; i++) {
       GenericRow genericRow = new GenericRow();
 
-      for (int j = 0; j < _columns.length; j++) {
-        String metricName = _columns[j];
+      for (int j = 0; j < NUM_COLUMNS; j++) {
         double value = baseValue + i + j;
         _inputData[j][i] = value;
-        genericRow.putValue(metricName, value);
+        genericRow.putValue(_columns[j], value);
       }
       // Compute the max result and insert into a grouped map
       computeMaxResult(_inputData[0][i], _inputData[1][i]);
       rows.add(genericRow);
-      //baseValue += 10;
+      baseValue += 10;
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
@@ -188,7 +198,7 @@ public class GroupByInSegmentTrimTest {
   private Schema buildSchema() {
     Schema schema = new Schema();
 
-    for (int i = 0; i < NUM_COLUMN; i++) {
+    for (int i = 0; i < NUM_COLUMNS; i++) {
       String metricName = METRIC_PREFIX + i;
       MetricFieldSpec metricFieldSpec = new MetricFieldSpec(metricName, FieldSpec.DataType.DOUBLE);
       schema.addField(metricFieldSpec);
@@ -201,9 +211,10 @@ public class GroupByInSegmentTrimTest {
    * Helper method to compute the aggregation result grouped by the key
    *
    */
-  private void computeMaxResult(Double key, Double result) {
-    if (_resultMap.get(key) == null || _resultMap.get(key) < result) {
-      _resultMap.put(key, result);
+  private void computeMaxResult(double key, double value) {
+    Double currentValue = _resultMap.get(key);
+    if (currentValue == null || currentValue < value) {
+      _resultMap.put(key, value);
     }
   }
 
@@ -212,88 +223,57 @@ public class GroupByInSegmentTrimTest {
    *
    * @return A list of expected results
    */
-  private ArrayList<Pair<Double, Double>> extractTestResult(IntermediateResultsBlock resultsBlock) {
-    AggregationGroupByResult result = resultsBlock.getAggregationGroupByResult();
-    if (result != null) {
-      // No trim
-      return extractAggregationResult(result);
-    } else {
-      // In case of trim
-      return extractIntermediateResult(resultsBlock.getIntermediateRecords());
+  private List<Pair<Double, Double>> extractTestResult(IntermediateResultsBlock resultsBlock)
+      throws Exception {
+    DataTable dataTable = resultsBlock.getDataTable();
+    int numRows = dataTable.getNumberOfRows();
+    List<Pair<Double, Double>> result = new ArrayList<>(numRows);
+    for (int i = 0; i < numRows; i++) {
+      result.add(Pair.of(dataTable.getDouble(i, 0), dataTable.getDouble(i, 1)));
     }
-  }
-
-  /**
-   * Helper method to extract the result from AggregationGroupByResult
-   *
-   * @return A list of expected results
-   */
-  private ArrayList<Pair<Double, Double>> extractAggregationResult(AggregationGroupByResult aggregationGroupByResult) {
-    ArrayList<Pair<Double, Double>> result = new ArrayList<>();
-    Iterator<GroupKeyGenerator.GroupKey> iterator = aggregationGroupByResult.getGroupKeyIterator();
-    int i = 0;
-    while (iterator.hasNext()) {
-      GroupKeyGenerator.GroupKey groupKey = iterator.next();
-      Double key = (Double) groupKey._keys[0];
-      Double value = (Double) aggregationGroupByResult.getResultForGroupId(i, groupKey._groupId);
-      result.add(new Pair<>(key, value));
-    }
-    result.sort((o1, o2) -> (int) (o2.getSecond() - o1.getSecond()));
-    return result;
-  }
-
-  /**
-   * Helper method to extract the result from Collection<IntermediateRecord>
-   *
-   * @return A list of expected results
-   */
-  private ArrayList<Pair<Double, Double>> extractIntermediateResult(Collection<IntermediateRecord> intermediateRecord) {
-    ArrayList<Pair<Double, Double>> result = new ArrayList<>();
-    PriorityQueue<IntermediateRecord> resultPQ = new PriorityQueue<>(intermediateRecord);
-    while (!resultPQ.isEmpty()) {
-      IntermediateRecord head = resultPQ.poll();
-      result.add(new Pair<>((Double) head._record.getValues()[0], (Double) head._record.getValues()[1]));
-    }
-    Collections.reverse(result);
+    result.sort((o1, o2) -> Double.compare(o2.getRight(), o1.getRight()));
     return result;
   }
 
   @DataProvider
-  public static Object[][] QueryDataProvider() {
+  public Object[][] groupByTrimTestDataProvider() {
     List<Object[]> data = new ArrayList<>();
-    ArrayList<Pair<Double, Double>> expectedResult = computeExpectedResult();
-    // Testcase1: low limit + high trim size
+    List<Pair<Double, Double>> expectedResult = computeExpectedResult();
+
+    // Testcase1: low limit + high min trim size
     QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY metric_0 DESC LIMIT 1");
-    int trimSize = 100;
-    int expectedSize = max(trimSize, 5 * queryContext.getLimit());
-    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
-    // Testcase2: high limit + low trim size
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 1");
+    List<Pair<Double, Double>> top100 = expectedResult.subList(0, 100);
+    data.add(new Object[]{queryContext, 100, 5000, top100});
+    data.add(new Object[]{queryContext, 100, -1, top100});
+    data.add(new Object[]{queryContext, -1, 100, top100});
+    data.add(new Object[]{queryContext, 5000, 100, top100});
+
+    // Testcase2: high limit + low min trim size
     queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
         "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50");
-    trimSize = 10;
-    expectedSize = max(trimSize, 5 * queryContext.getLimit());
-    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
-    // Testcase3: high limit + high trim size (No trim)
-    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 500");
-    trimSize = 1000;
-    expectedSize = 1000;
-    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
+    List<Pair<Double, Double>> top250 = expectedResult.subList(0, 250);
+    data.add(new Object[]{queryContext, 50, 5000, top250});
+    data.add(new Object[]{queryContext, 200, -1, top250});
+    data.add(new Object[]{queryContext, -1, 150, top250});
+    data.add(new Object[]{queryContext, 5000, 10, top250});
+    data.add(new Object[]{queryContext, 20, 30, top250});
 
-    // Testcase4: low limit + low server trim size + query option size
+    // Testcase3: disable trim
     queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50 OPTION(minSegmentTrimSize=1000)");
-    trimSize = 0;
-    expectedSize = 1000;
-    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 10");
+    data.add(new Object[]{queryContext, -1, -1, expectedResult});
 
-    // Testcase5: low limit + low server trim size + query option enable
+    // Testcase4: query option
     queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50 OPTION(enableSegmentTrim=true)");
-    trimSize = 0;
-    expectedSize = 1000;
-    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 1 OPTION(minSegmentGroupTrimSize=100)");
+    data.add(new Object[]{queryContext, -1, 5000, top100});
+    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50 OPTION(minServerGroupTrimSize=150)");
+    data.add(new Object[]{queryContext, -1, 5000, top250});
+    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 10 OPTION(minSegmentGroupTrimSize=-1,minServerGroupTrimSize=-1)");
+    data.add(new Object[]{queryContext, 5000, 5000, expectedResult});
 
     return data.toArray(new Object[data.size()][]);
   }
@@ -343,12 +323,12 @@ public class GroupByInSegmentTrimTest {
    *
    * @return A list of expected results
    */
-  private static ArrayList<Pair<Double, Double>> computeExpectedResult() {
-    ArrayList<Pair<Double, Double>> result = new ArrayList<>();
+  private List<Pair<Double, Double>> computeExpectedResult() {
+    List<Pair<Double, Double>> result = new ArrayList<>(_resultMap.size());
     for (Map.Entry<Double, Double> entry : _resultMap.entrySet()) {
-      result.add(new Pair<>(entry.getKey(), entry.getValue()));
+      result.add(Pair.of(entry.getKey(), entry.getValue()));
     }
-    result.sort((o1, o2) -> (int) (o2.getSecond() - o1.getSecond()));
+    result.sort((o1, o2) -> Double.compare(o2.getRight(), o1.getRight()));
     return result;
   }
 }
