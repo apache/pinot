@@ -21,7 +21,8 @@ package org.apache.pinot.controller.api.resources;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
-import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -56,17 +57,17 @@ public class PinotControllerPeriodicTaskRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/run")
-  @ApiOperation(value = "Run controller periodic task against the specified table. If no table name is specified, task will run against all tables.")
+  @ApiOperation(value = "Run controller periodic task against the specified comma-separated list of table names with type suffix. If no table name is specified, task will run against all tables.")
   public boolean runPeriodicTask(
       @ApiParam(value = "Periodic Task Name", required = true) @QueryParam("taskname") String periodicTaskName,
-      @ApiParam(value = "Table Name (with type)", required = false) @QueryParam("tablename") String tableName) {
+      @ApiParam(value = "Table Name(s) (comma-separated list of table names with type suffix)", example = "oneTable_OFFLINE, twoTable_REALTIME", required = false) @QueryParam("tablename") String tableNameWithType) {
     if (!_periodicTaskScheduler.hasTask(periodicTaskName)) {
       throw new WebApplicationException("Periodic task '" + periodicTaskName + "' not found.",
           Response.Status.NOT_FOUND);
     }
 
     LOGGER.info("Sending periodic task execution message to all controllers for running task {} against {}.",
-        periodicTaskName, tableName != null ? tableName + " table" : "all tables");
+        periodicTaskName, tableNameWithType != null ? " table '" + tableNameWithType + "'" : "all tables");
 
     // Create and send message to send to all controllers (including this one)
     Criteria recipientCriteria = new Criteria();
@@ -75,7 +76,7 @@ public class PinotControllerPeriodicTaskRestletResource {
     recipientCriteria.setSessionSpecific(true);
     recipientCriteria.setResource(CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
     recipientCriteria.setSelfExcluded(false);
-    RunPeriodicTaskMessage runPeriodicTaskMessage = new RunPeriodicTaskMessage(periodicTaskName, tableName);
+    RunPeriodicTaskMessage runPeriodicTaskMessage = new RunPeriodicTaskMessage(periodicTaskName, Arrays.asList(tableNameWithType.split(",")));
 
     ClusterMessagingService clusterMessagingService =
         _pinotHelixResourceManager.getHelixZkManager().getMessagingService();
@@ -88,17 +89,7 @@ public class PinotControllerPeriodicTaskRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/names")
   @ApiOperation(value = "Get comma-delimited list of all available periodic task names.")
-  public ArrayList<String> getPeriodicTaskNames() {
-    ArrayList<String> list = new ArrayList<>();
-    list.add(org.apache.pinot.controller.validation.BrokerResourceValidationManager.class.getSimpleName());
-    list.add(org.apache.pinot.controller.validation.OfflineSegmentIntervalChecker.class.getSimpleName());
-    list.add(org.apache.pinot.controller.validation.RealtimeSegmentValidationManager.class.getSimpleName());
-    list.add(org.apache.pinot.controller.helix.SegmentStatusChecker.class.getSimpleName());
-    list.add(org.apache.pinot.controller.helix.core.retention.RetentionManager.class.getSimpleName());
-    list.add(org.apache.pinot.controller.helix.core.relocation.SegmentRelocator.class.getSimpleName());
-    list.add(org.apache.pinot.controller.helix.core.minion.PinotTaskManager.class.getSimpleName());
-    list.add(org.apache.pinot.controller.helix.core.minion.MinionInstancesCleanupTask.class.getSimpleName());
-    list.add(org.apache.pinot.controller.helix.core.minion.TaskMetricsEmitter.class.getSimpleName());
-    return list;
+  public List<String> getPeriodicTaskNames() {
+    return _periodicTaskScheduler.getTaskNameList();
   }
 }

@@ -55,10 +55,10 @@ public class MinionInstancesCleanupTask extends BasePeriodicTask {
   }
 
   /**
-   * @param filter Currently not used, but can be used to specify how this task should be run.
+   * @param filters Currently not used, but can be used to specify how this task should be run.
    */
   @Override
-  protected void runTask(String filter) {
+  protected void runTask(List<String> filters) {
     // Make it so that only one controller is responsible for cleaning up minion instances.
     if (!_leadControllerManager.isLeaderForTable(TASK_NAME)) {
       return;

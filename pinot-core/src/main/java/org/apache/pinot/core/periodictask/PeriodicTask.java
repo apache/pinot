@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.periodictask;
 
+import java.util.List;
 import javax.annotation.concurrent.ThreadSafe;
 
 
@@ -61,9 +62,9 @@ public interface PeriodicTask extends Runnable {
 
   /**
    * Execute the task once. This method will calls the {@link #run} method.
-   * @param filter An implementation specific string that may dictate how the task will be run. null by default.
+   * @param filters An implementation specific string that may dictate how the task will be run. null by default.
    */
-  void run(String filter);
+  void run(List<String> filters);
 
   /**
    * Stops the periodic task and performs necessary cleanups. Should be called after removing the periodic task from the

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.periodictask;
 
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import javax.annotation.Nullable;
@@ -46,14 +47,14 @@ public abstract class BasePeriodicTask implements PeriodicTask {
 
   // A string passed to tasks being run that dictates how the task will be run. null by default.
   // TODO: to be finalized based on code review.
-  private String _filter;
+  private List<String> _filters;
 
   public BasePeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds) {
     _taskName = taskName;
     _intervalInSeconds = runFrequencyInSeconds;
     _initialDelayInSeconds = initialDelayInSeconds;
     _runLock = new ReentrantLock();
-    _filter = null;
+    _filters = null;
   }
 
   @Override
@@ -133,7 +134,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
         long startTime = System.currentTimeMillis();
         LOGGER.info("Start running task: {}", _taskName);
         try {
-          runTask(_filter);
+          runTask(_filters);
         } catch (Exception e) {
           LOGGER.error("Caught exception while running task: {}", _taskName, e);
         }
@@ -150,13 +151,13 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   }
 
   @Override
-  public void run(@Nullable String filter) {
+  public void run(@Nullable List<String> filter) {
     try {
       _runLock.lock();
-      _filter = filter;
+      _filters = filter;
       run();
     } finally {
-      _filter = null;
+      _filters = null;
       _runLock.unlock();
     }
   }
@@ -164,9 +165,9 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   /**
    * Executes the task. This method should early terminate if {@code started} flag is set to false by {@link #stop()}
    * during execution.
-   * @param filter An implementation specific string that may dictate how the task will be run. null by default.
+   * @param filters An implementation specific string that may dictate how the task will be run. null by default.
    */
-  protected abstract void runTask(@Nullable String filter);
+  protected abstract void runTask(@Nullable List<String> filters);
 
   /**
    * {@inheritDoc}
@@ -187,7 +188,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
       if (!_runLock.tryLock(MAX_PERIODIC_TASK_STOP_TIME_MILLIS, TimeUnit.MILLISECONDS)) {
         LOGGER.warn("Task: {} did not finish within timeout of {}ms", MAX_PERIODIC_TASK_STOP_TIME_MILLIS);
       } else {
-        LOGGER.warn("Task: {} finished within timeout of {}ms", MAX_PERIODIC_TASK_STOP_TIME_MILLIS);
+        LOGGER.info("Task: {} finished within timeout of {}ms", MAX_PERIODIC_TASK_STOP_TIME_MILLIS);
       }
     } catch (InterruptedException ie) {
       Thread.currentThread().interrupt();

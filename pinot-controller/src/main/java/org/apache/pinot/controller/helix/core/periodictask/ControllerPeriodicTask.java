@@ -54,16 +54,16 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
     _controllerMetrics = controllerMetrics;
   }
 
-  /** @param filter Table name against which task will be run. If null, then task is run against all tables. */
+  /** @param filters Table name against which task will be run. If null, then task is run against all tables. */
   @Override
-  protected final void runTask(String filter) {
+  protected final void runTask(List<String> filters) {
     _controllerMetrics.addMeteredTableValue(_taskName, ControllerMeter.CONTROLLER_PERIODIC_TASK_RUN, 1L);
     try {
       // Process the tables that are managed by this controller
       List<String> tablesToProcess = new ArrayList<>();
       for (String tableNameWithType : _pinotHelixResourceManager.getAllTables()) {
-        if (_leadControllerManager.isLeaderForTable(tableNameWithType) && (filter == null || tableNameWithType
-            .equalsIgnoreCase(filter))) {
+        if (_leadControllerManager.isLeaderForTable(tableNameWithType) && (filters == null || filters.size() == 0
+            || filters.contains(tableNameWithType))) {
           tablesToProcess.add(tableNameWithType);
         }
       }

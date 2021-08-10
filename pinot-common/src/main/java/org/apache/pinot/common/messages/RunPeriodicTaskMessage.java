@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.messages;
 
+import java.util.List;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import org.apache.helix.ZNRecord;
@@ -31,19 +32,19 @@ import org.apache.helix.model.Message;
 public class RunPeriodicTaskMessage extends Message {
   public static final String RUN_PERIODIC_TASK_MSG_SUB_TYPE = "PERIODIC_TASK";
   private static final String PERIODIC_TASK_NAME_KEY = "periodicTaskName";
-  private static final String TABLE_NAME_KEY = "tableName";
+  private static final String TABLE_NAMES_LIST_KEY = "tableNames";
 
   /**
    * @param periodicTaskName Name of the task that will be run.
-   * @param tableName Table name against which task will run.
+   * @param tableNamesWithType Table (names with type suffix) on which task will run.
    */
-  public RunPeriodicTaskMessage(@Nonnull String periodicTaskName, String tableName) {
+  public RunPeriodicTaskMessage(@Nonnull String periodicTaskName, List<String> tableNamesWithType) {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
     setMsgSubType(RUN_PERIODIC_TASK_MSG_SUB_TYPE);
     setExecutionTimeout(-1);
     ZNRecord znRecord = getRecord();
     znRecord.setSimpleField(PERIODIC_TASK_NAME_KEY, periodicTaskName);
-    znRecord.setSimpleField(TABLE_NAME_KEY, tableName);
+    znRecord.setListField(TABLE_NAMES_LIST_KEY, tableNamesWithType);
   }
 
   public RunPeriodicTaskMessage(Message message) {
@@ -55,7 +56,7 @@ public class RunPeriodicTaskMessage extends Message {
     return getRecord().getSimpleField(PERIODIC_TASK_NAME_KEY);
   }
 
-  public String getTableName() {
-    return getRecord().getSimpleField(TABLE_NAME_KEY);
+  public List<String> getTableNames() {
+    return getRecord().getListField(TABLE_NAMES_LIST_KEY);
   }
 }

@@ -121,6 +121,16 @@ public class PeriodicTaskScheduler {
     return false;
   }
 
+  /** @return List of tasks name that will run periodically. */
+  public List<String> getTaskNameList() {
+    List<String> taskNameList = new ArrayList<>();
+    for (PeriodicTask task : _tasksWithValidInterval) {
+      taskNameList.add(task.getTaskName());
+    }
+
+    return taskNameList;
+  }
+
   private PeriodicTask getPeriodicTask(String periodicTaskName) {
     for (PeriodicTask task : _tasksWithValidInterval) {
       if (task.getTaskName().equals(periodicTaskName)) {
@@ -134,7 +144,7 @@ public class PeriodicTaskScheduler {
    * Execute specified {@link PeriodicTask} immediately. If the task is already running, wait for the running task
    * to finish before executing the task again.
    */
-  public void scheduleNow(String periodicTaskName, @Nullable String tableName) {
+  public void scheduleNow(String periodicTaskName, @Nullable List<String> tableNamesWithType) {
     // Each controller may have a slightly different list of periodic tasks if we add, remove, or rename periodic
     // task. To avoid this situation, we check again (besides the check at controller API level) whether the
     // periodic task exists.
@@ -148,7 +158,7 @@ public class PeriodicTaskScheduler {
       try {
         // To prevent thread conflict, this call will block if the same task is already running (see
         // BasePeriodicTask.run method).
-        periodicTask.run(tableName);
+        periodicTask.run(tableNamesWithType);
       } catch (Throwable t) {
         // catch all errors to prevent subsequent executions from being silently suppressed
         // Ref: https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ScheduledExecutorService.html#scheduleWithFixedDelay-java.lang.Runnable-long-long-java.util.concurrent.TimeUnit-
