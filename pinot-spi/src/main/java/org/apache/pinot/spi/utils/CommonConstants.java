@@ -227,8 +227,7 @@ public class CommonConstants {
         public static final String SKIP_UPSERT = "skipUpsert";
         public static final String MIN_SEGMENT_GROUP_TRIM_SIZE = "minSegmentGroupTrimSize";
         public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
-        public static final String ON_THE_FLY_TRIM_THRESHOLD = "onTheFlyTrimThreshold";
-        public static final String ON_THE_FLY_TRIM_SIZE = "onTheFlyTrimSize";
+        public static final String MIN_SEGMENT_GROUP_TRIM_THRESHOLD = "minSegmentGroupTrimThreshold";
       }
     }
   }

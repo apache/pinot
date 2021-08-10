@@ -34,10 +34,8 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 import org.apache.pinot.core.util.GroupByUtils;
-import org.apache.pinot.core.util.QueryOptions;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
-import static org.apache.pinot.core.util.GroupByUtils.getTableCapacity;
 
 
 /**
@@ -144,8 +142,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     if (_queryContext.getOrderByExpressions() != null && _minGroupTrimSize > 0) {
       int trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit(), _minGroupTrimSize);
       if (groupByExecutor.getNumGroups() > trimSize) {
-        TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
-        Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
+        Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize);
         return new IntermediateResultsBlock(_aggregationFunctions, intermediateRecords, _dataSchema);
       }
     }

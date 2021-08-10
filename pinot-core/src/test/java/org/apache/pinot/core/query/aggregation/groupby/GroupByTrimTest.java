@@ -74,7 +74,7 @@ public class GroupByTrimTest {
   private static final String SEGMENT_NAME = "testSegment";
   private static final String METRIC_PREFIX = "metric_";
   private static final int NUM_COLUMNS = 2;
-  private static final int NUM_ROWS = 10000;
+  private static final int NUM_ROWS = 100000;
 
   private final ExecutorService _executorService = Executors.newCachedThreadPool();
   private IndexSegment _indexSegment;
@@ -134,18 +134,23 @@ public class GroupByTrimTest {
   }
 
   @Test(dataProvider = "QueryDataProviderForOnTheFlyTrim")
-  void TestTrimOnTheFly(int trimSize, List<Pair<Double, Double>> expectedResult, QueryContext queryContext) {
+  void TestTrimOnTheFly(int trimSize, List<Pair<Double, Double>> expectedResult, QueryContext queryContext)
+      throws Exception {
     // Create a query plan
-    AggregationGroupByOrderByPlanNode aggregationGroupByOrderByPlanNode =
-        new AggregationGroupByOrderByPlanNode(_indexSegment, queryContext, MAX_INITIAL_RESULT_HOLDER_CAPACITY,
-            NUM_GROUPS_LIMIT, trimSize);
+    AggregationGroupByOrderByOperator groupByOperator =
+        new AggregationGroupByOrderByPlanNode(_indexSegment, queryContext,
+            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY,
+            InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, -1).run();
+    GroupByOrderByCombineOperator combineOperator =
+        new GroupByOrderByCombineOperator(Collections.singletonList(groupByOperator), queryContext, _executorService,
+            System.currentTimeMillis() + CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS,
+            -1, InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD);
 
     // Get the query executor
-    AggregationGroupByOrderByOperator aggregationGroupByOrderByOperator = aggregationGroupByOrderByPlanNode.run();
+    IntermediateResultsBlock resultsBlock = combineOperator.nextBlock();
 
     // Extract the execution result
-    IntermediateResultsBlock resultsBlock = aggregationGroupByOrderByOperator.nextBlock();
-    ArrayList<Pair<Double, Double>> extractedResult = extractTestResult(resultsBlock);
+    List<Pair<Double, Double>> extractedResult = extractTestResult(resultsBlock);
 
     assertEquals(extractedResult, expectedResult);
   }
@@ -279,15 +284,16 @@ public class GroupByTrimTest {
   }
 
   @DataProvider
-  public static Object[][] QueryDataProviderForOnTheFlyTrim() {
+  public Object[][] QueryDataProviderForOnTheFlyTrim() {
     List<Object[]> data = new ArrayList<>();
-    ArrayList<Pair<Double, Double>> expectedResult = computeExpectedResult();
+    List<Pair<Double, Double>> expectedResult = computeExpectedResult();
     // Testcase1: low limit + high trim size
     QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY metric_0 DESC LIMIT 1 OPTION(onTheFlyTrimSize=100, onTheFlyTrimThreshold=200)");
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 1 OPTION(minSegmentGroupTrimSize=100, minSegmentGroupTrimThreshold=200)");
     int trimSize = 0;
     int expectedSize = 100;
-    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
+    List<Pair<Double, Double>> top100 = expectedResult.subList(0, 100);
+    data.add(new Object[]{trimSize, top100, queryContext});
     // Testcase2: high limit + low trim size
 //    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
 //        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50");

@@ -105,16 +105,20 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     _onTheFlyTrimFlag = !PQLQueryMode;
     _tableResizer = tableResizer;
     // TODO: Add more checks here
-    int trimSize = QueryOptions.getTrimSize(queryOptions);
-    int threshold = QueryOptions.getTrimThreshold(queryOptions);
     if (_onTheFlyTrimFlag) {
-      _onTheFlyTrimSize = trimSize > 0 ? trimSize : ON_THE_FLY_TRIM_SIZE;
-      _onTheFlyTrimThreshold = threshold > 0 ? threshold : ON_THE_FLY_TRIM_THRESHOLD;
+      if (queryOptions != null) {
+        Integer trimSize = QueryOptions.getMinSegmentGroupTrimSize(queryOptions);
+        Integer threshold = QueryOptions.getMinSegmentGroupTrimThreshold(queryOptions);
+        _onTheFlyTrimSize = trimSize != null ? trimSize : ON_THE_FLY_TRIM_SIZE;
+        _onTheFlyTrimThreshold = threshold != null ? threshold : ON_THE_FLY_TRIM_THRESHOLD;
+      } else {
+        _onTheFlyTrimSize = -1;
+        _onTheFlyTrimThreshold = -1;
+      }
     } else {
       _onTheFlyTrimSize = -1;
       _onTheFlyTrimThreshold = -1;
     }
-
 
     // Initialize result holders
     int maxNumResults = _groupKeyGenerator.getGlobalGroupKeyUpperBound();
