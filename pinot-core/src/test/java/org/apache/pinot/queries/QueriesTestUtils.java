@@ -124,7 +124,7 @@ public class QueriesTestUtils {
    * @param expectedNumTotalDocs Total documents.
    * @param responseMapper Mapper to process response.
    * @param expectedAggregationResults Expected aggregation results.
-   * @param resultComparisionDelta Validate results are within +/- delta range (0 - 100).
+   * @param resultComparisionDelta Validate results are within +/- delta range (0 - 100)%.
    */
   public static void testInterSegmentApproximateAggregationResult(BrokerResponseNative brokerResponse,
       long expectedNumDocsScanned, long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter,
