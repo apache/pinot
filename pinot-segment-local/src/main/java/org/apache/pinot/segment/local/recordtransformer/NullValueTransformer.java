@@ -20,16 +20,20 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.TimeConverter;
 
 
 public class NullValueTransformer implements RecordTransformer {
   private final Map<String, Object> _defaultNullValues = new HashMap<>();
+  private final TimeConverter _timeConverter;
+  private final String _timeColumnName;
 
-  public NullValueTransformer(Schema schema) {
+  public NullValueTransformer(TableConfig tableConfig, Schema schema) {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn() && fieldSpec.getFieldType() != FieldType.TIME) {
         String fieldName = fieldSpec.getName();
@@ -40,6 +44,14 @@ public class NullValueTransformer implements RecordTransformer {
           _defaultNullValues.put(fieldName, new Object[]{defaultNullValue});
         }
       }
+    }
+
+    if (tableConfig.getValidationConfig().isNullTimeColumnHandlingEnabled() && schema.getTimeFieldSpec() != null && schema.getTimeFieldSpec().getIncomingGranularitySpec() != null) {
+      _timeConverter = new TimeConverter(schema.getTimeFieldSpec().getIncomingGranularitySpec());
+      _timeColumnName = schema.getTimeFieldSpec().getName();
+    } else {
+      _timeConverter = null;
+      _timeColumnName = null;
     }
   }
 
@@ -52,6 +64,12 @@ public class NullValueTransformer implements RecordTransformer {
         record.putDefaultNullValue(fieldName, entry.getValue());
       }
     }
+
+    // handle null value in time column
+    if (_timeConverter != null && record.getValue(_timeColumnName) == null) {
+      record.putDefaultNullValue(_timeColumnName, _timeConverter.fromMillisSinceEpoch(System.currentTimeMillis()));
+    }
+
     return record;
   }
 }

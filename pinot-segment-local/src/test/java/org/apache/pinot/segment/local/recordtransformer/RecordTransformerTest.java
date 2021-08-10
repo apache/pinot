@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import java.sql.Timestamp;
 import java.util.Collections;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
@@ -28,6 +29,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
@@ -178,13 +180,34 @@ public class RecordTransformerTest {
 
   @Test
   public void testNullValueTransformer() {
-    RecordTransformer transformer = new NullValueTransformer(SCHEMA);
+    RecordTransformer transformer = new NullValueTransformer(TABLE_CONFIG, SCHEMA);
     GenericRow record = new GenericRow();
     for (int i = 0; i < NUM_ROUNDS; i++) {
       record = transformer.transform(record);
       assertNotNull(record);
       validateNullValueTransformerResult(record);
     }
+
+    // test null value handling for time column disabled by default.
+    String timeColumnName = "timeColumn";
+    Schema schemaWithTimeColumn = new Schema.SchemaBuilder()
+        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.SECONDS, timeColumnName), null).build();
+    record = new GenericRow();
+    transformer = new NullValueTransformer(TABLE_CONFIG, schemaWithTimeColumn);
+    record = transformer.transform(record);
+    assertNotNull(record);
+    assertNull(record.getValue(timeColumnName));
+    assertFalse(record.isNullValue(timeColumnName));
+
+    // test null value handling for time column enabled.
+    TableConfig tableConfigHandlingNullTimeColumn =
+      new TableConfigBuilder(TableType.REALTIME).setTableName("testTable").setNullTimeColumnHandlingEnabled(true).setTimeColumnName(timeColumnName).build();
+    record = new GenericRow();
+    transformer = new NullValueTransformer(tableConfigHandlingNullTimeColumn, schemaWithTimeColumn);
+    record = transformer.transform(record);
+    assertNotNull(record);
+    assertNotNull(record.getValue(timeColumnName));
+    assertTrue(record.isNullValue(timeColumnName));
   }
 
   private void validateNullValueTransformerResult(GenericRow record) {

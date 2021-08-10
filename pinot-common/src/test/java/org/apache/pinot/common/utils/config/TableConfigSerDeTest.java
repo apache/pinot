@@ -334,11 +334,30 @@ public class TableConfigSerDeTest {
       assertEquals(tunerConfigToCompare.getName(), name);
       assertEquals(tunerConfigToCompare.getTunerProperties(), props);
     }
+    {
+      // disable handling null value in time column
+      TableConfig tableConfig = tableConfigBuilder.setTimeColumnName("timeColumn").build();
+      checkNullTimeColumnHandlingEnabled(
+          JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class), false);
+      checkNullTimeColumnHandlingEnabled(
+          TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)), false);
+
+      // enable handling null value in time column
+      tableConfig = tableConfigBuilder.setNullTimeColumnHandlingEnabled(true).setTimeColumnName("timeColumn").build();
+      checkNullTimeColumnHandlingEnabled(
+          JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class), true);
+      checkNullTimeColumnHandlingEnabled(
+          TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)), true);
+    }
   }
 
   private void checkSegmentsValidationAndRetentionConfig(TableConfig tableConfig) {
     // TODO validate other fields of SegmentsValidationAndRetentionConfig.
     assertEquals(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme(), CommonConstants.HTTP_PROTOCOL);
+  }
+
+  private void checkNullTimeColumnHandlingEnabled(TableConfig tableConfig, boolean expected) {
+    assertEquals(tableConfig.getValidationConfig().isNullTimeColumnHandlingEnabled(), expected);
   }
 
   private void checkDefaultTableConfig(TableConfig tableConfig) {

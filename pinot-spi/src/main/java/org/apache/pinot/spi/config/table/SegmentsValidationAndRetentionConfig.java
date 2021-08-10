@@ -38,6 +38,8 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _schemaName;
   private String _timeColumnName;
   private TimeUnit _timeType;
+  // Flag to indicate if null value in time column should be handled.
+  private boolean _nullTimeColumnHandlingEnabled;
   private String _segmentAssignmentStrategy;
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
   private CompletionConfig _completionConfig;
@@ -75,6 +77,14 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
 
   public void setTimeType(String timeType) {
     _timeType = TimeUtils.timeUnitFromString(timeType);
+  }
+
+  public boolean isNullTimeColumnHandlingEnabled() {
+    return _nullTimeColumnHandlingEnabled;
+  }
+
+  public void setNullTimeColumnHandlingEnabled(boolean nullTimeColumnHandlingEnabled) {
+    _nullTimeColumnHandlingEnabled = nullTimeColumnHandlingEnabled;
   }
 
   public String getRetentionTimeUnit() {
