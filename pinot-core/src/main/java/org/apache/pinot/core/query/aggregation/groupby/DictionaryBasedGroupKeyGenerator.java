@@ -455,9 +455,10 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
     @Override
     public Iterator<GroupDictId> getGroupDictId () {
-      return new Iterator<GroupDictId>() {
+      return new Iterator<>() {
         private final Iterator<IntGroupIdMap.Entry> _iterator = _groupIdMap.iterator();
         private final GroupDictId _groupDictId = new GroupDictId();
+
         @Override
         public boolean hasNext() {
           return _iterator.hasNext();
@@ -720,10 +721,10 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
     @Override
     public Iterator<GroupDictId> getGroupDictId () {
-      return new Iterator<GroupDictId>() {
-        private final ObjectIterator<Long2IntMap.Entry> _iterator =
-            _groupIdMap.long2IntEntrySet().fastIterator();
+      return new Iterator<>() {
+        private final ObjectIterator<Long2IntMap.Entry> _iterator = _groupIdMap.long2IntEntrySet().fastIterator();
         private final GroupDictId _groupDictId = new GroupDictId();
+
         @Override
         public boolean hasNext() {
           return _iterator.hasNext();
@@ -744,6 +745,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       int[] dictIds = new int[_numGroupByExpressions];
       for (int i = 0; i < _numGroupByExpressions; i++) {
         int cardinality = _cardinalities[i];
+        // Decode dictIds
         dictIds[i] = (int) (rawKey % cardinality);
         rawKey /= cardinality;
       }
@@ -969,10 +971,11 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
     @Override
     public Iterator<GroupDictId> getGroupDictId () {
-      return new Iterator<GroupDictId>() {
+      return new Iterator<>() {
         private final ObjectIterator<Object2IntMap.Entry<IntArray>> _iterator =
             _groupIdMap.object2IntEntrySet().fastIterator();
         private final GroupDictId _groupDictId = new GroupDictId();
+
         @Override
         public boolean hasNext() {
           return _iterator.hasNext();

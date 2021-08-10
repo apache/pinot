@@ -287,25 +287,23 @@ public class GroupByTrimTest {
   public Object[][] QueryDataProviderForOnTheFlyTrim() {
     List<Object[]> data = new ArrayList<>();
     List<Pair<Double, Double>> expectedResult = computeExpectedResult();
-    // Testcase1: low limit + high trim size
+    // Testcase1: low trim threshold + high trim size
     QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 1 OPTION(minSegmentGroupTrimSize=100, minSegmentGroupTrimThreshold=200)");
-    int trimSize = 0;
-    int expectedSize = 100;
-    List<Pair<Double, Double>> top100 = expectedResult.subList(0, 100);
-    data.add(new Object[]{trimSize, top100, queryContext});
-    // Testcase2: high limit + low trim size
+        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 1 OPTION(minSegmentGroupTrimSize=1000, minSegmentGroupTrimThreshold=2000)");
+    int trimSize = 1000;
+    List<Pair<Double, Double>> top1000 = expectedResult.subList(0, 1000);
+    data.add(new Object[]{trimSize, top1000, queryContext});
+//    // Testcase2: high trim threshold + high trim size
 //    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-//        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50");
-//    trimSize = 10;
-//    expectedSize = max(trimSize, 5 * queryContext.getLimit());
-//    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
-//    // Testcase3: high limit + high trim size (No trim)
+//        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 5 OPTION(minSegmentGroupTrimSize=100, minSegmentGroupTrimThreshold=2000)");
+//    trimSize = 100;
+//    List<Pair<Double, Double>> top100 = expectedResult.subList(0, 100);
+//    data.add(new Object[]{trimSize, top100, queryContext});
+//    // Testcase3: super high trim threshold + high trim size
 //    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-//        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 500");
-//    trimSize = 1000;
-//    expectedSize = 1000;
-//    data.add(new Object[]{trimSize, expectedResult.subList(0, expectedSize), queryContext});
+//        "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50 OPTION(minSegmentGroupTrimSize=1000, minSegmentGroupTrimThreshold=200000)");
+//    trimSize = 10000;
+//    data.add(new Object[]{trimSize, expectedResult, queryContext});
 //
 //    // Testcase4: low limit + low server trim size + query option size
 //    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(

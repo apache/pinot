@@ -380,7 +380,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   }
 
   /**
-   * Iterator for {@link GroupKey}.
+   * Iterator for {@link GroupDictId}.
    */
   private class GroupDictIdIterator implements Iterator<GroupDictId> {
     private final ObjectIterator<Object2IntMap.Entry<FixedIntArray>> _iterator;

@@ -156,6 +156,7 @@ public class TableResizer {
       _dictionaries[i] = _orderByIndexArray[i] >= 0 ? dictionaries[_orderByIndexArray[i]] : null;
     }
 
+    // Comparator for segment trim
     _intermediateRecordComparator = (o1, o2) -> {
       for (int i = 0; i < _numOrderByExpressions; i++) {
         int result = comparators[i].compare(o1._values[i], o2._values[i]);
@@ -166,6 +167,7 @@ public class TableResizer {
       return 0;
     };
 
+    // comparator for on the fly trim
     _dictIdComparator = (o1, o2) -> {
       for (int i = 0; i < _numOrderByExpressions; i++) {
         int result;
@@ -370,6 +372,7 @@ public class TableResizer {
       // Iterate over keys
       GroupKeyGenerator.GroupDictId groupKey = groupKeyIterator.next();
       Object[] values = new Object[numColumns];
+      // For dictId cols, use dictIds, raw keys for fast access
       int[] dictIds = groupKey._dictIds;
       long rawKey = groupKey._rawKey;
       int groupId = groupKey._groupId;
@@ -392,6 +395,7 @@ public class TableResizer {
     while (groupKeyIterator.hasNext()) {
       // Iterate over keys
       GroupKeyGenerator.GroupDictId groupKey = groupKeyIterator.next();
+      // Use dictIds if possible
       Object[] keys = groupKey._keys;
       int groupId = groupKey._groupId;
       Object[] values = Arrays.copyOf(keys, numAggregationFunctions + _numGroupByExpressions);

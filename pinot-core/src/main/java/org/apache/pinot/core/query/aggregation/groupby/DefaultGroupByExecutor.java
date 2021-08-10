@@ -76,7 +76,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
    */
   public DefaultGroupByExecutor(AggregationFunction[] aggregationFunctions, ExpressionContext[] groupByExpressions,
       int maxInitialResultHolderCapacity, int numGroupsLimit, TransformOperator transformOperator,
-      TableResizer tableResizer, Map<String, String> queryOptions, boolean PQLQueryMode) {
+      TableResizer tableResizer, Map<String, String> queryOptions) {
     _aggregationFunctions = aggregationFunctions;
 
     boolean hasMVGroupByExpression = false;
@@ -104,13 +104,12 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     }
 
     _tableResizer = tableResizer;
-    // TODO: Add more checks here
     if (queryOptions != null) {
       Integer trimSize = QueryOptions.getMinSegmentGroupTrimSize(queryOptions);
       Integer threshold = QueryOptions.getMinSegmentGroupTrimThreshold(queryOptions);
       _onTheFlyTrimSize = trimSize != null ? trimSize : ON_THE_FLY_TRIM_SIZE;
       _onTheFlyTrimThreshold = threshold != null ? threshold : ON_THE_FLY_TRIM_THRESHOLD;
-      _onTheFlyTrimFlag = !PQLQueryMode && _onTheFlyTrimThreshold > 0 && _onTheFlyTrimSize > 0;
+      _onTheFlyTrimFlag = _onTheFlyTrimThreshold > 0 && _onTheFlyTrimSize > 0;
     } else {
       _onTheFlyTrimSize = -1;
       _onTheFlyTrimThreshold = -1;
@@ -155,11 +154,12 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       groupByResultHolder.ensureCapacity(capacityNeeded);
       aggregate(transformBlock, length, i);
     }
-
+    // No need to trim array type
     if (_onTheFlyTrimFlag && _groupKeyGenerator.getNumKeys() > _onTheFlyTrimThreshold
         && _groupKeyGenerator.getType() != GroupKeyGenerator.Type.DictArray) {
       PriorityQueue<DictIdRecord> pq;
       if (_hasNoDictionaryGroupByExpression) {
+        // Use Different trim function based on key gen type
         if (_numGroupByExpressions == 1) {
           pq = _tableResizer.trimNoDictSingleCol(_groupKeyGenerator, _groupByResultHolders, _onTheFlyTrimSize);
         } else {
@@ -170,11 +170,13 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       }
 
       _groupKeyGenerator.clearKeyHolder();
+      // Clear result holders
       for (int i = 0; i < numAggregationFunctions; i++) {
         GroupByResultHolder groupByResultHolder = _groupByResultHolders[i];
         groupByResultHolder.clearResultHolder(capacityNeeded);
       }
       for (DictIdRecord record : pq) {
+        // Get groupId
         int groupId = _groupKeyGenerator.getGroupId(record);
         for (int i = 0; i < numAggregationFunctions; i++) {
           Object value = record._record.getValues()[_numGroupByExpressions + i];

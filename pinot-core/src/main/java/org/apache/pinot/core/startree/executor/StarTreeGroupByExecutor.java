@@ -43,8 +43,8 @@ public class StarTreeGroupByExecutor extends DefaultGroupByExecutor {
   private final AggregationFunctionColumnPair[] _aggregationFunctionColumnPairs;
 
   public StarTreeGroupByExecutor(AggregationFunction[] aggregationFunctions, ExpressionContext[] groupByExpressions,
-      int maxInitialResultHolderCapacity, int numGroupsLimit, TransformOperator transformOperator, TableResizer tableResizer, Map<String, String> queryOptions, boolean PQLQueryMode) {
-    super(aggregationFunctions, groupByExpressions, maxInitialResultHolderCapacity, numGroupsLimit, transformOperator, tableResizer, queryOptions,  PQLQueryMode);
+      int maxInitialResultHolderCapacity, int numGroupsLimit, TransformOperator transformOperator, TableResizer tableResizer, Map<String, String> queryOptions) {
+    super(aggregationFunctions, groupByExpressions, maxInitialResultHolderCapacity, numGroupsLimit, transformOperator, tableResizer, queryOptions);
 
     int numAggregationFunctions = aggregationFunctions.length;
     _aggregationFunctionColumnPairs = new AggregationFunctionColumnPair[numAggregationFunctions];
