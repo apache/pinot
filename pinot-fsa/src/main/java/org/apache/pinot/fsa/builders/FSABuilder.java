@@ -207,6 +207,11 @@ public final class FSABuilder {
       serialized[p + ConstantArcSizeFSA.LABEL_OFFSET] = sequence[j++];
       setArcTarget(p, i == len ? ConstantArcSizeFSA.TERMINAL_STATE : activePath[i]);
 
+      //TODO: atri
+      int foo = i == len ? ConstantArcSizeFSA.TERMINAL_STATE : activePath[i];
+      System.out.println("CURRENT ARC " + p + " target " + foo);
+      //System.out.println("CURRENT ONE " + i + " value of seq " + j + " p " + p);
+
       outputSymbols.put(i, outputSymbol);
 
       nextArcOffset[i - 1] = p + ConstantArcSizeFSA.ARC_SIZE;

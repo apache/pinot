@@ -95,13 +95,14 @@ public class RegexpMatcher {
     }
 
     // Automaton start state and FST start node is added to the queue.
-    queue.add(new Path( _automaton.getInitialState(), _fst.getRootNode(), -1));
+    queue.add(new Path( _automaton.getInitialState(), _fst.getRootNode(), 0, -1));
 
 /*
     final FSA.Arc<Long> scratchArc = new FST.Arc<>();
     final FST.BytesReader fstReader = _fst.getBytesReader();
 
     Transition t = new Transition(); */
+
     Set<State> acceptStates = _automaton.getAcceptStates();
     while (queue.size() != 0) {
       final Path path = queue.remove(queue.size() - 1);
@@ -109,7 +110,10 @@ public class RegexpMatcher {
       // If automaton is in accept state and the fstNode is final (i.e. end node) then add the entry to endNodes which
       // contains the result set.
       if (acceptStates.contains(path.state)) {
-        if (_fst.isArcFinal(path.fstNodeArc)) {
+        if (_fst.isArcFinal(path.fstArc)) {
+          //TODO: atri
+          System.out.println("DOING IT " + path.fstArc + " " + path.node + " " + path.state);
+
           endNodes.add(path);
         }
       }
@@ -124,14 +128,20 @@ public class RegexpMatcher {
         final int max = t.max;
 
         if (min == max) {
-          int arc = _fst.getArc(path.fstNodeArc, (byte) t.min);
+          int arc = _fst.getArc(path.node, (byte) t.min);
+
+          //TODO: atri
+          System.out.println("ARC IS " + arc + " FOR ARC " + path.fstArc);
+
           if (arc != 0) {
-            queue.add(new Path(t.to, arc, _fst.getOutputSymbol(arc)));
+            //TODO: atri -- see why output symbols are missing and fix it
+            queue.add(new Path(t.to, _fst.getEndNode(arc), arc,-1));
           }
         } else {
-          int arc = _fst.getArc(path.fstNodeArc, (byte) min);
+          int arc = _fst.getArc(path.node, (byte) min);
           while (arc != 0 && _fst.getArcLabel(arc) <= max) {
-            queue.add(new Path(t.to, arc, _fst.getOutputSymbol(arc)));
+            //TODO: atri -- see why output symbols are missing and fix it
+            queue.add(new Path(t.to, _fst.getEndNode(arc), arc, -1));
             arc = _fst.getNextArc(arc);
           }
         }
@@ -161,12 +171,14 @@ public class RegexpMatcher {
 
   public static final class Path {
     public final State state;
-    public final int fstNodeArc;
+    public final int node;
+    public final int fstArc;
     public final int output;
 
-    public Path(State state, int fstNodeArc, int output) {
+    public Path(State state, int node, int fstArc, int output) {
       this.state = state;
-      this.fstNodeArc = fstNodeArc;
+      this.node = node;
+      this.fstArc = fstArc;
       this.output = output;
     }
   }
