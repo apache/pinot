@@ -57,6 +57,7 @@ public class RealtimeSegmentConfig {
   private final boolean _aggregateMetrics;
   private final boolean _nullHandlingEnabled;
   private final UpsertConfig.Mode _upsertMode;
+  private final UpsertConfig.HashFunction _hashFunction;
   private final String _upsertComparisonColumn;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final String _consumerDir;
@@ -69,7 +70,7 @@ public class RealtimeSegmentConfig {
       RealtimeSegmentZKMetadata realtimeSegmentZKMetadata, boolean offHeap, PinotDataBufferMemoryManager memoryManager,
       RealtimeSegmentStatsHistory statsHistory, String partitionColumn, PartitionFunction partitionFunction,
       int partitionId, boolean aggregateMetrics, boolean nullHandlingEnabled, String consumerDir,
-      UpsertConfig.Mode upsertMode, String upsertComparisonColumn,
+      UpsertConfig.Mode upsertMode, String upsertComparisonColumn, UpsertConfig.HashFunction hashFunction,
       PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
     _tableNameWithType = tableNameWithType;
     _segmentName = segmentName;
@@ -96,6 +97,7 @@ public class RealtimeSegmentConfig {
     _nullHandlingEnabled = nullHandlingEnabled;
     _consumerDir = consumerDir;
     _upsertMode = upsertMode != null ? upsertMode : UpsertConfig.Mode.NONE;
+    _hashFunction = hashFunction != null ? hashFunction : UpsertConfig.HashFunction.NONE;
     _upsertComparisonColumn = upsertComparisonColumn;
     _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
   }
@@ -205,6 +207,10 @@ public class RealtimeSegmentConfig {
     return _upsertMode;
   }
 
+  public UpsertConfig.HashFunction getHashFunction() {
+    return _hashFunction;
+  }
+
   public String getUpsertComparisonColumn() {
     return _upsertComparisonColumn;
   }
@@ -239,6 +245,7 @@ public class RealtimeSegmentConfig {
     private boolean _nullHandlingEnabled = false;
     private String _consumerDir;
     private UpsertConfig.Mode _upsertMode;
+    private UpsertConfig.HashFunction _hashFunction;
     private String _upsertComparisonColumn;
     private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
 
@@ -378,11 +385,16 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
+    public Builder setHashFunction(UpsertConfig.HashFunction hashFunction) {
+      _hashFunction = hashFunction;
+      return this;
+    }
+
     public Builder setUpsertComparisonColumn(String upsertComparisonColumn) {
       _upsertComparisonColumn = upsertComparisonColumn;
       return this;
     }
-    
+
     public Builder setPartitionUpsertMetadataManager(PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
       _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
       return this;
@@ -393,7 +405,8 @@ public class RealtimeSegmentConfig {
           _capacity, _avgNumMultiValues, _noDictionaryColumns, _varLengthDictionaryColumns, _invertedIndexColumns,
           _textIndexColumns, _fstIndexColumns, _jsonIndexColumns, _h3IndexConfigs, _realtimeSegmentZKMetadata, _offHeap,
           _memoryManager, _statsHistory, _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics,
-          _nullHandlingEnabled, _consumerDir, _upsertMode, _upsertComparisonColumn, _partitionUpsertMetadataManager);
+          _nullHandlingEnabled, _consumerDir, _upsertMode, _upsertComparisonColumn, _hashFunction,
+          _partitionUpsertMetadataManager);
     }
   }
 }
