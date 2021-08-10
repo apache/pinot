@@ -117,7 +117,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       HelixTaskResult result = new HelixTaskResult();
       _logger.info("Handling message: {}", _message);
       try {
-        acquireSema(_segmentName, LOGGER);
+        acquireSema(_segmentName, _logger);
         // The number of retry times depends on the retry count in Constants.
         _fetcherAndLoader.addOrReplaceOfflineSegment(_tableNameWithType, _segmentName);
         result.setSuccess(true);
@@ -132,9 +132,12 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
   }
 
   private class SegmentReloadMessageHandler extends DefaultMessageHandler {
+    private final boolean _forceDownload;
+
     SegmentReloadMessageHandler(SegmentReloadMessage segmentReloadMessage, ServerMetrics metrics,
         NotificationContext context) {
       super(segmentReloadMessage, metrics, context);
+      _forceDownload = segmentReloadMessage.shouldForceDownload();
     }
 
     @Override
@@ -145,13 +148,21 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       try {
         if (_segmentName.equals("")) {
           acquireSema("ALL", _logger);
-          // NOTE: the method aborts if any segment reload encounters an unhandled exception - can lead to inconsistent
-          // state across segments
-          _instanceDataManager.reloadAllSegments(_tableNameWithType);
+          // NOTE: the method aborts if any segment reload encounters an unhandled exception,
+          // and can lead to inconsistent state across segments
+          if (_forceDownload) {
+            _fetcherAndLoader.replaceAllOfflineSegments(_tableNameWithType);
+          } else {
+            _instanceDataManager.reloadAllSegments(_tableNameWithType);
+          }
         } else {
           // Reload one segment
           acquireSema(_segmentName, _logger);
-          _instanceDataManager.reloadSegment(_tableNameWithType, _segmentName);
+          if (_forceDownload) {
+            _fetcherAndLoader.addOrReplaceOfflineSegment(_tableNameWithType, _segmentName, true);
+          } else {
+            _instanceDataManager.reloadSegment(_tableNameWithType, _segmentName);
+          }
         }
         helixTaskResult.setSuccess(true);
       } catch (Throwable e) {

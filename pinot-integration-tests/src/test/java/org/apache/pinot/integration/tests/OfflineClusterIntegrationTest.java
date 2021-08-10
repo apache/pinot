@@ -35,6 +35,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.exception.QueryException;
@@ -327,16 +328,23 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testInvertedIndexTriggering()
       throws Exception {
     long numTotalDocs = getCountStarResult();
+    long tableSizeWithDefaultIndex = getTableSize(getTableName());
 
+    // Without index on DivActualElapsedTime, all docs are scanned at filtering stage.
     JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
     assertEquals(queryResponse.get("numEntriesScannedInFilter").asLong(), numTotalDocs);
 
-    // Update table config and trigger reload
+    // Update table config to add inverted index on DivActualElapsedTime column, and
+    // reload the table to get config change into effect and add the inverted index.
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setInvertedIndexColumns(UPDATED_INVERTED_INDEX_COLUMNS);
     updateTableConfig(tableConfig);
     reloadOfflineTable(getTableName());
 
+    // It takes a while to reload multiple segments, thus we retry the query for some time.
+    // After all segments are reloaded, the inverted index is added on DivActualElapsedTime.
+    // It's expected to have numEntriesScannedInFilter equal to 0, i.e. no docs is scanned
+    // at filtering stage when inverted index can answer the predicate directly.
     TestUtils.waitForCondition(aVoid -> {
       try {
         JsonNode queryResponse1 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
@@ -347,6 +355,60 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to generate inverted index");
+
+    long tableSizeWithNewIndex = getTableSize(getTableName());
+    assertTrue(tableSizeWithNewIndex > tableSizeWithDefaultIndex);
+
+    // Update table config to remove all inverted index.
+    tableConfig = getOfflineTableConfig();
+    tableConfig.getIndexingConfig().setInvertedIndexColumns(Collections.emptyList());
+    updateTableConfig(tableConfig);
+
+    // Reload table just disables those indices, not clean them physically.
+    reloadOfflineTable(getTableName());
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse2 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
+        // Total docs should not change during reload
+        assertEquals(queryResponse2.get("totalDocs").asLong(), numTotalDocs);
+        return queryResponse2.get("numEntriesScannedInFilter").asLong() == numTotalDocs;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to disable indices");
+    final long tableSizeAfterReload = getTableSize(getTableName());
+    assertEquals(tableSizeAfterReload, tableSizeWithNewIndex);
+
+    // Reload a single segment and force to download the segment,
+    // and we can expect disk usage drops a bit.
+    OfflineSegmentZKMetadata segmentZKMetadata = _helixResourceManager.getOfflineSegmentMetadata(getTableName()).get(0);
+    String segmentName = segmentZKMetadata.getSegmentName();
+    reloadOfflineSegment(getTableName(), segmentName, true);
+    AtomicLong tableSizeAfterDownloadSegment = new AtomicLong(0);
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse3 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
+        assertEquals(queryResponse3.get("totalDocs").asLong(), numTotalDocs);
+        tableSizeAfterDownloadSegment.set(getTableSize(getTableName()));
+        return tableSizeAfterDownloadSegment.longValue() < tableSizeWithNewIndex;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to clean up obsolete indices");
+
+    // Reload whole table and we can expect disk usage drops further.
+    reloadOfflineTable(getTableName(), true);
+    AtomicLong tableSizeAfterDownloadTable = new AtomicLong(0);
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse3 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
+        assertEquals(queryResponse3.get("totalDocs").asLong(), numTotalDocs);
+        tableSizeAfterDownloadTable.set(getTableSize(getTableName()));
+        return tableSizeAfterDownloadTable.longValue() < tableSizeAfterDownloadSegment.longValue();
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to clean up obsolete indices");
   }
 
   @Test

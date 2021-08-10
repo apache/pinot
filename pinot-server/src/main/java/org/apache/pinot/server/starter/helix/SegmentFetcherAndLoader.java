@@ -20,6 +20,7 @@ package org.apache.pinot.server.starter.helix;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.locks.Lock;
 import javax.annotation.Nullable;
@@ -71,13 +72,32 @@ public class SegmentFetcherAndLoader {
     PinotCrypterFactory.init(pinotCrypterConfig);
   }
 
+  public void replaceAllOfflineSegments(String tableNameWithType) {
+    LOGGER.info("Replacing all segments in table: {}", tableNameWithType);
+    List<SegmentMetadata> segMds = _instanceDataManager.getAllSegmentsMetadata(tableNameWithType);
+    for (SegmentMetadata segMd : segMds) {
+      addOrReplaceOfflineSegment(tableNameWithType, segMd.getName(), true);
+    }
+    LOGGER.info("Replaced all segments in table: {}", tableNameWithType);
+  }
+
   public void addOrReplaceOfflineSegment(String tableNameWithType, String segmentName) {
+    addOrReplaceOfflineSegment(tableNameWithType, segmentName, false);
+  }
+
+  /**
+   * Add a new segment or replace an existing segment for offline table. The method checks
+   * the local segment CRC with the one set in ZK by controller. If both equal, the method
+   * simply loads the local segment, otherwise it downloads the new segment then load. When
+   * forceDownload is set to true, the server always downloads the segment.
+   */
+  public void addOrReplaceOfflineSegment(String tableNameWithType, String segmentName, boolean forceDownload) {
     OfflineSegmentZKMetadata newSegmentZKMetadata = ZKMetadataProvider
         .getOfflineSegmentZKMetadata(_instanceDataManager.getPropertyStore(), tableNameWithType, segmentName);
     Preconditions.checkNotNull(newSegmentZKMetadata);
 
-    LOGGER.info("Adding or replacing segment {} for table {}, metadata {}", segmentName, tableNameWithType,
-        newSegmentZKMetadata);
+    LOGGER.info("Adding or replacing segment {} for table {}, metadata {}, downloadIsForced {}", segmentName,
+        tableNameWithType, newSegmentZKMetadata, forceDownload);
 
     // This method might modify the file on disk. Use segment lock to prevent race condition
     Lock segmentLock = SegmentLocks.getSegmentLock(tableNameWithType, segmentName);
@@ -108,7 +128,8 @@ public class SegmentFetcherAndLoader {
             localSegmentMetadata = null;
           }
           try {
-            if (!isNewSegmentMetadata(tableNameWithType, newSegmentZKMetadata, localSegmentMetadata)) {
+            if (!forceDownload && !isNewSegmentMetadata(tableNameWithType, newSegmentZKMetadata,
+                localSegmentMetadata)) {
               LOGGER.info("Segment metadata same as before, loading {} of table {} (crc {}) from disk", segmentName,
                   tableNameWithType, localSegmentMetadata.getCrc());
               _instanceDataManager.addOfflineSegment(tableNameWithType, segmentName, indexDir);
@@ -140,8 +161,10 @@ public class SegmentFetcherAndLoader {
       // If we get here, then either it is the case that we have the segment loaded in memory (and therefore present
       // in disk) or, we need to load from the server. In the former case, we still need to check if the metadata
       // that we have is different from that in zookeeper.
-      if (isNewSegmentMetadata(tableNameWithType, newSegmentZKMetadata, localSegmentMetadata)) {
-        if (localSegmentMetadata == null) {
+      if (forceDownload || isNewSegmentMetadata(tableNameWithType, newSegmentZKMetadata, localSegmentMetadata)) {
+        if (forceDownload) {
+          LOGGER.info("Force to download segment {} of table {} from controller.", segmentName, tableNameWithType);
+        } else if (localSegmentMetadata == null) {
           LOGGER.info("Loading new segment {} of table {} from controller", segmentName, tableNameWithType);
         } else {
           LOGGER.info("Trying to refresh segment {} of table {} with new data.", segmentName, tableNameWithType);
