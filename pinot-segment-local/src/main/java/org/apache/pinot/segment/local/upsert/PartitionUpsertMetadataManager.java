@@ -259,7 +259,6 @@ public class PartitionUpsertMetadataManager {
   }
 
   public static final class RecordInfo {
-    /** stores the primary key of the record or its hash value */
     private final PrimaryKey _primaryKey;
     private final int _docId;
     private final Comparable _comparisonValue;
