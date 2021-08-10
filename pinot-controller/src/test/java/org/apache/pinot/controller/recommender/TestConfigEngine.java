@@ -436,6 +436,13 @@ public class TestConfigEngine {
   }
 
   @Test
+  void testRealtimeProvisioningRule_highIngestionRate() throws Exception {
+    // Total memory for some of the options are greater than the provided max memory in a host.
+    // For those option, the returned values is "NA"
+    testRealtimeProvisioningRule("recommenderInput/RealtimeProvisioningInput_highIngestionRate.json");
+  }
+
+  @Test
   void testAggregateMetricsRule()
       throws Exception {
     ConfigManager output = runRecommenderDriver("recommenderInput/AggregateMetricsRuleInput.json");
