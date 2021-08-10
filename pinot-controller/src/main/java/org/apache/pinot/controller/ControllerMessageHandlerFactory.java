@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller;
 
-import java.util.List;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.messaging.handling.HelixTaskResult;
 import org.apache.helix.messaging.handling.MessageHandler;
@@ -45,7 +44,8 @@ public class ControllerMessageHandlerFactory implements MessageHandlerFactory {
   public MessageHandler createHandler(Message message, NotificationContext notificationContext) {
     String messageType = message.getMsgSubType();
     if (messageType.equals(RunPeriodicTaskMessage.RUN_PERIODIC_TASK_MSG_SUB_TYPE)) {
-      return new RunPeriodicTaskMessageHandler(new RunPeriodicTaskMessage(message), notificationContext, _periodicTaskScheduler);
+      return new RunPeriodicTaskMessageHandler(new RunPeriodicTaskMessage(message), notificationContext,
+          _periodicTaskScheduler);
     }
 
     LOGGER.warn("Unknown message type {} received by controller. ", messageType);
@@ -64,13 +64,14 @@ public class ControllerMessageHandlerFactory implements MessageHandlerFactory {
   /** Message handler for {@link RunPeriodicTaskMessage} message. */
   private static class RunPeriodicTaskMessageHandler extends MessageHandler {
     private final String _periodicTaskName;
-    private final List<String> _tableNamesWithType;
+    private final String _tableNameWithType;
     private final PeriodicTaskScheduler _periodicTaskScheduler;
 
-    RunPeriodicTaskMessageHandler(RunPeriodicTaskMessage message, NotificationContext context, PeriodicTaskScheduler periodicTaskScheduler) {
+    RunPeriodicTaskMessageHandler(RunPeriodicTaskMessage message, NotificationContext context,
+        PeriodicTaskScheduler periodicTaskScheduler) {
       super(message, context);
       _periodicTaskName = message.getPeriodicTaskName();
-      _tableNamesWithType = message.getTableNames();
+      _tableNameWithType = message.getTableNameWithType();
       _periodicTaskScheduler = periodicTaskScheduler;
     }
 
@@ -78,7 +79,7 @@ public class ControllerMessageHandlerFactory implements MessageHandlerFactory {
     public HelixTaskResult handleMessage()
         throws InterruptedException {
       LOGGER.info("Handling RunPeriodicTaskMessage by executing task {}", _periodicTaskName);
-      _periodicTaskScheduler.scheduleNow(_periodicTaskName, _tableNamesWithType);
+      _periodicTaskScheduler.scheduleNow(_periodicTaskName, _tableNameWithType);
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       helixTaskResult.setSuccess(true);
       return helixTaskResult;

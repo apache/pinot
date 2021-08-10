@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.periodictask;
 
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -54,16 +55,17 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
     _controllerMetrics = controllerMetrics;
   }
 
-  /** @param filters Table name against which task will be run. If null, then task is run against all tables. */
+  /** @param periodicTaskParameters Table name against which task will be run. If null, then task is run against all tables. */
   @Override
-  protected final void runTask(List<String> filters) {
+  protected final void runTask(@Nullable String periodicTaskParameters) {
     _controllerMetrics.addMeteredTableValue(_taskName, ControllerMeter.CONTROLLER_PERIODIC_TASK_RUN, 1L);
     try {
       // Process the tables that are managed by this controller
       List<String> tablesToProcess = new ArrayList<>();
       for (String tableNameWithType : _pinotHelixResourceManager.getAllTables()) {
-        if (_leadControllerManager.isLeaderForTable(tableNameWithType) && (filters == null || filters.size() == 0
-            || filters.contains(tableNameWithType))) {
+        // TODO: create method for checking if task satisfies table parameters.
+        if (_leadControllerManager.isLeaderForTable(tableNameWithType) && (periodicTaskParameters == null
+            || periodicTaskParameters.contains(tableNameWithType))) {
           tablesToProcess.add(tableNameWithType);
         }
       }

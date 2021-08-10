@@ -21,7 +21,6 @@ package org.apache.pinot.controller.api.resources;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
-import java.util.Arrays;
 import java.util.List;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
@@ -57,17 +56,18 @@ public class PinotControllerPeriodicTaskRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/run")
-  @ApiOperation(value = "Run a periodic task against the tables specified in comma-separated list of table names. Table names must be specified with type suffix. If no table name is specified, task will run against all tables.")
+  @ApiOperation(value = "Run a periodic task against specified table. If no table name is specified, task will run against all tables.")
   public boolean runPeriodicTask(
       @ApiParam(value = "Periodic task name", required = true) @QueryParam("taskname") String periodicTaskName,
-      @ApiParam(value = "Comma-separated list of table names with type suffix", example = "aTable_OFFLINE, bTable_REALTIME", required = false) @QueryParam("tablename") String tableNameWithType) {
+      @ApiParam(value = "Table name", required = false) @QueryParam("tablename") String tableName,
+      @ApiParam(value = "Table type suffix", required = false, example = "OFFLINE|REALTIME", defaultValue = "OFFLINE") @QueryParam("tabletype") String tableType) {
     if (!_periodicTaskScheduler.hasTask(periodicTaskName)) {
       throw new WebApplicationException("Periodic task '" + periodicTaskName + "' not found.",
           Response.Status.NOT_FOUND);
     }
 
     LOGGER.info("Sending periodic task execution message to all controllers for running task {} against {}.",
-        periodicTaskName, tableNameWithType != null ? " table '" + tableNameWithType + "'" : "all tables");
+        periodicTaskName, tableName != null ? " table '" + tableName + "'" : "all tables");
 
     // Create and send message to send to all controllers (including this one)
     Criteria recipientCriteria = new Criteria();
@@ -76,8 +76,8 @@ public class PinotControllerPeriodicTaskRestletResource {
     recipientCriteria.setSessionSpecific(true);
     recipientCriteria.setResource(CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
     recipientCriteria.setSelfExcluded(false);
-    RunPeriodicTaskMessage runPeriodicTaskMessage =
-        new RunPeriodicTaskMessage(periodicTaskName, Arrays.asList(tableNameWithType.trim().split("\\s*,\\s*")));
+    RunPeriodicTaskMessage runPeriodicTaskMessage = new RunPeriodicTaskMessage(periodicTaskName,
+        (tableName != null && tableName.length() > 0) ? tableName + "_" + tableType : null);
 
     ClusterMessagingService clusterMessagingService =
         _pinotHelixResourceManager.getHelixZkManager().getMessagingService();

@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.annotation.Nullable;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -46,7 +47,7 @@ public class PeriodicTaskSchedulerTest {
       }
 
       @Override
-      protected void runTask(List<String> filters) {
+      protected void runTask(@Nullable String periodicTaskParameters) {
         runCalled.set(true);
       }
 
@@ -84,7 +85,7 @@ public class PeriodicTaskSchedulerTest {
         }
 
         @Override
-        protected void runTask(List<String> filters) {
+        protected void runTask(@Nullable String periodicTaskParameters) {
           numTimesRunCalled.getAndIncrement();
         }
 
@@ -121,7 +122,7 @@ public class PeriodicTaskSchedulerTest {
     PeriodicTask task = new BasePeriodicTask("TestTask", 1L, 0L) {
       private volatile boolean isRunning = false;
       @Override
-      protected void runTask(List<String> filters) {
+      protected void runTask(@Nullable String periodicTaskParameters) {
         try {
           if (isRunning) {
             Assert.fail("More than one thread attempting to execute task at the same time.");
