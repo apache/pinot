@@ -21,10 +21,9 @@ package org.apache.pinot.broker.routing.segmentpreselector;
 import java.util.Set;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.common.lineage.LineageEntry;
-import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
+import org.apache.pinot.common.lineage.SegmentLineageUtils;
 
 
 /**
@@ -45,16 +44,7 @@ public class SegmentLineageBasedSegmentPreSelector implements SegmentPreSelector
   @Override
   public Set<String> preSelect(Set<String> onlineSegments) {
     SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, _tableNameWithType);
-    if (segmentLineage != null) {
-      for (String lineageEntryId : segmentLineage.getLineageEntryIds()) {
-        LineageEntry lineageEntry = segmentLineage.getLineageEntry(lineageEntryId);
-        if (lineageEntry.getState() == LineageEntryState.COMPLETED) {
-          onlineSegments.removeAll(lineageEntry.getSegmentsFrom());
-        } else {
-          onlineSegments.removeAll(lineageEntry.getSegmentsTo());
-        }
-      }
-    }
+    SegmentLineageUtils.filterSegmentsBasedOnLineageInplace(onlineSegments, segmentLineage);
     return onlineSegments;
   }
 }

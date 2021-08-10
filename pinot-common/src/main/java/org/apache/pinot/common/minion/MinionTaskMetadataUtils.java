@@ -52,17 +52,6 @@ public final class MinionTaskMetadataUtils {
   }
 
   /**
-   * Fetches the ZNRecord for MergeRollupTask for given tableNameWithType from MINION_TASK_METADATA/MergeRollupTask/tableNameWthType
-   * and converts it to a {@link MergeRollupTaskMetadata} object
-   */
-  @Nullable
-  public static MergeRollupTaskMetadata getMergeRollupTaskMetadata(
-      HelixPropertyStore<ZNRecord> propertyStore, String taskType, String tableNameWithType) {
-    ZNRecord znRecord = fetchMinionTaskMetadataZNRecord(propertyStore, taskType, tableNameWithType);
-    return znRecord != null ? MergeRollupTaskMetadata.fromZNRecord(znRecord) : null;
-  }
-
-  /**
    * Persists the provided {@link MergeRollupTaskMetadata} to MINION_TASK_METADATA/MergeRollupTask/tableNameWthType.
    * Will fail if expectedVersion does not match.
    * Set expectedVersion -1 to override version check.

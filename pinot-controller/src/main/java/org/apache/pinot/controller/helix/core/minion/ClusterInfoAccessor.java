@@ -22,9 +22,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.task.TaskState;
+import org.apache.pinot.common.lineage.SegmentLineage;
+import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -112,21 +115,33 @@ public class ClusterInfoAccessor {
   }
 
   /**
-   * Fetches the {@link MergeRollupTaskMetadata} from MINION_TASK_METADATA for given table
+   * Fetches the ZNRecord under MINION_TASK_METADATA/MergeRollupTask for the given tableNameWithType
    * @param tableNameWithType table name with type
    */
-  public MergeRollupTaskMetadata getMinionMergeRollupTaskMetadata(String tableNameWithType) {
-    return MinionTaskMetadataUtils.getMergeRollupTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
+  public ZNRecord getMinionMergeRollupTaskZNRecord(String tableNameWithType) {
+    return MinionTaskMetadataUtils.fetchMinionTaskMetadataZNRecord(_pinotHelixResourceManager.getPropertyStore(),
             MinionConstants.MergeRollupTask.TASK_TYPE, tableNameWithType);
+  }
+
+  /**
+   * Get the segment lineage for the given table name with type suffix.
+   *
+   * @param tableNameWithType Table name with type suffix
+   * @return Segment lineage
+   */
+  @Nullable
+  public SegmentLineage getSegmentLineage(String tableNameWithType) {
+    return SegmentLineageAccessHelper
+        .getSegmentLineage(_pinotHelixResourceManager.getPropertyStore(), tableNameWithType);
   }
 
   /**
    * Sets the {@link MergeRollupTaskMetadata} into MINION_TASK_METADATA
    * This call will override any previous metadata node
    */
-  public void setMergeRollupTaskMetadata(MergeRollupTaskMetadata mergeRollupTaskMetadata) {
+  public void setMergeRollupTaskMetadata(MergeRollupTaskMetadata mergeRollupTaskMetadata, int expectedVersion) {
     MinionTaskMetadataUtils.persistMergeRollupTaskMetadata(_pinotHelixResourceManager.getPropertyStore(),
-        MinionConstants.MergeRollupTask.TASK_TYPE, mergeRollupTaskMetadata, -1);
+        MinionConstants.MergeRollupTask.TASK_TYPE, mergeRollupTaskMetadata, expectedVersion);
   }
 
   /**
