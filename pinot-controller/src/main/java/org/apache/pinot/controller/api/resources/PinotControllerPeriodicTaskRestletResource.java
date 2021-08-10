@@ -57,10 +57,10 @@ public class PinotControllerPeriodicTaskRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/run")
-  @ApiOperation(value = "Run controller periodic task against the specified comma-separated list of table names with type suffix. If no table name is specified, task will run against all tables.")
+  @ApiOperation(value = "Run a periodic task against the tables specified in comma-separated list of table names. Table names must be specified with type suffix. If no table name is specified, task will run against all tables.")
   public boolean runPeriodicTask(
-      @ApiParam(value = "Periodic Task Name", required = true) @QueryParam("taskname") String periodicTaskName,
-      @ApiParam(value = "Table Name(s) (comma-separated list of table names with type suffix)", example = "oneTable_OFFLINE, twoTable_REALTIME", required = false) @QueryParam("tablename") String tableNameWithType) {
+      @ApiParam(value = "Periodic task name", required = true) @QueryParam("taskname") String periodicTaskName,
+      @ApiParam(value = "Comma-separated list of table names with type suffix", example = "aTable_OFFLINE, bTable_REALTIME", required = false) @QueryParam("tablename") String tableNameWithType) {
     if (!_periodicTaskScheduler.hasTask(periodicTaskName)) {
       throw new WebApplicationException("Periodic task '" + periodicTaskName + "' not found.",
           Response.Status.NOT_FOUND);
@@ -76,7 +76,8 @@ public class PinotControllerPeriodicTaskRestletResource {
     recipientCriteria.setSessionSpecific(true);
     recipientCriteria.setResource(CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
     recipientCriteria.setSelfExcluded(false);
-    RunPeriodicTaskMessage runPeriodicTaskMessage = new RunPeriodicTaskMessage(periodicTaskName, Arrays.asList(tableNameWithType.split(",")));
+    RunPeriodicTaskMessage runPeriodicTaskMessage =
+        new RunPeriodicTaskMessage(periodicTaskName, Arrays.asList(tableNameWithType.trim().split("\\s*,\\s*")));
 
     ClusterMessagingService clusterMessagingService =
         _pinotHelixResourceManager.getHelixZkManager().getMessagingService();

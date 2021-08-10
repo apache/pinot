@@ -61,7 +61,7 @@ public class ControllerMessageHandlerFactory implements MessageHandlerFactory {
   public void reset() {
   }
 
-  /** Message handler for "Run Periodic Task" message. */
+  /** Message handler for {@link RunPeriodicTaskMessage} message. */
   private static class RunPeriodicTaskMessageHandler extends MessageHandler {
     private final String _periodicTaskName;
     private final List<String> _tableNamesWithType;
