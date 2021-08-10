@@ -58,7 +58,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   protected final boolean _hasMVGroupByExpression;
   protected final int[] _svGroupKeys;
   protected final int[][] _mvGroupKeys;
-  protected final boolean _onTheFlyTrimFlag;
+  protected boolean _onTheFlyTrimFlag;
   protected final boolean _hasNoDictionaryGroupByExpression;
   protected final int _numGroupByExpressions;
   protected final TableResizer _tableResizer;
@@ -102,22 +102,19 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       _groupKeyGenerator = new DictionaryBasedGroupKeyGenerator(transformOperator, groupByExpressions, numGroupsLimit,
           maxInitialResultHolderCapacity);
     }
-    _onTheFlyTrimFlag = !PQLQueryMode;
+
     _tableResizer = tableResizer;
     // TODO: Add more checks here
-    if (_onTheFlyTrimFlag) {
-      if (queryOptions != null) {
-        Integer trimSize = QueryOptions.getMinSegmentGroupTrimSize(queryOptions);
-        Integer threshold = QueryOptions.getMinSegmentGroupTrimThreshold(queryOptions);
-        _onTheFlyTrimSize = trimSize != null ? trimSize : ON_THE_FLY_TRIM_SIZE;
-        _onTheFlyTrimThreshold = threshold != null ? threshold : ON_THE_FLY_TRIM_THRESHOLD;
-      } else {
-        _onTheFlyTrimSize = -1;
-        _onTheFlyTrimThreshold = -1;
-      }
+    if (queryOptions != null) {
+      Integer trimSize = QueryOptions.getMinSegmentGroupTrimSize(queryOptions);
+      Integer threshold = QueryOptions.getMinSegmentGroupTrimThreshold(queryOptions);
+      _onTheFlyTrimSize = trimSize != null ? trimSize : ON_THE_FLY_TRIM_SIZE;
+      _onTheFlyTrimThreshold = threshold != null ? threshold : ON_THE_FLY_TRIM_THRESHOLD;
+      _onTheFlyTrimFlag = !PQLQueryMode && _onTheFlyTrimThreshold > 0 && _onTheFlyTrimSize > 0;
     } else {
       _onTheFlyTrimSize = -1;
       _onTheFlyTrimThreshold = -1;
+      _onTheFlyTrimFlag = false;
     }
 
     // Initialize result holders
