@@ -266,6 +266,13 @@ public final class FSA5 extends FSA {
 
   @Override
   public int getOutputSymbol(int arc) {
+    //todo: atri
+    if (outputSymbols.get(arc) != null) {
+      System.out.println("NOT NULL " + arc);
+    } else {
+      System.out.println("NULL " + arc);
+    }
+
     return outputSymbols.get(arc);
   }
 

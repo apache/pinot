@@ -21,18 +21,19 @@ package org.apache.pinot.fsa.utils;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 
+import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.fsa.FSA;
 import org.apache.pinot.fsa.FSATraversal;
 import org.apache.pinot.fsa.automaton.Automaton;
 import org.apache.pinot.fsa.automaton.CharacterRunAutomaton;
 import org.apache.pinot.fsa.automaton.RegExp;
-import org.apache.pinot.fsa.automaton.RunAutomaton;
 import org.apache.pinot.fsa.automaton.State;
 import org.apache.pinot.fsa.automaton.Transition;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -44,19 +45,15 @@ import org.slf4j.LoggerFactory;
  *   match(input) Function builds the automaton and matches given input.
  */
 public class RegexpMatcher {
-  public static final Logger LOGGER = LoggerFactory.getLogger(FSTBuilder.class);
-
   private final String _regexQuery;
   private final FSA _fst;
-  private final RunAutomaton _automaton;
+  private final Automaton _automaton;
 
   public RegexpMatcher(String regexQuery, FSA fst) {
     _regexQuery = regexQuery;
     _fst = fst;
 
-    Automaton tempAutomaton = new RegExp(_regexQuery).toAutomaton();
-
-    _automaton = new RunAutomaton((tempAutomaton));
+    _automaton = new RegExp(_regexQuery).toAutomaton();
   }
 
   public static List<Long> regexMatch(String regexQuery, FSA fst)
@@ -89,59 +86,53 @@ public class RegexpMatcher {
    */
   public List<Long> regexMatchOnFST()
       throws IOException {
-    final List<Path<Long>> queue = new ArrayList<>();
-    final List<Path<Long>> endNodes = new ArrayList<>();
+    final List<Path> queue = new ArrayList<>();
+    final List<Path> endNodes = new ArrayList<>();
     final FSATraversal matcher = new FSATraversal(_fst);
 
-    if (_automaton.getSize() == 0) {
+    if (_automaton.getNumberOfStates() == 0) {
       return Collections.emptyList();
     }
 
     // Automaton start state and FST start node is added to the queue.
-    queue.add(new Path<>(_fst.getFirstArc(_fst.getRootNode()), _automaton.getInitialState(), IntsRefBuilder input);
+    queue.add(new Path( _automaton.getInitialState(), _fst.getRootNode(), -1));
 
-
+/*
     final FSA.Arc<Long> scratchArc = new FST.Arc<>();
     final FST.BytesReader fstReader = _fst.getBytesReader();
 
-    Transition t = new Transition();
+    Transition t = new Transition(); */
+    Set<State> acceptStates = _automaton.getAcceptStates();
     while (queue.size() != 0) {
-      final Path<Long> path = queue.remove(queue.size() - 1);
+      final Path path = queue.remove(queue.size() - 1);
 
       // If automaton is in accept state and the fstNode is final (i.e. end node) then add the entry to endNodes which
       // contains the result set.
-      if (_automaton.isAccept(path.state)) {
-        if (path.fstNodeArc.isFinal()) {
+      if (acceptStates.contains(path.state)) {
+        if (_fst.isArcFinal(path.fstNodeArc)) {
           endNodes.add(path);
         }
       }
 
-      // Gather next set of transitions on automaton and find target nodes in FST.
-      IntsRefBuilder currentInput = path.input;
-      int count = _automaton.initTransition(path.state, t);
-      for (int i = 0; i < count; i++) {
-        _automaton.getNextTransition(t);
+      Set<Transition> stateTransitions = path.state.getTransitions();
+      Iterator<Transition> iterator = stateTransitions.iterator();
+
+      while (iterator.hasNext()){
+        Transition t = iterator.next();
+
         final int min = t.min;
         final int max = t.max;
+
         if (min == max) {
-          final FST.Arc<Long> nextArc = _fst.findTargetArc(t.min, path.fstNodeArc, scratchArc, fstReader);
-          if (nextArc != null) {
-            final IntsRefBuilder newInput = new IntsRefBuilder();
-            newInput.copyInts(currentInput.get());
-            newInput.append(t.min);
-            queue.add(new Path<Long>(t.dest, new FST.Arc<Long>().copyFrom(nextArc),
-                _fst.outputs.add(path.output, nextArc.output), newInput));
+          int arc = _fst.getArc(path.fstNodeArc, (byte) t.min);
+          if (arc != 0) {
+            queue.add(new Path(t.to, arc, _fst.getOutputSymbol(arc)));
           }
         } else {
-          FST.Arc<Long> nextArc = Util.readCeilArc(min, _fst, path.fstNodeArc, scratchArc, fstReader);
-          while (nextArc != null && nextArc.label <= max) {
-            final IntsRefBuilder newInput = new IntsRefBuilder();
-            newInput.copyInts(currentInput.get());
-            newInput.append(nextArc.label);
-            queue.add(
-                new Path<>(t.dest, new FST.Arc<Long>().copyFrom(nextArc), _fst.outputs.add(path.output, nextArc.output),
-                    newInput));
-            nextArc = nextArc.isLast() ? null : _fst.readNextRealArc(nextArc, fstReader);
+          int arc = _fst.getArc(path.fstNodeArc, (byte) min);
+          while (arc != 0 && _fst.getArcLabel(arc) <= max) {
+            queue.add(new Path(t.to, arc, _fst.getOutputSymbol(arc)));
+            arc = _fst.getNextArc(arc);
           }
         }
       }
@@ -149,23 +140,34 @@ public class RegexpMatcher {
 
     // From the result set of matched entries gather the values stored and return.
     ArrayList<Long> matchedIds = new ArrayList<>();
-    for (Path<Long> path : endNodes) {
-      matchedIds.add(path.output);
+    for (Path path : endNodes) {
+      matchedIds.add(new Long(path.output));
     }
+
     return matchedIds;
   }
 
-  public static final class Path<T> {
+  /**
+  private Map<Integer, State> getStateMap(Set<State> states) {
+    Map<Integer, State> stateMap = new HashMap<>();
+    Iterator iterator = states.iterator();
+
+    while (iterator.hasNext()) {
+      State state = (State) iterator.next();
+
+      stateMap.put(state.)
+    }
+  }*/
+
+  public static final class Path {
     public final State state;
     public final int fstNodeArc;
-    public final T output;
-    public final IntsRefBuilder input;
+    public final int output;
 
-    public Path(State state, int fstNodeArc, T output, IntsRefBuilder input) {
+    public Path(State state, int fstNodeArc, int output) {
       this.state = state;
       this.fstNodeArc = fstNodeArc;
       this.output = output;
-      this.input = input;
     }
   }
 }

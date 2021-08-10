@@ -154,7 +154,7 @@ final class ConstantArcSizeFSA extends FSA {
     return getArcTarget(arc) == 0;
   }
 
-  private boolean isArcLast(int arc) {
+  public boolean isArcLast(int arc) {
     return (data[arc + FLAGS_OFFSET] & BIT_ARC_LAST) != 0;
   }
 

@@ -349,6 +349,8 @@ public abstract class FSA implements Iterable<ByteBuffer> {
     return hashMap;
   }
 
+  public abstract boolean isArcLast(int arc);
+
   /** Private recursion. */
   private void visitInPreOrder(StateVisitor v, int node, BitSet visited) {
     if (visited.get(node)) {
@@ -413,12 +415,17 @@ public abstract class FSA implements Iterable<ByteBuffer> {
    *           invalid or the class of the automaton read from the input stream
    *           is not assignable to <code>clazz</code>.
    */
-  public static <T extends FSA> T read(InputStream stream, Class<? extends T> clazz) throws IOException {
-    FSA fsa = read(stream, false);
+  public static <T extends FSA> T read(InputStream stream, Class<? extends T> clazz,
+      boolean hasOutputSymbols) throws IOException {
+    FSA fsa = read(stream, hasOutputSymbols);
     if (!clazz.isInstance(fsa)) {
       throw new IOException(String.format(Locale.ROOT, "Expected FSA type %s, but read an incompatible type %s.",
           clazz.getName(), fsa.getClass().getName()));
     }
     return clazz.cast(fsa);
+  }
+
+  public static <T extends FSA> T read(InputStream stream, Class<? extends T> clazz) throws IOException {
+    return read(stream, clazz, false);
   }
 }

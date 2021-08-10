@@ -35,10 +35,10 @@ public class Transition implements Serializable, Cloneable {
 	 * CLASS INVARIANT: min<=max
 	 */
 	
-	char min;
-	char max;
+	public  char min;
+	public char max;
 	
-	State to;
+	public State to;
 	
 	/** 
 	 * Constructs a new singleton interval transition. 

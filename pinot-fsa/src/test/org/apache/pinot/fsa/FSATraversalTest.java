@@ -33,8 +33,10 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashSet;
 
+import java.util.List;
 import org.apache.pinot.fsa.builders.FSA5Serializer;
 import org.apache.pinot.fsa.builders.FSABuilder;
+import org.apache.pinot.fsa.utils.RegexpMatcher;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -185,6 +187,35 @@ public final class FSATraversalTest extends TestBase {
     m = traversalHelper.match("ab".getBytes());
     assertEquals(SEQUENCE_IS_A_PREFIX, m.kind);
     assertEquals(new HashSet<String>(Arrays.asList("a")), suffixes(fsa, m.node));
+  }
+
+  @Test
+  public void testRegexMatcher() throws IOException {
+    byte[][] input = new byte[1][20];
+
+    input[0] = "hello".getBytes();
+    //input[1] = "hello-world123".getBytes();
+    //input[2] = "still".getBytes();
+
+    Arrays.sort(input, FSABuilder.LEXICAL_ORDERING);
+    FSA s = FSABuilder.build(input, new int[] {12, 21, 123});
+
+    final FSATraversal traversalHelper = new FSATraversal(fsa);
+
+    //MatchResult m = traversalHelper.match("hello-world123".getBytes());
+    //assertEquals(AUTOMATON_HAS_PREFIX, m.kind);
+
+    final byte[] fsaData =
+        new FSA5Serializer().withNumbers()
+            .serialize(s, new ByteArrayOutputStream())
+            .toByteArray();
+
+    final FSA5 fsa = FSA.read(new ByteArrayInputStream(fsaData), FSA5.class, true);
+
+    List<Long> results = RegexpMatcher.regexMatch("hel.*", fsa);
+
+    //System.out.println(results);
+    int i = 0;
   }
 
   /**
