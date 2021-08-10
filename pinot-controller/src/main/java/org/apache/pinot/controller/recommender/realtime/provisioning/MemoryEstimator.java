@@ -70,7 +70,7 @@ import org.slf4j.LoggerFactory;
  */
 public class MemoryEstimator {
 
-  private static final String NOT_APPLICABLE = "NA";
+  public static final String NOT_APPLICABLE = "NA";
   private static final String STATS_FILE_NAME = "stats.ser";
   private static final String STATS_FILE_COPY_NAME = "stats.copy.ser";
 

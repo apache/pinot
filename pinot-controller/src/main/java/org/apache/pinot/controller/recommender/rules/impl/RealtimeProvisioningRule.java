@@ -43,6 +43,8 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 
+import static org.apache.pinot.controller.recommender.realtime.provisioning.MemoryEstimator.NOT_APPLICABLE;
+
 
 /**
  * This rule gives some recommendations useful for provisioning real time tables. Specifically it provides some
@@ -132,7 +134,7 @@ public class RealtimeProvisioningRule extends AbstractRule {
     Map<String, String> segmentSizes = makeMatrix(memoryEstimator.getOptimalSegmentSize(), numHosts, numHours);
     Map<String, String> consumingMemory = makeMatrix(memoryEstimator.getConsumingMemoryPerHost(), numHosts, numHours);
     Map<String, String> totalMemory = makeMatrix(memoryEstimator.getActiveMemoryPerHost(), numHosts, numHours,
-        element -> element.substring(0, element.indexOf('/'))); // take the first number (eg: 48G/48G)
+        element -> element.equals(NOT_APPLICABLE) ? element : element.substring(0, element.indexOf('/'))); // take the first number (eg: 48G/48G)
     rtProvRecommendations.put(OPTIMAL_SEGMENT_SIZE, segmentSizes);
     rtProvRecommendations.put(CONSUMING_MEMORY_PER_HOST, consumingMemory);
     rtProvRecommendations.put(TOTAL_MEMORY_USED_PER_HOST, totalMemory);
