@@ -193,8 +193,8 @@ public final class TableConfigUtils {
       }
     }
 
-    if (validationConfig.isNullTimeColumnHandlingEnabled()) {
-      Preconditions.checkState(timeColumnName != null && !timeColumnName.isEmpty(), "'timeColumnName' should exist if null handling for time column is enabled");
+    if (validationConfig.isAllowNullTimeValue()) {
+      Preconditions.checkState(timeColumnName != null && !timeColumnName.isEmpty(), "'timeColumnName' should exist if null time value is allowed");
     }
 
     validateRetentionConfig(tableConfig);

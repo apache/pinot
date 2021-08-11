@@ -64,7 +64,7 @@ public class TableConfigBuilder {
   private String _numReplicas = DEFAULT_NUM_REPLICAS;
   private String _timeColumnName;
   private String _timeType;
-  private boolean _nullTimeColumnHandlingEnabled;
+  private boolean _allowNullTimeValue;
   private String _retentionTimeUnit;
   private String _retentionTimeValue;
   @Deprecated
@@ -153,8 +153,8 @@ public class TableConfigBuilder {
     return this;
   }
 
-  public TableConfigBuilder setNullTimeColumnHandlingEnabled(boolean nullTimeColumnHandlingEnabled) {
-    _nullTimeColumnHandlingEnabled = nullTimeColumnHandlingEnabled;
+  public TableConfigBuilder setAllowNullTimeValue(boolean allowNullTimeValue) {
+    _allowNullTimeValue = allowNullTimeValue;
     return this;
   }
 
@@ -370,7 +370,7 @@ public class TableConfigBuilder {
     SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
     validationConfig.setTimeColumnName(_timeColumnName);
     validationConfig.setTimeType(_timeType);
-    validationConfig.setNullTimeColumnHandlingEnabled(_nullTimeColumnHandlingEnabled);
+    validationConfig.setAllowNullTimeValue(_allowNullTimeValue);
     validationConfig.setRetentionTimeUnit(_retentionTimeUnit);
     validationConfig.setRetentionTimeValue(_retentionTimeValue);
     validationConfig.setSegmentPushFrequency(_segmentPushFrequency);

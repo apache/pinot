@@ -46,7 +46,7 @@ public class NullValueTransformer implements RecordTransformer {
       }
     }
 
-    if (tableConfig.getValidationConfig().isNullTimeColumnHandlingEnabled() && schema.getTimeFieldSpec() != null && schema.getTimeFieldSpec().getIncomingGranularitySpec() != null) {
+    if (tableConfig.getValidationConfig().isAllowNullTimeValue() && schema.getTimeFieldSpec() != null && schema.getTimeFieldSpec().getIncomingGranularitySpec() != null) {
       _timeConverter = new TimeConverter(schema.getTimeFieldSpec().getIncomingGranularitySpec());
       _timeColumnName = schema.getTimeFieldSpec().getName();
     } else {

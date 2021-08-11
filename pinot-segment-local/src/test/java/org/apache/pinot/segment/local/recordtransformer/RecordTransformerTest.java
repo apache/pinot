@@ -201,7 +201,7 @@ public class RecordTransformerTest {
 
     // test null value handling for time column enabled.
     TableConfig tableConfigHandlingNullTimeColumn =
-      new TableConfigBuilder(TableType.REALTIME).setTableName("testTable").setNullTimeColumnHandlingEnabled(true).setTimeColumnName(timeColumnName).build();
+      new TableConfigBuilder(TableType.REALTIME).setTableName("testTable").setAllowNullTimeValue(true).setTimeColumnName(timeColumnName).build();
     record = new GenericRow();
     transformer = new NullValueTransformer(tableConfigHandlingNullTimeColumn, schemaWithTimeColumn);
     record = transformer.transform(record);
