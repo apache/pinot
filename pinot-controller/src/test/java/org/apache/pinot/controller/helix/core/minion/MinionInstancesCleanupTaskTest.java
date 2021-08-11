@@ -38,22 +38,22 @@ public class MinionInstancesCleanupTaskTest extends ControllerTest {
   public void testMinionInstancesCleanupTask()
       throws Exception {
     MinionInstancesCleanupTask minionInstancesCleanupTask = _controllerStarter.getMinionInstancesCleanupTask();
-    minionInstancesCleanupTask.runTask(null);
+    minionInstancesCleanupTask.runTask();
     Assert.assertEquals(
         _controllerStarter.getControllerMetrics().getValueOfGlobalGauge(ControllerGauge.DROPPED_MINION_INSTANCES), 0);
     addFakeMinionInstancesToAutoJoinHelixCluster(3);
     Assert.assertEquals(
         _controllerStarter.getControllerMetrics().getValueOfGlobalGauge(ControllerGauge.DROPPED_MINION_INSTANCES), 0);
     stopFakeInstance("Minion_localhost_0");
-    minionInstancesCleanupTask.runTask(null);
+    minionInstancesCleanupTask.runTask();
     Assert.assertEquals(
         _controllerStarter.getControllerMetrics().getValueOfGlobalGauge(ControllerGauge.DROPPED_MINION_INSTANCES), 1);
     stopFakeInstance("Minion_localhost_1");
-    minionInstancesCleanupTask.runTask(null);
+    minionInstancesCleanupTask.runTask();
     Assert.assertEquals(
         _controllerStarter.getControllerMetrics().getValueOfGlobalGauge(ControllerGauge.DROPPED_MINION_INSTANCES), 2);
     stopFakeInstance("Minion_localhost_2");
-    minionInstancesCleanupTask.runTask(null);
+    minionInstancesCleanupTask.runTask();
     Assert.assertEquals(
         _controllerStarter.getControllerMetrics().getValueOfGlobalGauge(ControllerGauge.DROPPED_MINION_INSTANCES), 3);
   }

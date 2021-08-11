@@ -20,7 +20,6 @@ package org.apache.pinot.controller.helix.core.minion;
 
 import java.util.List;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -59,11 +58,8 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
     _leadControllerManager = leadControllerManager;
   }
 
-  /**
-   * @param periodicTaskParameters Currently not used, but can be used to specify how this task should be run.
-   */
   @Override
-  protected final void runTask(@Nullable String periodicTaskParameters) {
+  protected final void runTask() {
     // Make it so that only one controller returns the metric for all the tasks.
     if (!_leadControllerManager.isLeaderForTable(TASK_NAME)) {
       return;

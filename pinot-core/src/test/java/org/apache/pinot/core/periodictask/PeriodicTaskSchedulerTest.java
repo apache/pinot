@@ -23,7 +23,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import javax.annotation.Nullable;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -47,7 +46,7 @@ public class PeriodicTaskSchedulerTest {
       }
 
       @Override
-      protected void runTask(@Nullable String periodicTaskParameters) {
+      protected void runTask() {
         runCalled.set(true);
       }
 
@@ -85,7 +84,7 @@ public class PeriodicTaskSchedulerTest {
         }
 
         @Override
-        protected void runTask(@Nullable String periodicTaskParameters) {
+        protected void runTask() {
           numTimesRunCalled.getAndIncrement();
         }
 
@@ -122,7 +121,7 @@ public class PeriodicTaskSchedulerTest {
     PeriodicTask task = new BasePeriodicTask("TestTask", 1L, 0L) {
       private volatile boolean isRunning = false;
       @Override
-      protected void runTask(@Nullable String periodicTaskParameters) {
+      protected void runTask() {
         try {
           if (isRunning) {
             Assert.fail("More than one thread attempting to execute task at the same time.");
@@ -177,7 +176,7 @@ public class PeriodicTaskSchedulerTest {
     // Confirm that only some of the "execute" threads could run their task.
     Assert.assertTrue(counter.get() > 0);
 
-    // A named task can exuecte only once at any given time hence it won't be possible for all threads to execute the
+    // A named task can execute only once at any given time hence it won't be possible for all threads to execute the
     // same task in the available time.
     Assert.assertTrue(attempts.get() > counter.get());
   }

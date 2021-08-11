@@ -20,7 +20,6 @@ package org.apache.pinot.controller.helix.core.minion;
 
 import java.util.ArrayList;
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -55,11 +54,8 @@ public class MinionInstancesCleanupTask extends BasePeriodicTask {
         controllerConf.getMinionInstancesCleanupTaskMinOfflineTimeBeforeDeletionInSeconds() * 1000L;
   }
 
-  /**
-   * @param periodicTaskParameters Currently not used, but can be used to specify how this task should be run.
-   */
   @Override
-  protected void runTask(@Nullable String periodicTaskParameters) {
+  protected void runTask() {
     // Make it so that only one controller is responsible for cleaning up minion instances.
     if (!_leadControllerManager.isLeaderForTable(TASK_NAME)) {
       return;

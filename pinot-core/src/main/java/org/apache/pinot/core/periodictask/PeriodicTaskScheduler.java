@@ -20,6 +20,7 @@ package org.apache.pinot.core.periodictask;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -29,7 +30,8 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Periodic task scheduler will schedule a list of tasks based on their initial delay time and interval time.
+ * Periodic task scheduler will schedule a list of tasks based on their initial delay time and interval time. Tasks
+ * can also scheduled of immediate execution by calling the scheduleNow() method.
  */
 public class PeriodicTaskScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(PeriodicTaskScheduler.class);
@@ -140,11 +142,8 @@ public class PeriodicTaskScheduler {
     return null;
   }
 
-  /**
-   * Execute specified {@link PeriodicTask} immediately. If the task is already running, wait for the running task
-   * to finish before executing the task again.
-   */
-  public void scheduleNow(String periodicTaskName, @Nullable String tableNameWithType) {
+  /** Execute specified {@link PeriodicTask} immediately. */
+  public void scheduleNow(String periodicTaskName, @Nullable Properties periodicTaskProperties) {
     // Each controller may have a slightly different list of periodic tasks if we add, remove, or rename periodic
     // task. To avoid this situation, we check again (besides the check at controller API level) whether the
     // periodic task exists.
@@ -156,9 +155,10 @@ public class PeriodicTaskScheduler {
     LOGGER.info("Immediately executing periodic task {}", periodicTaskName);
     _executorService.schedule(() -> {
       try {
-        // To prevent thread conflict, this call will block if the same task is already running (see
-        // BasePeriodicTask.run method).
-        periodicTask.run(tableNameWithType);
+        // Run the periodic task using the specified parameters. The call to run() method will block if another thread
+        // (the periodic execution thread or another thread calling this method) is already in the process of
+        // running the same task.
+        periodicTask.run(periodicTaskProperties);
       } catch (Throwable t) {
         // catch all errors to prevent subsequent executions from being silently suppressed
         // Ref: https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ScheduledExecutorService.html#scheduleWithFixedDelay-java.lang.Runnable-long-long-java.util.concurrent.TimeUnit-

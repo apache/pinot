@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller;
 
+import java.util.Properties;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.messaging.handling.HelixTaskResult;
 import org.apache.helix.messaging.handling.MessageHandler;
@@ -79,7 +80,7 @@ public class ControllerMessageHandlerFactory implements MessageHandlerFactory {
     public HelixTaskResult handleMessage()
         throws InterruptedException {
       LOGGER.info("Handling RunPeriodicTaskMessage by executing task {}", _periodicTaskName);
-      _periodicTaskScheduler.scheduleNow(_periodicTaskName, _tableNameWithType);
+      _periodicTaskScheduler.scheduleNow(_periodicTaskName, createTaskProperties(_tableNameWithType));
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       helixTaskResult.setSuccess(true);
       return helixTaskResult;
@@ -88,6 +89,12 @@ public class ControllerMessageHandlerFactory implements MessageHandlerFactory {
     @Override
     public void onError(Exception e, ErrorCode errorCode, ErrorType errorType) {
       LOGGER.error("Message handling error.", e);
+    }
+
+    private static Properties createTaskProperties(String tableNameWithType) {
+      Properties periodicTaskParameters = new Properties();
+      periodicTaskParameters.setProperty("tablename", tableNameWithType);
+      return periodicTaskParameters;
     }
   }
 }

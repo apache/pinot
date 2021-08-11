@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.periodictask;
 
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import javax.annotation.Nullable;
@@ -44,8 +45,8 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   private volatile boolean _started;
   private volatile boolean _running;
 
-  // A string passed to tasks being run that dictates how the task will be run. null by default.
-  private String _activePeriodicTaskParameters;
+  // Properties that task may use during execution. null by default.
+  protected Properties _activePeriodicTaskProperties;
 
   public BasePeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds) {
     _taskName = taskName;
@@ -53,8 +54,8 @@ public abstract class BasePeriodicTask implements PeriodicTask {
     _initialDelayInSeconds = initialDelayInSeconds;
     _runLock = new ReentrantLock();
 
-    // Periodic task parameters are null by default since they are currently used only for manual execution of tasks
-    _activePeriodicTaskParameters = null;
+    // Periodic task parameters are null by default since they are currently used only when tasks are executed manually.
+    _activePeriodicTaskProperties = null;
   }
 
   @Override
@@ -134,7 +135,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
         long startTime = System.currentTimeMillis();
         LOGGER.info("Start running task: {}", _taskName);
         try {
-          runTask(_activePeriodicTaskParameters);
+          runTask();
         } catch (Exception e) {
           LOGGER.error("Caught exception while running task: {}", _taskName, e);
         }
@@ -151,20 +152,21 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   }
 
   @Override
-  public void run(@Nullable String periodicTaskParameters) {
-    String savedPeriodicTaskParameters = _activePeriodicTaskParameters;
+  public void run(@Nullable java.util.Properties periodicTaskProperties) {
+    java.util.Properties savedPeriodicTaskProperties = _activePeriodicTaskProperties;
     try {
       _runLock.lock();
 
       // save and replace active periodic task parameters
-      savedPeriodicTaskParameters = _activePeriodicTaskParameters;
-      _activePeriodicTaskParameters = periodicTaskParameters;
+      savedPeriodicTaskProperties = _activePeriodicTaskProperties;
+      _activePeriodicTaskProperties = periodicTaskProperties;
 
       // run task
       run();
     } finally {
-      // restore saved periodic task parameters
-      _activePeriodicTaskParameters = savedPeriodicTaskParameters;
+      // restore saved periodic task parameters so that normal periodic execution does not get effected by this
+      // execution.
+      _activePeriodicTaskProperties = savedPeriodicTaskProperties;
       _runLock.unlock();
     }
   }
@@ -172,9 +174,8 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   /**
    * Executes the task. This method should early terminate if {@code started} flag is set to false by {@link #stop()}
    * during execution.
-   * @param periodicTaskParameters An implementation specific string that may dictate how the task will be run. null by default.
    */
-  protected abstract void runTask(@Nullable String periodicTaskParameters);
+  protected abstract void runTask();
 
   /**
    * {@inheritDoc}

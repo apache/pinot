@@ -20,7 +20,6 @@ package org.apache.pinot.controller.helix.core.periodictask;
 
 import java.util.ArrayList;
 import java.util.List;
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -55,17 +54,24 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
     _controllerMetrics = controllerMetrics;
   }
 
-  /** @param periodicTaskParameters Table name against which task will be run. If null, then task is run against all tables. */
+  // Determine if this task can run on the specified table. Task can run on table if:
+  //   1) controller is leader for the table AND "tablename" property is not set OR
+  //   2) controller is leader for this table AND "tablename" property is also set to the same table.
+  // Note that "tablename" property is set when /periodictask/run controller API is manually invoked for running a
+  // particular task against a particular table.
+  private boolean runTaskForTable(String tableNameWithType) {
+    return _leadControllerManager.isLeaderForTable(tableNameWithType) && (_activePeriodicTaskProperties == null
+        || ((String) _activePeriodicTaskProperties.get("tablename")).equalsIgnoreCase(tableNameWithType));
+  }
+
   @Override
-  protected final void runTask(@Nullable String periodicTaskParameters) {
+  protected final void runTask() {
     _controllerMetrics.addMeteredTableValue(_taskName, ControllerMeter.CONTROLLER_PERIODIC_TASK_RUN, 1L);
     try {
       // Process the tables that are managed by this controller
       List<String> tablesToProcess = new ArrayList<>();
       for (String tableNameWithType : _pinotHelixResourceManager.getAllTables()) {
-        // TODO: create method for checking if task satisfies table parameters.
-        if (_leadControllerManager.isLeaderForTable(tableNameWithType) && (periodicTaskParameters == null
-            || periodicTaskParameters.contains(tableNameWithType))) {
+        if (runTaskForTable(tableNameWithType)) {
           tablesToProcess.add(tableNameWithType);
         }
       }
