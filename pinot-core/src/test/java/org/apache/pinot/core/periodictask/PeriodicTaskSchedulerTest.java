@@ -21,6 +21,7 @@ package org.apache.pinot.core.periodictask;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.testng.Assert;
@@ -110,12 +111,14 @@ public class PeriodicTaskSchedulerTest {
   /** Test that {@link PeriodicTaskScheduler} does not run the same task more than once at any time. */
   @Test
   public void testConcurrentExecutionOfSameTask() throws Exception {
-    // Count how many tasks were run.
-    final AtomicInteger counter = new AtomicInteger();
+    // Number of threads to run
+    final int numThreads = 20;
 
-    // Count how many attempts were made to run task
+    // Count number of attempts to execute task.
     final AtomicInteger attempts = new AtomicInteger();
 
+    // Countdown latch to ensure that approximately half the threads complete execution.
+    final CountDownLatch countDownLatch = new CountDownLatch(numThreads/2);
 
     // Create periodic task.
     PeriodicTask task = new BasePeriodicTask("TestTask", 1L, 0L) {
@@ -127,8 +130,8 @@ public class PeriodicTaskSchedulerTest {
             Assert.fail("More than one thread attempting to execute task at the same time.");
           }
           isRunning = true;
-          counter.incrementAndGet();
-          Thread.sleep(250);
+          Thread.sleep(200);
+          countDownLatch.countDown();
         } catch (InterruptedException ie) {
           Thread.currentThread().interrupt();
         } finally {
@@ -147,8 +150,7 @@ public class PeriodicTaskSchedulerTest {
 
     // Create multiple "execute" threads that try to run the same task that is already being run by scheduler
     // on a periodic basis.
-    final int threadCount = 20;
-    Thread[] threads = new Thread[threadCount];
+    Thread[] threads = new Thread[numThreads];
     for (int i = 0; i < threads.length; i++) {
       threads[i] = new Thread(() -> {
           attempts.incrementAndGet();
@@ -163,21 +165,19 @@ public class PeriodicTaskSchedulerTest {
       }
     }
 
-    //  Run for 3 seconds to let as many "execute" threads finish as possible.
-    Thread.sleep(3000);
+    // Wait for half the threads to finish running
+    countDownLatch.await();
 
     // Wait for scheduler to stop preset periodic task from running.
     taskScheduler.stop();
-    Thread.sleep(500);
 
     // Confirm that all the "execute" threads ran.
-    Assert.assertEquals(attempts.get(), threadCount);
+    Assert.assertEquals(attempts.get(), numThreads);
 
-    // Confirm that only some of the "execute" threads could run their task.
-    Assert.assertTrue(counter.get() > 0);
+    // Confirm that tasks got executed.
+    Assert.assertTrue(countDownLatch.getCount() == 0);
 
-    // A named task can execute only once at any given time hence it won't be possible for all threads to execute the
-    // same task in the available time.
-    Assert.assertTrue(attempts.get() > counter.get());
+    // Confirm that all threads attempted to execute
+    Assert.assertTrue(attempts.get() == numThreads);
   }
 }
