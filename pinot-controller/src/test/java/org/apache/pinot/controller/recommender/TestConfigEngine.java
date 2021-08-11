@@ -231,7 +231,7 @@ public class TestConfigEngine {
     AbstractRule abstractRule =
         RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.VariedLengthDictionaryRule, _input, output);
     abstractRule.run();
-    assertEquals(output.getIndexConfig().getVariedLengthDictionaryColumns().toString(), "[a, d, m]");
+    assertEquals(output.getIndexConfig().getVarLengthDictionaryColumns().toString(), "[a, d, m]");
   }
 
   @Test
@@ -436,7 +436,7 @@ public class TestConfigEngine {
   }
 
   @Test
-  void testRealtimeProvisioningRule_highIngestionRate() throws Exception {
+  void testRealtimeProvisioningRuleWithHighIngestionRate() throws Exception {
     // Total memory for some of the options are greater than the provided max memory in a host.
     // For those option, the returned values is "NA"
     testRealtimeProvisioningRule("recommenderInput/RealtimeProvisioningInput_highIngestionRate.json");

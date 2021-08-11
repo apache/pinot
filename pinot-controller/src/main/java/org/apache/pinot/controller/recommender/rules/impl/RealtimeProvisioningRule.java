@@ -110,7 +110,7 @@ public class RealtimeProvisioningRule extends AbstractRule {
     setIfNotEmpty(indexConfig.getNoDictionaryColumns(), tableConfigBuilder::setNoDictionaryColumns);
     setIfNotEmpty(indexConfig.getInvertedIndexColumns(), tableConfigBuilder::setInvertedIndexColumns);
     setIfNotEmpty(indexConfig.getOnHeapDictionaryColumns(), tableConfigBuilder::setOnHeapDictionaryColumns);
-    setIfNotEmpty(indexConfig.getVariedLengthDictionaryColumns(), tableConfigBuilder::setVarLengthDictionaryColumns);
+    setIfNotEmpty(indexConfig.getVarLengthDictionaryColumns(), tableConfigBuilder::setVarLengthDictionaryColumns);
 
     TableConfig tableConfig = tableConfigBuilder.build();
     tableConfig.getIndexingConfig().setAggregateMetrics(aggregateMetrics);
