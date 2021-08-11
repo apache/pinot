@@ -11,5 +11,6 @@ public class SelectedSegmentsTest {
     SelectedSegments s1 = new SelectedSegments(ImmutableSet.of("seg1", "seg2"), true);
     SelectedSegments s2 = new SelectedSegments(ImmutableSet.of("seg2", "seg1"), true);
     Assert.assertEquals(s1.getSegmentHash(), s2.getSegmentHash());
+    Assert.assertTrue(s1.hasHash());
   }
 }

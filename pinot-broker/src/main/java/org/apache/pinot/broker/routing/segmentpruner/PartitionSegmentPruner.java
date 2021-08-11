@@ -337,17 +337,15 @@ public class PartitionSegmentPruner implements SegmentPruner {
   }
 
   /**
-   * This class is created to speed up partition number calls. Sometimes with lots of segments (like 40k+)
-   * Computing partition values may be CPU intensive, caching the computation result may help
+   * This class is created to speed up partition number computations, on our Expression match evaluation
+   * In a worst case scenario, for an expression like <code>WHERE account_key = 'a73de713d'</code>
+   * the call to <code>MurmurFunction.getPartition("a73de713d")</code> will be invoked for each segments we have.
+   * If we have 30k+ segments, the same partition call are invoked 30k+ times.
+   * Computing partition values may be CPU intensive, caching the computation result here will speed up at least 2x
    *
-   * For each partition function, we have one TTL Fixed Sized Cache that caches the computation results of all
-   * the inputs seen. For example, if PartitionFunction is Murmur5, and Murmur5.getPartition("my_segment_1") = 9,
-   * after first computation, the "my_segment_1" => 9 value mapping is stored in the cache.
-   * The next time we can skip the computation of Murmur5.getPartition("my_segment_1") and
-   * directly lookup and find that the partition of "my_segment_1" is 9.
-   *
-   * This is helpful in situations where we have very high QPS, and Brokers are trying to prune 40k+ segments
-   * over and over again, such mapping/lookup can save CPU resource.
+   * For each partition function, we have one map created transiently for each Segment Prune job. The map here
+   * stores the HashFunction (mostly always the same), and then the Map<String, Integer> stores the lookup table
+   * of each String and its hash partitions.
    */
   private static class CachedPartitionFunction {
     final Map<PartitionFunction, Map<String, Integer>> cache = new HashMap<>();
