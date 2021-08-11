@@ -27,19 +27,19 @@ netstat -i
 
 df -h
 
-echo "<settings xmlns=\"http://maven.apache.org/SETTINGS/1.0.0\""> ../settings.xml
-echo "      xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"">> ../settings.xml
-echo "      xsi:schemaLocation=\"http://maven.apache.org/SETTINGS/1.0.0">> ../settings.xml
-echo "                          https://maven.apache.org/xsd/settings-1.0.0.xsd\">">> ../settings.xml
-echo "  <mirrors>">> ../settings.xml
-echo "    <mirror>">> ../settings.xml
-echo "      <id>confluent-mirror</id>">> ../settings.xml
-echo "      <mirrorOf>confluent</mirrorOf>">> ../settings.xml
-echo "      <url>https://packages.confluent.io/maven/</url>">> ../settings.xml
-echo "      <blocked>false</blocked>">> ../settings.xml
-echo "    </mirror>">> ../settings.xml
-echo "  </mirrors>">> ../settings.xml
-echo "</settings>">> ../settings.xml
+echo "<settings xmlns=\"http://maven.apache.org/SETTINGS/1.0.0\""> settings.xml
+echo "      xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"">> settings.xml
+echo "      xsi:schemaLocation=\"http://maven.apache.org/SETTINGS/1.0.0">> settings.xml
+echo "                          https://maven.apache.org/xsd/settings-1.0.0.xsd\">">> settings.xml
+echo "  <mirrors>">> settings.xml
+echo "    <mirror>">> settings.xml
+echo "      <id>confluent-mirror</id>">> settings.xml
+echo "      <mirrorOf>confluent</mirrorOf>">> settings.xml
+echo "      <url>https://packages.confluent.io/maven/</url>">> settings.xml
+echo "      <blocked>false</blocked>">> settings.xml
+echo "    </mirror>">> settings.xml
+echo "  </mirrors>">> settings.xml
+echo "</settings>">> settings.xml
 
 export PINOT_MAVEN_OPTS="-s $(pwd)/settings.xml"
 compatibility-verifier/checkoutAndBuild.sh -w $WORKING_DIR -o $OLD_COMMIT
