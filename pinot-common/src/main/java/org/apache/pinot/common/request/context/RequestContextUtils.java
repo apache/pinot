@@ -31,12 +31,12 @@ import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.IsNotNullPredicate;
 import org.apache.pinot.common.request.context.predicate.IsNullPredicate;
 import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
-import org.apache.pinot.common.request.context.predicate.LikePredicate;
 import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
+import org.apache.pinot.common.utils.LikeToRegexFormatConverterUtil;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.pql.parsers.pql2.ast.AstNode;
@@ -232,7 +232,8 @@ public class RequestContextUtils {
             new RegexpLikePredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
       case LIKE:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new LikePredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+            new RegexpLikePredicate(getExpression(operands.get(0)),
+                LikeToRegexFormatConverterUtil.processValue(getStringValue(operands.get(1)))));
       case TEXT_MATCH:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new TextMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
