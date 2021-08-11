@@ -54,11 +54,9 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
     _controllerMetrics = controllerMetrics;
   }
 
-  // Determine if this task can run on the specified table. Task can run on table if:
-  //   1) controller is leader for the table AND "tablename" property is not set OR
-  //   2) controller is leader for this table AND "tablename" property is also set to the same table.
-  // Note that "tablename" property is set when /periodictask/run controller API is manually invoked for running a
-  // particular task against a particular table.
+  // Determine if this task can run on the specified table. Task can run on all tables for which the controller is lead
+  // if "tablename"property is not set. However, if "tablename" property is set (by calling the /periodictask/run
+  // controller API), then the task will only run on the specified by the "tablename" property key.
   private boolean runTaskForTable(String tableNameWithType) {
     return _leadControllerManager.isLeaderForTable(tableNameWithType) && (_activePeriodicTaskProperties == null
         || ((String) _activePeriodicTaskProperties.get("tablename")).equalsIgnoreCase(tableNameWithType));
