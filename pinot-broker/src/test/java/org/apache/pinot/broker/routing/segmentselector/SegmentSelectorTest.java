@@ -69,7 +69,7 @@ public class SegmentSelectorTest {
     RealtimeSegmentSelector segmentSelector = new RealtimeSegmentSelector();
     segmentSelector.init(externalView, idealState, onlineSegments);
     BrokerRequest brokerRequest = mock(BrokerRequest.class);
-    assertTrue(segmentSelector.select(brokerRequest).getSegmentHash().isEmpty());
+    assertTrue(segmentSelector.select(brokerRequest).getSegments().isEmpty());
 
     // For HLC segments, only one group of segments should be selected
     int numHLCGroups = 3;
