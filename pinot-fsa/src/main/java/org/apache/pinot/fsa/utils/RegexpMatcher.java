@@ -151,15 +151,21 @@ public class RegexpMatcher {
             queue.add(new Path(t.to, _fst.getEndNode(arc), arc,-1));
           }
         } else {
+          //TODO: atri
+          if (_fst.isArcTerminal(path.fstArc)) {
+            System.out.println("IS FOOOOO " + " for transition " + (char) t.min);
+            continue;
+          }
+
           int node = _fst.getEndNode(path.fstArc);
           int arc = _fst.getFirstArc(node);
 
+          //TODO: atri
+          if (arc == 14) {
+            int i = _fst.getFirstArc(arc);
+          }
+
           while (arc != 0 && _fst.getArcLabel(arc) <= max) {
-            //TODO: atri
-              if (_fst.isArcTerminal(path.fstArc) && _fst.isArcLast(path.fstArc)) {
-                System.out.println("IS FOOOOO " + arc + " for transition " + (char) t.min);
-                break;
-              }
 
             //TODO: atri -- see why output symbols are missing and fix it
             //TODO: atri
