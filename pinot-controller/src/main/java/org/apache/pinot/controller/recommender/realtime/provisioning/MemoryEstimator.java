@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.recommender.data.generator.DataGenerator;
 import org.apache.pinot.controller.recommender.data.generator.DataGeneratorSpec;
 import org.apache.pinot.controller.recommender.io.metadata.DateTimeFieldSpecMetadata;
@@ -136,12 +136,8 @@ public class MemoryEstimator {
   public MemoryEstimator(TableConfig tableConfig, Schema schema, SchemaWithMetaData schemaWithMetadata,
       int numberOfRows, int ingestionRatePerPartition, long maxUsableHostMemory, int tableRetentionHours,
       File workingDir) {
-    this(tableConfig,
-        generateCompletedSegment(schemaWithMetadata, schema, tableConfig, numberOfRows, workingDir),
-        ingestionRatePerPartition,
-        maxUsableHostMemory,
-        tableRetentionHours,
-        workingDir);
+    this(tableConfig, generateCompletedSegment(schemaWithMetadata, schema, tableConfig, numberOfRows, workingDir),
+        ingestionRatePerPartition, maxUsableHostMemory, tableRetentionHours, workingDir);
   }
 
   /**
@@ -162,8 +158,7 @@ public class MemoryEstimator {
     }
 
     RealtimeIndexOffHeapMemoryManager memoryManager = new DirectMemoryManager(_segmentMetadata.getName());
-    RealtimeSegmentZKMetadata segmentZKMetadata =
-        getRealtimeSegmentZKMetadata(_segmentMetadata, _segmentMetadata.getTotalDocs());
+    SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(_segmentMetadata, _segmentMetadata.getTotalDocs());
 
     // create a config
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
@@ -172,7 +167,7 @@ public class MemoryEstimator {
             .setSchema(_segmentMetadata.getSchema()).setCapacity(_segmentMetadata.getTotalDocs())
             .setAvgNumMultiValues(_avgMultiValues).setNoDictionaryColumns(_noDictionaryColumns)
             .setVarLengthDictionaryColumns(_varLengthDictionaryColumns).setInvertedIndexColumns(_invertedIndexColumns)
-            .setRealtimeSegmentZKMetadata(segmentZKMetadata).setOffHeap(true).setMemoryManager(memoryManager)
+            .setSegmentZKMetadata(segmentZKMetadata).setOffHeap(true).setMemoryManager(memoryManager)
             .setStatsHistory(sampleStatsHistory);
 
     // create mutable segment impl
@@ -280,9 +275,8 @@ public class MemoryEstimator {
               memoryForConsumingSegmentPerPartition * totalConsumingPartitionsPerHost;
           long activeMemoryPerHostBytes =
               activeMemoryForCompletedSegmentsPerHost + totalMemoryForConsumingSegmentsPerHost;
-          long mappedMemoryPerHost =
-              totalMemoryForConsumingSegmentsPerHost + (numCompletedSegmentsPerPartition * totalConsumingPartitionsPerHost
-                  * completedSegmentSizeBytes);
+          long mappedMemoryPerHost = totalMemoryForConsumingSegmentsPerHost + (numCompletedSegmentsPerPartition
+              * totalConsumingPartitionsPerHost * completedSegmentSizeBytes);
 
           if (activeMemoryPerHostBytes <= _maxUsableHostMemory) {
             _activeMemoryPerHost[i][j] =
@@ -314,15 +308,15 @@ public class MemoryEstimator {
           "Exception when deserializing stats history from stats file " + statsFileCopy.getAbsolutePath(), e);
     }
     RealtimeIndexOffHeapMemoryManager memoryManager = new DirectMemoryManager(_segmentMetadata.getName());
-    RealtimeSegmentZKMetadata segmentZKMetadata = getRealtimeSegmentZKMetadata(_segmentMetadata, totalDocs);
+    SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(_segmentMetadata, totalDocs);
 
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
         new RealtimeSegmentConfig.Builder().setTableNameWithType(_tableNameWithType)
             .setSegmentName(_segmentMetadata.getName()).setStreamName(_tableNameWithType)
             .setSchema(_segmentMetadata.getSchema()).setCapacity(totalDocs).setAvgNumMultiValues(_avgMultiValues)
             .setNoDictionaryColumns(_noDictionaryColumns).setVarLengthDictionaryColumns(_varLengthDictionaryColumns)
-            .setInvertedIndexColumns(_invertedIndexColumns).setRealtimeSegmentZKMetadata(segmentZKMetadata)
-            .setOffHeap(true).setMemoryManager(memoryManager).setStatsHistory(statsHistory);
+            .setInvertedIndexColumns(_invertedIndexColumns).setSegmentZKMetadata(segmentZKMetadata).setOffHeap(true)
+            .setMemoryManager(memoryManager).setStatsHistory(statsHistory);
 
     // create mutable segment impl
     MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
@@ -383,20 +377,19 @@ public class MemoryEstimator {
   }
 
   /**
-   * Creates a sample realtime segment metadata for the realtime segment config
+   * Creates a sample segment ZK metadata for the given segment metadata
    * @param segmentMetadata
    * @return
    */
-  private RealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(SegmentMetadataImpl segmentMetadata, int totalDocs) {
-    RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = new RealtimeSegmentZKMetadata();
-    realtimeSegmentZKMetadata.setStartTime(segmentMetadata.getStartTime());
-    realtimeSegmentZKMetadata.setEndTime(segmentMetadata.getEndTime());
-    realtimeSegmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
-    realtimeSegmentZKMetadata.setSegmentName(segmentMetadata.getName());
-    realtimeSegmentZKMetadata.setTimeUnit(segmentMetadata.getTimeUnit());
-    realtimeSegmentZKMetadata.setTotalDocs(totalDocs);
-    realtimeSegmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
-    return realtimeSegmentZKMetadata;
+  private SegmentZKMetadata getSegmentZKMetadata(SegmentMetadataImpl segmentMetadata, int totalDocs) {
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadata.getName());
+    segmentZKMetadata.setStartTime(segmentMetadata.getStartTime());
+    segmentZKMetadata.setEndTime(segmentMetadata.getEndTime());
+    segmentZKMetadata.setTimeUnit(segmentMetadata.getTimeUnit());
+    segmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
+    segmentZKMetadata.setTotalDocs(totalDocs);
+    segmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
+    return segmentZKMetadata;
   }
 
   /**
@@ -501,9 +494,9 @@ public class MemoryEstimator {
         cardinalities.put(name, timeSpec.getCardinality());
         dataTypes.put(name, timeSpec.getDataType());
         fieldTypes.put(name, timeSpec.getFieldType());
-        TimeGranularitySpecMetadata timeGranSpec = timeSpec.getOutgoingGranularitySpec() != null
-            ? timeSpec.getOutgoingGranularitySpec()
-            : timeSpec.getIncomingGranularitySpec();
+        TimeGranularitySpecMetadata timeGranSpec =
+            timeSpec.getOutgoingGranularitySpec() != null ? timeSpec.getOutgoingGranularitySpec()
+                : timeSpec.getIncomingGranularitySpec();
         timeUnits.put(name, timeGranSpec.getTimeType());
       }
 
@@ -553,8 +546,7 @@ public class MemoryEstimator {
       } catch (Exception e) {
         throw new RuntimeException("Caught exception while verifying the created segment", e);
       }
-      LOGGER.info("Successfully loaded segment: {} of size: {} bytes", segmentName,
-          segment.getSegmentSizeBytes());
+      LOGGER.info("Successfully loaded segment: {} of size: {} bytes", segmentName, segment.getSegmentSizeBytes());
       segment.destroy();
 
       return indexDir;

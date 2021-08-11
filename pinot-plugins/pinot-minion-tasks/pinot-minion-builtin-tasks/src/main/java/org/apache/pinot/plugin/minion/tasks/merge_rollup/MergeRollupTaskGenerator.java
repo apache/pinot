@@ -33,7 +33,8 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.minion.MergeRollupTaskMetadata;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
@@ -116,18 +117,18 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
       LOGGER.info("Start generating task configs for table: {} for task: {}", offlineTableName, taskType);
 
       // Get all segment metadata
-      List<OfflineSegmentZKMetadata> allSegments = _clusterInfoAccessor.getOfflineSegmentsMetadata(offlineTableName);
+      List<SegmentZKMetadata> allSegments = _clusterInfoAccessor.getSegmentsZKMetadata(offlineTableName);
 
       // Select current segment snapshot based on lineage, filter out empty segments
       SegmentLineage segmentLineage = _clusterInfoAccessor.getSegmentLineage(offlineTableName);
       Set<String> preSelectedSegmentsBasedOnLineage = new HashSet<>();
-      for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : allSegments) {
-        preSelectedSegmentsBasedOnLineage.add(offlineSegmentZKMetadata.getSegmentName());
+      for (SegmentZKMetadata segment : allSegments) {
+        preSelectedSegmentsBasedOnLineage.add(segment.getSegmentName());
       }
       SegmentLineageUtils.filterSegmentsBasedOnLineageInplace(preSelectedSegmentsBasedOnLineage, segmentLineage);
 
-      List<OfflineSegmentZKMetadata> preSelectedSegments = new ArrayList<>();
-      for (OfflineSegmentZKMetadata segment : allSegments) {
+      List<SegmentZKMetadata> preSelectedSegments = new ArrayList<>();
+      for (SegmentZKMetadata segment : allSegments) {
         if (preSelectedSegmentsBasedOnLineage.contains(segment.getSegmentName()) && segment.getTotalDocs() > 0) {
           preSelectedSegments.add(segment);
         }
@@ -211,7 +212,7 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
         }
 
         // Find all segments overlapping with the merge window, if all overlapping segments are merged, bump up the target window
-        List<OfflineSegmentZKMetadata> selectedSegments = new ArrayList<>();
+        List<SegmentZKMetadata> selectedSegments = new ArrayList<>();
         boolean hasUnmergedSegments = false;
         boolean isValidMergeWindow = true;
 
@@ -221,7 +222,7 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
         // 2. All segments are merged in the merge window and we have loop through all segments, skip scheduling
         // 3. Merge window is invalid (windowEndMs > System.currentTimeMillis() - bufferMs || windowEndMs > waterMark of
         //    the lower mergeLevel), skip scheduling
-        for (OfflineSegmentZKMetadata preSelectedSegment : preSelectedSegments) {
+        for (SegmentZKMetadata preSelectedSegment : preSelectedSegments) {
           long startTimeMs = preSelectedSegment.getStartTimeMs();
           if (startTimeMs < windowEndMs) {
             long endTimeMs = preSelectedSegment.getEndTimeMs();
@@ -291,21 +292,21 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
           Map.Entry<String, ColumnPartitionConfig> partitionEntry = columnPartitionMap.entrySet().iterator().next();
           String partitionColumn = partitionEntry.getKey();
 
-          Map<Integer, List<OfflineSegmentZKMetadata>> partitionToSegments = new HashMap<>();
+          Map<Integer, List<SegmentZKMetadata>> partitionToSegments = new HashMap<>();
           // Handle segments that have multiple partitions or no partition info
-          List<OfflineSegmentZKMetadata> outlierSegments = new ArrayList<>();
-          for (OfflineSegmentZKMetadata selectedSegment : selectedSegments) {
-            if (selectedSegment.getPartitionMetadata() == null
-                || selectedSegment.getPartitionMetadata().getPartitions(partitionColumn).size() != 1) {
+          List<SegmentZKMetadata> outlierSegments = new ArrayList<>();
+          for (SegmentZKMetadata selectedSegment : selectedSegments) {
+            SegmentPartitionMetadata segmentPartitionMetadata = selectedSegment.getPartitionMetadata();
+            if (segmentPartitionMetadata == null
+                || segmentPartitionMetadata.getPartitions(partitionColumn).size() != 1) {
               outlierSegments.add(selectedSegment);
             } else {
-              int partition = selectedSegment.getPartitionMetadata().getPartitions(partitionColumn).iterator().next();
+              int partition = segmentPartitionMetadata.getPartitions(partitionColumn).iterator().next();
               partitionToSegments.computeIfAbsent(partition, k -> new ArrayList<>()).add(selectedSegment);
             }
           }
 
-          for (Map.Entry<Integer, List<OfflineSegmentZKMetadata>> partitionToSegmentsEntry : partitionToSegments
-              .entrySet()) {
+          for (Map.Entry<Integer, List<SegmentZKMetadata>> partitionToSegmentsEntry : partitionToSegments.entrySet()) {
             pinotTaskConfigsForTable.addAll(
                 createPinotTaskConfigs(partitionToSegmentsEntry.getValue(), offlineTableName, maxNumRecordsPerTask,
                     mergeLevel, mergeConfigs, taskConfigs));
@@ -358,9 +359,10 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
   /**
    * Check if the segment is merged for give merge level
    */
-  private boolean isMergedSegment(OfflineSegmentZKMetadata segmentZKMetadata, String mergeLevel) {
+  private boolean isMergedSegment(SegmentZKMetadata segmentZKMetadata, String mergeLevel) {
     Map<String, String> customMap = segmentZKMetadata.getCustomMap();
-    return customMap != null && mergeLevel.equals(customMap.get(MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY));
+    return customMap != null && mergeLevel
+        .equalsIgnoreCase(customMap.get(MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY));
   }
 
   /**
@@ -398,7 +400,7 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
   /**
    * Create pinot task configs with selected segments and configs
    */
-  private List<PinotTaskConfig> createPinotTaskConfigs(List<OfflineSegmentZKMetadata> selectedSegments,
+  private List<PinotTaskConfig> createPinotTaskConfigs(List<SegmentZKMetadata> selectedSegments,
       String offlineTableName, int maxNumRecordsPerTask, String mergeLevel, Map<String, String> mergeConfigs,
       Map<String, String> taskConfigs) {
     int numRecordsPerTask = 0;
@@ -408,7 +410,7 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
     List<String> downloadURLs = new ArrayList<>();
 
     for (int i = 0; i < selectedSegments.size(); i++) {
-      OfflineSegmentZKMetadata targetSegment = selectedSegments.get(i);
+      SegmentZKMetadata targetSegment = selectedSegments.get(i);
       segmentNames.add(targetSegment.getSegmentName());
       downloadURLs.add(targetSegment.getDownloadUrl());
       numRecordsPerTask += targetSegment.getTotalDocs();

@@ -43,8 +43,8 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
@@ -86,6 +86,7 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.SegmentType;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -194,14 +195,13 @@ public class PinotLLCRealtimeSegmentManager {
     for (Map.Entry<Integer, LLCSegmentName> entry : partitionGroupIdToLatestSegment.entrySet()) {
       int partitionGroupId = entry.getKey();
       LLCSegmentName llcSegmentName = entry.getValue();
-      LLCRealtimeSegmentZKMetadata llRealtimeSegmentZKMetadata =
+      SegmentZKMetadata segmentZKMetadata =
           getSegmentZKMetadata(streamConfig.getTableNameWithType(), llcSegmentName.getSegmentName());
       PartitionGroupConsumptionStatus partitionGroupConsumptionStatus =
           new PartitionGroupConsumptionStatus(partitionGroupId, llcSegmentName.getSequenceNumber(),
-              offsetFactory.create(llRealtimeSegmentZKMetadata.getStartOffset()),
-              llRealtimeSegmentZKMetadata.getEndOffset() == null ? null
-                  : offsetFactory.create(llRealtimeSegmentZKMetadata.getEndOffset()),
-              llRealtimeSegmentZKMetadata.getStatus().toString());
+              offsetFactory.create(segmentZKMetadata.getStartOffset()),
+              segmentZKMetadata.getEndOffset() == null ? null : offsetFactory.create(segmentZKMetadata.getEndOffset()),
+              segmentZKMetadata.getStatus().toString());
       partitionGroupConsumptionStatusList.add(partitionGroupConsumptionStatus);
     }
     return partitionGroupConsumptionStatusList;
@@ -344,12 +344,12 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
-  private LLCRealtimeSegmentZKMetadata getSegmentZKMetadata(String realtimeTableName, String segmentName) {
+  private SegmentZKMetadata getSegmentZKMetadata(String realtimeTableName, String segmentName) {
     return getSegmentZKMetadata(realtimeTableName, segmentName, null);
   }
 
   @VisibleForTesting
-  LLCRealtimeSegmentZKMetadata getSegmentZKMetadata(String realtimeTableName, String segmentName, @Nullable Stat stat) {
+  SegmentZKMetadata getSegmentZKMetadata(String realtimeTableName, String segmentName, @Nullable Stat stat) {
     try {
       ZNRecord znRecord = _propertyStore
           .get(ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, segmentName), stat,
@@ -357,7 +357,7 @@ public class PinotLLCRealtimeSegmentManager {
       Preconditions
           .checkState(znRecord != null, "Failed to find segment ZK metadata for segment: %s of table: %s", segmentName,
               realtimeTableName);
-      return new LLCRealtimeSegmentZKMetadata(znRecord);
+      return new SegmentZKMetadata(znRecord);
     } catch (Exception e) {
       _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_ZOOKEEPER_FETCH_FAILURES, 1L);
       throw e;
@@ -365,8 +365,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   @VisibleForTesting
-  void persistSegmentZKMetadata(String realtimeTableName, LLCRealtimeSegmentZKMetadata segmentZKMetadata,
-      int expectedVersion) {
+  void persistSegmentZKMetadata(String realtimeTableName, SegmentZKMetadata segmentZKMetadata, int expectedVersion) {
     String segmentName = segmentZKMetadata.getSegmentName();
     LOGGER.info("Persisting segment ZK metadata for segment: {}", segmentName);
     try {
@@ -493,7 +492,7 @@ public class PinotLLCRealtimeSegmentManager {
      */
 
     // Step-1
-    LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata =
+    SegmentZKMetadata committingSegmentZKMetadata =
         updateCommittingSegmentZKMetadata(realtimeTableName, committingSegmentDescriptor);
     // Refresh the Broker routing to reflect the changes in the segment ZK metadata
     _helixResourceManager.sendSegmentRefreshMessage(realtimeTableName, committingSegmentName, false, true);
@@ -557,14 +556,13 @@ public class PinotLLCRealtimeSegmentManager {
   /**
    * Updates segment ZK metadata for the committing segment.
    */
-  private LLCRealtimeSegmentZKMetadata updateCommittingSegmentZKMetadata(String realtimeTableName,
+  private SegmentZKMetadata updateCommittingSegmentZKMetadata(String realtimeTableName,
       CommittingSegmentDescriptor committingSegmentDescriptor) {
     String segmentName = committingSegmentDescriptor.getSegmentName();
     LOGGER.info("Updating segment ZK metadata for committing segment: {}", segmentName);
 
     Stat stat = new Stat();
-    LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata =
-        getSegmentZKMetadata(realtimeTableName, segmentName, stat);
+    SegmentZKMetadata committingSegmentZKMetadata = getSegmentZKMetadata(realtimeTableName, segmentName, stat);
     Preconditions.checkState(committingSegmentZKMetadata.getStatus() == Status.IN_PROGRESS,
         "Segment status for segment: %s should be IN_PROGRESS, found: %s", segmentName,
         committingSegmentZKMetadata.getStatus());
@@ -617,7 +615,7 @@ public class PinotLLCRealtimeSegmentManager {
    */
   private void createNewSegmentZKMetadata(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig,
       LLCSegmentName newLLCSegmentName, long creationTimeMs, CommittingSegmentDescriptor committingSegmentDescriptor,
-      @Nullable LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata, InstancePartitions instancePartitions,
+      @Nullable SegmentZKMetadata committingSegmentZKMetadata, InstancePartitions instancePartitions,
       int numPartitionGroups, int numReplicas) {
     String realtimeTableName = tableConfig.getTableName();
     String segmentName = newLLCSegmentName.getSegmentName();
@@ -627,9 +625,9 @@ public class PinotLLCRealtimeSegmentManager {
         .info("Creating segment ZK metadata for new CONSUMING segment: {} with start offset: {} and creation time: {}",
             segmentName, startOffset, creationTimeMs);
 
-    LLCRealtimeSegmentZKMetadata newSegmentZKMetadata = new LLCRealtimeSegmentZKMetadata();
+    SegmentZKMetadata newSegmentZKMetadata = new SegmentZKMetadata(segmentName);
     newSegmentZKMetadata.setTableName(realtimeTableName);
-    newSegmentZKMetadata.setSegmentName(segmentName);
+    newSegmentZKMetadata.setSegmentType(SegmentType.REALTIME);
     newSegmentZKMetadata.setCreationTime(creationTimeMs);
     newSegmentZKMetadata.setStartOffset(startOffset);
     // Leave maxOffset as null.
@@ -759,7 +757,7 @@ public class PinotLLCRealtimeSegmentManager {
    * @param realtimeTableName Realtime table name
    * @return Map from partition group id to the latest LLC realtime segment ZK metadata
    */
-  private Map<Integer, LLCRealtimeSegmentZKMetadata> getLatestSegmentZKMetadataMap(String realtimeTableName) {
+  private Map<Integer, SegmentZKMetadata> getLatestSegmentZKMetadataMap(String realtimeTableName) {
     List<String> segments = getLLCSegments(realtimeTableName);
 
     Map<Integer, LLCSegmentName> latestLLCSegmentNameMap = new HashMap<>();
@@ -778,9 +776,9 @@ public class PinotLLCRealtimeSegmentManager {
       });
     }
 
-    Map<Integer, LLCRealtimeSegmentZKMetadata> latestSegmentZKMetadataMap = new HashMap<>();
+    Map<Integer, SegmentZKMetadata> latestSegmentZKMetadataMap = new HashMap<>();
     for (Map.Entry<Integer, LLCSegmentName> entry : latestLLCSegmentNameMap.entrySet()) {
-      LLCRealtimeSegmentZKMetadata latestSegmentZKMetadata =
+      SegmentZKMetadata latestSegmentZKMetadata =
           getSegmentZKMetadata(realtimeTableName, entry.getValue().getSegmentName());
       latestSegmentZKMetadataMap.put(entry.getKey(), latestSegmentZKMetadata);
     }
@@ -990,8 +988,7 @@ public class PinotLLCRealtimeSegmentManager {
         StreamConsumerFactoryProvider.create(streamConfig).createStreamMsgOffsetFactory();
 
     // Get the latest segment ZK metadata for each partition
-    Map<Integer, LLCRealtimeSegmentZKMetadata> latestSegmentZKMetadataMap =
-        getLatestSegmentZKMetadataMap(realtimeTableName);
+    Map<Integer, SegmentZKMetadata> latestSegmentZKMetadataMap = getLatestSegmentZKMetadataMap(realtimeTableName);
 
     // Walk over all partitions that we have metadata for, and repair any partitions necessary.
     // Possible things to repair:
@@ -1006,9 +1003,9 @@ public class PinotLLCRealtimeSegmentManager {
     //    a. Create a new segment (with the next seq number)
     //       and restart consumption from the same offset (if possible) or a newer offset (if realtime stream does not have the same offset).
     //       In latter case, report data loss.
-    for (Map.Entry<Integer, LLCRealtimeSegmentZKMetadata> entry : latestSegmentZKMetadataMap.entrySet()) {
+    for (Map.Entry<Integer, SegmentZKMetadata> entry : latestSegmentZKMetadataMap.entrySet()) {
       int partitionGroupId = entry.getKey();
-      LLCRealtimeSegmentZKMetadata latestSegmentZKMetadata = entry.getValue();
+      SegmentZKMetadata latestSegmentZKMetadata = entry.getValue();
       String latestSegmentName = latestSegmentZKMetadata.getSegmentName();
       LLCSegmentName latestLLCSegmentName = new LLCSegmentName(latestSegmentName);
 

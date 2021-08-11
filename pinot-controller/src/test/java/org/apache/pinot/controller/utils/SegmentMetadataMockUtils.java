@@ -23,7 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -62,13 +62,11 @@ public class SegmentMetadataMockUtils {
     return mockSegmentMetadata(tableName, segmentName, 100, uniqueNumericString);
   }
 
-  public static RealtimeSegmentZKMetadata mockRealtimeSegmentZKMetadata(String tableName, String segmentName,
-      long numTotalDocs) {
-    RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = Mockito.mock(RealtimeSegmentZKMetadata.class);
-    Mockito.when(realtimeSegmentZKMetadata.getTableName()).thenReturn(tableName);
-    Mockito.when(realtimeSegmentZKMetadata.getSegmentName()).thenReturn(segmentName);
-    Mockito.when(realtimeSegmentZKMetadata.getTotalDocs()).thenReturn(numTotalDocs);
-    return realtimeSegmentZKMetadata;
+  public static SegmentZKMetadata mockSegmentZKMetadata(String segmentName, long numTotalDocs) {
+    SegmentZKMetadata segmentZKMetadata = Mockito.mock(SegmentZKMetadata.class);
+    Mockito.when(segmentZKMetadata.getSegmentName()).thenReturn(segmentName);
+    Mockito.when(segmentZKMetadata.getTotalDocs()).thenReturn(numTotalDocs);
+    return segmentZKMetadata;
   }
 
   public static SegmentMetadata mockSegmentMetadataWithPartitionInfo(String tableName, String segmentName,

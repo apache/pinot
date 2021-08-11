@@ -22,7 +22,7 @@ import com.google.common.base.Preconditions;
 import java.lang.reflect.Field;
 import java.util.Map;
 import org.apache.helix.HelixManager;
-import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
@@ -93,10 +93,10 @@ public class SegmentCompletionTest {
     final long now = System.currentTimeMillis();
     final LLCSegmentName segmentName = new LLCSegmentName(tableName, partitionId, seqId, now);
     segmentNameStr = segmentName.getSegmentName();
-    final LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
-    metadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
-    metadata.setNumReplicas(3);
-    segmentManager._segmentMetadata = metadata;
+    final SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentNameStr);
+    segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+    segmentZKMetadata.setNumReplicas(3);
+    segmentManager._segmentMetadata = segmentZKMetadata;
 
     segmentCompletionMgr = new MockSegmentCompletionManager(segmentManager, isLeader, isConnected);
     segmentManager._segmentCompletionMgr = segmentCompletionMgr;
@@ -1279,7 +1279,7 @@ public class SegmentCompletionTest {
   }
 
   public static class MockPinotLLCRealtimeSegmentManager extends PinotLLCRealtimeSegmentManager {
-    public LLCRealtimeSegmentZKMetadata _segmentMetadata;
+    public SegmentZKMetadata _segmentMetadata;
     public MockSegmentCompletionManager _segmentCompletionMgr;
     private static final ControllerConf CONTROLLER_CONF = new ControllerConf();
     public LLCSegmentName _stoppedSegmentName;
@@ -1296,7 +1296,7 @@ public class SegmentCompletionTest {
     }
 
     @Override
-    public LLCRealtimeSegmentZKMetadata getSegmentZKMetadata(String realtimeTableName, String segmentName, Stat stat) {
+    public SegmentZKMetadata getSegmentZKMetadata(String realtimeTableName, String segmentName, Stat stat) {
       return _segmentMetadata;
     }
 

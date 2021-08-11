@@ -23,7 +23,7 @@ import java.net.URI;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.helix.ZNRecord;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -62,8 +62,9 @@ public class ZKOperator {
       HttpHeaders headers, String zkDownloadURI, boolean moveSegmentToFinalLocation, String crypter)
       throws Exception {
     String segmentName = segmentMetadata.getName();
-    ZNRecord segmentMetadataZnRecord = _pinotHelixResourceManager.getSegmentMetadataZnRecord(tableNameWithType, segmentName);
-    if (segmentMetadataZnRecord == null) {
+    ZNRecord segmentMetadataZNRecord =
+        _pinotHelixResourceManager.getSegmentMetadataZnRecord(tableNameWithType, segmentName);
+    if (segmentMetadataZNRecord == null) {
       LOGGER.info("Adding new segment {} from table {}", segmentName, tableNameWithType);
       processNewSegment(segmentMetadata, finalSegmentLocationURI, currentSegmentLocation, zkDownloadURI, crypter,
           tableNameWithType, segmentName, moveSegmentToFinalLocation);
@@ -73,15 +74,14 @@ public class ZKOperator {
     // TODO Allow segment refreshing for realtime tables.
     if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
       throw new ControllerApplicationException(LOGGER,
-          "Refresh existing segment " + segmentName + " for realtime table " + tableNameWithType + " is not yet supported ",
-          Response.Status.NOT_IMPLEMENTED
-      );
+          "Refresh existing segment " + segmentName + " for realtime table " + tableNameWithType
+              + " is not yet supported ", Response.Status.NOT_IMPLEMENTED);
     }
 
     LOGGER.info("Segment {} from table {} already exists, refreshing if necessary", segmentName, tableNameWithType);
     processExistingSegment(segmentMetadata, finalSegmentLocationURI, currentSegmentLocation,
         enableParallelPushProtection, headers, zkDownloadURI, crypter, tableNameWithType, segmentName,
-        segmentMetadataZnRecord, moveSegmentToFinalLocation);
+        segmentMetadataZNRecord, moveSegmentToFinalLocation);
   }
 
   private void processExistingSegment(SegmentMetadata segmentMetadata, URI finalSegmentLocationURI,
@@ -90,7 +90,7 @@ public class ZKOperator {
       boolean moveSegmentToFinalLocation)
       throws Exception {
 
-    OfflineSegmentZKMetadata existingSegmentZKMetadata = new OfflineSegmentZKMetadata(znRecord);
+    SegmentZKMetadata existingSegmentZKMetadata = new SegmentZKMetadata(znRecord);
     long existingCrc = existingSegmentZKMetadata.getCrc();
 
     // Check if CRC match when IF-MATCH header is set
@@ -103,8 +103,8 @@ public class ZKOperator {
       if (segmentUploadStartTime > 0) {
         if (System.currentTimeMillis() - segmentUploadStartTime > _controllerConf.getSegmentUploadTimeoutInMillis()) {
           // Last segment upload does not finish properly, replace the segment
-          LOGGER
-              .error("Segment: {} of table: {} was not properly uploaded, replacing it", segmentName, tableNameWithType);
+          LOGGER.error("Segment: {} of table: {} was not properly uploaded, replacing it", segmentName,
+              tableNameWithType);
           _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_SEGMENT_UPLOAD_TIMEOUT_EXCEEDED, 1L);
         } else {
           // Another segment upload is in progress
@@ -214,7 +214,8 @@ public class ZKOperator {
             .info("Moved segment {} from temp location {} to {}", segmentName, currentSegmentLocation.getAbsolutePath(),
                 finalSegmentLocationURI.getPath());
       } catch (Exception e) {
-        LOGGER.error("Could not move segment {} from table {} to permanent directory", segmentName, tableNameWithType, e);
+        LOGGER
+            .error("Could not move segment {} from table {} to permanent directory", segmentName, tableNameWithType, e);
         throw new RuntimeException(e);
       }
     } else {

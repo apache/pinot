@@ -39,7 +39,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.DataTable;
@@ -299,7 +299,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testUploadSameSegments()
       throws Exception {
-    OfflineSegmentZKMetadata segmentZKMetadata = _helixResourceManager.getOfflineSegmentMetadata(getTableName()).get(0);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    SegmentZKMetadata segmentZKMetadata = _helixResourceManager.getSegmentsZKMetadata(offlineTableName).get(0);
     String segmentName = segmentZKMetadata.getSegmentName();
     long crc = segmentZKMetadata.getCrc();
     // Creation time is when the segment gets created
@@ -309,9 +310,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Refresh time is when the segment gets refreshed (existing segment)
     long refreshTime = segmentZKMetadata.getRefreshTime();
 
-    uploadSegments(getTableName(), _tarDir);
-    for (OfflineSegmentZKMetadata segmentZKMetadataAfterUpload : _helixResourceManager
-        .getOfflineSegmentMetadata(getTableName())) {
+    uploadSegments(offlineTableName, _tarDir);
+    for (SegmentZKMetadata segmentZKMetadataAfterUpload : _helixResourceManager
+        .getSegmentsZKMetadata(offlineTableName)) {
       // Only check one segment
       if (segmentZKMetadataAfterUpload.getSegmentName().equals(segmentName)) {
         assertEquals(segmentZKMetadataAfterUpload.getCrc(), crc);
@@ -327,8 +328,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testInvertedIndexTriggering()
       throws Exception {
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
     long numTotalDocs = getCountStarResult();
-    long tableSizeWithDefaultIndex = getTableSize(getTableName());
+    long tableSizeWithDefaultIndex = getTableSize(offlineTableName);
 
     // Without index on DivActualElapsedTime, all docs are scanned at filtering stage.
     JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
@@ -339,7 +341,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setInvertedIndexColumns(UPDATED_INVERTED_INDEX_COLUMNS);
     updateTableConfig(tableConfig);
-    reloadOfflineTable(getTableName());
+    reloadOfflineTable(offlineTableName);
 
     // It takes a while to reload multiple segments, thus we retry the query for some time.
     // After all segments are reloaded, the inverted index is added on DivActualElapsedTime.
@@ -356,7 +358,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       }
     }, 600_000L, "Failed to generate inverted index");
 
-    long tableSizeWithNewIndex = getTableSize(getTableName());
+    long tableSizeWithNewIndex = getTableSize(offlineTableName);
     assertTrue(tableSizeWithNewIndex > tableSizeWithDefaultIndex);
 
     // Update table config to remove all inverted index.
@@ -365,7 +367,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     updateTableConfig(tableConfig);
 
     // Reload table just disables those indices, not clean them physically.
-    reloadOfflineTable(getTableName());
+    reloadOfflineTable(offlineTableName);
     TestUtils.waitForCondition(aVoid -> {
       try {
         JsonNode queryResponse2 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
@@ -376,20 +378,20 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to disable indices");
-    final long tableSizeAfterReload = getTableSize(getTableName());
+    long tableSizeAfterReload = getTableSize(offlineTableName);
     assertEquals(tableSizeAfterReload, tableSizeWithNewIndex);
 
     // Reload a single segment and force to download the segment,
     // and we can expect disk usage drops a bit.
-    OfflineSegmentZKMetadata segmentZKMetadata = _helixResourceManager.getOfflineSegmentMetadata(getTableName()).get(0);
+    SegmentZKMetadata segmentZKMetadata = _helixResourceManager.getSegmentsZKMetadata(offlineTableName).get(0);
     String segmentName = segmentZKMetadata.getSegmentName();
-    reloadOfflineSegment(getTableName(), segmentName, true);
+    reloadOfflineSegment(offlineTableName, segmentName, true);
     AtomicLong tableSizeAfterDownloadSegment = new AtomicLong(0);
     TestUtils.waitForCondition(aVoid -> {
       try {
         JsonNode queryResponse3 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
         assertEquals(queryResponse3.get("totalDocs").asLong(), numTotalDocs);
-        tableSizeAfterDownloadSegment.set(getTableSize(getTableName()));
+        tableSizeAfterDownloadSegment.set(getTableSize(offlineTableName));
         return tableSizeAfterDownloadSegment.longValue() < tableSizeWithNewIndex;
       } catch (Exception e) {
         throw new RuntimeException(e);
@@ -397,13 +399,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }, 600_000L, "Failed to clean up obsolete indices");
 
     // Reload whole table and we can expect disk usage drops further.
-    reloadOfflineTable(getTableName(), true);
+    reloadOfflineTable(offlineTableName, true);
     AtomicLong tableSizeAfterDownloadTable = new AtomicLong(0);
     TestUtils.waitForCondition(aVoid -> {
       try {
         JsonNode queryResponse3 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
         assertEquals(queryResponse3.get("totalDocs").asLong(), numTotalDocs);
-        tableSizeAfterDownloadTable.set(getTableSize(getTableName()));
+        tableSizeAfterDownloadTable.set(getTableSize(offlineTableName));
         return tableSizeAfterDownloadTable.longValue() < tableSizeAfterDownloadSegment.longValue();
       } catch (Exception e) {
         throw new RuntimeException(e);

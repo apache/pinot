@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.data.Segment;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
@@ -95,29 +95,28 @@ public class ConvertToRawIndexTaskGenerator implements PinotTaskGenerator {
 
       // Generate tasks
       int tableNumTasks = 0;
-      for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : _clusterInfoAccessor
-          .getOfflineSegmentsMetadata(offlineTableName)) {
+      for (SegmentZKMetadata segmentZKMetadata : _clusterInfoAccessor.getSegmentsZKMetadata(offlineTableName)) {
         // Generate up to tableMaxNumTasks tasks each time for each table
         if (tableNumTasks == tableMaxNumTasks) {
           break;
         }
 
         // Skip segments that are already submitted
-        String segmentName = offlineSegmentZKMetadata.getSegmentName();
+        String segmentName = segmentZKMetadata.getSegmentName();
         if (runningSegments.contains(new Segment(offlineTableName, segmentName))) {
           continue;
         }
 
         // Only submit segments that have not been converted
-        Map<String, String> customMap = offlineSegmentZKMetadata.getCustomMap();
+        Map<String, String> customMap = segmentZKMetadata.getCustomMap();
         if (customMap == null || !customMap.containsKey(
             MinionConstants.ConvertToRawIndexTask.COLUMNS_TO_CONVERT_KEY + MinionConstants.TASK_TIME_SUFFIX)) {
           Map<String, String> configs = new HashMap<>();
           configs.put(MinionConstants.TABLE_NAME_KEY, offlineTableName);
           configs.put(MinionConstants.SEGMENT_NAME_KEY, segmentName);
-          configs.put(MinionConstants.DOWNLOAD_URL_KEY, offlineSegmentZKMetadata.getDownloadUrl());
+          configs.put(MinionConstants.DOWNLOAD_URL_KEY, segmentZKMetadata.getDownloadUrl());
           configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
-          configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, String.valueOf(offlineSegmentZKMetadata.getCrc()));
+          configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, String.valueOf(segmentZKMetadata.getCrc()));
           if (columnsToConvertConfig != null) {
             configs.put(MinionConstants.ConvertToRawIndexTask.COLUMNS_TO_CONVERT_KEY, columnsToConvertConfig);
           }

@@ -39,7 +39,7 @@ import org.apache.helix.store.HelixPropertyListener;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.HLCSegmentName;
@@ -201,15 +201,13 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
           for (String partition : state.getPartitionSet()) {
             // Helix partition is the segment name
             if (SegmentName.isHighLevelConsumerSegmentName(partition)) {
-              HLCSegmentName segName = new HLCSegmentName(partition);
-              RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = ZKMetadataProvider
-                  .getRealtimeSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(), segName.getTableName(),
-                      partition);
-              if (realtimeSegmentZKMetadata == null) {
+              SegmentZKMetadata segmentZKMetadata = ZKMetadataProvider
+                  .getSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(), realtimeTableName, partition);
+              if (segmentZKMetadata == null) {
                 // Segment was deleted by retention manager.
                 continue;
               }
-              if (realtimeSegmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
+              if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
                 instancesToAssignRealtimeSegment.removeAll(state.getInstanceSet(partition));
               }
             }
@@ -247,15 +245,14 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
         if (!idealStateMap.get(resourceName).getPartitionSet().contains(segmentId)) {
           // No, add it
           // Create the realtime segment metadata
-          RealtimeSegmentZKMetadata realtimeSegmentMetadataToAdd = new RealtimeSegmentZKMetadata();
-          realtimeSegmentMetadataToAdd.setTableName(resourceName);
-          realtimeSegmentMetadataToAdd.setSegmentType(SegmentType.REALTIME);
-          realtimeSegmentMetadataToAdd.setStatus(Status.IN_PROGRESS);
-          realtimeSegmentMetadataToAdd.setSegmentName(segmentId);
+          SegmentZKMetadata segmentMetadataToAdd = new SegmentZKMetadata(segmentId);
+          segmentMetadataToAdd.setTableName(resourceName);
+          segmentMetadataToAdd.setSegmentType(SegmentType.REALTIME);
+          segmentMetadataToAdd.setStatus(Status.IN_PROGRESS);
 
           // Add the new metadata to the property store
-          ZKMetadataProvider.setRealtimeSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(), resourceName,
-              realtimeSegmentMetadataToAdd);
+          ZKMetadataProvider
+              .setSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(), resourceName, segmentMetadataToAdd);
 
           // Update the ideal state to add the new realtime segment
           HelixHelper.updateIdealState(_pinotHelixResourceManager.getHelixZkManager(), resourceName,
@@ -338,15 +335,15 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
           StreamConfig metadata =
               new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
           if (metadata.hasHighLevelConsumerType()) {
-            String realtimeTable = tableConfig.getTableName();
-            String realtimeSegmentsPathForTable = _propertyStorePath + SEGMENTS_PATH + "/" + realtimeTable;
+            String realtimeTableName = tableConfig.getTableName();
+            String realtimeSegmentsPathForTable = _propertyStorePath + SEGMENTS_PATH + "/" + realtimeTableName;
 
-            LOGGER.info("Setting data/child changes watch for real-time table '{}'", realtimeTable);
+            LOGGER.info("Setting data/child changes watch for real-time table '{}'", realtimeTableName);
             _zkClient.subscribeDataChanges(realtimeSegmentsPathForTable, this);
             _zkClient.subscribeChildChanges(realtimeSegmentsPathForTable, this);
 
             List<String> childNames =
-                _pinotHelixResourceManager.getPropertyStore().getChildNames(SEGMENTS_PATH + "/" + realtimeTable, 0);
+                _pinotHelixResourceManager.getPropertyStore().getChildNames(SEGMENTS_PATH + "/" + realtimeTableName, 0);
 
             if (childNames != null && !childNames.isEmpty()) {
               for (String segmentName : childNames) {
@@ -354,14 +351,14 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
                   continue;
                 }
                 String segmentPath = realtimeSegmentsPathForTable + "/" + segmentName;
-                RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = ZKMetadataProvider
-                    .getRealtimeSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(),
-                        tableConfig.getTableName(), segmentName);
-                if (realtimeSegmentZKMetadata == null) {
+                SegmentZKMetadata segmentZKMetadata = ZKMetadataProvider
+                    .getSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(), realtimeTableName,
+                        segmentName);
+                if (segmentZKMetadata == null) {
                   // The segment got deleted by retention manager
                   continue;
                 }
-                if (realtimeSegmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
+                if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
                   LOGGER.info("Setting data change watch for real-time segment currently being consumed: {}",
                       segmentPath);
                   _zkClient.subscribeDataChanges(segmentPath, this);

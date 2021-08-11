@@ -34,7 +34,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.helix.task.JobConfig;
 import org.apache.helix.task.TaskState;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
@@ -155,19 +155,19 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
         break;
       }
       String batchSegmentIngestionType = IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig);
-      String batchSegmentIngestionFrequency = IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig);
       BatchIngestionConfig batchIngestionConfig = tableConfig.getIngestionConfig().getBatchIngestionConfig();
       List<Map<String, String>> batchConfigMaps = batchIngestionConfig.getBatchConfigMaps();
       for (Map<String, String> batchConfigMap : batchConfigMaps) {
         try {
-          URI inputDirURI = SegmentGenerationUtils.getDirectoryURI(batchConfigMap.get(BatchConfigProperties.INPUT_DIR_URI));
+          URI inputDirURI =
+              SegmentGenerationUtils.getDirectoryURI(batchConfigMap.get(BatchConfigProperties.INPUT_DIR_URI));
           updateRecordReaderConfigs(batchConfigMap);
-          List<OfflineSegmentZKMetadata> offlineSegmentsMetadata = Collections.emptyList();
+          List<SegmentZKMetadata> segmentsZKMetadata = Collections.emptyList();
           // For append mode, we don't create segments for input file URIs already created.
           if (BatchConfigProperties.SegmentIngestionType.APPEND.name().equalsIgnoreCase(batchSegmentIngestionType)) {
-            offlineSegmentsMetadata = this._clusterInfoAccessor.getOfflineSegmentsMetadata(offlineTableName);
+            segmentsZKMetadata = _clusterInfoAccessor.getSegmentsZKMetadata(offlineTableName);
           }
-          Set<String> existingSegmentInputFiles = getExistingSegmentInputFiles(offlineSegmentsMetadata);
+          Set<String> existingSegmentInputFiles = getExistingSegmentInputFiles(segmentsZKMetadata);
           Set<String> inputFilesFromRunningTasks = getInputFilesFromRunningTasks();
           existingSegmentInputFiles.addAll(inputFilesFromRunningTasks);
           LOGGER.info("Trying to extract input files from path: {}, "
@@ -323,12 +323,12 @@ public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator
     return inputFileURIs;
   }
 
-  private Set<String> getExistingSegmentInputFiles(List<OfflineSegmentZKMetadata> offlineSegmentsMetadata) {
+  private Set<String> getExistingSegmentInputFiles(List<SegmentZKMetadata> segmentsZKMetadata) {
     Set<String> existingSegmentInputFiles = new HashSet<>();
-    for (OfflineSegmentZKMetadata metadata : offlineSegmentsMetadata) {
-      if ((metadata.getCustomMap() != null) && metadata.getCustomMap()
-          .containsKey(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY)) {
-        existingSegmentInputFiles.add(metadata.getCustomMap().get(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY));
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+      Map<String, String> customMap = segmentZKMetadata.getCustomMap();
+      if (customMap != null && customMap.containsKey(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY)) {
+        existingSegmentInputFiles.add(customMap.get(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY));
       }
     }
     return existingSegmentInputFiles;

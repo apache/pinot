@@ -31,9 +31,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
-import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
@@ -57,6 +55,7 @@ import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.SegmentType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -146,10 +145,9 @@ public class LLRealtimeSegmentDataManagerTest {
     return tableDataManager;
   }
 
-  private LLCRealtimeSegmentZKMetadata createZkMetadata() {
-
-    LLCRealtimeSegmentZKMetadata segmentZKMetadata = new LLCRealtimeSegmentZKMetadata();
-    segmentZKMetadata.setSegmentName(_segmentNameStr);
+  private SegmentZKMetadata createZkMetadata() {
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(_segmentNameStr);
+    segmentZKMetadata.setSegmentType(SegmentType.REALTIME);
     segmentZKMetadata.setStartOffset(_startOffset.toString());
     segmentZKMetadata.setCreationTime(System.currentTimeMillis());
     segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
@@ -158,19 +156,15 @@ public class LLRealtimeSegmentDataManagerTest {
 
   private FakeLLRealtimeSegmentDataManager createFakeSegmentManager()
       throws Exception {
-    LLCRealtimeSegmentZKMetadata segmentZKMetadata = createZkMetadata();
+    SegmentZKMetadata segmentZKMetadata = createZkMetadata();
     TableConfig tableConfig = createTableConfig();
-    InstanceZKMetadata instanceZKMetadata = new InstanceZKMetadata();
     RealtimeTableDataManager tableDataManager = createTableDataManager(tableConfig);
-    String resourceDir = _segmentDir;
     LLCSegmentName llcSegmentName = new LLCSegmentName(_segmentNameStr);
     _partitionGroupIdToSemaphoreMap.putIfAbsent(_partitionGroupId, new Semaphore(1));
     Schema schema = Schema.fromString(makeSchema());
     ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
-    FakeLLRealtimeSegmentDataManager segmentDataManager =
-        new FakeLLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, tableDataManager, resourceDir, schema,
-            llcSegmentName, _partitionGroupIdToSemaphoreMap, serverMetrics);
-    return segmentDataManager;
+    return new FakeLLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, tableDataManager, _segmentDir, schema,
+        llcSegmentName, _partitionGroupIdToSemaphoreMap, serverMetrics);
   }
 
   @BeforeClass
@@ -446,7 +440,7 @@ public class LLRealtimeSegmentDataManagerTest {
   @Test
   public void testOnlineTransitionAfterStop()
       throws Exception {
-    LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
+    SegmentZKMetadata metadata = new SegmentZKMetadata(_segmentNameStr);
     final long finalOffsetValue = _startOffsetValue + 600;
     final LongMsgOffset finalOffset = new LongMsgOffset(finalOffsetValue);
     metadata.setEndOffset(finalOffset.toString());
@@ -698,7 +692,7 @@ public class LLRealtimeSegmentDataManagerTest {
     Assert.assertTrue(segmentTarFile.exists());
 
     // Now let the segment go ONLINE from CONSUMING, and ensure that the file is removed.
-    LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
+    SegmentZKMetadata metadata = new SegmentZKMetadata(_segmentNameStr);
     metadata.setEndOffset(new LongMsgOffset(finalOffset).toString());
     segmentDataManager._stopWaitTimeMs = 0;
     segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.HOLDING);
@@ -809,7 +803,7 @@ public class LLRealtimeSegmentDataManagerTest {
       return dataManagerConfig;
     }
 
-    public FakeLLRealtimeSegmentDataManager(RealtimeSegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
+    public FakeLLRealtimeSegmentDataManager(SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
         RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, Schema schema,
         LLCSegmentName llcSegmentName, Map<Integer, Semaphore> semaphoreMap, ServerMetrics serverMetrics)
         throws Exception {
@@ -938,7 +932,7 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected void downloadSegmentAndReplace(LLCRealtimeSegmentZKMetadata metadata) {
+    protected void downloadSegmentAndReplace(SegmentZKMetadata metadata) {
       _downloadAndReplaceCalled = true;
     }
 

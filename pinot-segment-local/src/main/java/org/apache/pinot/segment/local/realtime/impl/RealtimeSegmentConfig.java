@@ -22,7 +22,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
@@ -47,7 +47,7 @@ public class RealtimeSegmentConfig {
   private final Set<String> _fstIndexColumns;
   private final Set<String> _jsonIndexColumns;
   private final Map<String, H3IndexConfig> _h3IndexConfigs;
-  private final RealtimeSegmentZKMetadata _realtimeSegmentZKMetadata;
+  private final SegmentZKMetadata _segmentZKMetadata;
   private final boolean _offHeap;
   private final PinotDataBufferMemoryManager _memoryManager;
   private final RealtimeSegmentStatsHistory _statsHistory;
@@ -67,7 +67,7 @@ public class RealtimeSegmentConfig {
       String timeColumnName, int capacity, int avgNumMultiValues, Set<String> noDictionaryColumns,
       Set<String> varLengthDictionaryColumns, Set<String> invertedIndexColumns, Set<String> textIndexColumns,
       Set<String> fstIndexColumns, Set<String> jsonIndexColumns, Map<String, H3IndexConfig> h3IndexConfigs,
-      RealtimeSegmentZKMetadata realtimeSegmentZKMetadata, boolean offHeap, PinotDataBufferMemoryManager memoryManager,
+      SegmentZKMetadata segmentZKMetadata, boolean offHeap, PinotDataBufferMemoryManager memoryManager,
       RealtimeSegmentStatsHistory statsHistory, String partitionColumn, PartitionFunction partitionFunction,
       int partitionId, boolean aggregateMetrics, boolean nullHandlingEnabled, String consumerDir,
       UpsertConfig.Mode upsertMode, String upsertComparisonColumn, UpsertConfig.HashFunction hashFunction,
@@ -86,7 +86,7 @@ public class RealtimeSegmentConfig {
     _fstIndexColumns = fstIndexColumns;
     _jsonIndexColumns = jsonIndexColumns;
     _h3IndexConfigs = h3IndexConfigs;
-    _realtimeSegmentZKMetadata = realtimeSegmentZKMetadata;
+    _segmentZKMetadata = segmentZKMetadata;
     _offHeap = offHeap;
     _memoryManager = memoryManager;
     _statsHistory = statsHistory;
@@ -163,8 +163,8 @@ public class RealtimeSegmentConfig {
     return _h3IndexConfigs;
   }
 
-  public RealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata() {
-    return _realtimeSegmentZKMetadata;
+  public SegmentZKMetadata getSegmentZKMetadata() {
+    return _segmentZKMetadata;
   }
 
   public boolean isOffHeap() {
@@ -234,7 +234,7 @@ public class RealtimeSegmentConfig {
     private Set<String> _fstIndexColumns = new HashSet<>();
     private Set<String> _jsonIndexColumns = new HashSet<>();
     private Map<String, H3IndexConfig> _h3IndexConfigs = new HashMap<>();
-    private RealtimeSegmentZKMetadata _realtimeSegmentZKMetadata;
+    private SegmentZKMetadata _segmentZKMetadata;
     private boolean _offHeap;
     private PinotDataBufferMemoryManager _memoryManager;
     private RealtimeSegmentStatsHistory _statsHistory;
@@ -330,8 +330,8 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
-    public Builder setRealtimeSegmentZKMetadata(RealtimeSegmentZKMetadata realtimeSegmentZKMetadata) {
-      _realtimeSegmentZKMetadata = realtimeSegmentZKMetadata;
+    public Builder setSegmentZKMetadata(SegmentZKMetadata segmentZKMetadata) {
+      _segmentZKMetadata = segmentZKMetadata;
       return this;
     }
 
@@ -403,7 +403,7 @@ public class RealtimeSegmentConfig {
     public RealtimeSegmentConfig build() {
       return new RealtimeSegmentConfig(_tableNameWithType, _segmentName, _streamName, _schema, _timeColumnName,
           _capacity, _avgNumMultiValues, _noDictionaryColumns, _varLengthDictionaryColumns, _invertedIndexColumns,
-          _textIndexColumns, _fstIndexColumns, _jsonIndexColumns, _h3IndexConfigs, _realtimeSegmentZKMetadata, _offHeap,
+          _textIndexColumns, _fstIndexColumns, _jsonIndexColumns, _h3IndexConfigs, _segmentZKMetadata, _offHeap,
           _memoryManager, _statsHistory, _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics,
           _nullHandlingEnabled, _consumerDir, _upsertMode, _upsertComparisonColumn, _hashFunction,
           _partitionUpsertMetadataManager);
