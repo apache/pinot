@@ -202,19 +202,14 @@ public final class FSATraversalTest extends TestBase {
 
   @Test
   public void testRegexMatcher() throws IOException {
-    byte[][] input = new byte[10][20];
+    String firstString = "he";
+    String secondString = "hp";
+    FSABuilder builder = new FSABuilder();
 
-    //input[0] = "hello".getBytes(UTF_8);
-    input[0] = "hel12".getBytes();
-    //input[2] = "still".getBytes();
+    builder.add(firstString.getBytes(UTF_8), 0, firstString.length(), 127);
+    builder.add(secondString.getBytes(UTF_8), 0, secondString.length(), 136);
 
-    Arrays.sort(input, FSABuilder.LEXICAL_ORDERING);
-    FSA s = FSABuilder.build(input, new int[] {12, 21, 123});
-
-    final FSATraversal traversalHelper = new FSATraversal(fsa);
-
-    //MatchResult m = traversalHelper.match("hello".getBytes(UTF_8));
-    //assertEquals(EXACT_MATCH, m.kind);
+    FSA s = builder.complete();
 
     final byte[] fsaData =
         new FSA5Serializer().withNumbers()
@@ -223,7 +218,7 @@ public final class FSATraversalTest extends TestBase {
 
     final FSA5 fsa = FSA.read(new ByteArrayInputStream(fsaData), FSA5.class, true);
 
-    List<Long> results = RegexpMatcher.regexMatch("he.*12", fsa);
+    List<Long> results = RegexpMatcher.regexMatch("h.*", fsa);
 
     System.out.println(results);
     int i = 0;

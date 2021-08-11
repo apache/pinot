@@ -154,24 +154,16 @@ public class RegexpMatcher {
           int node = _fst.getEndNode(path.fstArc);
           int arc = _fst.getFirstArc(node);
 
-          if (arc == 0) {
-            int i = 0;
-          }
-
-          //TODO: atri
-          /*if (arc ==  0) {
-            System.out.println("IS 0");
-          }*/
           while (arc != 0 && _fst.getArcLabel(arc) <= max) {
             //TODO: atri
-              if (_fst.isArcLast(arc) && _fst.isArcTerminal(arc) && _fst.isArcFinal(arc)) {
-                System.out.println("IS FOOOOO " + arc);
+              if (_fst.isArcTerminal(path.fstArc) && _fst.isArcLast(path.fstArc)) {
+                System.out.println("IS FOOOOO " + arc + " for transition " + (char) t.min);
                 break;
               }
 
             //TODO: atri -- see why output symbols are missing and fix it
             //TODO: atri
-            System.out.println("ADDING PATH " + t.to + " " + _fst.getEndNode(arc) + " " + arc);
+            System.out.println("ADDING PATH for arc " + arc +  " " + _fst.getEndNode(arc) + " " + _fst.getFirstArc(_fst.getEndNode(arc)));
 
             queue.add(new Path(t.to, _fst.getEndNode(arc), arc, -1));
 
@@ -182,11 +174,6 @@ public class RegexpMatcher {
               if (_fst.isArcTerminal(arc)) {
                 System.out.println("IS TERMINAL " + arc);
               }*/
-
-            //TODO: atri
-            if (_fst.getRootNode()  == _fst.getEndNode(arc)) {
-              System.out.println("IS START  " + arc + " " + _fst.getEndNode(arc));
-            }
 
             arc = _fst.isArcLast(arc) ? 0 :_fst.getNextArc(arc);
           }

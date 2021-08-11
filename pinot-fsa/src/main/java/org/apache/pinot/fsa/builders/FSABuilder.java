@@ -208,6 +208,7 @@ public final class FSABuilder {
       setArcTarget(p, i == len ? ConstantArcSizeFSA.TERMINAL_STATE : activePath[i]);
 
       //TODO: atri
+      System.out.println("PUTTING CHAR " + (char) sequence[j - 1] + " " + "at " + p);
       int foo = i == len ? ConstantArcSizeFSA.TERMINAL_STATE : activePath[i];
       //System.out.println("ARC PUTTING for " + p + " for symbol " + (char) sequence[j - 1] + " and target " + foo);
 
