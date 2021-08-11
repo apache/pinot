@@ -91,7 +91,7 @@ public final class FSATraversalTest extends TestBase {
       assertEquals(AUTOMATON_HAS_PREFIX, m.kind);
       assertEquals(1, m.index);*/
 
-      List<Long> results = RegexpMatcher.regexMatch("ab", fsa5);
+      List<Long> results = RegexpMatcher.regexMatch("ab.*", fsa5);
 
       System.out.println(results);
 
@@ -204,8 +204,8 @@ public final class FSATraversalTest extends TestBase {
   public void testRegexMatcher() throws IOException {
     byte[][] input = new byte[10][20];
 
-    input[0] = "hello".getBytes(UTF_8);
-    //input[1] = "hello-world123".getBytes();
+    //input[0] = "hello".getBytes(UTF_8);
+    input[0] = "hel12".getBytes();
     //input[2] = "still".getBytes();
 
     Arrays.sort(input, FSABuilder.LEXICAL_ORDERING);
@@ -213,8 +213,8 @@ public final class FSATraversalTest extends TestBase {
 
     final FSATraversal traversalHelper = new FSATraversal(fsa);
 
-    MatchResult m = traversalHelper.match("hello".getBytes(UTF_8));
-    assertEquals(EXACT_MATCH, m.kind);
+    //MatchResult m = traversalHelper.match("hello".getBytes(UTF_8));
+    //assertEquals(EXACT_MATCH, m.kind);
 
     final byte[] fsaData =
         new FSA5Serializer().withNumbers()
@@ -223,9 +223,9 @@ public final class FSATraversalTest extends TestBase {
 
     final FSA5 fsa = FSA.read(new ByteArrayInputStream(fsaData), FSA5.class, true);
 
-    List<Long> results = RegexpMatcher.regexMatch("hel.*", fsa);
+    List<Long> results = RegexpMatcher.regexMatch("he.*12", fsa);
 
-    //System.out.println(results);
+    System.out.println(results);
     int i = 0;
   }
 

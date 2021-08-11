@@ -209,9 +209,14 @@ public final class FSABuilder {
 
       //TODO: atri
       int foo = i == len ? ConstantArcSizeFSA.TERMINAL_STATE : activePath[i];
-      System.out.println("CURRENT ARC " + p + " target " + foo);
+      //System.out.println("ARC PUTTING for " + p + " for symbol " + (char) sequence[j - 1] + " and target " + foo);
+
+      //TODO: atri
+      //System.out.println("CURRENT ARC " + p + " target " + foo);
       //System.out.println("CURRENT ONE " + i + " value of seq " + j + " p " + p);
 
+      //TODO: atri
+      //System.out.println("PUTTING SYMBOL " + outputSymbol + " FOR " + i);
       outputSymbols.put(i, outputSymbol);
 
       nextArcOffset[i - 1] = p + ConstantArcSizeFSA.ARC_SIZE;

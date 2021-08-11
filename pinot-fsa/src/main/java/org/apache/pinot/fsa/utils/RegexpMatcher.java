@@ -94,6 +94,9 @@ public class RegexpMatcher {
       return Collections.emptyList();
     }
 
+    //TODO: atri
+    //System.out.println(_automaton.toString());
+
     // Automaton start state and FST start node is added to the queue.
     queue.add(new Path( _automaton.getInitialState(), _fst.getRootNode(), 0, -1));
 
@@ -110,9 +113,11 @@ public class RegexpMatcher {
       // If automaton is in accept state and the fstNode is final (i.e. end node) then add the entry to endNodes which
       // contains the result set.
       if (acceptStates.contains(path.state)) {
+        //TODO: atri
+        //System.out.println("I AM COMPLETE BRO " + path.state);
         if (_fst.isArcFinal(path.fstArc)) {
           //TODO: atri
-          System.out.println("DOING IT " + path.fstArc + " " + path.node + " " + path.state);
+          //System.out.println("DOING IT " + path.fstArc + " " + path.node + " " + path.state + " " + (char) _fst.getArcLabel(path.fstArc));
 
           endNodes.add(path);
         }
@@ -131,18 +136,59 @@ public class RegexpMatcher {
           int arc = _fst.getArc(path.node, (byte) t.min);
 
           //TODO: atri
-          System.out.println("ARC IS " + arc + " FOR ARC " + path.fstArc);
+          //System.out.println("ARC IS " + arc + " FOR ARC " + path.fstArc + " for transition " + (char) t.min + " state" + path.state + " transition out " + t.to);
 
           if (arc != 0) {
+            //TODO: atri
+            /*try {
+              int foo = _fst.getOutputSymbol(arc);
+              System.out.println("DONE " + foo + " FOR ARC " + arc);
+            } catch (NullPointerException e) {
+              System.out.println("NULL VALUE1 " + arc);
+            }*/
+
             //TODO: atri -- see why output symbols are missing and fix it
             queue.add(new Path(t.to, _fst.getEndNode(arc), arc,-1));
           }
         } else {
-          int arc = _fst.getArc(path.node, (byte) min);
+          int node = _fst.getEndNode(path.fstArc);
+          int arc = _fst.getFirstArc(node);
+
+          if (arc == 0) {
+            int i = 0;
+          }
+
+          //TODO: atri
+          /*if (arc ==  0) {
+            System.out.println("IS 0");
+          }*/
           while (arc != 0 && _fst.getArcLabel(arc) <= max) {
+            //TODO: atri
+              if (_fst.isArcLast(arc) && _fst.isArcTerminal(arc) && _fst.isArcFinal(arc)) {
+                System.out.println("IS FOOOOO " + arc);
+                break;
+              }
+
             //TODO: atri -- see why output symbols are missing and fix it
+            //TODO: atri
+            System.out.println("ADDING PATH " + t.to + " " + _fst.getEndNode(arc) + " " + arc);
+
             queue.add(new Path(t.to, _fst.getEndNode(arc), arc, -1));
-            arc = _fst.getNextArc(arc);
+
+              /*if (_fst.isArcFinal(arc)) {
+                System.out.println("IS FINAL " + arc );
+              }
+
+              if (_fst.isArcTerminal(arc)) {
+                System.out.println("IS TERMINAL " + arc);
+              }*/
+
+            //TODO: atri
+            if (_fst.getRootNode()  == _fst.getEndNode(arc)) {
+              System.out.println("IS START  " + arc + " " + _fst.getEndNode(arc));
+            }
+
+            arc = _fst.isArcLast(arc) ? 0 :_fst.getNextArc(arc);
           }
         }
       }

@@ -247,7 +247,7 @@ public final class FSA5 extends FSA {
   @Override
   public int getEndNode(int arc) {
     final int nodeOffset = getDestinationNodeOffset(arc);
-    assert nodeOffset != 0 : "No target node for terminal arcs.";
+    //assert nodeOffset != 0 : "No target node for terminal arcs.";
     return nodeOffset;
   }
 
