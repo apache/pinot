@@ -36,6 +36,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.broker.routing.segmentpruner.interval.Interval;
 import org.apache.pinot.broker.routing.segmentpruner.interval.IntervalTree;
+import org.apache.pinot.broker.routing.segmentselector.SelectedSegments;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
@@ -154,7 +155,7 @@ public class TimeSegmentPruner implements SegmentPruner {
    *       M: # of qualified intersected segments).
    */
   @Override
-  public Set<String> prune(BrokerRequest brokerRequest, Set<String> segments) {
+  public SelectedSegments prune(BrokerRequest brokerRequest, SelectedSegments segments) {
     IntervalTree<String> intervalTree = _intervalTree;
 
     List<Interval> intervals;
@@ -179,18 +180,18 @@ public class TimeSegmentPruner implements SegmentPruner {
       return segments;
     }
     if (intervals.isEmpty()) { // invalid query time interval
-      return Collections.emptySet();
+      return new SelectedSegments(Collections.emptySet(), true);
     }
 
     Set<String> selectedSegments = new HashSet<>();
     for (Interval interval : intervals) {
       for (String segment : intervalTree.searchAll(interval)) {
-        if (segments.contains(segment)) {
+        if (segments.getSegments().contains(segment)) {
           selectedSegments.add(segment);
         }
       }
     }
-    return selectedSegments;
+    return new SelectedSegments(selectedSegments, false);
   }
 
   /**

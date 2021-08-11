@@ -69,7 +69,7 @@ public class SegmentSelectorTest {
     RealtimeSegmentSelector segmentSelector = new RealtimeSegmentSelector();
     segmentSelector.init(externalView, idealState, onlineSegments);
     BrokerRequest brokerRequest = mock(BrokerRequest.class);
-    assertTrue(segmentSelector.select(brokerRequest).isEmpty());
+    assertTrue(segmentSelector.select(brokerRequest).getSegmentHash().isEmpty());
 
     // For HLC segments, only one group of segments should be selected
     int numHLCGroups = 3;
@@ -89,7 +89,7 @@ public class SegmentSelectorTest {
     segmentSelector.onExternalViewChange(externalView, idealState, onlineSegments);
 
     // Only HLC segments exist, should select the HLC segments from the first group
-    assertEqualsNoOrder(segmentSelector.select(brokerRequest).toArray(), hlcSegments[0]);
+    assertEqualsNoOrder(segmentSelector.select(brokerRequest).getSegments().toArray(), hlcSegments[0]);
 
     // For LLC segments, only the first CONSUMING segment for each partition should be selected
     int numLLCPartitions = 3;
@@ -113,11 +113,11 @@ public class SegmentSelectorTest {
     segmentSelector.onExternalViewChange(externalView, idealState, onlineSegments);
 
     // Both HLC and LLC segments exist, should select the LLC segments
-    assertEqualsNoOrder(segmentSelector.select(brokerRequest).toArray(), expectedSelectedLLCSegments);
+    assertEqualsNoOrder(segmentSelector.select(brokerRequest).getSegments().toArray(), expectedSelectedLLCSegments);
 
     // When HLC is forced, should select the HLC segments from the second group
     when(brokerRequest.getDebugOptions()).thenReturn(Collections.singletonMap(ROUTING_OPTIONS_KEY, FORCE_HLC));
-    assertEqualsNoOrder(segmentSelector.select(brokerRequest).toArray(), hlcSegments[1]);
+    assertEqualsNoOrder(segmentSelector.select(brokerRequest).getSegments().toArray(), hlcSegments[1]);
 
     // Remove all the HLC segments from ideal state, should select the LLC segments even when HLC is forced
     for (String[] hlcSegmentsForGroup : hlcSegments) {
@@ -126,6 +126,6 @@ public class SegmentSelectorTest {
       }
     }
     segmentSelector.onExternalViewChange(externalView, idealState, onlineSegments);
-    assertEqualsNoOrder(segmentSelector.select(brokerRequest).toArray(), expectedSelectedLLCSegments);
+    assertEqualsNoOrder(segmentSelector.select(brokerRequest).getSegments().toArray(), expectedSelectedLLCSegments);
   }
 }

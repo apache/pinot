@@ -21,6 +21,7 @@ package org.apache.pinot.broker.routing.segmentpruner;
 import java.util.Set;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.broker.routing.segmentselector.SelectedSegments;
 import org.apache.pinot.common.request.BrokerRequest;
 
 
@@ -50,5 +51,5 @@ public interface SegmentPruner {
   /**
    * Prunes the segments queried by the given broker request, returns the selected segments to be queried.
    */
-  Set<String> prune(BrokerRequest brokerRequest, Set<String> segments);
+  SelectedSegments prune(BrokerRequest brokerRequest, SelectedSegments segments);
 }

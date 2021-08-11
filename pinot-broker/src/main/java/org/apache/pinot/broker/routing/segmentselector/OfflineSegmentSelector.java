@@ -29,7 +29,7 @@ import org.apache.pinot.common.request.BrokerRequest;
  * Segment selector for offline table.
  */
 public class OfflineSegmentSelector implements SegmentSelector {
-  private volatile Set<String> _segments;
+  private volatile SelectedSegments selectedSegments = new SelectedSegments(Collections.emptySet(), true);
 
   @Override
   public void init(ExternalView externalView, IdealState idealState, Set<String> onlineSegments) {
@@ -41,11 +41,11 @@ public class OfflineSegmentSelector implements SegmentSelector {
     // TODO: for new added segments, before all replicas are up, consider not selecting them to avoid causing
     //       hotspot servers
 
-    _segments = Collections.unmodifiableSet(onlineSegments);
+    selectedSegments = new SelectedSegments(Collections.unmodifiableSet(onlineSegments), true);
   }
 
   @Override
-  public Set<String> select(BrokerRequest brokerRequest) {
-    return _segments;
+  public SelectedSegments select(BrokerRequest brokerRequest) {
+    return selectedSegments;
   }
 }

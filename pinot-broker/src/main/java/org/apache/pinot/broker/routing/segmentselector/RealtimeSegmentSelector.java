@@ -55,7 +55,7 @@ public class RealtimeSegmentSelector implements SegmentSelector {
 
   private final AtomicLong _requestId = new AtomicLong();
   private volatile List<Set<String>> _hlcSegments;
-  private volatile Set<String> _llcSegments;
+  private volatile SelectedSegments _llcSegments;
 
   @Override
   public void init(ExternalView externalView, IdealState idealState, Set<String> onlineSegments) {
@@ -131,16 +131,16 @@ public class RealtimeSegmentSelector implements SegmentSelector {
       for (LLCSegmentName llcSegmentName : partitionIdToFirstConsumingLLCSegmentMap.values()) {
         llcSegments.add(llcSegmentName.getSegmentName());
       }
-      _llcSegments = Collections.unmodifiableSet(llcSegments);
+      _llcSegments = new SelectedSegments(Collections.unmodifiableSet(llcSegments), true);
     } else {
       _llcSegments = null;
     }
   }
 
   @Override
-  public Set<String> select(BrokerRequest brokerRequest) {
+  public SelectedSegments select(BrokerRequest brokerRequest) {
     if (_hlcSegments == null && _llcSegments == null) {
-      return Collections.emptySet();
+      return new SelectedSegments(Collections.emptySet(), true);
     }
     if (_hlcSegments == null) {
       return selectLLCSegments();
@@ -162,12 +162,12 @@ public class RealtimeSegmentSelector implements SegmentSelector {
     return selectLLCSegments();
   }
 
-  private Set<String> selectHLCSegments() {
+  private SelectedSegments selectHLCSegments() {
     List<Set<String>> hlcSegments = _hlcSegments;
-    return hlcSegments.get((int) (_requestId.getAndIncrement() % hlcSegments.size()));
+    return new SelectedSegments(hlcSegments.get((int) (_requestId.getAndIncrement() % hlcSegments.size())), true);
   }
 
-  private Set<String> selectLLCSegments() {
+  private SelectedSegments selectLLCSegments() {
     return _llcSegments;
   }
 }

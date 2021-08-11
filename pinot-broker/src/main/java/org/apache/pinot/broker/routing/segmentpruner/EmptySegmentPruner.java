@@ -30,6 +30,7 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.broker.routing.segmentselector.SelectedSegments;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -122,12 +123,12 @@ public class EmptySegmentPruner implements SegmentPruner {
    * Prune out segments which are empty
    */
   @Override
-  public Set<String> prune(BrokerRequest brokerRequest, Set<String> segments) {
+  public SelectedSegments prune(BrokerRequest brokerRequest, SelectedSegments segments) {
     if (_emptySegments.isEmpty()) {
       return segments;
     }
-    Set<String> selectedSegments = new HashSet<>(segments);
-    selectedSegments.removeAll(_emptySegments);
-    return selectedSegments;
+    Set<String> pruned = new HashSet<>(segments.getSegments());
+    pruned.removeAll(_emptySegments);
+    return new SelectedSegments(pruned, true);
   }
 }

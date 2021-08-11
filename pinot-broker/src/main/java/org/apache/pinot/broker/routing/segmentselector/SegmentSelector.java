@@ -59,5 +59,5 @@ public interface SegmentSelector {
    * Selects the segments queried by the given broker request. The segments selected should cover the whole dataset
    * (table) without overlap.
    */
-  Set<String> select(BrokerRequest brokerRequest);
+  SelectedSegments select(BrokerRequest brokerRequest);
 }

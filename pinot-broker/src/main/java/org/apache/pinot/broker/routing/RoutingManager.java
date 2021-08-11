@@ -47,6 +47,7 @@ import org.apache.pinot.broker.routing.segmentpruner.SegmentPruner;
 import org.apache.pinot.broker.routing.segmentpruner.SegmentPrunerFactory;
 import org.apache.pinot.broker.routing.segmentselector.SegmentSelector;
 import org.apache.pinot.broker.routing.segmentselector.SegmentSelectorFactory;
+import org.apache.pinot.broker.routing.segmentselector.SelectedSegments;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -570,14 +571,14 @@ public class RoutingManager implements ClusterChangeHandler {
     }
 
     InstanceSelector.SelectionResult calculateRouting(BrokerRequest brokerRequest) {
-      Set<String> selectedSegments = _segmentSelector.select(brokerRequest);
-      if (!selectedSegments.isEmpty()) {
+      SelectedSegments selectedSegments = _segmentSelector.select(brokerRequest);
+      if (!selectedSegments.getSegments().isEmpty()) {
         for (SegmentPruner segmentPruner : _segmentPruners) {
           selectedSegments = segmentPruner.prune(brokerRequest, selectedSegments);
         }
       }
-      if (!selectedSegments.isEmpty()) {
-        return _instanceSelector.select(brokerRequest, new ArrayList<>(selectedSegments));
+      if (!selectedSegments.getSegments().isEmpty()) {
+        return _instanceSelector.select(brokerRequest, new ArrayList<>(selectedSegments.getSegments()));
       } else {
         return new InstanceSelector.SelectionResult(Collections.emptyMap(), Collections.emptyList());
       }

@@ -33,6 +33,7 @@ import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.broker.routing.segmentselector.SelectedSegments;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
@@ -241,17 +242,17 @@ public class SegmentPrunerTest {
         new PartitionSegmentPruner(OFFLINE_TABLE_NAME, PARTITION_COLUMN, _propertyStore);
     Set<String> onlineSegments = new HashSet<>();
     segmentPruner.init(externalView, idealState, onlineSegments);
-    assertEquals(segmentPruner.prune(brokerRequest1, Collections.emptySet()), Collections.emptySet());
-    assertEquals(segmentPruner.prune(brokerRequest2, Collections.emptySet()), Collections.emptySet());
-    assertEquals(segmentPruner.prune(brokerRequest3, Collections.emptySet()), Collections.emptySet());
+    assertEquals(segmentPruner.prune(brokerRequest1, new SelectedSegments(Collections.emptySet(), true)).getSegments(), Collections.emptySet());
+    assertEquals(segmentPruner.prune(brokerRequest2, new SelectedSegments(Collections.emptySet(), true)).getSegments(), Collections.emptySet());
+    assertEquals(segmentPruner.prune(brokerRequest3, new SelectedSegments(Collections.emptySet(), true)).getSegments(), Collections.emptySet());
 
     // Segments without metadata (not updated yet) should not be pruned
     String newSegment = "newSegment";
-    assertEquals(segmentPruner.prune(brokerRequest1, Collections.singleton(newSegment)),
+    assertEquals(segmentPruner.prune(brokerRequest1, new SelectedSegments(Collections.singleton(newSegment), true)).getSegments(),
         Collections.singletonList(newSegment));
-    assertEquals(segmentPruner.prune(brokerRequest2, Collections.singleton(newSegment)),
+    assertEquals(segmentPruner.prune(brokerRequest2, new SelectedSegments(Collections.singleton(newSegment), true)).getSegments(),
         Collections.singletonList(newSegment));
-    assertEquals(segmentPruner.prune(brokerRequest3, Collections.singleton(newSegment)),
+    assertEquals(segmentPruner.prune(brokerRequest3, new SelectedSegments(Collections.singleton(newSegment), true)).getSegments(),
         Collections.singletonList(newSegment));
 
     // Segments without partition metadata should not be pruned
@@ -263,13 +264,13 @@ public class SegmentPrunerTest {
         .setOfflineSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segmentZKMetadataWithoutPartitionMetadata);
     segmentPruner.onExternalViewChange(externalView, idealState, onlineSegments);
     assertEquals(
-        segmentPruner.prune(brokerRequest1, new HashSet<>(Collections.singletonList(segmentWithoutPartitionMetadata))),
+        segmentPruner.prune(brokerRequest1, new SelectedSegments(new HashSet<>(Collections.singletonList(segmentWithoutPartitionMetadata)), true)).getSegments(),
         Collections.singletonList(segmentWithoutPartitionMetadata));
     assertEquals(
-        segmentPruner.prune(brokerRequest2, new HashSet<>(Collections.singletonList(segmentWithoutPartitionMetadata))),
+        segmentPruner.prune(brokerRequest2, new SelectedSegments(new HashSet<>(Collections.singletonList(segmentWithoutPartitionMetadata)), true)).getSegments(),
         Collections.singletonList(segmentWithoutPartitionMetadata));
     assertEquals(
-        segmentPruner.prune(brokerRequest3, new HashSet<>(Collections.singletonList(segmentWithoutPartitionMetadata))),
+        segmentPruner.prune(brokerRequest3, new SelectedSegments(new HashSet<>(Collections.singletonList(segmentWithoutPartitionMetadata)), true)).getSegments(),
         Collections.singletonList(segmentWithoutPartitionMetadata));
 
     // Test different partition functions and number of partitions
@@ -282,30 +283,30 @@ public class SegmentPrunerTest {
     onlineSegments.add(segment1);
     setSegmentZKPartitionMetadata(segment1, "Murmur", 4, 0);
     segmentPruner.onExternalViewChange(externalView, idealState, onlineSegments);
-    assertEquals(segmentPruner.prune(brokerRequest1, new HashSet<>(Arrays.asList(segment0, segment1))),
+    assertEquals(segmentPruner.prune(brokerRequest1, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1)), true)).getSegments(),
         new HashSet<>(Arrays.asList(segment0, segment1)));
-    assertEquals(segmentPruner.prune(brokerRequest2, new HashSet<>(Arrays.asList(segment0, segment1))),
+    assertEquals(segmentPruner.prune(brokerRequest2, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1)), true)).getSegments(),
         new HashSet<>(Arrays.asList(segment0, segment1)));
-    assertEquals(segmentPruner.prune(brokerRequest3, new HashSet<>(Arrays.asList(segment0, segment1))),
+    assertEquals(segmentPruner.prune(brokerRequest3, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1)), true)).getSegments(),
         new HashSet<>(Collections.singletonList(segment1)));
 
     // Update partition metadata without refreshing should have no effect
     setSegmentZKPartitionMetadata(segment0, "Modulo", 4, 1);
     segmentPruner.onExternalViewChange(externalView, idealState, onlineSegments);
-    assertEquals(segmentPruner.prune(brokerRequest1, new HashSet<>(Arrays.asList(segment0, segment1))),
+    assertEquals(segmentPruner.prune(brokerRequest1, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1)), true)).getSegments(),
         new HashSet<>(Arrays.asList(segment0, segment1)));
-    assertEquals(segmentPruner.prune(brokerRequest2, new HashSet<>(Arrays.asList(segment0, segment1))),
+    assertEquals(segmentPruner.prune(brokerRequest2, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1)), true)).getSegments(),
         new HashSet<>(Arrays.asList(segment0, segment1)));
-    assertEquals(segmentPruner.prune(brokerRequest3, new HashSet<>(Arrays.asList(segment0, segment1))),
+    assertEquals(segmentPruner.prune(brokerRequest3, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1)), true)).getSegments(),
         new HashSet<>(Collections.singletonList(segment1)));
 
     // Refresh the changed segment should update the segment pruner
     segmentPruner.refreshSegment(segment0);
-    assertEquals(segmentPruner.prune(brokerRequest1, new HashSet<>(Arrays.asList(segment0, segment1))),
+    assertEquals(segmentPruner.prune(brokerRequest1, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1)), true)).getSegments(),
         new HashSet<>(Arrays.asList(segment0, segment1)));
-    assertEquals(segmentPruner.prune(brokerRequest2, new HashSet<>(Arrays.asList(segment0, segment1))),
+    assertEquals(segmentPruner.prune(brokerRequest2, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1)), true)).getSegments(),
         new HashSet<>(Collections.singletonList(segment1)));
-    assertEquals(segmentPruner.prune(brokerRequest3, new HashSet<>(Arrays.asList(segment0, segment1))),
+    assertEquals(segmentPruner.prune(brokerRequest3, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1)), true)).getSegments(),
         new HashSet<>(Arrays.asList(segment0, segment1)));
   }
 
@@ -328,13 +329,13 @@ public class SegmentPrunerTest {
     TimeSegmentPruner segmentPruner = new TimeSegmentPruner(tableConfig, _propertyStore);
     Set<String> onlineSegments = new HashSet<>();
     segmentPruner.init(externalView, idealState, onlineSegments);
-    assertEquals(segmentPruner.prune(brokerRequest1, Collections.emptySet()), Collections.emptySet());
-    assertEquals(segmentPruner.prune(brokerRequest2, Collections.emptySet()), Collections.emptySet());
-    assertEquals(segmentPruner.prune(brokerRequest3, Collections.emptySet()), Collections.emptySet());
-    assertEquals(segmentPruner.prune(brokerRequest4, Collections.emptySet()), Collections.emptySet());
-    assertEquals(segmentPruner.prune(brokerRequest5, Collections.emptySet()), Collections.emptySet());
-    assertEquals(segmentPruner.prune(brokerRequest6, Collections.emptySet()), Collections.emptySet());
-    assertEquals(segmentPruner.prune(brokerRequest7, Collections.emptySet()), Collections.emptySet());
+    assertEquals(segmentPruner.prune(brokerRequest1, new SelectedSegments(Collections.emptySet(), true)).getSegments(), Collections.emptySet());
+    assertEquals(segmentPruner.prune(brokerRequest2, new SelectedSegments(Collections.emptySet(), true)).getSegments(), Collections.emptySet());
+    assertEquals(segmentPruner.prune(brokerRequest3, new SelectedSegments(Collections.emptySet(), true)).getSegments(), Collections.emptySet());
+    assertEquals(segmentPruner.prune(brokerRequest4, new SelectedSegments(Collections.emptySet(), true)).getSegments(), Collections.emptySet());
+    assertEquals(segmentPruner.prune(brokerRequest5, new SelectedSegments(Collections.emptySet(), true)).getSegments(), Collections.emptySet());
+    assertEquals(segmentPruner.prune(brokerRequest6, new SelectedSegments(Collections.emptySet(), true)).getSegments(), Collections.emptySet());
+    assertEquals(segmentPruner.prune(brokerRequest7, new SelectedSegments(Collections.emptySet(), true)).getSegments(), Collections.emptySet());
 
     // Initialize with non-empty onlineSegments
     // Segments without metadata (not updated yet) should not be pruned
@@ -342,19 +343,19 @@ public class SegmentPrunerTest {
     String newSegment = "newSegment";
     onlineSegments.add(newSegment);
     segmentPruner.init(externalView, idealState, onlineSegments);
-    assertEquals(segmentPruner.prune(brokerRequest1, Collections.singleton(newSegment)),
+    assertEquals(segmentPruner.prune(brokerRequest1, new SelectedSegments(Collections.singleton(newSegment), true)).getSegments(),
         Collections.singletonList(newSegment));
-    assertEquals(segmentPruner.prune(brokerRequest2, Collections.singleton(newSegment)),
+    assertEquals(segmentPruner.prune(brokerRequest2, new SelectedSegments(Collections.singleton(newSegment), true)).getSegments(),
         Collections.singletonList(newSegment));
-    assertEquals(segmentPruner.prune(brokerRequest3, Collections.singleton(newSegment)),
+    assertEquals(segmentPruner.prune(brokerRequest3, new SelectedSegments(Collections.singleton(newSegment), true)).getSegments(),
         Collections.singletonList(newSegment));
-    assertEquals(segmentPruner.prune(brokerRequest4, Collections.singleton(newSegment)),
+    assertEquals(segmentPruner.prune(brokerRequest4, new SelectedSegments(Collections.singleton(newSegment), true)).getSegments(),
         Collections.singletonList(newSegment));
-    assertEquals(segmentPruner.prune(brokerRequest5, Collections.singleton(newSegment)),
+    assertEquals(segmentPruner.prune(brokerRequest5, new SelectedSegments(Collections.singleton(newSegment), true)).getSegments(),
         Collections.singletonList(newSegment));
-    assertEquals(segmentPruner.prune(brokerRequest6, Collections.singleton(newSegment)),
+    assertEquals(segmentPruner.prune(brokerRequest6, new SelectedSegments(Collections.singleton(newSegment), true)).getSegments(),
         Collections.singletonList(newSegment));
-    assertEquals(segmentPruner.prune(brokerRequest7, Collections.singleton(newSegment)),
+    assertEquals(segmentPruner.prune(brokerRequest7, new SelectedSegments(Collections.singleton(newSegment), true)).getSegments(),
         Collections.emptySet()); // query with invalid range will always have empty filtered result
 
     // Segments without time range metadata should not be pruned
@@ -367,25 +368,25 @@ public class SegmentPrunerTest {
         .setRealtimeSegmentZKMetadata(_propertyStore, REALTIME_TABLE_NAME, segmentZKMetadataWithoutTimeRangeMetadata);
     segmentPruner.onExternalViewChange(externalView, idealState, onlineSegments);
     assertEquals(
-        segmentPruner.prune(brokerRequest1, new HashSet<>(Collections.singletonList(segmentWithoutTimeRangeMetadata))),
+        segmentPruner.prune(brokerRequest1, new SelectedSegments(new HashSet<>(Collections.singletonList(segmentWithoutTimeRangeMetadata)), true)).getSegments(),
         Collections.singletonList(segmentWithoutTimeRangeMetadata));
     assertEquals(
-        segmentPruner.prune(brokerRequest2, new HashSet<>(Collections.singletonList(segmentWithoutTimeRangeMetadata))),
+        segmentPruner.prune(brokerRequest2, new SelectedSegments(new HashSet<>(Collections.singletonList(segmentWithoutTimeRangeMetadata)), true)).getSegments(),
         Collections.singletonList(segmentWithoutTimeRangeMetadata));
     assertEquals(
-        segmentPruner.prune(brokerRequest3, new HashSet<>(Collections.singletonList(segmentWithoutTimeRangeMetadata))),
+        segmentPruner.prune(brokerRequest3, new SelectedSegments(new HashSet<>(Collections.singletonList(segmentWithoutTimeRangeMetadata)), true)).getSegments(),
         Collections.singletonList(segmentWithoutTimeRangeMetadata));
     assertEquals(
-        segmentPruner.prune(brokerRequest4, new HashSet<>(Collections.singletonList(segmentWithoutTimeRangeMetadata))),
+        segmentPruner.prune(brokerRequest4, new SelectedSegments(new HashSet<>(Collections.singletonList(segmentWithoutTimeRangeMetadata)), true)).getSegments(),
         Collections.singletonList(segmentWithoutTimeRangeMetadata));
     assertEquals(
-        segmentPruner.prune(brokerRequest5, new HashSet<>(Collections.singletonList(segmentWithoutTimeRangeMetadata))),
+        segmentPruner.prune(brokerRequest5, new SelectedSegments(new HashSet<>(Collections.singletonList(segmentWithoutTimeRangeMetadata)), true)).getSegments(),
         Collections.singletonList(segmentWithoutTimeRangeMetadata));
     assertEquals(
-        segmentPruner.prune(brokerRequest6, new HashSet<>(Collections.singletonList(segmentWithoutTimeRangeMetadata))),
+        segmentPruner.prune(brokerRequest6, new SelectedSegments(new HashSet<>(Collections.singletonList(segmentWithoutTimeRangeMetadata)), true)).getSegments(),
         Collections.singletonList(segmentWithoutTimeRangeMetadata));
     assertEquals(
-        segmentPruner.prune(brokerRequest7, new HashSet<>(Collections.singletonList(segmentWithoutTimeRangeMetadata))),
+        segmentPruner.prune(brokerRequest7, new SelectedSegments(new HashSet<>(Collections.singletonList(segmentWithoutTimeRangeMetadata)), true)).getSegments(),
         Collections.emptySet());
 
     // Test different time range
@@ -402,53 +403,53 @@ public class SegmentPrunerTest {
     setSegmentZKTimeRangeMetadata(segment2, 50, 65, TimeUnit.DAYS);
 
     segmentPruner.onExternalViewChange(externalView, idealState, onlineSegments);
-    assertEquals(segmentPruner.prune(brokerRequest1, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest1, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         new HashSet<>(Arrays.asList(segment0, segment1, segment2)));
-    assertEquals(segmentPruner.prune(brokerRequest2, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest2, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         Collections.singleton(segment0));
-    assertEquals(segmentPruner.prune(brokerRequest3, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest3, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         new HashSet<>(Arrays.asList(segment0, segment1)));
-    assertEquals(segmentPruner.prune(brokerRequest4, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest4, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         new HashSet<>(Arrays.asList(segment0, segment2)));
-    assertEquals(segmentPruner.prune(brokerRequest5, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest5, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         new HashSet<>(Arrays.asList(segment0, segment2)));
-    assertEquals(segmentPruner.prune(brokerRequest6, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest6, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         new HashSet<>(Arrays.asList(segment0, segment2)));
-    assertEquals(segmentPruner.prune(brokerRequest7, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest7, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         Collections.emptySet());
 
     // Update metadata without external view change or refreshing should have no effect
     setSegmentZKTimeRangeMetadata(segment2, 20, 30, TimeUnit.DAYS);
-    assertEquals(segmentPruner.prune(brokerRequest1, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest1, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         new HashSet<>(Arrays.asList(segment0, segment1, segment2)));
-    assertEquals(segmentPruner.prune(brokerRequest2, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest2, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         Collections.singleton(segment0));
-    assertEquals(segmentPruner.prune(brokerRequest3, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest3, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         new HashSet<>(Arrays.asList(segment0, segment1)));
-    assertEquals(segmentPruner.prune(brokerRequest4, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest4, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         new HashSet<>(Arrays.asList(segment0, segment2)));
-    assertEquals(segmentPruner.prune(brokerRequest5, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest5, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         new HashSet<>(Arrays.asList(segment0, segment2)));
-    assertEquals(segmentPruner.prune(brokerRequest6, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest6, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         new HashSet<>(Arrays.asList(segment0, segment2)));
-    assertEquals(segmentPruner.prune(brokerRequest7, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest7, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         Collections.emptySet());
 
     // Refresh the changed segment should update the segment pruner
     segmentPruner.refreshSegment(segment2);
-    assertEquals(segmentPruner.prune(brokerRequest1, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest1, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         new HashSet<>(Arrays.asList(segment0, segment1, segment2)));
-    assertEquals(segmentPruner.prune(brokerRequest2, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest2, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         Collections.singleton(segment0));
-    assertEquals(segmentPruner.prune(brokerRequest3, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest3, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         new HashSet<>(Arrays.asList(segment0, segment1, segment2)));
-    assertEquals(segmentPruner.prune(brokerRequest4, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest4, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         Collections.singleton(segment0));
-    assertEquals(segmentPruner.prune(brokerRequest5, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest5, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         Collections.singleton(segment0));
-    assertEquals(segmentPruner.prune(brokerRequest6, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest6, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         Collections.singleton(segment0));
-    assertEquals(segmentPruner.prune(brokerRequest7, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest7, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         Collections.emptySet());
   }
 
@@ -488,12 +489,12 @@ public class SegmentPrunerTest {
         dateTimeFormatSpec.fromFormatToMillis("20200430"), TimeUnit.MILLISECONDS);
 
     segmentPruner.init(externalView, idealState, onlineSegments);
-    assertEquals(segmentPruner.prune(brokerRequest1, onlineSegments), Collections.singleton(segment0));
-    assertEquals(segmentPruner.prune(brokerRequest2, onlineSegments), new HashSet<>(Arrays.asList(segment0, segment1)));
-    assertEquals(segmentPruner.prune(brokerRequest3, onlineSegments), Collections.singleton(segment1));
-    assertEquals(segmentPruner.prune(brokerRequest4, onlineSegments),
+    assertEquals(segmentPruner.prune(brokerRequest1, new SelectedSegments(onlineSegments, true)).getSegments(), Collections.singleton(segment0));
+    assertEquals(segmentPruner.prune(brokerRequest2, new SelectedSegments(onlineSegments, true)).getSegments(), new HashSet<>(Arrays.asList(segment0, segment1)));
+    assertEquals(segmentPruner.prune(brokerRequest3, new SelectedSegments(onlineSegments, true)).getSegments(), Collections.singleton(segment1));
+    assertEquals(segmentPruner.prune(brokerRequest4, new SelectedSegments(onlineSegments, true)).getSegments(),
         new HashSet<>(Arrays.asList(segment0, segment1, segment2)));
-    assertEquals(segmentPruner.prune(brokerRequest5, onlineSegments), Collections.emptySet());
+    assertEquals(segmentPruner.prune(brokerRequest5, new SelectedSegments(onlineSegments, true)).getSegments(), Collections.emptySet());
   }
 
   @Test(dataProvider = "compilerProvider")
@@ -517,30 +518,30 @@ public class SegmentPrunerTest {
     onlineSegments.add(segment1);
     setRealtimeSegmentZKTotalDocsMetadata(segment1, 0);
     segmentPruner.init(externalView, idealState, onlineSegments);
-    assertEquals(segmentPruner.prune(brokerRequest1, new HashSet<>(Arrays.asList(segment0, segment1))),
+    assertEquals(segmentPruner.prune(brokerRequest1, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1)), true)).getSegments(),
         new HashSet<>(Collections.singletonList(segment0)));
-    assertEquals(segmentPruner.prune(brokerRequest2, new HashSet<>(Arrays.asList(segment0, segment1))),
+    assertEquals(segmentPruner.prune(brokerRequest2, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1)), true)).getSegments(),
         new HashSet<>(Collections.singletonList(segment0)));
-    assertEquals(segmentPruner.prune(brokerRequest3, new HashSet<>(Arrays.asList(segment0, segment1))),
+    assertEquals(segmentPruner.prune(brokerRequest3, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1)), true)).getSegments(),
         new HashSet<>(Collections.singletonList(segment0)));
 
     // init with empty list of segments
     segmentPruner = new EmptySegmentPruner(tableConfig, _propertyStore);
     onlineSegments.clear();
     segmentPruner.init(externalView, idealState, onlineSegments);
-    assertEquals(segmentPruner.prune(brokerRequest1, Collections.emptySet()), Collections.emptySet());
-    assertEquals(segmentPruner.prune(brokerRequest2, Collections.emptySet()), Collections.emptySet());
-    assertEquals(segmentPruner.prune(brokerRequest3, Collections.emptySet()), Collections.emptySet());
+    assertEquals(segmentPruner.prune(brokerRequest1, new SelectedSegments(Collections.emptySet(), true)).getSegments(), Collections.emptySet());
+    assertEquals(segmentPruner.prune(brokerRequest2, new SelectedSegments(Collections.emptySet(), true)).getSegments(), Collections.emptySet());
+    assertEquals(segmentPruner.prune(brokerRequest3, new SelectedSegments(Collections.emptySet(), true)).getSegments(), Collections.emptySet());
 
     // Segments without metadata (not updated yet) should not be pruned
     String newSegment = "newSegment";
     onlineSegments.add(newSegment);
     segmentPruner.onExternalViewChange(externalView, idealState, onlineSegments);
-    assertEquals(segmentPruner.prune(brokerRequest1, Collections.singleton(newSegment)),
+    assertEquals(segmentPruner.prune(brokerRequest1, new SelectedSegments(Collections.singleton(newSegment), true)).getSegments(),
         Collections.singleton(newSegment));
-    assertEquals(segmentPruner.prune(brokerRequest2, Collections.singleton(newSegment)),
+    assertEquals(segmentPruner.prune(brokerRequest2, new SelectedSegments(Collections.singleton(newSegment), true)).getSegments(),
         Collections.singleton(newSegment));
-    assertEquals(segmentPruner.prune(brokerRequest3, Collections.singleton(newSegment)),
+    assertEquals(segmentPruner.prune(brokerRequest3, new SelectedSegments(Collections.singleton(newSegment), true)).getSegments(),
         Collections.singleton(newSegment));
 
     // Segments without totalDocs metadata should not be pruned
@@ -553,11 +554,11 @@ public class SegmentPrunerTest {
     ZKMetadataProvider
         .setRealtimeSegmentZKMetadata(_propertyStore, REALTIME_TABLE_NAME, segmentZKMetadataWithoutTotalDocsMetadata);
     segmentPruner.onExternalViewChange(externalView, idealState, onlineSegments);
-    assertEquals(segmentPruner.prune(brokerRequest1, Collections.singleton(segmentWithoutTotalDocsMetadata)),
+    assertEquals(segmentPruner.prune(brokerRequest1, new SelectedSegments(Collections.singleton(segmentWithoutTotalDocsMetadata), true)).getSegments(),
         Collections.singleton(segmentWithoutTotalDocsMetadata));
-    assertEquals(segmentPruner.prune(brokerRequest2, Collections.singleton(segmentWithoutTotalDocsMetadata)),
+    assertEquals(segmentPruner.prune(brokerRequest2, new SelectedSegments(Collections.singleton(segmentWithoutTotalDocsMetadata), true)).getSegments(),
         Collections.singleton(segmentWithoutTotalDocsMetadata));
-    assertEquals(segmentPruner.prune(brokerRequest3, Collections.singleton(segmentWithoutTotalDocsMetadata)),
+    assertEquals(segmentPruner.prune(brokerRequest3, new SelectedSegments(Collections.singleton(segmentWithoutTotalDocsMetadata), true)).getSegments(),
         Collections.singleton(segmentWithoutTotalDocsMetadata));
 
     // Segments with -1 totalDocs should not be pruned
@@ -566,11 +567,11 @@ public class SegmentPrunerTest {
     onlineSegments.add(segmentWithNegativeTotalDocsMetadata);
     setRealtimeSegmentZKTotalDocsMetadata(segmentWithNegativeTotalDocsMetadata, -1);
     segmentPruner.onExternalViewChange(externalView, idealState, onlineSegments);
-    assertEquals(segmentPruner.prune(brokerRequest1, Collections.singleton(segmentWithNegativeTotalDocsMetadata)),
+    assertEquals(segmentPruner.prune(brokerRequest1, new SelectedSegments(Collections.singleton(segmentWithNegativeTotalDocsMetadata), true)).getSegments(),
         Collections.singleton(segmentWithNegativeTotalDocsMetadata));
-    assertEquals(segmentPruner.prune(brokerRequest2, Collections.singleton(segmentWithNegativeTotalDocsMetadata)),
+    assertEquals(segmentPruner.prune(brokerRequest2, new SelectedSegments(Collections.singleton(segmentWithNegativeTotalDocsMetadata), true)).getSegments(),
         Collections.singleton(segmentWithNegativeTotalDocsMetadata));
-    assertEquals(segmentPruner.prune(brokerRequest3, Collections.singleton(segmentWithNegativeTotalDocsMetadata)),
+    assertEquals(segmentPruner.prune(brokerRequest3, new SelectedSegments(Collections.singleton(segmentWithNegativeTotalDocsMetadata), true)).getSegments(),
         Collections.singleton(segmentWithNegativeTotalDocsMetadata));
 
     // Prune segments with 0 total docs
@@ -584,30 +585,30 @@ public class SegmentPrunerTest {
     setRealtimeSegmentZKTotalDocsMetadata(segment2, -1);
 
     segmentPruner.onExternalViewChange(externalView, idealState, onlineSegments);
-    assertEquals(segmentPruner.prune(brokerRequest1, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest1, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         new HashSet<>(Arrays.asList(segment0, segment2)));
-    assertEquals(segmentPruner.prune(brokerRequest2, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest2, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         new HashSet<>(Arrays.asList(segment0, segment2)));
-    assertEquals(segmentPruner.prune(brokerRequest3, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest3, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         new HashSet<>(Arrays.asList(segment0, segment2)));
 
     // Update metadata without external view change or refreshing should have no effect
     setSegmentZKTimeRangeMetadata(segment2, 20, 30, TimeUnit.DAYS);
     setRealtimeSegmentZKTotalDocsMetadata(segment2, 0);
-    assertEquals(segmentPruner.prune(brokerRequest1, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest1, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         new HashSet<>(Arrays.asList(segment0, segment2)));
-    assertEquals(segmentPruner.prune(brokerRequest2, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest2, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         new HashSet<>(Arrays.asList(segment0, segment2)));
-    assertEquals(segmentPruner.prune(brokerRequest3, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest3, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         new HashSet<>(Arrays.asList(segment0, segment2)));
 
     // Refresh the changed segment should update the segment pruner
     segmentPruner.refreshSegment(segment2);
-    assertEquals(segmentPruner.prune(brokerRequest1, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest1, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         new HashSet<>(Collections.singletonList(segment0)));
-    assertEquals(segmentPruner.prune(brokerRequest2, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest2, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         new HashSet<>(Collections.singletonList(segment0)));
-    assertEquals(segmentPruner.prune(brokerRequest3, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+    assertEquals(segmentPruner.prune(brokerRequest3, new SelectedSegments(new HashSet<>(Arrays.asList(segment0, segment1, segment2)), true)).getSegments(),
         new HashSet<>(Collections.singletonList(segment0)));
   }
 
