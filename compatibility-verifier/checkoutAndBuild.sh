@@ -283,6 +283,7 @@ if [ ${curBuildStatus} -eq 0 ]; then
 else
   echo Compat checker build failed. See ${curBuildOutFile}
   cat ${curBuildOutFile}
+  exitStatus=1
 fi
 
 if [ ${buildNewTarget} -eq 1 ]; then
@@ -297,4 +298,4 @@ fi
 
 /bin/rm -r ${mvnCache}
 
-exit 0
+exit ${exitStatus}
