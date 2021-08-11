@@ -57,6 +57,18 @@ public class ObjectSerDeUtilsTest {
   }
 
   @Test
+  public void testInt() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      Integer expected = RANDOM.nextInt();
+
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      Integer actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.Int);
+
+      assertEquals(actual, expected, ERROR_MESSAGE);
+    }
+  }
+
+  @Test
   public void testLong() {
     for (int i = 0; i < NUM_ITERATIONS; i++) {
       Long expected = RANDOM.nextLong();

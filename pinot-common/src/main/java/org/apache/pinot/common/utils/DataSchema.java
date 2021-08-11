@@ -389,6 +389,8 @@ public class DataSchema {
           }
         case STRING_ARRAY:
           return (String[]) value;
+        case OBJECT:
+          return (Serializable) value;
         default:
           throw new IllegalStateException(String.format("Cannot convert: '%s' to type: %s", value, this));
       }
@@ -477,6 +479,8 @@ public class DataSchema {
           }
         case STRING_ARRAY:
           return (String[]) value;
+        case OBJECT:
+          return (Serializable) value;
         default:
           throw new IllegalStateException(String.format("Cannot convert and format: '%s' to type: %s", value, this));
       }

@@ -19,6 +19,7 @@
 package org.apache.pinot.core.common;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 import com.tdunning.math.stats.MergingDigest;
 import com.tdunning.math.stats.TDigest;
@@ -97,7 +98,8 @@ public class ObjectSerDeUtils {
     BytesSet(19),
     IdSet(20),
     List(21),
-    BigDecimal(22);
+    BigDecimal(22),
+    Int(23);
     private final int _value;
 
     ObjectType(int value) {
@@ -111,6 +113,8 @@ public class ObjectSerDeUtils {
     public static ObjectType getObjectType(Object value) {
       if (value instanceof String) {
         return ObjectType.String;
+      } else if (value instanceof Integer) {
+        return ObjectType.Int;
       } else if (value instanceof Long) {
         return ObjectType.Long;
       } else if (value instanceof Double) {
@@ -204,6 +208,24 @@ public class ObjectSerDeUtils {
       byte[] bytes = new byte[byteBuffer.remaining()];
       byteBuffer.get(bytes);
       return StringUtil.decodeUtf8(bytes);
+    }
+  };
+
+  public static final ObjectSerDe<Integer> INT_SER_DE = new ObjectSerDe<Integer>() {
+
+    @Override
+    public byte[] serialize(Integer value) {
+      return Ints.toByteArray(value);
+    }
+
+    @Override
+    public Integer deserialize(byte[] bytes) {
+      return Ints.fromByteArray(bytes);
+    }
+
+    @Override
+    public Integer deserialize(ByteBuffer byteBuffer) {
+      return byteBuffer.getInt();
     }
   };
 
@@ -899,7 +921,8 @@ public class ObjectSerDeUtils {
       BYTES_SET_SER_DE,
       ID_SET_SER_DE,
       LIST_SER_DE,
-      BIGDECIMAL_SER_DE
+      BIGDECIMAL_SER_DE,
+      INT_SER_DE
   };
   //@formatter:on
 
