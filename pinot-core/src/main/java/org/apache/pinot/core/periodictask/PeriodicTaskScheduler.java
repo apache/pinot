@@ -142,7 +142,7 @@ public class PeriodicTaskScheduler {
     return null;
   }
 
-  /** Execute specified {@link PeriodicTask} immediately. */
+  /** Execute {@link PeriodicTask} immediately on the specified table. */
   public void scheduleNow(String periodicTaskName, @Nullable Properties periodicTaskProperties) {
     // Each controller may have a slightly different list of periodic tasks if we add, remove, or rename periodic
     // task. To avoid this situation, we check again (besides the check at controller API level) whether the

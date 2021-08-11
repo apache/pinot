@@ -153,7 +153,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
 
   @Override
   public void run(@Nullable java.util.Properties periodicTaskProperties) {
-    java.util.Properties savedPeriodicTaskProperties = _activePeriodicTaskProperties;
+    Properties savedPeriodicTaskProperties = _activePeriodicTaskProperties;
     try {
       _runLock.lock();
 
