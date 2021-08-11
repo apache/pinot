@@ -27,21 +27,24 @@ netstat -i
 
 df -h
 
-echo "<settings xmlns=\"http://maven.apache.org/SETTINGS/1.0.0\""> settings.xml
-echo "      xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"">> settings.xml
-echo "      xsi:schemaLocation=\"http://maven.apache.org/SETTINGS/1.0.0">> settings.xml
-echo "                          https://maven.apache.org/xsd/settings-1.0.0.xsd\">">> settings.xml
-echo "  <mirrors>">> settings.xml
-echo "    <mirror>">> settings.xml
-echo "      <id>confluent-mirror</id>">> settings.xml
-echo "      <mirrorOf>confluent</mirrorOf>">> settings.xml
-echo "      <url>https://packages.confluent.io/maven/</url>">> settings.xml
-echo "      <blocked>false</blocked>">> settings.xml
-echo "    </mirror>">> settings.xml
-echo "  </mirrors>">> settings.xml
-echo "</settings>">> settings.xml
+SETTINGS_FILE="../settings.xml"
 
-export PINOT_MAVEN_OPTS="-s $(pwd)/settings.xml"
+echo "<settings xmlns=\"http://maven.apache.org/SETTINGS/1.0.0\""> ${SETTINGS_FILE}
+echo "      xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"">> ${SETTINGS_FILE}
+echo "      xsi:schemaLocation=\"http://maven.apache.org/SETTINGS/1.0.0">> ${SETTINGS_FILE}
+echo "                          https://maven.apache.org/xsd/settings-1.0.0.xsd\">">> ${SETTINGS_FILE}
+echo "  <mirrors>">> ${SETTINGS_FILE}
+echo "    <mirror>">> ${SETTINGS_FILE}
+echo "      <id>confluent-mirror</id>">> ${SETTINGS_FILE}
+echo "      <mirrorOf>confluent</mirrorOf>">> ${SETTINGS_FILE}
+echo "      <url>https://packages.confluent.io/maven/</url>">> ${SETTINGS_FILE}
+echo "      <blocked>false</blocked>">> ${SETTINGS_FILE}
+echo "    </mirror>">> ${SETTINGS_FILE}
+echo "  </mirrors>">> ${SETTINGS_FILE}
+echo "</settings>">> ${SETTINGS_FILE}
+
+# PINOT_MAVEN_OPTS is used to provide additional maven options to the checkoutAndBuild.sh command
+export PINOT_MAVEN_OPTS="-s $(pwd)/${SETTINGS_FILE}"
 compatibility-verifier/checkoutAndBuild.sh -w $WORKING_DIR -o $OLD_COMMIT
 
 compatibility-verifier/compCheck.sh -w $WORKING_DIR -t $TEST_SUITE
