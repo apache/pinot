@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.fsa.builders;
 
+import java.io.IOException;
 import java.util.*;
 import org.apache.pinot.fsa.FSA;
 
@@ -168,6 +169,17 @@ public final class FSABuilder {
     // Allocate root, with an initial empty set of output arcs.
     expandActivePath(1);
     root = activePath[0];
+  }
+
+  public static FSA buildFSA(SortedMap<String, Integer> input) {
+
+    FSABuilder fsaBuilder = new FSABuilder();
+
+    for (Map.Entry<String, Integer> entry : input.entrySet()) {
+      fsaBuilder.add(entry.getKey().getBytes(), 0, entry.getKey().length(), entry.getValue().intValue());
+    }
+
+    return fsaBuilder.complete();
   }
 
   /**

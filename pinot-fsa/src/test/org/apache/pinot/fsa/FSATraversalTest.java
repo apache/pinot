@@ -34,6 +34,8 @@ import java.util.Arrays;
 import java.util.HashSet;
 
 import java.util.List;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import org.apache.pinot.fsa.builders.FSA5Serializer;
 import org.apache.pinot.fsa.builders.FSABuilder;
 import org.apache.pinot.fsa.utils.RegexpMatcher;
@@ -201,7 +203,7 @@ public final class FSATraversalTest extends TestBase {
   }
 
   @Test
-  public void testRegexMatcher() throws IOException {
+  public void testRegexMatcherPrefix() throws IOException {
     String firstString = "he";
     String secondString = "hp";
     FSABuilder builder = new FSABuilder();
@@ -220,8 +222,28 @@ public final class FSATraversalTest extends TestBase {
 
     List<Long> results = RegexpMatcher.regexMatch("h.*", fsa);
 
-    System.out.println(results);
-    int i = 0;
+    assertEquals(results.size(), 2);
+  }
+
+  @Test
+  public void testRegexMatcherMatchAny() throws IOException {
+    SortedMap<String, Integer> x = new TreeMap<>();
+    x.put("hello-world", 12);
+    x.put("hello-world123", 21);
+    x.put("still", 123);
+
+    FSA s = FSABuilder.buildFSA(x);
+
+    final byte[] fsaData =
+        new FSA5Serializer().withNumbers()
+            .serialize(s, new ByteArrayOutputStream())
+            .toByteArray();
+
+    final FSA5 fsa = FSA.read(new ByteArrayInputStream(fsaData), FSA5.class, true);
+
+    List<Long> results = RegexpMatcher.regexMatch("hello.*123", fsa);
+
+    assertEquals(results.size(), 2);
   }
 
   /**

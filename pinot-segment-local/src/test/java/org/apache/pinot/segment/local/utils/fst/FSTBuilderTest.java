@@ -74,7 +74,7 @@ public class FSTBuilderTest {
 
     Outputs<Long> outputs = PositiveIntOutputs.getSingleton();
     File fstFile = new File(outputFile.getAbsolutePath());
-
+    
     PinotDataBuffer pinotDataBuffer =
         PinotDataBuffer.mapFile(fstFile, true, 0, fstFile.length(), ByteOrder.BIG_ENDIAN, "");
     PinotBufferIndexInput indexInput = new PinotBufferIndexInput(pinotDataBuffer, 0L, fstFile.length());

@@ -21,11 +21,9 @@ package org.apache.pinot.fsa.utils;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 
-import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.fsa.FSA;
 import org.apache.pinot.fsa.FSATraversal;
@@ -46,12 +44,12 @@ import org.apache.pinot.fsa.automaton.Transition;
  */
 public class RegexpMatcher {
   private final String _regexQuery;
-  private final FSA _fst;
+  private final FSA _fsa;
   private final Automaton _automaton;
 
-  public RegexpMatcher(String regexQuery, FSA fst) {
+  public RegexpMatcher(String regexQuery, FSA fsa) {
     _regexQuery = regexQuery;
-    _fst = fst;
+    _fsa = fsa;
 
     _automaton = new RegExp(_regexQuery).toAutomaton();
   }
@@ -88,7 +86,7 @@ public class RegexpMatcher {
       throws IOException {
     final List<Path> queue = new ArrayList<>();
     final List<Path> endNodes = new ArrayList<>();
-    final FSATraversal matcher = new FSATraversal(_fst);
+    final FSATraversal matcher = new FSATraversal(_fsa);
 
     if (_automaton.getNumberOfStates() == 0) {
       return Collections.emptyList();
@@ -98,7 +96,7 @@ public class RegexpMatcher {
     //System.out.println(_automaton.toString());
 
     // Automaton start state and FST start node is added to the queue.
-    queue.add(new Path( _automaton.getInitialState(), _fst.getRootNode(), 0, -1));
+    queue.add(new Path( _automaton.getInitialState(), _fsa.getRootNode(), 0, -1));
 
 /*
     final FSA.Arc<Long> scratchArc = new FST.Arc<>();
@@ -115,7 +113,7 @@ public class RegexpMatcher {
       if (acceptStates.contains(path.state)) {
         //TODO: atri
         //System.out.println("I AM COMPLETE BRO " + path.state);
-        if (_fst.isArcFinal(path.fstArc)) {
+        if (_fsa.isArcFinal(path.fstArc)) {
           //TODO: atri
           //System.out.println("DOING IT " + path.fstArc + " " + path.node + " " + path.state + " " + (char) _fst.getArcLabel(path.fstArc));
 
@@ -133,7 +131,7 @@ public class RegexpMatcher {
         final int max = t.max;
 
         if (min == max) {
-          int arc = _fst.getArc(path.node, (byte) t.min);
+          int arc = _fsa.getArc(path.node, (byte) t.min);
 
           //TODO: atri
           //System.out.println("ARC IS " + arc + " FOR ARC " + path.fstArc + " for transition " + (char) t.min + " state" + path.state + " transition out " + t.to);
@@ -148,30 +146,30 @@ public class RegexpMatcher {
             }*/
 
             //TODO: atri -- see why output symbols are missing and fix it
-            queue.add(new Path(t.to, _fst.getEndNode(arc), arc,-1));
+            queue.add(new Path(t.to, _fsa.getEndNode(arc), arc,-1));
           }
         } else {
           //TODO: atri
-          if (_fst.isArcTerminal(path.fstArc)) {
+          if (_fsa.isArcTerminal(path.fstArc)) {
             System.out.println("IS FOOOOO " + " for transition " + (char) t.min);
             continue;
           }
 
-          int node = _fst.getEndNode(path.fstArc);
-          int arc = _fst.getFirstArc(node);
+          int node = _fsa.getEndNode(path.fstArc);
+          int arc = _fsa.getFirstArc(node);
 
           //TODO: atri
           if (arc == 14) {
-            int i = _fst.getFirstArc(arc);
+            int i = _fsa.getFirstArc(arc);
           }
 
-          while (arc != 0 && _fst.getArcLabel(arc) <= max) {
+          while (arc != 0 && _fsa.getArcLabel(arc) <= max) {
 
             //TODO: atri -- see why output symbols are missing and fix it
             //TODO: atri
-            System.out.println("ADDING PATH for arc " + arc +  " " + _fst.getEndNode(arc) + " " + _fst.getFirstArc(_fst.getEndNode(arc)));
+            System.out.println("ADDING PATH for arc " + arc +  " " + _fsa.getEndNode(arc) + " " + _fsa.getFirstArc(_fsa.getEndNode(arc)));
 
-            queue.add(new Path(t.to, _fst.getEndNode(arc), arc, -1));
+            queue.add(new Path(t.to, _fsa.getEndNode(arc), arc, -1));
 
               /*if (_fst.isArcFinal(arc)) {
                 System.out.println("IS FINAL " + arc );
@@ -181,7 +179,7 @@ public class RegexpMatcher {
                 System.out.println("IS TERMINAL " + arc);
               }*/
 
-            arc = _fst.isArcLast(arc) ? 0 :_fst.getNextArc(arc);
+            arc = _fsa.isArcLast(arc) ? 0 : _fsa.getNextArc(arc);
           }
         }
       }
