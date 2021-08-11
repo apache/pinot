@@ -176,8 +176,5 @@ public class PeriodicTaskSchedulerTest {
 
     // Confirm that tasks got executed.
     Assert.assertTrue(countDownLatch.getCount() == 0);
-
-    // Confirm that all threads attempted to execute
-    Assert.assertTrue(attempts.get() == numThreads);
   }
 }
