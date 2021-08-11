@@ -199,7 +199,8 @@ public class RecordTransformerTest {
     assertNull(record.getValue(timeColumnName));
     assertFalse(record.isNullValue(timeColumnName));
 
-    // test null value handling for time column enabled.
+    // test null value handling for time column enabled, with time column in Long type, seconds unit.
+    long startTime = System.currentTimeMillis();
     TableConfig tableConfigHandlingNullTimeColumn =
       new TableConfigBuilder(TableType.REALTIME).setTableName("testTable").setAllowNullTimeValue(true).setTimeColumnName(timeColumnName).build();
     record = new GenericRow();
@@ -207,6 +208,33 @@ public class RecordTransformerTest {
     record = transformer.transform(record);
     assertNotNull(record);
     assertNotNull(record.getValue(timeColumnName));
+    assertTrue(record.getValue(timeColumnName) instanceof Long);
+    long endTime = System.currentTimeMillis();
+    assertTrue((long)record.getValue(timeColumnName) >= TimeUnit.MILLISECONDS.toSeconds(startTime) && (long)record.getValue(timeColumnName) <= TimeUnit.MILLISECONDS.toSeconds(endTime));
+    assertTrue(record.isNullValue(timeColumnName));
+
+    // test null value handling for time column enabled, with time column in Long type, millisecond unit.
+    schemaWithTimeColumn = new Schema.SchemaBuilder()
+        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, timeColumnName), null).build();
+    record = new GenericRow();
+    transformer = new NullValueTransformer(tableConfigHandlingNullTimeColumn, schemaWithTimeColumn);
+    record = transformer.transform(record);
+    assertNotNull(record);
+    assertNotNull(record.getValue(timeColumnName));
+    assertTrue(record.getValue(timeColumnName) instanceof Long);
+    endTime = System.currentTimeMillis();
+    assertTrue((long)record.getValue(timeColumnName) >= startTime && (long)record.getValue(timeColumnName) <= endTime);
+    assertTrue(record.isNullValue(timeColumnName));
+
+    // test null value handling for time column enabled, with time column in double type.
+    schemaWithTimeColumn = new Schema.SchemaBuilder()
+        .addTime(new TimeGranularitySpec(DataType.DOUBLE, TimeUnit.SECONDS, timeColumnName), null).build();
+    record = new GenericRow();
+    transformer = new NullValueTransformer(tableConfigHandlingNullTimeColumn, schemaWithTimeColumn);
+    record = transformer.transform(record);
+    assertNotNull(record);
+    assertNotNull(record.getValue(timeColumnName));
+    assertTrue(record.getValue(timeColumnName) instanceof Double);
     assertTrue(record.isNullValue(timeColumnName));
   }
 
