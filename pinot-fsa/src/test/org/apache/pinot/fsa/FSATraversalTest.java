@@ -246,6 +246,26 @@ public final class FSATraversalTest extends TestBase {
     assertEquals(results.size(), 2);
   }
 
+  @Test
+  public void testRegexMatcherMatchQuestionMark() throws IOException {
+    SortedMap<String, Integer> x = new TreeMap<>();
+    x.put("car", 12);
+    x.put("cars", 21);
+
+    FSA s = FSABuilder.buildFSA(x);
+
+    final byte[] fsaData =
+        new FSA5Serializer().withNumbers()
+            .serialize(s, new ByteArrayOutputStream())
+            .toByteArray();
+
+    final FSA5 fsa = FSA.read(new ByteArrayInputStream(fsaData), FSA5.class, true);
+
+    List<Long> results = RegexpMatcher.regexMatch("cars?", fsa);
+
+    assertEquals(results.size(), 2);
+  }
+
   /**
    * Return all sequences reachable from a given node, as strings.
    */

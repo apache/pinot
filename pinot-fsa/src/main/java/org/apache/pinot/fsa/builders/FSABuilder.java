@@ -211,6 +211,8 @@ public final class FSABuilder {
       nextArcOffset[i] = activePath[i];
     }
 
+    int prevArc = -1;
+
     // Create arcs to new suffix states.
     for (int i = commonPrefix + 1, j = start + commonPrefix; i <= len; i++) {
       final int p = nextArcOffset[i - 1];
@@ -230,11 +232,13 @@ public final class FSABuilder {
 
       //TODO: atri
       //System.out.println("PUTTING SYMBOL " + outputSymbol + " FOR " + i);
-      outputSymbols.put(i, outputSymbol);
-
       nextArcOffset[i - 1] = p + ConstantArcSizeFSA.ARC_SIZE;
+
+      prevArc = p;
     }
 
+    outputSymbols.put(prevArc, outputSymbol);
+    
     // Save last sequence's length so that we don't need to calculate it again.
     this.activePathLen = len;
   }

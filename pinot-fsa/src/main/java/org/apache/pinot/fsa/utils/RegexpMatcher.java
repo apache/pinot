@@ -85,7 +85,7 @@ public class RegexpMatcher {
   public List<Long> regexMatchOnFST()
       throws IOException {
     final List<Path> queue = new ArrayList<>();
-    final List<Path> endNodes = new ArrayList<>();
+    final List<Long> endNodes = new ArrayList<>();
     final FSATraversal matcher = new FSATraversal(_fsa);
 
     if (_automaton.getNumberOfStates() == 0) {
@@ -117,7 +117,7 @@ public class RegexpMatcher {
           //TODO: atri
           //System.out.println("DOING IT " + path.fstArc + " " + path.node + " " + path.state + " " + (char) _fst.getArcLabel(path.fstArc));
 
-          endNodes.add(path);
+          endNodes.add((long) path.fstArc);
         }
       }
 
@@ -134,7 +134,7 @@ public class RegexpMatcher {
           int arc = _fsa.getArc(path.node, (byte) t.min);
 
           //TODO: atri
-          //System.out.println("ARC IS " + arc + " FOR ARC " + path.fstArc + " for transition " + (char) t.min + " state" + path.state + " transition out " + t.to);
+          System.out.println("ARC IS " + arc + " FOR ARC " + path.fstArc + " for transition " + (char) t.min + " state" + path.state + " transition out " + t.to);
 
           if (arc != 0) {
             //TODO: atri
@@ -146,7 +146,8 @@ public class RegexpMatcher {
             }*/
 
             //TODO: atri -- see why output symbols are missing and fix it
-            queue.add(new Path(t.to, _fsa.getEndNode(arc), arc,-1));
+            System.out.println("ADDING PATH for arc " + arc +  " " + _fsa.getEndNode(arc) + " " + _fsa.getFirstArc(_fsa.getEndNode(arc)));
+            queue.add(new Path(t.to, _fsa.getEndNode(arc), arc, -1));
           }
         } else {
           //TODO: atri
@@ -186,12 +187,12 @@ public class RegexpMatcher {
     }
 
     // From the result set of matched entries gather the values stored and return.
-    ArrayList<Long> matchedIds = new ArrayList<>();
+    /*ArrayList<Long> matchedIds = new ArrayList<>();
     for (Path path : endNodes) {
       matchedIds.add(new Long(path.output));
-    }
+    }*/
 
-    return matchedIds;
+    return endNodes;
   }
 
   /**

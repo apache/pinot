@@ -79,10 +79,15 @@ public abstract class FSA implements Iterable<ByteBuffer> {
   public abstract byte getArcLabel(int arc);
 
   /**
-   *
+   * Get output symbols for the FSA
    */
   public abstract Map<Integer, Integer> getOutputSymbols();
 
+  /**
+   * Get output symbol for the given arc
+   * @param arc Arc for which the output symbol is requested
+   * @return Output symbol, null if not present
+   */
   public abstract int getOutputSymbol(int arc);
 
   /**
