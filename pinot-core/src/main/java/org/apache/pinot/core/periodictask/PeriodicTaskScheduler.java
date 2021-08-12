@@ -152,7 +152,11 @@ public class PeriodicTaskScheduler {
       throw new IllegalArgumentException("Unknown Periodic Task " + periodicTaskName);
     }
 
-    LOGGER.info("Schedule task '{}' to run immediately. If the task is already running, this run will wait until the current run finishes.", periodicTaskName);
+    String taskRequestId = periodicTaskProperties.get("requestid").toString();
+
+    LOGGER.info(
+        "[TaskRequestId: {}] Schedule task '{}' to run immediately. If the task is already running, this run will wait until the current run finishes.",
+        taskRequestId, periodicTaskName);
     _executorService.schedule(() -> {
       try {
         // Run the periodic task using the specified parameters. The call to run() method will block if another thread
@@ -162,7 +166,8 @@ public class PeriodicTaskScheduler {
       } catch (Throwable t) {
         // catch all errors to prevent subsequent executions from being silently suppressed
         // Ref: https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ScheduledExecutorService.html#scheduleWithFixedDelay-java.lang.Runnable-long-long-java.util.concurrent.TimeUnit-
-        LOGGER.warn("Caught exception while attempting to execute named periodic task: {}", periodicTask.getTaskName(), t);
+        LOGGER.warn("[TaskRequestId: {}] Caught exception while attempting to execute named periodic task: {}",
+            taskRequestId, periodicTask.getTaskName(), t);
       }
     }, 0, TimeUnit.SECONDS);
   }

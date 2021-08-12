@@ -30,6 +30,7 @@ import org.apache.helix.model.Message;
  */
 public class RunPeriodicTaskMessage extends Message {
   public static final String RUN_PERIODIC_TASK_MSG_SUB_TYPE = "PERIODIC_TASK";
+  private static final String PERIODIC_TASK_REQUEST_ID = "taskRequestId";
   private static final String PERIODIC_TASK_NAME_KEY = "periodicTaskName";
   private static final String TABLE_NAME_WITH_TYPE_KEY = "tableNameWithType";
 
@@ -37,11 +38,13 @@ public class RunPeriodicTaskMessage extends Message {
    * @param periodicTaskName Name of the task that will be run.
    * @param tableNameWithType Table (names with type suffix) on which task will run.
    */
-  public RunPeriodicTaskMessage(@Nonnull String periodicTaskName, String tableNameWithType) {
+  public RunPeriodicTaskMessage(@Nonnull String taskRequestId, @Nonnull String periodicTaskName,
+      String tableNameWithType) {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
     setMsgSubType(RUN_PERIODIC_TASK_MSG_SUB_TYPE);
     setExecutionTimeout(-1);
     ZNRecord znRecord = getRecord();
+    znRecord.setSimpleField(PERIODIC_TASK_REQUEST_ID, taskRequestId);
     znRecord.setSimpleField(PERIODIC_TASK_NAME_KEY, periodicTaskName);
     znRecord.setSimpleField(TABLE_NAME_WITH_TYPE_KEY, tableNameWithType);
   }
@@ -49,6 +52,10 @@ public class RunPeriodicTaskMessage extends Message {
   public RunPeriodicTaskMessage(Message message) {
     super(message.getRecord());
     String msgSubType = message.getMsgSubType();
+  }
+
+  public String getPeriodicTaskRequestId() {
+    return getRecord().getSimpleField(PERIODIC_TASK_REQUEST_ID);
   }
 
   public String getPeriodicTaskName() {

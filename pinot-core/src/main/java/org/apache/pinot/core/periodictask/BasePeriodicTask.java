@@ -131,17 +131,18 @@ public abstract class BasePeriodicTask implements PeriodicTask {
       _runLock.lock();
       _running = true;
 
+      String periodicTaskRequestId = _activePeriodicTaskProperties.getProperty("requestid");
       if (_started) {
         long startTime = System.currentTimeMillis();
-        LOGGER.info("Start running task: {}", _taskName);
+        LOGGER.info("[TaskRequestId: {}] Start running task: {}", periodicTaskRequestId, _taskName);
         try {
           runTask();
         } catch (Exception e) {
-          LOGGER.error("Caught exception while running task: {}", _taskName, e);
+          LOGGER.error("[TaskRequestId: {}] Caught exception while running task: {}", periodicTaskRequestId, _taskName, e);
         }
-        LOGGER.info("Finish running task: {} in {}ms", _taskName, System.currentTimeMillis() - startTime);
+        LOGGER.info("[TaskRequestId: {}] Finish running task: {} in {}ms", periodicTaskRequestId, _taskName, System.currentTimeMillis() - startTime);
       } else {
-        LOGGER.warn("Task: {} is skipped because it is not started or already stopped", _taskName);
+        LOGGER.warn("[TaskRequestId: {}] Task: {} is skipped because it is not started or already stopped", periodicTaskRequestId, _taskName);
       }
     } finally {
        _runLock.unlock();

@@ -64,6 +64,7 @@ public class ControllerMessageHandlerFactory implements MessageHandlerFactory {
 
   /** Message handler for {@link RunPeriodicTaskMessage} message. */
   private static class RunPeriodicTaskMessageHandler extends MessageHandler {
+    private final String _periodicTaskReqeustId;
     private final String _periodicTaskName;
     private final String _tableNameWithType;
     private final PeriodicTaskScheduler _periodicTaskScheduler;
@@ -71,6 +72,7 @@ public class ControllerMessageHandlerFactory implements MessageHandlerFactory {
     RunPeriodicTaskMessageHandler(RunPeriodicTaskMessage message, NotificationContext context,
         PeriodicTaskScheduler periodicTaskScheduler) {
       super(message, context);
+      _periodicTaskReqeustId = message.getPeriodicTaskRequestId();
       _periodicTaskName = message.getPeriodicTaskName();
       _tableNameWithType = message.getTableNameWithType();
       _periodicTaskScheduler = periodicTaskScheduler;
@@ -79,8 +81,10 @@ public class ControllerMessageHandlerFactory implements MessageHandlerFactory {
     @Override
     public HelixTaskResult handleMessage()
         throws InterruptedException {
-      LOGGER.info("Handling RunPeriodicTaskMessage by executing task {}", _periodicTaskName);
-      _periodicTaskScheduler.scheduleNow(_periodicTaskName, createTaskProperties(_tableNameWithType));
+      LOGGER.info("[TaskRequestId: {}] Handling RunPeriodicTaskMessage by executing task {}", _periodicTaskReqeustId,
+          _periodicTaskName);
+      _periodicTaskScheduler
+          .scheduleNow(_periodicTaskName, createTaskProperties(_periodicTaskReqeustId, _tableNameWithType));
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       helixTaskResult.setSuccess(true);
       return helixTaskResult;
@@ -88,11 +92,12 @@ public class ControllerMessageHandlerFactory implements MessageHandlerFactory {
 
     @Override
     public void onError(Exception e, ErrorCode errorCode, ErrorType errorType) {
-      LOGGER.error("Message handling error.", e);
+      LOGGER.error("[TaskRequestId: {}] Message handling error.", _periodicTaskReqeustId, e);
     }
 
-    private static Properties createTaskProperties(String tableNameWithType) {
+    private static Properties createTaskProperties(String periodicTaskReqeustId, String tableNameWithType) {
       Properties periodicTaskParameters = new Properties();
+      periodicTaskParameters.setProperty("requestid", periodicTaskReqeustId);
       periodicTaskParameters.setProperty("tablename", tableNameWithType);
       return periodicTaskParameters;
     }
