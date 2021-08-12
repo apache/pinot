@@ -27,7 +27,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -92,8 +92,8 @@ public class SegmentFetcherAndLoader {
    * forceDownload is set to true, the server always downloads the segment.
    */
   public void addOrReplaceOfflineSegment(String tableNameWithType, String segmentName, boolean forceDownload) {
-    OfflineSegmentZKMetadata newSegmentZKMetadata = ZKMetadataProvider
-        .getOfflineSegmentZKMetadata(_instanceDataManager.getPropertyStore(), tableNameWithType, segmentName);
+    SegmentZKMetadata newSegmentZKMetadata = ZKMetadataProvider
+        .getSegmentZKMetadata(_instanceDataManager.getPropertyStore(), tableNameWithType, segmentName);
     Preconditions.checkNotNull(newSegmentZKMetadata);
 
     LOGGER.info("Adding or replacing segment {} for table {}, metadata {}, downloadIsForced {}", segmentName,
@@ -192,7 +192,7 @@ public class SegmentFetcherAndLoader {
     }
   }
 
-  private boolean isNewSegmentMetadata(String tableNameWithType, OfflineSegmentZKMetadata newSegmentZKMetadata,
+  private boolean isNewSegmentMetadata(String tableNameWithType, SegmentZKMetadata newSegmentZKMetadata,
       @Nullable SegmentMetadata existedSegmentMetadata) {
     String segmentName = newSegmentZKMetadata.getSegmentName();
 

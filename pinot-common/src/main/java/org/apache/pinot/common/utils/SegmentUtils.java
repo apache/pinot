@@ -22,12 +22,16 @@ import com.google.common.base.Preconditions;
 import java.util.Set;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 
 
 // Util functions related to segments.
 public class SegmentUtils {
+  private SegmentUtils() {
+  }
+
   // Returns the partition id of a realtime segment based segment name and segment metadata info retrieved via Helix.
   // Important: The method is costly because it may read data from zookeeper. Do not use it in any query execution
   // path.
@@ -39,27 +43,21 @@ public class SegmentUtils {
     }
     // Otherwise, retrieve the partition id from the segment zk metadata. Currently only realtime segments from upsert
     // enabled tables have partition ids in their segment metadata.
-    RealtimeSegmentZKMetadata segmentZKMetadata = ZKMetadataProvider
-        .getRealtimeSegmentZKMetadata(helixManager.getHelixPropertyStore(), realtimeTableName, segmentName);
+    SegmentZKMetadata segmentZKMetadata =
+        ZKMetadataProvider.getSegmentZKMetadata(helixManager.getHelixPropertyStore(), realtimeTableName, segmentName);
     Preconditions
         .checkState(segmentZKMetadata != null, "Failed to find segment ZK metadata for segment: %s of table: %s",
             segmentName, realtimeTableName);
-    return getSegmentPartitionIdFromZkMetaData(realtimeTableName, segmentZKMetadata, partitionColumn);
-  }
-
-  private static int getSegmentPartitionIdFromZkMetaData(String realtimeTableName,
-      RealtimeSegmentZKMetadata segmentZKMetadata, String partitionColumn) {
-    String segmentName = segmentZKMetadata.getSegmentName();
-    Preconditions.checkState(segmentZKMetadata.getPartitionMetadata() != null,
+    SegmentPartitionMetadata segmentPartitionMetadata = segmentZKMetadata.getPartitionMetadata();
+    Preconditions.checkState(segmentPartitionMetadata != null,
         "Segment ZK metadata for segment: %s of table: %s does not contain partition metadata", segmentName,
         realtimeTableName);
-
-    ColumnPartitionMetadata partitionMetadata =
-        segmentZKMetadata.getPartitionMetadata().getColumnPartitionMap().get(partitionColumn);
-    Preconditions.checkState(partitionMetadata != null,
+    ColumnPartitionMetadata columnPartitionMetadata =
+        segmentPartitionMetadata.getColumnPartitionMap().get(partitionColumn);
+    Preconditions.checkState(columnPartitionMetadata != null,
         "Segment ZK metadata for segment: %s of table: %s does not contain partition metadata for column: %s. Check if the table is an upsert table.",
         segmentName, realtimeTableName, partitionColumn);
-    Set<Integer> partitions = partitionMetadata.getPartitions();
+    Set<Integer> partitions = columnPartitionMetadata.getPartitions();
     Preconditions.checkState(partitions.size() == 1,
         "Segment ZK metadata for segment: %s of table: %s contains multiple partitions for column: %s with %s",
         segmentName, realtimeTableName, partitionColumn, partitions);

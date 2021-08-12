@@ -38,13 +38,12 @@ public class ZKMetadataUtils {
 
   public static void updateSegmentMetadata(SegmentZKMetadata segmentZKMetadata, SegmentMetadata segmentMetadata,
       SegmentType segmentType) {
-    segmentZKMetadata.setSegmentName(segmentMetadata.getName());
     segmentZKMetadata.setTableName(segmentMetadata.getTableName());
+    segmentZKMetadata.setSegmentType(segmentType);
     SegmentVersion segmentVersion = segmentMetadata.getVersion();
     if (segmentVersion != null) {
       segmentZKMetadata.setIndexVersion(segmentVersion.name());
     }
-    segmentZKMetadata.setSegmentType(segmentType);
     if (segmentMetadata.getTimeInterval() != null) {
       segmentZKMetadata.setStartTime(segmentMetadata.getStartTime());
       segmentZKMetadata.setEndTime(segmentMetadata.getEndTime());

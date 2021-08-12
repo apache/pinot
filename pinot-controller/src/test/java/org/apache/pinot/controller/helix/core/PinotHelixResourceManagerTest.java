@@ -47,8 +47,7 @@ import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.ControllerTestUtils;
@@ -261,34 +260,32 @@ public class PinotHelixResourceManagerTest {
   }
 
   @Test
-  public void testRetrieveMetadata() {
+  public void testRetrieveSegmentZKMetadata() {
     String segmentName = "testSegment";
 
     // Test retrieving OFFLINE segment ZK metadata
     {
-      OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
-      offlineSegmentZKMetadata.setSegmentName(segmentName);
-      ZKMetadataProvider.setOfflineSegmentZKMetadata(ControllerTestUtils.getPropertyStore(), OFFLINE_TABLE_NAME,
-          offlineSegmentZKMetadata);
-      List<OfflineSegmentZKMetadata> retrievedMetadataList =
-          ControllerTestUtils.getHelixResourceManager().getOfflineSegmentMetadata(OFFLINE_TABLE_NAME);
-      Assert.assertEquals(retrievedMetadataList.size(), 1);
-      OfflineSegmentZKMetadata retrievedMetadata = retrievedMetadataList.get(0);
-      Assert.assertEquals(retrievedMetadata.getSegmentName(), segmentName);
+      SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
+      ZKMetadataProvider
+          .setSegmentZKMetadata(ControllerTestUtils.getPropertyStore(), OFFLINE_TABLE_NAME, segmentZKMetadata);
+      List<SegmentZKMetadata> retrievedSegmentsZKMetadata =
+          ControllerTestUtils.getHelixResourceManager().getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
+      Assert.assertEquals(retrievedSegmentsZKMetadata.size(), 1);
+      SegmentZKMetadata retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);
+      Assert.assertEquals(retrievedSegmentZKMetadata.getSegmentName(), segmentName);
     }
 
     // Test retrieving REALTIME segment ZK metadata
     {
-      RealtimeSegmentZKMetadata realtimeMetadata = new RealtimeSegmentZKMetadata();
-      realtimeMetadata.setSegmentName(segmentName);
+      SegmentZKMetadata realtimeMetadata = new SegmentZKMetadata(segmentName);
       realtimeMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
       ZKMetadataProvider
-          .setRealtimeSegmentZKMetadata(ControllerTestUtils.getPropertyStore(), REALTIME_TABLE_NAME, realtimeMetadata);
-      List<RealtimeSegmentZKMetadata> retrievedMetadataList =
-          ControllerTestUtils.getHelixResourceManager().getRealtimeSegmentMetadata(REALTIME_TABLE_NAME);
-      Assert.assertEquals(retrievedMetadataList.size(), 1);
-      RealtimeSegmentZKMetadata retrievedMetadata = retrievedMetadataList.get(0);
-      Assert.assertEquals(retrievedMetadata.getSegmentName(), segmentName);
+          .setSegmentZKMetadata(ControllerTestUtils.getPropertyStore(), REALTIME_TABLE_NAME, realtimeMetadata);
+      List<SegmentZKMetadata> retrievedSegmentsZKMetadata =
+          ControllerTestUtils.getHelixResourceManager().getSegmentsZKMetadata(REALTIME_TABLE_NAME);
+      Assert.assertEquals(retrievedSegmentsZKMetadata.size(), 1);
+      SegmentZKMetadata retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);
+      Assert.assertEquals(retrievedSegmentZKMetadata.getSegmentName(), segmentName);
       Assert.assertEquals(realtimeMetadata.getStatus(), CommonConstants.Segment.Realtime.Status.DONE);
     }
   }

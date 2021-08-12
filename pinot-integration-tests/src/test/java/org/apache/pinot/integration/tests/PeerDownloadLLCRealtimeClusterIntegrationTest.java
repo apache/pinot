@@ -30,8 +30,9 @@ import java.util.Map;
 import java.util.Random;
 import org.apache.avro.reflect.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
@@ -55,6 +56,8 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.controller.ControllerConf.ALLOW_HLC_TABLES;
 import static org.apache.pinot.controller.ControllerConf.ENABLE_SPLIT_COMMIT;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -186,35 +189,33 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
 
   @Test
   public void testSegmentFlushSize() {
-    String zkSegmentsPath = "/SEGMENTS/" + TableNameBuilder.REALTIME.tableNameWithType(getTableName());
-    List<String> segmentNames = _propertyStore.getChildNames(zkSegmentsPath, 0);
-    for (String segmentName : segmentNames) {
-      ZNRecord znRecord = _propertyStore.get(zkSegmentsPath + "/" + segmentName, null, 0);
-      assertEquals(znRecord.getSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE),
-          Integer.toString(getRealtimeSegmentFlushSize() / getNumKafkaPartitions()),
-          "Segment: " + segmentName + " does not have the expected flush size");
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    List<SegmentZKMetadata> segmentsZKMetadata =
+        ZKMetadataProvider.getSegmentsZKMetadata(_propertyStore, realtimeTableName);
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+      assertEquals(segmentZKMetadata.getSizeThresholdToFlushSegment(),
+          getRealtimeSegmentFlushSize() / getNumKafkaPartitions());
     }
   }
 
   @Test
   public void testSegmentDownloadURLs() {
     // Verify that all segments of even partition number have empty download url in zk.
-    String zkSegmentsPath = "/SEGMENTS/" + TableNameBuilder.REALTIME.tableNameWithType(getTableName());
-    List<String> segmentNames = _propertyStore.getChildNames(zkSegmentsPath, 0);
-    for (String segmentName : segmentNames) {
-      ZNRecord znRecord = _propertyStore.get(zkSegmentsPath + "/" + segmentName, null, 0);
-      String downloadURL = znRecord.getSimpleField("segment.realtime.download.url");
-      String numberOfDoc = znRecord.getSimpleField("segment.total.docs");
-      if (numberOfDoc.equals("-1")) {
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    List<SegmentZKMetadata> segmentsZKMetadata =
+        ZKMetadataProvider.getSegmentsZKMetadata(_propertyStore, realtimeTableName);
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+      String downloadUrl = segmentZKMetadata.getDownloadUrl();
+      if (segmentZKMetadata.getTotalDocs() < 0) {
         // This is a consuming segment so the download url is null.
-        Assert.assertNull(downloadURL);
-        continue;
-      }
-      int seqNum = Integer.parseInt(segmentName.split("__")[2]);
-      if (seqNum % UPLOAD_FAILURE_MOD == 0) {
-        Assert.assertEquals("", downloadURL);
+        assertNull(downloadUrl);
       } else {
-        Assert.assertTrue(downloadURL.startsWith("mockfs://"));
+        int sequenceNumber = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getSequenceNumber();
+        if (sequenceNumber % UPLOAD_FAILURE_MOD == 0) {
+          assertTrue(downloadUrl.isEmpty());
+        } else {
+          assertTrue(downloadUrl.startsWith("mockfs://"));
+        }
       }
     }
   }

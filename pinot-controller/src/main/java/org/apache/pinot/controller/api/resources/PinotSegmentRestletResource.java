@@ -54,8 +54,7 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -286,15 +285,9 @@ public class PinotSegmentRestletResource {
   @Nullable
   private Map<String, String> getSegmentMetadataInternal(String tableNameWithType, String segmentName) {
     ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
-    if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
-      OfflineSegmentZKMetadata offlineSegmentZKMetadata =
-          ZKMetadataProvider.getOfflineSegmentZKMetadata(propertyStore, tableNameWithType, segmentName);
-      return offlineSegmentZKMetadata != null ? offlineSegmentZKMetadata.toMap() : null;
-    } else {
-      RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
-          ZKMetadataProvider.getRealtimeSegmentZKMetadata(propertyStore, tableNameWithType, segmentName);
-      return realtimeSegmentZKMetadata != null ? realtimeSegmentZKMetadata.toMap() : null;
-    }
+    SegmentZKMetadata segmentZKMetadata =
+        ZKMetadataProvider.getSegmentZKMetadata(propertyStore, tableNameWithType, segmentName);
+    return segmentZKMetadata != null ? segmentZKMetadata.toMap() : null;
   }
 
   @Deprecated

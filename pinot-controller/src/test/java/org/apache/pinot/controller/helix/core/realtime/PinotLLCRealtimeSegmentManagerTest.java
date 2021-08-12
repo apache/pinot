@@ -35,9 +35,10 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.assignment.InstancePartitions;
-import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.URIUtils;
@@ -90,7 +91,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
   static final long START_TIME_MS = CURRENT_TIME_MS - TimeUnit.HOURS.toMillis(RANDOM.nextInt(24) + 24);
   static final long END_TIME_MS = START_TIME_MS + TimeUnit.HOURS.toMillis(RANDOM.nextInt(24) + 1);
   static final Interval INTERVAL = new Interval(START_TIME_MS, END_TIME_MS);
-  static final String CRC = Long.toString(RANDOM.nextLong());
+  // NOTE: CRC is always non-negative
+  static final String CRC = Long.toString(RANDOM.nextLong() & 0xFFFFFFFFL);
   static final SegmentVersion SEGMENT_VERSION = RANDOM.nextBoolean() ? SegmentVersion.v1 : SegmentVersion.v3;
   static final int NUM_DOCS = RANDOM.nextInt(Integer.MAX_VALUE) + 1;
 
@@ -160,8 +162,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
         assertEquals(state, SegmentStateModel.CONSUMING);
       }
 
-      LLCRealtimeSegmentZKMetadata segmentZKMetadata =
-          segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentName, null);
+      SegmentZKMetadata segmentZKMetadata = segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentName, null);
       assertEquals(segmentZKMetadata.getStatus(), Status.IN_PROGRESS);
       assertEquals(new LongMsgOffset(segmentZKMetadata.getStartOffset()).compareTo(PARTITION_OFFSET), 0);
       assertEquals(segmentZKMetadata.getCreationTime(), CURRENT_TIME_MS);
@@ -205,8 +206,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
         Collections.singleton(SegmentStateModel.CONSUMING));
 
     // Verify segment ZK metadata for committed segment and new consuming segment
-    LLCRealtimeSegmentZKMetadata committedSegmentZKMetadata =
-        segmentManager._segmentZKMetadataMap.get(committingSegment);
+    SegmentZKMetadata committedSegmentZKMetadata = segmentManager._segmentZKMetadataMap.get(committingSegment);
     assertEquals(committedSegmentZKMetadata.getStatus(), Status.DONE);
     assertEquals(committedSegmentZKMetadata.getStartOffset(), PARTITION_OFFSET.toString());
     assertEquals(committedSegmentZKMetadata.getEndOffset(),
@@ -216,8 +216,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertEquals(committedSegmentZKMetadata.getIndexVersion(), SEGMENT_VERSION.name());
     assertEquals(committedSegmentZKMetadata.getTotalDocs(), NUM_DOCS);
 
-    LLCRealtimeSegmentZKMetadata consumingSegmentZKMetadata =
-        segmentManager._segmentZKMetadataMap.get(consumingSegment);
+    SegmentZKMetadata consumingSegmentZKMetadata = segmentManager._segmentZKMetadataMap.get(consumingSegment);
     assertEquals(consumingSegmentZKMetadata.getStatus(), Status.IN_PROGRESS);
     assertEquals(consumingSegmentZKMetadata.getStartOffset(),
         new LongMsgOffset(PARTITION_OFFSET.getOffset() + NUM_DOCS).toString());
@@ -360,8 +359,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
   private void testSetUpNewPartitions(FakePinotLLCRealtimeSegmentManager segmentManager, boolean expectException) {
     Map<String, Map<String, String>> instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
     Map<String, Map<String, String>> oldInstanceStatesMap = cloneInstanceStatesMap(instanceStatesMap);
-    Map<String, LLCRealtimeSegmentZKMetadata> segmentZKMetadataMap = segmentManager._segmentZKMetadataMap;
-    Map<String, LLCRealtimeSegmentZKMetadata> oldSegmentZKMetadataMap = cloneSegmentZKMetadataMap(segmentZKMetadataMap);
+    Map<String, SegmentZKMetadata> segmentZKMetadataMap = segmentManager._segmentZKMetadataMap;
+    Map<String, SegmentZKMetadata> oldSegmentZKMetadataMap = cloneSegmentZKMetadataMap(segmentZKMetadataMap);
 
     try {
       segmentManager.ensureAllPartitionsConsuming();
@@ -405,7 +404,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       }
       // NOTE: Old segment ZK metadata might exist when previous round failed due to not enough instances
       assertTrue(segmentZKMetadataMap.containsKey(segmentName));
-      LLCRealtimeSegmentZKMetadata segmentZKMetadata = segmentZKMetadataMap.get(segmentName);
+      SegmentZKMetadata segmentZKMetadata = segmentZKMetadataMap.get(segmentName);
       assertEquals(segmentZKMetadata.getStatus(), Status.IN_PROGRESS);
       assertEquals(segmentZKMetadata.getStartOffset(), PARTITION_OFFSET.toString());
       assertEquals(segmentZKMetadata.getCreationTime(), CURRENT_TIME_MS);
@@ -420,11 +419,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
     return clone;
   }
 
-  private Map<String, LLCRealtimeSegmentZKMetadata> cloneSegmentZKMetadataMap(
-      Map<String, LLCRealtimeSegmentZKMetadata> segmentZKMetadataMap) {
-    Map<String, LLCRealtimeSegmentZKMetadata> clone = new HashMap<>();
-    for (Map.Entry<String, LLCRealtimeSegmentZKMetadata> entry : segmentZKMetadataMap.entrySet()) {
-      clone.put(entry.getKey(), new LLCRealtimeSegmentZKMetadata(entry.getValue().toZNRecord()));
+  private Map<String, SegmentZKMetadata> cloneSegmentZKMetadataMap(
+      Map<String, SegmentZKMetadata> segmentZKMetadataMap) {
+    Map<String, SegmentZKMetadata> clone = new HashMap<>();
+    for (Map.Entry<String, SegmentZKMetadata> entry : segmentZKMetadataMap.entrySet()) {
+      clone.put(entry.getKey(), new SegmentZKMetadata(new ZNRecord(entry.getValue().toZNRecord())));
     }
     return clone;
   }
@@ -717,7 +716,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
         assertEquals(new HashSet<>(instanceStateMap.values()), Collections.singleton(SegmentStateModel.ONLINE));
 
         // Committed segment ZK metadata should be DONE
-        LLCRealtimeSegmentZKMetadata segmentZKMetadata = segmentManager._segmentZKMetadataMap.get(segmentName);
+        SegmentZKMetadata segmentZKMetadata = segmentManager._segmentZKMetadataMap.get(segmentName);
         assertEquals(segmentZKMetadata.getStatus(), Status.DONE);
 
         // Verify segment start/end offset
@@ -744,7 +743,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._numPartitions = 4;
 
     String existingSegmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
-    segmentManager._segmentZKMetadataMap.put(existingSegmentName, new LLCRealtimeSegmentZKMetadata());
+    segmentManager._segmentZKMetadataMap.put(existingSegmentName, new SegmentZKMetadata(existingSegmentName));
     segmentManager.setUpNewTable();
   }
 
@@ -893,9 +892,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
     segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
 
-    LLCRealtimeSegmentZKMetadata metadata =
+    SegmentZKMetadata segmentZKMetadata =
         segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, committingSegment, null);
-    Assert.assertEquals(metadata.getDownloadUrl(), segmentLocationVIP);
+    Assert.assertEquals(segmentZKMetadata.getDownloadUrl(), segmentLocationVIP);
 
     // Test case 2: segment location with peer format: peer://segment1, verify that an empty string is stored in zk.
     committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
@@ -905,8 +904,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
     segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
 
-    metadata = segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, committingSegment, null);
-    Assert.assertEquals(metadata.getDownloadUrl(), "");
+    segmentZKMetadata = segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, committingSegment, null);
+    Assert.assertEquals(segmentZKMetadata.getDownloadUrl(), "");
   }
 
   //////////////////////////////////////////////////////////////////////////////////
@@ -925,7 +924,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     PartitionLevelStreamConfig _streamConfig;
     int _numInstances;
     InstancePartitions _consumingInstancePartitions;
-    Map<String, LLCRealtimeSegmentZKMetadata> _segmentZKMetadataMap = new HashMap<>();
+    Map<String, SegmentZKMetadata> _segmentZKMetadataMap = new HashMap<>();
     Map<String, Integer> _segmentZKMetadataVersionMap = new HashMap<>();
     IdealState _idealState;
     int _numPartitions;
@@ -985,18 +984,16 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    LLCRealtimeSegmentZKMetadata getSegmentZKMetadata(String realtimeTableName, String segmentName,
-        @Nullable Stat stat) {
+    SegmentZKMetadata getSegmentZKMetadata(String realtimeTableName, String segmentName, @Nullable Stat stat) {
       Preconditions.checkState(_segmentZKMetadataMap.containsKey(segmentName));
       if (stat != null) {
         stat.setVersion(_segmentZKMetadataVersionMap.get(segmentName));
       }
-      return new LLCRealtimeSegmentZKMetadata(_segmentZKMetadataMap.get(segmentName).toZNRecord());
+      return new SegmentZKMetadata(new ZNRecord(_segmentZKMetadataMap.get(segmentName).toZNRecord()));
     }
 
     @Override
-    void persistSegmentZKMetadata(String realtimeTableName, LLCRealtimeSegmentZKMetadata segmentZKMetadata,
-        int expectedVersion) {
+    void persistSegmentZKMetadata(String realtimeTableName, SegmentZKMetadata segmentZKMetadata, int expectedVersion) {
       String segmentName = segmentZKMetadata.getSegmentName();
       int version = _segmentZKMetadataVersionMap.getOrDefault(segmentName, -1);
       if (expectedVersion != -1) {
@@ -1061,9 +1058,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    LLCRealtimeSegmentZKMetadata getSegmentZKMetadata(String realtimeTableName, String segmentName,
-        @Nullable Stat stat) {
-      LLCRealtimeSegmentZKMetadata segmentZKMetadata = super.getSegmentZKMetadata(realtimeTableName, segmentName, stat);
+    SegmentZKMetadata getSegmentZKMetadata(String realtimeTableName, String segmentName, @Nullable Stat stat) {
+      SegmentZKMetadata segmentZKMetadata = super.getSegmentZKMetadata(realtimeTableName, segmentName, stat);
       switch (_scenario) {
         case ZK_VERSION_CHANGED:
           // Mock another controller updated the segment ZK metadata during the process
