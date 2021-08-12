@@ -58,7 +58,7 @@ public class PinotControllerPeriodicTaskRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/run")
   @ApiOperation(value = "Run a periodic task against specified table. If no table name is specified, task will run against all tables.")
-  public boolean runPeriodicTask(
+  public String runPeriodicTask(
       @ApiParam(value = "Periodic task name", required = true) @QueryParam("taskname") String periodicTaskName,
       @ApiParam(value = "Table name", required = false) @QueryParam("tablename") String tableName,
       @ApiParam(value = "Table type suffix", required = false, example = "OFFLINE | REALTIME", defaultValue = "OFFLINE") @QueryParam("tabletype") String tableType) {
@@ -91,8 +91,9 @@ public class PinotControllerPeriodicTaskRestletResource {
     ClusterMessagingService clusterMessagingService =
         _pinotHelixResourceManager.getHelixZkManager().getMessagingService();
     int messageCount = clusterMessagingService.send(recipientCriteria, runPeriodicTaskMessage, null, -1);
-    LOGGER.info("Periodic task execution message sent to {} controllers.", messageCount);
-    return messageCount > 0;
+    LOGGER.info("[TaskRequestId: {}] Periodic task execution message sent to {} controllers.", periodicTaskRequestId, messageCount);
+
+    return "Log Request Id: " + periodicTaskRequestId + ", Controllers notified: " + (messageCount > 0) + ".";
   }
 
   @GET
