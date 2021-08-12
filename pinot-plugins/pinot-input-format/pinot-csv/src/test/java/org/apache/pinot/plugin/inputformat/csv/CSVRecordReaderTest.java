@@ -110,19 +110,6 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
   }
 
   @Test
-  public void testIncorrectHeaderDelimiterWhenSourceFieldsAreSpecified() {
-    //setup
-    CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
-    csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
-    csvRecordReaderConfig.setHeader("col1;col2;col3;col4;col5;col6;col7;col8;col9;col10");
-    csvRecordReaderConfig.setDelimiter(',');
-    CSVRecordReader csvRecordReader = new CSVRecordReader();
-    //execution and assertion
-    Assert.assertThrows(IllegalArgumentException.class,
-        () -> csvRecordReader.init(_dataFile, _sourceFields, csvRecordReaderConfig));
-  }
-
-  @Test
   public void testInvalidDelimiterInHeader() {
     //setup
     CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
