@@ -261,7 +261,9 @@ if [ ${oldBuildStatus} -eq 0 ]; then
   echo Old version build completed successfully
 else
   echo Old version build failed. See ${oldBuildOutFile}
-  tail -250 ${oldBuildOutFile}
+  echo ======== Build output ========
+  cat ${oldBuildOutFile}
+  echo ==== End Build output ========
   exitStatus=1
 fi
 
@@ -269,7 +271,9 @@ if [ ${curBuildStatus} -eq 0 ]; then
   echo Compat checker build completed successfully
 else
   echo Compat checker build failed. See ${curBuildOutFile}
-  tail -250 ${curBuildOutFile}
+  echo ======== Build output ========
+  cat ${curBuildOutFile}
+  echo ==== End Build output ========
   exitStatus=1
 fi
 
@@ -278,7 +282,9 @@ if [ ${buildNewTarget} -eq 1 ]; then
     echo New version build completed successfully
   else
     echo New version build failed. See ${newBuildOutFile}
-    tail -250 ${newBuildOutFile}
+    echo ======== Build output ========
+    cat ${newBuildOutFile}
+    echo ==== End Build output ========
     exitStatus=1
   fi
 fi
