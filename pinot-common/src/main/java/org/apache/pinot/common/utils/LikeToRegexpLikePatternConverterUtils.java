@@ -24,7 +24,7 @@ package org.apache.pinot.common.utils;
 public class LikeToRegexpLikePatternConverterUtils {
   /* Represents all metacharacters to be processed */
   public static final String[] REGEXP_METACHARACTERS  = {"\\","^","$", ".", "{","}","[","]","(",")",
-      "*","+","?","|","<",">","-","&"};
+      "*","+","?","|","<",">","-","&", "/"};
 
   /**
    * Process an incoming LIKE string and make it regexp friendly
@@ -32,12 +32,7 @@ public class LikeToRegexpLikePatternConverterUtils {
    * @return Result regex
    */
   public static String processValue(String value) {
-    String result = escapeMetaCharacters(value);
-
-    // ... escape any other potentially problematic characters here
-    result = result.replace("_", ".");
-
-    return result.replaceAll("%", ".*");
+    return escapeMetaCharacters(value).replace('_', '.').replace("%", ".*");
   }
 
   /**
@@ -46,7 +41,7 @@ public class LikeToRegexpLikePatternConverterUtils {
   private static String escapeMetaCharacters(String inputString) {
 
     for (String metaCharacter : REGEXP_METACHARACTERS) {
-      if(inputString.contains(metaCharacter)){
+      if(inputString.contains(metaCharacter)) {
         inputString = inputString.replace(metaCharacter,"\\"
             + metaCharacter);
       }

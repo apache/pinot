@@ -347,7 +347,14 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
   @Test
   public void testLikeOperator()
       throws Exception {
-    String query = "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE 'www.domain1%' LIMIT 50000";
+
+    String query = "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE 'www.dom_in1.com' LIMIT 50000";
+    testSelectionResults(query, 64, null);
+
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE 'www.do_ai%' LIMIT 50000";
+    testSelectionResults(query, 512, null);
+
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE 'www.domain1%' LIMIT 50000";
     testSelectionResults(query, 256, null);
 
     query = "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE 'www.sd.domain1%' LIMIT 50000";
