@@ -23,7 +23,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.lang3.StringUtils;
@@ -118,8 +117,6 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     //execution and assertion
     Assert.assertThrows(IllegalArgumentException.class,
         () -> csvRecordReader.init(_dataFile, null, csvRecordReaderConfig));
-    Assert.assertThrows(IllegalArgumentException.class,
-        () -> csvRecordReader.init(_dataFile, Set.of(), csvRecordReaderConfig));
   }
 
   @Test
