@@ -24,12 +24,14 @@ import static org.apache.pinot.fsa.MatchResult.EXACT_MATCH;
 import static org.apache.pinot.fsa.MatchResult.NO_MATCH;
 import static org.apache.pinot.fsa.MatchResult.SEQUENCE_IS_A_PREFIX;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.HashSet;
 
@@ -47,10 +49,25 @@ import org.junit.Test;
  */
 public final class FSATraversalTest extends TestBase {
   private FSA fsa;
+  private FSA regexFSA;
 
   @Before
   public void setUp() throws Exception {
     fsa = FSA.read(this.getClass().getResourceAsStream("/resources/en_tst.dict"), false);
+
+    String regexTestInputString = "the quick brown fox jumps over the lazy ??? dog 493432 49344 [foo] 12.3 \\";
+    String[] splitArray = regexTestInputString.split("\\s+");
+    byte[][] bytesArray = convertToBytes(splitArray);
+
+    Arrays.sort(bytesArray, FSABuilder.LEXICAL_ORDERING);
+
+    FSABuilder fsaBuilder = new FSABuilder();
+
+    for (byte[] currentArray : bytesArray) {
+      fsaBuilder.add(currentArray, 0, currentArray.length, -1);
+    }
+
+    regexFSA = fsaBuilder.complete();
   }
 
   @Test
@@ -266,6 +283,80 @@ public final class FSATraversalTest extends TestBase {
     assertEquals(results.size(), 2);
   }
 
+  @Test
+  public void testRegex1() throws IOException {
+    assertEquals(1, regexQueryNrHits("q.[aeiou]c.*"));
+  }
+
+  @Test
+  public void testRegex2() throws IOException {
+    assertEquals(0, regexQueryNrHits(".[aeiou]c.*"));
+  }
+
+  public void testRegex3() throws IOException {
+    assertEquals(0, regexQueryNrHits("q.[aeiou]c"));
+  }
+
+  @Test
+  public void testNumericRange() throws IOException {
+    assertEquals(1, regexQueryNrHits("<420000-600000>"));
+    assertEquals(0, regexQueryNrHits("<493433-600000>"));
+  }
+
+  @Test
+  public void testCharacterClasses() throws IOException {
+    //assertEquals(0, regexQueryNrHits("\\d"));
+    assertEquals(1, regexQueryNrHits("\\d*"));
+    assertEquals(1, regexQueryNrHits("\\d{6}"));
+    assertEquals(1, regexQueryNrHits("[a\\d]{6}"));
+    assertEquals(1, regexQueryNrHits("\\d{2,7}"));
+    assertEquals(0, regexQueryNrHits("\\d{4}"));
+    assertEquals(0, regexQueryNrHits("\\dog"));
+    assertEquals(1, regexQueryNrHits("493\\d32"));
+
+    assertEquals(1, regexQueryNrHits("\\wox"));
+    assertEquals(1, regexQueryNrHits("493\\w32"));
+    assertEquals(1, regexQueryNrHits("\\?\\?\\?"));
+    assertEquals(1, regexQueryNrHits("\\?\\W\\?"));
+    assertEquals(1, regexQueryNrHits("\\?\\S\\?"));
+
+    assertEquals(1, regexQueryNrHits("\\[foo\\]"));
+    assertEquals(1, regexQueryNrHits("\\[\\w{3}\\]"));
+
+    assertEquals(0, regexQueryNrHits("\\s.*")); // no matches because all whitespace stripped
+    assertEquals(1, regexQueryNrHits("\\S*ck")); // matches quick
+    assertEquals(1, regexQueryNrHits("[\\d\\.]{3,10}")); // matches 12.3
+    assertEquals(1, regexQueryNrHits("\\d{1,3}(\\.(\\d{1,2}))+")); // matches 12.3
+
+    assertEquals(1, regexQueryNrHits("\\\\"));
+    assertEquals(1, regexQueryNrHits("\\\\.*"));
+
+    IllegalArgumentException expected =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> {
+              regexQueryNrHits("\\p");
+            });
+    assertTrue(expected.getMessage().contains("invalid character class"));
+  }
+
+  @Test
+  public void testRegexComplement() throws IOException {
+    assertEquals(1, regexQueryNrHits("4934~[3]"));
+    // not the empty lang, i.e. match all docs
+    assertEquals(1, regexQueryNrHits("~#"));
+  }
+
+  /**
+   * Test a corner case for backtracking: In this case the term dictionary has 493432 followed by
+   * 49344. When backtracking from 49343... to 4934, it's necessary to test that 4934 itself is ok
+   * before trying to append more characters.
+   */
+  @Test
+  public void testBacktracking() throws IOException {
+    assertEquals(1, regexQueryNrHits("4934[314]"));
+  }
+
   /**
    * Return all sequences reachable from a given node, as strings.
    */
@@ -275,5 +366,23 @@ public final class FSATraversalTest extends TestBase {
       result.add(new String(bb.array(), bb.position(), bb.remaining(), UTF_8));
     }
     return result;
+  }
+
+  /**
+   * Return all matches for given regex
+   */
+  private long regexQueryNrHits(String regex) throws IOException {
+    List<Long> resultList = RegexpMatcher.regexMatch(regex, regexFSA);
+
+    return resultList.size();
+  }
+
+  private static byte[][] convertToBytes(String[] strings) {
+    byte[][] data = new byte[strings.length][];
+    for (int i = 0; i < strings.length; i++) {
+      String string = strings[i];
+      data[i] = string.getBytes(Charset.defaultCharset()); // you can chose charset
+    }
+    return data;
   }
 }
