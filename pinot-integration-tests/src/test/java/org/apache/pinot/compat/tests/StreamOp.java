@@ -36,6 +36,7 @@ import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.KafkaAdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.integration.tests.ClusterTest;
@@ -87,6 +88,7 @@ public class StreamOp extends BaseOp {
   private static final String NUM_PARTITIONS = "numPartitions";
   private static final String PARTITION_COLUMN = "partitionColumn";
   private static final String EXCEPTIONS = "exceptions";
+  private static final String ERROR_CODE = "errorCode";
   private static final String NUM_SERVERS_QUERIED = "numServersQueried";
   private static final String NUM_SERVERS_RESPONEDED = "numServersResponded";
   private static final String TOTAL_DOCS = "totalDocs";
@@ -164,7 +166,7 @@ public class StreamOp extends BaseOp {
 
       final Map<String, Object> config = new HashMap<>();
       config.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG,
-          ClusterDescriptor.DEFAULT_HOST + ":" + ClusterDescriptor.KAFKA_PORT);
+          ClusterDescriptor.getInstance().getDefaultHost() + ":" + ClusterDescriptor.getInstance().getKafkaPort());
       config.put(AdminClientConfig.CLIENT_ID_CONFIG, "Kafka2AdminClient-" + UUID.randomUUID().toString());
       config.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, 15000);
       AdminClient adminClient = KafkaAdminClient.create(config);
@@ -219,7 +221,8 @@ public class StreamOp extends BaseOp {
       String schemaName = TableNameBuilder.extractRawTableName(tableName);
       String schemaString = ControllerTest.
           sendGetRequest(
-              ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.CONTROLLER_URL).forSchemaGet(schemaName));
+              ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl())
+                  .forSchemaGet(schemaName));
       Schema schema = JsonUtils.stringToObject(schemaString, Schema.class);
       DateTimeFormatSpec dateTimeFormatSpec =
           new DateTimeFormatSpec(schema.getSpecForTimeColumn(timeColumn).getFormat());
@@ -264,7 +267,7 @@ public class StreamOp extends BaseOp {
   private long fetchExistingTotalDocs(String tableName)
       throws Exception {
     String query = "SELECT count(*) FROM " + tableName;
-    JsonNode response = ClusterTest.postSqlQuery(query, ClusterDescriptor.BROKER_URL);
+    JsonNode response = ClusterTest.postSqlQuery(query, ClusterDescriptor.getInstance().getBrokerUrl());
     if (response == null) {
       String errorMsg = String.format("Failed to query Table: %s", tableName);
       LOGGER.error(errorMsg);
@@ -272,7 +275,14 @@ public class StreamOp extends BaseOp {
     }
 
     if (response.has(EXCEPTIONS) && response.get(EXCEPTIONS).size() > 0) {
-      String errorMsg = String.format("Failed when running query: %s; the response contains exceptions", query);
+      String errorMsg = String.format("Failed when running query: '%s'; got exceptions:\n%s\n", query,
+          response.toPrettyString());
+      JsonNode exceptions = response.get(EXCEPTIONS);
+      if (String.valueOf(QueryException.BROKER_INSTANCE_MISSING_ERROR)
+          .equals(exceptions.get(ERROR_CODE).toString())) {
+        LOGGER.warn(errorMsg + ".Trying again");
+        return 0;
+      }
       LOGGER.error(errorMsg);
       throw new RuntimeException(errorMsg);
     }

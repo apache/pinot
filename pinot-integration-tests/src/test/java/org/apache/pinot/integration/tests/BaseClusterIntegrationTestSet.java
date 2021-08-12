@@ -20,9 +20,8 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.net.URL;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -32,6 +31,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.client.ResultSetGroup;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -359,11 +359,10 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    */
   public void testQueriesFromQueryFile()
       throws Exception {
-    URL resourceUrl = BaseClusterIntegrationTestSet.class.getClassLoader().getResource(getQueryFileName());
-    assertNotNull(resourceUrl);
-    File queryFile = new File(resourceUrl.getFile());
+    InputStream inputStream = BaseClusterIntegrationTestSet.class.getClassLoader().getResourceAsStream(getQueryFileName());
+    assertNotNull(inputStream);
 
-    try (BufferedReader reader = new BufferedReader(new FileReader(queryFile))) {
+    try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
       String queryString;
       while ((queryString = reader.readLine()) != null) {
         // Skip commented line and empty line.
@@ -390,11 +389,10 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    */
   public void testSqlQueriesFromQueryFile()
       throws Exception {
-    URL resourceUrl = BaseClusterIntegrationTestSet.class.getClassLoader().getResource(getSqlQueryFileName());
-    assertNotNull(resourceUrl);
-    File queryFile = new File(resourceUrl.getFile());
+    InputStream inputStream = BaseClusterIntegrationTestSet.class.getClassLoader().getResourceAsStream(getSqlQueryFileName());
+    assertNotNull(inputStream);
 
-    try (BufferedReader reader = new BufferedReader(new FileReader(queryFile))) {
+    try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
       String queryString;
       while ((queryString = reader.readLine()) != null) {
         // Skip commented line and empty line.
@@ -463,16 +461,16 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    */
   public void testQueryExceptions()
       throws Exception {
-    testQueryException("POTATO");
-    testQueryException("SELECT COUNT(*) FROM potato");
-    testQueryException("SELECT POTATO(ArrTime) FROM mytable");
-    testQueryException("SELECT COUNT(*) FROM mytable where ArrTime = 'potato'");
+    testQueryException("POTATO", QueryException.PQL_PARSING_ERROR_CODE);
+    testQueryException("SELECT COUNT(*) FROM potato", QueryException.TABLE_DOES_NOT_EXIST_ERROR_CODE);
+    testQueryException("SELECT POTATO(ArrTime) FROM mytable", QueryException.QUERY_EXECUTION_ERROR_CODE);
+    testQueryException("SELECT COUNT(*) FROM mytable where ArrTime = 'potato'", QueryException.QUERY_EXECUTION_ERROR_CODE);
   }
 
-  private void testQueryException(String query)
+  private void testQueryException(String query, int errorCode)
       throws Exception {
     JsonNode jsonObject = postQuery(query);
-    assertTrue(jsonObject.get("exceptions").size() > 0);
+    assertEquals(jsonObject.get("exceptions").get(0).get("errorCode").asInt(), errorCode);
   }
 
   /**

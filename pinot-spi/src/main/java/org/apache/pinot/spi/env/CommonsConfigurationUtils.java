@@ -21,6 +21,7 @@ package org.apache.pinot.spi.env;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -61,6 +62,21 @@ public abstract class CommonsConfigurationUtils {
     }
   }
 
+  /**
+   * Instantiate a {@link PropertiesConfiguration} from an inputstream.
+   * @param inputStream containing properties
+   * @return a {@link PropertiesConfiguration} instance.
+   */
+  public static PropertiesConfiguration fromInputStream(InputStream inputStream) {
+    try {
+      PropertiesConfiguration propertiesConfiguration = new PropertiesConfiguration();
+      propertiesConfiguration.load(inputStream);
+      return propertiesConfiguration;
+    } catch (ConfigurationException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   private static Iterable<String> getIterable(Iterator<String> keys) {
     return () -> keys;
   }
@@ -91,8 +107,8 @@ public abstract class CommonsConfigurationUtils {
   }
 
   private static Object mapValue(String key, Configuration configuration) {
-    return Optional.of(configuration.getStringArray(key)).filter(values -> values.length > 1)
-        .<Object> map(values -> Arrays.stream(values).collect(Collectors.joining(",")))
+    return Optional.of(configuration.getStringArray(key)).filter(values -> values.length > 1).<Object>map(
+        values -> Arrays.stream(values).collect(Collectors.joining(",")))
         .orElseGet(() -> configuration.getProperty(key));
   }
 }

@@ -86,6 +86,14 @@
         </exclusion>
         <exclusion>
           <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-kinesis</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-s3</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.pinot</groupId>
           <artifactId>pinot-batch-ingestion-standalone</artifactId>
         </exclusion>
         <exclusion>
@@ -198,7 +206,7 @@
                   <goal>single</goal>
                 </goals>
                 <configuration>
-                  <finalName>apache-pinot-incubating-${project.version}-src</finalName>
+                  <finalName>apache-pinot-${project.version}-src</finalName>
                   <tarLongFileMode>posix</tarLongFileMode>
                   <descriptors>
                     <descriptor>${pinot.root}/pinot-distribution/pinot-source-assembly.xml</descriptor>
@@ -225,7 +233,7 @@
                 </goals>
                 <phase>package</phase>
                 <configuration>
-                  <finalName>apache-pinot-incubating-${project.version}-bin</finalName>
+                  <finalName>apache-pinot-${project.version}-bin</finalName>
                   <appendAssemblyId>false</appendAssemblyId>
                   <descriptors>
                     <descriptor>pinot-assembly.xml</descriptor>

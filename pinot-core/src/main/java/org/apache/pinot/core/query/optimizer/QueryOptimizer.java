@@ -32,12 +32,25 @@ import org.apache.pinot.core.query.optimizer.filter.FlattenAndOrFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.MergeEqInFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.MergeRangeFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.NumericalFilterOptimizer;
+import org.apache.pinot.core.query.optimizer.filter.TimePredicateFilterOptimizer;
+import org.apache.pinot.core.query.optimizer.statement.JsonStatementOptimizer;
+import org.apache.pinot.core.query.optimizer.statement.StatementOptimizer;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
 public class QueryOptimizer {
+  // DO NOT change the order of these optimizers.
+  // - MergeEqInFilterOptimizer and MergeRangeFilterOptimizer relies on FlattenAndOrFilterOptimizer to flatten the
+  //   AND/OR predicate so that the children are on the same level to be merged
+  // - TimePredicateFilterOptimizer and MergeRangeFilterOptimizer relies on NumericalFilterOptimizer to convert the
+  //   values to the proper format so that they can be properly parsed
   private static final List<FilterOptimizer> FILTER_OPTIMIZERS = Arrays
-      .asList(new FlattenAndOrFilterOptimizer(), new NumericalFilterOptimizer(), new MergeEqInFilterOptimizer(), new MergeRangeFilterOptimizer());
+      .asList(new FlattenAndOrFilterOptimizer(), new MergeEqInFilterOptimizer(), new NumericalFilterOptimizer(),
+          new TimePredicateFilterOptimizer(), new MergeRangeFilterOptimizer());
+
+  private static final List<StatementOptimizer> STATEMENT_OPTIMIZERS = Arrays
+      .asList(new JsonStatementOptimizer());
 
   /**
    * Optimizes the given PQL query.
@@ -54,16 +67,24 @@ public class QueryOptimizer {
     }
   }
 
-  /**
-   * Optimizes the given SQL query.
-   */
+  /** Optimizes the given SQL query. */
   public void optimize(PinotQuery pinotQuery, @Nullable Schema schema) {
+    optimize(pinotQuery, null, schema);
+  }
+
+  /** Optimizes the given SQL query. */
+  public void optimize(PinotQuery pinotQuery, @Nullable TableConfig tableConfig, @Nullable Schema schema) {
     Expression filterExpression = pinotQuery.getFilterExpression();
     if (filterExpression != null) {
       for (FilterOptimizer filterOptimizer : FILTER_OPTIMIZERS) {
         filterExpression = filterOptimizer.optimize(filterExpression, schema);
       }
       pinotQuery.setFilterExpression(filterExpression);
+    }
+
+    // Run statement optimizer after filter has already been optimized.
+    for (StatementOptimizer statementOptimizer : STATEMENT_OPTIMIZERS) {
+      statementOptimizer.optimize(pinotQuery, tableConfig, schema);
     }
   }
 }

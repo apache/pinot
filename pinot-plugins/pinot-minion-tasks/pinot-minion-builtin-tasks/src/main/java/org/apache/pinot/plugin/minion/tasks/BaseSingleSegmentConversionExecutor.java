@@ -58,11 +58,6 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
   protected abstract SegmentConversionResult convert(PinotTaskConfig pinotTaskConfig, File indexDir, File workingDir)
       throws Exception;
 
-  /**
-   * Returns the segment ZK metadata custom map modifier.
-   */
-  protected abstract SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier();
-
   @Override
   public SegmentConversionResult executeTask(PinotTaskConfig pinotTaskConfig)
       throws Exception {
@@ -74,6 +69,14 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
     String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
     String originalSegmentCrc = configs.get(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY);
     String authToken = configs.get(MinionConstants.AUTH_TOKEN);
+
+    long currentSegmentCrc = getSegmentCrc(tableNameWithType, segmentName);
+    if (Long.parseLong(originalSegmentCrc) != currentSegmentCrc) {
+      LOGGER.info("Segment CRC does not match, skip the task. Original CRC: {}, current CRC: {}", originalSegmentCrc,
+          currentSegmentCrc);
+      return new SegmentConversionResult.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
+          .build();
+    }
 
     LOGGER.info("Start executing {} on table: {}, segment: {} with downloadURL: {}, uploadURL: {}", taskType,
         tableNameWithType, segmentName, downloadURL, uploadURL);
@@ -91,6 +94,9 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       // Un-tar the segment file
       File segmentDir = new File(tempDataDir, "segmentDir");
       File indexDir = TarGzCompressionUtils.untar(tarredSegmentFile, segmentDir).get(0);
+      if (!FileUtils.deleteQuietly(tarredSegmentFile)) {
+        LOGGER.warn("Failed to delete tarred input segment: {}", tarredSegmentFile.getAbsolutePath());
+      }
 
       // Convert the segment
       File workingDir = new File(tempDataDir, "workingDir");
@@ -101,8 +107,20 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
           segmentConversionResult.getSegmentName(), segmentName);
 
       // Tar the converted segment
-      File convertedSegmentTarFile = new File(tempDataDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-      TarGzCompressionUtils.createTarGzFile(segmentConversionResult.getFile(), convertedSegmentTarFile);
+      File convertedSegmentDir = segmentConversionResult.getFile();
+      File convertedTarredSegmentFile =
+          new File(tempDataDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+      TarGzCompressionUtils.createTarGzFile(convertedSegmentDir, convertedTarredSegmentFile);
+      if (!FileUtils.deleteQuietly(convertedSegmentDir)) {
+        LOGGER.warn("Failed to delete converted segment: {}", convertedSegmentDir.getAbsolutePath());
+      }
+
+      // Delete the input segment after tarring the converted segment to avoid deleting the converted segment when the
+      // conversion happens in-place (converted segment dir is the same as input segment dir). It could also happen when
+      // the conversion is not required, and the input segment dir is returned as the result.
+      if (indexDir.exists() && !FileUtils.deleteQuietly(indexDir)) {
+        LOGGER.warn("Failed to delete input segment: {}", indexDir.getAbsolutePath());
+      }
 
       // Check whether the task get cancelled before uploading the segment
       if (_cancelled) {
@@ -118,7 +136,8 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       // Set segment ZK metadata custom map modifier into HTTP header to modify the segment ZK metadata
       // NOTE: even segment is not changed, still need to upload the segment to update the segment ZK metadata so that
       // segment will not be submitted again
-      SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier = getSegmentZKMetadataCustomMapModifier();
+      SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier =
+          getSegmentZKMetadataCustomMapModifier(pinotTaskConfig, segmentConversionResult);
       Header segmentZKMetadataCustomMapModifierHeader =
           new BasicHeader(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER,
               segmentZKMetadataCustomMapModifier.toJsonString());
@@ -137,7 +156,10 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
 
       // Upload the tarred segment
       SegmentConversionUtils.uploadSegment(configs, httpHeaders, parameters, tableNameWithType, segmentName, uploadURL,
-          convertedSegmentTarFile);
+          convertedTarredSegmentFile);
+      if (!FileUtils.deleteQuietly(convertedTarredSegmentFile)) {
+        LOGGER.warn("Failed to delete tarred converted segment: {}", convertedTarredSegmentFile.getAbsolutePath());
+      }
 
       LOGGER.info("Done executing {} on table: {}, segment: {}", taskType, tableNameWithType, segmentName);
       return segmentConversionResult;

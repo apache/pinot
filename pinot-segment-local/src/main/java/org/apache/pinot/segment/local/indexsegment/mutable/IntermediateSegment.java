@@ -32,22 +32,22 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.local.io.writer.impl.MmapMemoryManager;
-import org.apache.pinot.segment.local.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.MutableDictionaryFactory;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableForwardIndex;
-import org.apache.pinot.segment.local.segment.creator.impl.V1Constants;
 import org.apache.pinot.segment.local.segment.index.column.IntermediateIndexContainer;
 import org.apache.pinot.segment.local.segment.index.column.NumValuesInfo;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.reader.MutableDictionary;
 import org.apache.pinot.segment.spi.index.reader.MutableForwardIndex;
-import org.apache.pinot.segment.spi.index.reader.ValidDocIndexReader;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -219,7 +219,7 @@ public class IntermediateSegment implements MutableSegment {
 
   @Nullable
   @Override
-  public ValidDocIndexReader getValidDocIndex() {
+  public ThreadSafeMutableRoaringBitmap getValidDocIds() {
     return null;
   }
 

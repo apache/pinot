@@ -147,12 +147,13 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
   }
 
   @Override
-  protected void startController() {
+  protected void startController()
+      throws Exception {
     Map<String, Object> controllerConfig = getDefaultControllerConfiguration();
     // Perform realtime segment validation every second with 1 second initial delay.
     controllerConfig
-        .put(ControllerConf.ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS, 1);
-    controllerConfig.put(ControllerConf.ControllerPeriodicTasksConf.SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS, 1);
+        .put(ControllerConf.ControllerPeriodicTasksConf.DEPRECATED_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS, 1);
+    controllerConfig.put(ControllerConf.ControllerPeriodicTasksConf.DEPRECATED_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS, 1);
     controllerConfig
         .put(ControllerConf.ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_INITIAL_DELAY_IN_SECONDS, 1);
     startController(controllerConfig);

@@ -19,7 +19,6 @@
 package org.apache.pinot.core.segment.processing.partitioner;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.segment.spi.partition.Partitioner;
 
 
 /**

@@ -18,34 +18,19 @@
  */
 package org.apache.pinot.integration.tests;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
-import javax.annotation.Nullable;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
-import org.apache.pinot.core.minion.PinotTaskConfig;
-import org.apache.pinot.minion.event.MinionEventObserver;
-import org.apache.pinot.minion.event.MinionEventObserverFactory;
-import org.apache.pinot.minion.exception.TaskCancelledException;
-import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
-import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
-import org.apache.pinot.plugin.minion.tasks.BaseTaskExecutor;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -59,20 +44,21 @@ import static org.testng.Assert.*;
  * minion functionality.
  */
 public class SimpleMinionClusterIntegrationTest extends ClusterTest {
-  private static final String TASK_TYPE = "TestTask";
-  private static final String TABLE_NAME_1 = "testTable1";
-  private static final String TABLE_NAME_2 = "testTable2";
-  private static final String TABLE_NAME_3 = "testTable3";
+  // Accessed by the plug-in classes
+  public static final String TASK_TYPE = "TestTask";
+  public static final String TABLE_NAME_1 = "testTable1";
+  public static final String TABLE_NAME_2 = "testTable2";
+  public static final String TABLE_NAME_3 = "testTable3";
+  public static final int NUM_TASKS = 2;
+  public static final int NUM_CONFIGS = 3;
+  public static final AtomicBoolean HOLD = new AtomicBoolean();
+  public static final AtomicBoolean TASK_START_NOTIFIED = new AtomicBoolean();
+  public static final AtomicBoolean TASK_SUCCESS_NOTIFIED = new AtomicBoolean();
+  public static final AtomicBoolean TASK_CANCELLED_NOTIFIED = new AtomicBoolean();
+  public static final AtomicBoolean TASK_ERROR_NOTIFIED = new AtomicBoolean();
+
   private static final long STATE_TRANSITION_TIMEOUT_MS = 60_000L;  // 1 minute
   private static final long ZK_CALLBACK_TIMEOUT_MS = 30_000L;       // 30 seconds
-  private static final int NUM_TASKS = 2;
-  private static final int NUM_CONFIGS = 3;
-
-  private static final AtomicBoolean HOLD = new AtomicBoolean();
-  private static final AtomicBoolean TASK_START_NOTIFIED = new AtomicBoolean();
-  private static final AtomicBoolean TASK_SUCCESS_NOTIFIED = new AtomicBoolean();
-  private static final AtomicBoolean TASK_CANCELLED_NOTIFIED = new AtomicBoolean();
-  private static final AtomicBoolean TASK_ERROR_NOTIFIED = new AtomicBoolean();
 
   private PinotHelixTaskResourceManager _helixTaskResourceManager;
   private PinotTaskManager _taskManager;
@@ -96,29 +82,47 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     _helixTaskResourceManager = _controllerStarter.getHelixTaskResourceManager();
     _taskManager = _controllerStarter.getTaskManager();
 
-    // Register the test task generator into task manager
-    PinotTaskGenerator taskGenerator = new TestTaskGenerator();
-    taskGenerator.init(_taskManager.getClusterInfoAccessor());
-    _taskManager.registerTaskGenerator(taskGenerator);
+    startMinion();
+  }
 
-    startMinion(Collections.singletonList(new TestTaskExecutorFactory()),
-        Collections.singletonList(new TestEventObserverFactory()));
+  private void verifyTaskCount(String task, int errors, int waiting, int running, int total) {
+    PinotHelixTaskResourceManager.TaskCount taskCount = _helixTaskResourceManager.getTaskCount(task);
+    assertEquals(taskCount.getError(), errors);
+    assertEquals(taskCount.getWaiting(), waiting);
+    assertEquals(taskCount.getRunning(), running);
+    assertEquals(taskCount.getTotal(), total);
   }
 
   @Test
   public void testStopResumeDeleteTaskQueue() {
     // Hold the task
     HOLD.set(true);
+    // No tasks before we start.
+    assertEquals(_helixTaskResourceManager.getTasksInProgress(TASK_TYPE).size(),0);
+    verifyTaskCount("Task_" + TASK_TYPE + "_1624403781879", 0, 0, 0, 0);
 
     // Should create the task queues and generate a task
-    assertNotNull(_taskManager.scheduleTasks().get(TASK_TYPE));
+    String task1 = _taskManager.scheduleTasks().get(TASK_TYPE);
+    assertNotNull(task1);
     assertTrue(_helixTaskResourceManager.getTaskQueues()
         .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(TASK_TYPE)));
+    assertTrue(_helixTaskResourceManager.getTasksInProgress(TASK_TYPE).contains(task1));
 
-    // Should generate one more task
-    assertNotNull(_taskManager.scheduleTask(TASK_TYPE));
+    // Since we have two tables, two sub-tasks are generated -- one for each table.
+    // The default concurrent sub-tasks per minion instance is 1, and we have one minion
+    // instance spun up. So, one sub-tasks gets scheduled in a minion, and the other one
+    // waits.
+    verifyTaskCount(task1, 0, 1, 1, 2);
+    // Should generate one more task, with two sub-tasks. Both of these sub-tasks will wait
+    // since we have one minion instance that is still running one of the sub-tasks.
+    String task2 = _taskManager.scheduleTask(TASK_TYPE);
+    assertNotNull(task2);
+    assertTrue(_helixTaskResourceManager.getTasksInProgress(TASK_TYPE).contains(task2));
+    verifyTaskCount(task2, 0, 2, 0, 2);
 
-    // Should not generate more tasks
+    // Should not generate more tasks since SimpleMinionClusterIntegrationTests.NUM_TASKS is 2.
+    // Our test task generator does not generate if there are already this many sub-tasks in the
+    // running+waiting count already.
     assertNull(_taskManager.scheduleTasks().get(TASK_TYPE));
     assertNull(_taskManager.scheduleTask(TASK_TYPE));
 
@@ -228,118 +232,5 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     stopBroker();
     stopController();
     stopZk();
-  }
-
-  private static class TestTaskGenerator implements PinotTaskGenerator {
-
-    private ClusterInfoAccessor _clusterInfoAccessor;
-
-    @Override
-    public void init(ClusterInfoAccessor clusterInfoAccessor) {
-      _clusterInfoAccessor = clusterInfoAccessor;
-    }
-
-    @Override
-    public String getTaskType() {
-      return TASK_TYPE;
-    }
-
-    @Override
-    public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
-      assertEquals(tableConfigs.size(), NUM_TASKS);
-
-      // Generate at most 2 tasks
-      if (_clusterInfoAccessor.getTaskStates(TASK_TYPE).size() >= NUM_TASKS) {
-        return Collections.emptyList();
-      }
-
-      List<PinotTaskConfig> taskConfigs = new ArrayList<>();
-      for (TableConfig tableConfig : tableConfigs) {
-        Map<String, String> configs = new HashMap<>();
-        configs.put("tableName", tableConfig.getTableName());
-        configs.put("tableType", tableConfig.getTableType().toString());
-        taskConfigs.add(new PinotTaskConfig(TASK_TYPE, configs));
-      }
-      return taskConfigs;
-    }
-  }
-
-  public static class TestTaskExecutorFactory implements PinotTaskExecutorFactory {
-
-    @Override
-    public void init(MinionTaskZkMetadataManager zkMetadataManager) {
-    }
-
-    @Override
-    public String getTaskType() {
-      return TASK_TYPE;
-    }
-
-    @Override
-    public PinotTaskExecutor create() {
-      return new BaseTaskExecutor() {
-        @Override
-        public Boolean executeTask(PinotTaskConfig pinotTaskConfig) {
-          assertTrue(MINION_CONTEXT.getDataDir().exists());
-          assertNotNull(MINION_CONTEXT.getMinionMetrics());
-          assertNotNull(MINION_CONTEXT.getHelixPropertyStore());
-
-          assertEquals(pinotTaskConfig.getTaskType(), TASK_TYPE);
-          Map<String, String> configs = pinotTaskConfig.getConfigs();
-          assertEquals(configs.size(), NUM_CONFIGS);
-          String offlineTableName = configs.get("tableName");
-          assertEquals(TableNameBuilder.getTableTypeFromTableName(offlineTableName), TableType.OFFLINE);
-          String rawTableName = TableNameBuilder.extractRawTableName(offlineTableName);
-          assertTrue(rawTableName.equals(TABLE_NAME_1) || rawTableName.equals(TABLE_NAME_2));
-          assertEquals(configs.get("tableType"), TableType.OFFLINE.toString());
-
-          do {
-            if (_cancelled) {
-              throw new TaskCancelledException("Task has been cancelled");
-            }
-          } while (HOLD.get());
-          return true;
-        }
-      };
-    }
-  }
-
-  public static class TestEventObserverFactory implements MinionEventObserverFactory {
-
-    @Override
-    public void init(MinionTaskZkMetadataManager zkMetadataManager) {
-    }
-
-    @Override
-    public String getTaskType() {
-      return TASK_TYPE;
-    }
-
-    @Override
-    public MinionEventObserver create() {
-      return new MinionEventObserver() {
-        @Override
-        public void notifyTaskStart(PinotTaskConfig pinotTaskConfig) {
-          TASK_START_NOTIFIED.set(true);
-        }
-
-        @Override
-        public void notifyTaskSuccess(PinotTaskConfig pinotTaskConfig, @Nullable Object executionResult) {
-          assertTrue(executionResult instanceof Boolean);
-          assertTrue((Boolean) executionResult);
-          TASK_SUCCESS_NOTIFIED.set(true);
-        }
-
-        @Override
-        public void notifyTaskCancelled(PinotTaskConfig pinotTaskConfig) {
-          TASK_CANCELLED_NOTIFIED.set(true);
-        }
-
-        @Override
-        public void notifyTaskError(PinotTaskConfig pinotTaskConfig, Exception exception) {
-          TASK_ERROR_NOTIFIED.set(true);
-        }
-      };
-    }
   }
 }

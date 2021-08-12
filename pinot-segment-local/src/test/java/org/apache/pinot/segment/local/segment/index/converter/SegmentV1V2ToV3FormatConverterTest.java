@@ -26,14 +26,14 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
-import org.apache.pinot.segment.local.segment.creator.impl.V1Constants;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.local.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -100,7 +100,7 @@ public class SegmentV1V2ToV3FormatConverterTest {
     Assert.assertTrue(v3Location.isDirectory());
 
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(v3Location);
-    Assert.assertEquals(metadata.getVersion(), SegmentVersion.v3.toString());
+    Assert.assertEquals(metadata.getVersion(), SegmentVersion.v3);
     Assert.assertTrue(new File(v3Location, V1Constants.SEGMENT_CREATION_META).exists());
     FileTime afterConversionTime = Files.getLastModifiedTime(v3Location.toPath());
 
@@ -109,7 +109,7 @@ public class SegmentV1V2ToV3FormatConverterTest {
     IndexSegment indexSegment = ImmutableSegmentLoader.load(_segmentDirectory, _v3IndexLoadingConfig);
     Assert.assertNotNull(indexSegment);
     Assert.assertEquals(indexSegment.getSegmentName(), metadata.getName());
-    Assert.assertEquals(SegmentVersion.v3, SegmentVersion.valueOf(indexSegment.getSegmentMetadata().getVersion()));
+    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);
 
     FileTime afterLoadTime = Files.getLastModifiedTime(v3Location.toPath());
     Assert.assertEquals(afterConversionTime, afterLoadTime);

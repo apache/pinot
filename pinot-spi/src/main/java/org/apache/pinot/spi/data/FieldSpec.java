@@ -43,7 +43,7 @@ import org.apache.pinot.spi.utils.TimestampUtils;
  */
 @SuppressWarnings("unused")
 public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
-  private static final int DEFAULT_MAX_LENGTH = 512;
+  public static final int DEFAULT_MAX_LENGTH = 512;
 
   public static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_INT = Integer.MIN_VALUE;
   public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_LONG = Long.MIN_VALUE;
@@ -339,7 +339,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     return EqualityUtils.isEqual(_name, that._name) && EqualityUtils.isEqual(_dataType, that._dataType) && EqualityUtils
         .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils
         .isEqual(getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils
-        .isEqual(_maxLength, that._maxLength) && EqualityUtils.isEqual(_transformFunction, that._transformFunction);
+        .isEqual(_maxLength, that._maxLength) && EqualityUtils.isEqual(_transformFunction, that._transformFunction)
+        && EqualityUtils.isEqual(_virtualColumnProvider, that._virtualColumnProvider);
   }
 
   @Override
@@ -350,6 +351,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     result = EqualityUtils.hashCodeOf(result, getStringValue(_defaultNullValue));
     result = EqualityUtils.hashCodeOf(result, _maxLength);
     result = EqualityUtils.hashCodeOf(result, _transformFunction);
+    result = EqualityUtils.hashCodeOf(result, _virtualColumnProvider);
     return result;
   }
 
@@ -499,6 +501,13 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       } catch (Exception e) {
         throw new IllegalArgumentException(String.format("Cannot convert value: '%s' to type: %s", value, this));
       }
+    }
+
+    /**
+     * Checks whether the data type can be a sorted column.
+     */
+    public boolean canBeASortedColumn() {
+      return this != BYTES && this != JSON && this != STRUCT && this != MAP && this != LIST;
     }
   }
 

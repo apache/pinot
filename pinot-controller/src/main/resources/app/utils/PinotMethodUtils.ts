@@ -69,6 +69,7 @@ import {
   authenticateUser
 } from '../requests';
 import Utils from './Utils';
+const JSONbig = require('json-bigint')({'storeAsString': true})
 
 // This method is used to display tenants listing on cluster manager home page
 // API: /tenants
@@ -208,7 +209,11 @@ const getTableSchemaData = (tableName) => {
 
 const getAsObject = (str: SQLResult) => {
   if (typeof str === 'string' || str instanceof String) {
-    return JSON.parse(JSON.stringify(str));
+    try {
+      return JSONbig.parse(str);
+    } catch(e) {
+      return JSON.parse(JSON.stringify(str));
+    }
   }
   return str;
 };
@@ -219,7 +224,6 @@ const getAsObject = (str: SQLResult) => {
 const getQueryResults = (params, url, checkedOptions) => {
   return getQueryResult(params, url).then(({ data }) => {
     let queryResponse = null;
-
     queryResponse = getAsObject(data);
 
     // if sql api throws error, handle here
@@ -299,13 +303,13 @@ const getQueryResults = (params, url, checkedOptions) => {
       },
       queryStats: {
         columns: columnStats,
-        records: [[data.timeUsedMs, data.numDocsScanned, data.totalDocs, data.numServersQueried, data.numServersResponded,
-          data.numSegmentsQueried, data.numSegmentsProcessed, data.numSegmentsMatched, data.numConsumingSegmentsQueried,
-          data.numEntriesScannedInFilter, data.numEntriesScannedPostFilter, data.numGroupsLimitReached,
-          data.partialResponse ? data.partialResponse : '-', data.minConsumingFreshnessTimeMs,
-          data.offlineThreadCpuTimeNs, data.realtimeThreadCpuTimeNs]]
+        records: [[queryResponse.timeUsedMs, queryResponse.numDocsScanned, queryResponse.totalDocs, queryResponse.numServersQueried, queryResponse.numServersResponded,
+          queryResponse.numSegmentsQueried, queryResponse.numSegmentsProcessed, queryResponse.numSegmentsMatched, queryResponse.numConsumingSegmentsQueried,
+          queryResponse.numEntriesScannedInFilter, queryResponse.numEntriesScannedPostFilter, queryResponse.numGroupsLimitReached,
+          queryResponse.partialResponse ? queryResponse.partialResponse : '-', queryResponse.minConsumingFreshnessTimeMs,
+          queryResponse.offlineThreadCpuTimeNs, queryResponse.realtimeThreadCpuTimeNs]]
       },
-      data,
+      data: queryResponse,
     };
   });
 };

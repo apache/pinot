@@ -30,6 +30,7 @@ import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ConnectionFactory;
+import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.client.Request;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.core.common.MinionConstants;
@@ -61,7 +62,7 @@ public class BasicAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest
     startController();
     startBroker();
     startServer();
-    startMinion(null, null);
+    startMinion();
 
     // Unpack the Avro files
     List<File> avroFiles = unpackAvroData(_tempDir);
@@ -141,8 +142,11 @@ public class BasicAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest
   @Override
   protected Connection getPinotConnection() {
     if (_pinotConnection == null) {
+      JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
+      factory.setHeaders(AUTH_HEADER);
+
       _pinotConnection =
-          ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(), AUTH_HEADER);
+          ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(), factory.buildTransport());
     }
     return _pinotConnection;
   }
@@ -165,27 +169,28 @@ public class BasicAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest
 
     // schedule offline segment generation
     Assert.assertNotNull(_controllerStarter.getTaskManager().scheduleTasks());
-    Thread.sleep(5000);
 
-    ResultSetGroup resultAfterOffline = getPinotConnection().execute(query);
+    // wait for offline segments
+    JsonNode offlineSegments = TestUtils.waitForResult(() -> {
+      JsonNode segmentSets = JsonUtils.stringToJsonNode(
+          sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(getTableName()), AUTH_HEADER));
+      JsonNode currentOfflineSegments =
+          new IntRange(0, segmentSets.size()).stream().map(segmentSets::get).filter(s -> s.has("OFFLINE"))
+              .map(s -> s.get("OFFLINE")).findFirst().get();
+      Assert.assertFalse(currentOfflineSegments.isEmpty());
+      return currentOfflineSegments;
+    }, 30000);
 
     // Verify constant row count
+    ResultSetGroup resultAfterOffline = getPinotConnection().execute(query);
     Assert.assertEquals(resultBeforeOffline.getResultSet(0).getLong(0), resultAfterOffline.getResultSet(0).getLong(0));
-
-    // list offline segments
-    JsonNode segmentSets = JsonUtils
-        .stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(getTableName()), AUTH_HEADER));
-    JsonNode offlineSegments =
-        new IntRange(0, segmentSets.size()).stream().map(segmentSets::get).filter(s -> s.has("OFFLINE"))
-            .map(s -> s.get("OFFLINE")).findFirst().get();
-    Assert.assertFalse(offlineSegments.isEmpty());
 
     // download and sanity-check size of offline segment(s)
     for (int i = 0; i < offlineSegments.size(); i++) {
       String segment = offlineSegments.get(i).asText();
-      Assert.assertTrue(sendGetRequest(_controllerRequestURLBuilder
-          .forSegmentDownload(TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), segment), AUTH_HEADER)
-          .length() > 200000); // download segment
+      Assert.assertTrue(
+          sendGetRequest(_controllerRequestURLBuilder.forSegmentDownload(getTableName(), segment), AUTH_HEADER).length()
+              > 200000); // download segment
     }
   }
 }

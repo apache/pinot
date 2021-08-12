@@ -3,23 +3,19 @@
   "dimensionFieldSpecs": [
     {
       "name": "event_json",
-      "dataType": "STRING",
-      "maxLength": 2147483647
+      "dataType": "JSON"
     },
     {
       "name": "group_json",
-      "dataType": "STRING",
-      "maxLength": 2147483647
+      "dataType": "JSON"
     },
     {
       "name": "member_json",
-      "dataType": "STRING",
-      "maxLength": 2147483647
+      "dataType": "JSON"
     },
     {
       "name": "venue_json",
-      "dataType": "STRING",
-      "maxLength": 2147483647
+      "dataType": "JSON"
     },
     {
       "name": "response",

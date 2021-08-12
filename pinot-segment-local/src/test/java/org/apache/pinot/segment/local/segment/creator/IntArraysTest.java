@@ -28,8 +28,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
-import org.apache.pinot.segment.local.segment.index.metadata.ColumnMetadata;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
@@ -92,8 +91,7 @@ public class IntArraysTest {
       throws Exception {
     ImmutableSegment heapSegment = ImmutableSegmentLoader.load(INDEX_DIR.listFiles()[0], ReadMode.heap);
     ImmutableSegment mmapSegment = ImmutableSegmentLoader.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
-    Map<String, ColumnMetadata> metadataMap =
-        ((SegmentMetadataImpl) heapSegment.getSegmentMetadata()).getColumnMetadataMap();
+    Map<String, ColumnMetadata> metadataMap = heapSegment.getSegmentMetadata().getColumnMetadataMap();
 
     for (String column : metadataMap.keySet()) {
       ForwardIndexReader heapForwardIndex = heapSegment.getForwardIndex(column);

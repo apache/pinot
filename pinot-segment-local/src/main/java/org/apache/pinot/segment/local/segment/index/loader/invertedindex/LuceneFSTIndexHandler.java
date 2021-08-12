@@ -27,17 +27,17 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.text.LuceneFSTIndexCreator;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
-import org.apache.pinot.segment.local.segment.index.metadata.ColumnMetadata;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.local.segment.store.ColumnIndexType;
-import org.apache.pinot.segment.local.segment.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.store.ColumnIndexType;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.segment.local.segment.creator.impl.V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
+import static org.apache.pinot.segment.spi.V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
 
 
 /**
@@ -67,12 +67,12 @@ public class LuceneFSTIndexHandler {
   private final SegmentVersion _segmentVersion;
   private final Set<ColumnMetadata> _fstIndexColumns = new HashSet<>();
 
-  public LuceneFSTIndexHandler(File indexDir, SegmentMetadataImpl segmentMetadata, Set<String> fstIndexColumns,
+  public LuceneFSTIndexHandler(File indexDir, SegmentMetadata segmentMetadata, Set<String> fstIndexColumns,
       SegmentDirectory.Writer segmentWriter) {
     _indexDir = indexDir;
     _segmentWriter = segmentWriter;
     _segmentName = segmentMetadata.getName();
-    _segmentVersion = SegmentVersion.valueOf(segmentMetadata.getVersion());
+    _segmentVersion = segmentMetadata.getVersion();
 
     for (String column : fstIndexColumns) {
       ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);

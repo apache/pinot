@@ -44,6 +44,7 @@ public class RecommenderConstants {
     public static final boolean DEFAULT_RECOMMEND_PINOT_TABLE_PARTITION = true;
     public static final boolean DEFAULT_RECOMMEND_INVERTED_SORTED_INDEX_JOINT = true;
     public static final boolean DEFAULT_RECOMMEND_BLOOM_FILTER = true;
+    public static final boolean DEFAULT_RECOMMEND_RANGE_INDEX = true;
     public static final boolean DEFAULT_RECOMMEND_NO_DICTIONARY_ONHEAP_DICTIONARY_JOINT = true;
     public static final boolean DEFAULT_RECOMMEND_AGGREGATE_METRICS = true;
     public static final boolean DEFAULT_RECOMMEND_REALTIME_PROVISIONING = true;
@@ -65,6 +66,10 @@ public class RecommenderConstants {
     public static final double DEFAULT_THRESHOLD_MIN_PERCENT_EQ_BLOOMFILTER = 0.5d;
   }
 
+  public static class RangeIndexRule {
+    public static final double DEFAULT_THRESHOLD_MIN_PERCENT_RANGE_INDEX = 0.4;
+  }
+
   public static class NoDictionaryOnHeapDictionaryJointRule {
     public static final double DEFAULT_THRESHOLD_MIN_FILTER_FREQ_DICTIONARY = 0d;
     public static final double DEFAULT_THRESHOLD_MIN_SELECTION_FREQ_NO_DICTIONARY = 0.3d;
@@ -77,10 +82,10 @@ public class RecommenderConstants {
 
   public static class FlagQueryRuleParams{
     public static final long DEFAULT_THRESHOLD_MAX_LIMIT_SIZE = 100000;
-    public static final String WARNING_NO_FILTERING = "Warning: No filtering in ths query";
-    public static final String WARNING_NO_TIME_COL = "Warning: No time column used in ths query";
-    public static final String WARNING_TOO_LONG_LIMIT = "Warning: The size of LIMIT is longer than " + DEFAULT_THRESHOLD_MAX_LIMIT_SIZE;
-    public static final String ERROR_INVALID_QUERY = "Error: query not able to parse, skipped";
+    public static final String WARNING_NO_FILTERING = "Warning: Query seems to scan the entire table. No filters are used in the query. Please verify if filters are not needed.";
+    public static final String WARNING_NO_TIME_COL = "Warning: No time column used in filter in the query. Table with time columns typically use it in filters to make the queries more selective.";
+    public static final String WARNING_TOO_LONG_LIMIT = "Warning: Please verify if you need to pull out huge number of records for this query. Consider using smaller limit than " + DEFAULT_THRESHOLD_MAX_LIMIT_SIZE;
+    public static final String ERROR_INVALID_QUERY = "Error: Invalid query syntax. Please fix the query";
   }
 
   public static class RealtimeProvisioningRule {

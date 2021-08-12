@@ -36,10 +36,10 @@ public class BatchIngestionConfig extends BaseJsonConfig {
   private final List<Map<String, String>> _batchConfigMaps;
 
   @JsonPropertyDescription("Ingestion type APPEND or REFRESH")
-  private final String _segmentIngestionType;
+  private String _segmentIngestionType;
 
   @JsonPropertyDescription("Ingestion frequency HOURLY or DAILY")
-  private final String _segmentIngestionFrequency;
+  private String _segmentIngestionFrequency;
 
   @JsonCreator
   public BatchIngestionConfig(@JsonProperty("batchConfigMaps") @Nullable List<Map<String, String>> batchConfigMaps,
@@ -61,5 +61,13 @@ public class BatchIngestionConfig extends BaseJsonConfig {
 
   public String getSegmentIngestionFrequency() {
     return _segmentIngestionFrequency;
+  }
+
+  public void setSegmentIngestionType(String segmentIngestionType) {
+    _segmentIngestionType = segmentIngestionType;
+  }
+
+  public void setSegmentIngestionFrequency(String segmentIngestionFrequency) {
+    _segmentIngestionFrequency = segmentIngestionFrequency;
   }
 }

@@ -29,8 +29,8 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.core.data.manager.SegmentDataManager;
-import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -108,7 +108,7 @@ public class DimensionTableDataManagerTest {
       when(config.getDataDir()).thenReturn(INDEX_DIR.getAbsolutePath());
     }
     tableDataManager.init(config, "dummyInstance", mockPropertyStore(),
-        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class));
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null);
     tableDataManager.start();
 
     return tableDataManager;

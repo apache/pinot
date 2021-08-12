@@ -40,13 +40,13 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.data.manager.TableDataManager;
-import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -145,7 +145,7 @@ public class SegmentWithNullValueVectorTest {
     @SuppressWarnings("unchecked")
     TableDataManager tableDataManager = TableDataManagerProvider
         .getTableDataManager(tableDataManagerConfig, "testInstance", Mockito.mock(ZkHelixPropertyStore.class),
-            Mockito.mock(ServerMetrics.class), Mockito.mock(HelixManager.class));
+            Mockito.mock(ServerMetrics.class), Mockito.mock(HelixManager.class), null);
     tableDataManager.start();
     tableDataManager.addSegment(_segment);
     _instanceDataManager = Mockito.mock(InstanceDataManager.class);

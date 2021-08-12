@@ -18,6 +18,19 @@
 # under the License.
 #
 
+
+cleanup () {
+  # Terminate the process and wait for the clean up to be done
+  kill "$1"
+  while true;
+  do
+    kill -0 "$1" && sleep 1 || break
+  done
+
+  # Delete ZK directory
+  rm -rf '/tmp/PinotAdmin/zkData'
+}
+
 # Print environment variables
 printenv
 
@@ -27,12 +40,38 @@ netstat -i
 
 # Java version
 java -version
+jdk_version() {
+  IFS='
+'
+  # remove \r for Cygwin
+  lines=$(java -Xms32M -Xmx32M -version 2>&1 | tr '\r' '\n')
+  for line in $lines; do
+    if test -z $result && echo "$line" | grep -q 'version "'
+    then
+      ver=$(echo $line | sed -e 's/.*version "\(.*\)"\(.*\)/\1/; 1q')
+      # on macOS, sed doesn't support '?'
+      if case $ver in "1."*) true;; *) false;; esac;
+      then
+        result=$(echo $ver | sed -e 's/1\.\([0-9]*\)\(.*\)/\1/; 1q')
+      else
+        result=$(echo $ver | sed -e 's/\([0-9]*\)\(.*\)/\1/; 1q')
+      fi
+    fi
+  done
+  unset IFS
+  echo "$result"
+}
+JAVA_VER="$(jdk_version)"
 
 # Build
 PASS=0
-for i in $(seq 1 5)
+for i in $(seq 1 2)
 do
-  mvn clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true
+  if [ "$JAVA_VER" -gt 11 ] ; then
+    mvn clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true -Djdk.version=11
+  else
+    mvn clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true -Djdk.version=${JAVA_VER}
+  fi
   if [ $? -eq 0 ]; then
     PASS=1
     break;
@@ -43,11 +82,74 @@ if [ "${PASS}" != 1 ]; then
 fi
 
 # Quickstart
-DIST_BIN_DIR=`ls -d pinot-distribution/target/apache-pinot-*/apache-pinot-*`/bin
+DIST_BIN_DIR=`ls -d pinot-distribution/target/apache-pinot-*/apache-pinot-*`
 cd "${DIST_BIN_DIR}"
 
+# Test standalone pinot
+bin/pinot-admin.sh StartZookeeper &
+ZK_PID=$!
+sleep 10
+# Print the JVM settings
+jps -lvm
+
+bin/pinot-admin.sh StartServiceManager -bootstrapConfigPaths conf/pinot-controller.conf conf/pinot-broker.conf conf/pinot-server.conf conf/pinot-minion.conf&
+PINOT_PID=$!
+# Print the JVM settings
+jps -lvm
+
+# Wait for at most 6 minutes for all services up.
+sleep 60
+for i in $(seq 1 150)
+do
+  if [[ `curl localhost:9000/health` = "OK" ]]; then
+    if [[ `curl localhost:8099/health` = "OK" ]]; then
+      if [[ `curl localhost:8097/health` = "OK" ]]; then
+        break
+      fi
+    fi
+  fi
+  sleep 2
+done
+
+# Add Table
+bin/pinot-admin.sh AddTable -tableConfigFile examples/batch/baseballStats/baseballStats_offline_table_config.json -schemaFile examples/batch/baseballStats/baseballStats_schema.json -exec
+if [ $? -ne 0 ]; then
+  echo 'Failed to create table baseballStats.'
+  exit 1
+fi
+
+# Ingest Data
+bin/pinot-admin.sh LaunchDataIngestionJob -jobSpecFile examples/batch/baseballStats/ingestionJobSpec.yaml
+if [ $? -ne 0 ]; then
+  echo 'Failed to ingest data for table baseballStats.'
+  exit 1
+fi
+PASS=0
+
+# Wait for 10 Seconds for table to be set up, then query the total count.
+sleep 10
+for i in $(seq 1 150)
+do
+  QUERY_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from baseballStats limit 1","trace":false}' http://localhost:8099/query/sql`
+  if [ $? -eq 0 ]; then
+    COUNT_STAR_RES=`echo "${QUERY_RES}" | jq '.resultTable.rows[0][0]'`
+    if [[ "${COUNT_STAR_RES}" =~ ^[0-9]+$ ]] && [ "${COUNT_STAR_RES}" -eq 97889 ]; then
+      PASS=1
+      break
+    fi
+  fi
+  sleep 2
+done
+
+cleanup "${PINOT_PID}"
+cleanup "${ZK_PID}"
+if [ "${PASS}" -eq 0 ]; then
+  echo 'Standalone test failed: Cannot get correct result for count star query.'
+  exit 1
+fi
+
 # Test quick-start-batch
-./quick-start-batch.sh &
+bin/quick-start-batch.sh &
 PID=$!
 
 # Print the JVM settings
@@ -70,18 +172,6 @@ do
   sleep 2
 done
 
-cleanup () {
-  # Terminate the process and wait for the clean up to be done
-  kill "$1"
-  while true;
-  do
-    kill -0 "$1" && sleep 1 || break
-  done
-
-  # Delete ZK directory
-  rm -rf '/tmp/PinotAdmin/zkData'
-}
-
 cleanup "${PID}"
 if [ "${PASS}" -eq 0 ]; then
   echo 'Batch Quickstart failed: Cannot get correct result for count star query.'
@@ -89,7 +179,7 @@ if [ "${PASS}" -eq 0 ]; then
 fi
 
 # Test quick-start-batch-with-minion
-./quick-start-batch-with-minion.sh &
+bin/quick-start-batch-with-minion.sh &
 PID=$!
 
 # Print the JVM settings
@@ -119,7 +209,7 @@ if [ "${PASS}" -eq 0 ]; then
 fi
 
 # Test quick-start-streaming
-./quick-start-streaming.sh &
+bin/quick-start-streaming.sh &
 PID=$!
 
 PASS=0
@@ -156,7 +246,7 @@ if [ "${PASS}" -eq 0 ]; then
 fi
 
 # Test quick-start-hybrid
-./quick-start-hybrid.sh &
+bin/quick-start-hybrid.sh &
 PID=$!
 
 # Print the JVM settings

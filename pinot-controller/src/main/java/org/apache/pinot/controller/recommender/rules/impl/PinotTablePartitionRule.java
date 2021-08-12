@@ -217,7 +217,7 @@ public class PinotTablePartitionRule extends AbstractRule {
       String colName = lhs.toString();
       if (lhs.getType() == ExpressionContext.Type.FUNCTION) {
         LOGGER.trace("Skipping the function {}", colName);
-      } else if (_input.isPrimaryDateTime(colName)) {
+      } else if (_input.isTimeOrDateTimeColumn(colName)) {
         LOGGER.trace("Skipping the DateTime column {}", colName);
         return null;
       } else if (!_input.isDim(colName)) {

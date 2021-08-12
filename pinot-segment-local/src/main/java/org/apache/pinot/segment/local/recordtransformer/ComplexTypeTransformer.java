@@ -81,36 +81,36 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  */
 public class ComplexTypeTransformer implements RecordTransformer {
   public static final String DEFAULT_DELIMITER = ".";
-  public static final ComplexTypeConfig.CollectionToJsonMode DEFAULT_COLLECTION_TO_JSON_MODE =
-      ComplexTypeConfig.CollectionToJsonMode.NON_PRIMITIVE;
-  private final List<String> _unnestFields;
+  public static final ComplexTypeConfig.CollectionNotUnnestedToJson DEFAULT_COLLECTION_TO_JSON_MODE =
+      ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE;
+  private final List<String> _fieldsToUnnest;
   private final String _delimiter;
-  private final ComplexTypeConfig.CollectionToJsonMode _collectionToJsonMode;
+  private final ComplexTypeConfig.CollectionNotUnnestedToJson _collectionNotUnnestedToJson;
 
   public ComplexTypeTransformer(TableConfig tableConfig) {
-    this(parseUnnestFields(tableConfig), parseDelimiter(tableConfig), parseCollectionToJsonMode(tableConfig));
+    this(parseFieldsToUnnest(tableConfig), parseDelimiter(tableConfig), parseCollectionNotUnnestedToJson(tableConfig));
   }
 
   @VisibleForTesting
-  ComplexTypeTransformer(List<String> unnestFields, String delimiter) {
-    this(unnestFields, delimiter, DEFAULT_COLLECTION_TO_JSON_MODE);
+  ComplexTypeTransformer(List<String> fieldsToUnnest, String delimiter) {
+    this(fieldsToUnnest, delimiter, DEFAULT_COLLECTION_TO_JSON_MODE);
   }
 
   @VisibleForTesting
-  ComplexTypeTransformer(List<String> unnestFields, String delimiter,
-      ComplexTypeConfig.CollectionToJsonMode collectionToJsonMode) {
-    _unnestFields = new ArrayList<>(unnestFields);
+  ComplexTypeTransformer(List<String> fieldsToUnnest, String delimiter,
+      ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson) {
+    _fieldsToUnnest = new ArrayList<>(fieldsToUnnest);
     _delimiter = delimiter;
-    _collectionToJsonMode = collectionToJsonMode;
+    _collectionNotUnnestedToJson = collectionNotUnnestedToJson;
     // the unnest fields are sorted to achieve the topological sort of the collections, so that the parent collection
     // (e.g. foo) is unnested before the child collection (e.g. foo.bar)
-    Collections.sort(_unnestFields);
+    Collections.sort(_fieldsToUnnest);
   }
 
-  private static List<String> parseUnnestFields(TableConfig tableConfig) {
+  private static List<String> parseFieldsToUnnest(TableConfig tableConfig) {
     if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getComplexTypeConfig() != null
-        && tableConfig.getIngestionConfig().getComplexTypeConfig().getUnnestFields() != null) {
-      return tableConfig.getIngestionConfig().getComplexTypeConfig().getUnnestFields();
+        && tableConfig.getIngestionConfig().getComplexTypeConfig().getFieldsToUnnest() != null) {
+      return tableConfig.getIngestionConfig().getComplexTypeConfig().getFieldsToUnnest();
     } else {
       return new ArrayList<>();
     }
@@ -136,10 +136,10 @@ public class ComplexTypeTransformer implements RecordTransformer {
     return null;
   }
 
-  private static ComplexTypeConfig.CollectionToJsonMode parseCollectionToJsonMode(TableConfig tableConfig) {
+  private static ComplexTypeConfig.CollectionNotUnnestedToJson parseCollectionNotUnnestedToJson(TableConfig tableConfig) {
     if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getComplexTypeConfig() != null
-        && tableConfig.getIngestionConfig().getComplexTypeConfig().getCollectionToJsonMode() != null) {
-      return tableConfig.getIngestionConfig().getComplexTypeConfig().getCollectionToJsonMode();
+        && tableConfig.getIngestionConfig().getComplexTypeConfig().getCollectionNotUnnestedToJson() != null) {
+      return tableConfig.getIngestionConfig().getComplexTypeConfig().getCollectionNotUnnestedToJson();
     } else {
       return DEFAULT_COLLECTION_TO_JSON_MODE;
     }
@@ -149,7 +149,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
   @Override
   public GenericRow transform(GenericRow record) {
     flattenMap(record, new ArrayList<>(record.getFieldToValueMap().keySet()));
-    for (String collection : _unnestFields) {
+    for (String collection : _fieldsToUnnest) {
       unnestCollection(record, collection);
     }
     return record;
@@ -236,7 +236,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
         flattenMap(record, mapColumns);
       } else if (value instanceof Collection) {
         Collection collection = (Collection) value;
-        if (_unnestFields.contains(column)) {
+        if (_fieldsToUnnest.contains(column)) {
           for (Object inner : collection) {
             if (inner instanceof Map) {
               Map<String, Object> innerMap = (Map<String, Object>) inner;
@@ -255,7 +255,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
         }
       } else if (isArray(value)) {
         Object[] array = (Object[]) value;
-        if (_unnestFields.contains(column)) {
+        if (_fieldsToUnnest.contains(column)) {
           for (Object inner : array) {
             if (inner instanceof Map) {
               Map<String, Object> innerMap = (Map<String, Object>) inner;
@@ -321,9 +321,9 @@ public class ComplexTypeTransformer implements RecordTransformer {
         if (!innerMapFields.isEmpty()) {
           flattenMap(concatName, map, innerMapFields);
         }
-      } else if (value instanceof Collection && _unnestFields.contains(concatName)) {
+      } else if (value instanceof Collection && _fieldsToUnnest.contains(concatName)) {
         Collection collection = (Collection) value;
-        if (_unnestFields.contains(concatName)) {
+        if (_fieldsToUnnest.contains(concatName)) {
           for (Object inner : (Collection) value) {
             if (inner instanceof Map) {
               Map<String, Object> innerMap = (Map<String, Object>) inner;
@@ -342,7 +342,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
         }
       } else if (isArray(value)) {
         Object[] array = (Object[]) value;
-        if (_unnestFields.contains(concatName)) {
+        if (_fieldsToUnnest.contains(concatName)) {
           for (Object inner : (Object[]) value) {
             if (inner instanceof Map) {
               Map<String, Object> innerMap = (Map<String, Object>) inner;
@@ -364,7 +364,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
   }
 
   private boolean shallConvertToJson(Object[] value) {
-    switch (_collectionToJsonMode) {
+    switch (_collectionNotUnnestedToJson) {
       case ALL:
         return true;
       case NONE:
@@ -372,12 +372,12 @@ public class ComplexTypeTransformer implements RecordTransformer {
       case NON_PRIMITIVE:
         return !containPrimitives(value);
       default:
-        throw new IllegalArgumentException(String.format("Unsupported collectionToJsonMode %s", _collectionToJsonMode));
+        throw new IllegalArgumentException(String.format("Unsupported collectionNotUnnestedToJson %s", _collectionNotUnnestedToJson));
     }
   }
 
   private boolean shallConvertToJson(Collection value) {
-    switch (_collectionToJsonMode) {
+    switch (_collectionNotUnnestedToJson) {
       case ALL:
         return true;
       case NONE:
@@ -385,7 +385,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
       case NON_PRIMITIVE:
         return !containPrimitives(value);
       default:
-        throw new IllegalArgumentException(String.format("Unsupported collectionToJsonMode %s", _collectionToJsonMode));
+        throw new IllegalArgumentException(String.format("Unsupported collectionNotUnnestedToJson %s", _collectionNotUnnestedToJson));
     }
   }
 

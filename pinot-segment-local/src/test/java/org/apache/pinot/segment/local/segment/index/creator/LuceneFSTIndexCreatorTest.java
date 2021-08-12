@@ -24,13 +24,13 @@ import java.nio.ByteOrder;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.text.LuceneFSTIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.LuceneFSTIndexReader;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.segment.local.segment.creator.impl.V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
+import static org.apache.pinot.segment.spi.V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
 
 
 public class LuceneFSTIndexCreatorTest {

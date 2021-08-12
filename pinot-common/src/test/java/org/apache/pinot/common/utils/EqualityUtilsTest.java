@@ -18,13 +18,7 @@
  */
 package org.apache.pinot.common.utils;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -80,6 +74,74 @@ public class EqualityUtilsTest {
     Assert.assertFalse(EqualityUtils.isSameReference(map1, map1Copy));
     Assert.assertTrue(EqualityUtils.isEqual(map1, map1Copy));
     Assert.assertFalse(EqualityUtils.isEqual(map1, map2));
+  }
+
+  @Test
+  public void testNestedMapCollections() {
+    Map<Integer, Object> map1 = new HashMap<>();
+    Map<Integer, Object> map1WithInt = new HashMap<>();
+    map1WithInt.put(1, 1);
+    Map<Integer, Object> map1WithArrayOfMap = new HashMap<>();
+    map1WithArrayOfMap.put(1, Arrays.asList(1, map1WithInt).toArray());
+    Map<Integer, Object> map1WithListOfMap = new HashMap<>();
+    map1WithListOfMap.put(1, Arrays.asList(1, map1WithInt));
+    Map<Integer, Object> map1WithByteArray = new HashMap<>();
+    map1WithByteArray.put(1, "testString".getBytes());
+    Map<Integer, Object> map1WithNull = new HashMap<>();
+    map1WithNull.put(1, null);
+    map1.put(1, map1WithArrayOfMap);
+    map1.put(2, map1WithListOfMap);
+    map1.put(3, map1WithByteArray);
+    map1.put(4, map1WithNull);
+
+    Map<Integer, Object> map1Copy = new HashMap<>();
+    Map<Integer, Object> map1CopyWithInt = new HashMap<>();
+    map1CopyWithInt.put(1, 1);
+    Map<Integer, Object> map1CopyWithArrayOfMap = new HashMap<>();
+    map1CopyWithArrayOfMap.put(1, Arrays.asList(1, map1CopyWithInt).toArray());
+    Map<Integer, Object> map1CopyWithListOfMap = new HashMap<>();
+    map1CopyWithListOfMap.put(1, Arrays.asList(1, map1CopyWithInt));
+    Map<Integer, Object> map1CopyWithByteArray = new HashMap<>();
+    map1CopyWithByteArray.put(1, "testString".getBytes());
+    Map<Integer, Object> map1CopyWithNull = new HashMap<>();
+    map1CopyWithNull.put(1, null);
+    map1Copy.put(1, map1CopyWithArrayOfMap);
+    map1Copy.put(2, map1CopyWithListOfMap);
+    map1Copy.put(3, map1CopyWithByteArray);
+    map1Copy.put(4, map1CopyWithNull);
+
+    Assert.assertFalse(EqualityUtils.isSameReference(map1, map1Copy));
+    Assert.assertTrue(EqualityUtils.isEqual(map1, map1Copy));
+
+    // Place different data throughout the nested collections to ensure we're checking deep equality
+    List<Integer> floatLocations = Arrays.asList(0, 1, 2, 3, 4);
+    floatLocations.forEach(loc -> {
+      Map<Integer, Object> map2 = new HashMap<>();
+      Map<Integer, Object> map2WithInt = new HashMap<>();
+      map2WithInt.put(1, 1);
+      Map<Integer, Object> map2WithFloat = new HashMap<>();
+      map2WithFloat.put(1, 1L);
+      Map<Integer, Object> map2WithArrayOfMap = new HashMap<>();
+      map2WithArrayOfMap.put(1, Arrays.asList(1, loc == 1 ? map2WithFloat : map2WithInt).toArray());
+      Map<Integer, Object> map2WithByteArray = new HashMap<>();
+      String testString = loc == 2 ? "newTestString" : "testString";
+      map2WithByteArray.put(1, testString.getBytes());
+      Map<Integer, Object> map2WithListOfMap = new HashMap<>();
+      map2WithListOfMap.put(1, Arrays.asList(1, loc == 3 ? map2WithFloat : map2WithInt));
+      Map<Integer, Object> map2WithNull = new HashMap<>();
+      map2WithNull.put(1, loc == 4 ? map2WithInt : null);
+      map2.put(1, map2WithArrayOfMap);
+      map2.put(2, map2WithListOfMap);
+      map2.put(3, map2WithByteArray);
+      map2.put(4, map2WithNull);
+
+      if (loc == 0) {
+        Assert.assertTrue(EqualityUtils.isEqual(map1, map2), "Loc 0 should have no changes");
+      } else {
+        Assert.assertFalse(EqualityUtils.isEqual(map1, map2), "Failed at loc " + loc);
+      }
+    });
+
   }
 
   @Test

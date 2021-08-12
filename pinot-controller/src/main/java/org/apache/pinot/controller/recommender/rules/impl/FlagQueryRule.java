@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.apache.pinot.controller.recommender.rules.impl;
 
 import java.util.HashSet;
@@ -36,7 +37,7 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
  * Flag the queries that are not valid:
  *    Flag the queries with LIMIT value higher than a threshold.
  *    Flag the queries that are not using any filters.
- *    Flag the queries that are not using any filters.
+ *    Flag the queries that are not using any time filters.
  */
 public class FlagQueryRule extends AbstractRule {
   private final Logger LOGGER = LoggerFactory.getLogger(FlagQueryRule.class);
@@ -61,11 +62,15 @@ public class FlagQueryRule extends AbstractRule {
         //Flag the queries that are not using any filters.
         _output.getFlaggedQueries().add(query, WARNING_NO_FILTERING);
       }
-      else { //Flag the queries that are not using any filters.
+      else { //Flag the queries that are not using any time filters.
         Set<String> usedCols = new HashSet<>();
         queryContext.getFilter().getColumns(usedCols);
-        if (!usedCols.contains(_input.getPrimaryTimeCol())){
-          _output.getFlaggedQueries().add(query, WARNING_NO_TIME_COL);
+        Set<String> timeCols = _input.getTimeColumns();
+        if(!timeCols.isEmpty()) {
+          usedCols.retainAll(timeCols);
+          if (usedCols.isEmpty()) {
+            _output.getFlaggedQueries().add(query, WARNING_NO_TIME_COL);
+          }
         }
       }
     }

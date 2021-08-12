@@ -31,8 +31,8 @@ public class PinotEnvironmentProviderFactoryTest {
     Map<String, Object> properties = new HashMap<>();
     properties.put("class.test", PinotEnvironmentProviderFactoryTest.TestEnvironmentProvider.class.getName());
     properties.put("test.maxRetry", "3");
-    properties.put("test.connectionTimeout", "100");
-    properties.put("test.requestTimeout", "100");
+    properties.put("test.connectionTimeoutMillis", "100");
+    properties.put("test.requestTimeoutMillis", "100");
     PinotEnvironmentProviderFactory.init(new PinotConfiguration(properties));
 
     PinotEnvironmentProvider testPinotEnvironment = PinotEnvironmentProviderFactory.getEnvironmentProvider("test");
@@ -42,9 +42,9 @@ public class PinotEnvironmentProviderFactoryTest {
     Assert.assertEquals(((PinotEnvironmentProviderFactoryTest.TestEnvironmentProvider)
         testPinotEnvironment).getConfiguration().getProperty("maxRetry"), "3");
     Assert.assertEquals(((PinotEnvironmentProviderFactoryTest.TestEnvironmentProvider)
-        testPinotEnvironment).getConfiguration().getProperty("connectionTimeout"), "100");
+        testPinotEnvironment).getConfiguration().getProperty("connectionTimeoutMillis"), "100");
     Assert.assertEquals(((PinotEnvironmentProviderFactoryTest.TestEnvironmentProvider)
-        testPinotEnvironment).getConfiguration().getProperty("requestTimeout"), "100");
+        testPinotEnvironment).getConfiguration().getProperty("requestTimeoutMillis"), "100");
   }
 
   public static class TestEnvironmentProvider implements PinotEnvironmentProvider {

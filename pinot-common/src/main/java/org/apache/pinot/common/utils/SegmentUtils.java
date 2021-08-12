@@ -22,8 +22,8 @@ import com.google.common.base.Preconditions;
 import java.util.Set;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 
 
 // Util functions related to segments.

@@ -23,21 +23,20 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import javax.annotation.Nonnull;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
-import org.apache.pinot.segment.local.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.segment.local.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.sorted.SortedIndexReaderImpl;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
-import org.apache.pinot.segment.local.segment.store.ColumnIndexType;
-import org.apache.pinot.segment.local.segment.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.store.ColumnIndexType;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -157,7 +156,7 @@ public class LoaderUtils {
    * </ul>
    * <p>Should be called before trying to load the segment or metadata from index directory.
    */
-  public static void reloadFailureRecovery(@Nonnull File indexDir)
+  public static void reloadFailureRecovery(File indexDir)
       throws IOException {
     File parentDir = indexDir.getParentFile();
 

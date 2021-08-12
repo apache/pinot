@@ -209,28 +209,24 @@ com.clearspring.analytics:stream:2.7.0
 com.fasterxml.jackson.core:jackson-annotations:2.10.0
 com.fasterxml.jackson.core:jackson-core:2.10.0
 com.fasterxml.jackson.core:jackson-databind:2.10.0
+com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:2.10.4
 com.fasterxml.jackson.dataformat:jackson-dataformat-xml:2.10.0
 com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.10.0
 com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.11.3
 com.fasterxml.jackson.jaxrs:jackson-jaxrs-base:2.10.0
 com.fasterxml.jackson.jaxrs:jackson-jaxrs-json-provider:2.10.0
 com.fasterxml.jackson.module:jackson-module-jaxb-annotations:2.10.0
+com.fasterxml.jackson.module:jackson-module-jsonSchema:2.11.1
 com.fasterxml.woodstox:woodstox-core:6.0.1
-com.fasterxml:aalto-xml:1.0.0
-com.github.stephenc.jcip:jcip-annotations:1.0-1
+com.github.ben-manes.caffeine:caffeine:2.6.2
 com.google.android:annotations:4.1.1.4
+com.google.api-client:google-api-client:1.30.4
 com.google.api.grpc:proto-google-common-protos:1.17.0
 com.google.api.grpc:proto-google-iam-v1:0.13.0
-com.google.api:api-common:1.8.1
-com.google.api:gax:1.49.1
-com.google.api:gax-httpjson:0.66.1
-com.google.api-client:google-api-client:1.30.4
 com.google.apis:google-api-services-storage:v1-rev20190910-1.30.3
-com.google.auth:google-auth-library-credentials:0.18.0
-com.google.auth:google-auth-library-oauth2-http:0.18.0
 com.google.auto.value:auto-value-annotations:1.6.6
-com.google.cloud:google-cloud-core:1.91.3
 com.google.cloud:google-cloud-core-http:1.91.3
+com.google.cloud:google-cloud-core:1.91.3
 com.google.cloud:google-cloud-nio:0.120.0-alpha
 com.google.cloud:google-cloud-storage:1.102.0
 com.google.code.findbugs:jsr305:3.0.0
@@ -242,29 +238,28 @@ com.google.http-client:google-http-client-jackson2:1.32.1
 com.google.http-client:google-http-client:1.32.1
 com.google.j2objc:j2objc-annotations:1.3
 com.google.oauth-client:google-oauth-client:1.30.3
-com.google.protobuf:protobuf-java-util:3.10.0
 com.jayway.jsonpath:json-path:2.4.0
 com.lmax:disruptor:3.3.4
-com.nimbusds:content-type:2.0
-com.nimbusds:lang-tag:1.4.4
-com.nimbusds:nimbus-jose-jwt:8.8
-com.nimbusds:oauth2-oidc-sdk:7.1.1
 com.ning:async-http-client:1.9.21
+com.squareup.okio:okio:1.6.0
 com.tdunning:t-digest:3.2
 com.typesafe.netty:netty-reactive-streams-http:2.0.4
 com.typesafe.netty:netty-reactive-streams:2.0.4
 com.typesafe.scala-logging:scala-logging_2.11:3.9.0
 com.uber:h3:3.0.3
+com.yahoo.datasketches:memory:0.8.3
+com.yahoo.datasketches:sketches-core:0.8.3
 com.yammer.metrics:metrics-core:2.2.0
 com.zaxxer:HikariCP-java7:2.4.13
 commons-cli:commons-cli:1.2
-commons-codec:commons-codec:1.6
+commons-codec:commons-codec:1.15
 commons-collections:commons-collections:3.2.1
 commons-configuration:commons-configuration:1.10
 commons-httpclient:commons-httpclient:3.1
 commons-io:commons-io:2.4
 commons-lang:commons-lang:2.6
 commons-logging:commons-logging:1.2
+commons-pool:commons-pool:1.6
 io.airlift:aircompressor:0.10
 io.confluent:common-config:5.3.1
 io.confluent:common-utils:5.3.1
@@ -272,14 +267,16 @@ io.confluent:kafka-avro-serializer:5.3.1
 io.confluent:kafka-schema-registry-client:5.3.1
 io.dropwizard.metrics:metrics-core:4.1.2
 io.grpc:grpc-api:1.30.0
-io.grpc:grpc-context:1.30.0
+io.grpc:grpc-context:1.14.0
 io.grpc:grpc-core:1.30.0
 io.grpc:grpc-netty-shaded:1.30.0
-io.grpc:grpc-protobuf-lite:1.30.0
+io.grpc:grpc-protobuf-lite:1.19.0
 io.grpc:grpc-protobuf:1.30.0
 io.grpc:grpc-stub:1.30.0
 io.netty:netty-all:4.1.54.Final
 io.netty:netty-buffer:4.1.54.Final
+io.netty:netty-codec-dns:4.1.60.Final
+io.netty:netty-codec-haproxy:4.1.60.Final
 io.netty:netty-codec-http2:4.1.54.Final
 io.netty:netty-codec-http:4.1.54.Final
 io.netty:netty-codec-socks:4.1.54.Final
@@ -287,8 +284,9 @@ io.netty:netty-codec:4.1.54.Final
 io.netty:netty-common:4.1.54.Final
 io.netty:netty-handler-proxy:4.1.54.Final
 io.netty:netty-handler:4.1.54.Final
+io.netty:netty-resolver-dns:4.1.60.Final
 io.netty:netty-resolver:4.1.54.Final
-io.netty:netty-tcnative-boringssl-static:2.0.35.Final
+io.netty:netty-tcnative-boringssl-static:2.0.36.Final
 io.netty:netty-transport-native-epoll:4.1.54.Final
 io.netty:netty-transport-native-kqueue:4.1.54.Final
 io.netty:netty-transport-native-unix-common:4.1.54.Final
@@ -299,7 +297,10 @@ io.opencensus:opencensus-contrib-http-util:0.24.0
 io.perfmark:perfmark-api:0.19.0
 io.projectreactor.netty:reactor-netty:0.9.15.RELEASE
 io.projectreactor:reactor-core:3.3.12.RELEASE
-io.swagger:swagger-annotations:1.5.16
+io.prometheus:simpleclient:0.8.1
+io.prometheus:simpleclient_common:0.8.1
+io.prometheus:simpleclient_hotspot:0.8.1
+io.swagger:swagger-annotations:1.5.21
 io.swagger:swagger-core:1.5.16
 io.swagger:swagger-jaxrs:1.5.16
 io.swagger:swagger-jersey2-jaxrs:1.5.16
@@ -309,20 +310,22 @@ javax.inject:javax.inject:1
 javax.validation:validation-api:2.0.1.Final
 joda-time:joda-time:2.10.5
 me.lemire.integercompression:JavaFastPFOR:0.0.13
-net.java.dev.jna:jna-platform:5.6.0
-net.java.dev.jna:jna:5.5.0
 net.minidev:accessors-smart:1.2
 net.minidev:json-smart:2.3
-org.apache.avro:avro:1.7.6
+org.apache.avro:avro-protobuf:1.9.1
+org.apache.avro:avro:1.9.2
+org.apache.bookkeeper:bookkeeper-common-allocator:4.12.0
+org.apache.bookkeeper:circe-checksum:4.12.0
 org.apache.calcite.avatica:avatica-core:1.13.0
 org.apache.calcite:calcite-babel:1.19.0
 org.apache.calcite:calcite-core:1.19.0
 org.apache.calcite:calcite-linq4j:1.19.0
+org.apache.commons:commons-collections4:4.1
 org.apache.commons:commons-compress:1.20
 org.apache.commons:commons-csv:1.0
 org.apache.commons:commons-lang3:3.5
-org.apache.commons:commons-math:2.1
 org.apache.commons:commons-math3:3.2
+org.apache.commons:commons-math:2.1
 org.apache.datasketches:datasketches-java:1.2.0-incubating
 org.apache.datasketches:datasketches-memory:1.2.0-incubating
 org.apache.helix:helix-core:0.9.8
@@ -344,59 +347,67 @@ org.apache.lucene:lucene-queryparser:8.2.0
 org.apache.lucene:lucene-sandbox:8.2.0
 org.apache.orc:orc-core:1.5.9
 org.apache.orc:orc-shims:1.5.9
-org.apache.parquet:parquet-avro:1.8.0
-org.apache.parquet:parquet-column:1.8.0
-org.apache.parquet:parquet-common:1.8.0
-org.apache.parquet:parquet-encoding:1.8.0
-org.apache.parquet:parquet-format:2.3.0-incubating
-org.apache.parquet:parquet-hadoop:1.8.0
-org.apache.parquet:parquet-jackson:1.8.0
+org.apache.parquet:parquet-avro:1.11.1
+org.apache.parquet:parquet-column:1.11.1
+org.apache.parquet:parquet-common:1.11.1
+org.apache.parquet:parquet-encoding:1.11.1
+org.apache.parquet:parquet-format-structures:1.11.1
+org.apache.parquet:parquet-hadoop:1.11.1
+org.apache.parquet:parquet-jackson:1.11.1
+org.apache.pulsar:bouncy-castle-bc:2.7.2
+org.apache.pulsar:protobuf-shaded:2.1.0-incubating
+org.apache.pulsar:pulsar-client-admin-original:2.7.2
+org.apache.pulsar:pulsar-client-api:2.7.2
+org.apache.pulsar:pulsar-client-original:2.7.2
+org.apache.pulsar:pulsar-common:2.7.2
+org.apache.pulsar:pulsar-transaction-common:2.7.2
 org.apache.thrift:libthrift:0.12.0
-org.apache.yetus:audience-annotations:0.5.0
+org.apache.yetus:audience-annotations:0.13.0
 org.apache.zookeeper:zookeeper-jute:3.5.8
 org.apache.zookeeper:zookeeper:3.5.8
+org.asynchttpclient:async-http-client-netty-utils:2.12.1
+org.asynchttpclient:async-http-client:2.12.1
 org.codehaus.groovy:groovy-all:2.4.21
 org.codehaus.jackson:jackson-core-asl:1.9.13
 org.codehaus.jackson:jackson-mapper-asl:1.9.13
-org.jetbrains:annotations:15.0
+org.eclipse.jetty:jetty-http:9.4.39.v20210325
+org.eclipse.jetty:jetty-io:9.4.39.v20210325
+org.eclipse.jetty:jetty-security:9.4.39.v20210325
+org.eclipse.jetty:jetty-server:9.4.39.v20210325
+org.eclipse.jetty:jetty-servlet:9.4.39.v20210325
+org.eclipse.jetty:jetty-util-ajax:9.4.39.v20210325
+org.eclipse.jetty:jetty-util:9.4.39.v20210325
 org.javassist:javassist:3.19.0-GA
-org.linguafranca.pwdb:KeePassJava2-dom:2.1.4
-org.linguafranca.pwdb:KeePassJava2-jaxb:2.1.4
-org.linguafranca.pwdb:KeePassJava2-kdb:2.1.4
-org.linguafranca.pwdb:KeePassJava2-kdbx:2.1.4
-org.linguafranca.pwdb:KeePassJava2-simple:2.1.4
-org.linguafranca.pwdb:KeePassJava2:2.1.4
-org.linguafranca.pwdb:database:2.1.4
-org.lz4:lz4-java:1.4.1
+org.lz4:lz4-java:1.7.1
 org.quartz-scheduler:quartz:2.3.2
 org.roaringbitmap:RoaringBitmap:0.9.0
 org.roaringbitmap:shims:0.9.0
-org.scala-lang:scala-library:2.11.11
-org.simpleframework:simple-xml:2.7.1
 org.webjars:swagger-ui:3.18.2
 org.wildfly.openssl:wildfly-openssl:1.0.7.Final
 org.xerial.larray:larray-buffer:0.4.1
 org.xerial.larray:larray-mmap:0.4.1
 org.xerial.snappy:snappy-java:1.1.1.7
 org.yaml:snakeyaml:1.16
-software.amazon.awssdk:annotations:2.13.46
-software.amazon.awssdk:apache-client:2.13.46
-software.amazon.awssdk:arns:2.13.46
-software.amazon.awssdk:auth:2.13.46
-software.amazon.awssdk:aws-core:2.13.46
-software.amazon.awssdk:aws-query-protocol:2.13.46
-software.amazon.awssdk:aws-xml-protocol:2.13.46
-software.amazon.awssdk:http-client-spi:2.13.46
-software.amazon.awssdk:netty-nio-client:2.13.46
-software.amazon.awssdk:profiles:2.13.46
-software.amazon.awssdk:protocol-core:2.13.46
-software.amazon.awssdk:regions:2.13.46
-software.amazon.awssdk:s3:2.13.46
-software.amazon.awssdk:sdk-core:2.13.46
-software.amazon.awssdk:utils:2.13.46
+software.amazon.awssdk:annotations:2.14.28
+software.amazon.awssdk:apache-client:2.14.28
+software.amazon.awssdk:arns:2.14.28
+software.amazon.awssdk:auth:2.14.28
+software.amazon.awssdk:aws-cbor-protocol:2.14.28
+software.amazon.awssdk:aws-core:2.14.28
+software.amazon.awssdk:aws-json-protocol:2.14.28
+software.amazon.awssdk:aws-query-protocol:2.14.28
+software.amazon.awssdk:aws-xml-protocol:2.14.28
+software.amazon.awssdk:http-client-spi:2.14.28
+software.amazon.awssdk:kinesis:2.14.28
+software.amazon.awssdk:metrics-spi:2.14.28
+software.amazon.awssdk:netty-nio-client:2.14.28
+software.amazon.awssdk:profiles:2.14.28
+software.amazon.awssdk:protocol-core:2.14.28
+software.amazon.awssdk:regions:2.14.28
+software.amazon.awssdk:s3:2.14.28
+software.amazon.awssdk:sdk-core:2.14.28
+software.amazon.awssdk:utils:2.14.28
 software.amazon.eventstream:eventstream:1.0.1
-stax:stax-api:1.0.1
-stax:stax:1.2.0
 
 
 ------------------------------------------------------------------------------------
@@ -410,97 +421,90 @@ MIT License
 args4j:args4j:2.32
 com.azure:azure-core-http-netty:1.7.1
 com.azure:azure-core:1.12.0
-com.azure:azure-identity:1.2.2
 com.azure:azure-storage-blob:12.10.0
 com.azure:azure-storage-common:12.10.0
 com.azure:azure-storage-file-datalake:12.4.0
 com.azure:azure-storage-internal-avro:12.0.2
 com.microsoft.azure:azure-data-lake-store-sdk:2.3.9
-com.microsoft.azure:msal4j-persistence-extension:1.0.0
-com.microsoft.azure:msal4j:1.8.0
 net.sf.jopt-simple:jopt-simple:4.6
-org.codehaus.mojo:animal-sniffer-annotations:1.18
+org.codehaus.mojo:animal-sniffer-annotations:1.17
+org.reactivestreams:reactive-streams:1.0.3
+org.slf4j:jul-to-slf4j:1.7.25
 org.slf4j:slf4j-api:1.7.25
-
-pinot-controller/src/main/resources/*/js/lib/codemirror/*
-pinot-controller/src/main/resources/*/js/lib/foundation/*
-pinot-controller/src/main/resources/*/js/lib/angular*
-pinot-controller/src/main/resources/*/js/lib/underscore*
-pinot-controller/src/main/resources/*/js/lib/jquery-2.1.3.min.js
-pinot-controller/src/main/resources/*/js/lib/beautify.js
-pinot-controller/src/main/resources/*/js/lib/handlebars.js
-
-pinot-controller/src/main/resources/*/css/lib/codemirror*
-pinot-controller/src/main/resources/*/css/lib/foundation*
-pinot-controller/src/main/resources/*/css/lib/normalize.css
 
 
 BSD 2-Clause
 ------------
+com.github.luben:zstd-jni:1.4.9-5
 org.codehaus.woodstox:stax2-api:4.2
-org.reflections:reflections:0.9.11
 
 
 BSD 3-Clause
 ------------
+com.google.api:api-common:1.8.1
+com.google.api:gax-httpjson:0.66.1
+com.google.api:gax:1.49.1
+com.google.auth:google-auth-library-credentials:0.18.0
+com.google.auth:google-auth-library-oauth2-http:0.18.0
+com.google.protobuf:protobuf-java-util:3.11.4
 com.google.protobuf:protobuf-java:3.12.0
+com.google.protobuf:protobuf-lite:3.0.1
 com.jcabi:jcabi-aspects:0.22
 com.jcabi:jcabi-log:0.17.1
-com.thoughtworks.paranamer:paranamer:2.8
 org.antlr:antlr4-runtime:4.6
 org.ow2.asm:asm:5.0.4
+org.scala-lang:scala-library:2.11.11
 org.threeten:threeten-extra:1.5.0
 org.threeten:threetenbp:1.3.3
-
-pinot-controller/src/main/resources/*/js/lib/jquery.dataTables.min.js
 
 
 Common Development and Distribution License (CDDL) 1.0
 ------------------------------------------------------
-(see licenses-binary/LICENSE-cddl-1.0.txt)
+(see licenses/LICENSE-cddl-1.0.txt)
 
 javax.activation:activation:1.1.1
-javax.servlet:javax.servlet-api:3.0.1
 
 
 Common Development and Distribution License (CDDL) 1.1
 ------------------------------------------------------
-(see licenses-binary/LICENSE-cddl-1.1.txt)
+(see licenses/LICENSE-cddl-1.1.txt)
 
-com.sun.mail:javax.mail:1.6.1
+com.sun.activation:javax.activation:1.2.0
 com.sun.xml.bind:jaxb-core:2.3.0
 com.sun.xml.bind:jaxb-impl:2.3.0
-javax.annotation:javax.annotation-api:1.3.2
+javax.annotation:javax.annotation-api:1.2
+javax.servlet:javax.servlet-api:3.0.1
 javax.ws.rs:javax.ws.rs-api:2.0.1
 javax.xml.bind:jaxb-api:2.3.0
 org.glassfish.hk2:osgi-resource-locator:1.0.1
-org.glassfish.jersey.containers:jersey-container-servlet-core:2.25.1
 
 
 Eclipse Public License (EPL) 1.0
 --------------------------------
-(see licenses-binary/LICENSE-epl-1.0.txt)
+(see licenses/LICENSE-epl-1.0.txt)
 
-org.aspectj:aspectjrt:1.8.4
 com.mchange:c3p0:0.9.5.4
 com.mchange:mchange-commons-java:0.2.15
+org.aspectj:aspectjrt:1.8.4
+org.locationtech.jts:jts-core:1.16.1
 
 
 Eclipse Public License (EPL) 2.0
 -------------------------------
-(see licenses-binary/LICENSE-epl-2.0.txt)
+(see licenses/LICENSE-epl-2.0.txt)
 
 jakarta.annotation:jakarta.annotation-api:1.3.4
 jakarta.ws.rs:jakarta.ws.rs-api:2.1.5
 org.glassfish.grizzly:grizzly-framework:2.4.4
-org.glassfish.grizzly:grizzly-http:2.4.4
 org.glassfish.grizzly:grizzly-http-server:2.4.4
+org.glassfish.grizzly:grizzly-http:2.4.4
 org.glassfish.hk2.external:aopalliance-repackaged:2.5.0
 org.glassfish.hk2.external:jakarta.inject:2.5.0
 org.glassfish.hk2:hk2-api:2.5.0
 org.glassfish.hk2:hk2-locator:2.5.0
 org.glassfish.hk2:hk2-utils:2.5.0
 org.glassfish.jersey.containers:jersey-container-grizzly2-http:2.28
+org.glassfish.jersey.containers:jersey-container-servlet-core:2.28
 org.glassfish.jersey.core:jersey-client:2.28
 org.glassfish.jersey.core:jersey-common:2.28
 org.glassfish.jersey.core:jersey-server:2.28
@@ -510,15 +514,29 @@ org.glassfish.jersey.media:jersey-media-jaxb:2.28
 org.glassfish.jersey.media:jersey-media-json-jackson:2.28
 org.glassfish.jersey.media:jersey-media-multipart:2.28
 org.glassfish.tyrus.bundles:tyrus-standalone-client:1.15
-org.locationtech.jts:jts-core:1.16.1
+
 
 Eclipse Distribution License (EDL) 1.0
 --------------------------------------
+(see licenses/LICENSE-edl-1.0.txt)
+
 jakarta.activation:jakarta.activation-api:1.2.1
 jakarta.xml.bind:jakarta.xml.bind-api:2.3.2
 org.jvnet.mimepull:mimepull:1.9.11
 
 
-Public Domain
+WTFPL License
 -------------
-org.reactivestreams:reactive-streams:1.0.3
+org.reflections:reflections:0.9.11
+
+
+Creative Commons Attribution License (CC BY 2.5)
+------------------------------------------------
+net.jcip:jcip-annotations:1.0
+
+
+Bounty Castle License
+---------------------
+org.bouncycastle:bcpkix-jdk15to18:1.68
+org.bouncycastle:bcprov-ext-jdk15to18:1.68
+org.bouncycastle:bcprov-jdk15to18:1.68

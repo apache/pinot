@@ -19,11 +19,13 @@
 package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
-import java.io.IOException;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.store.ColumnIndexType;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -33,11 +35,12 @@ import org.testng.annotations.Test;
 
 public class SegmentLocalFSDirectoryTest {
   private static final File TEST_DIRECTORY = new File(SingleFileIndexDirectoryTest.class.toString());
-  SegmentLocalFSDirectory segmentDirectory;
+  SegmentDirectory segmentDirectory;
   SegmentMetadataImpl metadata;
 
   @BeforeClass
-  public void setUp() {
+  public void setUp()
+      throws Exception {
     FileUtils.deleteQuietly(TEST_DIRECTORY);
     TEST_DIRECTORY.mkdirs();
     metadata = ColumnIndexDirectoryTestHelper.writeMetadata(SegmentVersion.v1);
@@ -54,12 +57,12 @@ public class SegmentLocalFSDirectoryTest {
   @Test
   public void testMultipleReadersNoWriter()
       throws Exception {
-    SegmentLocalFSDirectory.Reader reader = segmentDirectory.createReader();
+    SegmentDirectory.Reader reader = segmentDirectory.createReader();
     Assert.assertNotNull(reader);
-    SegmentLocalFSDirectory.Reader reader1 = segmentDirectory.createReader();
+    SegmentDirectory.Reader reader1 = segmentDirectory.createReader();
     Assert.assertNotNull(reader1);
 
-    SegmentLocalFSDirectory.Writer writer = segmentDirectory.createWriter();
+    SegmentDirectory.Writer writer = segmentDirectory.createWriter();
     Assert.assertNull(writer);
     reader.close();
     reader1.close();
@@ -68,13 +71,13 @@ public class SegmentLocalFSDirectoryTest {
   @Test
   public void testExclusiveWrite()
       throws java.lang.Exception {
-    SegmentLocalFSDirectory.Writer writer = segmentDirectory.createWriter();
+    SegmentDirectory.Writer writer = segmentDirectory.createWriter();
     Assert.assertNotNull(writer);
 
-    SegmentLocalFSDirectory.Reader reader2 = segmentDirectory.createReader();
+    SegmentDirectory.Reader reader2 = segmentDirectory.createReader();
     Assert.assertNull(reader2);
 
-    SegmentLocalFSDirectory.Writer writer1 = segmentDirectory.createWriter();
+    SegmentDirectory.Writer writer1 = segmentDirectory.createWriter();
     Assert.assertNull(writer1);
     writer.close();
 
@@ -100,7 +103,7 @@ public class SegmentLocalFSDirectoryTest {
   @Test
   public void testWriteAndReadBackData()
       throws java.lang.Exception {
-    try (SegmentLocalFSDirectory.Writer writer = segmentDirectory.createWriter()) {
+    try (SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
       Assert.assertNotNull(writer);
       PinotDataBuffer buffer = writer.newIndexFor("newColumn", ColumnIndexType.FORWARD_INDEX, 1024);
       loadData(buffer);
@@ -115,27 +118,27 @@ public class SegmentLocalFSDirectoryTest {
 
   @Test
   public void testDirectorySize()
-      throws IOException {
+      throws Exception {
     // this test verifies that the segment size is returned correctly even if v3/ subdir
     // does not exist. We have not good way to test all the conditions since the
     // format converters are higher level modules that can not be used in this package
     // So, we do what we can do best....HACK HACK HACK
     File sizeTestDirectory = null;
+
     try {
       sizeTestDirectory = new File(SegmentLocalFSDirectoryTest.class.getName() + "-size_test");
       if (sizeTestDirectory.exists()) {
         FileUtils.deleteQuietly(sizeTestDirectory);
       }
       FileUtils.copyDirectoryToDirectory(segmentDirectory.getPath().toFile(), sizeTestDirectory);
-      SegmentDirectory sizeSegment =
-          SegmentLocalFSDirectory.createFromLocalFS(sizeTestDirectory, metadata, ReadMode.mmap);
+      SegmentDirectory sizeSegment = new SegmentLocalFSDirectory(sizeTestDirectory, metadata, ReadMode.mmap);
       Assert.assertEquals(sizeSegment.getDiskSizeBytes(), segmentDirectory.getDiskSizeBytes());
 
       Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(sizeTestDirectory, SegmentVersion.v3).exists());
       File v3SizeDir = new File(sizeTestDirectory, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
       // the destination is not exactly v3 but does not matter
       FileUtils.copyDirectoryToDirectory(segmentDirectory.getPath().toFile(), v3SizeDir);
-      SegmentDirectory sizeV3Segment = SegmentDirectory.createFromLocalFS(v3SizeDir, metadata, ReadMode.mmap);
+      SegmentDirectory sizeV3Segment = new SegmentLocalFSDirectory(v3SizeDir, metadata, ReadMode.mmap);
       Assert.assertEquals(sizeSegment.getDiskSizeBytes(), sizeV3Segment.getDiskSizeBytes());
 
       // now drop v3

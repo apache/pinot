@@ -44,6 +44,8 @@ public class BrokerResponseNative implements BrokerResponse {
   public static final BrokerResponseNative EMPTY_RESULT = BrokerResponseNative.empty();
   public static final BrokerResponseNative NO_TABLE_RESULT =
       new BrokerResponseNative(QueryException.BROKER_RESOURCE_MISSING_ERROR);
+  public static final BrokerResponseNative TABLE_DOES_NOT_EXIST =
+      new BrokerResponseNative(QueryException.TABLE_DOES_NOT_EXIST_ERROR);
 
   private int _numServersQueried = 0;
   private int _numServersResponded = 0;
@@ -63,6 +65,7 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _timeUsedMs = 0L;
   private long _offlineThreadCpuTimeNs = 0L;
   private long _realtimeThreadCpuTimeNs = 0L;
+  private int _numRowsResultSet = 0;
 
   private SelectionResults _selectionResults;
   private List<AggregationResult> _aggregationResults;
@@ -123,6 +126,7 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonProperty("resultTable")
   public void setResultTable(ResultTable resultTable) {
     _resultTable = resultTable;
+    _numRowsResultSet = resultTable.getRows().size();
   }
 
   @JsonProperty("exceptions")
@@ -285,12 +289,19 @@ public class BrokerResponseNative implements BrokerResponse {
     return _offlineThreadCpuTimeNs;
   }
 
+  @JsonProperty("numRowsResultSet")
+  @Override
+  public int getNumRowsResultSet() { return _numRowsResultSet; }
+
   @JsonProperty("offlineThreadCpuTimeNs")
   @Override
   public void setOfflineThreadCpuTimeNs(long timeUsedMs) {
     _offlineThreadCpuTimeNs = timeUsedMs;
   }
 
+  @JsonProperty("numRowsResultSet")
+  @Override
+  public void setNumRowsResultSet(int numRowsResultSet) { _numRowsResultSet = numRowsResultSet; }
 
   @JsonProperty("realtimeThreadCpuTimeNs")
   @Override

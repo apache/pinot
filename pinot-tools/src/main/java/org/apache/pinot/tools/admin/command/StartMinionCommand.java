@@ -23,6 +23,7 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -91,9 +92,10 @@ public class StartMinionCommand extends AbstractBaseAdminCommand implements Comm
       throws Exception {
     try {
       LOGGER.info("Executing command: " + toString());
+      Map<String, Object> minionConf = getMinionConf();
       StartServiceManagerCommand startServiceManagerCommand =
           new StartServiceManagerCommand().setZkAddress(_zkAddress).setClusterName(_clusterName).setPort(-1)
-              .setBootstrapServices(new String[0]).addBootstrapService(ServiceRole.MINION, getMinionConf());
+              .setBootstrapServices(new String[0]).addBootstrapService(ServiceRole.MINION, minionConf);
       startServiceManagerCommand.execute();
       String pidFile = ".pinotAdminMinion-" + System.currentTimeMillis() + ".pid";
       savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
@@ -110,8 +112,11 @@ public class StartMinionCommand extends AbstractBaseAdminCommand implements Comm
     Map<String, Object> properties = new HashMap<>();
     if (_configFileName != null) {
       properties.putAll(PinotConfigUtils.readConfigFromFile(_configFileName));
+      // Override the zkAddress and clusterName to ensure ServiceManager is connecting to the right Zookeeper and Cluster.
+      _zkAddress = MapUtils.getString(properties, CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
+      _clusterName = MapUtils.getString(properties, CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
     } else {
-      properties.putAll(PinotConfigUtils.generateMinionConf(_minionHost, _minionPort));
+      properties.putAll(PinotConfigUtils.generateMinionConf(_clusterName, _zkAddress, _minionHost, _minionPort));
     }
     if (_configOverrides != null) {
       properties.putAll(_configOverrides);

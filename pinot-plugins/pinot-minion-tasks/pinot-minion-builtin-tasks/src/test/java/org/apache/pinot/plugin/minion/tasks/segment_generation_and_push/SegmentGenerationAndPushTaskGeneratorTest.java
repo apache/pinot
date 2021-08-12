@@ -38,7 +38,8 @@ public class SegmentGenerationAndPushTaskGeneratorTest extends ControllerTest {
   SegmentGenerationAndPushTaskGenerator _generator;
 
   @BeforeClass
-  public void setup() {
+  public void setup()
+      throws Exception {
     int zkPort = 2171;
     startZk(zkPort);
     Map<String, Object> properties = getDefaultControllerConfiguration();

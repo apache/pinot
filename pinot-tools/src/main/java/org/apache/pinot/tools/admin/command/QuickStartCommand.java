@@ -22,8 +22,15 @@ import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.tools.BatchQuickstartWithMinion;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.HybridQuickstart;
+import org.apache.pinot.tools.JoinQuickStart;
+import org.apache.pinot.tools.JsonIndexQuickStart;
+import org.apache.pinot.tools.OfflineComplexTypeHandlingQuickStart;
+import org.apache.pinot.tools.QuickStartBase;
 import org.apache.pinot.tools.Quickstart;
+import org.apache.pinot.tools.RealtimeComplexTypeHandlingQuickStart;
+import org.apache.pinot.tools.RealtimeJsonIndexQuickStart;
 import org.apache.pinot.tools.RealtimeQuickStart;
+import org.apache.pinot.tools.UpsertQuickStart;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,6 +41,9 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
 
   @Option(name = "-type", required = false, metaVar = "<String>", usage = "Type of quickstart, supported: STREAM/BATCH/HYBRID")
   private String _type;
+
+  @Option(name = "-tmpDir", required = false, aliases = {"-quickstartDir", "-dataDir"}, metaVar = "<String>", usage = "Temp Directory to host quickstart data")
+  private String _tmpDir;
 
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
@@ -53,6 +63,14 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
     return this;
   }
 
+  public String getTmpDir() {
+    return _tmpDir;
+  }
+
+  public void setTmpDir(String tmpDir) {
+    _tmpDir = tmpDir;
+  }
+
   @Override
   public String toString() {
     return ("QuickStart -type " + _type);
@@ -60,7 +78,6 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
 
   @Override
   public void cleanup() {
-
   }
 
   @Override
@@ -72,27 +89,62 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
   public boolean execute()
       throws Exception {
     PluginManager.get().init();
+    QuickStartBase quickstart;
     switch (_type.toUpperCase()) {
       case "OFFLINE":
       case "BATCH":
-        new Quickstart().execute();
+        quickstart = new Quickstart();
         break;
       case "OFFLINE_MINION":
       case "BATCH_MINION":
       case "OFFLINE-MINION":
       case "BATCH-MINION":
-        new BatchQuickstartWithMinion().execute();
+        quickstart = new BatchQuickstartWithMinion();
         break;
       case "REALTIME":
       case "STREAM":
-        new RealtimeQuickStart().execute();
+        quickstart = new RealtimeQuickStart();
         break;
       case "HYBRID":
-        new HybridQuickstart().execute();
+        quickstart = new HybridQuickstart();
+        break;
+      case "JOIN":
+        quickstart = new JoinQuickStart();
+        break;
+      case "UPSERT":
+        quickstart = new UpsertQuickStart();
+        break;
+      case "OFFLINE_JSON_INDEX":
+      case "OFFLINE-JSON-INDEX":
+      case "BATCH_JSON_INDEX":
+      case "BATCH-JSON-INDEX":
+        quickstart = new JsonIndexQuickStart();
+        break;
+      case "REALTIME_JSON_INDEX":
+      case "REALTIME-JSON-INDEX":
+      case "STREAM_JSON_INDEX":
+      case "STREAM-JSON-INDEX":
+        quickstart = new RealtimeJsonIndexQuickStart();
+        break;
+      case "OFFLINE_COMPLEX_TYPE":
+      case "OFFLINE-COMPLEX-TYPE":
+      case "BATCH_COMPLEX_TYPE":
+      case "BATCH-COMPLEX-TYPE":
+        quickstart = new OfflineComplexTypeHandlingQuickStart();
+        break;
+      case "REALTIME_COMPLEX_TYPE":
+      case "REALTIME-COMPLEX-TYPE":
+      case "STREAM_COMPLEX_TYPE":
+      case "STREAM-COMPLEX-TYPE":
+        quickstart = new RealtimeComplexTypeHandlingQuickStart();
         break;
       default:
         throw new UnsupportedOperationException("Unsupported QuickStart type: " + _type);
     }
+    if (_tmpDir != null) {
+      quickstart.setTmpDir(_tmpDir);
+    }
+    quickstart.execute();
     return true;
   }
 }

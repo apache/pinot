@@ -25,14 +25,31 @@
 
 ### Step 1: checkout source code and build targets for older commit and newer commit
 ```shell
-./compatibility-verifier/checkoutAndBuild.sh [olderCommit] [newerCommit] [workingDir]
+Usage: checkoutAndBuild.sh [-o olderCommit] [-n newerCommit] -w workingDir
+  -w, --working-dir                      Working directory where olderCommit and newCommit target files reside
+
+  -o, --old-commit-hash                  git hash (or tag) for old commit
+
+  -n, --new-commit-hash                  git hash (or tag) for new commit
+
+If -n is not specified, then current commit is assumed
+If -o is not specified, then previous commit is assumed (expected -n is also empty)
+Examples:
+    To compare this checkout with previous commit: 'checkoutAndBuild.sh -w /tmp/wd'
+    To compare this checkout with some older tag or hash: 'checkoutAndBuild.sh -o release-0.7.1 -w /tmp/wd'
+    To compare any two previous tags or hashes: 'checkoutAndBuild.sh -o release-0.7.1 -n 637cc3494 -w /tmp/wd
+
 ```
-***NOTE***: `[workingDir]` is optional, if user does not specify `[workingDir]`, the script will create a temporary working 
-dir and output the path, which can be used in step 2.
 
 ### Step 2: run compatibility regression test against the two targets build in step1
 ```shell
-./compatibility-verifier/compCheck.sh [workingDir]
+./compCheck.sh -h
+Usage:  -w <workingDir> -t <testSuiteDir> [-k]
+MANDATORY:
+  -w, --working-dir                      Working directory where olderCommit and newCommit target files reside.
+  -t, --test-suite-dir                   Test suite directory
+
+OPTIONAL:
+  -k, --keep-cluster-on-failure          Keep cluster on test failure
+  -h, --help                             Prints this help
 ```
-***NOTE***: the script can only be run under the root folder of the project currently. Before run the script, make sure to 
-change to the right directory first.

@@ -42,6 +42,8 @@
     <module>pinot-kafka-base</module>
     <module>pinot-kafka-0.9</module>
     <module>pinot-kafka-2.0</module>
+    <module>pinot-kinesis</module>
+    <module>pinot-pulsar</module>
   </modules>
 
 </project>

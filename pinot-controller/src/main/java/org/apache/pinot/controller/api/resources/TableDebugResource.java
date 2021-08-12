@@ -19,55 +19,82 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.collect.BiMap;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixProperty;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
+import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
+import org.apache.pinot.common.restlet.resources.SegmentServerDebugInfo;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.debug.TableDebugInfo;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
+import org.apache.pinot.controller.util.CompletionServiceHelper;
+import org.apache.pinot.controller.util.TableIngestionStatusHelper;
 import org.apache.pinot.controller.util.TableSizeReader;
+import org.apache.pinot.spi.config.table.TableStatus;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;
 
 
 /**
  * This class implements the debugging endpoints.
+ * NOTE: Debug classes are not expected to guarantee backward compatibility, and should
+ * not be exposed to the client side.
  */
 @Api(tags = Constants.CLUSTER_TAG)
 @Path("/")
 public class TableDebugResource {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TableDebugResource.class);
+
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
 
   @Inject
+  PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
+
+  @Inject
   Executor _executor;
+
   @Inject
   HttpConnectionManager _connectionManager;
 
@@ -81,43 +108,49 @@ public class TableDebugResource {
   @Path("/debug/tables/{tableName}")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get debug information for table.", notes = "Debug information for table.")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")})
-  public String getClusterInfo(
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Table not found"), @ApiResponse(code = 500, message = "Internal server error")})
+  public String getTableDebugInfo(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr)
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "Verbosity of debug information") @DefaultValue("0") @QueryParam("verbosity") int verbosity)
       throws JsonProcessingException {
     ObjectNode root = JsonUtils.newObjectNode();
     root.put("clusterName", _pinotHelixResourceManager.getHelixClusterName());
 
-    TableType tableType = Constants.validateTableType(tableTypeStr);
-    List<TableType> tableTypes = (tableType == null) ? Arrays.asList(TableType.OFFLINE, TableType.REALTIME)
-        : Collections.singletonList(tableType);
+    List<TableType> tableTypes = getValidTableTypes(tableName, tableTypeStr, _pinotHelixResourceManager);
+    if (tableTypes.isEmpty()) {
+      throw new ControllerApplicationException(LOGGER, "Table '" + tableName + "' not found",
+          Response.Status.NOT_FOUND);
+    }
 
     List<TableDebugInfo> tableDebugInfos = new ArrayList<>();
     for (TableType type : tableTypes) {
-      tableDebugInfos.add(debugTable(_pinotHelixResourceManager, tableName, type));
+      tableDebugInfos.add(debugTable(_pinotHelixResourceManager, tableName, type, verbosity));
     }
+
     return new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(tableDebugInfos);
   }
 
   /**
-   * Helper method to colelct debug information about the table.
+   * Helper method to collect debug information about the table.
    *
    * @param pinotHelixResourceManager Helix Resource Manager for the cluster
    * @param tableName Name of the table
    * @param tableType Type of the table (offline|realtime)
-   * @return TableDebugInfo
+   * @param verbosity Verbosity level to include debug information. For level 0, only segments
+   *                  with errors are included. For level > 0, all segments are included.
+   * @return TableDebugInfo Debug info for table.
    */
   private TableDebugInfo debugTable(PinotHelixResourceManager pinotHelixResourceManager, String tableName,
-      TableType tableType) {
+      TableType tableType, int verbosity) {
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
 
     // Debug information for segments of the table.
     List<TableDebugInfo.SegmentDebugInfo> segmentDebugInfos =
-        debugSegments(pinotHelixResourceManager, tableNameWithType);
+        debugSegments(pinotHelixResourceManager, tableNameWithType, verbosity);
 
     // Debug information from brokers of the table.
-    List<TableDebugInfo.BrokerDebugInfo> brokerDebugInfos = debugBrokers(tableNameWithType);
+    List<TableDebugInfo.BrokerDebugInfo> brokerDebugInfos = debugBrokers(tableNameWithType, verbosity);
 
     // Debug information from servers of the table.
     List<TableDebugInfo.ServerDebugInfo> serverDebugInfos =
@@ -126,14 +159,33 @@ public class TableDebugResource {
     // Table size summary.
     TableDebugInfo.TableSizeSummary tableSizeSummary = getTableSize(tableNameWithType);
 
+    TableStatus.IngestionStatus ingestionStatus = getIngestionStatus(tableNameWithType, tableType);
+
     // Number of segments in the table.
     IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
     int numSegments = (idealState != null) ? idealState.getPartitionSet().size() : 0;
 
-    return new TableDebugInfo(tableNameWithType, tableSizeSummary,
+    return new TableDebugInfo(tableNameWithType, ingestionStatus, tableSizeSummary,
         _pinotHelixResourceManager.getBrokerInstancesForTable(tableName, tableType).size(),
         _pinotHelixResourceManager.getServerInstancesForTable(tableName, tableType).size(), numSegments,
         segmentDebugInfos, serverDebugInfos, brokerDebugInfos);
+  }
+
+  private TableStatus.IngestionStatus getIngestionStatus(String tableNameWithType, TableType tableType) {
+    try {
+      switch (tableType) {
+        case OFFLINE:
+          return TableIngestionStatusHelper.getOfflineTableIngestionStatus(tableNameWithType, _pinotHelixResourceManager,
+              _pinotHelixTaskResourceManager);
+        case REALTIME:
+          return TableIngestionStatusHelper.getRealtimeTableIngestionStatus(tableNameWithType,
+              _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000, _executor, _connectionManager,
+              _pinotHelixResourceManager);
+      }
+    } catch (Exception e) {
+      return TableStatus.IngestionStatus.newIngestionStatus(TableStatus.IngestionState.UNKNOWN, e.getMessage());
+    }
+    return null;
   }
 
   private TableDebugInfo.TableSizeSummary getTableSize(String tableNameWithType) {
@@ -156,38 +208,90 @@ public class TableDebugResource {
    *
    * @param pinotHelixResourceManager Helix Resource Manager
    * @param tableNameWithType Name of table with type
-   * @return Debug information for segments
+   * @param verbosity Verbosity level to include debug information. For level 0, only segments
+   *                  with errors are included. For level > 0, all segments are included.   * @return Debug information for segments
    */
   private List<TableDebugInfo.SegmentDebugInfo> debugSegments(PinotHelixResourceManager pinotHelixResourceManager,
-      String tableNameWithType) {
+      String tableNameWithType, int verbosity) {
     ExternalView externalView = pinotHelixResourceManager.getTableExternalView(tableNameWithType);
     IdealState idealState = pinotHelixResourceManager.getTableIdealState(tableNameWithType);
 
-    List<TableDebugInfo.SegmentDebugInfo> segmentDebugInfos = new ArrayList<>();
+    List<TableDebugInfo.SegmentDebugInfo> result = new ArrayList<>();
     if (idealState == null) {
-      return segmentDebugInfos;
+      return result;
     }
 
+    int serverRequestTimeoutMs = _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000;
+    final Map<String, List<String>> serverToSegments =
+        _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
+
+    BiMap<String, String> serverToEndpoints;
+    try {
+      serverToEndpoints = _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
+    } catch (InvalidConfigException e) {
+      throw new WebApplicationException(
+          "Caught exception when getting segment debug info for table: " + tableNameWithType);
+    }
+
+    Map<String, Map<String, SegmentServerDebugInfo>> segmentsDebugInfoFromServers =
+        getSegmentsDebugInfoFromServers(tableNameWithType, serverToEndpoints, serverRequestTimeoutMs);
+
     for (Map.Entry<String, Map<String, String>> segmentMapEntry : idealState.getRecord().getMapFields().entrySet()) {
-      String segment = segmentMapEntry.getKey();
-      Map<String, String> instanceStateMap = segmentMapEntry.getValue();
+      String segmentName = segmentMapEntry.getKey();
+      Map<String, String> segmentIsMap = segmentMapEntry.getValue();
 
-      List<TableDebugInfo.IsEvState> isEvStates = new ArrayList<>();
-      for (Map.Entry<String, String> entry : instanceStateMap.entrySet()) {
-        String serverName = entry.getKey();
-        String isState = entry.getValue();
+      Map<String, TableDebugInfo.SegmentState> segmentServerState = new HashMap<>();
+      for (Map.Entry<String, Map<String, SegmentServerDebugInfo>> segmentEntry : segmentsDebugInfoFromServers
+          .entrySet()) {
+        String instanceName = segmentEntry.getKey();
+        String isState = segmentIsMap.get(instanceName);
 
-        String evState = (externalView != null) ? externalView.getStateMap(segment).get(serverName) : "null";
-        if (!isState.equals(evState)) {
-          isEvStates.add(new TableDebugInfo.IsEvState(serverName, isState, evState));
+        Map<String, String> evStateMap = (externalView != null) ? externalView.getStateMap(segmentName) : null;
+        String evState = (evStateMap != null) ? evStateMap.get(instanceName) : null;
+
+        if (evState != null) {
+          Map<String, SegmentServerDebugInfo> segmentServerDebugInfoMap = segmentEntry.getValue();
+          SegmentServerDebugInfo segmentServerDebugInfo = segmentServerDebugInfoMap.get(segmentName);
+
+          if (verbosity > 0 || (segmentServerDebugInfo != null) && segmentHasErrors(segmentServerDebugInfo, evState)) {
+            segmentServerState.put(instanceName,
+                new TableDebugInfo.SegmentState(isState, evState, segmentServerDebugInfo.getSegmentSize(),
+                    segmentServerDebugInfo.getConsumerInfo(), segmentServerDebugInfo.getErrorInfo()));
+          }
+        } else {
+          segmentServerState.put(instanceName, new TableDebugInfo.SegmentState(isState, null, null, null, null));
         }
       }
 
-      if (isEvStates.size() > 0) {
-        segmentDebugInfos.add(new TableDebugInfo.SegmentDebugInfo(segment, isEvStates));
+      if (!segmentServerState.isEmpty()) {
+        result.add(new TableDebugInfo.SegmentDebugInfo(segmentName, segmentServerState));
       }
     }
-    return segmentDebugInfos;
+
+    return result;
+  }
+
+  /**
+   * Helper method to check if a segment has any errors/issues.
+   *
+   * @param segmentServerDebugInfo Segment debug info on server
+   * @param externalView external view of segment
+   * @return True if there's any error/issue for the segment, false otherwise.
+   */
+  private boolean segmentHasErrors(SegmentServerDebugInfo segmentServerDebugInfo, String externalView) {
+    // For now, we will skip cases where IS is ONLINE and EV is OFFLINE (or vice-versa), as it could happen during state transitions.
+    if (externalView.equals("ERROR")) {
+      return true;
+    }
+
+    SegmentConsumerInfo consumerInfo = segmentServerDebugInfo.getConsumerInfo();
+    if (consumerInfo != null && consumerInfo.getConsumerState()
+        .equals(CommonConstants.ConsumerState.NOT_CONSUMING.toString())) {
+      return true;
+    }
+
+    SegmentErrorInfo errorInfo = segmentServerDebugInfo.getErrorInfo();
+    return errorInfo != null && (errorInfo.getErrorMessage() != null || errorInfo.getStackTrace() != null);
   }
 
   /**
@@ -195,9 +299,10 @@ public class TableDebugResource {
    * for the broker resource.
    *
    * @param tableNameWithType Name of table with type suffix
+   * @param verbosity Verbosity level
    * @return Debug information for brokers of the table
    */
-  private List<TableDebugInfo.BrokerDebugInfo> debugBrokers(String tableNameWithType) {
+  private List<TableDebugInfo.BrokerDebugInfo> debugBrokers(String tableNameWithType, int verbosity) {
     List<TableDebugInfo.BrokerDebugInfo> brokerDebugInfos = new ArrayList<>();
     HelixDataAccessor helixDataAccessor = _pinotHelixResourceManager.getHelixZkManager().getHelixDataAccessor();
     IdealState idealState =
@@ -209,9 +314,8 @@ public class TableDebugResource {
       String brokerName = entry.getKey();
       String isState = entry.getValue();
       String evState = externalView.getStateMap(tableNameWithType).get(brokerName);
-      if (!isState.equals(evState)) {
-        brokerDebugInfos.add(
-            new TableDebugInfo.BrokerDebugInfo(brokerName, new TableDebugInfo.IsEvState(brokerName, isState, evState)));
+      if (verbosity > 0 || !isState.equals(evState)) {
+        brokerDebugInfos.add(new TableDebugInfo.BrokerDebugInfo(brokerName, isState, evState));
       }
     }
     return brokerDebugInfos;
@@ -252,5 +356,77 @@ public class TableDebugResource {
       serverDebugInfos.add(new TableDebugInfo.ServerDebugInfo(instanceName, numErrors, numMessages));
     }
     return serverDebugInfos;
+  }
+
+  /**
+   * This method makes a MultiGet call to all servers to get the segments debug info.
+   * @return Map of ServerName ->  (map of SegmentName -> SegmentServerDebugInfo).
+   */
+  private Map<String, Map<String, SegmentServerDebugInfo>> getSegmentsDebugInfoFromServers(String tableNameWithType,
+      BiMap<String, String> serverToEndpoints, int timeoutMs) {
+    LOGGER.info("Reading segments debug info from servers: {} for table: {}", serverToEndpoints.keySet(),
+        tableNameWithType);
+
+    List<String> serverUrls = new ArrayList<>(serverToEndpoints.size());
+    BiMap<String, String> endpointsToServers = serverToEndpoints.inverse();
+    for (String endpoint : endpointsToServers.keySet()) {
+      String segmentDebugInfoURI = String.format("%s/debug/tables/%s", endpoint, tableNameWithType);
+      serverUrls.add(segmentDebugInfoURI);
+    }
+
+    CompletionServiceHelper completionServiceHelper =
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs);
+
+    // Map from InstanceName -> <Segment -> DebugInfo>
+    Map<String, Map<String, SegmentServerDebugInfo>> serverToSegmentDebugInfoMap = new HashMap<>();
+    int failedParses = 0;
+    for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
+      try {
+        List<SegmentServerDebugInfo> segmentDebugInfos =
+            JsonUtils.stringToObject(streamResponse.getValue(), new TypeReference<List<SegmentServerDebugInfo>>() {
+            });
+        Map<String, SegmentServerDebugInfo> segmentsMap = segmentDebugInfos.stream()
+            .collect(Collectors.toMap(SegmentServerDebugInfo::getSegmentName, Function.identity()));
+        serverToSegmentDebugInfoMap.put(streamResponse.getKey(), segmentsMap);
+      } catch (IOException e) {
+        failedParses++;
+        LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
+      }
+    }
+    if (failedParses != 0) {
+      LOGGER.warn("Failed to parse {} / {} segment size info responses from servers.", failedParses, serverUrls.size());
+    }
+    return serverToSegmentDebugInfoMap;
+  }
+
+  /**
+   * Helper method to get valid types of table that exist in the cluster for the given table name.
+   *
+   * @param tableName Name of table
+   * @param tableTypeStr Type of table
+   * @param pinotHelixResourceManager Pinot Helix Resource manager
+   * @return List of valid table types that exist in the cluster
+   */
+  private List<TableType> getValidTableTypes(String tableName, String tableTypeStr,
+      PinotHelixResourceManager pinotHelixResourceManager) {
+    TableType tableType = Constants.validateTableType(tableTypeStr);
+    List<TableType> tableTypes = new ArrayList<>();
+
+    if (tableType == null) {
+      if (pinotHelixResourceManager.hasOfflineTable(tableName)) {
+        tableTypes.add(TableType.OFFLINE);
+      }
+      if (pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+        tableTypes.add(TableType.REALTIME);
+      }
+    } else {
+      String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
+      if (pinotHelixResourceManager.hasTable(tableNameWithType)) {
+        tableTypes.add(tableType);
+      }
+    }
+    return tableTypes;
   }
 }

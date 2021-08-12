@@ -76,9 +76,11 @@ public class HelixBrokerStarterTest extends ControllerTest {
 
     Map<String, Object> properties = new HashMap<>();
     properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, 18099);
-    
-    _brokerStarter =
-        new HelixBrokerStarter(new PinotConfiguration(properties), getHelixClusterName(), getZkUrl());
+    properties.put(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
+    properties.put(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
+
+    _brokerStarter = new HelixBrokerStarter();
+    _brokerStarter.init(new PinotConfiguration(properties));
     _brokerStarter.start();
 
     addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKERS - 1, true);
@@ -95,8 +97,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
     _helixResourceManager.addTable(offlineTableConfig);
     TableConfig realtimeTimeConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
-            .setTimeType(TimeUnit.DAYS.name()).
-            setStreamConfigs(getStreamConfigs()).build();
+            .setTimeType(TimeUnit.DAYS.name()).setStreamConfigs(getStreamConfigs()).build();
     _helixResourceManager.addTable(realtimeTimeConfig);
 
     for (int i = 0; i < NUM_OFFLINE_SEGMENTS; i++) {

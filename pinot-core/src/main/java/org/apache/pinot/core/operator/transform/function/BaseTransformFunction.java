@@ -52,17 +52,17 @@ public abstract class BaseTransformFunction implements TransformFunction {
   protected static final TransformResultMetadata BYTES_SV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.BYTES, true, false);
 
-  private int[] _intValuesSV;
-  private long[] _longValuesSV;
-  private float[] _floatValuesSV;
-  private double[] _doubleValuesSV;
-  private String[] _stringValuesSV;
-  private byte[][] _byteValuesSV;
-  private int[][] _intValuesMV;
-  private long[][] _longValuesMV;
-  private float[][] _floatValuesMV;
-  private double[][] _doubleValuesMV;
-  private String[][] _stringValuesMV;
+  protected int[] _intValuesSV;
+  protected long[] _longValuesSV;
+  protected float[] _floatValuesSV;
+  protected double[] _doubleValuesSV;
+  protected String[] _stringValuesSV;
+  protected byte[][] _byteValuesSV;
+  protected int[][] _intValuesMV;
+  protected long[][] _longValuesMV;
+  protected float[][] _floatValuesMV;
+  protected double[][] _doubleValuesMV;
+  protected String[][] _stringValuesMV;
 
   @Override
   public Dictionary getDictionary() {

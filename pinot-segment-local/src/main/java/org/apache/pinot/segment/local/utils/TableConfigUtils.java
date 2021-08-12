@@ -30,10 +30,8 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
-import org.apache.pinot.common.config.tuner.TableConfigTunerRegistry;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
-import org.apache.pinot.core.util.ReplicationUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
@@ -47,13 +45,11 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
-import org.apache.pinot.spi.config.table.TunerConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
-import org.apache.pinot.spi.config.table.tuner.TableConfigTuner;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
@@ -103,6 +99,7 @@ public final class TableConfigUtils {
     validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
     validateFieldConfigList(tableConfig.getFieldConfigList(), tableConfig.getIndexingConfig(), schema);
     validateUpsertConfig(tableConfig, schema);
+    validatePartialUpsertStrategies(tableConfig, schema);
     validateTaskConfigs(tableConfig);
   }
 
@@ -322,9 +319,10 @@ public final class TableConfigUtils {
    *  - the primary key exists on the schema
    *  - strict replica-group is configured for routing type
    *  - consumer type must be low-level
+   *  - comparison column exists
    */
   @VisibleForTesting
-  public static void validateUpsertConfig(TableConfig tableConfig, Schema schema) {
+  static void validateUpsertConfig(TableConfig tableConfig, Schema schema) {
     if (tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE) {
       return;
     }
@@ -348,6 +346,55 @@ public final class TableConfigUtils {
     Preconditions.checkState(
         CollectionUtils.isEmpty(tableConfig.getIndexingConfig().getStarTreeIndexConfigs()) && !tableConfig
             .getIndexingConfig().isEnableDefaultStarTree(), "The upsert table cannot have star-tree index.");
+    // comparison column exists
+    if (tableConfig.getUpsertConfig().getComparisonColumn() != null) {
+      String comparisonCol = tableConfig.getUpsertConfig().getComparisonColumn();
+      Preconditions.checkState(schema.hasColumn(comparisonCol), "The comparison column does not exist on schema");
+    }
+  }
+
+  /**
+   * Validates the partial upsert-related configurations:
+   *  - Null handling must be enabled
+   *  - Merger cannot be applied to private key columns
+   *  - Merger cannot be applied to non-existing columns
+   *  - INCREMENT merger must be applied to numeric columns
+   *  - APPEND/UNION merger cannot be applied to single-value columns
+   *  - INCREMENT merger cannot be applied to date time column
+   */
+  @VisibleForTesting
+  static void validatePartialUpsertStrategies(TableConfig tableConfig, Schema schema) {
+    if (tableConfig.getUpsertMode() != UpsertConfig.Mode.PARTIAL) {
+      return;
+    }
+
+    Preconditions.checkState(tableConfig.getIndexingConfig().isNullHandlingEnabled(),
+        "Null handling must be enabled for partial upsert tables");
+
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    assert upsertConfig != null;
+    Map<String, UpsertConfig.Strategy> partialUpsertStrategies = upsertConfig.getPartialUpsertStrategies();
+
+    List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
+    for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
+      String column = entry.getKey();
+      UpsertConfig.Strategy columnStrategy = entry.getValue();
+      Preconditions.checkState(!primaryKeyColumns.contains(column), "Merger cannot be applied to primary key columns");
+
+      FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+      Preconditions.checkState(fieldSpec != null, "Merger cannot be applied to non-existing column: %s", column);
+
+      if (columnStrategy == UpsertConfig.Strategy.INCREMENT) {
+        Preconditions.checkState(fieldSpec.getDataType().getStoredType().isNumeric(),
+            "INCREMENT merger cannot be applied to non-numeric column: %s", column);
+        Preconditions.checkState(!schema.getDateTimeNames().contains(column),
+            "INCREMENT merger cannot be applied to date time column: %s", column);
+      } else if (columnStrategy == UpsertConfig.Strategy.APPEND || columnStrategy == UpsertConfig.Strategy.UNION) {
+        Preconditions
+            .checkState(!fieldSpec.isSingleValueField(), "%s merger cannot be applied to single-value column: %s",
+                columnStrategy.toString(), column);
+      }
+    }
   }
 
   /**
@@ -617,18 +664,6 @@ public final class TableConfigUtils {
       return indexingColumns.stream().filter(v -> !v.isEmpty()).collect(Collectors.toList());
     }
     return null;
-  }
-
-  /**
-   * Apply TunerConfig to the tableConfig
-   */
-  public static void applyTunerConfig(TableConfig tableConfig, Schema schema) {
-    TunerConfig tunerConfig = tableConfig.getTunerConfig();
-    if (tunerConfig != null && tunerConfig.getName() != null && !tunerConfig.getName().isEmpty()) {
-      TableConfigTuner tuner = TableConfigTunerRegistry.getTuner(tunerConfig.getName());
-      tuner.init(tunerConfig, schema);
-      tuner.apply(tableConfig);
-    }
   }
 
   /**

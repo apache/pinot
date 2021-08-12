@@ -31,13 +31,13 @@ import javax.annotation.Nullable;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.segment.local.segment.creator.impl.V1Constants;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
-import org.apache.pinot.segment.local.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
+import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 
@@ -65,7 +65,7 @@ public class StarTreeBuilderUtils {
    * Generates the deduplicated star-tree builder configs.
    */
   public static List<StarTreeV2BuilderConfig> generateBuilderConfigs(@Nullable List<StarTreeIndexConfig> indexConfigs,
-      boolean enableDefaultStarTree, SegmentMetadataImpl segmentMetadata) {
+      boolean enableDefaultStarTree, SegmentMetadata segmentMetadata) {
     List<StarTreeV2BuilderConfig> builderConfigs = new ArrayList<>();
     if (indexConfigs != null) {
       for (StarTreeIndexConfig indexConfig : indexConfigs) {

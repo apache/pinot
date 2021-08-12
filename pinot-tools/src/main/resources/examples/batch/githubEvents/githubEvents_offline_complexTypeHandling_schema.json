@@ -9,21 +9,41 @@
       "dataType": "STRING"
     },
     {
-      "name": "payload.commits.sha",
-      "dataType": "STRING"
-    },
-    {
-      "name": "payload.commits.author.name",
-      "dataType": "STRING"
-    },
-    {
-      "name": "payload.commits.author.email",
-      "dataType": "STRING"
-    },
-    {
-      "name": "payload_json",
-      "dataType": "STRING",
-      "maxLength": 2147483647
+      "name" : "payload.push_id",
+      "dataType" : "LONG"
+    }, {
+      "name" : "payload.size",
+      "dataType" : "INT"
+    }, {
+      "name" : "payload.distinct_size",
+      "dataType" : "INT"
+    }, {
+      "name" : "payload.ref",
+      "dataType" : "STRING"
+    }, {
+      "name" : "payload.head",
+      "dataType" : "STRING"
+    }, {
+      "name" : "payload.before",
+      "dataType" : "STRING"
+    }, {
+      "name" : "payload.commits.sha",
+      "dataType" : "STRING"
+    }, {
+      "name" : "payload.commits.author.name",
+      "dataType" : "STRING"
+    }, {
+      "name" : "payload.commits.author.email",
+      "dataType" : "STRING"
+    }, {
+      "name" : "payload.commits.message",
+      "dataType" : "STRING"
+    }, {
+      "name" : "payload.commits.distinct",
+      "dataType" : "BOOLEAN"
+    }, {
+      "name" : "payload.commits.url",
+      "dataType" : "STRING"
     }
   ],
   "dateTimeFieldSpecs": [

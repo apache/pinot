@@ -39,15 +39,14 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
-import org.apache.pinot.core.data.manager.TableDataManager;
-import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -318,8 +317,8 @@ public class LLRealtimeSegmentDataManagerTest {
     segmentDataManager._consumeOffsets.add(catchupOffset); // Offset after catchup
     final SegmentCompletionProtocol.Response holdResponse1 = new SegmentCompletionProtocol.Response(
         new SegmentCompletionProtocol.Response.Params()
-            .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.HOLD).
-            withStreamPartitionMsgOffset(firstOffset.toString()));
+            .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.HOLD)
+            .withStreamPartitionMsgOffset(firstOffset.toString()));
     final SegmentCompletionProtocol.Response catchupResponse = new SegmentCompletionProtocol.Response(
         new SegmentCompletionProtocol.Response.Params()
             .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP)
@@ -382,8 +381,8 @@ public class LLRealtimeSegmentDataManagerTest {
     final LongMsgOffset endOffset = new LongMsgOffset(_startOffsetValue + 500);
     segmentDataManager._consumeOffsets.add(endOffset);
     SegmentCompletionProtocol.Response.Params params = new SegmentCompletionProtocol.Response.Params();
-    params.withStreamPartitionMsgOffset(endOffset.toString()).
-        withStatus(SegmentCompletionProtocol.ControllerResponseStatus.KEEP);
+    params.withStreamPartitionMsgOffset(endOffset.toString())
+        .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.KEEP);
     final SegmentCompletionProtocol.Response keepResponse = new SegmentCompletionProtocol.Response(params);
     segmentDataManager._responses.add(keepResponse);
 
@@ -775,7 +774,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
     TableDataManager tableDataManager = TableDataManagerProvider
         .getTableDataManager(tableDataManagerConfig, "testInstance", propertyStore, mock(ServerMetrics.class),
-            mock(HelixManager.class));
+            mock(HelixManager.class), null);
     tableDataManager.start();
     tableDataManager.shutDown();
     Assert.assertFalse(SegmentBuildTimeLeaseExtender.isExecutorShutdown());
@@ -816,8 +815,7 @@ public class LLRealtimeSegmentDataManagerTest {
         throws Exception {
       super(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir,
           new IndexLoadingConfig(makeInstanceDataManagerConfig(), tableConfig), schema, llcSegmentName,
-          semaphoreMap.get(llcSegmentName.getPartitionGroupId()), serverMetrics,
-          new PartitionUpsertMetadataManager("testTable_REALTIME", 0, serverMetrics));
+          semaphoreMap.get(llcSegmentName.getPartitionGroupId()), serverMetrics, null);
       _state = LLRealtimeSegmentDataManager.class.getDeclaredField("_state");
       _state.setAccessible(true);
       _shouldStop = LLRealtimeSegmentDataManager.class.getDeclaredField("_shouldStop");

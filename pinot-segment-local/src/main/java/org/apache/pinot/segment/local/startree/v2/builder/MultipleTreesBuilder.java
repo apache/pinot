@@ -32,16 +32,15 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.segment.local.segment.creator.impl.V1Constants;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.local.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils.IndexKey;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils.IndexValue;
 import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants.MetadataKey;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.ReadMode;
@@ -108,8 +107,8 @@ public class MultipleTreesBuilder implements Closeable {
     Preconditions.checkState(!_metadataProperties.containsKey(MetadataKey.STAR_TREE_COUNT), "Star-tree already exists");
     _segment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
     try {
-      _builderConfigs = StarTreeBuilderUtils.generateBuilderConfigs(indexConfigs, enableDefaultStarTree,
-          (SegmentMetadataImpl) _segment.getSegmentMetadata());
+      _builderConfigs = StarTreeBuilderUtils
+          .generateBuilderConfigs(indexConfigs, enableDefaultStarTree, _segment.getSegmentMetadata());
     } catch (Exception e) {
       _segment.destroy();
       throw e;

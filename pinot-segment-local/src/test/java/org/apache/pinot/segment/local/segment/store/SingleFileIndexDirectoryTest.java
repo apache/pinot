@@ -24,9 +24,11 @@ import java.util.Arrays;
 import java.util.HashSet;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
+import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
@@ -65,7 +67,7 @@ public class SingleFileIndexDirectoryTest {
 
   void writeMetadata() {
     SegmentMetadataImpl meta = Mockito.mock(SegmentMetadataImpl.class);
-    Mockito.when(meta.getVersion()).thenReturn(SegmentVersion.v3.toString());
+    Mockito.when(meta.getVersion()).thenReturn(SegmentVersion.v3);
     segmentMetadata = meta;
   }
 

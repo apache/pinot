@@ -25,11 +25,11 @@ import java.nio.ByteOrder;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.configuration.ConfigurationException;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.utils.ReadMode;
 
 import static org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils.IndexKey;

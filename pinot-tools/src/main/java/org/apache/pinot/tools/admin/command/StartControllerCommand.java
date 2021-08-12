@@ -33,6 +33,8 @@ import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.tools.utils.PinotConfigUtils.TMP_DIR;
+
 
 /**
  * Class to implement StartController command.
@@ -40,22 +42,31 @@ import org.slf4j.LoggerFactory;
  */
 public class StartControllerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartControllerCommand.class);
+
   @Option(name = "-controllerMode", required = false, metaVar = "<String>", usage = "Pinot controller mode.")
   private ControllerConf.ControllerMode _controllerMode = ControllerConf.ControllerMode.DUAL;
+
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
+
   @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
   private String _controllerHost;
+
   @Option(name = "-controllerPort", required = false, metaVar = "<int>", usage = "Port number to start the controller at.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
+
   @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Path to directory containging data.")
-  private String _dataDir = TMP_DIR + "PinotController";
+  private String _dataDir = TMP_DIR + "data/PinotController";
+
   @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "Http address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
+
   @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = DEFAULT_CLUSTER_NAME;
-  @Option(name = "-configFileName", required = false, metaVar = "<FilePathName>", usage = "Controller Starter config file", forbids = {"-controllerHost", "-controllerPort", "-dataDir", "-zkAddress", "-clusterName", "-controllerMode"})
+
+  @Option(name = "-configFileName", required = false, aliases = {"-config", "-configFile", "-controllerConfig", "-controllerConf"}, metaVar = "<FilePathName>", usage = "Controller Starter config file", forbids = {"-controllerHost", "-controllerPort", "-dataDir", "-zkAddress", "-clusterName", "-controllerMode"})
   private String _configFileName;
+
   // This can be set via the set method, or via config file input.
   private boolean _tenantIsolation = true;
 
@@ -131,9 +142,10 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
       throws Exception {
     try {
       LOGGER.info("Executing command: " + toString());
+      Map<String, Object> controllerConf = getControllerConf();
       StartServiceManagerCommand startServiceManagerCommand =
           new StartServiceManagerCommand().setZkAddress(_zkAddress).setClusterName(_clusterName).setPort(-1)
-              .setBootstrapServices(new String[0]).addBootstrapService(ServiceRole.CONTROLLER, getControllerConf());
+              .setBootstrapServices(new String[0]).addBootstrapService(ServiceRole.CONTROLLER, controllerConf);
       startServiceManagerCommand.execute();
       String pidFile = ".pinotAdminController-" + System.currentTimeMillis() + ".pid";
       savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
@@ -150,6 +162,10 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
     Map<String, Object> properties = new HashMap<>();
     if (_configFileName != null) {
       properties.putAll(PinotConfigUtils.generateControllerConf(_configFileName));
+      // Override the zkAddress and clusterName to ensure ServiceManager is connecting to the right Zookeeper and Cluster.
+      // Configs existence is already verified.
+      _zkAddress = properties.get(ControllerConf.ZK_STR).toString();
+      _clusterName = properties.get(ControllerConf.HELIX_CLUSTER_NAME).toString();
     } else {
       if (_controllerHost == null) {
         _controllerHost = NetUtils.getHostAddress();

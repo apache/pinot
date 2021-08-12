@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
@@ -35,15 +36,16 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.segment.local.aggregator.PercentileTDigestValueAggregator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.loader.LocalSegmentDirectoryLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
-import org.apache.pinot.segment.local.segment.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -52,6 +54,7 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.ReadMode;
@@ -152,7 +155,7 @@ public class SegmentGenerationWithBytesTypeTest {
   @Test
   public void testMetadata() {
     Assert.assertTrue(_segment.getDataSource(FIXED_BYTE_SORTED_COLUMN).getDataSourceMetadata().isSorted());
-    Assert.assertFalse(_segment.getSegmentMetadata().hasDictionary(FIXED_BYTES_NO_DICT_COLUMN));
+    Assert.assertFalse(_segment.getSegmentMetadata().getColumnMetadataFor(FIXED_BYTES_NO_DICT_COLUMN).hasDictionary());
   }
 
   @Test
@@ -204,8 +207,8 @@ public class SegmentGenerationWithBytesTypeTest {
     IndexSegment segment = buildSegmentFromAvro(schema, AVRO_DIR_NAME, AVRO_NAME, SEGMENT_NAME);
     SegmentMetadata metadata = segment.getSegmentMetadata();
 
-    Assert.assertTrue(metadata.hasDictionary(FIXED_BYTES_UNSORTED_COLUMN));
-    Assert.assertTrue(metadata.hasDictionary(VARIABLE_BYTES_COLUMN));
+    Assert.assertTrue(metadata.getColumnMetadataFor(FIXED_BYTES_UNSORTED_COLUMN).hasDictionary());
+    Assert.assertTrue(metadata.getColumnMetadataFor(VARIABLE_BYTES_COLUMN).hasDictionary());
 
     PinotSegmentRecordReader reader = new PinotSegmentRecordReader(new File(AVRO_DIR_NAME, SEGMENT_NAME));
     GenericRow row = new GenericRow();
@@ -266,7 +269,10 @@ public class SegmentGenerationWithBytesTypeTest {
     driver.init(config, recordReader);
     driver.build();
 
-    SegmentDirectory.createFromLocalFS(driver.getOutputDirectory(), ReadMode.mmap);
+    Map<String, Object> props = new HashMap<>();
+    props.put(LocalSegmentDirectoryLoader.READ_MODE_KEY, ReadMode.mmap.toString());
+    SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
+        .load(driver.getOutputDirectory().toURI(), new PinotConfiguration(props));
     recordReader.rewind();
     return recordReader;
   }

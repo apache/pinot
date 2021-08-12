@@ -52,6 +52,23 @@ public final class MinionTaskMetadataUtils {
   }
 
   /**
+   * Persists the provided {@link MergeRollupTaskMetadata} to MINION_TASK_METADATA/MergeRollupTask/tableNameWthType.
+   * Will fail if expectedVersion does not match.
+   * Set expectedVersion -1 to override version check.
+   */
+  public static void persistMergeRollupTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore,
+      String taskType, MergeRollupTaskMetadata mergeRollupTaskMetadata,
+      int expectedVersion) {
+    String path = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(taskType,
+        mergeRollupTaskMetadata.getTableNameWithType());
+    if (!propertyStore
+        .set(path, mergeRollupTaskMetadata.toZNRecord(), expectedVersion, AccessOption.PERSISTENT)) {
+      throw new ZkException(
+          "Failed to persist minion MergeRollupTask metadata: " + mergeRollupTaskMetadata);
+    }
+  }
+
+  /**
    * Fetches the ZNRecord for RealtimeToOfflineSegmentsTask for given tableNameWithType from MINION_TASK_METADATA/RealtimeToOfflineSegmentsTask/tableNameWthType
    * and converts it to a {@link RealtimeToOfflineSegmentsTaskMetadata} object
    */

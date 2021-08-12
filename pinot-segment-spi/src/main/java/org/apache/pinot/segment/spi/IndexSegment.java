@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.segment.spi.index.reader.ValidDocIndexReader;
+import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -74,7 +74,7 @@ public interface IndexSegment {
 
   // TODO(upsert): solve the coordination problems of getting validDoc across segments for result consistency
   @Nullable
-  ValidDocIndexReader getValidDocIndex();
+  ThreadSafeMutableRoaringBitmap getValidDocIds();
 
   /**
    * Returns the record for the given document Id. Virtual column values are not returned.
@@ -85,6 +85,13 @@ public interface IndexSegment {
    * @return Record for the given document Id
    */
   GenericRow getRecord(int docId, GenericRow reuse);
+
+  /**
+   * This is a hint to the the implementation, to prefetch buffers for specified columns
+   * @param columns columns to prefetch
+   */
+  default void prefetch(Set<String> columns) {
+  }
 
   /**
    * Destroys segment in memory and closes file handlers if in MMAP mode.

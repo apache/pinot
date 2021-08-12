@@ -28,7 +28,9 @@ public class MinionConstants {
   public static final String SEGMENT_NAME_KEY = "segmentName";
   public static final String DOWNLOAD_URL_KEY = "downloadURL";
   public static final String UPLOAD_URL_KEY = "uploadURL";
+  public static final String DOT_SEPARATOR = ".";
   public static final String URL_SEPARATOR = ",";
+  public static final String SEGMENT_NAME_SEPARATOR = ",";
   public static final String AUTH_TOKEN = "authToken";
 
   /**
@@ -46,6 +48,7 @@ public class MinionConstants {
   public static final String RETRY_SCALE_FACTOR_KEY = "retryScaleFactor";
 
   public static final String TABLE_MAX_NUM_TASKS_KEY = "tableMaxNumTasks";
+  public static final String ENABLE_REPLACE_SEGMENTS_KEY = "enableReplaceSegments";
 
   public static class ConvertToRawIndexTask {
     public static final String TASK_TYPE = "ConvertToRawIndexTask";
@@ -57,37 +60,56 @@ public class MinionConstants {
     public static final String TASK_TYPE = "PurgeTask";
   }
 
-  public static class MergeRollupTask {
-    public static final String TASK_TYPE = "mergeRollupTask";
-    public static final String MERGE_TYPE_KEY = "mergeTypeKey";
-    public static final String MERGED_SEGMENT_NAME_KEY = "mergedSegmentNameKey";
-  }
-
-  /**
-   * Creates segments for the OFFLINE table, using completed segments from the corresponding REALTIME table
-   */
-  public static class RealtimeToOfflineSegmentsTask {
-    public static final String TASK_TYPE = "RealtimeToOfflineSegmentsTask";
+  // Common config keys for segment merge tasks.
+  public static abstract class MergeTask {
 
     /**
      * The time window size for the task.
      * e.g. if set to "1d", then task is scheduled to run for a 1 day window
      */
     public static final String BUCKET_TIME_PERIOD_KEY = "bucketTimePeriod";
+
     /**
      * The time period to wait before picking segments for this task
      * e.g. if set to "2d", no task will be scheduled for a time window younger than 2 days
      */
     public static final String BUFFER_TIME_PERIOD_KEY = "bufferTimePeriod";
 
-    // Window start and window end set by task generator
+    // Time handling config
     public static final String WINDOW_START_MS_KEY = "windowStartMs";
     public static final String WINDOW_END_MS_KEY = "windowEndMs";
-    // Segment processing related configs
-    public static final String TIME_COLUMN_TRANSFORM_FUNCTION_KEY = "timeColumnTransformFunction";
-    public static final String COLLECTOR_TYPE_KEY = "collectorType";
+    public static final String ROUND_BUCKET_TIME_PERIOD_KEY = "roundBucketTimePeriod";
+    public static final String PARTITION_BUCKET_TIME_PERIOD_KEY = "partitionBucketTimePeriod";
+
+    // Merge config
+    public static final String MERGE_TYPE_KEY = "mergeType";
     public static final String AGGREGATION_TYPE_KEY_SUFFIX = ".aggregationType";
+
+    // Segment config
+    public static final String MAX_NUM_RECORDS_PER_TASK_KEY = "maxNumRecordsPerTask";
     public static final String MAX_NUM_RECORDS_PER_SEGMENT_KEY = "maxNumRecordsPerSegment";
+    public static final String SEGMENT_NAME_PREFIX_KEY = "segmentNamePrefix";
+  }
+
+  public static class MergeRollupTask extends MergeTask {
+    public static final String TASK_TYPE = "MergeRollupTask";
+
+    public static final String MERGE_LEVEL_KEY = "mergeLevel";
+
+    public static final String SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY = TASK_TYPE + "." + MERGE_LEVEL_KEY;
+    public static final String SEGMENT_ZK_METADATA_TIME_KEY = TASK_TYPE + TASK_TIME_SUFFIX;
+
+    public static final String MERGED_SEGMENT_NAME_PREFIX = "merged_";
+  }
+
+  /**
+   * Creates segments for the OFFLINE table, using completed segments from the corresponding REALTIME table
+   */
+  public static class RealtimeToOfflineSegmentsTask extends MergeTask {
+    public static final String TASK_TYPE = "RealtimeToOfflineSegmentsTask";
+
+    @Deprecated // Replaced by MERGE_TYPE_KEY
+    public static final String COLLECTOR_TYPE_KEY = "collectorType";
   }
 
   // Generate segment and push to controller based on batch ingestion configs
@@ -96,5 +118,4 @@ public class MinionConstants {
     public static final String CONFIG_NUMBER_CONCURRENT_TASKS_PER_INSTANCE =
         "SegmentGenerationAndPushTask.numConcurrentTasksPerInstance";
   }
-
 }

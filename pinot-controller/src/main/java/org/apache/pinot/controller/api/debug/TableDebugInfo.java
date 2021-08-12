@@ -23,15 +23,30 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
+import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
+import org.apache.pinot.spi.config.table.TableStatus;
 
 
+/**
+ * This class represents debug information associated with a table. For example:
+ * <ul>
+ *   <li>Table name, size, number of brokers, servers, segments, etc.</li>
+ *   <li>Debug information from server/brokers of the table.</li>
+ *   <li>Debug information related to segments of the table.</li>
+ * </ul>
+ */
 @JsonPropertyOrder({"tableName", "numSegments", "numServers", "numBrokers", "segmentDebugInfos", "serverDebugInfos", "brokerDebugInfos"})
 @JsonIgnoreProperties(ignoreUnknown = true)
 @SuppressWarnings("unused")
 public class TableDebugInfo {
   @JsonProperty("tableName")
   private final String _tableName;
+
+  @JsonProperty("ingestionStatus")
+  private final TableStatus.IngestionStatus _ingestionStatus;
 
   @JsonProperty("tableSize")
   private final TableSizeSummary _tableSizeSummary;
@@ -55,10 +70,11 @@ public class TableDebugInfo {
   private final List<BrokerDebugInfo> _brokerDebugInfos;
 
   @JsonCreator
-  public TableDebugInfo(String tableName, TableSizeSummary tableSizeSummary, int numBrokers, int numServers,
+  public TableDebugInfo(String tableName, TableStatus.IngestionStatus ingestionStatus, TableSizeSummary tableSizeSummary, int numBrokers, int numServers,
       int numSegments, List<SegmentDebugInfo> segmentDebugInfos, List<ServerDebugInfo> serverDebugInfos,
       List<BrokerDebugInfo> brokerDebugInfos) {
     _tableName = tableName;
+    _ingestionStatus = ingestionStatus;
     _tableSizeSummary = tableSizeSummary;
 
     _numBrokers = numBrokers;
@@ -72,6 +88,10 @@ public class TableDebugInfo {
 
   public String getTableName() {
     return _tableName;
+  }
+
+  public TableStatus.IngestionStatus getIngestionStatus() {
+    return _ingestionStatus;
   }
 
   public TableSizeSummary getTableSize() {
@@ -102,54 +122,92 @@ public class TableDebugInfo {
     return _brokerDebugInfos;
   }
 
+  @JsonPropertyOrder({"segmentName", "serverState"})
   public static class SegmentDebugInfo {
     private final String _segmentName;
-    private final List<IsEvState> _states;
 
-    public SegmentDebugInfo(String name, List<IsEvState> states) {
-      _segmentName = name;
-      _states = states;
+    private final Map<String, SegmentState> _serverStateMap;
+
+    @JsonCreator
+    public SegmentDebugInfo(@JsonProperty("segmentName") String segmentName,
+        @JsonProperty("serverState") Map<String, SegmentState> segmentServerState) {
+      _segmentName = segmentName;
+      _serverStateMap = segmentServerState;
     }
 
     public String getSegmentName() {
       return _segmentName;
     }
 
-    public List<IsEvState> getSegmentStateInServer() {
-      return _states;
+    public Map<String, SegmentState> getServerState() {
+      return _serverStateMap;
     }
   }
 
-  public static class IsEvState {
-    private final String _serverName;
-    private final String _idealStateStatus;
-    private final String _externalViewStatus;
+  /**
+   * This class represents the state of segment on the server:
+   *
+   * <ul>
+   *   <li>Ideal State vs External view.</li>
+   *   <li>Segment related errors and consumer information.</li>
+   *   <li>Segment size.</li>
+   * </ul>
+   */
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  @JsonPropertyOrder({"idealState", "externalView", "segmentSize", "consumerInfo", "errorInfo"})
+  public static class SegmentState {
+    private final String _idealState;
+    private final String _externalView;
+    private final String _segmentSize;
+    private final SegmentConsumerInfo _consumerInfo;
+    private final SegmentErrorInfo _errorInfo;
 
-    public IsEvState(String name, String idealStateStatus, String externalViewStatus) {
-      _serverName = name;
-      _idealStateStatus = idealStateStatus;
-      _externalViewStatus = externalViewStatus;
+    @JsonCreator
+    public SegmentState(@JsonProperty("idealState") String idealState,
+        @JsonProperty("externalView") String externalView, @JsonProperty("segmentSize") String segmentSize,
+        @JsonProperty("consumerInfo") SegmentConsumerInfo consumerInfo,
+        @JsonProperty("errorInfo") SegmentErrorInfo errorInfo) {
+      _idealState = idealState;
+      _externalView = externalView;
+      _segmentSize = segmentSize;
+      _consumerInfo = consumerInfo;
+      _errorInfo = errorInfo;
     }
 
-    public String getServerName() {
-      return _serverName;
+    public String getIdealState() {
+      return _idealState;
     }
 
-    public String getIdealStateStatus() {
-      return _idealStateStatus;
+    public String getExternalView() {
+      return _externalView;
     }
 
-    public String getExternalViewStatus() {
-      return _externalViewStatus;
+    public SegmentConsumerInfo getConsumerInfo() {
+      return _consumerInfo;
+    }
+
+    public SegmentErrorInfo getErrorInfo() {
+      return _errorInfo;
+    }
+
+    public String getSegmentSize() {
+      return _segmentSize;
     }
   }
 
+  /**
+   * Debug information related to Server.
+   */
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  @JsonPropertyOrder({"serverName", "numErrors", "numMessages"})
   public static class ServerDebugInfo {
+    private final String _serverName;
     private final int _numErrors;
     private final int _numMessages;
-    private final String _serverName;
 
-    public ServerDebugInfo(String serverName, int numErrors, int numMessages) {
+    @JsonCreator
+    public ServerDebugInfo(@JsonProperty("serverName") String serverName, @JsonProperty("numErrors") int numErrors,
+        @JsonProperty("numMessages") int numMessages) {
       _serverName = serverName;
       _numErrors = numErrors;
       _numMessages = numMessages;
@@ -168,24 +226,40 @@ public class TableDebugInfo {
     }
   }
 
+  /**
+   * Debug information related to broker.
+   */
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  @JsonPropertyOrder({"brokerName", "state"})
   public static class BrokerDebugInfo {
     private final String _brokerName;
-    private final IsEvState _state;
+    private final String _idealState;
+    private final String _externalView;
 
-    public BrokerDebugInfo(String brokerName, IsEvState state) {
+    @JsonCreator
+    public BrokerDebugInfo(@JsonProperty("brokerName") String brokerName, @JsonProperty("idealState") String idealState,
+        @JsonProperty("externalView") String externalView) {
       _brokerName = brokerName;
-      _state = state;
+      _idealState = idealState;
+      _externalView = externalView;
     }
 
     public String getBrokerName() {
       return _brokerName;
     }
 
-    public IsEvState getState() {
-      return _state;
+    public String getIdealState() {
+      return _idealState;
+    }
+
+    public String getExternalView() {
+      return _externalView;
     }
   }
 
+  /**
+   * Summary of table size - reported and estimated size.
+   */
   public static class TableSizeSummary {
     private final String _reportedSize;
     private final String _estimatedSize;

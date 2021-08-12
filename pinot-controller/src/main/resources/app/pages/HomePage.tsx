@@ -101,7 +101,7 @@ const HomePage = () => {
           <Link to="/tenants" className={classes.paperLinks}>
             <Paper className={classes.paper}>
               <h4>Tenants</h4>
-              <h2>{tenantsData.records.length}</h2>
+              <h2>{Array.isArray(tenantsData.records) ? tenantsData.records.length : 0}</h2>
             </Paper>
           </Link>
         </Grid>
@@ -109,7 +109,7 @@ const HomePage = () => {
           <Link to="/controllers" className={classes.paperLinks}>
             <Paper className={classes.paper}>
               <h4>Controllers</h4>
-              <h2>{instances.Controller.length}</h2>
+              <h2>{Array.isArray(instances.Controller) ? instances.Controller.length : 0}</h2>
             </Paper>
           </Link>
         </Grid>
@@ -117,7 +117,7 @@ const HomePage = () => {
           <Link to="/brokers" className={classes.paperLinks}>
             <Paper className={classes.paper}>
               <h4>Brokers</h4>
-              <h2>{instances.Broker.length}</h2>
+              <h2>{Array.isArray(instances.Broker) ? instances.Broker.length : 0}</h2>
             </Paper>
           </Link>
         </Grid>
@@ -125,7 +125,7 @@ const HomePage = () => {
           <Link to="/servers" className={classes.paperLinks}>
             <Paper className={classes.paper}>
               <h4>Servers</h4>
-              <h2>{instances.Server.length}</h2>
+              <h2>{Array.isArray(instances.Server) ? instances.Server.length : 0}</h2>
             </Paper>
           </Link>
         </Grid>
@@ -133,7 +133,7 @@ const HomePage = () => {
           <Link to="/tables" className={classes.paperLinks}>
             <Paper className={classes.paper}>
               <h4>Tables</h4>
-              <h2>{tables.length}</h2>
+              <h2>{Array.isArray(tables) ? tables.length : 0}</h2>
             </Paper>
           </Link>
         </Grid>

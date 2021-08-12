@@ -27,10 +27,9 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.commons.lang.math.RandomUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
-import org.apache.pinot.segment.local.segment.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -72,7 +71,7 @@ public class SegmentGenerationWithMultipleRecordsTest {
   public void testNumDocs()
       throws Exception {
     File segmentDir = buildSegment(_tableConfig, _schema);
-    SegmentMetadataImpl metadata = SegmentDirectory.loadSegmentMetadata(segmentDir);
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(segmentDir);
     Assert.assertEquals(metadata.getTotalDocs(), 6);
     Assert.assertTrue(metadata.getAllColumns().containsAll(Sets.newHashSet(SUB_COLUMN_1, SUB_COLUMN_2)));
   }

@@ -18,10 +18,9 @@
  */
 package org.apache.pinot.client;
 
+import java.util.Collections;
 import java.util.concurrent.Future;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
@@ -31,29 +30,19 @@ import org.testng.annotations.Test;
  */
 public class PreparedStatementTest {
   private final DummyPinotClientTransport _dummyPinotClientTransport = new DummyPinotClientTransport();
-  private PinotClientTransportFactory _previousTransportFactory = null;
 
   @Test
   public void testPreparedStatementEscaping() {
     // Create a prepared statement that has to quote a string appropriately
-    Connection connection = ConnectionFactory.fromHostList("dummy");
-    PreparedStatement preparedStatement = connection.prepareStatement(new Request("sql", "SELECT foo FROM bar WHERE baz = ?"));
+    Connection connection =
+        ConnectionFactory.fromHostList(Collections.singletonList("dummy"), _dummyPinotClientTransport);
+    PreparedStatement preparedStatement =
+        connection.prepareStatement(new Request("sql", "SELECT foo FROM bar WHERE baz = ?"));
     preparedStatement.setString(0, "'hello'");
     preparedStatement.execute();
 
     // Check that the query sent is appropriately escaped
     Assert.assertEquals("SELECT foo FROM bar WHERE baz = '''hello'''", _dummyPinotClientTransport.getLastQuery());
-  }
-
-  @BeforeClass
-  public void overridePinotClientTransport() {
-    _previousTransportFactory = ConnectionFactory._transportFactory;
-    ConnectionFactory._transportFactory = new DummyPinotClientTransportFactory();
-  }
-
-  @AfterClass
-  public void resetPinotClientTransport() {
-    ConnectionFactory._transportFactory = _previousTransportFactory;
   }
 
   static class DummyPinotClientTransport implements PinotClientTransport {

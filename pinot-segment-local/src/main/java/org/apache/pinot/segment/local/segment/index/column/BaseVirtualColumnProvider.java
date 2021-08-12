@@ -18,12 +18,11 @@
  */
 package org.apache.pinot.segment.local.segment.index.column;
 
-import org.apache.pinot.segment.local.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnIndexContainer;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 
 
 /**
@@ -31,12 +30,9 @@ import org.apache.pinot.spi.data.FieldSpec;
  */
 public abstract class BaseVirtualColumnProvider implements VirtualColumnProvider {
 
-  protected ColumnMetadata.Builder getColumnMetadataBuilder(VirtualColumnContext context) {
-    FieldSpec fieldSpec = context.getFieldSpec();
-    return new ColumnMetadata.Builder().setVirtual(true).setColumnName(fieldSpec.getName())
-        .setFieldType(fieldSpec.getFieldType()).setDataType(fieldSpec.getDataType())
-        .setTotalDocs(context.getTotalDocCount()).setSingleValue(fieldSpec.isSingleValueField())
-        .setDefaultNullValueString(context.getFieldSpec().getDefaultNullValueString());
+  protected ColumnMetadataImpl.Builder getColumnMetadataBuilder(VirtualColumnContext context) {
+    return new ColumnMetadataImpl.Builder().setFieldSpec(context.getFieldSpec())
+        .setTotalDocs(context.getTotalDocCount());
   }
 
   @Override

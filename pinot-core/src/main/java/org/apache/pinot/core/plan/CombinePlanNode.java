@@ -22,6 +22,7 @@ import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.Phaser;
@@ -61,9 +62,12 @@ public class CombinePlanNode implements PlanNode {
   private final ExecutorService _executorService;
   private final long _endTimeMs;
   private final int _numGroupsLimit;
+
+  // Used for SQL GROUP BY during server combine
+  private final int _minGroupTrimSize;
+  private final int _groupTrimThreshold;
+
   private final StreamObserver<Server.ServerResponse> _streamObserver;
-  // used for SQL GROUP BY during server combine
-  private final int _groupByTrimThreshold;
 
   /**
    * Constructor for the class.
@@ -73,19 +77,21 @@ public class CombinePlanNode implements PlanNode {
    * @param executorService Executor service
    * @param endTimeMs End time in milliseconds for the query
    * @param numGroupsLimit Limit of number of groups stored in each segment
+   * @param minGroupTrimSize Minimum number of groups to keep when trimming groups for SQL GROUP BY
+   * @param groupTrimThreshold Trim threshold to use for server combine for SQL GROUP BY
    * @param streamObserver Optional stream observer for streaming query
-   * @param groupByTrimThreshold trim threshold to use for server combine for SQL GROUP BY
    */
   public CombinePlanNode(List<PlanNode> planNodes, QueryContext queryContext, ExecutorService executorService,
-      long endTimeMs, int numGroupsLimit, @Nullable StreamObserver<Server.ServerResponse> streamObserver,
-      int groupByTrimThreshold) {
+      long endTimeMs, int numGroupsLimit, int minGroupTrimSize, int groupTrimThreshold,
+      @Nullable StreamObserver<Server.ServerResponse> streamObserver) {
     _planNodes = planNodes;
     _queryContext = queryContext;
     _executorService = executorService;
     _endTimeMs = endTimeMs;
     _numGroupsLimit = numGroupsLimit;
+    _minGroupTrimSize = minGroupTrimSize;
+    _groupTrimThreshold = groupTrimThreshold;
     _streamObserver = streamObserver;
-    _groupByTrimThreshold = groupByTrimThreshold;
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})
@@ -179,10 +185,10 @@ public class CombinePlanNode implements PlanNode {
         return new AggregationOnlyCombineOperator(operators, _queryContext, _executorService, _endTimeMs);
       } else {
         // Aggregation group-by
-        QueryOptions queryOptions = new QueryOptions(_queryContext.getQueryOptions());
-        if (queryOptions.isGroupByModeSQL()) {
+        Map<String, String> queryOptions = _queryContext.getQueryOptions();
+        if (queryOptions != null && QueryOptions.isGroupByModeSQL(queryOptions)) {
           return new GroupByOrderByCombineOperator(operators, _queryContext, _executorService, _endTimeMs,
-              _groupByTrimThreshold);
+              _minGroupTrimSize, _groupTrimThreshold);
         }
         return new GroupByCombineOperator(operators, _queryContext, _executorService, _endTimeMs, _numGroupsLimit);
       }

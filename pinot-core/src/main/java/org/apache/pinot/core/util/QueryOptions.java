@@ -37,7 +37,7 @@ public class QueryOptions {
   public QueryOptions(@Nullable Map<String, String> queryOptions) {
     if (queryOptions != null) {
       _timeoutMs = getTimeoutMs(queryOptions);
-      _groupByModeSQL = Request.SQL.equalsIgnoreCase(queryOptions.get(Request.QueryOptionKey.GROUP_BY_MODE));
+      _groupByModeSQL = isGroupByModeSQL(queryOptions);
       _responseFormatSQL = Request.SQL.equalsIgnoreCase(queryOptions.get(Request.QueryOptionKey.RESPONSE_FORMAT));
       _preserveType = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.PRESERVE_TYPE));
       _skipUpsert = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.SKIP_UPSERT));
@@ -81,5 +81,21 @@ public class QueryOptions {
     } else {
       return null;
     }
+  }
+
+  public static boolean isGroupByModeSQL(Map<String, String> queryOptions) {
+    return Request.SQL.equalsIgnoreCase(queryOptions.get(Request.QueryOptionKey.GROUP_BY_MODE));
+  }
+
+  @Nullable
+  public static Integer getMinSegmentGroupTrimSize(Map<String, String> queryOptions) {
+    String minSegmentGroupTrimSizeString = queryOptions.get(Request.QueryOptionKey.MIN_SEGMENT_GROUP_TRIM_SIZE);
+    return minSegmentGroupTrimSizeString != null ? Integer.parseInt(minSegmentGroupTrimSizeString) : null;
+  }
+
+  @Nullable
+  public static Integer getMinServerGroupTrimSize(Map<String, String> queryOptions) {
+    String minServerGroupTrimSizeString = queryOptions.get(Request.QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE);
+    return minServerGroupTrimSizeString != null ? Integer.parseInt(minServerGroupTrimSizeString) : null;
   }
 }

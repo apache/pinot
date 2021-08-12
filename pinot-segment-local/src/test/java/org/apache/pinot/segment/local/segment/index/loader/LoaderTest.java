@@ -21,32 +21,36 @@ package org.apache.pinot.segment.local.segment.index.loader;
 import java.io.File;
 import java.net.URL;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.loader.LocalSegmentDirectoryLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
-import org.apache.pinot.segment.local.segment.creator.impl.V1Constants;
-import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
-import org.apache.pinot.segment.local.segment.index.metadata.ColumnMetadata;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
-import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
-import org.apache.pinot.segment.local.segment.store.ColumnIndexType;
-import org.apache.pinot.segment.local.segment.store.SegmentDirectory;
-import org.apache.pinot.segment.local.segment.store.SegmentDirectoryPaths;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.store.ColumnIndexType;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.ReadMode;
@@ -57,7 +61,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import org.testng.collections.Lists;
 
-import static org.apache.pinot.segment.local.segment.creator.impl.V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
+import static org.apache.pinot.segment.spi.V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
 
 
 public class LoaderTest {
@@ -74,6 +78,8 @@ public class LoaderTest {
   private File _indexDir;
   private IndexLoadingConfig _v1IndexLoadingConfig;
   private IndexLoadingConfig _v3IndexLoadingConfig;
+  private SegmentDirectoryLoader _localSegmentDirectoryLoader;
+  private PinotConfiguration _pinotConfiguration;
 
   @BeforeClass
   public void setUp()
@@ -83,6 +89,9 @@ public class LoaderTest {
     URL resourceUrl = getClass().getClassLoader().getResource(AVRO_DATA);
     Assert.assertNotNull(resourceUrl);
     _avroFile = new File(resourceUrl.getFile());
+    Map<String, Object> props = new HashMap<>();
+    props.put(LocalSegmentDirectoryLoader.READ_MODE_KEY, ReadMode.heap.toString());
+    _pinotConfiguration = new PinotConfiguration(props);
 
     _v1IndexLoadingConfig = new IndexLoadingConfig();
     _v1IndexLoadingConfig.setReadMode(ReadMode.mmap);
@@ -91,6 +100,8 @@ public class LoaderTest {
     _v3IndexLoadingConfig = new IndexLoadingConfig();
     _v3IndexLoadingConfig.setReadMode(ReadMode.mmap);
     _v3IndexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
+
+    _localSegmentDirectoryLoader = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader();
   }
 
   private Schema constructV1Segment()
@@ -112,7 +123,7 @@ public class LoaderTest {
   public void testLoad()
       throws Exception {
     constructV1Segment();
-    Assert.assertEquals(new SegmentMetadataImpl(_indexDir).getSegmentVersion(), SegmentVersion.v1);
+    Assert.assertEquals(new SegmentMetadataImpl(_indexDir).getVersion(), SegmentVersion.v1);
     Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
 
     testConversion();
@@ -137,19 +148,19 @@ public class LoaderTest {
       throws Exception {
     // Do not set segment version, should not convert the segment
     IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, ReadMode.mmap);
-    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1.toString());
+    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1);
     Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
     indexSegment.destroy();
 
     // Set segment version to v1, should not convert the segment
     indexSegment = ImmutableSegmentLoader.load(_indexDir, _v1IndexLoadingConfig);
-    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1.toString());
+    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1);
     Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
     indexSegment.destroy();
 
     // Set segment version to v3, should convert the segment to v3
     indexSegment = ImmutableSegmentLoader.load(_indexDir, _v3IndexLoadingConfig);
-    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3.toString());
+    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);
     Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
     indexSegment.destroy();
   }
@@ -187,7 +198,7 @@ public class LoaderTest {
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentDirectory);
     ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor("name");
     Assert.assertEquals(columnMetadata.getPaddingCharacter(), V1Constants.Str.LEGACY_STRING_PAD_CHAR);
-    SegmentDirectory segmentDir = SegmentDirectory.createFromLocalFS(segmentDirectory, segmentMetadata, ReadMode.heap);
+    SegmentDirectory segmentDir = _localSegmentDirectoryLoader.load(segmentDirectory.toURI(), _pinotConfiguration);
     SegmentDirectory.Reader reader = segmentDir.createReader();
     PinotDataBuffer dictionaryBuffer = reader.getIndexFor("name", ColumnIndexType.DICTIONARY);
     StringDictionary dict =
@@ -208,7 +219,7 @@ public class LoaderTest {
     segmentMetadata = new SegmentMetadataImpl(segmentDirectory);
     columnMetadata = segmentMetadata.getColumnMetadataFor("name");
     Assert.assertEquals(columnMetadata.getPaddingCharacter(), V1Constants.Str.LEGACY_STRING_PAD_CHAR);
-    segmentDir = SegmentDirectory.createFromLocalFS(segmentDirectory, segmentMetadata, ReadMode.heap);
+    segmentDir = _localSegmentDirectoryLoader.load(segmentDirectory.toURI(), _pinotConfiguration);
     reader = segmentDir.createReader();
     dictionaryBuffer = reader.getIndexFor("name", ColumnIndexType.DICTIONARY);
     dict = new StringDictionary(dictionaryBuffer, columnMetadata.getCardinality(), columnMetadata.getColumnMaxLength(),
@@ -228,7 +239,7 @@ public class LoaderTest {
     segmentMetadata = new SegmentMetadataImpl(segmentDirectory);
     columnMetadata = segmentMetadata.getColumnMetadataFor("name");
     Assert.assertEquals(columnMetadata.getPaddingCharacter(), V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
-    segmentDir = SegmentDirectory.createFromLocalFS(segmentDirectory, segmentMetadata, ReadMode.heap);
+    segmentDir = _localSegmentDirectoryLoader.load(segmentDirectory.toURI(), _pinotConfiguration);
     reader = segmentDir.createReader();
     dictionaryBuffer = reader.getIndexFor("name", ColumnIndexType.DICTIONARY);
     dict = new StringDictionary(dictionaryBuffer, columnMetadata.getCardinality(), columnMetadata.getColumnMaxLength(),
@@ -297,7 +308,7 @@ public class LoaderTest {
   public void testFSTIndexLoad()
       throws Exception {
     constructSegmentWithFSTIndex(SegmentVersion.v3);
-    Assert.assertEquals(new SegmentMetadataImpl(_indexDir).getSegmentVersion(), SegmentVersion.v3);
+    Assert.assertEquals(new SegmentMetadataImpl(_indexDir).getVersion(), SegmentVersion.v3);
     Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
     verifyIndexDirIsV3(_indexDir);
     File fstIndexFile = SegmentDirectoryPaths.findFSTIndexIndexFile(_indexDir, FST_INDEX_COL_NAME);
@@ -308,12 +319,12 @@ public class LoaderTest {
     indexLoadingConfig.setReadMode(ReadMode.mmap);
     IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, indexLoadingConfig);
     // check that loaded segment version is v3
-    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3.toString());
+    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);
     Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
     // check that index dir is not in V1 format (the only subdir it should have is V3)
     verifyIndexDirIsV3(_indexDir);
 
-    SegmentDirectory segmentDir = SegmentDirectory.createFromLocalFS(_indexDir, ReadMode.heap);
+    SegmentDirectory segmentDir = _localSegmentDirectoryLoader.load(_indexDir.toURI(), _pinotConfiguration);
     SegmentDirectory.Reader reader = segmentDir.createReader();
     Assert.assertNotNull(reader);
     Assert.assertTrue(reader.hasIndexFor(FST_INDEX_COL_NAME, ColumnIndexType.FST_INDEX));
@@ -325,11 +336,11 @@ public class LoaderTest {
     indexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
     indexSegment = ImmutableSegmentLoader.load(_indexDir, indexLoadingConfig);
     // check that loaded segment version is v3
-    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3.toString());
+    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);
     Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
     // check that index dir is not in V1 format (the only subdir it should have is V3)
     verifyIndexDirIsV3(_indexDir);
-    segmentDir = SegmentDirectory.createFromLocalFS(_indexDir, ReadMode.heap);
+    segmentDir = _localSegmentDirectoryLoader.load(_indexDir.toURI(), _pinotConfiguration);
     reader = segmentDir.createReader();
     Assert.assertNotNull(reader);
     Assert.assertTrue(reader.hasIndexFor(FST_INDEX_COL_NAME, ColumnIndexType.FST_INDEX));
@@ -343,7 +354,7 @@ public class LoaderTest {
     constructSegmentWithFSTIndex(SegmentVersion.v1);
 
     // check that segment on-disk version is V1 after creation
-    Assert.assertEquals(new SegmentMetadataImpl(_indexDir).getSegmentVersion(), SegmentVersion.v1);
+    Assert.assertEquals(new SegmentMetadataImpl(_indexDir).getVersion(), SegmentVersion.v1);
     // check that segment v1 dir exists
     Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v1).exists());
     // check that v3 index sub-dir does not exist
@@ -363,7 +374,7 @@ public class LoaderTest {
     indexLoadingConfig.setReadMode(ReadMode.mmap);
     indexSegment = ImmutableSegmentLoader.load(_indexDir, indexLoadingConfig);
     // check that loaded segment version is v1
-    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1.toString());
+    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1);
     // no change/conversion should have happened in indexDir
     Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v1).exists());
     Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
@@ -380,7 +391,7 @@ public class LoaderTest {
     indexLoadingConfig.setSegmentVersion(SegmentVersion.v1);
     indexSegment = ImmutableSegmentLoader.load(_indexDir, indexLoadingConfig);
     // check that loaded segment version is v1
-    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1.toString());
+    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1);
     // no change/conversion should have happened in indexDir
     Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v1).exists());
     Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
@@ -397,13 +408,13 @@ public class LoaderTest {
     indexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
     indexSegment = ImmutableSegmentLoader.load(_indexDir, indexLoadingConfig);
     // check that loaded segment version is v3
-    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3.toString());
+    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);
     // the index dir should exist in v3 format due to conversion
     Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
     verifyIndexDirIsV3(_indexDir);
     fstIndexFile = SegmentDirectoryPaths.findFSTIndexIndexFile(_indexDir, FST_INDEX_COL_NAME);
     Assert.assertNull(fstIndexFile);
-    segmentDir = SegmentDirectory.createFromLocalFS(_indexDir, ReadMode.heap);
+    segmentDir = _localSegmentDirectoryLoader.load(_indexDir.toURI(), _pinotConfiguration);
     reader = segmentDir.createReader();
     Assert.assertNotNull(reader);
     Assert.assertTrue(reader.hasIndexFor(FST_INDEX_COL_NAME, ColumnIndexType.FST_INDEX));
@@ -438,7 +449,7 @@ public class LoaderTest {
     constructSegmentWithTextIndex(SegmentVersion.v3);
 
     // check that segment on-disk version is V3 after creation
-    Assert.assertEquals(new SegmentMetadataImpl(_indexDir).getSegmentVersion(), SegmentVersion.v3);
+    Assert.assertEquals(new SegmentMetadataImpl(_indexDir).getVersion(), SegmentVersion.v3);
     // check that V3 index sub-dir exists
     Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
     // check that index dir is not in V1 format (the only subdir it should have is V3)
@@ -448,7 +459,7 @@ public class LoaderTest {
     Assert.assertNotNull(textIndexFile);
     Assert.assertTrue(textIndexFile.isDirectory());
     Assert.assertEquals(textIndexFile.getName(),
-        TEXT_INDEX_COL_NAME + LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION);
+        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION);
     Assert.assertEquals(textIndexFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
 
     // CASE 1: don't set the segment version to load in IndexLoadingConfig
@@ -459,7 +470,7 @@ public class LoaderTest {
     indexLoadingConfig.setReadMode(ReadMode.mmap);
     IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, indexLoadingConfig);
     // check that loaded segment version is v3
-    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3.toString());
+    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);
     // no change/conversion should have happened in indexDir
     Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
     // check that index dir is not in V1 format (the only subdir it should have is V3)
@@ -474,10 +485,10 @@ public class LoaderTest {
     Assert.assertTrue(textIndexFile.isDirectory());
     Assert.assertFalse(textIndexDocIdMappingFile.isDirectory());
     Assert.assertEquals(textIndexFile.getName(),
-        TEXT_INDEX_COL_NAME + LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION);
+        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION);
     Assert.assertEquals(textIndexFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
     Assert.assertEquals(textIndexDocIdMappingFile.getName(),
-        TEXT_INDEX_COL_NAME + LuceneTextIndexReader.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
+        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
     Assert
         .assertEquals(textIndexDocIdMappingFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
     indexSegment.destroy();
@@ -488,7 +499,7 @@ public class LoaderTest {
     indexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
     indexSegment = ImmutableSegmentLoader.load(_indexDir, indexLoadingConfig);
     // check that loaded segment version is v3
-    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3.toString());
+    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);
     // no change/conversion should have happened in indexDir
     Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
     // check that index dir is not in V1 format (the only subdir it should have is V3)
@@ -502,10 +513,10 @@ public class LoaderTest {
     Assert.assertTrue(textIndexFile.isDirectory());
     Assert.assertFalse(textIndexDocIdMappingFile.isDirectory());
     Assert.assertEquals(textIndexFile.getName(),
-        TEXT_INDEX_COL_NAME + LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION);
+        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION);
     Assert.assertEquals(textIndexFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
     Assert.assertEquals(textIndexDocIdMappingFile.getName(),
-        TEXT_INDEX_COL_NAME + LuceneTextIndexReader.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
+        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
     Assert
         .assertEquals(textIndexDocIdMappingFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
     indexSegment.destroy();
@@ -518,7 +529,7 @@ public class LoaderTest {
     constructSegmentWithTextIndex(SegmentVersion.v1);
 
     // check that segment on-disk version is V1 after creation
-    Assert.assertEquals(new SegmentMetadataImpl(_indexDir).getSegmentVersion(), SegmentVersion.v1);
+    Assert.assertEquals(new SegmentMetadataImpl(_indexDir).getVersion(), SegmentVersion.v1);
     // check that segment v1 dir exists
     Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v1).exists());
     // check that v3 index sub-dir does not exist
@@ -529,7 +540,7 @@ public class LoaderTest {
     Assert.assertTrue(textIndexFile.isDirectory());
     Assert.assertFalse(textIndexDocIdMappingFile.isDirectory());
     Assert.assertEquals(textIndexFile.getName(),
-        TEXT_INDEX_COL_NAME + LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION);
+        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION);
     Assert.assertEquals(textIndexFile.getParentFile().getName(), new SegmentMetadataImpl(_indexDir).getName());
 
     // CASE 1: don't set the segment version to load in IndexLoadingConfig
@@ -540,7 +551,7 @@ public class LoaderTest {
     indexLoadingConfig.setReadMode(ReadMode.mmap);
     indexSegment = ImmutableSegmentLoader.load(_indexDir, indexLoadingConfig);
     // check that loaded segment version is v1
-    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1.toString());
+    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1);
     // no change/conversion should have happened in indexDir
     Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v1).exists());
     Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
@@ -552,10 +563,10 @@ public class LoaderTest {
     Assert.assertNotNull(textIndexDocIdMappingFile);
     Assert.assertTrue(textIndexFile.isDirectory());
     Assert.assertEquals(textIndexFile.getName(),
-        TEXT_INDEX_COL_NAME + LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION);
+        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION);
     Assert.assertEquals(textIndexFile.getParentFile().getName(), new SegmentMetadataImpl(_indexDir).getName());
     Assert.assertEquals(textIndexDocIdMappingFile.getName(),
-        TEXT_INDEX_COL_NAME + LuceneTextIndexReader.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
+        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
     Assert.assertEquals(textIndexDocIdMappingFile.getParentFile().getName(),
         new SegmentMetadataImpl(_indexDir).getName());
     indexSegment.destroy();
@@ -566,7 +577,7 @@ public class LoaderTest {
     indexLoadingConfig.setSegmentVersion(SegmentVersion.v1);
     indexSegment = ImmutableSegmentLoader.load(_indexDir, indexLoadingConfig);
     // check that loaded segment version is v1
-    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1.toString());
+    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1);
     // no change/conversion should have happened in indexDir
     Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v1).exists());
     Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
@@ -578,10 +589,10 @@ public class LoaderTest {
     Assert.assertNotNull(textIndexDocIdMappingFile);
     Assert.assertTrue(textIndexFile.isDirectory());
     Assert.assertEquals(textIndexFile.getName(),
-        TEXT_INDEX_COL_NAME + LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION);
+        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION);
     Assert.assertEquals(textIndexFile.getParentFile().getName(), new SegmentMetadataImpl(_indexDir).getName());
     Assert.assertEquals(textIndexDocIdMappingFile.getName(),
-        TEXT_INDEX_COL_NAME + LuceneTextIndexReader.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
+        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
     Assert.assertEquals(textIndexDocIdMappingFile.getParentFile().getName(),
         new SegmentMetadataImpl(_indexDir).getName());
     indexSegment.destroy();
@@ -592,7 +603,7 @@ public class LoaderTest {
     indexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
     indexSegment = ImmutableSegmentLoader.load(_indexDir, indexLoadingConfig);
     // check that loaded segment version is v3
-    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3.toString());
+    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);
     // the index dir should exist in v3 format due to conversion
     Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
     verifyIndexDirIsV3(_indexDir);
@@ -604,10 +615,10 @@ public class LoaderTest {
     Assert.assertNotNull(textIndexDocIdMappingFile);
     Assert.assertTrue(textIndexFile.isDirectory());
     Assert.assertEquals(textIndexFile.getName(),
-        TEXT_INDEX_COL_NAME + LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION);
+        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION);
     Assert.assertEquals(textIndexFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
     Assert.assertEquals(textIndexDocIdMappingFile.getName(),
-        TEXT_INDEX_COL_NAME + LuceneTextIndexReader.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
+        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
     Assert
         .assertEquals(textIndexDocIdMappingFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
     indexSegment.destroy();

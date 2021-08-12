@@ -33,6 +33,15 @@ public class CommonConstants {
 
   public static final String KEY_OF_AUTH_TOKEN = "auth.token";
 
+  public static final String TABLE_NAME = "tableName";
+
+  /**
+   * The state of the consumer for a given segment
+   */
+  public enum ConsumerState {
+    CONSUMING, NOT_CONSUMING // In error state
+  }
+
   public static class Table {
     public static final String PUSH_FREQUENCY_HOURLY = "hourly";
     public static final String PUSH_FREQUENCY_DAILY = "daily";
@@ -51,6 +60,11 @@ public class CommonConstants {
     public static final String PREFIX_OF_BROKER_INSTANCE = "Broker_";
     public static final String PREFIX_OF_SERVER_INSTANCE = "Server_";
     public static final String PREFIX_OF_MINION_INSTANCE = "Minion_";
+
+    public static int CONTROLLER_INSTANCE_PREFIX_LENGTH = PREFIX_OF_CONTROLLER_INSTANCE.length();
+    public static int BROKER_INSTANCE_PREFIX_LENGTH = PREFIX_OF_BROKER_INSTANCE.length();
+    public static int SERVER_INSTANCE_PREFIX_LENGTH = PREFIX_OF_SERVER_INSTANCE.length();
+    public static int MINION_INSTANCE_PREFIX_LENGTH = PREFIX_OF_MINION_INSTANCE.length();
 
     public static final String BROKER_RESOURCE_INSTANCE = "brokerResource";
     public static final String LEAD_CONTROLLER_RESOURCE_NAME = "leadControllerResource";
@@ -117,6 +131,7 @@ public class CommonConstants {
       public static final String ADMIN_HTTPS_PORT_KEY = "adminHttpsPort";
       public static final String GRPC_PORT_KEY = "grpcPort";
       public static final String NETTYTLS_PORT_KEY = "nettyTlsPort";
+      public static final String SYSTEM_RESOURCE_INFO_KEY = "SYSTEM_RESOURCE_INFO";
     }
 
     public static final String SET_INSTANCE_ID_TO_HOSTNAME_KEY = "pinot.set.instance.id.to.hostname";
@@ -142,8 +157,14 @@ public class CommonConstants {
         "pinot.helix.instance.state.maxStateTransitions";
     public static final String DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS = "100000";
     public static final String DEFAULT_FLAPPING_TIME_WINDOW_MS = "1";
-
     public static final String PINOT_SERVICE_ROLE = "pinot.service.role";
+    public static final String CONFIG_OF_CLUSTER_NAME = "pinot.cluster.name";
+    public static final String CONFIG_OF_ZOOKEEPR_SERVER = "pinot.zk.server";
+
+    public static final String CONFIG_OF_PINOT_CONTROLLER_STARTABLE_CLASS = "pinot.controller.startable.class";
+    public static final String CONFIG_OF_PINOT_BROKER_STARTABLE_CLASS = "pinot.broker.startable.class";
+    public static final String CONFIG_OF_PINOT_SERVER_STARTABLE_CLASS = "pinot.server.startable.class";
+    public static final String CONFIG_OF_PINOT_MINION_STARTABLE_CLASS = "pinot.minion.startable.class";
   }
 
   public static class Broker {
@@ -170,6 +191,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_TIMEOUT_MS = "pinot.broker.timeoutMs";
     public static final long DEFAULT_BROKER_TIMEOUT_MS = 10_000L;
     public static final String CONFIG_OF_BROKER_ID = "pinot.broker.id";
+    public static final String CONFIG_OF_BROKER_HOSTNAME = "pinot.broker.hostname";
     // Configuration to consider the broker ServiceStatus as being STARTED if the percent of resources (tables) that
     // are ONLINE for this this broker has crossed the threshold percentage of the total number of tables
     // that it is expected to serve.
@@ -203,6 +225,8 @@ public class CommonConstants {
         public static final String RESPONSE_FORMAT = "responseFormat";
         public static final String GROUP_BY_MODE = "groupByMode";
         public static final String SKIP_UPSERT = "skipUpsert";
+        public static final String MIN_SEGMENT_GROUP_TRIM_SIZE = "minSegmentGroupTrimSize";
+        public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
       }
     }
   }
@@ -241,7 +265,8 @@ public class CommonConstants {
         "pinot.server.instance.realtime.alloc.offheap.direct";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.server.storage.factory";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.server.crypter";
-    public static final String CONFIG_OF_VALUE_PRUNER_IN_PREDICATE_THRESHOLD = "pinot.server.query.executor.pruner.columnvaluesegmentpruner.inpredicate.threshold";
+    public static final String CONFIG_OF_VALUE_PRUNER_IN_PREDICATE_THRESHOLD =
+        "pinot.server.query.executor.pruner.columnvaluesegmentpruner.inpredicate.threshold";
     public static final int DEFAULT_VALUE_PRUNER_IN_PREDICATE_THRESHOLD = 10;
 
     /**
@@ -261,8 +286,8 @@ public class CommonConstants {
     public static final int DEFAULT_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS = 0;
 
     public static final String DEFAULT_READ_MODE = "mmap";
-    // Whether to reload consuming segment on scheme update. Will change default behavior to true when this feature is stabilized
-    public static final boolean DEFAULT_RELOAD_CONSUMING_SEGMENT = false;
+    // Whether to reload consuming segment on scheme update
+    public static final boolean DEFAULT_RELOAD_CONSUMING_SEGMENT = true;
     public static final String DEFAULT_INSTANCE_BASE_DIR =
         System.getProperty("java.io.tmpdir") + File.separator + "PinotServer";
     public static final String DEFAULT_INSTANCE_DATA_DIR = DEFAULT_INSTANCE_BASE_DIR + File.separator + "index";
@@ -319,9 +344,26 @@ public class CommonConstants {
     public static class SegmentCompletionProtocol {
       public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";
 
+      /**
+       * Deprecated. Enable legacy https configs for segment upload.
+       * Use server-wide TLS configs instead.
+       */
+      @Deprecated
       public static final String CONFIG_OF_CONTROLLER_HTTPS_ENABLED = "enabled";
+
+      /**
+       * Deprecated. Set the legacy https port for segment upload.
+       * Use server-wide TLS configs instead.
+       */
+      @Deprecated
       public static final String CONFIG_OF_CONTROLLER_HTTPS_PORT = "controller.port";
+
       public static final String CONFIG_OF_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = "upload.request.timeout.ms";
+
+      /**
+       * Specify connection scheme to use for controller upload connections. Defaults to "http"
+       */
+      public static final String CONFIG_OF_PROTOCOL = "protocol";
 
       /**
        * Service token for accessing protected controller APIs.
@@ -350,7 +392,8 @@ public class CommonConstants {
     public static final int DEFAULT_CURRENT_DATA_TABLE_VERSION = 3;
 
     // Environment Provider Configs
-    public static final String PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY = "pinot.server.environmentProvider.factory";
+    public static final String PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY =
+        "pinot.server.environmentProvider.factory";
     public static final String ENVIRONMENT_PROVIDER_CLASS_NAME = "pinot.server.environmentProvider.className";
   }
 
@@ -369,6 +412,8 @@ public class CommonConstants {
     // but we keep this default for backward compatibility in case someone relies on this format
     // see Server or Broker class for correct prefix format you should use
     public static final String DEFAULT_METRICS_PREFIX = "pinot.controller.";
+
+    public static final String CONFIG_OF_INSTANCE_ID = "pinot.controller.instance.id";
   }
 
   public static class Minion {

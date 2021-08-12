@@ -31,13 +31,13 @@ import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.segment.local.partition.ModuloPartitionFunction;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.segment.local.segment.index.metadata.ColumnMetadata;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.partition.ModuloPartitionFunction;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -104,15 +104,15 @@ public class SegmentPartitionTest {
    */
   @Test
   public void testMetadata() {
-    SegmentMetadataImpl metadata = (SegmentMetadataImpl) _segment.getSegmentMetadata();
-    ColumnMetadata columnMetadata = metadata.getColumnMetadataFor(PARTITIONED_COLUMN_NAME);
+    SegmentMetadata segmentMetadata = _segment.getSegmentMetadata();
+    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(PARTITIONED_COLUMN_NAME);
 
     Assert.assertTrue(columnMetadata.getPartitionFunction() instanceof ModuloPartitionFunction);
 
     Set<Integer> actualPartitions = columnMetadata.getPartitions();
     Assert.assertEquals(actualPartitions, _expectedPartitions);
 
-    columnMetadata = metadata.getColumnMetadataFor(NON_PARTITIONED_COLUMN_NAME);
+    columnMetadata = segmentMetadata.getColumnMetadataFor(NON_PARTITIONED_COLUMN_NAME);
     Assert.assertNull(columnMetadata.getPartitionFunction());
     Assert.assertNull(columnMetadata.getPartitions());
   }

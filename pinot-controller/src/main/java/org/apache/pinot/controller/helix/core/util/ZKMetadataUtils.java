@@ -20,14 +20,15 @@ package org.apache.pinot.controller.helix.core.util;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
-import org.apache.pinot.segment.local.segment.index.metadata.ColumnMetadata;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.SegmentType;
 
 
@@ -39,7 +40,10 @@ public class ZKMetadataUtils {
       SegmentType segmentType) {
     segmentZKMetadata.setSegmentName(segmentMetadata.getName());
     segmentZKMetadata.setTableName(segmentMetadata.getTableName());
-    segmentZKMetadata.setIndexVersion(segmentMetadata.getVersion());
+    SegmentVersion segmentVersion = segmentMetadata.getVersion();
+    if (segmentVersion != null) {
+      segmentZKMetadata.setIndexVersion(segmentVersion.name());
+    }
     segmentZKMetadata.setSegmentType(segmentType);
     if (segmentMetadata.getTimeInterval() != null) {
       segmentZKMetadata.setStartTime(segmentMetadata.getStartTime());
@@ -57,15 +61,14 @@ public class ZKMetadataUtils {
     // Extract column partition metadata (if any), and set it into segment ZK metadata.
     Map<String, ColumnPartitionMetadata> columnPartitionMap = new HashMap<>();
     if (segmentMetadata instanceof SegmentMetadataImpl) {
-      SegmentMetadataImpl metadata = (SegmentMetadataImpl) segmentMetadata;
-      for (Map.Entry<String, ColumnMetadata> entry : metadata.getColumnMetadataMap().entrySet()) {
+      for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
         String column = entry.getKey();
         ColumnMetadata columnMetadata = entry.getValue();
         PartitionFunction partitionFunction = columnMetadata.getPartitionFunction();
 
         if (partitionFunction != null) {
           ColumnPartitionMetadata columnPartitionMetadata =
-              new ColumnPartitionMetadata(partitionFunction.toString(), columnMetadata.getNumPartitions(),
+              new ColumnPartitionMetadata(partitionFunction.toString(), partitionFunction.getNumPartitions(),
                   columnMetadata.getPartitions());
           columnPartitionMap.put(column, columnPartitionMetadata);
         }

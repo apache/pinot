@@ -32,14 +32,13 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.RowBasedBlockValueFetcher;
 import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.core.operator.BitmapDocIdSetOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.ProjectionOperator;
-import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -47,9 +46,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
-import org.roaringbitmap.IntIterator;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -252,7 +249,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     // and store the document ids into a bitmap
     int numRows = _rows.size();
     List<Object[]> rowList = new ArrayList<>(numRows);
-    MutableRoaringBitmap docIds = new MutableRoaringBitmap();
+    RoaringBitmap docIds = new RoaringBitmap();
     for (Object[] row : _rows) {
       rowList.add(row);
       int docId = (int) row[numOrderByExpressions];
@@ -327,35 +324,5 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, _numEntriesScannedPostFilter,
         numTotalDocs);
-  }
-
-  private static class BitmapDocIdSetOperator extends BaseOperator<DocIdSetBlock> {
-    static final String OPERATOR_NAME = "BitmapDocIdSetOperator";
-
-    final IntIterator _docIdIterator;
-    final int[] _docIdBuffer;
-
-    BitmapDocIdSetOperator(ImmutableRoaringBitmap docIds, int numDocs) {
-      _docIdIterator = docIds.getIntIterator();
-      _docIdBuffer = new int[Math.min(numDocs, DocIdSetPlanNode.MAX_DOC_PER_CALL)];
-    }
-
-    @Override
-    protected DocIdSetBlock getNextBlock() {
-      int numDocIdsFilled = 0;
-      while (numDocIdsFilled < DocIdSetPlanNode.MAX_DOC_PER_CALL && _docIdIterator.hasNext()) {
-        _docIdBuffer[numDocIdsFilled++] = _docIdIterator.next();
-      }
-      if (numDocIdsFilled > 0) {
-        return new DocIdSetBlock(_docIdBuffer, numDocIdsFilled);
-      } else {
-        return null;
-      }
-    }
-
-    @Override
-    public String getOperatorName() {
-      return OPERATOR_NAME;
-    }
   }
 }

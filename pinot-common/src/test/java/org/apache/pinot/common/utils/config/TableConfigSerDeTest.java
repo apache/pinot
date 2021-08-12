@@ -246,7 +246,8 @@ public class TableConfigSerDeTest {
     }
     {
       // with upsert config
-      UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+      UpsertConfig upsertConfig =
+          new UpsertConfig(UpsertConfig.Mode.FULL, null, "comparison", UpsertConfig.HashFunction.NONE);
 
       TableConfig tableConfig = tableConfigBuilder.setUpsertConfig(upsertConfig).build();
 
@@ -274,11 +275,11 @@ public class TableConfigSerDeTest {
       streamConfigMaps.add(streamConfigMap);
       List<Map<String, String>> batchConfigMaps = new ArrayList<>();
       batchConfigMaps.add(batchConfigMap);
-      List<String> unnestFields = Arrays.asList("c1, c2");
+      List<String> fieldsToUnnest = Arrays.asList("c1, c2");
       IngestionConfig ingestionConfig =
           new IngestionConfig(new BatchIngestionConfig(batchConfigMaps, "APPEND", "HOURLY"),
               new StreamIngestionConfig(streamConfigMaps), new FilterConfig("filterFunc(foo)"), transformConfigs,
-              new ComplexTypeConfig(unnestFields, ".", ComplexTypeConfig.CollectionToJsonMode.NON_PRIMITIVE));
+              new ComplexTypeConfig(fieldsToUnnest, ".", ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE));
       TableConfig tableConfig = tableConfigBuilder.setIngestionConfig(ingestionConfig).build();
 
       checkIngestionConfig(tableConfig);

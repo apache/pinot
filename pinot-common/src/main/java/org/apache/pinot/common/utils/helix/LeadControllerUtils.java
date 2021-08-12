@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
 
 
 public class LeadControllerUtils {
-  public static final Logger LOGGER = LoggerFactory.getLogger(LeadControllerUtils.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(LeadControllerUtils.class);
 
   /**
    * Given a raw table name and number of partitions, returns the partition id in lead controller resource.
@@ -52,13 +52,6 @@ public class LeadControllerUtils {
    */
   public static String generateParticipantInstanceId(String controllerHost, int controllerPort) {
     return Helix.PREFIX_OF_CONTROLLER_INSTANCE + controllerHost + "_" + controllerPort;
-  }
-
-  /**
-   * Extracts controller instance id, e.g. returns localhost_9000 given Controller_localhost_9000 as the participant instance id.
-   */
-  public static String extractControllerInstanceId(String participantInstanceId) {
-    return participantInstanceId.substring(participantInstanceId.indexOf('_') + 1);
   }
 
   /**

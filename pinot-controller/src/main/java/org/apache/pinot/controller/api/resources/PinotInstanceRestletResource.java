@@ -26,6 +26,7 @@ import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import java.util.List;
+import java.util.Map;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -106,6 +107,7 @@ public class PinotInstanceRestletResource {
     if ("true".equalsIgnoreCase(queriesDisabled)) {
       response.put(CommonConstants.Helix.QUERIES_DISABLED, "true");
     }
+    response.put("systemResourceInfo", JsonUtils.objectToJsonNode(getSystemResourceInfo(instanceConfig)));
     return response.toString();
   }
 
@@ -131,6 +133,10 @@ public class PinotInstanceRestletResource {
       }
     }
     return Instance.NOT_SET_ADMIN_PORT_VALUE;
+  }
+
+  private Map<String, String> getSystemResourceInfo(InstanceConfig instanceConfig) {
+    return instanceConfig.getRecord().getMapField(CommonConstants.Helix.Instance.SYSTEM_RESOURCE_INFO_KEY);
   }
 
   @POST

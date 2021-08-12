@@ -303,6 +303,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     if ((offlineTableName == null) && (realtimeTableName == null)) {
       // No table matches the request
+      if (_tableCache.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName)) == null
+          && _tableCache.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName)) == null) {
+        LOGGER.info("Table not found for request {}: {}", requestId, query);
+        requestStatistics.setErrorCode(QueryException.TABLE_DOES_NOT_EXIST_ERROR_CODE);
+        return BrokerResponseNative.TABLE_DOES_NOT_EXIST;
+      }
       LOGGER.info("No table matches for request {}: {}", requestId, query);
       requestStatistics.setErrorCode(QueryException.BROKER_RESOURCE_MISSING_ERROR_CODE);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.RESOURCE_MISSING_EXCEPTIONS, 1);
@@ -339,23 +345,25 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (offlineTableName != null && realtimeTableName != null) {
       // Hybrid
       offlineBrokerRequest = getOfflineBrokerRequest(brokerRequest);
-      _queryOptimizer.optimize(offlineBrokerRequest.getPinotQuery(), schema);
+      _queryOptimizer
+          .optimize(offlineBrokerRequest.getPinotQuery(), _tableCache.getTableConfig(offlineTableName), schema);
       realtimeBrokerRequest = getRealtimeBrokerRequest(brokerRequest);
-      _queryOptimizer.optimize(realtimeBrokerRequest.getPinotQuery(), schema);
+      _queryOptimizer
+          .optimize(realtimeBrokerRequest.getPinotQuery(), _tableCache.getTableConfig(realtimeTableName), schema);
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.HYBRID);
       requestStatistics.setOfflineServerTenant(getServerTenant(offlineTableName));
       requestStatistics.setRealtimeServerTenant(getServerTenant(realtimeTableName));
     } else if (offlineTableName != null) {
       // OFFLINE only
       setTableName(brokerRequest, offlineTableName);
-      _queryOptimizer.optimize(pinotQuery, schema);
+      _queryOptimizer.optimize(pinotQuery, _tableCache.getTableConfig(offlineTableName), schema);
       offlineBrokerRequest = brokerRequest;
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.OFFLINE);
       requestStatistics.setOfflineServerTenant(getServerTenant(offlineTableName));
     } else {
       // REALTIME only
       setTableName(brokerRequest, realtimeTableName);
-      _queryOptimizer.optimize(pinotQuery, schema);
+      _queryOptimizer.optimize(pinotQuery, _tableCache.getTableConfig(realtimeTableName), schema);
       realtimeBrokerRequest = brokerRequest;
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.REALTIME);
       requestStatistics.setRealtimeServerTenant(getServerTenant(realtimeTableName));
@@ -506,13 +514,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     LOGGER.debug("Broker Response: {}", brokerResponse);
 
     // Please keep the format as name=value comma-separated with no spaces
-    // Please add new entries at the end
+    // Please keep all the name value pairs together, then followed by the query. To add a new entry, please add it to
+    // the end of existing pairs, but before the query.
     if (_queryLogRateLimiter.tryAcquire() || forceLog(brokerResponse, totalTimeMs)) {
       // Table name might have been changed (with suffix _OFFLINE/_REALTIME appended)
       LOGGER.info("requestId={},table={},timeMs={},docs={}/{},entries={}/{},"
               + "segments(queried/processed/matched/consuming/unavailable):{}/{}/{}/{}/{},consumingFreshnessTimeMs={},"
-              + "servers={}/{},groupLimitReached={},brokerReduceTimeMs={},exceptions={},serverStats={},query={},"
-              + "offlineThreadCpuTimeNs={},realtimeThreadCpuTimeNs={}", requestId,
+              + "servers={}/{},groupLimitReached={},brokerReduceTimeMs={},exceptions={},serverStats={},"
+              + "offlineThreadCpuTimeNs={},realtimeThreadCpuTimeNs={},query={}", requestId,
           brokerRequest.getQuerySource().getTableName(), totalTimeMs, brokerResponse.getNumDocsScanned(),
           brokerResponse.getTotalDocs(), brokerResponse.getNumEntriesScannedInFilter(),
           brokerResponse.getNumEntriesScannedPostFilter(), brokerResponse.getNumSegmentsQueried(),
@@ -521,8 +530,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           brokerResponse.getMinConsumingFreshnessTimeMs(), brokerResponse.getNumServersResponded(),
           brokerResponse.getNumServersQueried(), brokerResponse.isNumGroupsLimitReached(),
           requestStatistics.getReduceTimeMillis(), brokerResponse.getExceptionsSize(), serverStats.getServerStats(),
-          StringUtils.substring(query, 0, _queryLogLength), brokerResponse.getOfflineThreadCpuTimeNs(),
-          brokerResponse.getRealtimeThreadCpuTimeNs());
+          brokerResponse.getOfflineThreadCpuTimeNs(), brokerResponse.getRealtimeThreadCpuTimeNs(),
+          StringUtils.substring(query, 0, _queryLogLength));
 
       // Limit the dropping log message at most once per second.
       if (_numDroppedLogRateLimiter.tryAcquire()) {
@@ -642,6 +651,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     if ((offlineTableName == null) && (realtimeTableName == null)) {
       // No table matches the request
+      if (_tableCache.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName)) == null
+          && _tableCache.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName)) == null) {
+        LOGGER.info("Table not found for request {}: {}", requestId, query);
+        requestStatistics.setErrorCode(QueryException.TABLE_DOES_NOT_EXIST_ERROR_CODE);
+        return BrokerResponseNative.TABLE_DOES_NOT_EXIST;
+      }
       LOGGER.info("No table matches for request {}: {}", requestId, query);
       requestStatistics.setErrorCode(QueryException.BROKER_RESOURCE_MISSING_ERROR_CODE);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.RESOURCE_MISSING_EXCEPTIONS, 1);

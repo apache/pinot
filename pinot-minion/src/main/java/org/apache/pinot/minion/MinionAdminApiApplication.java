@@ -27,6 +27,7 @@ import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
@@ -70,8 +71,9 @@ public class MinionAdminApiApplication extends ResourceConfig {
     } catch (IOException e) {
       throw new RuntimeException("Failed to start http server", e);
     }
-
-    setupSwagger();
+    synchronized (PinotReflectionUtils.getReflectionLock()) {
+      setupSwagger();
+    }
   }
 
   private void setupSwagger() {

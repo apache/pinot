@@ -50,6 +50,7 @@ import org.testng.annotations.Test;
 public class CalciteSqlCompilerTest {
   private static final PinotQuery2BrokerRequestConverter BROKER_REQUEST_CONVERTER =
       new PinotQuery2BrokerRequestConverter();
+  private static final long ONE_HOUR_IN_MS = TimeUnit.HOURS.toMillis(1);
 
   @Test
   public void testCaseWhenStatements() {
@@ -178,11 +179,6 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(func.getOperator(), "REGEXP_LIKE");
     Assert.assertEquals(func.getOperands().get(0).getIdentifier().getName(), "E");
     Assert.assertEquals(func.getOperands().get(1).getLiteral().getStringValue(), "^U.*");
-    pinotQuery = CalciteSqlParser.compileToPinotQuery("select * from vegetables where f LIKE '%potato%'");
-    func = pinotQuery.getFilterExpression().getFunctionCall();
-    Assert.assertEquals(func.getOperator(), SqlKind.LIKE.name());
-    Assert.assertEquals(func.getOperands().get(0).getIdentifier().getName(), "f");
-    Assert.assertEquals(func.getOperands().get(1).getLiteral().getStringValue(), "%potato%");
     pinotQuery = CalciteSqlParser.compileToPinotQuery("select * from vegetables where g IN (12, 13, 15.2, 17)");
     func = pinotQuery.getFilterExpression().getFunctionCall();
     Assert.assertEquals(func.getOperator(), SqlKind.IN.name());
@@ -341,6 +337,30 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
+  public void testInvalidFilterClauses() {
+    // Only support regexp_like
+    testInvalidFilterClause("a like b");
+    // Only support literals in IN/NOT_IN/REGEXP_LIKE/TEXT_MATCH/JSON_MATCH predicate
+    testInvalidFilterClause("a in (\"b\")");
+    testInvalidFilterClause("a not in ('b', c)");
+    testInvalidFilterClause("regexp_like(a, b)");
+    testInvalidFilterClause("text_match(a, \"b\")");
+    testInvalidFilterClause("json_match(a, b");
+    // Nested invalid filter
+    testInvalidFilterClause("a = 1 and c in (\"d\")");
+  }
+
+  private void testInvalidFilterClause(String filter) {
+    try {
+      CalciteSqlParser.compileToPinotQuery("select * from vegetables where " + filter);
+    } catch (SqlCompilationException e) {
+      // Expected
+      return;
+    }
+    Assert.fail("Should fail on invalid filter: " + filter);
+  }
+
+  @Test
   public void testBrokerConverter() {
     PinotQuery pinotQuery =
         CalciteSqlParser.compileToPinotQuery("select * from vegetables where g IN (12, 13, 15.2, 17)");
@@ -374,6 +394,19 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(tempBrokerRequest.getQuerySource().getTableName(), "mytable");
     Assert.assertEquals(tempBrokerRequest.getSelections().getSelectionColumns().get(0),
         String.format("'%s'", literal.getFieldValue().toString()));
+
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("select ago('PT1H') from mytable");
+    literal = pinotQuery.getSelectList().get(0).getLiteral();
+    Assert.assertNotNull(literal);
+    converter = new PinotQuery2BrokerRequestConverter();
+    tempBrokerRequest = converter.convert(pinotQuery);
+    Assert.assertEquals(tempBrokerRequest.getQuerySource().getTableName(), "mytable");
+    Assert.assertEquals(tempBrokerRequest.getSelections().getSelectionColumns().get(0),
+        String.format("'%s'", literal.getFieldValue().toString()));
+
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT count(*) from mytable where bar > ago('PT1H')");
+    literal = pinotQuery.getSelectList().get(0).getLiteral();
+    Assert.assertNull(literal);
   }
 
   @Test
@@ -1669,7 +1702,7 @@ public class CalciteSqlCompilerTest {
 
   @Test
   public void testCompilationInvokedFunction() {
-    String query = "SELECT now() FROM foo ";
+    String query = "SELECT now() FROM foo";
     long lowerBound = System.currentTimeMillis();
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     long nowTs = pinotQuery.getSelectList().get(0).getLiteral().getLongValue();
@@ -1691,6 +1724,23 @@ public class CalciteSqlCompilerTest {
     greaterThan = pinotQuery.getFilterExpression().getFunctionCall();
     nowTs = greaterThan.getOperands().get(1).getLiteral().getLongValue();
     Assert.assertEquals(nowTs, 1577836800000L);
+
+    query = "SELECT ago('PT1H') FROM foo";
+    lowerBound = System.currentTimeMillis() - ONE_HOUR_IN_MS;
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    nowTs = pinotQuery.getSelectList().get(0).getLiteral().getLongValue();
+    upperBound = System.currentTimeMillis() - ONE_HOUR_IN_MS;
+    Assert.assertTrue(nowTs >= lowerBound);
+    Assert.assertTrue(nowTs <= upperBound);
+
+    query = "SELECT a FROM foo where time_col > ago('PT1H')";
+    lowerBound = System.currentTimeMillis() - ONE_HOUR_IN_MS;
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    greaterThan = pinotQuery.getFilterExpression().getFunctionCall();
+    nowTs = greaterThan.getOperands().get(1).getLiteral().getLongValue();
+    upperBound = System.currentTimeMillis() - ONE_HOUR_IN_MS;
+    Assert.assertTrue(nowTs >= lowerBound);
+    Assert.assertTrue(nowTs <= upperBound);
   }
 
   @Test
@@ -1721,6 +1771,24 @@ public class CalciteSqlCompilerTest {
     expression = CalciteSqlParser.invokeCompileTimeFunctionExpression(expression);
     Assert.assertNotNull(expression.getLiteral());
     upperBound = TimeUnit.MILLISECONDS.toHours(System.currentTimeMillis()) + 1;
+    result = expression.getLiteral().getLongValue();
+    Assert.assertTrue(result >= lowerBound && result <= upperBound);
+
+    lowerBound = System.currentTimeMillis() - ONE_HOUR_IN_MS;
+    expression = CalciteSqlParser.compileToExpression("ago('PT1H')");
+    Assert.assertNotNull(expression.getFunctionCall());
+    expression = CalciteSqlParser.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertNotNull(expression.getLiteral());
+    upperBound = System.currentTimeMillis() - ONE_HOUR_IN_MS;
+    result = expression.getLiteral().getLongValue();
+    Assert.assertTrue(result >= lowerBound && result <= upperBound);
+
+    lowerBound = System.currentTimeMillis() + ONE_HOUR_IN_MS;
+    expression = CalciteSqlParser.compileToExpression("ago('PT-1H')");
+    Assert.assertNotNull(expression.getFunctionCall());
+    expression = CalciteSqlParser.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertNotNull(expression.getLiteral());
+    upperBound = System.currentTimeMillis() + ONE_HOUR_IN_MS;
     result = expression.getLiteral().getLongValue();
     Assert.assertTrue(result >= lowerBound && result <= upperBound);
 

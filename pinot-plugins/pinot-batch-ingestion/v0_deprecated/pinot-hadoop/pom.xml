@@ -66,8 +66,16 @@
                       <shadedPattern>shaded.com.google.common.base</shadedPattern>
                     </relocation>
                     <relocation>
+                      <pattern>com.google.common.cache</pattern>
+                      <shadedPattern>shaded.com.google.common.cache</shadedPattern>
+                    </relocation>
+                    <relocation>
                       <pattern>com.fasterxml.jackson</pattern>
                       <shadedPattern>shaded.com.fasterxml.jackson</shadedPattern>
+                    </relocation>
+                    <relocation>
+                      <pattern>org.apache.http</pattern>
+                      <shadedPattern>shaded.org.apache.http</shadedPattern>
                     </relocation>
                   </relocations>
                   <transformers>
@@ -108,7 +116,6 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
       <version>${project.version}</version>
-      <classifier>shaded</classifier>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -190,7 +197,10 @@
     <dependency>
       <groupId>org.apache.avro</groupId>
       <artifactId>avro-mapred</artifactId>
-      <classifier>hadoop2</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.orc</groupId>
+      <artifactId>orc-mapreduce</artifactId>
     </dependency>
     <dependency>
       <groupId>javax.xml.bind</groupId>

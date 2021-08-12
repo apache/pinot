@@ -25,7 +25,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.reader.impl.FixedBitIntReader;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.io.writer.impl.FixedBitSVForwardIndexWriter;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;

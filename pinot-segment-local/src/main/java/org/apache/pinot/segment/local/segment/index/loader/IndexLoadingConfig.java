@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.segment.local.loader.LocalSegmentDirectoryLoader;
 import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -36,6 +38,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ReadMode;
 
@@ -45,6 +48,7 @@ import org.apache.pinot.spi.utils.ReadMode;
  */
 public class IndexLoadingConfig {
   private static final int DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT = 2;
+  public static final String DEFAULT_TIER_BACKEND = "local";
 
   private ReadMode _readMode = ReadMode.DEFAULT_MODE;
   private List<String> _sortedColumns = Collections.emptyList();
@@ -76,6 +80,8 @@ public class IndexLoadingConfig {
   private Map<String, Map<String, String>> _columnProperties = new HashMap<>();
 
   private TableConfig _tableConfig;
+  private String _tierBackend;
+  private PinotConfiguration _tierConfigs;
 
   public IndexLoadingConfig(InstanceDataManagerConfig instanceDataManagerConfig, TableConfig tableConfig) {
     extractFromInstanceConfig(instanceDataManagerConfig);
@@ -237,6 +243,8 @@ public class IndexLoadingConfig {
     }
     _enableSplitCommitEndWithMetadata = instanceDataManagerConfig.isEnableSplitCommitEndWithMetadata();
     _segmentStoreURI = instanceDataManagerConfig.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI);
+    _tierBackend = instanceDataManagerConfig.getTierBackend();
+    _tierConfigs = instanceDataManagerConfig.getTierConfigs();
   }
 
   /**
@@ -270,10 +278,8 @@ public class IndexLoadingConfig {
 
   /**
    * Used in two places:
-   * (1) In {@link PhysicalColumnIndexContainer}
-   * to create the index loading info for immutable segments
-   * (2) In {@link org.apache.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager}
-   * to create the {@link org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig}.
+   * (1) In {@link PhysicalColumnIndexContainer} to create the index loading info for immutable segments
+   * (2) In LLRealtimeSegmentDataManager to create the RealtimeSegmentConfig.
    * RealtimeSegmentConfig is used to specify the text index column info for newly
    * to-be-created Mutable Segments
    * @return a set containing names of text index columns
@@ -441,5 +447,18 @@ public class IndexLoadingConfig {
   @VisibleForTesting
   public void setTableConfig(TableConfig tableConfig) {
     _tableConfig = tableConfig;
+  }
+
+  public String getTierBackend() {
+    return StringUtils.isNotBlank(_tierBackend) ? _tierBackend : DEFAULT_TIER_BACKEND;
+  }
+
+  public PinotConfiguration getTierConfigs() {
+    if (_tierConfigs == null) {
+      Map<String, Object> props = new HashMap<>();
+      props.put(LocalSegmentDirectoryLoader.READ_MODE_KEY, _readMode);
+      return new PinotConfiguration(props);
+    }
+    return _tierConfigs;
   }
 }

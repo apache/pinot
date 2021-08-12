@@ -32,6 +32,7 @@ import org.apache.avro.SchemaBuilder;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DateTimeGranularitySpec;
@@ -79,19 +80,20 @@ public class AvroUtils {
    * @param avroSchema Avro schema
    * @param fieldTypeMap Map from column to field type
    * @param timeUnit Time unit
-   * @param unnestFields the fields to unnest
+   * @param fieldsToUnnest the fields to unnest
    * @param delimiter the delimiter to separate components in nested structure
+   * @param collectionNotUnnestedToJson the mode of converting collection to JSON
    *
    * @return Pinot schema
    */
   public static Schema getPinotSchemaFromAvroSchemaWithComplexTypeHandling(org.apache.avro.Schema avroSchema,
-      @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit, List<String> unnestFields,
-      String delimiter) {
+      @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit, List<String> fieldsToUnnest,
+      String delimiter, ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson) {
     Schema pinotSchema = new Schema();
 
     for (Field field : avroSchema.getFields()) {
-      extractSchemaWithComplexTypeHandling(field.schema(), unnestFields, delimiter, field.name(), pinotSchema,
-          fieldTypeMap, timeUnit);
+      extractSchemaWithComplexTypeHandling(field.schema(), fieldsToUnnest, delimiter, field.name(), pinotSchema,
+          fieldTypeMap, timeUnit, collectionNotUnnestedToJson);
     }
     return pinotSchema;
   }
@@ -132,20 +134,21 @@ public class AvroUtils {
    * @param fieldTypeMap Map from column to field type
    * @param timeUnit Time unit
    * @param complexType if allows complex-type handling
-   * @param unnestFields the fields to unnest
+   * @param fieldsToUnnest the fields to unnest
    * @param delimiter the delimiter separating components in nested structure
+   * @param collectionNotUnnestedToJson to mode of converting collection to JSON string
    * @return Pinot schema
    */
   public static Schema getPinotSchemaFromAvroSchemaFile(File avroSchemaFile,
       @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit, boolean complexType,
-      List<String> unnestFields, String delimiter)
+      List<String> fieldsToUnnest, String delimiter, ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson)
       throws IOException {
     org.apache.avro.Schema avroSchema = new org.apache.avro.Schema.Parser().parse(avroSchemaFile);
     if (!complexType) {
       return getPinotSchemaFromAvroSchema(avroSchema, fieldTypeMap, timeUnit);
     } else {
-      return getPinotSchemaFromAvroSchemaWithComplexTypeHandling(avroSchema, fieldTypeMap, timeUnit, unnestFields,
-          delimiter);
+      return getPinotSchemaFromAvroSchemaWithComplexTypeHandling(avroSchema, fieldTypeMap, timeUnit, fieldsToUnnest,
+          delimiter, collectionNotUnnestedToJson);
     }
   }
 
@@ -282,8 +285,9 @@ public class AvroUtils {
   }
 
   private static void extractSchemaWithComplexTypeHandling(org.apache.avro.Schema fieldSchema,
-      List<String> unnestFields, String delimiter, String path, Schema pinotSchema,
-      @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit) {
+      List<String> fieldsToUnnest, String delimiter, String path, Schema pinotSchema,
+      @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit,
+      ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson) {
     org.apache.avro.Schema.Type fieldType = fieldSchema.getType();
     switch (fieldType) {
       case UNION:
@@ -298,33 +302,50 @@ public class AvroUtils {
           }
         }
         if (nonNullSchema != null) {
-          extractSchemaWithComplexTypeHandling(nonNullSchema, unnestFields, delimiter, path, pinotSchema, fieldTypeMap,
-              timeUnit);
+          extractSchemaWithComplexTypeHandling(nonNullSchema, fieldsToUnnest, delimiter, path, pinotSchema, fieldTypeMap,
+              timeUnit, collectionNotUnnestedToJson);
         } else {
           throw new IllegalStateException("Cannot find non-null schema in UNION schema");
         }
         break;
       case RECORD:
         for (Field innerField : fieldSchema.getFields()) {
-          extractSchemaWithComplexTypeHandling(innerField.schema(), unnestFields, delimiter,
-              String.join(delimiter, path, innerField.name()), pinotSchema, fieldTypeMap, timeUnit);
+          extractSchemaWithComplexTypeHandling(innerField.schema(), fieldsToUnnest, delimiter,
+              String.join(delimiter, path, innerField.name()), pinotSchema, fieldTypeMap, timeUnit,
+              collectionNotUnnestedToJson);
         }
         break;
       case ARRAY:
         org.apache.avro.Schema elementType = fieldSchema.getElementType();
-        if (unnestFields.contains(path)) {
-          extractSchemaWithComplexTypeHandling(elementType, unnestFields, delimiter, path, pinotSchema, fieldTypeMap,
-              timeUnit);
-        } else if (AvroSchemaUtil.isPrimitiveType(elementType.getType())) {
+        if (fieldsToUnnest.contains(path)) {
+          extractSchemaWithComplexTypeHandling(elementType, fieldsToUnnest, delimiter, path, pinotSchema, fieldTypeMap,
+              timeUnit, collectionNotUnnestedToJson);
+        } else if (collectionNotUnnestedToJson == ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE && AvroSchemaUtil
+            .isPrimitiveType(elementType.getType())) {
           addFieldToPinotSchema(pinotSchema, AvroSchemaUtil.valueOf(elementType.getType()), path, false, fieldTypeMap,
               timeUnit);
-        } else {
+        } else if (shallConvertToJson(collectionNotUnnestedToJson, elementType)) {
           addFieldToPinotSchema(pinotSchema, DataType.STRING, path, true, fieldTypeMap, timeUnit);
         }
+        // do not include the node for other cases
         break;
       default:
         DataType dataType = AvroSchemaUtil.valueOf(fieldType);
         addFieldToPinotSchema(pinotSchema, dataType, path, true, fieldTypeMap, timeUnit);
+    }
+  }
+
+  private static boolean shallConvertToJson(ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson,
+      org.apache.avro.Schema elementType) {
+    switch (collectionNotUnnestedToJson) {
+      case ALL:
+        return true;
+      case NONE:
+        return false;
+      case NON_PRIMITIVE:
+        return !AvroSchemaUtil.isPrimitiveType(elementType.getType());
+      default:
+        throw new IllegalArgumentException(String.format("Unsupported collectionNotUnnestedToJson %s", collectionNotUnnestedToJson));
     }
   }
 

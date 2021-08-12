@@ -20,7 +20,7 @@ package org.apache.pinot.segment.local.segment.index.datasource;
 
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.local.segment.index.metadata.ColumnMetadata;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;

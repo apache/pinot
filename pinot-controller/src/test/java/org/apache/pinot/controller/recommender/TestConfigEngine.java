@@ -88,7 +88,7 @@ public class TestConfigEngine {
     assertEquals(_input.getAverageDataLen("g"), 100);
     assertTrue(_input.isSingleValueColumn("j"));
     assertFalse(_input.isSingleValueColumn("i"));
-    assertEquals(_input.getPrimaryTimeCol(),"t");
+    assertTrue(_input.getTimeColumns().contains("t"));
   }
 
   @Test
@@ -126,6 +126,18 @@ public class TestConfigEngine {
   }
 
   @Test
+  void testSortedInvertedIndexJointRuleWithMetricAndDateTimeColumn()
+      throws InvalidInputException, IOException {
+    loadInput("recommenderInput/SortedInvertedIndexInputWithMetricAndDateTimeColumn.json");
+    ConfigManager output = new ConfigManager();
+    AbstractRule abstractRule =
+        RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.InvertedSortedIndexJointRule, _input, output);
+    abstractRule.run();
+    assertEquals(output.getIndexConfig().getInvertedIndexColumns().toString(), "[c, t, x]");
+    assertEquals(output.getIndexConfig().getSortedColumn(), "p");
+  }
+
+  @Test
   void testEngineEmptyQueries()
       throws InvalidInputException, IOException {
     String input = readInputToStr("recommenderInput/EmptyQueriesInput.json");
@@ -144,9 +156,9 @@ public class TestConfigEngine {
             .build();
 
     Set<String> results = new HashSet<String>() {{
-      add("[[PredicateParseResult{dims{[1]}, AND, BITMAP, nESI=1.568, selected=0.068, nESIWithIdx=0.618}, PredicateParseResult{dims{[0]}, AND, BITMAP, nESI=1.568, selected=0.068, nESIWithIdx=0.767}, PredicateParseResult{dims{[]}, AND, NESTED, nESI=1.568, selected=0.068, nESIWithIdx=1.568}]]");
-      add("[[PredicateParseResult{dims{[5]}, AND, BITMAP, nESI=0.150, selected=0.015, nESIWithIdx=0.058}, PredicateParseResult{dims{[]}, AND, NESTED, nESI=0.150, selected=0.015, nESIWithIdx=0.150}], [PredicateParseResult{dims{[3, 7]}, AND, BITMAP, nESI=12.000, selected=0.500, nESIWithIdx=4.000}, PredicateParseResult{dims{[]}, AND, NESTED, nESI=12.000, selected=0.500, nESIWithIdx=12.000}]]");
-      add("[[PredicateParseResult{dims{[0, 2]}, AND, BITMAP, nESI=7.250, selected=0.047, nESIWithIdx=1.122}, PredicateParseResult{dims{[]}, AND, NESTED, nESI=7.250, selected=0.047, nESIWithIdx=7.250}]]");
+      add("[[PredicateParseResult{dims{[3]}, AND, BITMAP, nESI=1.645, selected=0.034, nESIWithIdx=0.695}, PredicateParseResult{dims{[2]}, AND, BITMAP, nESI=1.645, selected=0.034, nESIWithIdx=0.835}, PredicateParseResult{dims{[]}, AND, NESTED, nESI=1.645, selected=0.034, nESIWithIdx=1.645}]]");
+      add("[[PredicateParseResult{dims{[7]}, AND, BITMAP, nESI=0.150, selected=0.015, nESIWithIdx=0.058}, PredicateParseResult{dims{[]}, AND, NESTED, nESI=0.150, selected=0.015, nESIWithIdx=0.150}], [PredicateParseResult{dims{[5, 9]}, AND, BITMAP, nESI=12.000, selected=0.500, nESIWithIdx=4.000}, PredicateParseResult{dims{[]}, AND, NESTED, nESI=12.000, selected=0.500, nESIWithIdx=12.000}]]");
+      add("[[PredicateParseResult{dims{[2, 4]}, AND, BITMAP, nESI=7.625, selected=0.023, nESIWithIdx=1.309}, PredicateParseResult{dims{[]}, AND, NESTED, nESI=7.625, selected=0.023, nESIWithIdx=7.625}]]");
     }};
 
     String q1 = "select i from tableName where b in (2,4) and ((a in (1,2,3) and e = 4) or c = 7) and d in ('#VALUES', 23) and t > 500";
@@ -176,7 +188,6 @@ public class TestConfigEngine {
     loadInput("recommenderInput/InvalidInput2.json");
   }
 
-
   @Test
   void testFlagQueryRule()
       throws InvalidInputException, IOException {
@@ -185,8 +196,13 @@ public class TestConfigEngine {
     AbstractRule abstractRule =
         RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.FlagQueryRule, _input, output);
     abstractRule.run();
-    assertEquals(output.getFlaggedQueries().getFlaggedQueries().toString(),
-        "{select g from tableName LIMIT 1000000000=Warning: The size of LIMIT is longer than 100000 | Warning: No filtering in ths query, not a valid query=Error: query not able to parse, skipped, select f from tableName=Warning: No filtering in ths query, select f from tableName where a =3=Warning: No time column used in ths query}");
+
+    assertFalse(output.getFlaggedQueries().getFlaggedQueries().containsKey("select f from tableName where x = 2"));
+    assertFalse(output.getFlaggedQueries().getFlaggedQueries().containsKey("select f from tableName where t = 3"));
+    assertTrue(output.getFlaggedQueries().getFlaggedQueries().containsKey("select * from tableName"));
+    assertTrue(output.getFlaggedQueries().getFlaggedQueries().containsKey("select f from tableName"));
+    assertTrue(output.getFlaggedQueries().getFlaggedQueries().containsKey("select f from tableName where a =3"));
+    assertTrue(output.getFlaggedQueries().getFlaggedQueries().containsKey("select g from tableName LIMIT 1000000000"));
   }
 
   @Test
@@ -209,6 +225,31 @@ public class TestConfigEngine {
         RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.BloomFilterRule, _input, output);
     abstractRule.run();
     assertEquals(output.getIndexConfig().getBloomFilterColumns().toString(), "[c]");
+  }
+
+  @Test
+  void testBloomFilterRuleWithTimeSpecColumn()
+      throws InvalidInputException, IOException {
+    loadInput("recommenderInput/BloomFilterInputWithDateTimeColumn.json");
+    ConfigManager output = new ConfigManager();
+    AbstractRule abstractRule =
+        RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.BloomFilterRule, _input, output);
+    abstractRule.run();
+    assertEquals(output.getIndexConfig().getBloomFilterColumns().toString(), "[b, t, x]");
+  }
+
+  @Test
+  void testRangeIndexRule()
+      throws InvalidInputException, IOException {
+    loadInput("recommenderInput/RangeIndexInput.json");
+    ConfigManager output = new ConfigManager();
+    AbstractRule abstractRule =
+        RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.RangeIndexRule, _input, output);
+    abstractRule.run();
+    // Although column i has highest weight, it being string column, range index recommender will skip it and select next winner
+    assertNotEquals(output.getIndexConfig().getRangeIndexColumns().toString(), "[i]");
+    // index can be supported on dimension, date-time and metric columns
+    assertEquals(output.getIndexConfig().getRangeIndexColumns().toString(), "[t, j]");
   }
 
   @Test

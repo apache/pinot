@@ -45,23 +45,24 @@ import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
-import org.apache.pinot.segment.local.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.local.realtime.converter.RealtimeSegmentConverter;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
-import org.apache.pinot.segment.local.segment.creator.impl.V1Constants;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.segment.local.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.MutableSegment;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.CompletionConfig;
@@ -85,6 +86,7 @@ import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 import org.apache.pinot.spi.stream.TransientConsumerException;
+import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.CompletionMode;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.joda.time.DateTime;
@@ -519,8 +521,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             }
           }
         } catch (Exception e) {
-          segmentLogger.error("Caught exception while transforming the record: {}", decodedRow, e);
+          String errorMessage = String.format("Caught exception while transforming the record: %s", decodedRow);
+          segmentLogger.error(errorMessage, e);
           _numRowsErrored++;
+          _realtimeTableDataManager
+              .addSegmentError(_segmentNameStr, new SegmentErrorInfo(System.currentTimeMillis(), errorMessage, e));
         }
       } else {
         realtimeRowsDroppedMeter = _serverMetrics
@@ -617,6 +622,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                   } else {
                     // Could not build segment for some reason. We can only download it.
                     _state = State.ERROR;
+                    _realtimeTableDataManager.addSegmentError(_segmentNameStr,
+                        new SegmentErrorInfo(System.currentTimeMillis(), "Could not build segment", null));
                   }
                   break;
               }
@@ -628,6 +635,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               if (_segmentBuildDescriptor == null) {
                 // We could not build the segment. Go into error state.
                 _state = State.ERROR;
+                _realtimeTableDataManager.addSegmentError(_segmentNameStr,
+                    new SegmentErrorInfo(System.currentTimeMillis(), "Could not build segment", null));
               } else {
                 success = commitSegment(response.getControllerVipUrl(),
                     response.isSplitCommit() && _indexLoadingConfig.isEnableSplitCommit());
@@ -649,9 +658,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           }
         }
       } catch (Exception e) {
-        segmentLogger.error("Exception while in work", e);
+        String errorMessage = "Exception while in work";
+        segmentLogger.error(errorMessage, e);
         postStopConsumedMsg(e.getClass().getName());
         _state = State.ERROR;
+        _realtimeTableDataManager
+            .addSegmentError(_segmentNameStr, new SegmentErrorInfo(System.currentTimeMillis(), errorMessage, e));
         _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
         return;
       }
@@ -800,7 +812,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       try {
         FileUtils.moveDirectory(tempIndexDir, indexDir);
       } catch (IOException e) {
-        segmentLogger.error("Caught exception while moving index directory from: {} to: {}", tempIndexDir, indexDir, e);
+        String errorMessage =
+            String.format("Caught exception while moving index directory from: %s to: %s", tempIndexDir, indexDir);
+        segmentLogger.error(errorMessage, e);
+        _realtimeTableDataManager
+            .addSegmentError(_segmentNameStr, new SegmentErrorInfo(System.currentTimeMillis(), errorMessage, e));
         return null;
       } finally {
         FileUtils.deleteQuietly(tempSegmentFolder);
@@ -817,8 +833,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         try {
           TarGzCompressionUtils.createTarGzFile(indexDir, segmentTarFile);
         } catch (IOException e) {
-          segmentLogger
-              .error("Caught exception while taring index directory from: {} to: {}", indexDir, segmentTarFile, e);
+          String errorMessage =
+              String.format("Caught exception while taring index directory from: %s to: %s", indexDir, segmentTarFile);
+          segmentLogger.error(errorMessage, e);
+          _realtimeTableDataManager
+              .addSegmentError(_segmentNameStr, new SegmentErrorInfo(System.currentTimeMillis(), errorMessage, e));
           return null;
         }
 
@@ -1240,7 +1259,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
             .setAggregateMetrics(indexingConfig.isAggregateMetrics()).setNullHandlingEnabled(_nullHandlingEnabled)
             .setConsumerDir(consumerDir).setUpsertMode(tableConfig.getUpsertMode())
-            .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager);
+            .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
+            .setHashFunction(tableConfig.getHashFunction())
+            .setUpsertComparisonColumn(tableConfig.getUpsertComparisonColumn());
 
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig.getIngestionConfig(), _schema);

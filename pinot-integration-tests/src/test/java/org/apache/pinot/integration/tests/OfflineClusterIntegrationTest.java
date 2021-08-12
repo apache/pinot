@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -33,6 +34,8 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.exception.QueryException;
@@ -114,6 +117,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private static final String TEST_EXTRA_COLUMNS_QUERY = "SELECT COUNT(*) FROM mytable WHERE NewAddedIntDimension < 0";
   private static final String TEST_MISSING_COLUMNS_QUERY = "SELECT COUNT(*) FROM mytable WHERE AirlineID > 0";
   private static final String SELECT_STAR_QUERY = "SELECT * FROM mytable";
+
+  private static final String DISK_SIZE_IN_BYTES_KEY = "diskSizeInBytes";
+  private static final String NUM_SEGMENTS_KEY = "numSegments";
+  private static final String NUM_ROWS_KEY = "numRows";
+  private static final String COLUMN_LENGTH_MAP_KEY = "columnLengthMap";
+  private static final String COLUMN_CARDINALITY_MAP_KEY = "columnCardinalityMap";
+  private static final int DISK_SIZE_IN_BYTES = 20270480;
+  private static final int NUM_ROWS = 115545;
 
   private final List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbacks =
       new ArrayList<>(getNumBrokers() + getNumServers());
@@ -317,16 +328,23 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testInvertedIndexTriggering()
       throws Exception {
     long numTotalDocs = getCountStarResult();
+    long tableSizeWithDefaultIndex = getTableSize(getTableName());
 
+    // Without index on DivActualElapsedTime, all docs are scanned at filtering stage.
     JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
     assertEquals(queryResponse.get("numEntriesScannedInFilter").asLong(), numTotalDocs);
 
-    // Update table config and trigger reload
+    // Update table config to add inverted index on DivActualElapsedTime column, and
+    // reload the table to get config change into effect and add the inverted index.
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setInvertedIndexColumns(UPDATED_INVERTED_INDEX_COLUMNS);
     updateTableConfig(tableConfig);
     reloadOfflineTable(getTableName());
 
+    // It takes a while to reload multiple segments, thus we retry the query for some time.
+    // After all segments are reloaded, the inverted index is added on DivActualElapsedTime.
+    // It's expected to have numEntriesScannedInFilter equal to 0, i.e. no docs is scanned
+    // at filtering stage when inverted index can answer the predicate directly.
     TestUtils.waitForCondition(aVoid -> {
       try {
         JsonNode queryResponse1 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
@@ -337,54 +355,128 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to generate inverted index");
+
+    long tableSizeWithNewIndex = getTableSize(getTableName());
+    assertTrue(tableSizeWithNewIndex > tableSizeWithDefaultIndex);
+
+    // Update table config to remove all inverted index.
+    tableConfig = getOfflineTableConfig();
+    tableConfig.getIndexingConfig().setInvertedIndexColumns(Collections.emptyList());
+    updateTableConfig(tableConfig);
+
+    // Reload table just disables those indices, not clean them physically.
+    reloadOfflineTable(getTableName());
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse2 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
+        // Total docs should not change during reload
+        assertEquals(queryResponse2.get("totalDocs").asLong(), numTotalDocs);
+        return queryResponse2.get("numEntriesScannedInFilter").asLong() == numTotalDocs;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to disable indices");
+    final long tableSizeAfterReload = getTableSize(getTableName());
+    assertEquals(tableSizeAfterReload, tableSizeWithNewIndex);
+
+    // Reload a single segment and force to download the segment,
+    // and we can expect disk usage drops a bit.
+    OfflineSegmentZKMetadata segmentZKMetadata = _helixResourceManager.getOfflineSegmentMetadata(getTableName()).get(0);
+    String segmentName = segmentZKMetadata.getSegmentName();
+    reloadOfflineSegment(getTableName(), segmentName, true);
+    AtomicLong tableSizeAfterDownloadSegment = new AtomicLong(0);
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse3 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
+        assertEquals(queryResponse3.get("totalDocs").asLong(), numTotalDocs);
+        tableSizeAfterDownloadSegment.set(getTableSize(getTableName()));
+        return tableSizeAfterDownloadSegment.longValue() < tableSizeWithNewIndex;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to clean up obsolete indices");
+
+    // Reload whole table and we can expect disk usage drops further.
+    reloadOfflineTable(getTableName(), true);
+    AtomicLong tableSizeAfterDownloadTable = new AtomicLong(0);
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse3 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
+        assertEquals(queryResponse3.get("totalDocs").asLong(), numTotalDocs);
+        tableSizeAfterDownloadTable.set(getTableSize(getTableName()));
+        return tableSizeAfterDownloadTable.longValue() < tableSizeAfterDownloadSegment.longValue();
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to clean up obsolete indices");
   }
 
   @Test
   public void testTimeFunc()
       throws Exception {
-    String sqlQuery = "SELECT toDateTime(now(), 'yyyy-MM-dd z') FROM mytable";
+    String sqlQuery = "SELECT toDateTime(now(), 'yyyy-MM-dd z'), toDateTime(ago('PT1H'), 'yyyy-MM-dd z') FROM mytable";
     JsonNode response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
     String todayStr = response.get("resultTable").get("rows").get(0).get(0).asText();
     String expectedTodayStr =
         Instant.now().atZone(ZoneId.of("UTC")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
     assertEquals(todayStr, expectedTodayStr);
+
+    String oneHourAgoTodayStr = response.get("resultTable").get("rows").get(0).get(1).asText();
+    String expectedOneHourAgoTodayStr = Instant.now().minus(Duration.parse("PT1H")).atZone(ZoneId.of("UTC"))
+        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
+    assertEquals(oneHourAgoTodayStr, expectedOneHourAgoTodayStr);
   }
 
   @Test
   public void testLiteralOnlyFunc()
       throws Exception {
+    long ONE_HOUR_IN_MS = TimeUnit.HOURS.toMillis(1);
     long currentTsMin = System.currentTimeMillis();
-    String sqlQuery = "SELECT 1, now() as currentTs, 'abc', toDateTime(now(), 'yyyy-MM-dd z') as today, now()";
+    long oneHourAgoTsMin = currentTsMin - ONE_HOUR_IN_MS;
+    String sqlQuery =
+        "SELECT 1, now() as currentTs, ago('PT1H') as oneHourAgoTs, 'abc', toDateTime(now(), 'yyyy-MM-dd z') as today, now(), ago('PT1H')";
     JsonNode response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
     long currentTsMax = System.currentTimeMillis();
+    long oneHourAgoTsMax = currentTsMax - ONE_HOUR_IN_MS;
 
     assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "1");
     assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(1).asText(), "currentTs");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(2).asText(), "abc");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(3).asText(), "today");
-    String nowColumnName = response.get("resultTable").get("dataSchema").get("columnNames").get(4).asText();
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(2).asText(), "oneHourAgoTs");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(3).asText(), "abc");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(4).asText(), "today");
+    String nowColumnName = response.get("resultTable").get("dataSchema").get("columnNames").get(5).asText();
+    String oneHourAgoColumnName = response.get("resultTable").get("dataSchema").get("columnNames").get(6).asText();
     assertTrue(Long.parseLong(nowColumnName) > currentTsMin);
     assertTrue(Long.parseLong(nowColumnName) < currentTsMax);
+    assertTrue(Long.parseLong(oneHourAgoColumnName) > oneHourAgoTsMin);
+    assertTrue(Long.parseLong(oneHourAgoColumnName) < oneHourAgoTsMax);
 
     assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "LONG");
     assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(1).asText(), "LONG");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(2).asText(), "STRING");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(2).asText(), "LONG");
     assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(3).asText(), "STRING");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(4).asText(), "LONG");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(4).asText(), "STRING");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(5).asText(), "LONG");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(6).asText(), "LONG");
 
     int first = response.get("resultTable").get("rows").get(0).get(0).asInt();
     long second = response.get("resultTable").get("rows").get(0).get(1).asLong();
-    String third = response.get("resultTable").get("rows").get(0).get(2).asText();
+    long third = response.get("resultTable").get("rows").get(0).get(2).asLong();
+    String fourth = response.get("resultTable").get("rows").get(0).get(3).asText();
     assertEquals(first, 1);
     assertTrue(second > currentTsMin);
     assertTrue(second < currentTsMax);
-    assertEquals(third, "abc");
-    String todayStr = response.get("resultTable").get("rows").get(0).get(3).asText();
+    assertTrue(third > oneHourAgoTsMin);
+    assertTrue(third < oneHourAgoTsMax);
+    assertEquals(fourth, "abc");
+    String todayStr = response.get("resultTable").get("rows").get(0).get(4).asText();
     String expectedTodayStr =
         Instant.now().atZone(ZoneId.of("UTC")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
     assertEquals(todayStr, expectedTodayStr);
-    long nowValue = response.get("resultTable").get("rows").get(0).get(4).asLong();
+    long nowValue = response.get("resultTable").get("rows").get(0).get(5).asLong();
     assertEquals(nowValue, Long.parseLong(nowColumnName));
+    long oneHourAgoValue = response.get("resultTable").get("rows").get(0).get(6).asLong();
+    assertEquals(oneHourAgoValue, Long.parseLong(oneHourAgoColumnName));
   }
 
   @Test
@@ -450,9 +542,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     updateTableConfig(tableConfig);
 
     long startTime = System.currentTimeMillis();
-    // The query below will fail execution due to use of double quotes around value in IN clause.
-    JsonNode queryResponse = postSqlQuery("SELECT count(*) FROM mytable WHERE Dest IN (\"DFW\")");
-    String result = queryResponse.toPrettyString();
+    // The query below will fail execution due to JSON_MATCH on column without json index
+    JsonNode queryResponse = postSqlQuery("SELECT count(*) FROM mytable WHERE JSON_MATCH(Dest, '$=123')");
 
     assertTrue(System.currentTimeMillis() - startTime < queryTimeout);
     assertTrue(queryResponse.get("exceptions").get(0).get("message").toString().startsWith("\"QueryExecutionError"));
@@ -1203,16 +1294,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
     {
       //test single alias
-      String query =
-          "SELECT ArrTime, Carrier AS CarrierName, DaysSinceEpoch FROM mytable ORDER BY DaysSinceEpoch DESC";
+      String query = "SELECT ArrTime, Carrier AS CarrierName, DaysSinceEpoch FROM mytable ORDER BY DaysSinceEpoch DESC";
       testSqlQuery(query, Collections.singletonList(query));
 
-      query =
-          "SELECT count(*) AS cnt, max(ArrTime) as maxArrTime FROM mytable";
+      query = "SELECT count(*) AS cnt, max(ArrTime) as maxArrTime FROM mytable";
       testSqlQuery(query, Collections.singletonList(query));
 
-      query =
-          "SELECT count(*) AS cnt, Carrier AS CarrierName FROM mytable GROUP BY CarrierName ORDER BY cnt";
+      query = "SELECT count(*) AS cnt, Carrier AS CarrierName FROM mytable GROUP BY CarrierName ORDER BY cnt";
       testSqlQuery(query, Collections.singletonList(query));
     }
     {
@@ -1221,8 +1309,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
           "SELECT ArrTime, Carrier, Carrier AS CarrierName1, Carrier AS CarrierName2, DaysSinceEpoch FROM mytable ORDER BY DaysSinceEpoch DESC";
       testSqlQuery(query, Collections.singletonList(query));
 
-      query =
-          "SELECT count(*) AS cnt, max(ArrTime) as maxArrTime1, max(ArrTime) as maxArrTime2 FROM mytable";
+      query = "SELECT count(*) AS cnt, max(ArrTime) as maxArrTime1, max(ArrTime) as maxArrTime2 FROM mytable";
       testSqlQuery(query, Collections.singletonList(query));
 
       query =
@@ -1396,14 +1483,15 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testCaseInsensitivity() {
     int daysSinceEpoch = 16138;
-    long secondsSinceEpoch = 16138 * 24 * 60 * 60;
+    int hoursSinceEpoch = 16138 * 24;
+    int secondsSinceEpoch = 16138 * 24 * 60 * 60;
     List<String> baseQueries = Arrays.asList("SELECT * FROM mytable",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch limit 10000",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000",
         "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch,
+        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','HOURS') = " + hoursSinceEpoch,
         "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch,
-        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + daysSinceEpoch,
         "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable",
         "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
     List<String> queries = new ArrayList<>();
@@ -1428,14 +1516,15 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testColumnNameContainsTableName() {
     int daysSinceEpoch = 16138;
-    long secondsSinceEpoch = 16138 * 24 * 60 * 60;
+    int hoursSinceEpoch = 16138 * 24;
+    int secondsSinceEpoch = 16138 * 24 * 60 * 60;
     List<String> baseQueries = Arrays.asList("SELECT * FROM mytable",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch limit 10000",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000",
         "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch,
+        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','HOURS') = " + hoursSinceEpoch,
         "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch,
-        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + daysSinceEpoch,
         "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable",
         "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
     List<String> queries = new ArrayList<>();
@@ -1459,14 +1548,15 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testCaseInsensitivityWithColumnNameContainsTableName() {
     int daysSinceEpoch = 16138;
-    long secondsSinceEpoch = 16138 * 24 * 60 * 60;
+    int hoursSinceEpoch = 16138 * 24;
+    int secondsSinceEpoch = 16138 * 24 * 60 * 60;
     List<String> baseQueries = Arrays.asList("SELECT * FROM mytable",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch limit 10000",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000",
         "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch,
+        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','HOURS') = " + hoursSinceEpoch,
         "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch,
-        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + daysSinceEpoch,
         "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable",
         "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
     List<String> queries = new ArrayList<>();
@@ -1607,5 +1697,49 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testHardcodedServerPartitionedSqlQueries()
       throws Exception {
     super.testHardcodedServerPartitionedSqlQueries();
+  }
+
+  @Test
+  public void testAggregateMetadataAPI()
+      throws IOException {
+    JsonNode oneColumnResponse = JsonUtils
+        .stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=DestCityMarketID"));
+    assertEquals(oneColumnResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
+    assertEquals(oneColumnResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
+    assertEquals(oneColumnResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
+    assertEquals(oneColumnResponse.get(COLUMN_LENGTH_MAP_KEY).size(), 1);
+    assertEquals(oneColumnResponse.get(COLUMN_CARDINALITY_MAP_KEY).size(), 1);
+
+    JsonNode threeColumnsResponse = JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl
+        + "/tables/mytable/metadata?columns=DivActualElapsedTime&columns=CRSElapsedTime&columns=OriginStateName"));
+    assertEquals(threeColumnsResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
+    assertEquals(threeColumnsResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
+    assertEquals(threeColumnsResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
+    assertEquals(threeColumnsResponse.get(COLUMN_LENGTH_MAP_KEY).size(), 3);
+    assertEquals(threeColumnsResponse.get(COLUMN_CARDINALITY_MAP_KEY).size(), 3);
+
+    JsonNode zeroColumnResponse =
+        JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata"));
+    assertEquals(zeroColumnResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
+    assertEquals(zeroColumnResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
+    assertEquals(zeroColumnResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
+    assertEquals(zeroColumnResponse.get(COLUMN_LENGTH_MAP_KEY).size(), 0);
+    assertEquals(zeroColumnResponse.get(COLUMN_CARDINALITY_MAP_KEY).size(), 0);
+
+    JsonNode allColumnResponse =
+        JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=*"));
+    assertEquals(allColumnResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
+    assertEquals(allColumnResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
+    assertEquals(allColumnResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
+    assertEquals(allColumnResponse.get(COLUMN_LENGTH_MAP_KEY).size(), 82);
+    assertEquals(allColumnResponse.get(COLUMN_CARDINALITY_MAP_KEY).size(), 82);
+
+    allColumnResponse = JsonUtils.stringToJsonNode(sendGetRequest(
+        _controllerBaseApiUrl + "/tables/mytable/metadata?columns=CRSElapsedTime&columns=*&columns=OriginStateName"));
+    assertEquals(allColumnResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
+    assertEquals(allColumnResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
+    assertEquals(allColumnResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
+    assertEquals(allColumnResponse.get(COLUMN_LENGTH_MAP_KEY).size(), 82);
+    assertEquals(allColumnResponse.get(COLUMN_CARDINALITY_MAP_KEY).size(), 82);
   }
 }

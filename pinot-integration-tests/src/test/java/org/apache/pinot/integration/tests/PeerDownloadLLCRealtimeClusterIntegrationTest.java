@@ -130,9 +130,9 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
   }
 
-
   @Override
-  public void startController() {
+  public void startController()
+      throws Exception {
     Map<String, Object> controllerConfig = getDefaultControllerConfiguration();
     controllerConfig.put(ALLOW_HLC_TABLES, false);
     controllerConfig.put(ENABLE_SPLIT_COMMIT, _enableSplitCommit);
@@ -166,7 +166,8 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     // Set the segment deep store uri.
     configuration.setProperty("pinot.server.instance.segment.store.uri", "mockfs://" + getHelixClusterName());
     // For setting the HDFS segment fetcher.
-    configuration.setProperty(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY + ".protocols", "file,http");
+    configuration
+        .setProperty(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY + ".protocols", "file,http");
     if (_isConsumerDirConfigured) {
       configuration.setProperty(CommonConstants.Server.CONFIG_OF_CONSUMER_DIR, CONSUMER_DIRECTORY);
     }
@@ -220,12 +221,11 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
 
   @Test
   public void testAllSegmentsAreOnlineOrConsuming() {
-    ExternalView externalView =
-        HelixHelper.getExternalViewForResource(_helixAdmin, getHelixClusterName(),
-            TableNameBuilder.REALTIME.tableNameWithType(getTableName()));
+    ExternalView externalView = HelixHelper.getExternalViewForResource(_helixAdmin, getHelixClusterName(),
+        TableNameBuilder.REALTIME.tableNameWithType(getTableName()));
     Assert.assertEquals("2", externalView.getReplicas());
     // Verify for each segment e, the state of e in its 2 hosting servers is either ONLINE or CONSUMING
-    for(String segment : externalView.getPartitionSet()) {
+    for (String segment : externalView.getPartitionSet()) {
       Map<String, String> instanceToStateMap = externalView.getStateMap(segment);
       Assert.assertEquals(2, instanceToStateMap.size());
       for (Map.Entry<String, String> instanceState : instanceToStateMap.entrySet()) {
@@ -247,6 +247,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
   public static class MockPinotFS extends PinotFS {
     LocalPinotFS _localPinotFS = new LocalPinotFS();
     File _basePath;
+
     @Override
     public void init(PinotConfiguration config) {
       _localPinotFS.init(config);

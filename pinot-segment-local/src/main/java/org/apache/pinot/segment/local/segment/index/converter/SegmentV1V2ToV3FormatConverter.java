@@ -26,22 +26,25 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.creator.impl.V1Constants;
-import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
-import org.apache.pinot.segment.local.segment.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
-import org.apache.pinot.segment.local.segment.store.ColumnIndexType;
-import org.apache.pinot.segment.local.segment.store.SegmentDirectory;
-import org.apache.pinot.segment.local.segment.store.SegmentDirectoryPaths;
+import org.apache.pinot.segment.local.loader.LocalSegmentDirectoryLoader;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.store.ColumnIndexType;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,7 +71,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
 
     // check existing segment version
     SegmentMetadataImpl v2Metadata = new SegmentMetadataImpl(v2SegmentDirectory);
-    SegmentVersion oldVersion = SegmentVersion.valueOf(v2Metadata.getVersion());
+    SegmentVersion oldVersion = v2Metadata.getVersion();
     Preconditions.checkState(oldVersion != SegmentVersion.v3, "Segment {} is already in v3 format but at wrong path",
         v2Metadata.getName());
 
@@ -104,7 +107,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
       if (file.isFile() && file.exists()) {
         FileUtils.deleteQuietly(file);
       }
-      if (file.isDirectory() && file.getName().endsWith(LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION)) {
+      if (file.isDirectory() && file.getName().endsWith(V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION)) {
         FileUtils.deleteDirectory(file);
       }
     }
@@ -134,9 +137,13 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
 
   private void copyIndexData(File v2Directory, SegmentMetadataImpl v2Metadata, File v3Directory)
       throws Exception {
-    SegmentMetadataImpl v3Metadata = new SegmentMetadataImpl(v3Directory);
-    try (SegmentDirectory v2Segment = SegmentDirectory.createFromLocalFS(v2Directory, v2Metadata, ReadMode.mmap);
-        SegmentDirectory v3Segment = SegmentDirectory.createFromLocalFS(v3Directory, v3Metadata, ReadMode.mmap)) {
+    Map<String, Object> props = new HashMap<>();
+    props.put(LocalSegmentDirectoryLoader.READ_MODE_KEY, ReadMode.mmap.toString());
+    PinotConfiguration configuration = new PinotConfiguration(props);
+    try (SegmentDirectory v2Segment = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
+        .load(v2Directory.toURI(), configuration);
+        SegmentDirectory v3Segment = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
+            .load(v3Directory.toURI(), configuration)) {
 
       // for each dictionary and each fwdIndex, copy that to newDirectory buffer
       Set<String> allColumns = v2Metadata.getAllColumns();
@@ -212,7 +219,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
   private void copyLuceneTextIndexIfExists(File segmentDirectory, File v3Dir)
       throws IOException {
     // TODO: see if this can be done by reusing some existing methods
-    String suffix = LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION;
+    String suffix = V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION;
     File[] textIndexFiles = segmentDirectory.listFiles(new FilenameFilter() {
       @Override
       public boolean accept(File dir, String name) {
@@ -233,7 +240,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     // to moving the lucene text index files, we need to move the
     // docID mapping/cache file created by us in v1/v2 during an earlier
     // load of the segment.
-    String docIDFileSuffix = LuceneTextIndexReader.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION;
+    String docIDFileSuffix = V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION;
     File[] textIndexDocIdMappingFiles = segmentDirectory.listFiles(new FilenameFilter() {
       @Override
       public boolean accept(File dir, String name) {

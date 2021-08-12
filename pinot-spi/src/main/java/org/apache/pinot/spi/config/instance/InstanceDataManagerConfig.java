@@ -54,4 +54,10 @@ public interface InstanceDataManagerConfig {
   int getMaxParallelSegmentBuilds();
 
   String getAuthToken();
+
+  String getTierBackend();
+
+  PinotConfiguration getTierConfigs();
+
+  long getErrorCacheSize();
 }

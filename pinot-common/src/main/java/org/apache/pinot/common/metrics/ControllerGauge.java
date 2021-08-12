@@ -45,6 +45,12 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   OFFLINE_TABLE_COUNT("TableCount", true),
   DISABLED_TABLE_COUNT("TableCount", true),
   PERIODIC_TASK_NUM_TABLES_PROCESSED("PeriodicTaskNumTablesProcessed", true),
+  NUM_MINION_TASKS_IN_PROGRESS("NumMinionTasksInProgress", true),
+  NUM_MINION_SUBTASKS_WAITING("NumMinionSubtasksWaiting", true),
+  NUM_MINION_SUBTASKS_RUNNING("NumMinionSubtasksRunning", true),
+  NUM_MINION_SUBTASKS_ERROR("NumMinionSubtasksError", true),
+  PERCENT_MINION_SUBTASKS_IN_QUEUE("PercentMinionSubtasksInQueue", true),
+  PERCENT_MINION_SUBTASKS_IN_ERROR("PercentMinionSubtasksInError", true),
 
   // Pinot controller leader
   PINOT_CONTROLLER_LEADER("PinotControllerLeader", true),
@@ -74,7 +80,10 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   TASK_STATUS("taskStatus", false),
 
   // Number of dropped minion instances
-  DROPPED_MINION_INSTANCES("droppedMinionInstances", true);
+  DROPPED_MINION_INSTANCES("droppedMinionInstances", true),
+
+  // Number of online minion instances
+  ONLINE_MINION_INSTANCES("onlineMinionInstances", true);
 
   private final String gaugeName;
   private final String unit;

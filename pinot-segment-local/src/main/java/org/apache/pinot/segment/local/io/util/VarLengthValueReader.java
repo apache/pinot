@@ -19,7 +19,7 @@
 package org.apache.pinot.segment.local.io.util;
 
 import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.segment.local.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
 /**

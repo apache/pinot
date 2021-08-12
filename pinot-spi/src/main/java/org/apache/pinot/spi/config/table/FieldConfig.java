@@ -73,7 +73,7 @@ public class FieldConfig extends BaseJsonConfig {
   }
 
   public enum CompressionCodec {
-    PASS_THROUGH, SNAPPY, ZSTANDARD
+    PASS_THROUGH, SNAPPY, ZSTANDARD, LZ4
   }
 
   public String getName() {

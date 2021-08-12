@@ -10,18 +10,15 @@
     },
     {
       "name": "actor",
-      "dataType": "STRING",
-      "maxLength": 2147483647
+      "dataType": "JSON"
     },
     {
       "name": "repo",
-      "dataType": "STRING",
-      "maxLength": 2147483647
+      "dataType": "JSON"
     },
     {
       "name": "payload",
-      "dataType": "STRING",
-      "maxLength": 2147483647
+      "dataType": "JSON"
     },
     {
       "name": "public",

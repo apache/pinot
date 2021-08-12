@@ -66,7 +66,9 @@ public class TableConfigBuilder {
   private String _timeType;
   private String _retentionTimeUnit;
   private String _retentionTimeValue;
+  @Deprecated
   private String _segmentPushFrequency;
+  @Deprecated
   private String _segmentPushType = DEFAULT_SEGMENT_PUSH_TYPE;
   private String _segmentAssignmentStrategy = DEFAULT_SEGMENT_ASSIGNMENT_STRATEGY;
   private String _peerSegmentDownloadScheme;
@@ -160,6 +162,9 @@ public class TableConfigBuilder {
     return this;
   }
 
+  /**
+   * @deprecated Use {@code segmentIngestionType} from {@link IngestionConfig#getBatchIngestionConfig()}
+   */
   public TableConfigBuilder setSegmentPushType(String segmentPushType) {
     if (REFRESH_SEGMENT_PUSH_TYPE.equalsIgnoreCase(segmentPushType)) {
       _segmentPushType = REFRESH_SEGMENT_PUSH_TYPE;
@@ -169,6 +174,9 @@ public class TableConfigBuilder {
     return this;
   }
 
+  /**
+   * @deprecated Use {@code segmentIngestionFrequency} from {@link IngestionConfig#getBatchIngestionConfig()}
+   */
   public TableConfigBuilder setSegmentPushFrequency(String segmentPushFrequency) {
     _segmentPushFrequency = segmentPushFrequency;
     return this;

@@ -24,6 +24,7 @@ import org.apache.pinot.minion.executor.TaskExecutorFactoryRegistry;
 import org.apache.pinot.plugin.minion.tasks.convert_to_raw_index.ConvertToRawIndexTaskExecutorFactory;
 import org.apache.pinot.plugin.minion.tasks.convert_to_raw_index.ConvertToRawIndexTaskGenerator;
 import org.apache.pinot.plugin.minion.tasks.merge_rollup.MergeRollupTaskExecutorFactory;
+import org.apache.pinot.plugin.minion.tasks.merge_rollup.MergeRollupTaskGenerator;
 import org.apache.pinot.plugin.minion.tasks.purge.PurgeTaskExecutorFactory;
 import org.apache.pinot.plugin.minion.tasks.realtime_to_offline_segments.RealtimeToOfflineSegmentsTaskExecutorFactory;
 import org.apache.pinot.plugin.minion.tasks.realtime_to_offline_segments.RealtimeToOfflineSegmentsTaskGenerator;
@@ -37,8 +38,9 @@ public class TaskRegistryTest {
   @Test
   public void testTaskGeneratorRegistry() {
     Set<Class<?>> classes = TaskGeneratorRegistry.getTaskGeneratorClasses();
-    Assert.assertTrue(classes.size() >= 3);
+    Assert.assertTrue(classes.size() >= 4);
     Assert.assertTrue(classes.contains(ConvertToRawIndexTaskGenerator.class));
+    Assert.assertTrue(classes.contains(MergeRollupTaskGenerator.class));
     Assert.assertTrue(classes.contains(SegmentGenerationAndPushTaskGenerator.class));
     Assert.assertTrue(classes.contains(RealtimeToOfflineSegmentsTaskGenerator.class));
   }

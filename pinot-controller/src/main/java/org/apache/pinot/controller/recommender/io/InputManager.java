@@ -46,6 +46,7 @@ import org.apache.pinot.controller.recommender.rules.io.params.FlagQueryRulePara
 import org.apache.pinot.controller.recommender.rules.io.params.InvertedSortedIndexJointRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.NoDictionaryOnHeapDictionaryJointRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.PartitionRuleParams;
+import org.apache.pinot.controller.recommender.rules.io.params.RangeIndexRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.RealtimeProvisioningRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.SegmentSizeRuleParams;
 import org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset;
@@ -101,6 +102,7 @@ public class InputManager {
   public InvertedSortedIndexJointRuleParams _invertedSortedIndexJointRuleParams =
       new InvertedSortedIndexJointRuleParams();
   public BloomFilterRuleParams _bloomFilterRuleParams = new BloomFilterRuleParams();
+  public RangeIndexRuleParams _rangeIndexRuleParams = new RangeIndexRuleParams();
   public NoDictionaryOnHeapDictionaryJointRuleParams _noDictionaryOnHeapDictionaryJointRuleParams =
       new NoDictionaryOnHeapDictionaryJointRuleParams();
   public FlagQueryRuleParams _flagQueryRuleParams = new FlagQueryRuleParams();
@@ -118,7 +120,7 @@ public class InputManager {
   Set<String> _dimNames = null;
   Set<String> _metricNames = null;
   Set<String> _dateTimeNames = null;
-  Set<String> _dimNamesInvertedSortedIndexApplicable = null;
+  Set<String> _columnNamesInvertedSortedIndexApplicable = null;
   Map<String, Integer> _colNameToIntMap = null;
   String[] _intToColNameMap = null;
   Map<String, Triple<Double, BrokerRequest, QueryContext>> _parsedQueries = new HashMap<>();
@@ -229,47 +231,35 @@ public class InputManager {
     _metricNames = new HashSet<>(_schema.getMetricNames());
     _dateTimeNames = new HashSet<>(_schema.getDateTimeNames());
 
-    String primaryTimeCol;
-    if ((primaryTimeCol = getPrimaryTimeCol()) != null) {
-      _dateTimeNames.add(primaryTimeCol);
+    if (_schema.getTimeFieldSpec() != null) {
+      _dateTimeNames.add(_schema.getTimeFieldSpec().getName());
     }
 
     _intToColNameMap = new String[_dimNames.size() + _metricNames.size() + _dateTimeNames.size()];
     _colNameToIntMap = new HashMap<>();
 
-    _dimNamesInvertedSortedIndexApplicable = new HashSet<>(_dimNames);
-    _dimNamesInvertedSortedIndexApplicable.remove(sortedColumn);
-    _dimNamesInvertedSortedIndexApplicable.removeAll(invertedIndexColumns);
-    _dimNamesInvertedSortedIndexApplicable.removeAll(noDictionaryColumns);
+    // Inverted index and sorted index will be recommended on all types of columns : dimensions, metrics and date time
+    _columnNamesInvertedSortedIndexApplicable = new HashSet<>(_dimNames);
+    _columnNamesInvertedSortedIndexApplicable.addAll(_metricNames);
+    _columnNamesInvertedSortedIndexApplicable.addAll(_dateTimeNames);
 
-    HashSet<String> dimNamesInveredSortedIndexNotApplicable = new HashSet<>(_dimNames);
-    dimNamesInveredSortedIndexNotApplicable.removeAll(_dimNamesInvertedSortedIndexApplicable);
-
-    LOGGER.debug("_dimNamesInveredSortedIndexApplicable {}", _dimNamesInvertedSortedIndexApplicable);
     AtomicInteger counter = new AtomicInteger(0);
-    _dimNamesInvertedSortedIndexApplicable.forEach(name -> {
+    _columnNamesInvertedSortedIndexApplicable.forEach(name -> {
       _intToColNameMap[counter.get()] = name;
       _colNameToIntMap.put(name, counter.getAndIncrement());
     });
 
-    dimNamesInveredSortedIndexNotApplicable.forEach(name -> {
-      _intToColNameMap[counter.get()] = name;
-      _colNameToIntMap.put(name, counter.getAndIncrement());
-    });
+    _columnNamesInvertedSortedIndexApplicable.remove(sortedColumn);
+    _columnNamesInvertedSortedIndexApplicable.removeAll(invertedIndexColumns);
+    _columnNamesInvertedSortedIndexApplicable.removeAll(noDictionaryColumns);
+
+    LOGGER.debug("_columnNamesInvertedSortedIndexApplicable {}", _columnNamesInvertedSortedIndexApplicable);
 
     LOGGER.debug("_dimNames{}", _dimNames);
     LOGGER.debug("_metricNames{}", _metricNames);
     LOGGER.debug("_dateTimeNames{}", _dateTimeNames);
-    _metricNames.forEach(name -> {
-      _intToColNameMap[counter.get()] = name;
-      _colNameToIntMap.put(name, counter.getAndIncrement());
-    });
-    _dateTimeNames.forEach(name -> {
-      _intToColNameMap[counter.get()] = name;
-      _colNameToIntMap.put(name, counter.getAndIncrement());
-    });
 
-    LOGGER.info("*Num dims we can apply index on: {}", getNumDimsInvertedSortedApplicable());
+    LOGGER.info("*Num dims we can apply index on: {}", getNumColumnsInvertedSortedApplicable());
     LOGGER.info("*Col name to int map {} _intToColNameMap {}", _colNameToIntMap, _intToColNameMap);
   }
 
@@ -428,8 +418,8 @@ public class InputManager {
    * Get the number of dimensions we can apply Inverted Sorted indices on.
    * @return total number of dimensions minus number of dimensions with overwritten indices
    */
-  public int getNumDimsInvertedSortedApplicable() {
-    return _dimNamesInvertedSortedIndexApplicable.size();
+  public int getNumColumnsInvertedSortedApplicable() {
+    return _columnNamesInvertedSortedIndexApplicable.size();
   }
 
   public NoDictionaryOnHeapDictionaryJointRuleParams getNoDictionaryOnHeapDictionaryJointRuleParams() {
@@ -444,15 +434,10 @@ public class InputManager {
     return _colNameToIntMap.size();
   }
 
-  //TODO: Currently Pinot is using only ONE time column specified by TimeFieldSpec
-  // Change the implementation after the new schema with multiple _dateTimeNames is in use
-  // Return the time column used in server level filtering
-  public String getPrimaryTimeCol() {
-    if (_schema.getTimeFieldSpec() != null) {
-      return _schema.getTimeFieldSpec().getName();
-    } else {
-      return null;
-    }
+  // Provides set of time columns.
+  // This could be at most 1 from TimeFieldSpec and 1 or more from DatetimeFieldSpec
+  public Set<String> getTimeColumns() {
+    return _dateTimeNames;
   }
 
   public Set<String> getColNamesNoDictionary() {
@@ -469,6 +454,10 @@ public class InputManager {
 
   public BloomFilterRuleParams getBloomFilterRuleParams() {
     return _bloomFilterRuleParams;
+  }
+
+  public RangeIndexRuleParams getRangeIndexRuleParams() {
+    return _rangeIndexRuleParams;
   }
 
   public RealtimeProvisioningRuleParams getRealtimeProvisioningRuleParams() {
@@ -545,7 +534,7 @@ public class InputManager {
   }
 
   public boolean isIndexableDim(String colName) {
-    return _dimNamesInvertedSortedIndexApplicable.contains(colName);
+    return _columnNamesInvertedSortedIndexApplicable.contains(colName);
   }
 
   public boolean isSingleValueColumn(String colName) {
@@ -580,8 +569,8 @@ public class InputManager {
     return _dimNames.contains(colName);
   }
 
-  public boolean isPrimaryDateTime(String colName) {
-    return colName != null && colName.equalsIgnoreCase(getPrimaryTimeCol());
+  public boolean isTimeOrDateTimeColumn(String colName) {
+    return colName != null && getTimeColumns().stream().anyMatch(d -> colName.equalsIgnoreCase(d));
   }
 
   public void estimateSizePerRecord()

@@ -23,10 +23,11 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
-import org.apache.pinot.segment.local.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.annotations.Test;
@@ -131,6 +132,38 @@ public class ColumnValueSegmentPrunerTest {
     assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 0 OR column = 2"));
     assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 0 OR column < 10"));
     assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 0 OR column = 10"));
+  }
+
+  @Test
+  public void testBloomFilterInPredicatePruning() {
+    Map<String, Object> properties = new HashMap<>();
+    // override default value
+    properties.put(ColumnValueSegmentPruner.IN_PREDICATE_THRESHOLD, 5);
+    PinotConfiguration configuration = new PinotConfiguration(properties);
+    PRUNER.init(configuration);
+
+    IndexSegment indexSegment = mock(IndexSegment.class);
+
+    DataSource dataSource = mock(DataSource.class);
+    when(indexSegment.getDataSource("column")).thenReturn(dataSource);
+    // Add support for bloom filter
+    DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
+    BloomFilterReader bloomFilterReader = mock(BloomFilterReader.class);
+
+    when(dataSourceMetadata.getDataType()).thenReturn(DataType.INT);
+    when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
+    when(dataSource.getBloomFilter()).thenReturn(bloomFilterReader);
+    when(bloomFilterReader.mightContain("1")).thenReturn(true);
+    when(bloomFilterReader.mightContain("2")).thenReturn(true);
+    when(bloomFilterReader.mightContain("3")).thenReturn(true);
+    when(dataSourceMetadata.getMinValue()).thenReturn(5);
+    when(dataSourceMetadata.getMaxValue()).thenReturn(10);
+
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (0)"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (0, 1, 2)"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (21, 30)"));
+    assertFalse(
+        runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)"));
   }
 
   private boolean runPruner(IndexSegment indexSegment, String query) {
