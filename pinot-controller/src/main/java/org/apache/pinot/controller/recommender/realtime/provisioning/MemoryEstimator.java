@@ -95,6 +95,7 @@ public class MemoryEstimator {
 
   private String[][] _activeMemoryPerHost;
   private String[][] _optimalSegmentSize;
+  private String[][] _numRowsInSegment;
   private String[][] _consumingMemoryPerHost;
   private String[][] _numSegmentsQueriedPerHost;
 
@@ -240,12 +241,14 @@ public class MemoryEstimator {
       throws IOException {
     _activeMemoryPerHost = new String[numHours.length][numHosts.length];
     _optimalSegmentSize = new String[numHours.length][numHosts.length];
+    _numRowsInSegment = new String[numHours.length][numHosts.length];
     _consumingMemoryPerHost = new String[numHours.length][numHosts.length];
     _numSegmentsQueriedPerHost = new String[numHours.length][numHosts.length];
     for (int i = 0; i < numHours.length; i++) {
       for (int j = 0; j < numHosts.length; j++) {
         _activeMemoryPerHost[i][j] = NOT_APPLICABLE;
         _consumingMemoryPerHost[i][j] = NOT_APPLICABLE;
+        _numRowsInSegment[i][j] = NOT_APPLICABLE;
         _optimalSegmentSize[i][j] = NOT_APPLICABLE;
         _numSegmentsQueriedPerHost[i][j] = NOT_APPLICABLE;
       }
@@ -296,6 +299,7 @@ public class MemoryEstimator {
                 DataSizeUtils.fromBytes(activeMemoryPerHostBytes) + "/" + DataSizeUtils.fromBytes(mappedMemoryPerHost);
             _consumingMemoryPerHost[i][j] = DataSizeUtils.fromBytes(totalMemoryForConsumingSegmentsPerHost);
             _optimalSegmentSize[i][j] = DataSizeUtils.fromBytes(completedSegmentSizeBytes);
+            _numRowsInSegment[i][j] = String.valueOf(totalDocs);
             _numSegmentsQueriedPerHost[i][j] =
                 String.valueOf(numActiveSegmentsPerPartition * totalConsumingPartitionsPerHost);
           }
@@ -429,6 +433,10 @@ public class MemoryEstimator {
 
   public String[][] getOptimalSegmentSize() {
     return _optimalSegmentSize;
+  }
+
+  public String[][] getNumRowsInSegment() {
+    return _numRowsInSegment;
   }
 
   public String[][] getConsumingMemoryPerHost() {
