@@ -1382,7 +1382,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
   private void testTextSearchSelectQueryHelper(String query, int expectedResultSize, boolean compareGrepOutput,
       List<Serializable[]> expectedResults)
       throws Exception {
-    SelectionOnlyOperator operator = getOperatorForPqlQuery(query);
+    SelectionOnlyOperator operator = getOperatorForSqlQuery(query);
     IntermediateResultsBlock operatorResult = operator.nextBlock();
     List<Object[]> resultset = (List<Object[]>) operatorResult.getSelectionResult();
     Assert.assertNotNull(resultset);
