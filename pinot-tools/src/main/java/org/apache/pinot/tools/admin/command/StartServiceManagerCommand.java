@@ -149,7 +149,9 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
 
   @Override
   public void cleanup() {
-    _pinotServiceManager.stopAll();
+    if (_pinotServiceManager != null) {
+      _pinotServiceManager.stopAll();
+    }
   }
 
   @Override
