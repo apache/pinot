@@ -90,17 +90,17 @@ public final class FSATraversalTest extends TestBase {
     final FSA5 fsa5 = FSA.read(new ByteArrayInputStream(fsaData), FSA5.class, true);
 
       FSATraversal fsaTraversal = new FSATraversal(fsa5);
-      //assertEquals(EXACT_MATCH, fsaTraversal.match("a".getBytes(UTF_8)).kind);
-      //assertEquals(EXACT_MATCH, fsaTraversal.match("ab".getBytes(UTF_8)).kind);
+      assertEquals(EXACT_MATCH, fsaTraversal.match("a".getBytes(UTF_8)).kind);
+      assertEquals(EXACT_MATCH, fsaTraversal.match("ab".getBytes(UTF_8)).kind);
       assertEquals(EXACT_MATCH, fsaTraversal.match("abc".getBytes(UTF_8)).kind);
-      //assertEquals(EXACT_MATCH, fsaTraversal.match("ad".getBytes(UTF_8)).kind);
+      assertEquals(EXACT_MATCH, fsaTraversal.match("ad".getBytes(UTF_8)).kind);
 
-      //assertEquals(SEQUENCE_IS_A_PREFIX, fsaTraversal.match("b".getBytes(UTF_8)).kind);
-      //assertEquals(SEQUENCE_IS_A_PREFIX, fsaTraversal.match("bc".getBytes(UTF_8)).kind);
+      assertEquals(SEQUENCE_IS_A_PREFIX, fsaTraversal.match("b".getBytes(UTF_8)).kind);
+      assertEquals(SEQUENCE_IS_A_PREFIX, fsaTraversal.match("bc".getBytes(UTF_8)).kind);
 
       MatchResult m;
       
-      /*m = fsaTraversal.match("abcd".getBytes(UTF_8));
+      m = fsaTraversal.match("abcd".getBytes(UTF_8));
       assertEquals(AUTOMATON_HAS_PREFIX, m.kind);
       assertEquals(3, m.index);
 
@@ -110,7 +110,7 @@ public final class FSATraversalTest extends TestBase {
 
       m = fsaTraversal.match("ax".getBytes(UTF_8));
       assertEquals(AUTOMATON_HAS_PREFIX, m.kind);
-      assertEquals(1, m.index);*/
+      assertEquals(1, m.index);
 
       List<Long> results = RegexpMatcher.regexMatch("ab.*", fsa5);
 
