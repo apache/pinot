@@ -177,7 +177,6 @@ public class FilterPlanNode implements PlanNode {
             case TEXT_MATCH:
               return new TextMatchFilterOperator(dataSource.getTextIndex(), ((TextMatchPredicate) predicate).getValue(),
                   _numDocs);
-            case LIKE:
             case REGEXP_LIKE:
               // FST Index is available only for rolled out segments. So, we use different evaluator for rolled out and
               // consuming segments.
