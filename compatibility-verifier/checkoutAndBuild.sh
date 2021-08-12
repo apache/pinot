@@ -75,19 +75,6 @@ function build() {
   local versionOption="-Djdk.version=8"
 
   mkdir -p ${MVN_CACHE_DIR}
-  echo "<settings xmlns=\"http://maven.apache.org/SETTINGS/1.0.0\""> ../settings.xml
-  echo "      xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"">> ../settings.xml
-  echo "      xsi:schemaLocation=\"http://maven.apache.org/SETTINGS/1.0.0">> ../settings.xml
-  echo "                          https://maven.apache.org/xsd/settings-1.0.0.xsd\">">> ../settings.xml
-  echo "  <mirrors>">> ../settings.xml
-  echo "    <mirror>">> ../settings.xml
-  echo "      <id>confluent-mirror</id>">> ../settings.xml
-  echo "      <mirrorOf>confluent</mirrorOf>">> ../settings.xml
-  echo "      <url>https://packages.confluent.io/maven/</url>">> ../settings.xml
-  echo "      <blocked>false</blocked>">> ../settings.xml
-  echo "    </mirror>">> ../settings.xml
-  echo "  </mirrors>">> ../settings.xml
-  echo "</settings>">> ../settings.xml
 
   if [ ${buildId} -gt 0 ]; then
     # Build it in a different env under different version so that maven cache does
@@ -98,12 +85,12 @@ function build() {
     repoOption="-Dmaven.repo.local=${mvnCache}/${buildId}"
   fi
 
-  mvn install package -s ../settings.xml -DskipTests -Pbin-dist ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>${outFile} 2>&1
+  mvn install package -DskipTests -Pbin-dist ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>${outFile} 2>&1
   if [ $? -ne 0 ]; then exit 1; fi
-  mvn -pl pinot-tools package -s ../settings.xml -DskipTests ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
+  mvn -pl pinot-tools package -DskipTests ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
   if [ $? -ne 0 ]; then exit 1; fi
   if [ $buildTests -eq 1 ]; then
-    mvn -pl pinot-integration-tests package -s ../settings.xml -DskipTests ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
+    mvn -pl pinot-integration-tests package -DskipTests ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
     if [ $? -ne 0 ]; then exit 1; fi
   fi
 }
@@ -274,7 +261,9 @@ if [ ${oldBuildStatus} -eq 0 ]; then
   echo Old version build completed successfully
 else
   echo Old version build failed. See ${oldBuildOutFile}
+  echo ======== Build output ========
   cat ${oldBuildOutFile}
+  echo ==== End Build output ========
   exitStatus=1
 fi
 
@@ -282,7 +271,9 @@ if [ ${curBuildStatus} -eq 0 ]; then
   echo Compat checker build completed successfully
 else
   echo Compat checker build failed. See ${curBuildOutFile}
+  echo ======== Build output ========
   cat ${curBuildOutFile}
+  echo ==== End Build output ========
   exitStatus=1
 fi
 
@@ -291,7 +282,9 @@ if [ ${buildNewTarget} -eq 1 ]; then
     echo New version build completed successfully
   else
     echo New version build failed. See ${newBuildOutFile}
+    echo ======== Build output ========
     cat ${newBuildOutFile}
+    echo ==== End Build output ========
     exitStatus=1
   fi
 fi
