@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.util;
+package org.apache.pinot.common.utils;
 
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
 /**
- * Tests for {@LikeToRegexpLikePatternConverterUtils}
+ * Tests for {@link LikeToRegexpLikePatternConverterUtils}
  */
 public class LikeToRegexpLikePatternConverterUtilsTest {
-
   private static final String LEADING_WILDCARD = "%++";
   private static final String TRAILING_WILDCARD = "C+%";
   private static final String BOTH_SIDES_WILDCARD = "%+%";
@@ -37,57 +37,41 @@ public class LikeToRegexpLikePatternConverterUtilsTest {
 
   @Test
   public void testLeadingWildcard() {
-    String result = org.apache.pinot.common.utils.LikeToRegexpLikePatternConverterUtils.processValue(LEADING_WILDCARD);
-
-    assert result.equals(".*\\+\\+");
+    Assert.assertEquals(LikeToRegexpLikePatternConverterUtils.processValue(LEADING_WILDCARD), ".*\\+\\+");
   }
 
   @Test
   public void testTrailingWildcard() {
-    String result = org.apache.pinot.common.utils.LikeToRegexpLikePatternConverterUtils.processValue(TRAILING_WILDCARD);
-
-    assert result.equals("C\\+.*");
+    Assert.assertEquals(LikeToRegexpLikePatternConverterUtils.processValue(TRAILING_WILDCARD), "C\\+.*");
   }
 
   @Test
   public void testBothSidesWildcard() {
-    String result = org.apache.pinot.common.utils.LikeToRegexpLikePatternConverterUtils.processValue(BOTH_SIDES_WILDCARD);
-
-    assert result.equals(".*\\+.*");
+    Assert.assertEquals(LikeToRegexpLikePatternConverterUtils.processValue(BOTH_SIDES_WILDCARD), ".*\\+.*");
   }
 
   @Test
   public void testWildCardInMiddle() {
-    String result = org.apache.pinot.common.utils.LikeToRegexpLikePatternConverterUtils.processValue(WILD_CARD_IN_MIDDLE);
-
-    assert result.equals("C.*\\+");
+    Assert.assertEquals(LikeToRegexpLikePatternConverterUtils.processValue(WILD_CARD_IN_MIDDLE), "C.*\\+");
   }
 
   @Test
   public void testTrailingSingleCharacter() {
-    String result = org.apache.pinot.common.utils.LikeToRegexpLikePatternConverterUtils.processValue(TRAILING_SINGLE_CHARACTER);
-
-    assert result.equals("C\\+.");
+    Assert.assertEquals(LikeToRegexpLikePatternConverterUtils.processValue(TRAILING_SINGLE_CHARACTER), "C\\+.");
   }
 
   @Test
   public void testLeadingSingleCharacter() {
-    String result = org.apache.pinot.common.utils.LikeToRegexpLikePatternConverterUtils.processValue(LEADING_SINGLE_CHARACTER);
-
-    assert result.equals(".\\+\\+");
+    Assert.assertEquals(LikeToRegexpLikePatternConverterUtils.processValue(LEADING_SINGLE_CHARACTER), ".\\+\\+");
   }
 
   @Test
   public void testSingleCharacterInMiddle() {
-    String result = org.apache.pinot.common.utils.LikeToRegexpLikePatternConverterUtils.processValue(SINGLE_CHARACTER_IN_MIDDLE);
-
-    assert result.equals("C.\\+");
+    Assert.assertEquals(LikeToRegexpLikePatternConverterUtils.processValue(SINGLE_CHARACTER_IN_MIDDLE), "C.\\+");
   }
 
   @Test
   public void testCombinationPattern() {
-    String result = org.apache.pinot.common.utils.LikeToRegexpLikePatternConverterUtils.processValue(COMBINATION_PATTERN);
-
-    assert result.equals("C..*");
+    Assert.assertEquals(LikeToRegexpLikePatternConverterUtils.processValue(COMBINATION_PATTERN), "C..*");
   }
 }
