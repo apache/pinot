@@ -21,9 +21,9 @@ package org.apache.pinot.common.utils;
 /**
  * Utility for converting LIKE operator syntax to a regex
  */
-public class LikeToRegexFormatConverterUtil {
+public class LikeToRegexpLikePatternConverterUtils {
   /* Represents all metacharacters to be processed */
-  public static final String[] REGEXP_METACHARACTERS  = {"\\","^","$","{","}","[","]","(",")",
+  public static final String[] REGEXP_METACHARACTERS  = {"\\","^","$", ".", "{","}","[","]","(",")",
       "*","+","?","|","<",">","-","&"};
 
   /**
@@ -34,11 +34,10 @@ public class LikeToRegexFormatConverterUtil {
   public static String processValue(String value) {
     String result = escapeMetaCharacters(value);
 
-    result = result.replace(".", "\\.");
     // ... escape any other potentially problematic characters here
-    result = result.replace("?", ".");
+    result = result.replace("_", ".");
 
-    return result.replaceAll("(?<!\\\\)%", ".*");
+    return result.replaceAll("%", ".*");
   }
 
   /**
@@ -46,10 +45,10 @@ public class LikeToRegexFormatConverterUtil {
    */
   private static String escapeMetaCharacters(String inputString) {
 
-    for (int i = 0 ; i < REGEXP_METACHARACTERS.length ; i++){
-      if(inputString.contains(REGEXP_METACHARACTERS[i])){
-        inputString = inputString.replace(REGEXP_METACHARACTERS[i],"\\"
-            + REGEXP_METACHARACTERS[i]);
+    for (String metaCharacter : REGEXP_METACHARACTERS) {
+      if(inputString.contains(metaCharacter)){
+        inputString = inputString.replace(metaCharacter,"\\"
+            + metaCharacter);
       }
     }
     return inputString;
