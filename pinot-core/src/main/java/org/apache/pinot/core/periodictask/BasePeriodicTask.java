@@ -143,8 +143,6 @@ public abstract class BasePeriodicTask implements PeriodicTask {
       } else {
         LOGGER.warn("Task: {} is skipped because it is not started or already stopped", _taskName);
       }
-
-      _running = false;
     } finally {
        _runLock.unlock();
        _running = false;

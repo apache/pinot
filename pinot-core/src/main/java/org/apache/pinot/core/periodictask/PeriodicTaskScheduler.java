@@ -144,15 +144,15 @@ public class PeriodicTaskScheduler {
 
   /** Execute {@link PeriodicTask} immediately on the specified table. */
   public void scheduleNow(String periodicTaskName, @Nullable Properties periodicTaskProperties) {
-    // Each controller may have a slightly different list of periodic tasks if we add, remove, or rename periodic
-    // task. To avoid this situation, we check again (besides the check at controller API level) whether the
-    // periodic task exists.
+    // During controller deployment, each controller can have a slightly different list of periodic tasks if we add,
+    // remove, or rename periodic task. To avoid this situation, we check again (besides the check at controller API
+    // level) whether the periodic task exists.
     PeriodicTask periodicTask = getPeriodicTask(periodicTaskName);
     if (periodicTask == null) {
       throw new IllegalArgumentException("Unknown Periodic Task " + periodicTaskName);
     }
 
-    LOGGER.info("Immediately executing periodic task {}", periodicTaskName);
+    LOGGER.info("Schedule task '{}' to run immediately. If the task is already running, this run will wait until the current run finishes.", periodicTaskName);
     _executorService.schedule(() -> {
       try {
         // Run the periodic task using the specified parameters. The call to run() method will block if another thread

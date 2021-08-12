@@ -60,10 +60,14 @@ public class PinotControllerPeriodicTaskRestletResource {
   public boolean runPeriodicTask(
       @ApiParam(value = "Periodic task name", required = true) @QueryParam("taskname") String periodicTaskName,
       @ApiParam(value = "Table name", required = false) @QueryParam("tablename") String tableName,
-      @ApiParam(value = "Table type suffix", required = false, example = "OFFLINE|REALTIME", defaultValue = "OFFLINE") @QueryParam("tabletype") String tableType) {
+      @ApiParam(value = "Table type suffix", required = false, example = "OFFLINE | REALTIME", defaultValue = "OFFLINE") @QueryParam("tabletype") String tableType) {
     if (!_periodicTaskScheduler.hasTask(periodicTaskName)) {
       throw new WebApplicationException("Periodic task '" + periodicTaskName + "' not found.",
           Response.Status.NOT_FOUND);
+    }
+
+    if (!_pinotHelixResourceManager.getAllRawTables().contains(tableName)) {
+      throw new WebApplicationException("Table '" + tableName + "' not found.", Response.Status.NOT_FOUND);
     }
 
     LOGGER.info("Sending periodic task execution message to all controllers for running task {} against {}.",
