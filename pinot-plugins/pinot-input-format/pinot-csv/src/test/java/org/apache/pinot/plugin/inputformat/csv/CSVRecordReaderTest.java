@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.plugin.inputformat.csv;
 
+import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.lang3.StringUtils;
@@ -32,6 +35,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.testng.Assert;
+import org.testng.annotations.Parameters;
 import org.testng.annotations.Test;
 
 
@@ -106,7 +110,7 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
   }
 
   @Test
-  public void whenConfiguredHeaderDoesNotContainConfiguredDelimiterThenExceptionShouldBeThrown() {
+  public void testIncorrectHeaderDelimiterWhenSourceFieldsAreSpecified() {
     //setup
     CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
     csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
@@ -116,5 +120,36 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     //execution and assertion
     Assert.assertThrows(IllegalArgumentException.class,
         () -> csvRecordReader.init(_dataFile, _sourceFields, csvRecordReaderConfig));
+  }
+
+  @Test
+  public void testInvalidDelimiterInHeader() {
+    //setup
+    CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
+    csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
+    csvRecordReaderConfig.setHeader("col1;col2;col3;col4;col5;col6;col7;col8;col9;col10");
+    csvRecordReaderConfig.setDelimiter(',');
+    CSVRecordReader csvRecordReader = new CSVRecordReader();
+    //execution and assertion
+    Assert.assertThrows(IllegalArgumentException.class,
+        () -> csvRecordReader.init(_dataFile, null, csvRecordReaderConfig));
+    Assert.assertThrows(IllegalArgumentException.class,
+        () -> csvRecordReader.init(_dataFile, Set.of(), csvRecordReaderConfig));
+  }
+
+  @Test
+  public void testValidDelimiterInHeader()
+      throws IOException {
+    //setup
+    CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
+    csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
+    csvRecordReaderConfig.setHeader("col1,col2,col3,col4,col5,col6,col7,col8,col9,col10");
+    csvRecordReaderConfig.setDelimiter(',');
+    CSVRecordReader csvRecordReader = new CSVRecordReader();
+
+    //read all fields
+    csvRecordReader.init(_dataFile, null, csvRecordReaderConfig);
+
+    Assert.assertTrue(csvRecordReader.hasNext());
   }
 }
