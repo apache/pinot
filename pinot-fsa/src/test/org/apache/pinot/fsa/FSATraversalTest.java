@@ -46,6 +46,8 @@ import org.junit.Test;
 
 /**
  * Tests {@link FSATraversal}.
+ *
+ * This class also holds tests for {@link RegexpMatcher} since they both perform FSA traversals
  */
 public final class FSATraversalTest extends TestBase {
   private FSA fsa;
@@ -55,7 +57,7 @@ public final class FSATraversalTest extends TestBase {
   public void setUp() throws Exception {
     fsa = FSA.read(this.getClass().getResourceAsStream("/resources/en_tst.dict"), false);
 
-    String regexTestInputString = "the quick brown fox jumps over the lazy ??? dog 493432 49344 [foo] 12.3 \\";
+    String regexTestInputString = "the quick brown fox jumps over the lazy ??? dog dddddd 493432 49344 [foo] 12.3 \\";
     String[] splitArray = regexTestInputString.split("\\s+");
     byte[][] bytesArray = convertToBytes(splitArray);
 
@@ -128,50 +130,6 @@ public final class FSATraversalTest extends TestBase {
     assertEquals(346773, count);
   }
 
-  @Test
-  public void testPerfectHash() throws IOException {
-    byte[][] input = new byte[][] { 
-      { 'a' }, 
-      { 'a', 'b', 'a' }, 
-      { 'a', 'c' }, 
-      { 'b' }, 
-      { 'b', 'a' }, 
-      { 'c' }, };
-
-    Arrays.sort(input, FSABuilder.LEXICAL_ORDERING);
-    FSA s = FSABuilder.build(input, new int[] {11, 12, 13, 14, 15, 16});
-
-    final byte[] fsaData = 
-        new FSA5Serializer().withNumbers()
-                            .serialize(s, new ByteArrayOutputStream())
-                            .toByteArray();
-
-    final FSA5 fsa = FSA.read(new ByteArrayInputStream(fsaData), FSA5.class);
-    final FSATraversal traversal = new FSATraversal(fsa);
-
-    int i = 0;
-    for (byte[] seq : input) {
-      assertEquals(new String(seq), i++, traversal.perfectHash(seq));
-    }
-
-    // Check if the total number of sequences is encoded at the root node.
-    assertEquals(6, fsa.getRightLanguageCount(fsa.getRootNode()));
-
-    // Check sub/super sequence scenarios.
-    assertEquals(AUTOMATON_HAS_PREFIX, traversal.perfectHash("abax".getBytes(UTF_8)));
-    assertEquals(AUTOMATON_HAS_PREFIX, traversal.perfectHash("abx".getBytes(UTF_8)));
-    assertEquals(SEQUENCE_IS_A_PREFIX, traversal.perfectHash("ab".getBytes(UTF_8)));
-    assertEquals(NO_MATCH, traversal.perfectHash("d".getBytes(UTF_8)));
-    assertEquals(NO_MATCH, traversal.perfectHash(new byte[] { 0 }));
-
-    assertTrue(AUTOMATON_HAS_PREFIX < 0);
-    assertTrue(SEQUENCE_IS_A_PREFIX < 0);
-    assertTrue(NO_MATCH < 0);
-  }
-
-  /**
-     * 
-     */
   @Test
   public void testRecursiveTraversal() {
     final int[] counter = new int[] { 0 };
@@ -298,53 +256,20 @@ public final class FSATraversalTest extends TestBase {
   }
 
   @Test
-  public void testNumericRange() throws IOException {
-    assertEquals(1, regexQueryNrHits("<420000-600000>"));
-    assertEquals(0, regexQueryNrHits("<493433-600000>"));
-  }
-
-  @Test
   public void testCharacterClasses() throws IOException {
-    //assertEquals(0, regexQueryNrHits("\\d"));
     assertEquals(1, regexQueryNrHits("\\d*"));
     assertEquals(1, regexQueryNrHits("\\d{6}"));
     assertEquals(1, regexQueryNrHits("[a\\d]{6}"));
     assertEquals(1, regexQueryNrHits("\\d{2,7}"));
     assertEquals(0, regexQueryNrHits("\\d{4}"));
-    assertEquals(0, regexQueryNrHits("\\dog"));
-    assertEquals(1, regexQueryNrHits("493\\d32"));
-
-    assertEquals(1, regexQueryNrHits("\\wox"));
-    assertEquals(1, regexQueryNrHits("493\\w32"));
-    assertEquals(1, regexQueryNrHits("\\?\\?\\?"));
-    assertEquals(1, regexQueryNrHits("\\?\\W\\?"));
-    assertEquals(1, regexQueryNrHits("\\?\\S\\?"));
-
-    assertEquals(1, regexQueryNrHits("\\[foo\\]"));
-    assertEquals(1, regexQueryNrHits("\\[\\w{3}\\]"));
-
-    assertEquals(0, regexQueryNrHits("\\s.*")); // no matches because all whitespace stripped
-    assertEquals(1, regexQueryNrHits("\\S*ck")); // matches quick
-    assertEquals(1, regexQueryNrHits("[\\d\\.]{3,10}")); // matches 12.3
-    assertEquals(1, regexQueryNrHits("\\d{1,3}(\\.(\\d{1,2}))+")); // matches 12.3
-
-    assertEquals(1, regexQueryNrHits("\\\\"));
-    assertEquals(1, regexQueryNrHits("\\\\.*"));
-
-    IllegalArgumentException expected =
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> {
-              regexQueryNrHits("\\p");
-            });
-    assertTrue(expected.getMessage().contains("invalid character class"));
+    assertEquals(1, regexQueryNrHits("\\dog"));
   }
 
   @Test
   public void testRegexComplement() throws IOException {
-    assertEquals(1, regexQueryNrHits("4934~[3]"));
+    assertEquals(3, regexQueryNrHits("4934~[3]"));
     // not the empty lang, i.e. match all docs
-    assertEquals(1, regexQueryNrHits("~#"));
+    assertEquals(15, regexQueryNrHits("~#"));
   }
 
   /**
