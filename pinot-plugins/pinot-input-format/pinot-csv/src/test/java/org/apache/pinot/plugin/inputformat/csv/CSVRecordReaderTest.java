@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.inputformat.csv;
 
-import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -35,7 +34,6 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.testng.Assert;
-import org.testng.annotations.Parameters;
 import org.testng.annotations.Test;
 
 
