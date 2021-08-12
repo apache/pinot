@@ -21,6 +21,7 @@ package org.apache.pinot.core.periodictask;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -107,17 +108,24 @@ public class PeriodicTaskSchedulerTest {
     assertEquals(numTimesStopCalled.get(), numTasks);
   }
 
-
-  /** Test that {@link PeriodicTaskScheduler} does not run the same task more than once at any time. */
+  /**
+   * Test that {@link PeriodicTaskScheduler} is thread safe and does not run the same task more than once at any time.
+   * This is done by attempting to run the same task object in 20 different threads at the same time. While the test
+   * case launches 20 threads to keep {@link PeriodicTaskScheduler} busy, it waits for only around half of them to
+   * complete. The test case then checks whether the threads that did not complete execution were waiting to execute
+   * (i.e they had requested execution, but had not executed yet). This "waiting" indicates that task execution was
+   * being properly synchronized (otherwise all the tasks would have just run immediately). 'isRunning' variable within
+   * the task is used to check that the task is not executing more than once at any given time.
+   */
   @Test
   public void testConcurrentExecutionOfSameTask() throws Exception {
     // Number of threads to run
     final int numThreads = 20;
 
-    // Count number of attempts to execute task.
+    // Count number of threads that requested execution.
     final AtomicInteger attempts = new AtomicInteger();
 
-    // Countdown latch to ensure that approximately half the threads complete execution.
+    // Countdown latch to ensure that this test case will wait only for around half the tasks to complete.
     final CountDownLatch countDownLatch = new CountDownLatch(numThreads/2);
 
     // Create periodic task.
@@ -127,6 +135,7 @@ public class PeriodicTaskSchedulerTest {
       protected void runTask() {
         try {
           if (isRunning) {
+            // fail since task is already running in another thread.
             Assert.fail("More than one thread attempting to execute task at the same time.");
           }
           isRunning = true;
@@ -165,16 +174,13 @@ public class PeriodicTaskSchedulerTest {
       }
     }
 
-    // Wait for half the threads to finish running
+    // Wait for around half the threads to finish running.
     countDownLatch.await();
 
-    // Wait for scheduler to stop preset periodic task from running.
+    // stop task scheduler.
     taskScheduler.stop();
 
-    // Confirm that all the "execute" threads ran.
+    // Confirm that all threads requested execution, even though only half the threads completed execution.
     Assert.assertEquals(attempts.get(), numThreads);
-
-    // Confirm that tasks got executed.
-    Assert.assertTrue(countDownLatch.getCount() == 0);
   }
 }
