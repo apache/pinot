@@ -220,7 +220,7 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
 
   private void testSelectionResults(String query, int expectedResultSize, List<Serializable[]> expectedResults)
       throws Exception {
-    Operator<IntermediateResultsBlock> operator = getOperatorForPqlQuery(query);
+    Operator<IntermediateResultsBlock> operator = getOperatorForSqlQuery(query);
     IntermediateResultsBlock operatorResult = operator.nextBlock();
     List<Object[]> resultset = (List<Object[]>) operatorResult.getSelectionResult();
     Assert.assertNotNull(resultset);
@@ -342,6 +342,29 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
     expected.add(new Serializable[]{1012, "www.sd.domain2.co.cd/d"});
     expected.add(new Serializable[]{1016, "www.domain1.com/a"});
     testSelectionResults(query, 5, null);
+  }
+
+  @Test
+  public void testLikeOperator()
+      throws Exception {
+
+    String query = "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE 'www.dom_in1.com' LIMIT 50000";
+    testSelectionResults(query, 64, null);
+
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE 'www.do_ai%' LIMIT 50000";
+    testSelectionResults(query, 512, null);
+
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE 'www.domain1%' LIMIT 50000";
+    testSelectionResults(query, 256, null);
+
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE 'www.sd.domain1%' LIMIT 50000";
+    testSelectionResults(query, 256, null);
+
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE '%domain1%' LIMIT 50000";
+    testSelectionResults(query, 512, null);
+
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE '%com' LIMIT 50000";
+    testSelectionResults(query, 256, null);
   }
 
   @Test
