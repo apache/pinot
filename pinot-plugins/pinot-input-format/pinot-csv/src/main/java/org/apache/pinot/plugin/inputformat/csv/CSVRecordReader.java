@@ -114,8 +114,8 @@ public class CSVRecordReader implements RecordReader {
     }
   }
 
-  private boolean recordHasMultipleValues(CSVRecord firstRecord) {
-    return null != firstRecord && firstRecord.size() > 1;
+  private boolean recordHasMultipleValues(CSVRecord record) {
+    return null != record && record.size() > 1;
   }
 
   private boolean delimiterNotPresentInHeader(char delimiter, String csvHeader) {
